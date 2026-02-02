@@ -1,9 +1,47 @@
 // lib/ai/careerAnalysis.ts
 // AI Career Analysis Engine
 
-import { proModel, flashModel } from './gemini'
+import { DEEPSEEK_CONFIG } from '@/lib/config/api'
 import type { SubjectScores } from '@/lib/pathwayCalculator'
 
+// ---------------------------------------------------------------------------
+// Shared helper — single place to call DeepSeek
+// ---------------------------------------------------------------------------
+async function callDeepSeek(prompt: string): Promise<string> {
+  const response = await fetch(`${DEEPSEEK_CONFIG.baseURL}/v1/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${DEEPSEEK_CONFIG.getKeyOrThrow()}`,
+    },
+    body: JSON.stringify({
+      model: DEEPSEEK_CONFIG.model,
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a helpful assistant. Always respond with valid JSON only — no markdown, no explanation, just the raw JSON.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      temperature: 0.7,
+    }),
+  })
+
+  if (!response.ok) {
+    const err = await response.text()
+    throw new Error(`DeepSeek API error ${response.status}: ${err}`)
+  }
+
+  const data = await response.json()
+  return data.choices[0].message.content as string
+}
+
+// ---------------------------------------------------------------------------
+// Types (unchanged)
+// ---------------------------------------------------------------------------
 export type CareerProfile = {
   studentName: string
   grade: number
@@ -43,10 +81,12 @@ export type IntegratedLearningPlan = {
   }>
 }
 
+// ---------------------------------------------------------------------------
+// Career analysis  (was proModel)
+// ---------------------------------------------------------------------------
 export async function analyzeCareerOptions(
   profile: CareerProfile
 ): Promise<CareerRecommendation[]> {
-  
   const prompt = `You are an expert Kenyan education and career counselor specializing in the CBC (Competency-Based Curriculum) system.
 
 STUDENT PROFILE:
@@ -80,7 +120,7 @@ For EACH career, provide:
 - Average starting salary in KES
 - Typical career progression path (3-5 steps)
 
-Return as JSON array with this structure:
+Return as a JSON array ONLY (no markdown, no extra text):
 [
   {
     "career": "Software Engineer",
@@ -103,24 +143,24 @@ IMPORTANT:
 - Focus on CBC-aligned pathways`
 
   try {
-    const result = await proModel.generateContent(prompt)
-    const response = await result.response
-    const text = response.text()
-    
+    const text = await callDeepSeek(prompt)
+
     const jsonMatch = text.match(/\[[\s\S]*\]/)
     if (!jsonMatch) {
       throw new Error('Failed to parse AI response')
     }
-    
+
     const careers: CareerRecommendation[] = JSON.parse(jsonMatch[0])
     return careers.slice(0, 5)
-    
   } catch (error) {
     console.error('Career analysis error:', error)
     throw new Error('Failed to generate career recommendations')
   }
 }
 
+// ---------------------------------------------------------------------------
+// Integrated learning plan  (was flashModel)
+// ---------------------------------------------------------------------------
 export async function generateCareerIntegratedLearningPlan(
   career: string,
   subject: string,
@@ -128,7 +168,6 @@ export async function generateCareerIntegratedLearningPlan(
   targetLevel: number,
   studentName: string
 ): Promise<IntegratedLearningPlan> {
-  
   const prompt = `You are a personalized learning coach for ${studentName}, a Kenyan CBC student.
 
 CONTEXT:
@@ -144,7 +183,7 @@ TASK: Create a personalized learning plan that:
 4. Shares inspiring success stories
 5. Sets monthly milestones with career relevance
 
-Return as JSON:
+Return as a JSON object ONLY (no markdown, no extra text):
 {
   "whyItMatters": "As a future ${career}, ${subject} is crucial because...",
   "careerSpecificSteps": [
@@ -183,25 +222,22 @@ Return as JSON:
 Make it INSPIRING and SPECIFIC to ${career}. Use Kenyan context where possible.`
 
   try {
-    const result = await flashModel.generateContent(prompt)
-    const response = await result.response
-    const text = response.text()
-    
+    const text = await callDeepSeek(prompt)
+
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
       throw new Error('Failed to parse AI response')
     }
-    
+
     const plan = JSON.parse(jsonMatch[0])
-    
+
     return {
       career,
       subject,
       currentLevel,
       targetLevel,
-      ...plan
+      ...plan,
     }
-    
   } catch (error) {
     console.error('Integrated learning plan error:', error)
     throw new Error('Failed to generate integrated learning plan')
