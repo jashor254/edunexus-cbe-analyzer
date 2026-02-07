@@ -1,0 +1,138 @@
+.
+├── app
+│   ├── admin
+│   │   └── cleanup
+│   │       └── page.tsx
+│   ├── api
+│   │   ├── admin
+│   │   │   ├── cleanup-stats
+│   │   │   └── trigger-cleanup
+│   │   ├── ai
+│   │   │   ├── career-analysis
+│   │   │   ├── integrated-plan
+│   │   │   ├── tutor
+│   │   │   └── usage
+│   │   ├── auth
+│   │   │   ├── update-activity
+│   │   │   └── verify-email
+│   │   ├── chat
+│   │   │   └── route.ts
+│   │   ├── clinic
+│   │   │   └── download
+│   │   ├── cron
+│   │   │   └── cleanup-users
+│   │   ├── payments
+│   │   │   ├── callback
+│   │   │   ├── initialize
+│   │   │   ├── verify
+│   │   │   └── webhook
+│   │   ├── referrals
+│   │   │   └── stats
+│   │   ├── test-env
+│   │   │   └── route.ts
+│   │   ├── tokens
+│   │   │   └── deduct
+│   │   └── users
+│   │       ├── create
+│   │       └── use-free-analysis
+│   ├── (auth)
+│   │   ├── layout.tsx
+│   │   ├── login
+│   │   │   └── page.tsx
+│   │   └── signup
+│   │       └── page.tsx
+│   ├── chat
+│   │   └── page.tsx
+│   ├── dashboard
+│   │   ├── assessments
+│   │   │   ├── add
+│   │   │   ├── guidance
+│   │   │   └── history
+│   │   ├── error.tsx
+│   │   ├── loading.tsx
+│   │   ├── page.tsx
+│   │   ├── referrals
+│   │   │   └── page.tsx
+│   │   └── settings
+│   │       └── page.tsx
+│   ├── favicon.ico
+│   ├── globals.css
+│   ├── layout.tsx
+│   ├── (marketing)
+│   │   ├── layout.tsx
+│   │   ├── page.tsx
+│   │   └── pricing
+│   │       └── page.tsx
+│   ├── not-found.tsx
+│   └── payment
+│       ├── cancelled
+│       │   └── page.tsx
+│       ├── failed
+│       │   └── page.tsx
+│       └── success
+│           └── page.tsx
+├── components
+│   ├── admin
+│   │   └── CleanupDashboard.tsx
+│   ├── ai
+│   │   ├── CareerRecommendations.tsx
+│   │   ├── IntegratedLearningPlan.tsx
+│   │   └── UsageQuota.tsx
+│   ├── clinic
+│   │   ├── DownloadClinicButton.tsx
+│   │   └── PaymentFeedBack.tsx
+│   ├── payments
+│   │   ├── PaymentModal.tsx
+│   │   └── SubscriptionPlans.tsx
+│   └── referrals
+│       ├── ReferralsDashboard.tsx
+│       └── ShareButton.tsx
+├── eslint.config.mjs
+├── final-check.js
+├── hooks
+│   ├── useReferrals.ts
+│   ├── useSubscription.ts
+│   └── useUser.ts
+├── lib
+│   ├── academicClinic
+│   │   ├── careerDatabase.ts
+│   │   ├── pdfGenerator.tsx
+│   │   └── reportGenerator.ts
+│   ├── adaptiveLearning.ts
+│   ├── ai
+│   │   ├── careerAnalysis.ts
+│   │   ├── deepseek.ts
+│   │   ├── GuardianTutor.ts
+│   │   └── rateLimit.ts
+│   ├── cbcCurriculum.ts
+│   ├── competencyFramework.ts
+│   ├── config
+│   │   └── api.ts
+│   ├── pathwayCalculator.ts
+│   ├── payments
+│   │   ├── config.ts
+│   │   └── paystack.ts
+│   └── supabase.ts
+├── middleware.ts
+├── next.config.ts
+├── next-env.d.ts
+├── package.json
+├── package-lock.json
+├── postcss.config.mjs
+├── project_structure.txt
+├── public
+│   ├── file.svg
+│   ├── globe.svg
+│   ├── next.svg
+│   ├── vercel.svg
+│   └── window.svg
+├── README.md
+├── tsconfig.json
+├── utils
+│   └── supabase
+│       ├── client.ts
+│       ├── middleware.ts
+│       └── server.ts
+└── vercel.json
+
+66 directories, 70 files

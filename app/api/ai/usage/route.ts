@@ -1,22 +1,18 @@
 // app/api/ai/usage/route.ts
-// API endpoint to check current usage
-
 import { NextRequest, NextResponse } from 'next/server'
 import { checkRateLimit } from '@/lib/ai/rateLimit'
 
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams
+    const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
     const tier = (searchParams.get('tier') as 'free' | 'family' | 'school') || 'free'
     
     if (!userId) {
-      return NextResponse.json(
-        { error: 'Missing userId parameter' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
     }
     
+    // Hapa tunacheki kama amefika kikomo (Rate Limits)
     const [careerAnalysis, learningPlans, chatMessages] = await Promise.all([
       checkRateLimit(userId, 'careerAnalysis', tier),
       checkRateLimit(userId, 'learningPlans', tier),
@@ -27,7 +23,7 @@ export async function GET(request: NextRequest) {
       success: true,
       tier,
       usage: {
-        careerAnalysis,
+        careerAnalysis, // Hii itarudisha { allowed: boolean, remaining: number }
         learningPlans,
         chatMessages
       },
@@ -36,10 +32,7 @@ export async function GET(request: NextRequest) {
     
   } catch (error) {
     console.error('Usage check API error:', error)
-    return NextResponse.json(
-      { error: 'Failed to check usage' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
 

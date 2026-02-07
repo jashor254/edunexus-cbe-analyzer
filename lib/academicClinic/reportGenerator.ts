@@ -27,17 +27,19 @@ export async function generateAcademicClinicReport(
     subject,
     displayName: formatSubjectName(subject),
     level,
-    details: getCompetencyDescription(subject, level)
+    // THE FIX: (level: number, subject: string)
+    details: getCompetencyDescription(level, subject) 
   }));
 
   // Identify Critical Gaps (Level 1 or 2)
   const criticalGaps = subjectBreakdown.filter(s => s.level <= 2);
 
-  // Build the 90-Day Action Plan (Your Best Practice)
+  // Build the 90-Day Action Plan
   const actionPlan = {
     immediate: criticalGaps.map(gap => ({
       action: `Intensive intervention for ${gap.displayName}`,
-      rationale: `Currently at '${gap.details?.name}'. Target is Level 3 for ${pathwayData.top_pathway} eligibility.`
+      // Added fallback if details is just a string
+      rationale: `Currently at '${gap.level}'. Target is Level 3 for ${pathwayData.top_pathway} eligibility.`
     })),
     shortTerm: [
       { action: "Career Mentorship", rationale: `Connect with a professional in ${matchingCareers[0]?.name}` },
