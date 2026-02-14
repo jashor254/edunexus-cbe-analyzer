@@ -40,7 +40,7 @@ async function callDeepSeek(prompt: string): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------
-// Types (unchanged)
+// Types (UPDATED - No salary numbers!)
 // ---------------------------------------------------------------------------
 export type CareerProfile = {
   studentName: string
@@ -59,9 +59,13 @@ export type CareerRecommendation = {
   requiredSubjects: string[]
   currentGaps: string[]
   kenyanUniversities: string[]
+  tvetOptions: string[]  // ✅ ADDED
   internationalOptions: string[]
-  industryDemand: 'high' | 'medium' | 'low'
-  averageSalaryKES: string
+  industryDemand: 'very_high' | 'high' | 'moderate' | 'low'
+  earningPotential: 'exceptional' | 'very_lucrative' | 'lucrative' | 'moderate' | 'lower_but_stable'  // ✅ CHANGED
+  jobSecurity: 'very_high' | 'high' | 'moderate' | 'low'  // ✅ ADDED
+  kenyanMarketReality: string  // ✅ ADDED
+  aiDisruptionRisk: 'very_low' | 'low' | 'moderate' | 'high' | 'very_high'  // ✅ ADDED
   careerPath: string[]
 }
 
@@ -82,7 +86,7 @@ export type IntegratedLearningPlan = {
 }
 
 // ---------------------------------------------------------------------------
-// Career analysis  (was proModel)
+// Career analysis (UPDATED PROMPT - No salary numbers!)
 // ---------------------------------------------------------------------------
 export async function analyzeCareerOptions(
   profile: CareerProfile
@@ -104,9 +108,10 @@ ${Object.entries(profile.subjectScores).map(([subject, score]) => `- ${subject}:
 
 TASK: Provide 5 career recommendations that:
 1. Match the student's strengths and pathway
-2. Are realistic for Kenya
-3. Consider current job market demand
-4. Include both local and international opportunities
+2. Are realistic for Kenya's job market
+3. Consider both local and international opportunities
+4. Include TVET (Technical and Vocational Education) options where applicable
+5. Consider AI disruption and future job security
 
 For EACH career, provide:
 - Career name
@@ -115,32 +120,49 @@ For EACH career, provide:
 - Required subject combinations for Kenyan universities
 - Current gaps in student's preparation
 - Top 3 Kenyan universities offering this path
+- TVET/Diploma options (if applicable)
 - International university options (if relevant)
-- Industry demand in Kenya (high/medium/low)
-- Average starting salary in KES
+- Industry demand in Kenya (very_high/high/moderate/low)
+- Earning potential (exceptional/very_lucrative/lucrative/moderate/lower_but_stable)
+- Job security level (very_high/high/moderate/low)
+- Kenyan market reality (2-3 sentences about the REAL job market in Kenya)
+- AI disruption risk (very_low/low/moderate/high/very_high)
 - Typical career progression path (3-5 steps)
+
+CRITICAL: 
+- DO NOT include specific salary numbers
+- Use earning potential categories instead
+- Be brutally honest about Kenyan job market realities
+- Consider AI impact on each career
+- Include both university AND TVET pathways
 
 Return as a JSON array ONLY (no markdown, no extra text):
 [
   {
     "career": "Software Engineer",
     "matchScore": 85,
-    "reasoning": "Strong mathematics and logical thinking...",
+    "reasoning": "Strong mathematics and logical thinking align perfectly with software development. The student's analytical skills show natural aptitude for programming.",
     "requiredSubjects": ["Mathematics", "Physics", "Computer Science"],
     "currentGaps": ["Mathematics needs improvement from level 1 to 3"],
-    "kenyanUniversities": ["University of Nairobi", "JKUAT", "Strathmore"],
+    "kenyanUniversities": ["JKUAT", "UoN", "Strathmore"],
+    "tvetOptions": ["Nairobi Technical Training Institute", "NIBS Tech", "Zetech College"],
     "internationalOptions": ["MIT", "Stanford", "Waterloo"],
-    "industryDemand": "high",
-    "averageSalaryKES": "80,000 - 150,000",
-    "careerPath": ["Junior Developer", "Mid-level Developer", "Senior Developer", "Tech Lead", "CTO"]
+    "industryDemand": "very_high",
+    "earningPotential": "very_lucrative",
+    "jobSecurity": "high",
+    "kenyanMarketReality": "Tech startups, banks, telcos, and international remote jobs create high demand. Can work from anywhere. Competitive but rewarding field.",
+    "aiDisruptionRisk": "moderate",
+    "careerPath": ["Junior Developer", "Mid-level Developer", "Senior Developer", "Tech Lead", "CTO/Entrepreneur"]
   }
 ]
 
 IMPORTANT: 
-- Be realistic about gaps
-- Prioritize careers available in Kenya
+- Be realistic about gaps and challenges
+- Prioritize careers actually available in Kenya
 - Consider both traditional and emerging careers
-- Focus on CBC-aligned pathways`
+- Focus on CBC-aligned pathways
+- Remember: Many students will pursue TVET, not just university
+- Be honest about AI impact on each career`
 
   try {
     const text = await callDeepSeek(prompt)
@@ -159,7 +181,7 @@ IMPORTANT:
 }
 
 // ---------------------------------------------------------------------------
-// Integrated learning plan  (was flashModel)
+// Integrated learning plan (UNCHANGED - This is already great!)
 // ---------------------------------------------------------------------------
 export async function generateCareerIntegratedLearningPlan(
   career: string,
@@ -180,7 +202,7 @@ TASK: Create a personalized learning plan that:
 1. Explains WHY this subject matters for their career dream
 2. Provides career-specific action steps (not generic)
 3. Suggests resources aligned with their career interest
-4. Shares inspiring success stories
+4. Shares inspiring Kenyan success stories
 5. Sets monthly milestones with career relevance
 
 Return as a JSON object ONLY (no markdown, no extra text):
@@ -192,23 +214,23 @@ Return as a JSON object ONLY (no markdown, no extra text):
     "Build a mini-project that demonstrates ${subject} in ${career}"
   ],
   "careerSpecificResources": [
-    "Resource 1 - how it relates to career",
-    "Resource 2 - career connection",
-    "Resource 3 - real-world application"
+    "Resource 1 (FREE if possible) - how it relates to career",
+    "Resource 2 (Kenyan-specific) - career connection",
+    "Resource 3 (practical application) - real-world use"
   ],
   "successStories": [
-    "Story of someone who went from level ${currentLevel} to success in ${career}",
+    "Story of a Kenyan who went from similar level to success in ${career}",
     "Kenyan professional in ${career} who excelled in ${subject}"
   ],
   "milestones": [
     {
       "month": 1,
-      "goal": "Specific achievement for month 1",
+      "goal": "Specific, measurable achievement for month 1",
       "careerRelevance": "How this connects to ${career}"
     },
     {
       "month": 2,
-      "goal": "Specific achievement for month 2",
+      "goal": "Specific, measurable achievement for month 2",
       "careerRelevance": "How this connects to ${career}"
     },
     {
@@ -219,7 +241,7 @@ Return as a JSON object ONLY (no markdown, no extra text):
   ]
 }
 
-Make it INSPIRING and SPECIFIC to ${career}. Use Kenyan context where possible.`
+Make it INSPIRING and SPECIFIC to ${career}. Use Kenyan context where possible. Prioritize FREE or affordable resources.`
 
   try {
     const text = await callDeepSeek(prompt)

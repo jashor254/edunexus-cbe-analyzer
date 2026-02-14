@@ -1,0 +1,111 @@
+// emails/components/Layout.tsx
+
+import {
+  Body,
+  Container,
+  Head,
+  Heading,
+  Html,
+  Img,
+  Preview,
+  Section,
+  Text,
+} from '@react-email/components';
+import * as React from 'react';
+
+interface LayoutProps {
+  preview: string;
+  children: React.ReactNode;
+}
+
+export function EmailLayout({ preview, children }: LayoutProps) {
+  return (
+    <Html>
+      <Head />
+      <Preview>{preview}</Preview>
+      <Body style={styles.body}>
+        <Container style={styles.container}>
+          {/* Header with Kenyan Colors */}
+          <Section style={styles.header}>
+            <Heading style={styles.logo}>
+              EDUNEXUS 🇰🇪
+            </Heading>
+            <Text style={styles.tagline}>
+              Your Child's CBC Journey Partner
+            </Text>
+          </Section>
+
+          {/* Main Content */}
+          <Section style={styles.content}>
+            {children}
+          </Section>
+
+          {/* Footer */}
+          <Section style={styles.footer}>
+            <Text style={styles.footerText}>
+              EduNexus - Transforming CBC Education in Kenya
+            </Text>
+            <Text style={styles.footerText}>
+              Questions? Reply to this email or visit edunexus.app
+            </Text>
+            <Text style={styles.copyright}>
+              © 2026 EduNexus Kenya. All rights reserved.
+            </Text>
+          </Section>
+        </Container>
+      </Body>
+    </Html>
+  );
+}
+
+const styles = {
+  body: {
+    backgroundColor: '#f6f9fc',
+    fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Ubuntu,sans-serif',
+  },
+  container: {
+    backgroundColor: '#ffffff',
+    margin: '0 auto',
+    padding: '20px 0 48px',
+    marginBottom: '64px',
+  },
+  header: {
+    padding: '32px 24px',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    borderRadius: '8px 8px 0 0',
+  },
+  logo: {
+    color: '#ffffff',
+    fontSize: '32px',
+    fontWeight: 'bold',
+    margin: '0 0 8px',
+    textAlign: 'center' as const,
+  },
+  tagline: {
+    color: '#ffffff',
+    fontSize: '14px',
+    textAlign: 'center' as const,
+    margin: 0,
+  },
+  content: {
+    padding: '32px 24px',
+  },
+  footer: {
+    padding: '24px',
+    backgroundColor: '#f6f9fc',
+    borderRadius: '0 0 8px 8px',
+  },
+  footerText: {
+    color: '#8898aa',
+    fontSize: '12px',
+    lineHeight: '16px',
+    textAlign: 'center' as const,
+    margin: '4px 0',
+  },
+  copyright: {
+    color: '#8898aa',
+    fontSize: '10px',
+    textAlign: 'center' as const,
+    marginTop: '16px',
+  },
+};

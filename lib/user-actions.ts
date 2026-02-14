@@ -1,44 +1,80 @@
 // lib/user-actions.ts
-import { createClient } from '@/utils/supabase/client'
+'use server'
+
+import { createClient } from '@/utils/supabase/server'
+import { revalidatePath } from 'next/cache'
 
 /**
- * Mark onboarding as complete for a specific user.
- * This handles the UUID update in the 'profiles' table.
+ * Mark onboarding as complete for a user
  */
-export async function markOnboardingComplete(userId: string) {
-  // 1. Initialize the client-side Supabase client
-  const supabase = createClient()
-
+export async function markOnboardingComplete(userId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    // 2. Update the profile. 
-    // user_id hapa inakuja kama UUID, na DB yetu sasa hivi ni UUID. Match!
+    const supabase = await createClient()
+
     const { error } = await supabase
-      .from('profiles')
-      .update({ has_seen_onboarding: true })
+      .from('users')
+      .update({ 
+        has_seen_onboarding: true,
+        onboarding_completed_at: new Date().toISOString()
+      })
       .eq('id', userId)
 
     if (error) {
-      console.error('Database update error:', error.message)
+      console.error('Failed to mark onboarding complete:', error)
+      return { success: false, error: error.message }
+    }
+
+    // Revalidate the dashboard to reflect changes
+    revalidatePath('/dashboard')
+    
+    return { success: true }
+  } catch (error) {
+    console.error('Error in markOnboardingComplete:', error)
+    return { success: false, error: 'Failed to update onboarding status' }
+  }
+}
+
+/**
+ * Check if user has seen onboarding
+ */
+export async function hasSeenOnboarding(userId: string): Promise<boolean> {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('users')
+      .select('has_seen_onboarding')
+      .eq('id', userId)
+      .single()
+
+    if (error) {
+      console.error('Failed to check onboarding status:', error)
       return false
     }
 
-    return true
-  } catch (err) {
-    console.error('Unexpected error marking onboarding complete:', err)
+    return data?.has_seen_onboarding ?? false
+  } catch (error) {
+    console.error('Error in hasSeenOnboarding:', error)
     return false
   }
 }
 
 /**
- * Update user credits or tokens after payment (Example for later)
+ * Log tutorial replay (optional analytics)
  */
-export async function updateUserTokens(userId: string, tokens: number) {
-  const supabase = createClient()
-  
-  const { error } = await supabase
-    .from('profiles')
-    .update({ tokens_remaining: tokens })
-    .eq('id', userId)
+export async function logTutorialReplay(userId: string): Promise<void> {
+  try {
+    const supabase = await createClient()
 
-  return !error
+    await supabase
+      .from('user_activity_log')
+      .insert({
+        user_id: userId,
+        activity_type: 'tutorial_replay',
+        created_at: new Date().toISOString()
+      })
+  } catch (error) {
+    console.error('Failed to log tutorial replay:', error)
+    // Silent fail - not critical
+  }
 }

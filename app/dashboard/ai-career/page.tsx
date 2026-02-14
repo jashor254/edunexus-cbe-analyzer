@@ -67,7 +67,7 @@ export default function AICareerAnalysisPage() {
         subjectScores: latestAssessment.subject_scores,
         strengths: latestAssessment.pathway_recommendations?.strengths || [],
         weaknesses: latestAssessment.pathway_recommendations?.development_areas || [],
-        pathwayConfidence: latestAssessment.pathway_recommendations?.confidence || 'medium'
+        pathwayConfidence: latestAssessment.pathway_recommendations?.confidence || 'moderate' // ✅ FIXED
       }
 
       const response = await fetch('/api/ai/career-analysis', {
@@ -223,13 +223,12 @@ export default function AICareerAnalysisPage() {
                     <div className="flex flex-col items-end gap-2">
                       <span className={`px-4 py-2 rounded-full font-black text-sm ${
                         career.industryDemand === 'high' ? 'bg-green-100 text-green-800' :
-                        career.industryDemand === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                        career.industryDemand === 'moderate' ? 'bg-yellow-100 text-yellow-800' : // ✅ FIXED
                         'bg-slate-100 text-slate-800'
                       }`}>
                         {career.industryDemand.toUpperCase()} DEMAND
                       </span>
                       <span className="text-xs font-black text-slate-400">
-                        💰 KES {career.averageSalaryKES}
                       </span>
                     </div>
                   </div>
