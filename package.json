@@ -9,10 +9,12 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@react-email/components": "^1.0.7",
     "@react-pdf/renderer": "^4.3.2",
+    "@supabase/auth-helpers-nextjs": "^0.15.0",
     "@supabase/ssr": "^0.8.0",
-    "@supabase/supabase-js": "^2.93.3",
+    "@supabase/supabase-js": "^2.97.0",
     "ai": "^6.0.61",
     "canvas-confetti": "^1.9.4",
     "dotenv": "^17.2.3",
@@ -29,6 +31,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@tailwindcss/typography": "^0.5.19",
     "@types/dotenv": "^6.1.1",
     "@types/node": "^20.19.30",
     "@types/react": "^19",

@@ -25,6 +25,22 @@ const JUNIOR_SUBJECTS = [
   { key: 'agriculture_nutrition', label: 'Agriculture & Nutrition' }
 ]
 
+// ✨ NEW: Available interests for tracking
+const AVAILABLE_INTERESTS = [
+  { key: 'technology', label: 'Technology', emoji: '💻' },
+  { key: 'science', label: 'Science', emoji: '🔬' },
+  { key: 'mathematics', label: 'Mathematics', emoji: '🔢' },
+  { key: 'art_design', label: 'Art & Design', emoji: '🎨' },
+  { key: 'music', label: 'Music', emoji: '🎵' },
+  { key: 'sports', label: 'Sports', emoji: '⚽' },
+  { key: 'business', label: 'Business', emoji: '💼' },
+  { key: 'languages', label: 'Languages', emoji: '🗣️' },
+  { key: 'helping_people', label: 'Helping People', emoji: '❤️' },
+  { key: 'writing', label: 'Writing', emoji: '✍️' },
+  { key: 'engineering', label: 'Engineering', emoji: '⚙️' },
+  { key: 'public_speaking', label: 'Public Speaking', emoji: '🎤' },
+]
+
 export default function BrutalistAddAssessment() {
   const [students, setStudents] = useState<Student[]>([])
   const [selectedStudent, setSelectedStudent] = useState<string>('')
@@ -36,6 +52,11 @@ export default function BrutalistAddAssessment() {
   const [selectedElectives, setSelectedElectives] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  // ✨ NEW: Interests tracking state
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([])
+  const [customInterests, setCustomInterests] = useState<string>('') // ✨ NEW: Custom interests
+  const [dreamCareer, setDreamCareer] = useState<string>('')
   
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -76,6 +97,11 @@ export default function BrutalistAddAssessment() {
       setScores({})
       setSelectedElectives([])
       
+      // ✨ NEW: Reset interests
+      setSelectedInterests([])
+      setCustomInterests('') // ✨ Reset custom interests too
+      setDreamCareer('')
+      
       // Auto-set math type based on pathway
       if (student?.current_pathway === 'STEM') {
         setMathType('core')
@@ -95,6 +121,17 @@ export default function BrutalistAddAssessment() {
       setSelectedElectives(p => [...p, key])
     } else {
       alert('Maximum 3 electives only! ⚠️')
+    }
+  }
+
+  // ✨ NEW: Toggle interest function
+  const toggleInterest = (key: string) => {
+    if (selectedInterests.includes(key)) {
+      setSelectedInterests(p => p.filter(i => i !== key))
+    } else if (selectedInterests.length < 6) {
+      setSelectedInterests(p => [...p, key])
+    } else {
+      alert('Maximum 6 interests only! ⚠️')
     }
   }
 
@@ -156,6 +193,33 @@ export default function BrutalistAddAssessment() {
         .insert(assessmentData)
 
       if (insertError) throw insertError
+
+      // ✨ NEW: Save interests if any selected
+      if (selectedInterests.length > 0 || customInterests.trim() || dreamCareer.trim()) {
+        // Combine preset interests with custom ones
+        const customInterestsList = customInterests
+          .split(',')
+          .map(i => i.trim())
+          .filter(i => i.length > 0)
+        
+        const allInterests = [...selectedInterests, ...customInterestsList]
+        
+        const interestsData = {
+          student_id: selectedStudent,
+          interests: allInterests.length > 0 ? allInterests : null,
+          dream_career: dreamCareer.trim() || null,
+          created_at: new Date().toISOString()
+        }
+
+        const { error: interestsError } = await supabase
+          .from('student_interests')
+          .insert(interestsData)
+
+        if (interestsError) {
+          console.error('Failed to save interests:', interestsError)
+          // Don't fail the whole assessment, just log it
+        }
+      }
 
       // Success!
       if (isJunior) {
@@ -272,6 +336,92 @@ export default function BrutalistAddAssessment() {
             </div>
           </div>
         </section>
+
+        {/* ✨ NEW: INTERESTS & ASPIRATIONS SECTION */}
+        {currentStudent && (
+          <section className="mb-10 p-8 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-3xl border-2 border-yellow-200">
+            <div className="flex items-start gap-4 mb-6">
+              <span className="text-4xl">✨</span>
+              <div className="flex-1">
+                <h2 className="text-xl font-black mb-2 uppercase text-yellow-900">
+                  Interests & Aspirations
+                </h2>
+                <p className="text-sm text-yellow-700 leading-relaxed">
+                  Help us understand what {currentStudent.name} enjoys. This tracks interests over time and helps with career recommendations!
+                </p>
+              </div>
+              <span className="text-xs font-black text-yellow-600 bg-yellow-100 px-3 py-1.5 rounded-full">
+                Optional ✨
+              </span>
+            </div>
+
+            {/* Interest Selection */}
+            <div className="mb-6">
+              <label className="block text-sm font-black text-yellow-800 mb-3 uppercase">
+                What are they interested in? (Select up to 6)
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {AVAILABLE_INTERESTS.map(interest => (
+                  <button
+                    key={interest.key}
+                    type="button"
+                    onClick={() => toggleInterest(interest.key)}
+                    className={`p-4 rounded-2xl text-left font-bold border-2 transition-all ${
+                      selectedInterests.includes(interest.key)
+                        ? 'bg-yellow-600 text-white border-yellow-600 scale-105 shadow-lg'
+                        : 'bg-white text-yellow-700 border-yellow-200 hover:border-yellow-400'
+                    }`}
+                  >
+                    <div className="text-3xl mb-2">{interest.emoji}</div>
+                    <div className="text-xs font-black uppercase">
+                      {interest.label}
+                    </div>
+                    {selectedInterests.includes(interest.key) && (
+                      <div className="text-xs mt-1">✓ Selected</div>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-3 text-xs text-yellow-600 font-semibold">
+                📊 Selected: {selectedInterests.length}/6
+              </div>
+            </div>
+
+            {/* ✨ NEW: Custom Interests Field */}
+            <div className="mb-6">
+              <label className="block text-sm font-black text-yellow-800 mb-3 uppercase">
+                Other Interests (Optional)
+              </label>
+              <input
+                type="text"
+                value={customInterests}
+                onChange={e => setCustomInterests(e.target.value)}
+                placeholder="e.g., Photography, Cooking, Gaming, Robotics (separate with commas)"
+                className="w-full p-4 bg-white rounded-xl font-medium border-2 border-yellow-200 focus:border-yellow-500 focus:outline-none placeholder:text-slate-400"
+              />
+              <p className="mt-2 text-xs text-yellow-600 leading-relaxed">
+                💡 <strong>Don't see an interest above?</strong> Type it here! Separate multiple interests with commas.
+              </p>
+            </div>
+
+            {/* Dream Career (Optional) */}
+            <div>
+              <label className="block text-sm font-black text-yellow-800 mb-3 uppercase">
+                Dream Career (Optional)
+              </label>
+              <input
+                type="text"
+                value={dreamCareer}
+                onChange={e => setDreamCareer(e.target.value)}
+                placeholder="e.g., Software Engineer, Doctor, Teacher, Artist..."
+                className="w-full p-4 bg-white rounded-xl font-medium border-2 border-yellow-200 focus:border-yellow-500 focus:outline-none placeholder:text-slate-400"
+              />
+              <p className="mt-2 text-xs text-yellow-600 leading-relaxed">
+                💡 <strong>Why track this?</strong> We'll show you if their interests align with their career goals over time, helping you guide them better!
+              </p>
+            </div>
+          </section>
+        )}
 
         {/* JUNIOR SCHOOL */}
         {isJunior && currentStudent && (

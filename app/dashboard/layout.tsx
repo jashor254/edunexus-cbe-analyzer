@@ -1,59 +1,80 @@
-import { createClient } from '@/utils/supabase/server'
 import { OnboardingTutorial } from '@/components/onboarding-tutorial'
+import { SuccessHandler } from '@/components/dashboard/success-handler'
+import { hasSeenOnboarding } from '@/lib/user-actions'
+import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
+import Link from 'next/link'
 
-export default async function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  // 1. Await createClient bila kupitisha argument yoyote
-  // Hii itasoma cookies automatic ndani ya utils/supabase/server.ts
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
-
-  // 2. Auth Check - Sasa .auth itatambulika vizuri
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
   
-  if (authError || !user) {
+  // Check if user is logged in
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
     redirect('/login')
   }
 
-  // 3. Fetch Profile kishua
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('has_seen_onboarding, full_name')
-    .eq('id', user.id)
-    .single()
-    
-  const hasSeenOnboarding = profile?.has_seen_onboarding ?? false
+  // Check if user has completed onboarding
+  const hasCompleted = await hasSeenOnboarding(user.id)
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC]">
-      <div className="flex flex-col min-h-screen">
-        {/* Simple Top Navbar */}
-        <header className="h-16 border-b bg-white flex items-center justify-between px-8 sticky top-0 z-40">
-          <div className="flex items-center gap-2">
-            <span className="text-xl font-black tracking-tighter text-purple-600">EduNexus</span>
-            <span className="bg-slate-100 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Beta</span>
-          </div>
-          <div className="flex items-center gap-4">
-             <span className="text-sm font-bold text-slate-500 truncate max-w-[150px]">
-               {profile?.full_name || user.email}
-             </span>
-             <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 shadow-inner" />
-          </div>
-        </header>
+    <div className="min-h-screen bg-white">
+      {/* Success Handler for payment confirmations */}
+      <Suspense fallback={null}>
+        <SuccessHandler />
+      </Suspense>
 
-        {/* Content */}
-        <main className="flex-1 w-full max-w-7xl mx-auto p-4 md:p-8">
-          {children}
-        </main>
-      </div>
-
-      {/* Onboarding Logic */}
-      {user && !hasSeenOnboarding && (
-        <OnboardingTutorial userId={user.id} />
+      {/* Onboarding tutorial for new users */}
+      {!hasCompleted && (
+        <OnboardingTutorial 
+          userId={user.id}
+          userName={user.user_metadata?.full_name || user.email?.split('@')[0] || 'there'}
+        />
       )}
+      
+      {/* Navigation */}
+      <nav className="border-b-4 border-black bg-white sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <Link href="/dashboard" className="text-2xl font-black uppercase">
+              EduNexus
+            </Link>
+            
+            <div className="flex items-center gap-4">
+              <Link 
+                href="/dashboard/assessments" 
+                className="text-sm font-bold text-slate-600 hover:text-slate-900"
+              >
+                Assessments
+              </Link>
+              <Link 
+                href="/chat" 
+                className="text-sm font-bold text-slate-600 hover:text-slate-900"
+              >
+                Tutor
+              </Link>
+              <Link 
+                href="/pricing" 
+                className="text-sm font-bold text-slate-600 hover:text-slate-900"
+              >
+                Upgrade
+              </Link>
+              <form action="/auth/signout" method="post">
+                <button 
+                  type="submit"
+                  className="text-sm font-bold text-slate-600 hover:text-slate-900"
+                >
+                  Sign Out
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+      
+      {/* Main Content */}
+      {children}
     </div>
   )
 }

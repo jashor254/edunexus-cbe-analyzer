@@ -1,34 +1,41 @@
 import { NextResponse } from 'next/server';
-import { pdf } from '@react-pdf/renderer';
-import { AcademicClinicPDF } from '@/lib/academicClinic/pdfGenerator';
-import { generateAcademicClinicReport } from '@/lib/academicClinic/reportGenerator';
+import { renderToStream, Document } from '@react-pdf/renderer'; // Hakikisha Document ime-importiwa hapa
+import { PremiumAcademicClinicPDF } from '@/lib/academicClinic/premiumpdfGenerator';
+import { PremiumReportEngine } from '@/lib/academicClinic/premiumReportEngine';
+import React from 'react';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { studentId, scores, profile } = body;
+    const { studentId } = await req.json();
+    if (!studentId) return NextResponse.json({ error: 'Student ID is required' }, { status: 400 });
 
-    // 1. Generate report data
-    const reportData = await generateAcademicClinicReport(profile, scores);
+    const premiumEngine = new PremiumReportEngine();
+    const reportData = await premiumEngine.generatePremiumReport(studentId);
 
-    // 2. Render PDF to a Buffer-like structure
-    const doc = <AcademicClinicPDF report={reportData} />;
-    
-    // Tuseme .toBuffer() kwa Node environment au .toUint8Array()
-    // Njia ya uhakika zaidi inayofanya kazi Next.js 14/15:
-    const blob = await pdf(doc).toBlob();
-    const arrayBuffer = await blob.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
+    // ✅ NJIA YA UHAKIKA: Funga PremiumAcademicClinicPDF ndani ya <Document> hapa hapa
+    // Hii inaondoa ile Error ya Incompatible Types
+    const stream = await renderToStream(
+      <Document>
+        <PremiumAcademicClinicPDF report={reportData} />
+      </Document>
+    );
 
-    return new NextResponse(uint8Array, {
+    const studentFirstName = reportData.studentProfile.name.split(' ')[0] || 'Student';
+    const filename = `Premium_Clinic_${studentFirstName}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+    return new Response(stream as unknown as ReadableStream, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="Academic_Clinic_${studentId}.pdf"`,
-        'Content-Length': uint8Array.length.toString(),
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Cache-Control': 'no-cache',
       },
     });
-  } catch (error) {
-    console.error('PDF Error:', error);
-    return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 });
+
+  } catch (error: any) {
+    console.error('❌ PDF Error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

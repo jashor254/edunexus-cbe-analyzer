@@ -34,10 +34,10 @@ export type CareerData = {
     disruptionPercentage: number
     growthOutlook: JobGrowthOutlook
     growthPercentage: number
-    timeline: { 
+    timeline: {
       shortTerm: string
       midTerm: string
-      longTerm: string 
+      longTerm: string
     }
     survivalStrategy: string[]
   }
@@ -86,10 +86,10 @@ export const CAREER_DATABASE: CareerData[] = [
         longTerm: 'Human creativity and business understanding remain irreplaceable.',
       },
       survivalStrategy: [
-        'Learn AI/ML fundamentals - don\'t fear AI, USE it',
+        "Learn AI/ML fundamentals - don't fear AI, USE it",
         'Master system design and architecture (not just coding)',
         'Develop soft skills - communication, teamwork, business thinking',
-        'Specialize in a niche (fintech, healthtech, agritech)'
+        'Specialize in a niche (fintech, healthtech, agritech)',
       ],
     },
     realityCheck: {
@@ -97,15 +97,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Work remotely for global companies (earn in USD/EUR)',
         'Flexible hours and work-life balance',
         'Continuous learning keeps work interesting',
-        'Can freelance or start your own tech company'
+        'Can freelance or start your own tech company',
       ],
       challenges: [
         'Requires constant upskilling - tech changes fast',
         'Can be sedentary - health concerns if not careful',
         'Competitive job market for entry-level',
-        'Imposter syndrome is common in the field'
+        'Imposter syndrome is common in the field',
       ],
-      typicalDay: 'Write code, attend team meetings (often virtual), debug issues, learn new technologies, collaborate on projects. Mix of solo deep work and team collaboration.',
+      typicalDay:
+        'Write code, attend team meetings (often virtual), debug issues, learn new technologies, collaborate on projects. Mix of solo deep work and team collaboration.',
     },
   },
 
@@ -121,7 +122,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'very_lucrative',
       jobSecurity: 'very_high',
       demandLevel: 'very_high',
-      kenyanContext: 'Always in demand. Can work in public hospitals, private clinics, or start own practice. Long training but guaranteed employment. Rural areas desperate for doctors.',
+      kenyanContext:
+        'Always in demand. Can work in public hospitals, private clinics, or start own practice. Long training but guaranteed employment. Rural areas desperate for doctors.',
     },
     cbeReadiness: {
       coreCompetencies: ['Empathy', 'Communication', 'Ethical Decision Making', 'Critical Thinking'],
@@ -143,7 +145,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Embrace medical technology and AI diagnostic tools',
         'Specialize (cardiology, pediatrics, surgery, etc.)',
         'Develop excellent patient communication skills',
-        'Consider public health or healthcare administration'
+        'Consider public health or healthcare administration',
       ],
     },
     realityCheck: {
@@ -151,15 +153,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Saving lives - deeply fulfilling career',
         'Highly respected in society',
         'Job security guaranteed',
-        'Multiple specialization options'
+        'Multiple specialization options',
       ],
       challenges: [
         'Long education (6-8 years minimum)',
         'Emotionally and physically demanding',
         'Irregular hours, night shifts, emergencies',
-        'High stress and burnout risk'
+        'High stress and burnout risk',
       ],
-      typicalDay: 'Patient consultations, diagnose conditions, prescribe treatment, perform procedures, update medical records, continuous learning on new treatments.',
+      typicalDay:
+        'Patient consultations, diagnose conditions, prescribe treatment, perform procedures, update medical records, continuous learning on new treatments.',
     },
   },
 
@@ -175,7 +178,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'exceptional',
       jobSecurity: 'high',
       demandLevel: 'very_high',
-      kenyanContext: 'Fastest growing tech field. Banks, insurance, telcos, government all need data scientists. Can work remotely for international companies. Shortage of qualified professionals.',
+      kenyanContext:
+        'Fastest growing tech field. Banks, insurance, telcos, government all need data scientists. Can work remotely for international companies. Shortage of qualified professionals.',
     },
     cbeReadiness: {
       coreCompetencies: ['Critical Thinking', 'Digital Literacy', 'Analytical Skills', 'Problem Solving'],
@@ -197,7 +201,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Master both technical skills AND business communication',
         'Specialize in industry verticals (fintech, health, agriculture)',
         'Focus on data ethics and explainable AI',
-        'Build storytelling skills - translate data to decisions'
+        'Build storytelling skills - translate data to decisions',
       ],
     },
     realityCheck: {
@@ -205,15 +209,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Cutting-edge field with constant innovation',
         'High demand, low supply of talent',
         'Can work across any industry',
-        'Combination of math, tech, and business'
+        'Combination of math, tech, and business',
       ],
       challenges: [
         'Requires strong math and programming skills',
         'Fast-changing field - constant learning required',
-        'Can be frustrating when business doesn\'t act on insights',
-        'Need to explain complex concepts to non-technical people'
+        "Can be frustrating when business doesn't act on insights",
+        'Need to explain complex concepts to non-technical people',
       ],
-      typicalDay: 'Clean and analyze data, build predictive models, create visualizations, present findings to stakeholders, collaborate with engineers and business teams.',
+      typicalDay:
+        'Clean and analyze data, build predictive models, create visualizations, present findings to stakeholders, collaborate with engineers and business teams.',
     },
   },
 
@@ -229,7 +234,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'lucrative',
       jobSecurity: 'high',
       demandLevel: 'very_high',
-      kenyanContext: 'Massive infrastructure projects (roads, buildings, dams). Government, private contractors, Chinese firms all hiring. Can start own construction consultancy.',
+      kenyanContext:
+        'Massive infrastructure projects (roads, buildings, dams). Government, private contractors, Chinese firms all hiring. Can start own construction consultancy.',
     },
     cbeReadiness: {
       coreCompetencies: ['Problem Solving', 'Spatial Intelligence', 'Project Management', 'Attention to Detail'],
@@ -243,7 +249,7 @@ export const CAREER_DATABASE: CareerData[] = [
       growthOutlook: 'growing',
       growthPercentage: 90,
       timeline: {
-        shortTerm: 'Kenya\'s infrastructure boom continues (Vision 2030, Affordable Housing).',
+        shortTerm: "Kenya's infrastructure boom continues (Vision 2030, Affordable Housing).",
         midTerm: 'AI assists design and planning, humans manage on-ground execution.',
         longTerm: 'Site judgment, safety, and stakeholder management remain human.',
       },
@@ -251,7 +257,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Master BIM (Building Information Modeling) software',
         'Specialize in sustainable/green building',
         'Develop strong project management skills',
-        'Get registered with Engineers Board of Kenya (EBK)'
+        'Get registered with Engineers Board of Kenya (EBK)',
       ],
     },
     realityCheck: {
@@ -259,15 +265,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'See tangible results of your work (buildings, roads, bridges)',
         'Variety - office work and site visits',
         'Can own construction firm after experience',
-        'Government and private sector opportunities'
+        'Government and private sector opportunities',
       ],
       challenges: [
         'Site work can be physically demanding',
         'Dealing with contractors and deadlines stressful',
         'Weather-dependent work schedules',
-        'Corruption in tender processes (ethical challenges)'
+        'Corruption in tender processes (ethical challenges)',
       ],
-      typicalDay: 'Site inspections, design reviews, coordinate with contractors, solve on-site problems, prepare reports, attend project meetings, ensure safety compliance.',
+      typicalDay:
+        'Site inspections, design reviews, coordinate with contractors, solve on-site problems, prepare reports, attend project meetings, ensure safety compliance.',
     },
   },
 
@@ -283,7 +290,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'lucrative',
       jobSecurity: 'very_high',
       demandLevel: 'very_high',
-      kenyanContext: 'Kenya is agricultural. Food security is national priority. Tech-enabled farming (drones, IoT, precision agriculture) growing fast. Can be researcher, extension officer, or entrepreneur.',
+      kenyanContext:
+        'Kenya is agricultural. Food security is national priority. Tech-enabled farming (drones, IoT, precision agriculture) growing fast. Can be researcher, extension officer, or entrepreneur.',
     },
     cbeReadiness: {
       coreCompetencies: ['Innovation', 'Environmental Stewardship', 'Problem Solving', 'Entrepreneurship'],
@@ -305,7 +313,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Learn precision agriculture and IoT systems',
         'Study climate-resilient crops and techniques',
         'Combine traditional knowledge with modern tech',
-        'Build agri-business and value-addition skills'
+        'Build agri-business and value-addition skills',
       ],
     },
     realityCheck: {
@@ -313,15 +321,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Solve real problems (hunger, poverty, sustainability)',
         'Work outdoors and in labs',
         'Can own profitable agri-business',
-        'Government support for agriculture'
+        'Government support for agriculture',
       ],
       challenges: [
         'Weather and climate unpredictability',
         'Dealing with conservative farmers resistant to change',
         'Initial capital for experiments/startups',
-        'Rural work may require relocation'
+        'Rural work may require relocation',
       ],
-      typicalDay: 'Field research, soil/crop testing, advise farmers, design irrigation systems, analyze data, write reports, conduct training sessions.',
+      typicalDay:
+        'Field research, soil/crop testing, advise farmers, design irrigation systems, analyze data, write reports, conduct training sessions.',
     },
   },
 
@@ -337,7 +346,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'lucrative',
       jobSecurity: 'very_high',
       demandLevel: 'high',
-      kenyanContext: 'Every hospital, clinic, and pharmacy needs licensed pharmacists. Can own retail pharmacy. Growing demand for pharmaceutical consultants and researchers.',
+      kenyanContext:
+        'Every hospital, clinic, and pharmacy needs licensed pharmacists. Can own retail pharmacy. Growing demand for pharmaceutical consultants and researchers.',
     },
     cbeReadiness: {
       coreCompetencies: ['Attention to Detail', 'Communication', 'Ethical Decision Making', 'Analytical Skills'],
@@ -359,7 +369,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Specialize (clinical pharmacy, industrial pharmacy, research)',
         'Develop excellent patient counseling skills',
         'Stay updated on new medications and treatments',
-        'Consider pharmaceutical manufacturing or research'
+        'Consider pharmaceutical manufacturing or research',
       ],
     },
     realityCheck: {
@@ -367,15 +377,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Direct patient interaction and helping people',
         'Can own profitable retail pharmacy',
         'Regular working hours (compared to doctors)',
-        'Respected profession with good income'
+        'Respected profession with good income',
       ],
       challenges: [
         'Long hours standing in retail pharmacies',
         'Dealing with difficult patients and insurance',
         'High responsibility - medication errors can be fatal',
-        'Competitive retail pharmacy market in cities'
+        'Competitive retail pharmacy market in cities',
       ],
-      typicalDay: 'Dispense medications, counsel patients on usage, check drug interactions, manage inventory, advise doctors on medications, ensure regulatory compliance.',
+      typicalDay:
+        'Dispense medications, counsel patients on usage, check drug interactions, manage inventory, advise doctors on medications, ensure regulatory compliance.',
     },
   },
 
@@ -391,7 +402,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'very_lucrative',
       jobSecurity: 'moderate',
       demandLevel: 'high',
-      kenyanContext: 'Real estate boom creates demand. Affordable housing projects, commercial buildings, renovation market. Can start own firm. Competitive but lucrative for good designers.',
+      kenyanContext:
+        'Real estate boom creates demand. Affordable housing projects, commercial buildings, renovation market. Can start own firm. Competitive but lucrative for good designers.',
     },
     cbeReadiness: {
       coreCompetencies: ['Creativity', 'Spatial Intelligence', 'Problem Solving', 'Attention to Detail'],
@@ -405,15 +417,15 @@ export const CAREER_DATABASE: CareerData[] = [
       growthOutlook: 'growing',
       growthPercentage: 65,
       timeline: {
-        shortTerm: 'AI generates basic floor plans, but creativity and client needs require humans.',
-        midTerm: 'Architects who use AI tools will outcompete those who don\'t.',
+        shortTerm: "AI generates basic floor plans, but creativity and client needs require humans.",
+        midTerm: "Architects who use AI tools will outcompete those who don't.",
         longTerm: 'Cultural context, sustainability, and human-centered design stay human.',
       },
       survivalStrategy: [
         'Master AI design tools (Midjourney, parametric design)',
         'Focus on sustainable and green architecture',
         'Develop strong client relationship skills',
-        'Specialize in a niche (heritage, eco-design, smart buildings)'
+        'Specialize in a niche (heritage, eco-design, smart buildings)',
       ],
     },
     realityCheck: {
@@ -421,15 +433,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Creative and technical work combined',
         'See your designs become reality',
         'Can build own successful firm',
-        'Work on diverse projects'
+        'Work on diverse projects',
       ],
       challenges: [
         'Long education and apprenticeship period',
         'Dealing with contractors and clients can be stressful',
         'Projects can be delayed or cancelled',
-        'Competitive field - need strong portfolio'
+        'Competitive field - need strong portfolio',
       ],
-      typicalDay: 'Meet clients, create design concepts, use CAD software, coordinate with engineers, visit construction sites, prepare presentations, manage budgets.',
+      typicalDay:
+        'Meet clients, create design concepts, use CAD software, coordinate with engineers, visit construction sites, prepare presentations, manage budgets.',
     },
   },
 
@@ -445,7 +458,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'moderate',
       jobSecurity: 'high',
       demandLevel: 'high',
-      kenyanContext: 'Climate change makes this critical. NGOs, NEMA, KWS, research institutions hiring. Growing corporate ESG (environmental, social, governance) roles.',
+      kenyanContext:
+        'Climate change makes this critical. NGOs, NEMA, KWS, research institutions hiring. Growing corporate ESG (environmental, social, governance) roles.',
     },
     cbeReadiness: {
       coreCompetencies: ['Environmental Stewardship', 'Critical Thinking', 'Research Skills', 'Communication'],
@@ -467,7 +481,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Combine science with policy and advocacy',
         'Learn GIS and environmental modeling tools',
         'Build community engagement skills',
-        'Specialize (water, wildlife, renewable energy, waste management)'
+        'Specialize (water, wildlife, renewable energy, waste management)',
       ],
     },
     realityCheck: {
@@ -475,15 +489,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Meaningful work protecting planet',
         'Work outdoors and in field',
         'Can work with wildlife and nature',
-        'Growing field with job security'
+        'Growing field with job security',
       ],
       challenges: [
         'Pay lower than engineering/medicine initially',
         'Can be frustrating dealing with politics/bureaucracy',
         'Field work can be physically demanding',
-        'Remote locations for some roles'
+        'Remote locations for some roles',
       ],
-      typicalDay: 'Environmental impact assessments, field data collection, lab analysis, write reports, advise on conservation, coordinate with communities and government.',
+      typicalDay:
+        'Environmental impact assessments, field data collection, lab analysis, write reports, advise on conservation, coordinate with communities and government.',
     },
   },
 
@@ -499,7 +514,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'very_lucrative',
       jobSecurity: 'very_high',
       demandLevel: 'very_high',
-      kenyanContext: 'Power infrastructure expansion (Last Mile Connectivity, renewable energy). KPLC, REA, private contractors, manufacturing companies all need electrical engineers.',
+      kenyanContext:
+        'Power infrastructure expansion (Last Mile Connectivity, renewable energy). KPLC, REA, private contractors, manufacturing companies all need electrical engineers.',
     },
     cbeReadiness: {
       coreCompetencies: ['Problem Solving', 'Critical Thinking', 'Safety Consciousness', 'Innovation'],
@@ -521,7 +537,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Specialize in renewable energy (solar, wind)',
         'Learn automation and control systems',
         'Master power system design software',
-        'Get professional engineering license (EBK)'
+        'Get professional engineering license (EBK)',
       ],
     },
     realityCheck: {
@@ -529,15 +545,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Critical infrastructure work',
         'Good job security',
         'Can work across industries',
-        'Opportunity in renewable energy boom'
+        'Opportunity in renewable energy boom',
       ],
       challenges: [
         'High-risk work environment (electricity)',
         'Emergency call-outs at odd hours',
         'Physically demanding site work',
-        'High responsibility for safety'
+        'High responsibility for safety',
       ],
-      typicalDay: 'Design electrical systems, supervise installations, troubleshoot power issues, ensure safety compliance, coordinate with contractors, prepare technical drawings.',
+      typicalDay:
+        'Design electrical systems, supervise installations, troubleshoot power issues, ensure safety compliance, coordinate with contractors, prepare technical drawings.',
     },
   },
 
@@ -553,7 +570,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'lucrative',
       jobSecurity: 'high',
       demandLevel: 'high',
-      kenyanContext: 'Livestock is huge in Kenya. Private clinics, government, NGOs, pharmaceutical companies. Can specialize in pets (urban) or livestock (rural). Growing pet ownership in cities.',
+      kenyanContext:
+        'Livestock is huge in Kenya. Private clinics, government, NGOs, pharmaceutical companies. Can specialize in pets (urban) or livestock (rural). Growing pet ownership in cities.',
     },
     cbeReadiness: {
       coreCompetencies: ['Empathy', 'Problem Solving', 'Manual Dexterity', 'Communication'],
@@ -575,7 +593,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Specialize (small animals, large animals, exotic)',
         'Build strong client relationships',
         'Stay updated on veterinary medicine advances',
-        'Consider pharmaceutical or research roles'
+        'Consider pharmaceutical or research roles',
       ],
     },
     realityCheck: {
@@ -583,15 +601,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Work with animals (if you love them!)',
         'Can own profitable clinic',
         'Variety - pets, livestock, wildlife',
-        'Respected profession'
+        'Respected profession',
       ],
       challenges: [
         'Emotional toll (euthanasia, sick animals)',
         'Physically demanding (restraining animals)',
         'Irregular hours (emergencies)',
-        'Dealing with difficult pet owners'
+        'Dealing with difficult pet owners',
       ],
-      typicalDay: 'Examine animals, diagnose conditions, perform surgeries, prescribe medications, advise owners, conduct vaccinations, manage clinic operations.',
+      typicalDay:
+        'Examine animals, diagnose conditions, perform surgeries, prescribe medications, advise owners, conduct vaccinations, manage clinic operations.',
     },
   },
 
@@ -610,7 +629,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'lucrative',
       jobSecurity: 'moderate',
       demandLevel: 'high',
-      kenyanContext: 'Every brand needs creative strategy. Advertising agencies, corporates, startups. Can freelance or start own agency. Nairobi creative scene growing fast.',
+      kenyanContext:
+        'Every brand needs creative strategy. Advertising agencies, corporates, startups. Can freelance or start own agency. Nairobi creative scene growing fast.',
     },
     cbeReadiness: {
       coreCompetencies: ['Creativity', 'Communication', 'Cultural Awareness', 'Critical Thinking'],
@@ -632,7 +652,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Master AI creative tools (Midjourney, ChatGPT, Runway)',
         'Focus on strategy and concept over execution',
         'Build personal brand and thought leadership',
-        'Develop business acumen - creativity + commerce'
+        'Develop business acumen - creativity + commerce',
       ],
     },
     realityCheck: {
@@ -640,15 +660,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Exciting, dynamic work environment',
         'See your ideas become campaigns',
         'Can build successful agency',
-        'Work with diverse brands and industries'
+        'Work with diverse brands and industries',
       ],
       challenges: [
         'Tight deadlines and client pressure',
         'Subjective work - dealing with criticism',
         'Competitive field - need strong portfolio',
-        'Irregular income if freelancing'
+        'Irregular income if freelancing',
       ],
-      typicalDay: 'Brainstorm campaigns, present concepts to clients, manage design team, review creative work, track industry trends, pitch for new business.',
+      typicalDay:
+        'Brainstorm campaigns, present concepts to clients, manage design team, review creative work, track industry trends, pitch for new business.',
     },
   },
 
@@ -664,7 +685,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'moderate',
       jobSecurity: 'moderate',
       demandLevel: 'moderate',
-      kenyanContext: 'Traditional media struggling, but digital content booming. YouTube, podcasts, blogs, social media. Can work for media houses or be independent content creator.',
+      kenyanContext:
+        'Traditional media struggling, but digital content booming. YouTube, podcasts, blogs, social media. Can work for media houses or be independent content creator.',
     },
     cbeReadiness: {
       coreCompetencies: ['Communication', 'Critical Thinking', 'Digital Literacy', 'Ethical Awareness'],
@@ -686,7 +708,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Build personal brand - become the story',
         'Master video and multimedia production',
         'Develop investigative and data journalism skills',
-        'Create niche expertise (politics, tech, sports, etc.)'
+        'Create niche expertise (politics, tech, sports, etc.)',
       ],
     },
     realityCheck: {
@@ -694,15 +716,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Tell important stories, impact society',
         'Meet interesting people',
         'Variety - no two days the same',
-        'Can build large following as influencer'
+        'Can build large following as influencer',
       ],
       challenges: [
         'Lower pay in traditional media',
         'Irregular hours, working weekends',
         'Stressful deadlines',
-        'Online harassment and trolling'
+        'Online harassment and trolling',
       ],
-      typicalDay: 'Research stories, conduct interviews, write articles/scripts, edit content, manage social media, attend press conferences, pitch story ideas.',
+      typicalDay:
+        'Research stories, conduct interviews, write articles/scripts, edit content, manage social media, attend press conferences, pitch story ideas.',
     },
   },
 
@@ -718,7 +741,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'very_lucrative',
       jobSecurity: 'low',
       demandLevel: 'moderate',
-      kenyanContext: 'Kenyan music industry growing (Gengetone, Afrobeats). Multiple income streams: performances, streaming, production, teaching. Highly competitive but rewarding for talented.',
+      kenyanContext:
+        'Kenyan music industry growing (Gengetone, Afrobeats). Multiple income streams: performances, streaming, production, teaching. Highly competitive but rewarding for talented.',
     },
     cbeReadiness: {
       coreCompetencies: ['Creativity', 'Discipline', 'Collaboration', 'Entrepreneurship'],
@@ -740,7 +764,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Learn music production AND performance',
         'Build strong social media presence',
         'Diversify income (teaching, licensing, production)',
-        'Master digital distribution and marketing'
+        'Master digital distribution and marketing',
       ],
     },
     realityCheck: {
@@ -748,15 +772,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Do what you love (if passionate about music)',
         'Creative freedom',
         'Potential for fame and high earnings',
-        'Multiple income streams'
+        'Multiple income streams',
       ],
       challenges: [
-        'Very competitive, many don\'t make it',
+        "Very competitive, many don't make it",
         'Unstable income, especially starting out',
         'Requires thick skin (criticism, rejection)',
-        'Need business skills to succeed'
+        'Need business skills to succeed',
       ],
-      typicalDay: 'Practice instrument/vocals, write songs, record in studio, promote on social media, network with industry, perform at gigs, negotiate deals.',
+      typicalDay:
+        'Practice instrument/vocals, write songs, record in studio, promote on social media, network with industry, perform at gigs, negotiate deals.',
     },
   },
 
@@ -772,7 +797,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'exceptional',
       jobSecurity: 'low',
       demandLevel: 'moderate',
-      kenyanContext: 'Kenya dominates distance running. Football, rugby, basketball growing. Short career, so need transition plan. Coaching and sports management are stable alternatives.',
+      kenyanContext:
+        'Kenya dominates distance running. Football, rugby, basketball growing. Short career, so need transition plan. Coaching and sports management are stable alternatives.',
     },
     cbeReadiness: {
       coreCompetencies: ['Discipline', 'Resilience', 'Teamwork', 'Goal Setting'],
@@ -794,7 +820,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Get sports science education alongside training',
         'Plan for life after playing (coaching, management)',
         'Build personal brand during peak years',
-        'Invest earnings wisely'
+        'Invest earnings wisely',
       ],
     },
     realityCheck: {
@@ -802,15 +828,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Represent Kenya globally',
         'Top athletes earn very well',
         'Do what you love (if passionate)',
-        'Build lasting fame'
+        'Build lasting fame',
       ],
       challenges: [
         'Extremely competitive',
         'Injury can end career suddenly',
         'Short career span (usually 10-15 years)',
-        'Need discipline and sacrifice'
+        'Need discipline and sacrifice',
       ],
-      typicalDay: 'Intense training sessions, diet management, physiotherapy, strategy meetings with coaches, competitions, recovery and rest, sponsor obligations.',
+      typicalDay:
+        'Intense training sessions, diet management, physiotherapy, strategy meetings with coaches, competitions, recovery and rest, sponsor obligations.',
     },
   },
 
@@ -826,7 +853,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'lucrative',
       jobSecurity: 'moderate',
       demandLevel: 'high',
-      kenyanContext: 'Real estate boom drives demand. Homes, offices, hotels, restaurants all need designers. Can start own firm. Growing middle class wants nice interiors.',
+      kenyanContext:
+        'Real estate boom drives demand. Homes, offices, hotels, restaurants all need designers. Can start own firm. Growing middle class wants nice interiors.',
     },
     cbeReadiness: {
       coreCompetencies: ['Creativity', 'Spatial Intelligence', 'Attention to Detail', 'Client Management'],
@@ -840,7 +868,7 @@ export const CAREER_DATABASE: CareerData[] = [
       growthOutlook: 'growing',
       growthPercentage: 70,
       timeline: {
-        shortTerm: 'AI generates mood boards, but client taste is personal.',
+        shortTerm: "AI generates mood boards, but client taste is personal.",
         midTerm: 'Designers who use AI visualization tools win more clients.',
         longTerm: 'Understanding client psychology and space functionality stay human.',
       },
@@ -848,7 +876,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Master 3D visualization software',
         'Build strong portfolio and social media',
         'Develop excellent client communication',
-        'Specialize (luxury, sustainable, minimalist, etc.)'
+        'Specialize (luxury, sustainable, minimalist, etc.)',
       ],
     },
     realityCheck: {
@@ -856,15 +884,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Creative and practical work',
         'See transformations you create',
         'Can build profitable business',
-        'Work with variety of clients'
+        'Work with variety of clients',
       ],
       challenges: [
         'Dealing with demanding clients',
         'Managing budgets and contractors',
         'Competitive market',
-        'Need business skills to succeed'
+        'Need business skills to succeed',
       ],
-      typicalDay: 'Meet clients, create design concepts, source furniture/materials, coordinate with contractors, visit sites, manage projects, maintain supplier relationships.',
+      typicalDay:
+        'Meet clients, create design concepts, source furniture/materials, coordinate with contractors, visit sites, manage projects, maintain supplier relationships.',
     },
   },
 
@@ -880,7 +909,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'lucrative',
       jobSecurity: 'moderate',
       demandLevel: 'high',
-      kenyanContext: 'Kenyan film/TV industry growing (Riverwood). Corporate videos, ads, YouTube content booming. Netflix, Showmax commissioning local content. Can freelance or start production company.',
+      kenyanContext:
+        'Kenyan film/TV industry growing (Riverwood). Corporate videos, ads, YouTube content booming. Netflix, Showmax commissioning local content. Can freelance or start production company.',
     },
     cbeReadiness: {
       coreCompetencies: ['Creativity', 'Leadership', 'Storytelling', 'Technical Skills'],
@@ -902,7 +932,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Master AI editing and effects tools',
         'Develop strong storytelling skills',
         'Build production and business skills',
-        'Create unique voice/style'
+        'Create unique voice/style',
       ],
     },
     realityCheck: {
@@ -910,15 +940,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Creative fulfillment',
         'Tell Kenyan stories to world',
         'Growing industry opportunities',
-        'Can become famous/influential'
+        'Can become famous/influential',
       ],
       challenges: [
         'Project-based income (feast or famine)',
         'Long, irregular hours',
         'High equipment costs initially',
-        'Competitive field'
+        'Competitive field',
       ],
-      typicalDay: 'Develop scripts, plan shoots, direct actors/crew, edit footage, pitch projects, manage budgets, coordinate with clients, market your work.',
+      typicalDay:
+        'Develop scripts, plan shoots, direct actors/crew, edit footage, pitch projects, manage budgets, coordinate with clients, market your work.',
     },
   },
 
@@ -934,7 +965,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'moderate',
       jobSecurity: 'moderate',
       demandLevel: 'high',
-      kenyanContext: 'Every business needs design. Agencies, corporates, NGOs, startups. Easy to freelance globally. Nairobi has vibrant design scene. Can work remotely for international clients.',
+      kenyanContext:
+        'Every business needs design. Agencies, corporates, NGOs, startups. Easy to freelance globally. Nairobi has vibrant design scene. Can work remotely for international clients.',
     },
     cbeReadiness: {
       coreCompetencies: ['Creativity', 'Digital Literacy', 'Visual Communication', 'Attention to Detail'],
@@ -956,7 +988,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Master AI tools (Midjourney, Adobe Firefly, etc.)',
         'Move from execution to strategy (senior roles)',
         'Specialize (motion graphics, UX/UI, branding)',
-        'Build strong portfolio and personal brand'
+        'Build strong portfolio and personal brand',
       ],
     },
     realityCheck: {
@@ -964,15 +996,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Creative work daily',
         'Can work remotely/freelance',
         'Diverse projects',
-        'Relatively easy to start (laptop + skills)'
+        'Relatively easy to start (laptop + skills)',
       ],
       challenges: [
         'Competitive and saturated market',
         'Client revisions can be frustrating',
         'Pressure to constantly learn new tools',
-        'Lower pay for junior designers'
+        'Lower pay for junior designers',
       ],
-      typicalDay: 'Create designs (logos, posters, social media, packaging), revise based on feedback, communicate with clients, research trends, manage multiple projects.',
+      typicalDay:
+        'Create designs (logos, posters, social media, packaging), revise based on feedback, communicate with clients, research trends, manage multiple projects.',
     },
   },
 
@@ -988,7 +1021,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'lucrative',
       jobSecurity: 'moderate',
       demandLevel: 'high',
-      kenyanContext: 'Kenyans love events (weddings, corporate, conferences). Growing middle class spending on celebrations. Tourism and hospitality recovering. Can start own events company.',
+      kenyanContext:
+        'Kenyans love events (weddings, corporate, conferences). Growing middle class spending on celebrations. Tourism and hospitality recovering. Can start own events company.',
     },
     cbeReadiness: {
       coreCompetencies: ['Organization', 'Communication', 'Creativity', 'Problem Solving'],
@@ -1010,7 +1044,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Use tech for efficiency (booking systems, design tools)',
         'Build strong vendor network',
         'Develop niche (corporate, weddings, international)',
-        'Excellent client service and reputation'
+        'Excellent client service and reputation',
       ],
     },
     realityCheck: {
@@ -1018,15 +1052,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Exciting, social work',
         'See immediate results',
         'Can build profitable business',
-        'Meet diverse people'
+        'Meet diverse people',
       ],
       challenges: [
         'High stress (everything must be perfect)',
         'Long hours, including weekends/nights',
         'Dealing with difficult clients',
-        'Seasonal income fluctuations'
+        'Seasonal income fluctuations',
       ],
-      typicalDay: 'Meet clients, plan event details, coordinate vendors, visit venues, manage budgets, solve problems, oversee event execution, handle crises.',
+      typicalDay:
+        'Meet clients, plan event details, coordinate vendors, visit venues, manage budgets, solve problems, oversee event execution, handle crises.',
     },
   },
 
@@ -1045,7 +1080,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'very_lucrative',
       jobSecurity: 'high',
       demandLevel: 'high',
-      kenyanContext: 'Always in demand. Can work in law firms, corporate, government, or private practice. Competitive but lucrative. Long education but respected profession.',
+      kenyanContext:
+        'Always in demand. Can work in law firms, corporate, government, or private practice. Competitive but lucrative. Long education but respected profession.',
     },
     cbeReadiness: {
       coreCompetencies: ['Critical Thinking', 'Communication', 'Ethical Decision Making', 'Research Skills'],
@@ -1067,7 +1103,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Specialize (corporate, human rights, IP, etc.)',
         'Embrace legal tech tools',
         'Develop strong courtroom and negotiation skills',
-        'Build reputation and client base'
+        'Build reputation and client base',
       ],
     },
     realityCheck: {
@@ -1075,15 +1111,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Intellectual and challenging work',
         'High earning potential',
         'Respected profession',
-        'Can fight for justice'
+        'Can fight for justice',
       ],
       challenges: [
         'Very long education (6+ years)',
         'Highly competitive',
         'Long hours, high stress',
-        'Dealing with difficult/emotional cases'
+        'Dealing with difficult/emotional cases',
       ],
-      typicalDay: 'Client consultations, legal research, draft documents, court appearances, negotiations, case strategy, manage paralegals, continuing legal education.',
+      typicalDay:
+        'Client consultations, legal research, draft documents, court appearances, negotiations, case strategy, manage paralegals, continuing legal education.',
     },
   },
 
@@ -1099,7 +1136,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'lucrative',
       jobSecurity: 'high',
       demandLevel: 'very_high',
-      kenyanContext: 'Every organization needs accountants. Big 4 firms, banks, corporates, government, SMEs. CPA qualification is gold standard. Stable career with clear progression.',
+      kenyanContext:
+        'Every organization needs accountants. Big 4 firms, banks, corporates, government, SMEs. CPA qualification is gold standard. Stable career with clear progression.',
     },
     cbeReadiness: {
       coreCompetencies: ['Analytical Thinking', 'Attention to Detail', 'Ethical Decision Making', 'Problem Solving'],
@@ -1121,7 +1159,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Specialize in high-value areas (forensic, strategic CFO work)',
         'Master financial analysis, not just compliance',
         'Develop business advisory skills',
-        'Learn data analytics and financial modeling'
+        'Learn data analytics and financial modeling',
       ],
     },
     realityCheck: {
@@ -1129,15 +1167,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Clear career path and qualifications',
         'Good job security',
         'Work across any industry',
-        'Respected profession'
+        'Respected profession',
       ],
       challenges: [
         'Studying for CPA while working is tough',
         'Can be repetitive work',
         'Busy seasons (audit, tax deadlines)',
-        'AI disrupting traditional roles'
+        'AI disrupting traditional roles',
       ],
-      typicalDay: 'Prepare financial statements, analyze data, conduct audits, advise management, ensure compliance, manage budgets, prepare reports.',
+      typicalDay:
+        'Prepare financial statements, analyze data, conduct audits, advise management, ensure compliance, manage budgets, prepare reports.',
     },
   },
 
@@ -1153,7 +1192,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'lower_but_stable',
       jobSecurity: 'very_high',
       demandLevel: 'very_high',
-      kenyanContext: 'CBC rollout creates demand. Government (TSC) guaranteed employment. Private schools pay better. Can become principal/education officer. Very secure but lower pay than other professions.',
+      kenyanContext:
+        'CBC rollout creates demand. Government (TSC) guaranteed employment. Private schools pay better. Can become principal/education officer. Very secure but lower pay than other professions.',
     },
     cbeReadiness: {
       coreCompetencies: ['Communication', 'Empathy', 'Patience', 'Leadership'],
@@ -1175,7 +1215,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Embrace educational technology',
         'Specialize (special needs, gifted students, CBC training)',
         'Develop curriculum design skills',
-        'Pursue school leadership roles'
+        'Pursue school leadership roles',
       ],
     },
     realityCheck: {
@@ -1183,15 +1223,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Very stable employment (TSC)',
         'Holidays aligned with school calendar',
         'Shape young minds',
-        'Respected in community'
+        'Respected in community',
       ],
       challenges: [
         'Lower pay compared to other professions',
         'Large class sizes in public schools',
         'Dealing with difficult students/parents',
-        'Heavy workload (marking, planning)'
+        'Heavy workload (marking, planning)',
       ],
-      typicalDay: 'Prepare lessons, teach classes, mark assignments, manage classroom discipline, parent meetings, staff meetings, extracurricular activities.',
+      typicalDay:
+        'Prepare lessons, teach classes, mark assignments, manage classroom discipline, parent meetings, staff meetings, extracurricular activities.',
     },
   },
 
@@ -1207,7 +1248,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'moderate',
       jobSecurity: 'high',
       demandLevel: 'high',
-      kenyanContext: 'NGOs, government, hospitals, children\'s homes all need social workers. Meaningful work but moderate pay. Growing field as Kenya addresses social issues.',
+      kenyanContext:
+        "NGOs, government, hospitals, children's homes all need social workers. Meaningful work but moderate pay. Growing field as Kenya addresses social issues.",
     },
     cbeReadiness: {
       coreCompetencies: ['Empathy', 'Communication', 'Problem Solving', 'Cultural Awareness'],
@@ -1229,7 +1271,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Specialize (child protection, mental health, community development)',
         'Develop counseling and conflict resolution skills',
         'Learn program design and grant writing',
-        'Build strong community relationships'
+        'Build strong community relationships',
       ],
     },
     realityCheck: {
@@ -1237,15 +1279,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Meaningful work helping vulnerable',
         'Variety of settings (hospitals, NGOs, government)',
         'Strong job security',
-        'Personal fulfillment'
+        'Personal fulfillment',
       ],
       challenges: [
         'Emotionally draining work',
         'Moderate pay in NGO sector',
         'Dealing with difficult cases',
-        'Bureaucracy in government roles'
+        'Bureaucracy in government roles',
       ],
-      typicalDay: 'Meet clients, assess needs, connect to resources, write case reports, conduct home visits, coordinate with agencies, advocate for clients.',
+      typicalDay:
+        'Meet clients, assess needs, connect to resources, write case reports, conduct home visits, coordinate with agencies, advocate for clients.',
     },
   },
 
@@ -1261,7 +1304,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'lucrative',
       jobSecurity: 'high',
       demandLevel: 'high',
-      kenyanContext: 'Every company needs HR. From recruitment to employee relations. Can work corporate, consulting, or government. Clear career progression to senior management.',
+      kenyanContext:
+        'Every company needs HR. From recruitment to employee relations. Can work corporate, consulting, or government. Clear career progression to senior management.',
     },
     cbeReadiness: {
       coreCompetencies: ['Communication', 'Conflict Resolution', 'Empathy', 'Organization'],
@@ -1283,7 +1327,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Focus on strategic HR, not admin tasks',
         'Develop talent development and coaching skills',
         'Learn HR analytics and people data',
-        'Master change management and org development'
+        'Master change management and org development',
       ],
     },
     realityCheck: {
@@ -1291,15 +1335,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Work with people daily',
         'Strategic role in organization',
         'Good work-life balance',
-        'Clear career progression'
+        'Clear career progression',
       ],
       challenges: [
         'Caught between management and employees',
         'Dealing with conflicts and difficult people',
         'Sometimes blamed for unpopular decisions',
-        'Administrative burden in small companies'
+        'Administrative burden in small companies',
       ],
-      typicalDay: 'Recruitment interviews, employee relations issues, policy development, training coordination, performance management, payroll oversight, strategic planning.',
+      typicalDay:
+        'Recruitment interviews, employee relations issues, policy development, training coordination, performance management, payroll oversight, strategic planning.',
     },
   },
 
@@ -1315,7 +1360,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'lucrative',
       jobSecurity: 'high',
       demandLevel: 'high',
-      kenyanContext: 'Mental health awareness growing. Schools, hospitals, corporates, private practice all need psychologists. Still stigma but changing. Growing field with good prospects.',
+      kenyanContext:
+        "Mental health awareness growing. Schools, hospitals, corporates, private practice all need psychologists. Still stigma but changing. Growing field with good prospects.",
     },
     cbeReadiness: {
       coreCompetencies: ['Empathy', 'Communication', 'Critical Thinking', 'Ethical Awareness'],
@@ -1337,7 +1383,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Get proper licensure and credentials',
         'Specialize (clinical, educational, organizational)',
         'Build strong therapeutic skills',
-        'Combine traditional and modern approaches'
+        'Combine traditional and modern approaches',
       ],
     },
     realityCheck: {
@@ -1345,15 +1391,16 @@ export const CAREER_DATABASE: CareerData[] = [
         'Help people through difficult times',
         'Intellectually stimulating',
         'Can have private practice',
-        'Growing field in Kenya'
+        'Growing field in Kenya',
       ],
       challenges: [
         'Emotionally demanding work',
         'Dealing with severe mental health issues',
-        'Carrying clients\' burdens',
-        'Need own therapy/supervision'
+        "Carrying clients' burdens",
+        'Need own therapy/supervision',
       ],
-      typicalDay: 'Client sessions, assessment and diagnosis, develop treatment plans, take notes, coordinate with other professionals, continuing education.',
+      typicalDay:
+        'Client sessions, assessment and diagnosis, develop treatment plans, take notes, coordinate with other professionals, continuing education.',
     },
   },
 
@@ -1369,7 +1416,8 @@ export const CAREER_DATABASE: CareerData[] = [
       earningPotential: 'very_lucrative',
       jobSecurity: 'high',
       demandLevel: 'moderate',
-      kenyanContext: 'Government, Central Bank, research institutions, international organizations (World Bank, IMF). Highly intellectual work. Good pay and influence on policy.',
+      kenyanContext:
+        'Government, Central Bank, research institutions, international organizations (World Bank, IMF). Highly intellectual work. Good pay and influence on policy.',
     },
     cbeReadiness: {
       coreCompetencies: ['Analytical Thinking', 'Critical Thinking', 'Research Skills', 'Communication'],
@@ -1391,7 +1439,7 @@ export const CAREER_DATABASE: CareerData[] = [
         'Master econometrics and data science',
         'Develop strong communication skills',
         'Specialize (development, monetary policy, trade)',
-        'Combine quantitative skills with policy understanding'
+        'Combine quantitative skills with policy understanding',
       ],
     },
     realityCheck: {
@@ -1399,40 +1447,41 @@ export const CAREER_DATABASE: CareerData[] = [
         'Influence national policy',
         'Intellectually challenging',
         'Respected profession',
-        'Good work environment'
+        'Good work environment',
       ],
       challenges: [
         'Requires advanced degrees (Masters/PhD)',
         'Can be abstract/theoretical',
         'Frustration when policy ignored',
-        'Competitive for top positions'
+        'Competitive for top positions',
       ],
-      typicalDay: 'Economic research, data analysis, forecast modeling, write policy briefs, present findings, advise government/organizations, publish papers.',
+      typicalDay:
+        'Economic research, data analysis, forecast modeling, write policy briefs, present findings, advise government/organizations, publish papers.',
     },
   },
 ]
+
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
 
 /**
  * Returns careers matching the given pathway where the student meets
  * all minimum competency levels. Sorted by best match first.
  */
 export function getMatchingCareers(
-  pathway: string, 
+  pathway: string,
   scores: Record<string, number>
 ): CareerData[] {
   if (!CAREER_DATABASE || CAREER_DATABASE.length === 0) return []
 
   return CAREER_DATABASE
     .filter((career) => {
-      // Must match the pathway
       if (career.pathway !== pathway) return false
-      
-      // Must meet all minimum requirements
       return Object.entries(career.matchRequirements.minimumLevels).every(
         ([subject, minLevel]) => (scores[subject] ?? 0) >= minLevel
       )
     })
-    // Sort by surplus (how much above minimum)
     .sort((a, b) => {
       const getSurplus = (career: CareerData) =>
         Object.entries(career.matchRequirements.minimumLevels).reduce(
@@ -1441,63 +1490,63 @@ export function getMatchingCareers(
         )
       return getSurplus(b) - getSurplus(a)
     })
-    // Return top 5
     .slice(0, 5)
-}// lib/academicClinic/careerDatabase.ts
-
-// ... (Keep ALL your existing code: types, CAREER_DATABASE array, getMatchingCareers function)
+}
 
 /**
  * Search for a career by name (fuzzy match)
+ * ✅ FIXED: Single definition, no duplicates
  */
 export function findCareerByName(careerName: string): CareerData | null {
-  const normalized = careerName.toLowerCase().trim();
-  
-  // Exact match first
+  const normalized = careerName.toLowerCase().trim()
+
+  // 1. Exact match
   const exactMatch = CAREER_DATABASE.find(
-    career => career.name.toLowerCase() === normalized
-  );
-  if (exactMatch) return exactMatch;
-  
-  // Partial match
+    (career) => career.name.toLowerCase() === normalized
+  )
+  if (exactMatch) return exactMatch
+
+  // 2. Partial match (career name contains query or vice versa)
   const partialMatch = CAREER_DATABASE.find(
-    career => career.name.toLowerCase().includes(normalized) ||
-              normalized.includes(career.name.toLowerCase())
-  );
-  if (partialMatch) return partialMatch;
-  
-  // Check by ID
+    (career) =>
+      career.name.toLowerCase().includes(normalized) ||
+      normalized.includes(career.name.toLowerCase())
+  )
+  if (partialMatch) return partialMatch
+
+  // 3. ID match
   const idMatch = CAREER_DATABASE.find(
-    career => career.id === normalized.replace(/\s+/g, '_')
-  );
-  if (idMatch) return idMatch;
-  
-  return null;
+    (career) => career.id === normalized.replace(/\s+/g, '_')
+  )
+  if (idMatch) return idMatch
+
+  return null
 }
 
 /**
- * Get all career names (for autocomplete/suggestions)
+ * Get all career names (for autocomplete)
+ * ✅ FIXED: Single definition, no duplicates
  */
 export function getAllCareerNames(): string[] {
-  return CAREER_DATABASE.map(career => career.name);
+  return CAREER_DATABASE.map((career) => career.name)
 }
 
 /**
- * Get all careers for a pathway
+ * Get all careers for a specific pathway
  */
 export function getCareersByPathway(pathway: string): CareerData[] {
-  return CAREER_DATABASE.filter(career => career.pathway === pathway);
+  return CAREER_DATABASE.filter((career) => career.pathway === pathway)
 }
 
 /**
  * Search careers by keyword (returns multiple matches)
  */
 export function searchCareers(keyword: string): CareerData[] {
-  const normalized = keyword.toLowerCase().trim();
-  
-  return CAREER_DATABASE.filter(career => 
-    career.name.toLowerCase().includes(normalized) ||
-    career.id.includes(normalized) ||
-    career.marketReality.kenyanContext.toLowerCase().includes(normalized)
-  );
+  const normalized = keyword.toLowerCase().trim()
+  return CAREER_DATABASE.filter(
+    (career) =>
+      career.name.toLowerCase().includes(normalized) ||
+      career.id.includes(normalized) ||
+      career.marketReality.kenyanContext.toLowerCase().includes(normalized)
+  )
 }

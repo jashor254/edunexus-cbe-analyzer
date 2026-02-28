@@ -1,46 +1,30 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { GuardianTutor } from '@/lib/ai/GuardianTutor';
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/utils/supabase/server'
+import { AI } from '@/lib/ai/hybrid-system'
 
-export async function POST(req: NextRequest) {
+export const dynamic = 'force-dynamic' // ✅ Force dynamic for build
+export const runtime = 'edge'
+
+export async function POST(request: NextRequest) {
   try {
-    // 1. Jaribu kusoma body
-    const body = await req.json().catch(() => ({}));
-    console.log("📥 Incoming Data:", body);
+    const { message, studentId, conversationHistory } = await request.json()
+    if (!message || !studentId) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
 
-    // 2. Toa vigezo na uweke 'fallbacks' (default values)
-    const { 
-      message, 
-      subjectId = 'mathematics', 
-      grade = 7, 
-      conversationHistory = [] 
-    } = body;
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    // 3. Hakikisha message ipo, isipokuwepo toa error ya kueleweka
-    if (!message) {
-      return NextResponse.json(
-        { error: 'Message is required' }, 
-        { status: 400 }
-      );
-    }
-
-    // 4. Muite GuardianTutor
-    const response = await GuardianTutor.generateResponse({
-      subjectId,
-      studentGrade: grade,
-      studentLevel: 2,
-      question: message,
-      conversationHistory
-    });
-
-    return NextResponse.json({ text: response });
-
-  } catch (error: any) {
-    console.error('🔴 API ROUTE CRASH:', error.message);
+    const { data: student } = await supabase.from('students').select('name, grade').eq('id', studentId).single()
     
-    // Rudisha error message halisi ili tuione kwenye browser
-    return NextResponse.json(
-      { error: error.message || 'Internal Server Error' }, 
-      { status: 500 }
-    );
+    const response = await AI.chat(
+      student?.name || 'Student',
+      student?.grade || 8,
+      message,
+      conversationHistory || []
+    )
+
+    return NextResponse.json({ success: true, response })
+  } catch (error) {
+    return NextResponse.json({ error: 'Chat failed', fallback: { message: 'Try again!' } }, { status: 500 })
   }
 }
