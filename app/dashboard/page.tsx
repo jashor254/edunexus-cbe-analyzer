@@ -177,8 +177,7 @@ export default async function DashboardPage() {
             </p>
             <Link
               href="/dashboard/assessments/add"
-              className="inline-block bg-slate-900 text-white px-8 py-3 rounded-xl font-black hover:bg-slate-800 transition-all"
-            >
+              className="inline-block bg-slate-900 text-white px-8 py-3 rounded-xl font-black hover:bg-slate-800 transition-all"            >
               Add Assessment
             </Link>
           </div>
