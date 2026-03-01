@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ShieldCheck, Sparkles, Mail, Lock, User as UserIcon, Zap } from 'lucide-react'
+import { ShieldCheck, Mail, Lock, User as UserIcon, Zap } from 'lucide-react'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
@@ -14,15 +14,31 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  // 1. Google Auth Function - "Simple & Non-complicated"
+  // 1. Google Auth Function - Force Redirect to bypass Soft Navigation
   const handleGoogleLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    })
-    if (error) setError(error.message)
+    setError(null)
+    try {
+      const { data, error: googleError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          // Hakikisha hii inalingana na Redirect URIs kule Supabase Dashboard
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      })
+
+      if (googleError) throw googleError
+
+      // KAMA DATA.URL IPO, TULAZIMISHE BROWSER IONDOKE KUEKEA GOOGLE
+      if (data?.url) {
+        window.location.href = data.url
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Google login failed.')
+    }
   }
 
   // 2. Standard Email Signup
@@ -35,13 +51,19 @@ export default function SignupPage() {
         email,
         password,
         options: {
-          data: { full_name: name },
+          data: { 
+            full_name: name,
+            // Hapa unaweza kuongeza meta-data zingine kama unataka
+          },
         },
       })
+
       if (authError) throw authError
+
       if (data.user) {
-        alert('Karibu EduNexus! Check your email to verify.')
-        router.push('/login')
+        // Kwa sasa tumezima "Confirm Email" kule Supabase Dashboard
+        // Mteja anaweza kuingia moja kwa moja
+        router.push('/dashboard')
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Signup failed.')
@@ -65,8 +87,9 @@ export default function SignupPage() {
         <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 p-10">
           <h2 className="text-2xl font-bold text-slate-800 mb-6 text-center">Get Started Free</h2>
 
-          {/* Google Button - "The Kuul Part" */}
+          {/* Google Button - Fixed with window.location.href */}
           <button
+            type="button" // Muhimu: Isichukulike kama form submit
             onClick={handleGoogleLogin}
             className="w-full flex items-center justify-center gap-3 py-4 border-2 border-slate-100 rounded-2xl font-bold text-slate-700 hover:bg-slate-50 transition-all mb-6"
           >
@@ -76,7 +99,9 @@ export default function SignupPage() {
 
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-100"></span></div>
-            <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-4 text-slate-400 font-bold">Or use email</span></div>
+            <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-4 text-slate-400 font-bold">Or use email</span>
+            </div>
           </div>
 
           <form onSubmit={handleSignup} className="space-y-4">
@@ -127,11 +152,13 @@ export default function SignupPage() {
                   className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-blue-500 outline-none transition-all font-semibold"
                   placeholder="••••••••"
                   required
+                  minLength={6}
                 />
               </div>
             </div>
 
             <button
+              type="submit"
               disabled={loading}
               className="w-full py-5 bg-blue-600 text-white font-black rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 mt-4 disabled:opacity-50"
             >
