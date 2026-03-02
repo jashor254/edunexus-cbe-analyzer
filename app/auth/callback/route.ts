@@ -3,12 +3,13 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
+  const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
+  // Kama kuna 'next' parameter, itumie, vinginevyo iende dashboard
   const next = searchParams.get('next') ?? '/dashboard'
 
   if (code) {
-    // Kwenye Next.js 15+, cookies() ni promise, lazima iwe awaited
+    // Kwa Next.js 15+, cookies() ni promise
     const cookieStore = await cookies() 
     
     const supabase = createServerClient(
@@ -30,11 +31,14 @@ export async function GET(request: Request) {
     )
     
     const { error } = await supabase.auth.exchangeCodeForSession(code)
+    
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
+      // TULAZIMISHE redirect kwenda kwenye domain yako halisi
+      // Hii inazuia ile loop ya kurudi landing page
+      return NextResponse.redirect(new URL(next, 'https://edunexus.co.ke'))
     }
   }
 
-  // Ikishindikana, mrudishe login au fanya fallback
-  return NextResponse.redirect(`${origin}/login?error=auth-failed`)
+  // Ikishindikana, mrudishe login na error message
+  return NextResponse.redirect(new URL('/login?error=auth-failed', 'https://edunexus.co.ke'))
 }
