@@ -1,21 +1,29 @@
 import { NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server" // Hakikisha ni ya server!
 
-// Fake starter data — unaweza replace later na DB
 export async function GET() {
   try {
-    const stats = {
-      users: 1,
-      analyses: 0,
-      lastSync: new Date().toISOString(),
+    const supabase = await createClient() // Lazima iwe na await sasa
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    return NextResponse.json(stats)
+    // Pata stats zako sasa "asteaste"
+    const { count: studentCount } = await supabase
+      .from('students')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+
+    return NextResponse.json({
+      students: studentCount || 0,
+      lastSync: new Date().toISOString()
+    })
+
   } catch (err) {
     console.error(err)
-
-    return NextResponse.json(
-      { error: "Failed to fetch stats" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: "Server Error" }, { status: 500 })
   }
 }

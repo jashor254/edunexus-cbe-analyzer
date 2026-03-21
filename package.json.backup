@@ -1,0 +1,46 @@
+{
+  "name": "cbc-analyzer",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test:report": "tsx scripts/test-report.ts"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@react-email/components": "^1.0.7",
+    "@react-pdf/renderer": "^4.3.2",
+    "@supabase/auth-helpers-nextjs": "^0.15.0",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.99.2",
+    "ai": "^6.0.61",
+    "canvas-confetti": "^1.9.4",
+    "dotenv": "^17.2.3",
+    "framer-motion": "^12.34.0",
+    "lucide-react": "^0.563.0",
+    "next": "^16.1.6",
+    "openai": "^6.17.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-email": "^5.2.8",
+    "resend": "^6.9.2",
+    "sonner": "^2.0.7",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@tailwindcss/typography": "^0.5.19",
+    "@types/dotenv": "^6.1.1",
+    "@types/node": "^20.19.37",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.1",
+    "tailwindcss": "^4",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,104 +1,130 @@
 // lib/payments/config.ts
 
+// ===== PLAN TYPES =====
+export type PlanType = 'termly' | 'annual' | 'none';
+export type TokenBundleType = 'starter' | 'popular' | 'pro';
+export type PaymentMethod = 'mpesa_stk' | 'mpesa_b2c' | 'card' | 'bank';
+
+// ===== PAYMENT PLANS =====
 export const PAYMENT_PLANS = {
   termly: {
+    id: 'termly',
     name: 'Termly Subscription',
-    price: 350,
+    price: 1500,
     currency: 'KES',
-    tokens: 50,
+    period: 'term',
     features: [
-      '50 AI scheme analyses',
-      'Valid for one term (4 months)',
-      'Unlimited lesson plans & reports',
-      'Progress tracking',
-      'Priority support',
-      'Export to PDF/Word',
-      'Only KES 7 per analysis!',
+      'Unlimited Academic Clinic reports',
+      'Unlimited AI tutoring sessions',
+      'All subjects (Junior & Senior)',
+      'Parent insights dashboard',
+      'Progress tracking over time',
+      'Downloadable PDF reports',
+      'Priority email support'
     ],
-    duration: '4 months (1 term)',
-    savings: 650, // vs buying tokens individually
+    limits: {
+      reportsPerMonth: 'unlimited',
+      studentsPerAccount: 3,
+      aiSessionsPerDay: 'unlimited'
+    }
   },
+  annual: {
+    id: 'annual',
+    name: 'Annual Subscription',
+    price: 4000,
+    currency: 'KES',
+    period: 'year',
+    features: [
+      'Everything in Termly, PLUS:',
+      '2 months FREE (save KES 500)',
+      'Advanced career predictions',
+      'Comparison with CBC benchmarks',
+      'WhatsApp support group access',
+      'Early access to new features'
+    ],
+    limits: {
+      reportsPerMonth: 'unlimited',
+      studentsPerAccount: 5,
+      aiSessionsPerDay: 'unlimited'
+    }
+  }
 } as const;
 
+// ===== TOKEN BUNDLES =====
 export const TOKEN_BUNDLES = {
   starter: {
+    id: 'starter',
     name: 'Starter Pack',
-    tokens: 5,
-    price: 100,
+    tokens: 3,
+    price: 300,
     currency: 'KES',
-    pricePerToken: 20,
-    savings: 0,
+    pricePerToken: 100,
     popular: false,
+    features: [
+      '3 full Academic Clinic reports',
+      'Valid forever (no expiry)',
+      'All subjects included',
+      'Downloadable PDFs',
+      'Perfect for trying it out'
+    ]
   },
   popular: {
+    id: 'popular',
     name: 'Popular Pack',
-    tokens: 15,
-    price: 250,
+    tokens: 10,
+    price: 850,
     currency: 'KES',
-    pricePerToken: 16.67,
-    savings: 50,
-    popular: true, // Mark as most popular
+    pricePerToken: 85,
+    popular: true,
+    features: [
+      '10 full Academic Clinic reports',
+      'Save 15% vs Starter Pack',
+      'Valid forever (no expiry)',
+      'All subjects included',
+      'Most popular choice'
+    ]
   },
-  value: {
-    name: 'Best Value Pack',
-    tokens: 30,
-    price: 400,
+  pro: {
+    id: 'pro',
+    name: 'Pro Pack',
+    tokens: 25,
+    price: 1875,
     currency: 'KES',
-    pricePerToken: 13.33,
-    savings: 200,
+    pricePerToken: 75,
     popular: false,
-  },
+    features: [
+      '25 full Academic Clinic reports',
+      'Save 25% vs Starter Pack',
+      'Valid forever (no expiry)',
+      'All subjects included',
+      'Best value for schools'
+    ]
+  }
 } as const;
 
-export type PlanType = keyof typeof PAYMENT_PLANS;
-export type TokenBundleType = keyof typeof TOKEN_BUNDLES;
-export type PaymentMethod = 'mpesa_stk' | 'mpesa_paybill' | 'card';
-export type PaymentStatus = 'pending' | 'successful' | 'failed' | 'cancelled';
-export type SubscriptionStatus = 'active' | 'expired' | 'cancelled';
+// ===== COMBINED PRODUCTS =====
+export const ALL_PRODUCTS = {
+  // Subscriptions
+  ...PAYMENT_PLANS,
+  // Token Bundles
+  ...TOKEN_BUNDLES
+} as const;
 
-export interface Subscription {
-  id: string;
-  user_id: string;
-  plan_type: PlanType | 'token_bundle';
-  status: SubscriptionStatus;
-  ai_tokens_remaining: number;
-  ai_tokens_total: number;
-  term_year?: number;
-  term_number?: number;
-  started_at: string;
-  expires_at?: string;
-  created_at: string;
-  updated_at: string;
-}
+// ===== TYPES =====
+export type ProductId = keyof typeof ALL_PRODUCTS;
+export type Product = typeof ALL_PRODUCTS[ProductId];
 
-export interface Payment {
-  id: string;
-  user_id: string;
-  transaction_id: string;
-  amount: number;
-  currency: string;
-  payment_method: PaymentMethod;
-  phone_number?: string;
-  status: PaymentStatus;
-  plan_type: string;
-  metadata?: Record<string, any>;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface User {
-  id: string;
-  email: string;
-  created_at: string;
-  last_active_at: string;
-  free_analysis_used: boolean;
-  free_analysis_expires_at?: string;
-  referred_by?: string;
-  referral_code: string;
-  referral_count: number;
-}
+// ===== HELPER FUNCTIONS =====
 
 export function getPlanDetails(planType: PlanType) {
+  if (planType === 'none') {
+    return {
+      name: 'Free Tier',
+      price: 0,
+      features: ['1 free analysis', 'Basic subject tracking'],
+      limits: { reportsPerMonth: 1, studentsPerAccount: 1 }
+    };
+  }
   return PAYMENT_PLANS[planType];
 }
 
@@ -109,35 +135,84 @@ export function getTokenBundleDetails(bundleType: TokenBundleType) {
 export function formatCurrency(amount: number, currency: string = 'KES'): string {
   return new Intl.NumberFormat('en-KE', {
     style: 'currency',
-    currency: currency,
+    currency,
     minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    maximumFractionDigits: 0
   }).format(amount);
 }
 
 export function formatPhoneNumber(phone: string): string {
-  let cleaned = phone.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
-  if (cleaned.startsWith('+')) cleaned = cleaned.substring(1);
-  if (cleaned.startsWith('0')) cleaned = '254' + cleaned.substring(1);
-  if (!cleaned.startsWith('254')) cleaned = '254' + cleaned;
+  // Convert 0712345678 to 254712345678
+  const cleaned = phone.replace(/\D/g, '');
+  if (cleaned.startsWith('0')) {
+    return '254' + cleaned.slice(1);
+  }
+  if (cleaned.startsWith('7')) {
+    return '254' + cleaned;
+  }
   return cleaned;
 }
 
-export function isSubscriptionActive(subscription: Subscription): boolean {
-  if (subscription.status !== 'active') return false;
-  
-  if (subscription.expires_at) {
-    return new Date(subscription.expires_at) > new Date();
-  }
-  
-  return true;
+export function calculateTokensNeeded(reportCount: number): TokenBundleType | null {
+  if (reportCount <= 3) return 'starter';
+  if (reportCount <= 10) return 'popular';
+  if (reportCount <= 25) return 'pro';
+  return null; // Recommend subscription instead
 }
 
-export function generateReferralCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Exclude confusing chars
-  let code = '';
-  for (let i = 0; i < 8; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+export function isSubscriptionActive(subscription: any): boolean {
+  if (!subscription) return false;
+  if (subscription.status !== 'active') return false;
+  
+  const now = new Date();
+  const endDate = new Date(subscription.end_date);
+  return endDate > now;
+}
+
+export function getPaymentRecommendation(
+  hasSubscription: boolean,
+  tokenBalance: number,
+  neededReports: number
+): {
+  recommendation: 'subscribe' | 'buy_tokens' | 'use_tokens' | 'free_trial';
+  message: string;
+} {
+  if (!hasSubscription && tokenBalance < neededReports) {
+    const tokensNeeded = neededReports - tokenBalance;
+    if (tokensNeeded <= 3) {
+      return {
+        recommendation: 'buy_tokens',
+        message: `Buy a Starter Pack (${tokensNeeded} tokens) to continue`
+      };
+    } else if (tokensNeeded <= 10) {
+      return {
+        recommendation: 'buy_tokens',
+        message: 'Buy the Popular Pack for best value'
+      };
+    } else {
+      return {
+        recommendation: 'subscribe',
+        message: 'Subscribe termly for unlimited reports (cheaper than tokens)'
+      };
+    }
   }
-  return code;
+  
+  if (hasSubscription) {
+    return {
+      recommendation: 'use_tokens',
+      message: 'You have unlimited access!'
+    };
+  }
+  
+  if (tokenBalance >= neededReports) {
+    return {
+      recommendation: 'use_tokens',
+      message: `You have ${tokenBalance} tokens remaining`
+    };
+  }
+  
+  return {
+    recommendation: 'free_trial',
+    message: 'Use your free analysis first!'
+  };
 }

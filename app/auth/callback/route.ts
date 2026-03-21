@@ -1,17 +1,23 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const code = searchParams.get('code')
-  // Kama kuna 'next' parameter, itumie, vinginevyo iende dashboard
-  const next = searchParams.get('next') ?? '/dashboard'
-
-  if (code) {
-    // Kwa Next.js 15+, cookies() ni promise
-    const cookieStore = await cookies() 
+  try {
+    const requestUrl = new URL(request.url)
+    const code = requestUrl.searchParams.get('code')
     
+    console.log("🔵 Callback hit - URL:", request.url)
+    
+    if (!code) {
+      console.log("❌ No code found")
+      return NextResponse.redirect(new URL('/login?error=no-code', requestUrl.origin))
+    }
+
+    // Get cookie store
+    const cookieStore = await cookies()
+    
+    // Create Supabase client with SSR
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -20,25 +26,40 @@ export async function GET(request: Request) {
           get(name: string) {
             return cookieStore.get(name)?.value
           },
-          set(name: string, value: string, options: CookieOptions) {
-            cookieStore.set({ name, value, ...options })
+          set(name: string, value: string, options: any) {
+            try {
+              cookieStore.set({ name, value, ...options })
+            } catch (error) {
+              // Handle error
+            }
           },
-          remove(name: string, options: CookieOptions) {
-            cookieStore.set({ name, value: '', ...options })
+          remove(name: string, options: any) {
+            try {
+              cookieStore.set({ name, value: '', ...options })
+            } catch (error) {
+              // Handle error
+            }
           },
         },
       }
     )
-    
+
+    // Exchange code for session
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     
-    if (!error) {
-      // TULAZIMISHE redirect kwenda kwenye domain yako halisi
-      // Hii inazuia ile loop ya kurudi landing page
-      return NextResponse.redirect(new URL(next, 'https://edunexus.co.ke'))
+    if (error) {
+      console.error("❌ Exchange error:", error)
+      return NextResponse.redirect(new URL('/login?error=exchange-failed', requestUrl.origin))
     }
-  }
 
-  // Ikishindikana, mrudishe login na error message
-  return NextResponse.redirect(new URL('/login?error=auth-failed', 'https://edunexus.co.ke'))
+    console.log("✅ Session exchanged successfully!")
+    
+    // Redirect to dashboard
+    return NextResponse.redirect(new URL('/dashboard', requestUrl.origin))
+    
+  } catch (error) {
+    console.error("💥 Callback error:", error)
+    const requestUrl = new URL(request.url)
+    return NextResponse.redirect(new URL('/login?error=exception', requestUrl.origin))
+  }
 }

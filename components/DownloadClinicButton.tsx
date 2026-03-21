@@ -7,12 +7,18 @@ import { toast } from 'sonner';
 interface Props {
   studentId: string;
   studentName: string;
-  hasPaid: boolean; // Hii itatoka kwenye query yako ya payments
+  hasPaid: boolean;
   scores: any;
   profile: any;
 }
 
-export default function DownloadClinicButton({ studentId, studentName, hasPaid, scores, profile }: Props) {
+export default function DownloadClinicButton({ 
+  studentId, 
+  studentName, 
+  hasPaid, 
+  scores, 
+  profile 
+}: Props) {
   const [isGenerating, setIsGenerating] = useState(false);
 
   const handleDownload = async () => {
@@ -26,10 +32,17 @@ export default function DownloadClinicButton({ studentId, studentName, hasPaid, 
       const response = await fetch('/api/clinic/download', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId, scores, profile }),
+        body: JSON.stringify({ 
+          studentId, 
+          assessments: [scores],
+          profile 
+        }),
       });
 
-      if (!response.ok) throw new Error('Generation failed');
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || 'Generation failed');
+      }
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -42,6 +55,7 @@ export default function DownloadClinicButton({ studentId, studentName, hasPaid, 
       
       toast.success("Ripoti imepakuliwa kikamilifu!");
     } catch (err) {
+      console.error('Download error:', err);
       toast.error("Kuna tatizo la kiufundi. Jaribu tena.");
     } finally {
       setIsGenerating(false);
@@ -57,7 +71,7 @@ export default function DownloadClinicButton({ studentId, studentName, hasPaid, 
 
       {!hasPaid ? (
         <button 
-          onClick={() => window.location.href = '/billing'} // Au trigger M-Pesa modal
+          onClick={() => window.location.href = '/pricing'}
           className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white py-4 rounded-xl font-bold hover:bg-black transition-all"
         >
           <Lock className="w-5 h-5 text-yellow-400" />

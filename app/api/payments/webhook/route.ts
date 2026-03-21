@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { paystackClient } from '@/lib/payments/paystack';
 
-// Tunatumia Service Role hapa ili kuweza ku-update DB bila vikwazo vya RLS
+// Service Role for bypassing RLS
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -10,80 +10,90 @@ const supabase = createClient(
 
 export async function POST(request: NextRequest) {
   try {
+    // ============================================
+    // 1. SECURITY: Verify Paystack Signature
+    // ============================================
     const signature = request.headers.get('x-paystack-signature');
-    const body = await request.text();
+    const body = await request.text(); // Raw body for signature verification
     
-    // 1. Security Check
     if (!signature || !paystackClient.verifyWebhookSignature(signature, body)) {
+      console.error('❌ Invalid Webhook Signature');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const event = JSON.parse(body);
+    
+    // Only process successful charges
     if (event.event !== 'charge.success') {
       return NextResponse.json({ status: 'ignored' });
     }
 
-    const data = event.data;
-    const reference = data.reference;
-    // Muhimu: Hakikisha metadata hizi unazituma kutoka kwa frontend wakati wa kuanzisha malipo
-    const { user_id, plan_type, tokens_to_add } = data.metadata;
-
-    console.log(`📨 Processing Payment: ${reference} for User: ${user_id}`);
-
-    // 2. Double Check na Paystack (Optional but Safe)
-    const verifyResult = await paystackClient.verifyPayment(reference);
-    if (!verifyResult.status || verifyResult.data.status !== 'success') {
-      return NextResponse.json({ error: 'Paystack verification failed' }, { status: 400 });
-    }
-
-    // 3. Database Updates (Inline with yesterday's Logic)
+    const { reference, metadata, amount, customer } = event.data;
     
-    if (plan_type === 'term') {
-      // Logic ya UNLIMITED (3 Months / 90 Days)
-      await supabase
-        .from('subscriptions')
-        .update({
-          plan_type: 'term',
-          tokens_remaining: 999999, // Backup tokens
-          subscription_end: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', user_id);
-      
-      console.log(`✅ Termly Unlimited activated for ${user_id}`);
+    // ============================================
+    // 2. PARSE METADATA (handle string or object)
+    // ============================================
+    const meta = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
+    const { user_id, product_id, payment_type, tokens_to_add } = meta || {};
 
-    } else {
-      // Logic ya TOKENS
-      // Tunatumia RPC tuliyoiandika jana ili ku-increment tokens salama
-      const { error: rpcError } = await supabase.rpc('add_tokens', {
-        p_user_id: user_id,
-        p_tokens: tokens_to_add || 10, // Default kama metadata ikikosekana
-        p_amount: data.amount / 100    // Convert cents to KES
-      });
-
-      if (rpcError) {
-        console.error('❌ RPC Token Error:', rpcError);
-        return NextResponse.json({ error: 'DB Update Failed' }, { status: 500 });
-      }
-      
-      console.log(`✅ ${tokens_to_add} tokens added for ${user_id}`);
+    if (!user_id) {
+      console.error('❌ Missing user_id in metadata for ref:', reference);
+      return NextResponse.json({ error: 'Missing user_id in metadata' }, { status: 400 });
     }
 
-    // 4. Rekodi Transaction (Hii ni kwa ajili ya audit/history)
-    await supabase.from('payments').insert({
-      user_id: user_id,
-      transaction_id: reference,
-      amount: data.amount / 100,
-      status: 'successful',
-      plan_type: plan_type,
-      metadata: data.metadata
+    // ============================================
+    // 3. IDEMPOTENCY CHECK - Prevent double processing
+    // ============================================
+    const { data: existingPayment } = await supabase
+      .from('payments')
+      .select('id, status')
+      .eq('transaction_id', reference)
+      .single();
+
+    if (existingPayment) {
+      if (existingPayment.status === 'completed' || existingPayment.status === 'successful') {
+        console.log(`⚠️ Transaction ${reference} already processed. Skipping.`);
+        return NextResponse.json({ status: 'already_processed' });
+      }
+    }
+
+    console.log(`📨 Processing Payment: ${reference} | Amount: KES ${amount/100}`);
+
+    // ============================================
+    // 4. ATOMIC UPDATE - All or nothing!
+    // ============================================
+    const { error: rpcError } = await supabase.rpc('handle_successful_payment_webhook', {
+      p_user_id: user_id,
+      p_transaction_id: reference,
+      p_product_id: product_id || 'token_bundle',
+      p_payment_type: payment_type || 'bundle',
+      p_tokens_to_add: Number(tokens_to_add) || 0,
+      p_amount: amount / 100,
+      p_metadata: meta,
+      p_customer_email: customer?.email || null
     });
 
-    return NextResponse.json({ status: 'success', message: 'Processed' });
+    if (rpcError) {
+      console.error('❌ RPC Error:', rpcError);
+      
+      // Log to error table for manual review
+      await supabase.from('webhook_errors').insert({
+        transaction_id: reference,
+        error: rpcError.message,
+        payload: meta,
+        created_at: new Date().toISOString()
+      });
+      
+      // Return 500 so Paystack retries
+      return NextResponse.json({ error: 'Database update failed' }, { status: 500 });
+    }
+
+    console.log(`✅ Success! Payment processed for User: ${user_id}`);
+    return NextResponse.json({ status: 'success' }, { status: 200 });
 
   } catch (error: any) {
-    console.error('❌ Webhook Crash:', error.message);
-    return NextResponse.json({ error: 'Internal Error' }, { status: 500 });
+    console.error('❌ Webhook Critical Error:', error.message);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
 

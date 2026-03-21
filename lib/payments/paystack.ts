@@ -1,27 +1,16 @@
-// lib/payments/paystack.ts
 import crypto from 'crypto';
 
-interface PaystackConfig {
-  publicKey: string;
-  secretKey: string;
-  baseUrl: string;
-}
-
-interface InitializePaymentParams {
+export interface InitializePaymentParams {
   email: string;
   amount: number;
   reference: string;
+  currency?: string;
   callback_url: string;
-  metadata?: {
-    user_id: string;
-    plan_type: string;
-    payment_id: string;
-    [key: string]: any;
-  };
-  channels?: string[];
+  metadata?: Record<string, any>;
+  phone?: string;
 }
 
-interface InitializePaymentResponse {
+export interface InitializePaymentResponse {
   status: boolean;
   message: string;
   data: {
@@ -31,110 +20,35 @@ interface InitializePaymentResponse {
   };
 }
 
-interface VerifyPaymentResponse {
-  status: boolean;
-  message: string;
-  data: {
-    id: number;
-    domain: string;
-    status: string;
-    reference: string;
-    amount: number;
-    message: string | null;
-    gateway_response: string;
-    paid_at: string;
-    created_at: string;
-    channel: string;
-    currency: string;
-    ip_address: string;
-    metadata: any;
-    fees: number;
-    customer: {
-      id: number;
-      email: string;
-      customer_code: string;
-    };
-  };
-}
-
-class PaystackClient {
-  private config: PaystackConfig;
+export class PaystackClient {
+  private secretKey: string;
+  private baseUrl = 'https://api.paystack.co';
 
   constructor() {
-    this.config = {
-      publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
-      secretKey: process.env.PAYSTACK_SECRET_KEY || '',
-      baseUrl: 'https://api.paystack.co',
-    };
-
-    if (!this.config.secretKey) {
-      console.warn('Paystack secret key not configured');
-    }
+    this.secretKey = process.env.PAYSTACK_SECRET_KEY!;
   }
 
   generateReference(): string {
-    return `TXN_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
+    return `EDU-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  async initializePayment(
-    params: InitializePaymentParams
-  ): Promise<InitializePaymentResponse> {
-    try {
-      const response = await fetch(`${this.config.baseUrl}/transaction/initialize`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.config.secretKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(params),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.status) {
-        throw new Error(data.message || 'Payment initialization failed');
-      }
-
-      return data;
-    } catch (error: any) {
-      console.error('Paystack initialization error:', error);
-      throw error;
-    }
+  toKobo(amount: number): number {
+    return amount * 100;
   }
 
-  async verifyPayment(reference: string): Promise<VerifyPaymentResponse> {
-    try {
-      const response = await fetch(
-        `${this.config.baseUrl}/transaction/verify/${reference}`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${this.config.secretKey}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Payment verification failed');
-      }
-
-      return data;
-    } catch (error: any) {
-      console.error('Paystack verification error:', error);
-      throw error;
-    }
-  }
-
+  /**
+   * Verify Paystack webhook signature
+   * This is CRITICAL for security!
+   */
   verifyWebhookSignature(signature: string, body: string): boolean {
     try {
+      // Create HMAC SHA512 hash using your secret key
       const hash = crypto
-        .createHmac('sha512', this.config.secretKey)
+        .createHmac('sha512', this.secretKey)
         .update(body)
         .digest('hex');
-
+      
+      // Compare the hash with Paystack's signature
       return hash === signature;
     } catch (error) {
       console.error('Webhook signature verification error:', error);
@@ -142,41 +56,107 @@ class PaystackClient {
     }
   }
 
-  toKobo(amount: number): number {
-    return Math.round(amount * 100);
+  async initializePayment(params: InitializePaymentParams): Promise<InitializePaymentResponse> {
+    const response = await fetch(`${this.baseUrl}/transaction/initialize`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.secretKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Paystack initialization failed');
+    }
+
+    return response.json();
   }
 
-  fromKobo(kobo: number): number {
-    return kobo / 100;
+  async verifyPayment(reference: string) {
+    const response = await fetch(`${this.baseUrl}/transaction/verify/${reference}`, {
+      headers: {
+        Authorization: `Bearer ${this.secretKey}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Payment verification failed');
+    }
+
+    return response.json();
   }
 
-  getPublicKey(): string {
-    return this.config.publicKey;
+  /**
+   * List banks (for transfers)
+   */
+  async listBanks() {
+    const response = await fetch(`${this.baseUrl}/bank`, {
+      headers: {
+        Authorization: `Bearer ${this.secretKey}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch banks');
+    }
+
+    return response.json();
   }
 
-  formatPhoneNumber(phone: string): string {
-    let cleaned = phone.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
-    
-    if (cleaned.startsWith('+')) {
-      cleaned = cleaned.substring(1);
+  /**
+   * Create transfer recipient
+   */
+  async createTransferRecipient(params: {
+    type: 'nuban' | 'mobile_money' | 'basa';
+    name: string;
+    account_number: string;
+    bank_code: string;
+    currency?: string;
+  }) {
+    const response = await fetch(`${this.baseUrl}/transferrecipient`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.secretKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to create transfer recipient');
     }
-    
-    if (cleaned.startsWith('0')) {
-      cleaned = '254' + cleaned.substring(1);
+
+    return response.json();
+  }
+
+  /**
+   * Initiate transfer
+   */
+  async initiateTransfer(params: {
+    source: 'balance';
+    amount: number;
+    recipient: string;
+    reason?: string;
+    reference?: string;
+  }) {
+    const response = await fetch(`${this.baseUrl}/transfer`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.secretKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to initiate transfer');
     }
-    
-    if (!cleaned.startsWith('254')) {
-      cleaned = '254' + cleaned;
-    }
-    
-    return cleaned;
+
+    return response.json();
   }
 }
 
+// Singleton instance
 export const paystackClient = new PaystackClient();
-
-export type {
-  InitializePaymentParams,
-  InitializePaymentResponse,
-  VerifyPaymentResponse,
-};

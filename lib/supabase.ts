@@ -1,11 +1,118 @@
-import { createClient } from "@supabase/supabase-js";
+import { createBrowserClient } from '@supabase/ssr'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+// ==================== SUPABASE CLIENT ====================
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-// ==================== TYPES ====================
+// Validate environment variables
+if (!supabaseUrl) {
+  throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL')
+}
+if (!supabaseAnonKey) {
+  throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY')
+}
+
+// Create Supabase browser client with SSR support
+export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey)
+
+// ==================== AUTH HELPER FUNCTIONS ====================
+
+/**
+ * Get current user session
+ */
+export async function getCurrentUser() {
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser()
+    if (error) throw error
+    return user
+  } catch (error) {
+    console.error('Error getting user:', error)
+    return null
+  }
+}
+
+/**
+ * Sign out user
+ */
+export async function signOut() {
+  try {
+    const { error } = await supabase.auth.signOut()
+    if (error) throw error
+    return { success: true }
+  } catch (error) {
+    console.error('Error signing out:', error)
+    return { success: false, error }
+  }
+}
+
+/**
+ * Sign in with Google
+ */
+export async function signInWithGoogle() {
+  try {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
+    })
+    
+    if (error) throw error
+    return { success: true, url: data.url }
+  } catch (error) {
+    console.error('Error signing in with Google:', error)
+    return { success: false, error }
+  }
+}
+
+/**
+ * Sign in with email/password
+ */
+export async function signInWithEmail(email: string, password: string) {
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+    
+    if (error) throw error
+    return { success: true, user: data.user }
+  } catch (error) {
+    console.error('Error signing in:', error)
+    return { success: false, error }
+  }
+}
+
+/**
+ * Sign up with email/password
+ */
+export async function signUpWithEmail(email: string, password: string, name: string) {
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: name,
+        },
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
+    })
+    
+    if (error) throw error
+    return { success: true, user: data.user }
+  } catch (error) {
+    console.error('Error signing up:', error)
+    return { success: false, error }
+  }
+}
+
+// ==================== TYPES (Hazijabadilishwa) ====================
 
 export type Student = {
   id: string
@@ -147,8 +254,8 @@ export const PRICING = {
   }
 } as const;
 
-// ==================== JUNIOR SCHOOL (Grade 7-9) ====================
-// Rationalized to 8 Core + 1 Religious subject [cite: 2026-01-31]
+// ==================== SCHOOL SUBJECTS ====================
+
 export const JUNIOR_SUBJECTS = [
   { key: 'mathematics', label: 'Mathematics' },
   { key: 'english', label: 'English' },
@@ -165,9 +272,6 @@ export const JUNIOR_RELIGION = [
   { key: 'ire', label: 'Islamic Religious Education' },
   { key: 'hre', label: 'Hindu Religious Education' },
 ] as const;
-
-// ==================== SENIOR SCHOOL (Grade 10-12) ====================
-// Based on KICD Lesson Distribution
 
 export const SENIOR_CORE_SUBJECTS = [
   { key: 'english', label: 'English' },
@@ -201,8 +305,8 @@ export function getPathwayElectives(pathway: string) {
       { key: 'theatre_film', label: 'Theatre and Film' },
       { key: 'fine_arts', label: 'Fine Arts' },
     ]
-  };
-  return mapping[pathway] || [];
+  }
+  return mapping[pathway] || []
 }
 
 export const COMPETENCY_LEVELS = [
@@ -210,13 +314,10 @@ export const COMPETENCY_LEVELS = [
   { value: 2, label: 'Approaching Expectations', short: 'AE', bgColor: 'bg-yellow-50', borderColor: 'border-yellow-500', textColor: 'text-yellow-700' },
   { value: 3, label: 'Meeting Expectations', short: 'ME', bgColor: 'bg-green-50', borderColor: 'border-green-500', textColor: 'text-green-700' },
   { value: 4, label: 'Exceeding Expectations', short: 'EE', bgColor: 'bg-blue-50', borderColor: 'border-blue-500', textColor: 'text-blue-700' },
-] as const;
+] as const
 
 // ==================== HELPER FUNCTIONS ====================
 
-/**
- * Check if user has active subscription
- */
 export async function hasActiveSubscription(userId: string): Promise<boolean> {
   const { data, error } = await supabase
     .from('subscriptions')
@@ -224,78 +325,67 @@ export async function hasActiveSubscription(userId: string): Promise<boolean> {
     .eq('user_id', userId)
     .eq('status', 'active')
     .gte('end_date', new Date().toISOString())
-    .single();
+    .single()
 
-  return !error && !!data;
+  return !error && !!data
 }
 
-/**
- * Get user's available tokens
- */
 export async function getAvailableTokens(userId: string): Promise<number> {
   const { data, error } = await supabase
     .from('user_tokens')
     .select('tokens_remaining')
     .eq('user_id', userId)
-    .or(`expiry_date.is.null,expiry_date.gte.${new Date().toISOString()}`);
+    .or(`expiry_date.is.null,expiry_date.gte.${new Date().toISOString()}`)
 
-  if (error || !data) return 0;
+  if (error || !data) return 0
 
-  return data.reduce((sum, row) => sum + row.tokens_remaining, 0);
+  return data.reduce((sum, row) => sum + row.tokens_remaining, 0)
 }
 
-/**
- * Deduct tokens from user account
- */
 export async function deductTokens(
   userId: string,
   action: keyof typeof PRICING.TOKEN_COSTS,
   metadata?: Record<string, any>
 ): Promise<{ success: boolean; message: string }> {
-  const tokenCost = PRICING.TOKEN_COSTS[action];
+  const tokenCost = PRICING.TOKEN_COSTS[action]
 
   const { data, error } = await supabase.rpc('deduct_tokens', {
     p_user_id: userId,
     p_action: action,
     p_tokens: tokenCost,
     p_metadata: metadata || {}
-  });
+  })
 
   if (error) {
-    return { success: false, message: error.message };
+    return { success: false, message: error.message }
   }
 
   if (!data) {
-    return { success: false, message: 'Insufficient tokens' };
+    return { success: false, message: 'Insufficient tokens' }
   }
 
-  return { success: true, message: 'Tokens deducted successfully' };
+  return { success: true, message: 'Tokens deducted successfully' }
 }
 
-/**
- * Check if user can perform action (has subscription OR tokens)
- */
 export async function canPerformAction(
   userId: string,
   action: keyof typeof PRICING.TOKEN_COSTS
 ): Promise<{ allowed: boolean; method: 'subscription' | 'tokens' | null; message: string }> {
-  // Check subscription first
-  const hasSub = await hasActiveSubscription(userId);
+  const hasSub = await hasActiveSubscription(userId)
   if (hasSub) {
-    return { allowed: true, method: 'subscription', message: 'Access via subscription' };
+    return { allowed: true, method: 'subscription', message: 'Access via subscription' }
   }
 
-  // Check tokens
-  const availableTokens = await getAvailableTokens(userId);
-  const requiredTokens = PRICING.TOKEN_COSTS[action];
+  const availableTokens = await getAvailableTokens(userId)
+  const requiredTokens = PRICING.TOKEN_COSTS[action]
 
   if (availableTokens >= requiredTokens) {
-    return { allowed: true, method: 'tokens', message: `Will use ${requiredTokens} tokens` };
+    return { allowed: true, method: 'tokens', message: `Will use ${requiredTokens} tokens` }
   }
 
   return { 
     allowed: false, 
     method: null, 
     message: `Need ${requiredTokens} tokens or active subscription` 
-  };
+  }
 }

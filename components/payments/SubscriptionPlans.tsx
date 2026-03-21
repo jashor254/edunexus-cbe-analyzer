@@ -1,4 +1,3 @@
-// components/payments/SubscriptionPlans.tsx
 'use client';
 
 import { useState } from 'react';
@@ -15,11 +14,13 @@ import PaymentModal from './PaymentModal';
 interface SubscriptionPlansProps {
   userEmail: string;
   hasFreeAnalysis: boolean;
+  currentPlanId?: string; // Mpya: Ili tujue kama tayari amelipa
 }
 
 export default function SubscriptionPlans({ 
   userEmail,
-  hasFreeAnalysis
+  hasFreeAnalysis,
+  currentPlanId
 }: SubscriptionPlansProps) {
   const [selectedPlan, setSelectedPlan] = useState<PlanType | null>(null);
   const [selectedBundle, setSelectedBundle] = useState<TokenBundleType | null>(null);
@@ -37,199 +38,130 @@ export default function SubscriptionPlans({
     setShowPaymentModal(true);
   };
 
+  // Convert objects to arrays for easier mapping without TS errors
+  const tokenBundlesList = Object.entries(TOKEN_BUNDLES) as [TokenBundleType, typeof TOKEN_BUNDLES['starter']][];
+
   return (
     <>
-      <div className="py-12 px-4">
+      <div className="py-12 px-4 bg-gray-50/50 rounded-3xl">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Choose Your Plan
+            <h2 className="text-4xl font-black text-gray-900 mb-4 tracking-tight">
+              Ready to Upgrade?
             </h2>
-            <p className="text-lg text-gray-600 mb-2">
-              Unlock powerful AI tools for CBC teaching
+            <p className="text-lg text-gray-600 font-medium">
+              Join 500+ CBC teachers using EduNexus to save 10+ hours weekly.
             </p>
             {hasFreeAnalysis && (
-              <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2 rounded-full text-sm font-semibold">
+              <div className="mt-6 inline-flex items-center gap-2 bg-green-100 text-green-700 px-6 py-2 rounded-full text-sm font-bold animate-bounce">
                 <Sparkles className="w-4 h-4" />
-                You have 1 FREE analysis available!
+                You have 1 FREE analysis left!
               </div>
             )}
           </div>
 
-          {/* Termly Subscription */}
-          <div className="max-w-2xl mx-auto mb-12">
-            <div className="relative rounded-2xl border-2 border-blue-500 bg-blue-50 p-8 shadow-lg ring-2 ring-blue-500">
-              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                <span className="bg-blue-600 text-white px-6 py-2 rounded-full text-sm font-semibold flex items-center gap-2">
+          {/* Termly Subscription (The Hero) */}
+          <div className="max-w-3xl mx-auto mb-16">
+            <div className={`relative rounded-[2.5rem] border-4 p-10 shadow-2xl transition-all ${
+              currentPlanId === 'termly' ? 'border-green-500 bg-white' : 'border-blue-600 bg-white'
+            }`}>
+              <div className="absolute -top-5 left-1/2 transform -translate-x-1/2">
+                <span className="bg-blue-600 text-white px-8 py-2 rounded-full text-sm font-black uppercase tracking-tighter flex items-center gap-2 shadow-lg">
                   <Crown className="w-4 h-4" />
-                  Best Value - Most Popular
+                  Recommended for Teachers
                 </span>
               </div>
 
-              <div className="flex items-start justify-between mb-6 mt-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="p-3 rounded-full bg-blue-100">
-                      <Zap className="w-8 h-8 text-blue-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-bold text-gray-900">
-                        Termly Subscription
-                      </h3>
-                      <p className="text-gray-600 text-sm">Best for regular users</p>
-                    </div>
+              <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-6">
+                <div className="flex items-center gap-5">
+                  <div className="p-4 rounded-3xl bg-blue-50">
+                    <Zap className="w-10 h-10 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-3xl font-black text-gray-900 leading-none">
+                      {PAYMENT_PLANS.termly.name}
+                    </h3>
+                    <p className="text-gray-500 font-bold mt-2 uppercase text-xs tracking-widest">Unlimited potential</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-4xl font-bold text-gray-900">
+                <div className="text-center md:text-right">
+                  <div className="text-5xl font-black text-gray-900">
                     {formatCurrency(PAYMENT_PLANS.termly.price)}
                   </div>
-                  <div className="text-sm text-gray-600">per term</div>
-                  <div className="text-xs text-green-600 font-semibold mt-1">
-                    Save {formatCurrency(PAYMENT_PLANS.termly.savings)}!
-                  </div>
+                  <div className="text-sm font-bold text-gray-400 uppercase tracking-widest">per school term</div>
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4 mb-6">
+              <div className="grid md:grid-cols-2 gap-y-4 gap-x-8 mb-10 border-y py-8 border-gray-100">
                 {PAYMENT_PLANS.termly.features.map((feature, index) => (
-                  <div key={index} className="flex items-start gap-2">
-                    <Check className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-700 text-sm">{feature}</span>
+                  <div key={index} className="flex items-center gap-3">
+                    <div className="bg-green-100 p-1 rounded-full">
+                      <Check className="w-4 h-4 text-green-600" />
+                    </div>
+                    <span className="text-gray-700 font-bold text-sm">{feature}</span>
                   </div>
                 ))}
               </div>
 
               <button
                 onClick={() => handleSelectPlan('termly')}
-                className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg"
+                disabled={currentPlanId === 'termly'}
+                className="w-full py-6 bg-gray-900 text-white text-xl font-black rounded-2xl hover:bg-blue-700 hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-blue-100 disabled:bg-green-500"
               >
-                Subscribe Now - {formatCurrency(PAYMENT_PLANS.termly.price)}
+                {currentPlanId === 'termly' ? '✓ YOUR CURRENT PLAN' : `GET STARTED NOW`}
               </button>
             </div>
           </div>
 
           {/* Token Bundles */}
-          <div className="mb-8">
-            <h3 className="text-2xl font-bold text-center text-gray-900 mb-2">
-              Or Buy Token Bundles
+          <div className="text-center mb-10">
+            <h3 className="text-2xl font-black text-gray-900 mb-2 uppercase tracking-tighter">
+              Short on cash? Buy Tokens
             </h3>
-            <p className="text-center text-gray-600 mb-8">
-              Pay only for what you need - tokens never expire
-            </p>
+            <p className="text-gray-500 font-bold">Pay as you go. No expiry. No pressure.</p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {(Object.keys(TOKEN_BUNDLES) as TokenBundleType[]).map((bundleType) => {
-              const bundle = TOKEN_BUNDLES[bundleType];
-
-              return (
-                <div
-                  key={bundleType}
-                  className={`relative rounded-xl border-2 p-6 shadow-md transition-transform hover:scale-105 ${
-                    bundle.popular
-                      ? 'border-orange-500 bg-orange-50'
-                      : 'border-gray-300 bg-white'
-                  }`}
-                >
-                  {bundle.popular && (
-                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                      <span className="bg-orange-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
-                        Most Popular
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="flex justify-center mb-4">
-                    <div className={`p-3 rounded-full ${
-                      bundle.popular 
-                        ? 'bg-orange-100' 
-                        : 'bg-gray-100'
-                    }`}>
-                      <Package className={`w-6 h-6 ${
-                        bundle.popular 
-                          ? 'text-orange-600' 
-                          : 'text-gray-600'
-                      }`} />
-                    </div>
+          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {tokenBundlesList.map(([id, bundle]) => (
+              <div
+                key={id}
+                className={`group relative rounded-[2rem] border-2 p-8 shadow-sm transition-all hover:shadow-xl hover:-translate-y-2 ${
+                  bundle.popular ? 'border-orange-400 bg-orange-50/50' : 'border-gray-100 bg-white'
+                }`}
+              >
+                <div className="flex flex-col items-center text-center">
+                  <div className={`p-4 rounded-2xl mb-6 transition-colors ${
+                    bundle.popular ? 'bg-orange-100' : 'bg-gray-50 group-hover:bg-blue-50'
+                  }`}>
+                    <Package className={`w-8 h-8 ${bundle.popular ? 'text-orange-600' : 'text-gray-400'}`} />
                   </div>
 
-                  <h4 className="text-xl font-bold text-center mb-2">
-                    {bundle.name}
-                  </h4>
-
-                  <div className="text-center mb-4">
-                    <div className="text-3xl font-bold text-gray-900">
-                      {formatCurrency(bundle.price)}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      {bundle.tokens} AI Analyses
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {formatCurrency(bundle.pricePerToken)} per analysis
-                    </div>
-                    {bundle.savings > 0 && (
-                      <div className="text-xs text-green-600 font-semibold mt-1">
-                        Save {formatCurrency(bundle.savings)}!
-                      </div>
-                    )}
+                  <h4 className="text-xl font-black text-gray-900 mb-2">{bundle.name}</h4>
+                  <div className="text-4xl font-black text-gray-900 mb-1">
+                    {formatCurrency(bundle.price)}
                   </div>
-
-                  <ul className="space-y-2 mb-6">
-                    <li className="flex items-center gap-2 text-sm text-gray-700">
-                      <Check className="w-4 h-4 text-green-600" />
-                      {bundle.tokens} scheme analyses
-                    </li>
-                    <li className="flex items-center gap-2 text-sm text-gray-700">
-                      <Check className="w-4 h-4 text-green-600" />
-                      Never expires
-                    </li>
-                    <li className="flex items-center gap-2 text-sm text-gray-700">
-                      <Check className="w-4 h-4 text-green-600" />
-                      Full access to all features
-                    </li>
-                  </ul>
+                  <p className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-6">
+                    {bundle.tokens} ANALYSES
+                  </p>
 
                   <button
-                    onClick={() => handleSelectBundle(bundleType)}
-                    className={`w-full py-3 rounded-lg font-semibold transition-colors ${
+                    onClick={() => handleSelectBundle(id)}
+                    className={`w-full py-4 rounded-xl font-black transition-all shadow-lg ${
                       bundle.popular
-                        ? 'bg-orange-600 hover:bg-orange-700 text-white'
-                        : 'bg-gray-600 hover:bg-gray-700 text-white'
+                        ? 'bg-orange-600 text-white hover:bg-orange-700'
+                        : 'bg-white border-2 border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white'
                     }`}
                   >
-                    Buy Now
+                    SELECT
                   </button>
                 </div>
-              );
-            })}
-          </div>
-
-          {/* Trust Signals */}
-          <div className="mt-12 text-center">
-            <p className="text-sm text-gray-600 mb-4">
-              Trusted by CBC teachers across Kenya
-            </p>
-            <div className="flex justify-center items-center gap-6 text-xs text-gray-500">
-              <div className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-green-600" />
-                <span>Secure Payments</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-green-600" />
-                <span>Instant Access</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-green-600" />
-                <span>Money Back Guarantee</span>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Payment Modal */}
       {showPaymentModal && (selectedPlan || selectedBundle) && (
         <PaymentModal
           planType={selectedPlan}
