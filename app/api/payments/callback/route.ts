@@ -1,44 +1,201 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { createServiceClient } from '@/utils/supabase/service'
+import { createHmac } from 'crypto'
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL!
 
-  const code = searchParams.get('code')
-  const returnTo = searchParams.get('returnTo') || '/pricing'
-  const product = searchParams.get('product')
+// ─────────────────────────────────────────────────────────────────────────────
+// Core payment processor — idempotent, called by both GET and POST
+// ─────────────────────────────────────────────────────────────────────────────
+async function processPayment(
+  reference: string
+): Promise<'success' | 'failed' | 'already_processed' | 'not_found'> {
+  const db = createServiceClient()
 
-  // ✅ FIX: await cookies()
-  const cookieStore = await cookies()
+  // 1. Fetch payment record
+  const { data: payment, error: fetchError } = await db
+    .from('payments')
+    .select('*')
+    .eq('transaction_id', reference)
+    .single()
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get: (name: string) => cookieStore.get(name)?.value,
-        set: (name: string, value: string, options: any) => {
-          cookieStore.set({ name, value, ...options })
-        },
-        remove: (name: string, options: any) => {
-          cookieStore.set({ name, value: '', ...options })
-        },
-      },
-    }
+  if (fetchError || !payment) {
+    console.error('[callback] payment not found:', reference)
+    return 'not_found'
+  }
+
+  // 2. Idempotency guard — never process twice
+  if (payment.status === 'success') {
+    return 'already_processed'
+  }
+
+  // 3. Verify with Paystack
+  const verifyRes = await fetch(
+    `https://api.paystack.co/transaction/verify/${reference}`,
+    { headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` } }
   )
 
-  // Exchange code for session
-  if (code) {
-    await supabase.auth.exchangeCodeForSession(code)
+  const verification = await verifyRes.json()
+
+  if (!verification.status || verification.data?.status !== 'success') {
+    console.error('[callback] verification failed for:', reference)
+    await db
+      .from('payments')
+      .update({ status: 'failed' })
+      .eq('transaction_id', reference)
+    return 'failed'
   }
 
-  // Build redirect URL safely
-  const redirectUrl = new URL(returnTo, request.url)
+  // 4. Mark payment success
+  await db
+    .from('payments')
+    .update({ status: 'success' })
+    .eq('transaction_id', reference)
 
-  if (product) {
-    redirectUrl.searchParams.set('product', product)
+  const userId    = payment.user_id
+  const productId = payment.product_id
+
+  // 5. Fulfill based on product ─────────────────────────────────────────────
+
+  if (productId === 'starter') {
+    // Add 15 tokens to balance
+    const { data: existing } = await db
+      .from('token_balances')
+      .select('balance, total_ever')
+      .eq('user_id', userId)
+      .single()
+
+    if (existing) {
+      await db
+        .from('token_balances')
+        .update({
+          balance:    existing.balance + 15,
+          total_ever: existing.total_ever + 15,
+        })
+        .eq('user_id', userId)
+    } else {
+      await db
+        .from('token_balances')
+        .insert({ user_id: userId, balance: 15, total_ever: 15 })
+    }
+
+  } else if (productId === 'term' || productId === 'premium') {
+    // Create or extend subscription by 3 months
+    const { data: existingSub } = await db
+      .from('subscriptions')
+      .select('id, expires_at')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .single()
+
+    if (existingSub) {
+      // Extend from current expiry — not from today
+      const newExpiry = new Date(existingSub.expires_at)
+      newExpiry.setMonth(newExpiry.getMonth() + 3)
+
+      await db
+        .from('subscriptions')
+        .update({
+          plan:       productId,
+          status:     'active',
+          expires_at: newExpiry.toISOString(),
+          payment_id: payment.id,
+        })
+        .eq('id', existingSub.id)
+    } else {
+      const expiry = new Date()
+      expiry.setMonth(expiry.getMonth() + 3)
+
+      await db
+        .from('subscriptions')
+        .insert({
+          user_id:    userId,
+          payment_id: payment.id,
+          plan:       productId,
+          status:     'active',
+          started_at: new Date().toISOString(),
+          expires_at: expiry.toISOString(),
+        })
+    }
   }
 
-  return NextResponse.redirect(redirectUrl)
+  return 'success'
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET — Browser redirect after Paystack checkout
+// ─────────────────────────────────────────────────────────────────────────────
+export async function GET(req: Request) {
+  const url       = new URL(req.url)
+  const reference = url.searchParams.get('reference') || url.searchParams.get('trxref')
+  const plan      = url.searchParams.get('plan') || ''
+
+  if (!reference) {
+    return NextResponse.redirect(`${SITE_URL}/pricing?error=missing_ref`)
+  }
+
+  try {
+    const result = await processPayment(reference)
+
+    if (result === 'success' || result === 'already_processed') {
+      return NextResponse.redirect(
+        `${SITE_URL}/payment/success?plan=${plan}&reference=${reference}`
+      )
+    }
+
+    if (result === 'failed') {
+      return NextResponse.redirect(
+        `${SITE_URL}/payment/failed?reference=${reference}`
+      )
+    }
+
+    return NextResponse.redirect(`${SITE_URL}/pricing?error=not_found`)
+
+  } catch (error: any) {
+    console.error('[callback GET] error:', error.message)
+    return NextResponse.redirect(`${SITE_URL}/payment/failed`)
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST — Paystack server webhook (configure in Paystack Dashboard)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function POST(req: Request) {
+  try {
+    const rawBody   = await req.text()
+    const signature = req.headers.get('x-paystack-signature') || ''
+    const secret    = process.env.PAYSTACK_WEBHOOK_SECRET || process.env.PAYSTACK_SECRET_KEY || ''
+
+    // 🔒 Reject anything not signed by Paystack
+    const expectedSig = createHmac('sha512', secret)
+      .update(rawBody)
+      .digest('hex')
+
+    if (signature !== expectedSig) {
+      console.error('[webhook] invalid signature — rejected')
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+    }
+
+    const event = JSON.parse(rawBody)
+
+    // Only process successful charges
+    if (event.event !== 'charge.success') {
+      return NextResponse.json({ received: true })
+    }
+
+    const reference = event.data?.reference
+    if (!reference) {
+      return NextResponse.json({ error: 'No reference' }, { status: 400 })
+    }
+
+    await processPayment(reference)
+    return NextResponse.json({ received: true })
+
+  } catch (error: any) {
+    console.error('[webhook POST] error:', error.message)
+    return NextResponse.json(
+      { error: 'Webhook processing failed' },
+      { status: 500 }
+    )
+  }
 }

@@ -1,71 +1,148 @@
-'use client';
+'use client'
 
-import { useEffect, useState, Suspense } from 'react'; // Ongeza Suspense
-import { useSearchParams, useRouter } from 'next/navigation';
-import { CheckCircle, ArrowRight } from 'lucide-react';
+import { useEffect, useState, Suspense } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { CheckCircle, PartyPopper, ArrowRight, Sparkles } from 'lucide-react'
+import Link from 'next/link'
+import confetti from 'canvas-confetti'
 
-// Tenganisha logic ya content
+// ─── Inner component (needs Suspense because of useSearchParams) ───────────────
 function SuccessContent() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const [verifying, setVerifying] = useState(true);
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const [message, setMessage] = useState('')
+  const [subMessage, setSubMessage] = useState('')
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    // ... ile kodi yako ya fetch hapa ...
-    const transactionId = searchParams.get('transactionId') || searchParams.get('reference'); // Paystack hutumia 'reference'
-    
-    if (transactionId) {
-      fetch('/api/payments/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transactionId }),
-      })
-      .then(res => res.json())
-      .then(() => setVerifying(false))
-      .catch(() => setVerifying(false));
-    } else {
-       setVerifying(false);
-    }
-  }, [searchParams]);
+    const reference = searchParams.get('reference') || searchParams.get('trxref')
+    const plan = searchParams.get('plan') || searchParams.get('product')
 
-  if (verifying) {
-    return (
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-green-600 mx-auto mb-4"></div>
-        <p className="text-lg text-gray-600 font-medium">Inathibitisha malipo yako...</p>
-      </div>
-    );
-  }
+    // ── Set message based on plan ──────────────────────────────────────────────
+    if (plan === 'starter') {
+      setMessage('Tokeni zako zimeongezwa!')
+      setSubMessage('Uko tayari kupata uchambuzi wa kwanza wa mtoto wako. Anza sasa hivi.')
+    } else if (plan === 'term') {
+      setMessage('Term Plan imewashwa!')
+      setSubMessage('Access isiyo na kikomo kwa muhula mzima. Mtoto wako yuko tayari kujifunza.')
+    } else if (plan === 'premium') {
+      setMessage('Premium imewashwa!')
+      setSubMessage('Umefungua kila kitu. Watoto wako watapata msaada bora zaidi.')
+    } else {
+      setMessage('Malipo yamekubaliwa!')
+      setSubMessage('Akaunti yako imesasishwa. Unaweza kuanza safari ya elimu sasa.')
+    }
+
+    // ── Clean URL so refresh doesn't re-trigger ────────────────────────────────
+    window.history.replaceState({}, '', '/payment/success')
+
+    // ── Confetti 🎉 ────────────────────────────────────────────────────────────
+    const duration = 4 * 1000
+    const animationEnd = Date.now() + duration
+    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 }
+
+    const randomInRange = (min: number, max: number) =>
+      Math.random() * (max - min) + min
+
+    const interval = setInterval(() => {
+      const timeLeft = animationEnd - Date.now()
+      if (timeLeft <= 0) return clearInterval(interval)
+      const particleCount = 50 * (timeLeft / duration)
+      confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } })
+      confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } })
+    }, 250)
+
+    setReady(true)
+
+    return () => clearInterval(interval)
+  }, [searchParams])
 
   return (
-    <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
-        <div className="flex justify-center mb-6">
-          <CheckCircle className="w-20 h-20 text-green-600" />
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center px-6 relative overflow-hidden">
+
+      {/* Ambient glow */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-green-500/10 rounded-full blur-[120px]" />
+      </div>
+
+      {/* Logo top */}
+      <Link href="/" className="absolute top-8 left-8 flex items-center gap-2 group">
+        <div className="w-9 h-9 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition">
+          <Sparkles className="w-4 h-4 text-white" />
         </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-4 font-heading">
-          Malipo Yamefanikiwa! 🎉
-        </h1>
-        <p className="text-gray-600 mb-8">
-          Usajili wako umekamilika. Sasa unaweza kuanza kupata ripoti za AI kwa mwanao.
-        </p>
-        <button
-          onClick={() => router.push('/dashboard')}
-          className="w-full py-4 bg-gradient-to-r from-green-600 to-blue-600 text-white font-bold rounded-lg hover:from-green-700 hover:to-blue-700 flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-200"
-        >
-          Nenda Kwenye Dashboard
-          <ArrowRight className="w-5 h-5" />
-        </button>
+        <span className="text-lg font-black text-white tracking-tight">EduNexus</span>
+      </Link>
+
+      {/* Card */}
+      <div className="relative z-10 w-full max-w-md animate-in zoom-in duration-500">
+
+        {/* Glow border */}
+        <div className="absolute -inset-0.5 bg-gradient-to-r from-green-500 to-emerald-500 rounded-3xl blur opacity-40" />
+
+        <div className="relative bg-slate-900 border border-green-500/30 rounded-3xl p-10 text-center overflow-hidden">
+
+          {/* Top accent bar */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-400 via-emerald-400 to-teal-400" />
+
+          {/* Animated check icon */}
+          <div className="w-24 h-24 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-7 relative">
+            <CheckCircle className="w-14 h-14 text-green-400 relative z-10" />
+            <div className="absolute inset-0 bg-green-400/20 rounded-full animate-ping" />
+          </div>
+
+          {/* Title */}
+          <h1 className="text-4xl font-black text-white mb-2 tracking-tight">
+            MALIPO YAMEKUBALI! 🎉
+          </h1>
+
+          {/* Plan-specific message */}
+          {ready && (
+            <div className="animate-in fade-in duration-700">
+              <p className="text-green-400 font-black text-lg mb-3">{message}</p>
+              <p className="text-white/60 text-sm leading-relaxed mb-10 px-2">
+                {subMessage}
+              </p>
+            </div>
+          )}
+
+          {/* Primary CTA — actually navigates */}
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white py-5 rounded-2xl font-black text-lg uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-3 shadow-xl shadow-green-500/20 mb-4"
+          >
+            <PartyPopper className="w-6 h-6" />
+            Nenda Dashboard
+            <ArrowRight className="w-5 h-5" />
+          </button>
+
+          {/* Secondary — go to clinic directly */}
+          <button
+            onClick={() => router.push('/dashboard/clinic')}
+            className="w-full bg-white/5 border border-white/10 hover:bg-white/10 text-white/70 hover:text-white py-3.5 rounded-2xl font-bold text-sm transition-all"
+          >
+            Anza Uchambuzi Sasa →
+          </button>
+
+          {/* Trust note */}
+          <p className="text-white/25 text-xs mt-6">
+            Risiti imetumwa kwa {' '}
+            <span className="text-white/40 font-bold">barua pepe yako</span>
+          </p>
+        </div>
+      </div>
     </div>
-  );
+  )
 }
 
-// Wrapper Page inayotumia Suspense
+// ─── Page export (required Suspense wrapper for useSearchParams) ───────────────
 export default function PaymentSuccessPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
-      <Suspense fallback={<p>Loading...</p>}>
-        <SuccessContent />
-      </Suspense>
-    </div>
-  );
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="w-10 h-10 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <SuccessContent />
+    </Suspense>
+  )
 }

@@ -1369,7 +1369,61 @@ RESPOND WITH JSON:
       return this.getFallbackTask(subject, difficulty as 1|2|3|4|5, state, 
         this.visualSubjects.includes(subject.toLowerCase()))
     }
+  }// ─────────────────────────────────────────────────────────────────────────────
+// ADD THESE TWO METHODS to the LearningCompass class in lib/ai/learningCompass.ts
+// Place them just before the closing brace of the class (before the singleton export)
+// ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Restore learner state from DB into memory
+   * Called at the start of each request to rebuild in-memory state
+   */
+  restoreState(learnerId: string, savedState: any): void {
+    if (!savedState || typeof savedState !== 'object') return
+
+    // Only restore if it looks like a valid LearnerState
+    if (savedState.currentTier && savedState.learner) {
+      this.learnerHistory.set(learnerId, savedState as LearnerState)
+    }
   }
+
+  /**
+   * Export current learner state for DB persistence
+   * Called at the end of each request to save state
+   */
+  exportState(learnerId: string): Partial<LearnerState> | null {
+    const state = this.learnerHistory.get(learnerId)
+    if (!state) return null
+
+    // Return a clean serializable version (no circular refs)
+    return {
+      learner:            state.learner,
+      currentTier:        state.currentTier,
+      subjectTiers:       state.subjectTiers,
+      cognitiveLoad:      state.cognitiveLoad,
+      engagementLevel:    state.engagementLevel,
+      confidenceLevel:    state.confidenceLevel,
+      currentSubject:     state.currentSubject,
+      currentConcept:     state.currentConcept,
+      timeOnTask:         state.timeOnTask,
+      attemptsOnConcept:  state.attemptsOnConcept,
+      breaksTaken:        state.breaksTaken,
+      masteredConcepts:   state.masteredConcepts,
+      strugglingConcepts: state.strugglingConcepts,
+    }
+  }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ALSO: Add session_state column to compass_sessions table
+// Run this in Supabase SQL Editor:
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// ALTER TABLE compass_sessions
+//   ADD COLUMN IF NOT EXISTS session_state JSONB DEFAULT '{}',
+//   ADD COLUMN IF NOT EXISTS last_subject   TEXT,
+//   ADD COLUMN IF NOT EXISTS updated_at     TIMESTAMPTZ DEFAULT NOW();
+//
+// ─────────────────────────────────────────────────────────────────────────────
 }
 
 // Singleton instance for app-wide use

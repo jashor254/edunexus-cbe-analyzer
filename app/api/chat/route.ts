@@ -1,161 +1,266 @@
 // app/api/chat/route.ts
 import { NextResponse } from 'next/server'
 import { learningCompass } from '@/lib/ai/learningCompass'
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/utils/supabase/server'       // ✅ correct path
+import { createServiceClient } from '@/utils/supabase/service'
 
 export async function POST(req: Request) {
   try {
-    const { message, studentId, sessionState } = await req.json()
+    // ── 1. Parse body (matches what chat UI sends) ───────────────────────────
+    const {
+      message,
+      sessionId,
+      learnerId,
+      subjectId,
+      grade,
+      sessionState,   // optional — sent on subsequent messages
+    } = await req.json()
 
+    // ── 2. Auth ──────────────────────────────────────────────────────────────
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    
+
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check token balance
-    const { data: tokenData } = await supabase
-      .from('user_tokens')
-      .select('balance')
-      .eq('user_id', user.id)
-      .maybeSingle()
+    // ── 3. Check access — subscription OR token balance ──────────────────────
+    const db = createServiceClient()
 
-    if (!tokenData || tokenData.balance < 1) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Insufficient tokens' 
-      }, { status: 403 })
+    const [{ data: subscription }, { data: tokenData }] = await Promise.all([
+      db
+        .from('subscriptions')
+        .select('plan, expires_at')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .gt('expires_at', new Date().toISOString())
+        .single(),
+
+      // ✅ token_balances (not user_tokens)
+      db
+        .from('token_balances')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single(),
+    ])
+
+    const hasSubscription = !!subscription
+    const tokenBalance    = tokenData?.balance || 0
+
+    if (!hasSubscription && tokenBalance < 1) {
+      return NextResponse.json(
+        { error: 'Insufficient tokens', tokensRemaining: 0 },
+        { status: 403 }
+      )
     }
 
-    // Detect struggle/confidence from message
-    const struggled = message.toLowerCase().includes('don\'t understand') || 
-                      message.toLowerCase().includes('confused') ||
-                      message.toLowerCase().includes('help') ||
-                      message.toLowerCase().includes('sijaelewa') ||
-                      message.toLowerCase().includes('hard') ||
-                      message.toLowerCase().includes('tough')
+    // ── 4. Load or initialize learner state from DB ──────────────────────────
+    // This fixes the in-memory state loss between requests
+    const { data: savedState } = await db
+      .from('compass_sessions')
+      .select('session_state')
+      .eq('id', sessionId)
+      .eq('learner_id', user.id)
+      .single()
 
-    let confidence: 'low' | 'medium' | 'high' = 'medium'
-    if (message.toLowerCase().includes('got it') || 
-        message.toLowerCase().includes('understand') ||
-        message.toLowerCase().includes('easy') ||
-        message.toLowerCase().includes('nimeelewa')) {
-      confidence = 'high'
-    } else if (struggled) {
-      confidence = 'low'
+    // If compass doesn't know this learner yet, initialize from their assessments
+    const compassKnowsLearner = savedState?.session_state?.initialized === true
+
+    if (!compassKnowsLearner) {
+      // Fetch latest assessments to initialize compass
+      const { data: assessments } = await db
+        .from('assessments')
+        .select(`
+          *,
+          students (name, grade)
+        `)
+        .eq('student_id', learnerId || user.id)
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      const { data: interests } = await db
+        .from('student_interests')
+        .select('*')
+        .eq('student_id', learnerId || user.id)
+        .single()
+
+      if (assessments && assessments.length > 0) {
+        await learningCompass.initializeFromAssessments(
+          learnerId || user.id,
+          assessments,
+          interests
+        )
+      }
+    } else if (savedState?.session_state) {
+      // Restore state into compass memory for this request
+      learningCompass.restoreState(learnerId || user.id, savedState.session_state)
     }
 
-    // Detect subject
-    let subject = 'mathematics'
+    // ── 5. Detect struggle / confidence from message ─────────────────────────
+    const msgLower = message.toLowerCase()
+
+    const struggled =
+      msgLower.includes("don't understand") ||
+      msgLower.includes("confused") ||
+      msgLower.includes("help") ||
+      msgLower.includes("sijaelewa") ||
+      msgLower.includes("hard") ||
+      msgLower.includes("sijui") ||
+      msgLower.includes("ngumu")
+
+    const confident =
+      msgLower.includes("got it") ||
+      msgLower.includes("understand") ||
+      msgLower.includes("easy") ||
+      msgLower.includes("nimeelewa") ||
+      msgLower.includes("sawa")
+
+    const confidence: 'low' | 'medium' | 'high' =
+      confident ? 'high' : struggled ? 'low' : 'medium'
+
+    // ── 6. Detect subject from message ───────────────────────────────────────
     const subjectKeywords: Record<string, string[]> = {
-      mathematics: ['math', 'algebra', 'fraction', 'percentage', 'geometry', 'numbers'],
-      english: ['english', 'grammar', 'reading', 'writing', 'story'],
-      kiswahili: ['kiswahili', 'sarufi', 'insha', 'kusoma'],
-      biology: ['biology', 'cell', 'plant', 'animal', 'heart', 'lungs'],
-      chemistry: ['chemistry', 'atom', 'molecule', 'reaction'],
-      physics: ['physics', 'force', 'energy', 'electricity', 'circuit'],
-      geography: ['geography', 'map', 'weather', 'climate', 'river'],
-      agriculture: ['agriculture', 'farm', 'crop', 'soil', 'planting']
+      mathematics:        ['math', 'algebra', 'fraction', 'percentage', 'geometry', 'equation', 'number', 'hesabu'],
+      english:            ['english', 'grammar', 'reading', 'writing', 'essay', 'vocabulary'],
+      kiswahili:          ['kiswahili', 'sarufi', 'insha', 'kusoma', 'fasihi'],
+      biology:            ['biology', 'cell', 'plant', 'animal', 'heart', 'photosynthesis', 'organism'],
+      chemistry:          ['chemistry', 'atom', 'molecule', 'reaction', 'element', 'compound'],
+      physics:            ['physics', 'force', 'energy', 'electricity', 'circuit', 'motion', 'light'],
+      geography:          ['geography', 'map', 'weather', 'climate', 'river', 'mountain', 'population'],
+      agriculture:        ['agriculture', 'farm', 'crop', 'soil', 'planting', 'harvest', 'irrigation'],
+      history:            ['history', 'colonialism', 'independence', 'war', 'civilization'],
+      integrated_science: ['science', 'experiment', 'hypothesis', 'solar', 'ecosystem'],
     }
 
+    let subject = subjectId || 'mathematics'
     for (const [subj, keywords] of Object.entries(subjectKeywords)) {
-      if (keywords.some(k => message.toLowerCase().includes(k))) {
+      if (keywords.some(k => msgLower.includes(k))) {
         subject = subj
         break
       }
     }
 
-    // Get response from Learning Compass
+    // ── 7. Get compass decision ──────────────────────────────────────────────
     const compassResponse = await learningCompass.getNextTask(
-      studentId || user.id,
+      learnerId || user.id,
       subject,
       {
         completed: true,
         timeSpent: sessionState?.timeOnTask || 0,
-        struggled: struggled,
-        confidence: confidence
+        struggled,
+        confidence,
       }
     )
 
-    // Deduct token
-    await supabase
-      .from('user_tokens')
-      .update({ balance: tokenData.balance - 1 })
-      .eq('user_id', user.id)
+    // ── 8. Persist updated learner state to DB ───────────────────────────────
+    const updatedState = learningCompass.exportState(learnerId || user.id)
 
-    // Log interaction
-    await supabase
-      .from('chat_logs')
-      .insert({
-        user_id: user.id,
-        student_id: studentId,
-        message,
-        response: compassResponse.task.content.instruction,
+    await db
+      .from('compass_sessions')
+      .update({
+        session_state:  { ...updatedState, initialized: true },
+        last_subject:   subject,
+        updated_at:     new Date().toISOString(),
+      })
+      .eq('id', sessionId)
+
+    // ── 9. Deduct token (only if not on subscription) ────────────────────────
+    if (!hasSubscription) {
+      await db
+        .from('token_balances')
+        .update({ balance: tokenBalance - 1 })
+        .eq('user_id', user.id)
+
+      // Log token usage
+      await db.from('token_usage').insert({
+        user_id:     user.id,
+        action:      'compass_session',
         tokens_used: 1,
-        subject: subject,
-        difficulty: compassResponse.task.difficulty,
         metadata: {
-          strategy: compassResponse.task.type,
-          struggled,
-          confidence
+          session_id: sessionId,
+          subject,
+          difficulty: compassResponse.task.difficulty,
         }
       })
-
-    // Format response
-    const formattedResponse = {
-      text: compassResponse.task.content.instruction + 
-            (compassResponse.task.content.example ? `\n\n📌 For example: ${compassResponse.task.content.example}` : '') +
-            (compassResponse.task.content.question ? `\n\n✏️ Try this: ${compassResponse.task.content.question}` : '') +
-            `\n\n💡 ${compassResponse.encouragement}`,
-      
-      visualAid: compassResponse.task.content.visualAid || null,
-      
-      pedagogy: {
-        strategy: compassResponse.task.type,
-        checkForUnderstanding: compassResponse.task.successCriteria
-      },
-      
-      parentInsight: {
-        conceptAttempted: compassResponse.task.concept,
-        childApproach: `Working at difficulty level ${compassResponse.task.difficulty}`,
-        celebrationMoment: compassResponse.encouragement,
-        practiceIdea: compassResponse.parentInsight,
-        emotionDetected: struggled ? 'needs support' : confidence === 'high' ? 'confident' : 'engaged'
-      },
-      
-      nextSteps: [
-        `Complete this task (${compassResponse.task.estimatedMinutes} min)`,
-        compassResponse.task.nextTaskRecommended
-      ],
-      
-      encouragement: compassResponse.encouragement,
-      
-      metadata: {
-        difficultyLevel: compassResponse.task.difficulty,
-        timeEstimate: compassResponse.task.estimatedMinutes,
-        visualProvided: !!compassResponse.task.content.visualAid
-      },
-      
-      sessionUpdate: {
-        timeOnTask: (sessionState?.timeOnTask || 0) + compassResponse.task.estimatedMinutes,
-        currentSubject: subject,
-        currentConcept: compassResponse.task.concept,
-        needsBreak: compassResponse.needsBreak,
-        breakDuration: compassResponse.breakDuration
-      }
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      response: formattedResponse 
+    // ── 10. Log chat message ─────────────────────────────────────────────────
+    await db.from('compass_messages').insert([
+      {
+        session_id: sessionId,
+        role:       'user',
+        content:    message,
+        created_at: new Date().toISOString(),
+      },
+      {
+        session_id: sessionId,
+        role:       'assistant',
+        content:    compassResponse.task.content.instruction,
+        metadata: {
+          difficulty:       compassResponse.task.difficulty,
+          subject,
+          struggled,
+          confidence,
+          visual_provided:  !!compassResponse.task.content.visualAid,
+        },
+        created_at: new Date(Date.now() + 1).toISOString(),
+      }
+    ])
+
+    // ── 11. Format response to match what chat UI expects ────────────────────
+    const task = compassResponse.task
+
+    const responseText =
+      task.content.instruction +
+      (task.content.example
+        ? `\n\n📌 Example: ${task.content.example}`
+        : '') +
+      (task.content.question
+        ? `\n\n✏️ Try this: ${task.content.question}`
+        : '') +
+      `\n\n💡 ${compassResponse.encouragement}`
+
+    // ✅ Response shape matches exactly what chat UI destructures
+    return NextResponse.json({
+      text:      responseText,
+      visualAid: task.content.visualAid || null,
+
+      pedagogy: {
+        strategy:              task.type,
+        checkForUnderstanding: task.successCriteria,
+      },
+
+      parentInsight: {
+        conceptAttempted:   task.concept,
+        childApproach:      `Working at difficulty level ${task.difficulty} — ${compassResponse.adaptationReason}`,
+        celebrationMoment:  compassResponse.encouragement,
+        practiceIdea:       compassResponse.parentInsight,
+        whyThisTask:        compassResponse.adaptationReason,
+        emotionDetected:    struggled ? 'needs support' : confidence === 'high' ? 'confident' : 'engaged',
+      },
+
+      difficulty:        task.difficulty,
+      adaptationReason:  compassResponse.adaptationReason,
+      audioText:         task.content.instruction, // clean text for TTS
+
+      tokensRemaining: hasSubscription
+        ? 999  // unlimited
+        : tokenBalance - 1,
+
+      sessionUpdate: {
+        timeOnTask:     (sessionState?.timeOnTask || 0) + task.estimatedMinutes,
+        currentSubject: subject,
+        currentConcept: task.concept,
+        needsBreak:     compassResponse.needsBreak,
+        breakDuration:  compassResponse.breakDuration,
+      },
     })
 
-  } catch (error) {
-    console.error('Chat API Error:', error)
-    return NextResponse.json({ 
-      success: false, 
-      error: 'Internal server error' 
-    }, { status: 500 })
+  } catch (error: any) {
+    console.error('[chat] error:', error.message)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }

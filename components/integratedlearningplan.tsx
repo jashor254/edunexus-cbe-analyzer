@@ -6,7 +6,7 @@ interface Props {
   plan: IntegratedLearningPlan
 }
 
-export default function IntegratedLearningPlanDisplay({ plan }: Props) {
+export default function integratedlearningplan({ plan }: Props) {
   const getLevelBadge = (level: number) => {
     const configs = {
       1: { label: 'BE', color: 'bg-red-100 text-red-800', icon: '🔴' },

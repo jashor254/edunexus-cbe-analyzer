@@ -1,155 +1,33 @@
 // app/api/clinic/download/route.ts
-import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
-import { generateAcademicClinicPDF } from '@/lib/academicClinic/pdfGenerator'
-import { 
-  generateReport, 
-  calculateVitals, 
-  generateJuniorGuidance, 
+import { NextResponse } from 'next/server'
+import { createClient } from '@/utils/supabase/server'
+import { createServiceClient } from '@/utils/supabase/service'
+import {
+  generateReport,
+  calculateVitals,
+  generateActionPlan,
+  generateJuniorGuidance,
   generateSeniorGuidance,
   formatSubjectName,
-  type AcademicClinicReport,
-  type StudentProfile,
-  type SubjectProgress
+} from '@/lib/academicClinic/reportGenerator'
+import { generateAcademicClinicPDF } from '@/lib/academicClinic/pdfGenerator'
+import type {
+  SubjectProgress,
+  StudentProfile,
 } from '@/lib/academicClinic/reportGenerator'
 
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
-
-// Helper function to prepare report data from assessments
-function prepareReportData(student: any, assessments: any[]): AcademicClinicReport | null {
-  if (!assessments || assessments.length === 0) return null
-
-  // Get latest assessment for current data
-  const latest = assessments[assessments.length - 1]
-  
-  // Build subject progress from ALL assessments
-  const subjectProgress: SubjectProgress[] = []
-  const subjectMap = new Map<string, number[]>()
-  
-  // Collect all scores per subject from ALL assessments
-  assessments.forEach(assessment => {
-    if (assessment.subject_scores) {
-      Object.entries(assessment.subject_scores).forEach(([subject, score]) => {
-        if (!subjectMap.has(subject)) {
-          subjectMap.set(subject, [])
-        }
-        subjectMap.get(subject)!.push(score as number)
-      })
-    }
-  })
-
-  // Calculate progress for each subject
-  subjectMap.forEach((scores, subject) => {
-    const latestScore = scores[scores.length - 1]
-    const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length
-    
-    // Calculate trend based on first vs last
-    let trend: 'improving' | 'declining' | 'stable' = 'stable'
-    if (scores.length > 1) {
-      if (scores[scores.length - 1] > scores[0]) trend = 'improving'
-      else if (scores[scores.length - 1] < scores[0]) trend = 'declining'
-    }
-    
-    // Calculate velocity (average change per assessment)
-    let velocity = 0
-    if (scores.length > 1) {
-      let totalChange = 0
-      for (let i = 1; i < scores.length; i++) {
-        totalChange += scores[i] - scores[i-1]
-      }
-      velocity = totalChange / (scores.length - 1)
-    }
-    
-    subjectProgress.push({
-      subject,
-      displayName: formatSubjectName(subject),
-      level: latestScore as 1 | 2 | 3 | 4,
-      trend: trend as any,
-      velocity: parseFloat(velocity.toFixed(2)),
-      previousScores: scores
-    })
-  })
-
-  // Create student profile
-  const studentProfile: StudentProfile = {
-    id: student.id,
-    name: student.name,
-    grade: student.grade,
-    level: student.grade >= 10 ? 'Senior School' : 'Junior School',
-    term: latest.term,
-    year: latest.year
-  }
-
-  // Calculate vitals
-  const vitals = calculateVitals(subjectProgress)
-
-  // Create action plan based on struggling subjects
-  const struggling = subjectProgress.filter(s => s.level <= 2)
-  const improving = subjectProgress.filter(s => s.trend === 'improving')
-  
-  const actionPlan = {
-    immediate: struggling.map(s => `Focus on improving ${s.displayName} (currently Level ${s.level})`),
-    shortTerm: improving.map(s => `Continue good progress in ${s.displayName}`),
-    longTerm: subjectProgress
-      .filter(s => s.level >= 3)
-      .map(s => `Maintain excellence in ${s.displayName}`)
-  }
-
-  // Generate guidance based on grade level
-  const isJunior = student.grade <= 9
-  const juniorGuidance = isJunior ? generateJuniorGuidance(subjectProgress) : undefined
-  const seniorGuidance = !isJunior ? generateSeniorGuidance(subjectProgress) : undefined
-
-  console.log('Generated subjectProgress:', subjectProgress) // Debug log
-  console.log('Generated vitals:', vitals) // Debug log
-
-  // Generate the final report
-  return generateReport(
-    studentProfile,
-    subjectProgress,
-    vitals,
-    actionPlan,
-    juniorGuidance,
-    seniorGuidance
-  )
-}
-
-export async function POST(request: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const cookieStore = await cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value
-          },
-          set(name: string, value: string, options: any) {
-            cookieStore.set({ name, value, ...options })
-          },
-          remove(name: string, options: any) {
-            cookieStore.set({ name, value: '', ...options })
-          },
-        },
-      }
-    )
+    // ── 1. Auth check ────────────────────────────────────────────────────────
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-    const { data: { session } } = await supabase.auth.getSession()
-
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized - Please log in' },
-        { status: 401 }
-      )
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { studentId, assessments, profile } = body
-
-    console.log('Received request:', { studentId, assessmentsCount: assessments?.length, profile })
+    // ── 2. Parse request body ────────────────────────────────────────────────
+    const { studentId, assessments, profile } = await req.json()
 
     if (!studentId || !assessments || !profile) {
       return NextResponse.json(
@@ -158,12 +36,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verify student belongs to user
-    const { data: student, error: studentError } = await supabase
+    // ── 3. Verify student belongs to user (security check) ───────────────────
+    const db = createServiceClient()
+
+    const { data: student, error: studentError } = await db
       .from('students')
       .select('*')
       .eq('id', studentId)
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .single()
 
     if (studentError || !student) {
@@ -173,71 +53,148 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Prepare report data using ALL assessments
-    const reportData = prepareReportData(student, assessments)
+    // ── 4. Check access — subscription OR token balance ──────────────────────
+    const [{ data: subscription }, { data: tokenBalance }] = await Promise.all([
+      db
+        .from('subscriptions')
+        .select('plan, expires_at')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .gt('expires_at', new Date().toISOString())
+        .single(),
 
-    if (!reportData) {
+      db
+        .from('token_balances')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single(),
+    ])
+
+    const hasSubscription = !!subscription
+    const tokens          = tokenBalance?.balance || 0
+    const hasTokens       = tokens > 0
+
+    if (!hasSubscription && !hasTokens) {
       return NextResponse.json(
-        { error: 'Insufficient data to generate report. Need at least one assessment.' },
-        { status: 400 }
+        { error: 'No active subscription or tokens. Please upgrade.' },
+        { status: 403 }
       )
     }
 
-    console.log('Report data generated:', reportData.reportId)
+    // ── 5. Deduct token if not on subscription ───────────────────────────────
+    if (!hasSubscription && hasTokens) {
+      const { error: deductError } = await db
+        .from('token_balances')
+        .update({ balance: tokens - 1 })
+        .eq('user_id', user.id)
 
-    // Generate PDF
-    const pdfBlob = await generateAcademicClinicPDF(reportData)
+      if (deductError) {
+        console.error('[clinic/download] token deduct error:', deductError)
+        return NextResponse.json(
+          { error: 'Could not deduct token. Try again.' },
+          { status: 500 }
+        )
+      }
 
-    // Log report generation
-    await supabase
-      .from('report_downloads')
-      .insert({
-        user_id: session.user.id,
-        student_id: studentId,
-        report_id: reportData.reportId,
-        downloaded_at: new Date().toISOString()
+      // Log token usage
+      await db.from('token_usage').insert({
+        user_id:     user.id,
+        action:      'clinic_report',
+        tokens_used: 1,
+        metadata: {
+          student_id:   studentId,
+          student_name: student.name,
+        }
       })
+    }
 
-    // Return PDF as download
-    const filename = `${student.name.replace(/\s+/g, '_')}_Academic_Clinic_Report_${new Date().toLocaleDateString('en-GB').replace(/\//g, '-')}.pdf`
+    // ── 6. Build subject progress from assessments ───────────────────────────
+    const latestAssessment  = assessments[assessments.length - 1]
+    const currentScores     = latestAssessment?.subject_scores || {}
 
-    return new NextResponse(pdfBlob, {
+    const subjectProgress: SubjectProgress[] = Object.keys(currentScores).map(subject => {
+      const scores = assessments
+        .map((a: any) => a.subject_scores?.[subject])
+        .filter((s: any): s is number => s !== undefined && s !== null)
+
+      const latestScore = scores[scores.length - 1]
+
+      // Trend
+      let trend: 'improving' | 'declining' | 'stable' = 'stable'
+      if (scores.length > 1) {
+        if (scores[scores.length - 1] > scores[0]) trend = 'improving'
+        else if (scores[scores.length - 1] < scores[0]) trend = 'declining'
+      }
+
+      // Velocity
+      let velocity = 0
+      if (scores.length > 1) {
+        let totalChange = 0
+        for (let i = 1; i < scores.length; i++) {
+          totalChange += scores[i] - scores[i - 1]
+        }
+        velocity = totalChange / (scores.length - 1)
+      }
+
+      return {
+        subject,
+        displayName:    formatSubjectName(subject),
+        level:          latestScore as 1 | 2 | 3 | 4,
+        trend,
+        velocity:       parseFloat(velocity.toFixed(2)),
+        previousScores: scores,
+      }
+    })
+
+    // ── 7. Build report ──────────────────────────────────────────────────────
+    const vitals     = calculateVitals(subjectProgress)
+    const actionPlan = generateActionPlan(subjectProgress)
+    const isJunior   = student.grade <= 9
+
+    const studentProfile: StudentProfile = {
+      id:       student.id,
+      name:     student.name,
+      grade:    student.grade,
+      level:    isJunior ? 'Junior School' : 'Senior School',
+      term:     latestAssessment?.term || 1,
+      year:     latestAssessment?.year || new Date().getFullYear(),
+      pathway:  student.current_pathway,
+      school:   student.school,
+    }
+
+    const juniorGuidance = isJunior  ? generateJuniorGuidance(subjectProgress)  : undefined
+    const seniorGuidance = !isJunior ? generateSeniorGuidance(subjectProgress) : undefined
+
+    const report = generateReport(
+      studentProfile,
+      subjectProgress,
+      vitals,
+      actionPlan,
+      juniorGuidance,
+      seniorGuidance
+    )
+
+    // ── 8. Generate PDF ──────────────────────────────────────────────────────
+    const pdfBlob = await generateAcademicClinicPDF(report)
+    const pdfBuffer = Buffer.from(await pdfBlob.arrayBuffer())
+
+    // ── 9. Return PDF ────────────────────────────────────────────────────────
+    const filename = `${student.name.replace(/\s+/g, '_')}_Academic_Report.pdf`
+
+    return new NextResponse(pdfBuffer, {
       status: 200,
       headers: {
-        'Content-Type': 'application/pdf',
+        'Content-Type':        'application/pdf',
         'Content-Disposition': `attachment; filename="${filename}"`,
-        'Content-Length': pdfBlob.size.toString(),
+        'Content-Length':      pdfBuffer.length.toString(),
       },
     })
 
-  } catch (error) {
-    console.error('PDF Generation Error:', error)
+  } catch (error: any) {
+    console.error('[clinic/download] error:', error.message)
     return NextResponse.json(
-      { 
-        error: 'Failed to generate report',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { error: 'Failed to generate report. Please try again.' },
       { status: 500 }
     )
   }
-}
-
-export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams
-  const studentId = searchParams.get('studentId')
-  
-  if (!studentId) {
-    return NextResponse.json(
-      { error: 'studentId is required' },
-      { status: 400 }
-    )
-  }
-
-  return NextResponse.json({
-    endpoint: 'Academic Clinic Report Download',
-    version: '1.0',
-    available: true,
-    formats: ['PDF'],
-    description: 'POST to this endpoint with student data to generate a comprehensive Academic Clinic Report'
-  })
 }

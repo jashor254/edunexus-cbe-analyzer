@@ -115,6 +115,18 @@ export function generateSeniorGuidance(subjects: SubjectProgress[]): SeniorGuida
       description: 'Analyze complex data to drive business decisions',
       matchPercentage: 82,
       requiredSubjects: ['Mathematics', 'Computer Studies', 'Business']
+    },
+    {
+      name: 'Engineering',
+      description: 'Design and build structures, machines, and systems',
+      matchPercentage: 80,
+      requiredSubjects: ['Physics', 'Mathematics', 'Chemistry']
+    },
+    {
+      name: 'Business Management',
+      description: 'Lead organizations and drive business growth',
+      matchPercentage: 75,
+      requiredSubjects: ['Business Studies', 'Mathematics', 'English']
     }
   ]
   
@@ -142,7 +154,7 @@ export function generateActionPlan(subjects: SubjectProgress[]): ActionPlan {
   }
 }
 
-// ===== HELPER: Generate Graph Data (FIXED VERSION) =====
+// ===== HELPER: Generate Graph Data =====
 export function generateGraphData(subjects: SubjectProgress[]): GraphData {
   return {
     competencyDistribution: {

@@ -1,113 +1,320 @@
-// app/chat/page.tsx
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
-import { 
-  Brain, 
-  Send,
-  Mic,
-  Volume2,
-  Sparkles,
-  ArrowLeft,
-  Zap,
-  Target,
-  Heart,
-  TrendingUp,
-  Lightbulb,
-  AlertCircle,
-  Flame,
-  Star,
-  Image as ImageIcon
-} from 'lucide-react'
 import Link from 'next/link'
-
-// Import VisualAid type from LearningCompass
+import {
+  Send, Mic, MicOff, Volume2, VolumeX,
+  Plus, ChevronLeft, Maximize2, X,
+  Zap, Star, Flame, Brain,
+  Image as ImageIcon, Heart, Sparkles,
+  RotateCcw, Clock
+} from 'lucide-react'
 import type { VisualAid } from '@/lib/ai/learningCompass'
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
   metadata?: {
-    pedagogy?: any
-    parentInsight?: any
-    audioOptimized?: string
-    difficulty?: number
+    pedagogy?:        { strategy: string; checkForUnderstanding?: string }
+    parentInsight?:   any
+    audioOptimized?:  string
+    difficulty?:      number
     adaptationReason?: string
-    visualAid?: VisualAid  // 👈 NEW: Visual aid support!
+    visualAid?:       VisualAid
   }
   timestamp: Date
 }
 
-interface LearnerStats {
-  streakDays: number
-  conceptsMastered: number
-  avgCognitiveLoad: string
-  tokens: number
+interface SessionState {
+  timeOnTask:     number
+  currentSubject: string
+  currentConcept: string
 }
 
-export default function LearningCompassChat() {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [sessionId, setSessionId] = useState<string | null>(null)
-  const [learnerId, setLearnerId] = useState<string | null>(null)
-  const [stats, setStats] = useState<LearnerStats | null>(null)
-  const [showParentMode, setShowParentMode] = useState(false)
-  const [currentInsight, setCurrentInsight] = useState<any>(null)
-  const [hasAccess, setHasAccess] = useState(false)
-  const [freeMessagesLeft, setFreeMessagesLeft] = useState(1) // 🎁 1 FREE MESSAGE!
-  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false)
-  const [selectedImage, setSelectedImage] = useState<VisualAid | null>(null) // 👈 For full-screen diagram
-  
+interface Stats {
+  streakDays:       number
+  conceptsMastered: number
+  tokens:           number
+  hasSubscription:  boolean
+}
+
+// ─── Difficulty label ─────────────────────────────────────────────────────────
+const DIFF_LABEL: Record<number, { label: string; color: string }> = {
+  1: { label: 'Foundational', color: 'text-red-400'    },
+  2: { label: 'Building',     color: 'text-amber-400'  },
+  3: { label: 'Grade Level',  color: 'text-green-400'  },
+  4: { label: 'Challenge',    color: 'text-blue-400'   },
+  5: { label: 'Advanced',     color: 'text-purple-400' },
+}
+
+const STRATEGY_LABEL: Record<string, string> = {
+  concept_intro: 'New Concept',
+  practice:      'Practice',
+  challenge:     'Challenge',
+  review:        'Review',
+  break:         'Brain Break',
+}
+
+// ─── Suggestion chips ─────────────────────────────────────────────────────────
+const SUGGESTIONS = [
+  'Help me with fractions 🍕',
+  'Explain photosynthesis 🌱',
+  'I don\'t understand algebra',
+  'What is the water cycle? 💧',
+  'Help with essay writing ✍️',
+  'Teach me about circuits ⚡',
+]
+
+// ─── Visual Aid renderer ──────────────────────────────────────────────────────
+function VisualAidBlock({
+  aid,
+  onExpand,
+}: {
+  aid: VisualAid
+  onExpand: (aid: VisualAid) => void
+}) {
+  return (
+    <div className="mt-3 rounded-2xl overflow-hidden border border-white/10">
+      <div className="flex items-center justify-between px-3 py-2 bg-white/5">
+        <div className="flex items-center gap-2">
+          <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
+          <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">
+            {aid.subject || 'Diagram'}
+          </span>
+        </div>
+        <button
+          onClick={() => onExpand(aid)}
+          className="flex items-center gap-1 text-xs text-white/40 hover:text-white/80 transition-colors"
+        >
+          <Maximize2 className="w-3 h-3" />
+          Expand
+        </button>
+      </div>
+      <pre
+        className="p-4 font-mono text-xs text-emerald-300 bg-slate-950/60 overflow-x-auto whitespace-pre leading-relaxed cursor-pointer hover:bg-slate-950/80 transition-colors"
+        onClick={() => onExpand(aid)}
+      >
+        {aid.content}
+      </pre>
+      {aid.caption && (
+        <p className="px-3 py-1.5 text-xs text-white/40 italic bg-white/3">
+          {aid.caption}
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ─── Expanded diagram modal ───────────────────────────────────────────────────
+function DiagramModal({
+  aid,
+  onClose,
+}: {
+  aid: VisualAid
+  onClose: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-6"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-2xl bg-slate-900 rounded-3xl border border-white/10 overflow-hidden shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-amber-500/20 rounded-xl flex items-center justify-center">
+              <ImageIcon className="w-4 h-4 text-amber-400" />
+            </div>
+            <div>
+              <p className="font-bold text-white text-sm">{aid.subject}</p>
+              <p className="text-xs text-white/40">{aid.concept}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center transition-colors"
+          >
+            <X className="w-4 h-4 text-white/60" />
+          </button>
+        </div>
+        <pre className="p-8 font-mono text-sm text-emerald-300 overflow-x-auto whitespace-pre leading-relaxed">
+          {aid.content}
+        </pre>
+        {aid.caption && (
+          <p className="px-6 py-3 text-sm text-white/50 italic border-t border-white/10 text-center">
+            {aid.caption}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Message bubble ───────────────────────────────────────────────────────────
+function MessageBubble({
+  msg,
+  onExpand,
+  onSpeak,
+  onParentInsight,
+}: {
+  msg: Message
+  onExpand:       (aid: VisualAid) => void
+  onSpeak:        (text: string) => void
+  onParentInsight:(insight: any) => void
+}) {
+  const isUser = msg.role === 'user'
+  const diff   = msg.metadata?.difficulty
+  const strat  = msg.metadata?.pedagogy?.strategy
+
+  return (
+    <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'} items-end`}>
+
+      {/* Avatar */}
+      <div className={`w-8 h-8 rounded-2xl flex-shrink-0 flex items-center justify-center text-xs font-black shadow-lg ${
+        isUser
+          ? 'bg-gradient-to-br from-blue-500 to-cyan-500'
+          : 'bg-gradient-to-br from-violet-600 to-indigo-600'
+      }`}>
+        {isUser ? 'You' : <Brain className="w-4 h-4 text-white" />}
+      </div>
+
+      <div className={`flex flex-col gap-1 max-w-[80%] ${isUser ? 'items-end' : 'items-start'}`}>
+
+        {/* Metadata chips — assistant only */}
+        {!isUser && (diff || strat) && (
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            {strat && (
+              <span className="text-[10px] font-bold text-white/40 uppercase tracking-wider">
+                {STRATEGY_LABEL[strat] || strat}
+              </span>
+            )}
+            {diff && DIFF_LABEL[diff] && (
+              <span className={`text-[10px] font-bold uppercase tracking-wider ${DIFF_LABEL[diff].color}`}>
+                • {DIFF_LABEL[diff].label}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Bubble */}
+        <div className={`px-4 py-3 rounded-2xl leading-relaxed text-sm ${
+          isUser
+            ? 'bg-gradient-to-br from-blue-600 to-cyan-600 text-white rounded-br-sm'
+            : 'bg-white/8 border border-white/10 text-white/90 rounded-bl-sm'
+        }`}>
+          {msg.content.split('\n').map((line, i) => (
+            line.trim()
+              ? <p key={i} className="mb-2 last:mb-0">{line}</p>
+              : <div key={i} className="h-1" />
+          ))}
+
+          {/* Visual aid */}
+          {!isUser && msg.metadata?.visualAid && (
+            <VisualAidBlock aid={msg.metadata.visualAid} onExpand={onExpand} />
+          )}
+        </div>
+
+        {/* Action row — assistant only */}
+        {!isUser && (
+          <div className="flex items-center gap-3 px-1">
+            <button
+              onClick={() => onSpeak(msg.metadata?.audioOptimized || msg.content)}
+              className="flex items-center gap-1 text-[10px] text-white/30 hover:text-white/60 transition-colors font-bold uppercase tracking-wider"
+            >
+              <Volume2 className="w-3 h-3" />
+              Listen
+            </button>
+            {msg.metadata?.parentInsight && (
+              <button
+                onClick={() => onParentInsight(msg.metadata!.parentInsight)}
+                className="flex items-center gap-1 text-[10px] text-pink-400/50 hover:text-pink-400 transition-colors font-bold uppercase tracking-wider"
+              >
+                <Heart className="w-3 h-3" />
+                Parent tip
+              </button>
+            )}
+            {msg.metadata?.visualAid && (
+              <button
+                onClick={() => onExpand(msg.metadata!.visualAid!)}
+                className="flex items-center gap-1 text-[10px] text-amber-400/50 hover:text-amber-400 transition-colors font-bold uppercase tracking-wider"
+              >
+                <ImageIcon className="w-3 h-3" />
+                Diagram
+              </button>
+            )}
+            <span className="text-[10px] text-white/20 ml-auto">
+              {msg.timestamp.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Main chat content ────────────────────────────────────────────────────────
+function ChatContent() {
+  const supabase     = createClient()
+  const router       = useRouter()
+  const searchParams = useSearchParams()
+
+  const [messages,        setMessages]        = useState<Message[]>([])
+  const [input,           setInput]           = useState('')
+  const [isLoading,       setIsLoading]       = useState(false)
+  const [sessionId,       setSessionId]       = useState<string | null>(null)
+  const [learnerId,       setLearnerId]       = useState<string | null>(null)
+  const [stats,           setStats]           = useState<Stats | null>(null)
+  const [sessionState,    setSessionState]    = useState<SessionState>({ timeOnTask: 0, currentSubject: 'mathematics', currentConcept: '' })
+  const [expandedDiagram, setExpandedDiagram] = useState<VisualAid | null>(null)
+  const [parentInsight,   setParentInsight]   = useState<any>(null)
+  const [showParent,      setShowParent]      = useState(false)
+  const [isSpeaking,      setIsSpeaking]      = useState(false)
+  const [isListening,     setIsListening]     = useState(false)
+  const [hasAccess,       setHasAccess]       = useState(false)
+  const [freeLeft,        setFreeLeft]        = useState(1)
+  const [showUpgrade,     setShowUpgrade]     = useState(false)
+  const [initDone,        setInitDone]        = useState(false)
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef       = useRef<HTMLTextAreaElement>(null)
   const recognitionRef = useRef<any>(null)
-  const supabase = createClient()
 
+  // ── Init ────────────────────────────────────────────────────────────────────
+  useEffect(() => { initSession() }, [])
   useEffect(() => {
-    initSession()
-    initSpeechRecognition()
-  }, [])
-
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, isLoading])
 
   const initSession = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) { router.push('/login'); return }
 
     setLearnerId(user.id)
-    
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select(`
-        *,
-        parent_profiles (subscription_tier),
-        user_tokens (balance)
-      `)
-      .eq('id', user.id)
-      .single()
 
-    if (profile) {
-      const planType = profile.parent_profiles?.[0]?.subscription_tier || 'trial'
-      const tokenBalance = profile.user_tokens?.[0]?.balance || 0
-      const isPremium = planType === 'single' || planType === 'family'
-      
-      setStats({
-        streakDays: 3,
-        conceptsMastered: 12,
-        avgCognitiveLoad: 'optimal',
-        tokens: tokenBalance
-      })
-      
-      // 🎁 EVERYONE GETS 1 FREE MESSAGE!
-      // Always allow access initially (free message)
-      setHasAccess(true)
-      setFreeMessagesLeft(1)
-    }
-    
+    // Check access
+    const [{ data: tokenData }, { data: subscription }] = await Promise.all([
+      supabase.from('token_balances').select('balance').eq('user_id', user.id).single(),
+      supabase.from('subscriptions').select('plan').eq('user_id', user.id).eq('status', 'active').gt('expires_at', new Date().toISOString()).single(),
+    ])
+
+    const tokens          = tokenData?.balance || 0
+    const hasSubscription = !!subscription
+
+    setStats({
+      streakDays:       3,
+      conceptsMastered: 0,
+      tokens,
+      hasSubscription,
+    })
+    setHasAccess(true) // everyone gets free message
+
+    // Load or create session
     const { data: existing } = await supabase
       .from('compass_sessions')
       .select('*')
@@ -119,29 +326,14 @@ export default function LearningCompassChat() {
 
     if (existing) {
       setSessionId(existing.id)
-      loadMessages(existing.id)
+      await loadMessages(existing.id)
     } else {
-      createNewSession(user.id)
+      await createNewSession(user.id)
     }
-  }
 
-  const createNewSession = async (userId: string) => {
-    const { data } = await supabase
-      .from('compass_sessions')
-      .insert({
-        learner_id: userId,
-        title: 'New Learning Journey',
-        grade: 7,
-        subject_id: 'mathematics',
-        status: 'active'
-      })
-      .select()
-      .single()
-    
-    if (data) {
-      setSessionId(data.id)
-      setMessages([])
-    }
+    // Init speech recognition
+    initSpeech()
+    setInitDone(true)
   }
 
   const loadMessages = async (sId: string) => {
@@ -151,667 +343,609 @@ export default function LearningCompassChat() {
       .eq('session_id', sId)
       .order('created_at', { ascending: true })
 
-    if (data) {
+    if (data && data.length > 0) {
       setMessages(data.map(m => ({
-        ...m,
+        id:        m.id,
+        role:      m.role as 'user' | 'assistant',
+        content:   m.content,
+        metadata:  m.metadata || {},
         timestamp: new Date(m.created_at),
-        metadata: m.metadata || {}
       })))
     }
   }
 
-  const initSpeechRecognition = () => {
-    if (typeof window === 'undefined') return
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRecognition) return
+  const createNewSession = async (userId: string) => {
+    // Close existing active sessions
+    await supabase
+      .from('compass_sessions')
+      .update({ status: 'completed' })
+      .eq('learner_id', userId)
+      .eq('status', 'active')
 
-    recognitionRef.current = new SpeechRecognition()
-    recognitionRef.current.continuous = false
-    recognitionRef.current.lang = 'en-US'
-    recognitionRef.current.onresult = (event: any) => {
-      setInput(event.results[0][0].transcript)
+    const { data } = await supabase
+      .from('compass_sessions')
+      .insert({
+        learner_id:    userId,
+        title:         'Learning Session',
+        grade:         7,
+        subject_id:    'mathematics',
+        status:        'active',
+        session_state: {},
+      })
+      .select()
+      .single()
+
+    if (data) {
+      setSessionId(data.id)
+      setMessages([])
     }
   }
 
-  const toggleListening = () => {
-    if (!recognitionRef.current) {
-      alert('Voice input not supported')
-      return
+  const initSpeech = () => {
+    if (typeof window === 'undefined') return
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SR) return
+    const rec           = new SR()
+    rec.lang            = 'en-KE'
+    rec.continuous      = false
+    rec.interimResults  = false
+    rec.onresult        = (e: any) => {
+      setInput(e.results[0][0].transcript)
+      setIsListening(false)
     }
-    recognitionRef.current.start()
+    rec.onend = () => setIsListening(false)
+    recognitionRef.current = rec
+  }
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) return
+    if (isListening) {
+      recognitionRef.current.stop()
+      setIsListening(false)
+    } else {
+      recognitionRef.current.start()
+      setIsListening(true)
+    }
   }
 
   const speak = (text: string) => {
     window.speechSynthesis.cancel()
-    const utterance = new SpeechSynthesisUtterance(text.substring(0, 300))
-    utterance.rate = 0.9
-    utterance.pitch = 1.1
-    window.speechSynthesis.speak(utterance)
+    if (isSpeaking) { setIsSpeaking(false); return }
+    const u   = new SpeechSynthesisUtterance(text.substring(0, 400))
+    u.rate    = 0.9
+    u.pitch   = 1.05
+    u.onend   = () => setIsSpeaking(false)
+    setIsSpeaking(true)
+    window.speechSynthesis.speak(u)
   }
 
-  const sendMessage = async (e?: React.FormEvent) => {
-    e?.preventDefault()
-    if (!input.trim() || isLoading || !sessionId || !learnerId) return
+  // ── Send message ─────────────────────────────────────────────────────────────
+  const sendMessage = useCallback(async (text?: string) => {
+    const userMessage = (text || input).trim()
+    if (!userMessage || isLoading || !sessionId || !learnerId) return
 
-    const userMessage = input.trim()
     setInput('')
     setIsLoading(true)
 
-    const tempId = Date.now().toString()
+    // Optimistic
+    const tempId = `temp-${Date.now()}`
     setMessages(prev => [...prev, {
-      id: tempId,
-      role: 'user',
-      content: userMessage,
-      timestamp: new Date()
+      id:        tempId,
+      role:      'user',
+      content:   userMessage,
+      timestamp: new Date(),
     }])
 
     try {
       const res = await fetch('/api/chat', {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: userMessage,
+          message:      userMessage,
           sessionId,
           learnerId,
-          subjectId: 'mathematics',
-          grade: 7
+          subjectId:    sessionState.currentSubject,
+          grade:        7,
+          sessionState,
         }),
       })
+
+      if (res.status === 403) {
+        setShowUpgrade(true)
+        setHasAccess(false)
+        setMessages(prev => prev.filter(m => m.id !== tempId))
+        return
+      }
 
       const data = await res.json()
 
       if (data.text) {
-        const assistantMsg: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
+        setMessages(prev => [...prev, {
+          id:      `msg-${Date.now()}`,
+          role:    'assistant',
           content: data.text,
           metadata: {
-            pedagogy: data.pedagogy,
-            parentInsight: data.parentInsight,
-            audioOptimized: data.audioText,
-            difficulty: data.difficulty,
+            pedagogy:        data.pedagogy,
+            parentInsight:   data.parentInsight,
+            audioOptimized:  data.audioText,
+            difficulty:      data.difficulty,
             adaptationReason: data.adaptationReason,
-            visualAid: data.visualAid  // 👈 NEW: Visual aid from API
+            visualAid:       data.visualAid || undefined,
           },
-          timestamp: new Date()
+          timestamp: new Date(),
+        }])
+
+        if (data.parentInsight) setParentInsight(data.parentInsight)
+
+        if (data.sessionUpdate) {
+          setSessionState({
+            timeOnTask:     data.sessionUpdate.timeOnTask,
+            currentSubject: data.sessionUpdate.currentSubject || sessionState.currentSubject,
+            currentConcept: data.sessionUpdate.currentConcept || '',
+          })
         }
 
-        setMessages(prev => [...prev, assistantMsg])
-        setCurrentInsight(data.parentInsight)
-        
-        // 🎁 HANDLE FREE MESSAGE TRACKING
-        if (freeMessagesLeft > 0) {
-          const newFreeMessagesLeft = freeMessagesLeft - 1
-          setFreeMessagesLeft(newFreeMessagesLeft)
-          
-          // Show upgrade prompt after free message used
-          if (newFreeMessagesLeft === 0) {
-            // Check if they have tokens or subscription
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select(`
-                parent_profiles (subscription_tier),
-                user_tokens (balance)
-              `)
-              .eq('id', learnerId)
-              .single()
-            
-            const planType = profile?.parent_profiles?.[0]?.subscription_tier || 'trial'
-            const tokenBalance = profile?.user_tokens?.[0]?.balance || 0
-            const isPremium = planType === 'single' || planType === 'family'
-            
-            if (!isPremium && tokenBalance < 1) {
-              // No access - show upgrade prompt
-              setShowUpgradePrompt(true)
-              setHasAccess(false)
-            } else {
-              // Has tokens or subscription - continue
-              setHasAccess(true)
-            }
-          }
-        }
-        
         if (data.tokensRemaining !== undefined) {
           setStats(prev => prev ? { ...prev, tokens: data.tokensRemaining } : null)
         }
+
+        // Handle free message gate
+        if (freeLeft > 0) {
+          const remaining = freeLeft - 1
+          setFreeLeft(remaining)
+          if (remaining === 0 && data.tokensRemaining === 0 && !stats?.hasSubscription) {
+            setShowUpgrade(true)
+            setHasAccess(false)
+          }
+        }
+
+        // Break nudge
+        if (data.sessionUpdate?.needsBreak) {
+          setTimeout(() => {
+            setMessages(prev => [...prev, {
+              id:      `break-${Date.now()}`,
+              role:    'assistant',
+              content: `⏰ Pumzika kidogo! Take a ${data.sessionUpdate.breakDuration || 2}-minute break then come back stronger. Your brain is working hard! 💪`,
+              timestamp: new Date(),
+            }])
+          }, 600)
+        }
       }
-    } catch (error) {
-      console.error('Failed:', error)
+    } catch {
+      setMessages(prev => prev.filter(m => m.id !== tempId))
+      setMessages(prev => [...prev, {
+        id:      `err-${Date.now()}`,
+        role:    'assistant',
+        content: 'Pole! Kuna tatizo la mtandao. Jaribu tena.',
+        timestamp: new Date(),
+      }])
     } finally {
       setIsLoading(false)
+      inputRef.current?.focus()
+    }
+  }, [input, isLoading, sessionId, learnerId, sessionState, freeLeft, stats])
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      sendMessage()
     }
   }
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }
-
-  const getStrategyBadge = (strategy: string) => {
-    const badges: Record<string, { color: string; icon: any; label: string }> = {
-      'socratic-questioning': { color: 'from-purple-500/20 to-purple-600/20 border-purple-500/40 text-purple-300', icon: Lightbulb, label: 'Thinking Together' },
-      'worked-example': { color: 'from-blue-500/20 to-blue-600/20 border-blue-500/40 text-blue-300', icon: Brain, label: 'Learning by Example' },
-      'break-concept': { color: 'from-orange-500/20 to-orange-600/20 border-orange-500/40 text-orange-300', icon: AlertCircle, label: 'Step by Step' },
-      'direct-instruction': { color: 'from-violet-500/20 to-violet-600/20 border-violet-500/40 text-violet-300', icon: TrendingUp, label: 'Clear Guidance' },
-      'challenge': { color: 'from-red-500/20 to-red-600/20 border-red-500/40 text-red-300', icon: Zap, label: 'Challenge Mode' },
-    }
-    return badges[strategy] || badges['direct-instruction']
-  }
-
-  /**
-   * 👩‍🎨 RENDER VISUAL AID (Diagram)
-   * This renders ASCII diagrams beautifully
-   */
-  const renderVisualAid = (visualAid?: VisualAid) => {
-    if (!visualAid) return null
-    
+  // ── Locked screen ────────────────────────────────────────────────────────────
+  if (!hasAccess && !showUpgrade) {
     return (
-      <div className="mt-4 mb-2">
-        <div className="inline-flex items-center gap-1 px-2 py-1 bg-amber-500/20 border border-amber-500/40 rounded-full mb-2">
-          <ImageIcon className="w-3 h-3 text-amber-400" />
-          <span className="text-xs font-bold text-amber-300">Diagram</span>
-        </div>
-        
-        <div 
-          className="bg-slate-900/80 backdrop-blur-sm border border-violet-500/30 rounded-2xl p-5 font-mono text-sm text-cyan-300 whitespace-pre overflow-x-auto cursor-pointer hover:border-violet-400 transition-colors"
-          onClick={() => setSelectedImage(visualAid)}
-        >
-          {visualAid.content}
-        </div>
-        
-        {visualAid.caption && (
-          <p className="text-xs text-slate-400 mt-1 italic">
-            {visualAid.caption}
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
+        <div className="max-w-sm w-full text-center">
+          <div className="w-20 h-20 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-violet-500/30">
+            <Brain className="w-10 h-10 text-white" />
+          </div>
+          <h2 className="text-2xl font-black text-white mb-3">Learning Compass</h2>
+          <p className="text-white/50 mb-8 leading-relaxed">
+            Unlock your personal AI tutor — adapts to your child's exact level.
           </p>
-        )}
-      </div>
-    )
-  }
-
-  /**
-   * 🖼️ FULL-SCREEN DIAGRAM MODAL
-   */
-  const renderFullScreenDiagram = () => {
-    if (!selectedImage) return null
-    
-    return (
-      <div 
-        className="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center p-8"
-        onClick={() => setSelectedImage(null)}
-      >
-        <div 
-          className="relative max-w-4xl w-full bg-slate-900 rounded-3xl border-4 border-violet-500/50 p-8 shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            onClick={() => setSelectedImage(null)}
-            className="absolute top-4 right-4 w-10 h-10 bg-red-500/20 hover:bg-red-500/40 rounded-full flex items-center justify-center text-white text-xl font-bold transition-colors"
-          >
-            ✕
-          </button>
-          
-          <div className="mb-4 flex items-center gap-2">
-            <ImageIcon className="w-5 h-5 text-amber-400" />
-            <h3 className="text-xl font-bold text-white">
-              {selectedImage.subject || 'Diagram'} - {selectedImage.concept || ''}
-            </h3>
-          </div>
-          
-          <div className="bg-slate-950 rounded-xl p-8 font-mono text-lg text-cyan-300 whitespace-pre overflow-x-auto border-2 border-violet-500/30">
-            {selectedImage.content}
-          </div>
-          
-          {selectedImage.caption && (
-            <p className="text-slate-300 mt-4 text-center">
-              {selectedImage.caption}
-            </p>
-          )}
+          <Link href="/pricing" className="block w-full py-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-2xl font-black hover:scale-105 transition-all shadow-xl mb-3">
+            Unlock Now — From KES 500
+          </Link>
+          <Link href="/dashboard" className="block w-full py-3 bg-white/5 text-white/60 rounded-2xl font-bold hover:bg-white/10 transition-all">
+            Back to Dashboard
+          </Link>
         </div>
       </div>
     )
   }
 
-  if (!hasAccess) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950 flex items-center justify-center p-4">
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-violet-600/20 rounded-full blur-[120px] animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-600/20 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }} />
-        </div>
-        
-        <div className="relative max-w-md w-full backdrop-blur-xl bg-white/5 rounded-[40px] p-8 border border-white/10 text-center">
-          <div className="w-24 h-24 bg-gradient-to-br from-violet-500 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl">
-            <Brain className="w-12 h-12 text-white" />
-          </div>
-          <h2 className="text-3xl font-black text-white mb-4 tracking-tight">Learning Compass Locked</h2>
-          <p className="text-violet-200 mb-8 text-lg">
-            Unlock your AI-powered personal tutor with tokens or subscription.
-          </p>
-          <div className="space-y-3">
-            <Link
-              href="/pricing"
-              className="block w-full py-4 bg-gradient-to-r from-violet-600 to-cyan-600 text-white rounded-2xl font-black text-lg hover:scale-105 transition-all shadow-2xl"
-            >
-              Unlock Now
-            </Link>
-            <Link
-              href="/dashboard"
-              className="block w-full py-4 bg-white/10 text-white rounded-2xl font-bold hover:bg-white/20 transition-all"
-            >
-              Back to Dashboard
-            </Link>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
+  // ─────────────────────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950 overflow-hidden relative">
-      {/* Animated background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/3 w-[600px] h-[600px] bg-violet-600/20 rounded-full blur-[140px] animate-pulse" />
-        <div className="absolute bottom-0 right-1/3 w-[500px] h-[500px] bg-cyan-600/20 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1.5s' }} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-600/10 rounded-full blur-[150px]" />
-      </div>
+    <div className="flex h-screen bg-[#0a0a14] overflow-hidden">
 
-      {/* LEFT SIDEBAR */}
-      <div className="relative w-80 backdrop-blur-2xl bg-gradient-to-b from-slate-900/60 to-slate-950/60 border-r border-white/10 flex-col hidden lg:flex">
-        <div className="p-6 border-b border-white/10 bg-gradient-to-r from-violet-900/30 to-cyan-900/30">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3 group">
-              <div className="relative">
-                <div className="absolute inset-0 bg-violet-500 blur-xl opacity-60 group-hover:opacity-100 transition-opacity" />
-                <div className="relative w-12 h-12 bg-gradient-to-br from-violet-500 via-indigo-500 to-cyan-500 rounded-2xl flex items-center justify-center shadow-2xl transform group-hover:scale-110 transition-transform">
-                  <Brain className="w-6 h-6 text-white" />
-                </div>
-              </div>
-              <div>
-                <h1 className="text-xl font-black text-white tracking-tight">Learning Compass</h1>
-                <div className="flex items-center gap-1 text-xs text-violet-300 font-bold">
-                  <Sparkles className="w-3 h-3" />
-                  <span>AI Tutor</span>
-                </div>
-              </div>
+      {/* ── LEFT SIDEBAR ───────────────────────────────────────────────────── */}
+      <aside className="hidden lg:flex flex-col w-72 border-r border-white/5 bg-[#0d0d1a]">
+
+        {/* Logo + back */}
+        <div className="flex items-center justify-between px-5 py-5 border-b border-white/5">
+          <Link href="/dashboard" className="flex items-center gap-2 group">
+            <ChevronLeft className="w-4 h-4 text-white/30 group-hover:text-white/60 transition-colors" />
+            <div className="w-8 h-8 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+              <Brain className="w-4 h-4 text-white" />
             </div>
-            <Link href="/dashboard" className="p-2 hover:bg-white/10 rounded-xl transition-colors group">
-              <ArrowLeft className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors" />
-            </Link>
-          </div>
+            <span className="font-black text-white/80 text-sm tracking-tight">Compass</span>
+          </Link>
+          <button
+            onClick={() => learnerId && createNewSession(learnerId)}
+            className="w-8 h-8 bg-white/5 hover:bg-white/10 rounded-xl flex items-center justify-center transition-colors group"
+            title="New session"
+          >
+            <Plus className="w-4 h-4 text-white/40 group-hover:text-white/70" />
+          </button>
         </div>
 
+        {/* Stats */}
         {stats && (
-          <div className="p-4 space-y-3 overflow-y-auto flex-1">
-            <div className="relative overflow-hidden bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/30 rounded-2xl p-5">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-orange-500/20 rounded-full blur-2xl" />
-              <div className="relative flex items-center gap-3 mb-2">
-                <Flame className="w-5 h-5 text-orange-400" />
-                <div className="text-sm font-bold text-orange-300 uppercase tracking-wider">Streak</div>
+          <div className="p-4 space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-white/3 rounded-2xl p-3 border border-white/5">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Flame className="w-3.5 h-3.5 text-orange-400" />
+                  <span className="text-[10px] font-bold text-white/40 uppercase tracking-wider">Streak</span>
+                </div>
+                <div className="text-2xl font-black text-orange-400">{stats.streakDays}</div>
+                <div className="text-[10px] text-white/30">days</div>
               </div>
-              <div className="text-4xl font-black text-orange-400">{stats.streakDays} days 🔥</div>
-            </div>
-
-            <div className="bg-gradient-to-br from-violet-500/10 to-purple-500/10 border border-violet-500/30 rounded-2xl p-5">
-              <div className="flex items-center gap-2 text-violet-300 font-bold text-sm mb-2">
-                <Star className="w-4 h-4" />
-                Concepts Mastered
-              </div>
-              <div className="text-3xl font-black text-violet-400">{stats.conceptsMastered}</div>
-            </div>
-
-            <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/30 rounded-2xl p-5">
-              <div className="text-cyan-300 font-bold text-sm mb-2">Learning Zone</div>
-              <div className="text-lg font-black text-cyan-400">
-                {stats.avgCognitiveLoad === 'optimal' ? 'Perfect! 🎯' :
-                 stats.avgCognitiveLoad === 'high' ? 'Working Hard 💪' :
-                 'Building Up 🌱'}
+              <div className="bg-white/3 rounded-2xl p-3 border border-white/5">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Zap className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-[10px] font-bold text-white/40 uppercase tracking-wider">Tokens</span>
+                </div>
+                <div className="text-2xl font-black text-amber-400">
+                  {stats.hasSubscription ? '∞' : stats.tokens}
+                </div>
+                <div className="text-[10px] text-white/30">
+                  {stats.hasSubscription ? 'unlimited' : 'left'}
+                </div>
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-amber-500/10 to-yellow-500/10 border border-amber-500/30 rounded-2xl p-5">
-              <div className="flex items-center gap-2 text-amber-300 font-bold text-sm mb-2">
-                <Zap className="w-5 h-5 fill-amber-400" />
-                Tokens Left
+            {/* Current subject */}
+            {sessionState.currentSubject && (
+              <div className="bg-white/3 rounded-2xl p-3 border border-white/5">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Star className="w-3.5 h-3.5 text-violet-400" />
+                  <span className="text-[10px] font-bold text-white/40 uppercase tracking-wider">Now Learning</span>
+                </div>
+                <div className="font-black text-white/80 capitalize text-sm">{sessionState.currentSubject}</div>
+                {sessionState.currentConcept && (
+                  <div className="text-[10px] text-white/30 mt-0.5">{sessionState.currentConcept}</div>
+                )}
               </div>
-              <div className="text-3xl font-black text-amber-400">{stats.tokens}</div>
-            </div>
+            )}
+
+            {/* Session time */}
+            {sessionState.timeOnTask > 0 && (
+              <div className="bg-white/3 rounded-2xl p-3 border border-white/5">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="text-[10px] font-bold text-white/40 uppercase tracking-wider">Session Time</span>
+                </div>
+                <div className="font-black text-cyan-400 text-sm">{sessionState.timeOnTask} min</div>
+              </div>
+            )}
           </div>
         )}
 
-        <div className="p-4 border-t border-white/10 bg-slate-950/40">
+        {/* Parent insights toggle */}
+        <div className="mt-auto p-4 border-t border-white/5">
           <button
-            onClick={() => setShowParentMode(!showParentMode)}
-            className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl bg-gradient-to-r from-pink-600/20 to-rose-600/20 hover:from-pink-600/30 hover:to-rose-600/30 border border-pink-500/30 text-pink-300 font-bold transition-all hover:scale-105"
+            onClick={() => setShowParent(!showParent)}
+            className={`w-full flex items-center gap-2 px-4 py-3 rounded-2xl font-bold text-sm transition-all ${
+              showParent
+                ? 'bg-pink-500/15 border border-pink-500/30 text-pink-300'
+                : 'bg-white/3 border border-white/5 text-white/40 hover:text-white/60 hover:bg-white/5'
+            }`}
           >
-            <Heart className="w-5 h-5" />
-            {showParentMode ? 'Hide' : 'Show'} Parent View
+            <Heart className="w-4 h-4" />
+            {showParent ? 'Hide' : 'Parent'} Insights
           </button>
         </div>
-      </div>
+      </aside>
 
-      {/* MAIN CHAT */}
-      <div className="relative flex-1 flex flex-col">
-        {/* Header */}
-        <div className="backdrop-blur-2xl bg-slate-900/60 border-b border-white/10 p-4 flex justify-between items-center">
-          <div>
-            <h2 className="font-black text-white text-lg">Today's Learning</h2>
-            <p className="text-xs text-violet-300 font-bold">Mathematics • CBC Aligned</p>
+      {/* ── MAIN CHAT ──────────────────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0">
+
+        {/* Top bar */}
+        <header className="flex items-center justify-between px-5 py-4 border-b border-white/5 bg-[#0a0a14]/80 backdrop-blur-xl">
+          <div className="flex items-center gap-3">
+            {/* Mobile back */}
+            <Link href="/dashboard" className="lg:hidden w-8 h-8 flex items-center justify-center">
+              <ChevronLeft className="w-5 h-5 text-white/40" />
+            </Link>
+            <div>
+              <h1 className="font-black text-white text-sm capitalize">
+                {sessionState.currentSubject || 'Learning Compass'}
+              </h1>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+                <span className="text-[10px] text-green-400 font-bold">
+                  Adapting to your level
+                </span>
+              </div>
+            </div>
           </div>
-          <button
-            onClick={() => createNewSession(learnerId!)}
-            className="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-cyan-600 text-white rounded-xl text-sm font-black hover:scale-105 transition-all shadow-xl"
-          >
-            New Topic
-          </button>
-        </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full text-center space-y-8 px-4">
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-violet-600 to-cyan-600 rounded-full blur-3xl opacity-50 animate-pulse" />
-                <div className="relative w-32 h-32 bg-gradient-to-br from-violet-500 via-indigo-500 to-cyan-500 rounded-full flex items-center justify-center shadow-2xl">
-                  <Sparkles className="w-16 h-16 text-white" />
+          <div className="flex items-center gap-2">
+            {/* Mobile new session */}
+            <button
+              onClick={() => learnerId && createNewSession(learnerId)}
+              className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 bg-white/5 rounded-xl text-xs font-bold text-white/50 hover:bg-white/10 hover:text-white/70 transition-all"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              New
+            </button>
+            {/* Mobile parent toggle */}
+            <button
+              onClick={() => setShowParent(!showParent)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                showParent
+                  ? 'bg-pink-500/15 text-pink-400'
+                  : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/60'
+              }`}
+            >
+              <Heart className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Parent</span>
+            </button>
+          </div>
+        </header>
+
+        {/* Messages area */}
+        <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6 space-y-5">
+
+          {/* Empty state */}
+          {messages.length === 0 && initDone && (
+            <div className="flex flex-col items-center justify-center h-full text-center py-10 px-4">
+              <div className="relative mb-8">
+                <div className="absolute inset-0 bg-violet-600/30 rounded-full blur-3xl animate-pulse" />
+                <div className="relative w-24 h-24 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-violet-600/40">
+                  <Sparkles className="w-12 h-12 text-white" />
                 </div>
               </div>
-              <div className="max-w-lg">
-                <h3 className="text-3xl font-black text-white mb-4 tracking-tight">Karibu! Ready to learn?</h3>
-                <p className="text-xl text-violet-200 mb-6 font-medium">
-                  I'm your <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-cyan-400 font-black">personal AI tutor</span> - ask me anything!
-                </p>
-                <div className="flex flex-wrap gap-3 justify-center">
-                  {['How do fractions work?', 'Explain photosynthesis', 'Help with division'].map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      onClick={() => setInput(suggestion)}
-                      className="px-5 py-3 bg-white/5 hover:bg-white/10 border border-white/20 hover:border-violet-500/50 rounded-2xl text-sm text-violet-200 font-medium transition-all hover:scale-105 backdrop-blur-xl"
-                    >
-                      {suggestion}
-                    </button>
+              <h2 className="text-2xl font-black text-white mb-2">Karibu! 🇰🇪</h2>
+              <p className="text-white/50 mb-8 max-w-sm leading-relaxed text-sm">
+                Mimi ni mwalimu wako wa kibinafsi wa AI. Niulize chochote — nitakusaidia kuelewa vizuri.
+              </p>
+              {/* Suggestion chips */}
+              <div className="flex flex-wrap gap-2 justify-center max-w-lg">
+                {SUGGESTIONS.map(s => (
+                  <button
+                    key={s}
+                    onClick={() => sendMessage(s)}
+                    className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-violet-500/40 rounded-full text-sm text-white/60 hover:text-white/90 font-medium transition-all"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+
+              {/* Free message banner */}
+              {freeLeft > 0 && (
+                <div className="mt-8 flex items-center gap-2 px-5 py-2.5 bg-green-500/10 border border-green-500/20 rounded-full">
+                  <Sparkles className="w-4 h-4 text-green-400" />
+                  <span className="text-sm font-bold text-green-300">
+                    🎁 {freeLeft} free message — try it now!
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Message list */}
+          {messages.map(msg => (
+            <MessageBubble
+              key={msg.id}
+              msg={msg}
+              onExpand={setExpandedDiagram}
+              onSpeak={speak}
+              onParentInsight={setParentInsight}
+            />
+          ))}
+
+          {/* Typing indicator */}
+          {isLoading && (
+            <div className="flex gap-3 items-end">
+              <div className="w-8 h-8 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                <Brain className="w-4 h-4 text-white" />
+              </div>
+              <div className="px-4 py-3 bg-white/8 border border-white/10 rounded-2xl rounded-bl-sm">
+                <div className="flex gap-1.5">
+                  {[0, 0.15, 0.3].map((d, i) => (
+                    <div
+                      key={i}
+                      className="w-2 h-2 bg-violet-400 rounded-full animate-bounce"
+                      style={{ animationDelay: `${d}s` }}
+                    />
                   ))}
                 </div>
               </div>
             </div>
           )}
 
-          {messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-3xl w-full ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'} flex gap-4 items-start`}>
-                {/* Avatar */}
-                <div className={`flex-shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center shadow-xl ${
-                  msg.role === 'user' 
-                    ? 'bg-gradient-to-br from-blue-500 to-cyan-500' 
-                    : 'bg-gradient-to-br from-violet-500 via-indigo-500 to-cyan-500'
-                }`}>
-                  {msg.role === 'user' ? (
-                    <span className="text-white text-sm font-black">You</span>
-                  ) : (
-                    <Brain className="w-5 h-5 text-white" />
-                  )}
-                </div>
-
-                {/* Content */}
-                <div className={`flex-1 space-y-2 ${msg.role === 'user' ? 'items-end' : 'items-start'} flex flex-col`}>
-                  {/* Metadata badges */}
-                  {msg.role === 'assistant' && msg.metadata && (
-                    <div className="flex flex-wrap gap-2">
-                      {msg.metadata.pedagogy && (
-                        <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r ${getStrategyBadge(msg.metadata.pedagogy.strategy).color} border backdrop-blur-xl`}>
-                          {(() => {
-                            const Icon = getStrategyBadge(msg.metadata.pedagogy.strategy).icon
-                            return <Icon className="w-3.5 h-3.5" />
-                          })()}
-                          {getStrategyBadge(msg.metadata.pedagogy.strategy).label}
-                        </div>
-                      )}
-                      {msg.metadata.difficulty && (
-                        <div className="px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 text-amber-300 backdrop-blur-xl">
-                          Level {msg.metadata.difficulty}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Message bubble */}
-                  <div className={`p-5 rounded-3xl shadow-2xl backdrop-blur-xl ${
-                    msg.role === 'user' 
-                      ? 'bg-gradient-to-br from-blue-600 to-cyan-600 text-white rounded-tr-md' 
-                      : 'bg-gradient-to-br from-white/10 to-white/5 border border-white/20 text-white rounded-tl-md'
-                  }`}>
-                    <div className="prose prose-sm max-w-none prose-invert">
-                      {msg.content.split('\n').map((line, i) => (
-                        <p key={i} className="mb-3 last:mb-0 leading-relaxed font-medium">{line}</p>
-                      ))}
-                    </div>
-                    
-                    {/* 👩‍🎨 RENDER VISUAL AID HERE */}
-                    {msg.role === 'assistant' && msg.metadata?.visualAid && renderVisualAid(msg.metadata.visualAid)}
-                  </div>
-
-                  {/* Actions */}
-                  {msg.role === 'assistant' && (
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => speak(msg.metadata?.audioOptimized || msg.content)}
-                        className="flex items-center gap-1.5 text-xs text-violet-300 hover:text-violet-100 transition-colors font-bold group"
-                      >
-                        <Volume2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                        Listen
-                      </button>
-                      {msg.metadata?.parentInsight && (
-                        <button
-                          onClick={() => setCurrentInsight(msg.metadata.parentInsight)}
-                          className="flex items-center gap-1.5 text-xs text-pink-300 hover:text-pink-100 transition-colors font-bold group"
-                        >
-                          <Heart className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                          Parent Tip
-                        </button>
-                      )}
-                      {msg.metadata?.visualAid && (
-                        <button
-                          onClick={() => setSelectedImage(msg.metadata.visualAid!)}
-                          className="flex items-center gap-1.5 text-xs text-amber-300 hover:text-amber-100 transition-colors font-bold group"
-                        >
-                          <ImageIcon className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                          View Full Diagram
-                        </button>
-                      )}
-                      {msg.metadata?.adaptationReason && (
-                        <div className="text-xs text-cyan-300 font-medium">
-                          {msg.metadata.adaptationReason}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-
-          {isLoading && (
-            <div className="flex items-center gap-3 text-violet-300">
-              <div className="flex gap-1">
-                <div className="w-2.5 h-2.5 bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full animate-bounce" />
-                <div className="w-2.5 h-2.5 bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                <div className="w-2.5 h-2.5 bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-              </div>
-              <span className="text-sm font-bold">Compass thinking...</span>
-            </div>
-          )}
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input */}
-        <form onSubmit={sendMessage} className="backdrop-blur-2xl bg-slate-900/60 border-t border-white/10 p-6">
-          <div className="max-w-4xl mx-auto flex gap-3">
+        {/* ── Input area ────────────────────────────────────────────────────── */}
+        <div className="px-4 md:px-6 py-4 border-t border-white/5 bg-[#0a0a14]/90 backdrop-blur-xl">
+
+          {/* Free message indicator */}
+          {freeLeft > 0 && messages.length > 0 && (
+            <div className="flex justify-center mb-3">
+              <span className="text-xs font-bold text-green-400/70 bg-green-500/10 px-4 py-1.5 rounded-full border border-green-500/15">
+                🎁 {freeLeft} free message remaining
+              </span>
+            </div>
+          )}
+
+          <div className="flex gap-3 items-end max-w-3xl mx-auto">
+
+            {/* Mic button */}
             <button
               type="button"
               onClick={toggleListening}
-              className="p-4 text-violet-400 hover:text-violet-300 hover:bg-white/10 rounded-2xl transition-all hover:scale-105"
+              className={`flex-shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${
+                isListening
+                  ? 'bg-red-500/20 border border-red-500/40 text-red-400 animate-pulse'
+                  : 'bg-white/5 border border-white/10 text-white/40 hover:bg-white/8 hover:text-white/60'
+              }`}
             >
-              <Mic className="w-6 h-6" />
+              {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
             </button>
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={freeMessagesLeft > 0 ? "Try your FREE message! Ask anything..." : "Ask anything..."}
-              className="flex-1 px-6 py-4 bg-white/5 border border-white/20 rounded-2xl focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 text-white placeholder-slate-400 font-medium transition-all backdrop-blur-xl text-lg"
-            />
+
+            {/* Text input */}
+            <div className="flex-1 relative">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={e => {
+                  setInput(e.target.value)
+                  // Auto-resize
+                  e.target.style.height = 'auto'
+                  e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder={isListening ? 'Listening...' : 'Ask me anything... (Enter to send)'}
+                rows={1}
+                className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white placeholder-white/25 text-sm font-medium resize-none focus:outline-none focus:border-violet-500/50 focus:bg-white/8 transition-all leading-relaxed"
+                style={{ minHeight: '44px', maxHeight: '120px' }}
+              />
+            </div>
+
+            {/* Send button */}
             <button
-              type="submit"
+              onClick={() => sendMessage()}
               disabled={isLoading || !input.trim()}
-              className="px-8 py-4 bg-gradient-to-r from-violet-600 to-cyan-600 text-white rounded-2xl font-black hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-3 shadow-2xl"
+              className="flex-shrink-0 w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-600/25 hover:scale-105 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all"
             >
-              <Send className="w-5 h-5" />
-              Send
+              <Send className="w-4 h-4 text-white" />
             </button>
           </div>
-          
-          {/* Free message indicator */}
-          {freeMessagesLeft > 0 && (
-            <div className="max-w-4xl mx-auto mt-4 text-center">
-              <div className="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/40 rounded-full backdrop-blur-xl">
-                <Sparkles className="w-4 h-4 text-green-400" />
-                <span className="text-sm font-bold text-green-300">
-                  🎁 {freeMessagesLeft} FREE message left - Try it now!
-                </span>
-              </div>
-            </div>
-          )}
-        </form>
+
+          <p className="text-center text-[10px] text-white/15 mt-3 font-medium">
+            Shift+Enter for new line • Powered by DeepSeek AI • CBC Kenya aligned
+          </p>
+        </div>
       </div>
 
-      {/* PARENT INSIGHTS PANEL */}
-      {showParentMode && (
-        <div className="relative w-96 backdrop-blur-2xl bg-gradient-to-b from-slate-900/60 to-slate-950/60 border-l border-white/10 overflow-y-auto">
-          <div className="p-6 bg-gradient-to-r from-pink-900/30 to-rose-900/30 border-b border-white/10">
-            <h3 className="font-black text-white flex items-center gap-2 text-xl tracking-tight mb-2">
-              <Heart className="w-6 h-6 text-pink-400" />
-              Parent Insights
-            </h3>
-            <p className="text-sm text-pink-200 font-medium">Understanding your child's journey</p>
+      {/* ── PARENT INSIGHTS PANEL ──────────────────────────────────────────── */}
+      {showParent && (
+        <aside className="w-80 border-l border-white/5 bg-[#0d0d1a] flex flex-col overflow-y-auto">
+          <div className="flex items-center justify-between px-5 py-5 border-b border-white/5">
+            <div className="flex items-center gap-2">
+              <Heart className="w-4 h-4 text-pink-400" />
+              <span className="font-black text-white/80 text-sm">Parent Insights</span>
+            </div>
+            <button
+              onClick={() => setShowParent(false)}
+              className="w-6 h-6 flex items-center justify-center text-white/30 hover:text-white/60 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
-          <div className="p-6 space-y-4">
-            {currentInsight ? (
+          <div className="p-4 space-y-3 flex-1">
+            {parentInsight ? (
               <>
-                <div className="bg-gradient-to-br from-white/10 to-white/5 border border-white/20 rounded-2xl p-5 backdrop-blur-xl">
-                  <div className="text-xs font-bold text-violet-400 uppercase tracking-wider mb-2">Learning Now</div>
-                  <div className="text-white font-bold text-lg">{currentInsight.conceptAttempted}</div>
-                </div>
-
-                <div className="bg-gradient-to-br from-white/10 to-white/5 border border-white/20 rounded-2xl p-5 backdrop-blur-xl">
-                  <div className="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2">Their Approach</div>
-                  <div className="text-white font-medium">{currentInsight.childApproach}</div>
-                </div>
-
-                <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/30 rounded-2xl p-5">
-                  <div className="text-xs font-bold text-green-400 uppercase tracking-wider mb-2">Celebrate! 🎉</div>
-                  <div className="text-green-200 font-bold">{currentInsight.celebrationMoment}</div>
-                </div>
-
-                <div className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border border-blue-500/30 rounded-2xl p-5">
-                  <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">Practice at Home</div>
-                  <div className="text-blue-200 font-medium text-sm">{currentInsight.practiceIdea}</div>
-                </div>
-
-                {currentInsight.whyThisTask && (
-                  <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-2xl p-5">
-                    <div className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2">Why This Task?</div>
-                    <div className="text-amber-200 font-medium text-sm">{currentInsight.whyThisTask}</div>
+                {[
+                  { label: 'Learning Now',      value: parentInsight.conceptAttempted, color: 'text-violet-300' },
+                  { label: 'Their Approach',    value: parentInsight.childApproach,    color: 'text-cyan-300'   },
+                  { label: 'Celebrate! 🎉',     value: parentInsight.celebrationMoment,color: 'text-green-300' },
+                  { label: 'Practice at Home',  value: parentInsight.practiceIdea,     color: 'text-amber-300' },
+                  { label: 'Why This Task?',    value: parentInsight.whyThisTask,       color: 'text-white/60'  },
+                ].map(({ label, value, color }) => value ? (
+                  <div key={label} className="bg-white/3 border border-white/5 rounded-2xl p-4">
+                    <p className="text-[10px] font-black text-white/30 uppercase tracking-wider mb-2">{label}</p>
+                    <p className={`text-sm font-medium leading-relaxed ${color}`}>{value}</p>
                   </div>
-                )}
+                ) : null)}
               </>
             ) : (
-              <div className="text-center text-slate-400 py-12">
-                <Brain className="w-12 h-12 mx-auto mb-4 opacity-40" />
-                <p className="font-medium">Ask a question to see insights</p>
+              <div className="flex flex-col items-center justify-center h-48 text-center">
+                <Heart className="w-10 h-10 text-white/10 mb-3" />
+                <p className="text-sm text-white/30 font-medium">
+                  Insights appear after the first response
+                </p>
               </div>
             )}
           </div>
-        </div>
+        </aside>
       )}
 
-      {/* UPGRADE PROMPT - Shows after free message used */}
-      {showUpgradePrompt && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[999] flex items-center justify-center p-4">
-          <div className="relative max-w-lg w-full bg-gradient-to-br from-slate-900 to-indigo-950 rounded-[40px] p-8 border-4 border-violet-500/50 shadow-2xl">
-            <div className="absolute inset-0 overflow-hidden rounded-[40px]">
-              <div className="absolute top-0 right-0 w-40 h-40 bg-violet-500/20 rounded-full blur-3xl" />
-              <div className="absolute bottom-0 left-0 w-40 h-40 bg-cyan-500/20 rounded-full blur-3xl" />
+      {/* ── UPGRADE MODAL ──────────────────────────────────────────────────── */}
+      {showUpgrade && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+          <div className="relative w-full max-w-md bg-[#0d0d1a] rounded-3xl border border-white/10 p-8 shadow-2xl">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-violet-600/30">
+                <Sparkles className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-xl font-black text-white mb-2">Loved the Experience?</h3>
+              <p className="text-white/50 text-sm leading-relaxed">
+                Continue with personalized AI tutoring that adapts to your child's exact level.
+              </p>
             </div>
-            
-            <div className="relative text-center">
-              <div className="w-24 h-24 bg-gradient-to-br from-violet-500 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl">
-                <Sparkles className="w-12 h-12 text-white" />
-              </div>
-              
-              <h3 className="text-3xl font-black text-white mb-3 tracking-tight">Loved Your Free Taste?</h3>
-              <p className="text-violet-200 text-lg mb-2">
-                You just experienced the <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-cyan-400">Learning Compass</span>
-              </p>
-              <p className="text-violet-300 mb-8 font-medium">
-                Personalized AI tutoring that adapts to YOUR level!
-              </p>
-              
-              <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 mb-8 border border-white/20">
-                <div className="text-sm text-violet-200 mb-4 font-bold">What You Get:</div>
-                <div className="space-y-3 text-left">
-                  <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span className="text-white text-xs">✓</span>
-                    </div>
-                    <span className="text-white font-medium">Unlimited AI tutoring sessions</span>
+
+            <div className="space-y-2 mb-6">
+              {[
+                'Unlimited tutoring sessions',
+                'Adapts to your child\'s CBC level',
+                'Visual diagrams for Science & Geography',
+                'Parent insights after every session',
+                'Kenyan context — chapati, matatu & more',
+              ].map((f, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="w-5 h-5 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-green-400 text-[10px]">✓</span>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span className="text-white text-xs">✓</span>
-                    </div>
-                    <span className="text-white font-medium">Adapts to your child's level</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span className="text-white text-xs">✓</span>
-                    </div>
-                    <span className="text-white font-medium">Parent insights every session</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span className="text-white text-xs">✓</span>
-                    </div>
-                    <span className="text-white font-medium">Kenyan CBC-aligned content</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span className="text-white text-xs">✓</span>
-                    </div>
-                    <span className="text-white font-medium">Rich diagrams for Biology, Geography, Physics!</span>
-                  </div>
+                  <span className="text-sm text-white/70 font-medium">{f}</span>
                 </div>
-              </div>
-              
-              <div className="space-y-3">
-                <Link
-                  href="/pricing"
-                  className="block w-full py-5 bg-gradient-to-r from-violet-600 to-cyan-600 text-white rounded-2xl font-black text-lg hover:scale-105 transition-all shadow-2xl"
-                >
-                  Unlock Full Access Now
-                </Link>
-                <button
-                  onClick={() => setShowUpgradePrompt(false)}
-                  className="block w-full py-4 bg-white/10 text-white rounded-2xl font-bold hover:bg-white/20 transition-all"
-                >
-                  Maybe Later
-                </button>
-              </div>
+              ))}
+            </div>
+
+            <div className="space-y-3">
+              <Link
+                href="/pricing"
+                className="block w-full py-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-2xl font-black text-center hover:scale-[1.02] transition-all shadow-xl shadow-violet-600/25"
+              >
+                Unlock Full Access — From KES 500
+              </Link>
+              <button
+                onClick={() => setShowUpgrade(false)}
+                className="block w-full py-3 bg-white/5 text-white/50 rounded-2xl font-bold hover:bg-white/8 transition-all text-sm"
+              >
+                Maybe Later
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 🖼️ Full-screen diagram modal */}
-      {renderFullScreenDiagram()}
+      {/* ── DIAGRAM MODAL ──────────────────────────────────────────────────── */}
+      {expandedDiagram && (
+        <DiagramModal aid={expandedDiagram} onClose={() => setExpandedDiagram(null)} />
+      )}
     </div>
+  )
+}
+
+// ─── Page export ──────────────────────────────────────────────────────────────
+export default function LearningCompassPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#0a0a14] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-2 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-white/30 text-sm font-bold">Loading Compass...</p>
+        </div>
+      </div>
+    }>
+      <ChatContent />
+    </Suspense>
   )
 }

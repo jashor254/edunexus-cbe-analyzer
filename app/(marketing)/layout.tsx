@@ -1,174 +1,182 @@
-'use client';
+'use client'
 
-import Link from 'next/link';
-import { GraduationCap, Menu, X, Mail } from 'lucide-react';
-import { useState } from 'react';
+import { useState } from 'react'
+import Link from 'next/link'
+import { Sparkles, X, Users, Clock } from 'lucide-react'
 
-export default function MarketingLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
+// ─── Shared Nav ────────────────────────────────────────────────────────────────
+function MarketingNav() {
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-
-      {/* NAVIGATION */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-
-            {/* Logo */}
-            <Link href="/" className="flex items-center gap-3">
-              <GraduationCap className="w-7 h-7 text-blue-600" />
-              <span className="text-xl font-black text-slate-900 tracking-tight">
-                EDUNEXUS
-              </span>
-              <span className="hidden sm:inline-flex items-center text-xs font-bold text-green-600 bg-green-50 border border-green-200 px-2 py-1 rounded-full">
-                🇰🇪 CBC
-              </span>
-            </Link>
-
-            {/* Desktop Links */}
-            <div className="hidden md:flex items-center gap-8">
-              {[
-                { label: 'How It Works', href: '#how-it-works' },
-                { label: 'Pricing', href: '#pricing' },
-              ].map((item) => (
-                <a
-                  key={item.label}
-                  href={item.href}
-                  className="text-slate-600 hover:text-slate-900 font-semibold transition-colors text-sm"
-                >
-                  {item.label}
-                </a>
-              ))}
-            </div>
-
-            {/* Auth Buttons */}
-            <div className="hidden md:flex items-center gap-4">
-              <Link
-                href="/login"
-                className="text-slate-600 hover:text-slate-900 font-bold transition-colors text-sm"
-              >
-                Login
-              </Link>
-              <Link
-                href="/signup"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-full font-bold text-sm transition-all hover:scale-105 shadow-md"
-              >
-                Get Started
-              </Link>
-            </div>
-
-            {/* Mobile Menu Button */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-slate-600 hover:text-slate-900"
-            >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
+    <nav className="border-b border-white/5 bg-slate-950/50 backdrop-blur-xl sticky top-0 z-40">
+      <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-3 animate-in fade-in slide-in-from-left duration-700">
+          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/20">
+            <Sparkles className="w-5 h-5 text-white" />
           </div>
+          <span className="text-xl font-black tracking-tight text-white">EduNexus</span>
+        </Link>
 
-          {/* Mobile Menu Content */}
-          {mobileMenuOpen && (
-            <div className="md:hidden pt-4 pb-4 border-t border-slate-200 mt-4 space-y-4">
-              {[
-                { label: 'How It Works', href: '#how-it-works' },
-                { label: 'Pricing', href: '#pricing' },
-              ].map((item) => (
-                <a
-                  key={item.label}
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block text-slate-600 hover:text-slate-900 font-semibold py-2"
-                >
-                  {item.label}
-                </a>
-              ))}
-              <div className="pt-4 flex flex-col gap-3 border-t border-slate-200">
-                <Link href="/login" className="text-center border-2 border-slate-200 text-slate-700 py-3 rounded-full font-bold">Login</Link>
-                <Link href="/signup" className="text-center bg-blue-600 text-white py-3 rounded-full font-bold shadow-md">Get Started</Link>
-              </div>
-            </div>
-          )}
+        {/* Links */}
+        <div className="hidden md:flex gap-8 animate-in fade-in duration-700" style={{ animationDelay: '100ms' }}>
+          <a href="/#features"      className="text-sm font-bold text-white/60 hover:text-purple-400 transition-colors">Features</a>
+          <a href="/#pricing"       className="text-sm font-bold text-white/60 hover:text-purple-400 transition-colors">Pricing</a>
+          <a href="/#testimonials"  className="text-sm font-bold text-white/60 hover:text-purple-400 transition-colors">Testimonials</a>
         </div>
-      </nav>
 
-      {/* MAIN CONTENT */}
-      <main className="pt-[72px] flex-1">
-        {children}
-      </main>
+        {/* CTA */}
+        <div className="flex gap-3 animate-in fade-in slide-in-from-right duration-700" style={{ animationDelay: '200ms' }}>
+          <Link
+            href="/login"
+            className="text-sm font-bold text-white/60 hover:text-white px-4 py-2 transition-colors"
+          >
+            Login
+          </Link>
+          <Link
+            href="/signup"
+            className="text-sm bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-2 rounded-xl hover:scale-105 transition-all shadow-lg shadow-purple-500/20 font-bold"
+          >
+            Start Free
+          </Link>
+        </div>
+      </div>
+    </nav>
+  )
+}
 
-      {/* UPDATED FOOTER */}
-      <footer className="bg-slate-900 text-white py-16 px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-12 mb-12">
-
-            {/* Brand Section */}
-            <div className="md:col-span-1">
-              <div className="flex items-center gap-2 mb-4">
-                <GraduationCap className="w-6 h-6 text-blue-400" />
-                <span className="text-xl font-black italic tracking-tighter">EDUNEXUS</span>
-              </div>
-              <p className="text-sm text-slate-400 leading-relaxed mb-4">
-                Kenya's first CBC pathway intelligence platform. Helping parents
-                understand and support their children's journey.
-              </p>
-              <div className="flex items-center gap-2 text-sm text-slate-400 font-semibold">
-                <span>🇰🇪</span>
-                <span>Made in Nairobi, for Kenya</span>
-              </div>
-            </div>
-
-            {/* Product Links */}
-            <div>
-              <h4 className="font-black text-xs uppercase tracking-widest text-blue-400 mb-6">Product</h4>
-              <div className="space-y-4 text-sm font-medium">
-                <a href="#how-it-works" className="block text-slate-400 hover:text-white transition-colors">How It Works</a>
-                <a href="#pricing" className="block text-slate-400 hover:text-white transition-colors">Pricing</a>
-                <Link href="/signup" className="block text-slate-400 hover:text-white transition-colors">Get Started</Link>
-              </div>
-            </div>
-
-            {/* Updated Legal Links - Correct Paths */}
-            <div>
-              <h4 className="font-black text-xs uppercase tracking-widest text-blue-400 mb-6">Legal</h4>
-              <div className="space-y-4 text-sm font-medium">
-                <Link href="/legal/privacy" className="block text-slate-400 hover:text-white transition-colors">Privacy Policy</Link>
-                <Link href="/legal/terms" className="block text-slate-400 hover:text-white transition-colors">Terms of Service</Link>
-                <Link href="/legal/refund" className="block text-slate-400 hover:text-white transition-colors">Refund Policy</Link>
-                <Link href="/legal" className="block text-blue-400 hover:underline transition-colors italic">Legal Center →</Link>
-              </div>
-            </div>
-
-            {/* Support Section */}
-            <div>
-              <h4 className="font-black text-xs uppercase tracking-widest text-blue-400 mb-6">Support</h4>
-              <div className="space-y-4 text-sm font-medium text-slate-400">
-                <p>Have questions? Reach out:</p>
-                <a href="mailto:kariukidennis092@gmail.com" className="flex items-center gap-2 text-white hover:text-blue-400 transition-colors">
-                  <Mail className="w-4 h-4" />
-                  Email Support
-                </a>
-              </div>
-            </div>
-
+// ─── Shared Footer ─────────────────────────────────────────────────────────────
+function MarketingFooter() {
+  return (
+    <footer className="border-t border-white/5 bg-slate-950/50 backdrop-blur-xl py-12 mt-20">
+      <div className="max-w-7xl mx-auto px-6 text-center">
+        {/* Logo */}
+        <Link href="/" className="inline-flex items-center gap-2 mb-6 group">
+          <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition">
+            <Sparkles className="w-4 h-4 text-white" />
           </div>
+          <span className="text-base font-black text-white/60">EduNexus</span>
+        </Link>
 
-          {/* Bottom Bar */}
-          <div className="border-t border-white/10 pt-8 flex flex-col md:row justify-between items-center gap-4">
-            <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">
-              © {new Date().getFullYear()} EDUNEXUS KENYA. ALL RIGHTS RESERVED.
+        {/* Legal links */}
+        <div className="flex justify-center gap-8 mb-6">
+          <Link href="/legal/privacy" className="text-sm text-white/40 hover:text-white transition-colors font-bold">Privacy</Link>
+          <Link href="/legal/terms"   className="text-sm text-white/40 hover:text-white transition-colors font-bold">Terms</Link>
+          <Link href="/legal/refund"  className="text-sm text-white/40 hover:text-white transition-colors font-bold">Refund</Link>
+        </div>
+
+        {/* Social hint */}
+        <div className="flex justify-center gap-6 mb-6">
+          <a
+            href="https://tiktok.com/@edunexuscbe"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-white/30 hover:text-white/60 transition-colors font-bold"
+          >
+            TikTok
+          </a>
+          <a
+            href="https://facebook.com/edunexuskenya"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-white/30 hover:text-white/60 transition-colors font-bold"
+          >
+            Facebook
+          </a>
+          <a
+            href="https://wa.me/254710798030"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-white/30 hover:text-white/60 transition-colors font-bold"
+          >
+            WhatsApp
+          </a>
+        </div>
+
+        <p className="text-sm text-white/40">© 2026 EduNexus. Made in Kenya 🇰🇪</p>
+      </div>
+    </footer>
+  )
+}
+
+// ─── Coming Soon Modal (shared across marketing pages) ─────────────────────────
+export function ComingSoonModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-in fade-in duration-200">
+      <div className="relative max-w-md w-full">
+        <div className="absolute -inset-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-3xl blur opacity-30" />
+        <div className="relative bg-slate-900 border border-white/10 rounded-3xl p-8">
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <Users className="w-8 h-8 text-white" />
+          </div>
+          <h3 className="text-2xl font-black text-center text-white mb-3">Study Groups Coming Soon! 🎉</h3>
+          <p className="text-white/70 text-center mb-6 leading-relaxed">
+            We're building something special. Join forces with other students, share notes, compete in challenges, and climb leaderboards together.
+          </p>
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-6">
+            <div className="flex items-center gap-2 text-amber-300 mb-2">
+              <Clock className="w-5 h-5" />
+              <span className="font-bold">Keep checking back!</span>
+            </div>
+            <p className="text-sm text-amber-200/70">
+              Study Groups launching soon. Be among the first to collaborate and compete!
             </p>
-            <div className="flex items-center gap-2">
-               <span className="text-slate-600 text-[10px] font-black tracking-tighter uppercase">Status:</span>
-               <span className="bg-green-500/10 text-green-500 border border-green-500/20 px-2 py-0.5 text-[10px] rounded font-bold">SYSTEMS ONLINE</span>
-            </div>
           </div>
+          <button
+            onClick={onClose}
+            className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-2xl font-black hover:scale-105 transition-all"
+          >
+            Got it!
+          </button>
         </div>
-      </footer>
+      </div>
     </div>
-  );
+  )
+}
+
+// ─── Layout ────────────────────────────────────────────────────────────────────
+export default function MarketingLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-slate-950 text-white overflow-hidden">
+      {/* Ambient gradient orbs — shared atmosphere */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div
+          className="absolute -top-1/2 -left-1/2 w-[1000px] h-[1000px] bg-purple-600/10 rounded-full blur-[120px] animate-pulse"
+          style={{ animationDuration: '8s' }}
+        />
+        <div
+          className="absolute -bottom-1/2 -right-1/2 w-[1000px] h-[1000px] bg-blue-600/10 rounded-full blur-[120px] animate-pulse"
+          style={{ animationDuration: '10s', animationDelay: '2s' }}
+        />
+        <div
+          className="absolute top-1/2 left-1/2 w-[800px] h-[800px] bg-amber-600/5 rounded-full blur-[100px] animate-pulse"
+          style={{ animationDuration: '12s', animationDelay: '4s' }}
+        />
+      </div>
+
+      {/* Grain texture */}
+      <div
+        className="fixed inset-0 opacity-[0.02] pointer-events-none"
+        style={{
+          backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 400 400\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' /%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\' /%3E%3C/svg%3E")'
+        }}
+      />
+
+      {/* Nav */}
+      <MarketingNav />
+
+      {/* Page content */}
+      <div className="relative z-10">
+        {children}
+      </div>
+
+      {/* Footer */}
+      <MarketingFooter />
+    </div>
+  )
 }
