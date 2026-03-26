@@ -14,6 +14,6 @@ export default function robots(): MetadataRoute.Robots {
         '/*.json$',        // JSON files
       ],
     },
-    sitemap: 'https://edunexus.co.ke/sitemap.xml',
+    sitemap: 'https://www.edunexus.co.ke/sitemap.xml',
   }
 }
