@@ -33,6 +33,49 @@ export interface ActionPlan {
   longTerm: string[]
 }
 
+// ─── Clinical Overview (Page 2) ──────────────────────────────────────────────
+
+export interface ClinicalOverview {
+  overallCompetencyLevel: 1 | 2 | 3 | 4
+  overallCompetencyLabel: string
+  clinicalParagraph: string
+  clinicalStrengths: SubjectProgress[]   // top subjects level 3-4
+  priorityAreas: SubjectProgress[]       // bottom subjects level 1-2
+  trajectory: 'IMPROVING' | 'STABLE' | 'NEEDS ATTENTION' | 'CRITICAL'
+}
+
+// ─── Pathway Analysis (Junior — Page 4A) ─────────────────────────────────────
+
+export interface PathwayScore {
+  name: 'STEM' | 'Social Sciences' | 'Arts & Sports Science'
+  score: number   // 0–100
+  color: string
+}
+
+export interface PathwayAnalysis {
+  pathwayScores: PathwayScore[]
+  recommendedPathway: 'STEM' | 'Social Sciences' | 'Arts & Sports Science'
+  confidenceLevel: 'HIGH' | 'MEDIUM' | 'DEVELOPING'
+  reasons: string[]
+  subjectsToStrengthen: string[]
+  futureMessage: string
+}
+
+// ─── Career Match (Senior — Page 4B) ─────────────────────────────────────────
+
+export interface CareerMatch {
+  name: string
+  description: string              // kept for web UI backward compat
+  matchPercentage: number          // kept for web UI backward compat
+  requiredSubjects?: string[]
+  matchStrength?: 'STRONG' | 'GOOD' | 'POSSIBLE'
+  whyItFits?: string
+  keyGap?: string
+  kenyanPathway?: string
+}
+
+// ─── Junior / Senior Guidance (kept for backward compat with web UI) ─────────
+
 export interface JuniorGuidance {
   recommendedPathway: 'STEM' | 'Social Sciences' | 'Arts & Sports Science'
   reasoning: string
@@ -40,18 +83,42 @@ export interface JuniorGuidance {
   areasToImprove: string[]
 }
 
-export interface CareerMatch {
-  name: string
-  description: string
-  matchPercentage: number
-  requiredSubjects?: string[]
-}
-
 export interface SeniorGuidance {
   topCareers: CareerMatch[]
   reasoning: string
   nextSteps: string[]
+  honestAssessment?: string
 }
+
+// ─── Holiday Action Plan (Page 5) ────────────────────────────────────────────
+
+export interface WeekPlan {
+  weekNumber: 1 | 2 | 3
+  title: string
+  theme: string
+  focusSubjects: string[]
+  dailyMinutes: number
+  goal: string
+  activities: string[]
+}
+
+export interface HolidayActionPlan {
+  weeks: [WeekPlan, WeekPlan, WeekPlan]
+  morningRoutine: string
+  afternoonRoutine: string
+  eveningRoutine: string
+}
+
+// ─── Learning Compass Recommendations (Page 6) ───────────────────────────────
+
+export interface LearningCompassRec {
+  firstSessionSubject: string
+  sessionFrequency: string
+  topicsToAsk: string[]
+  sessionGoal: string
+}
+
+// ─── Graph Data ───────────────────────────────────────────────────────────────
 
 export interface GraphData {
   competencyDistribution: {
@@ -66,13 +133,19 @@ export interface GraphData {
   }>
 }
 
+// ─── Main Report ─────────────────────────────────────────────────────────────
+
 export interface AcademicClinicReport {
   studentProfile: StudentProfile
   subjectBreakdown: SubjectProgress[]
   vitals: Vitals
   actionPlan: ActionPlan
-  juniorGuidance?: JuniorGuidance
-  seniorGuidance?: SeniorGuidance
+  clinicalOverview: ClinicalOverview           // NEW — Page 2
+  pathwayAnalysis?: PathwayAnalysis            // NEW — Page 4A (Junior)
+  holidayPlan: HolidayActionPlan               // NEW — Page 5
+  learningCompassRec: LearningCompassRec       // NEW — Page 6
+  juniorGuidance?: JuniorGuidance              // kept for web UI
+  seniorGuidance?: SeniorGuidance              // kept for web UI (enriched)
   graphData: GraphData
   reportId: string
   generatedAt: string

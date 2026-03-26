@@ -146,12 +146,13 @@ export default async function StudentReportPage({
   const juniorGuidance: JuniorGuidance | undefined = isJunior ? generateJuniorGuidance(subjectProgress) : undefined
   const seniorGuidance: SeniorGuidance | undefined = !isJunior ? generateSeniorGuidance(subjectProgress) : undefined
 
-  // Generate final report - WITH ALL 6 ARGUMENTS!
+  // Generate final report
   const report = generateReport(
     studentProfile,
     subjectProgress,
     vitals,
     actionPlan,
+    assessments,
     juniorGuidance,
     seniorGuidance
   )

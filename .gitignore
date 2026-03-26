@@ -30,8 +30,27 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files — never commit any env variant
+.env
+.env.*
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.production
+.env.production.local
+.env.staging
+.env.staging.local
+.env.backup
+.env.bak
+.env.prod
+.env.old
+.env.copy
+.env.example.local
+*.env
+*.env.local
+*.env.backup
 
 # vercel
 .vercel
@@ -39,3 +58,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# MCP config — contains service role key, never commit
+.mcp.json

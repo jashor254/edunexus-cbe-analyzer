@@ -104,6 +104,7 @@ async function testReport() {
     subjectProgress,
     vitals,
     actionPlan,
+    [],             // assessments array (empty for test)
     juniorGuidance
   )
   

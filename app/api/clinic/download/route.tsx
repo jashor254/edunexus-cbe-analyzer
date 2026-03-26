@@ -149,7 +149,7 @@ export async function POST(req: Request) {
     // ── 7. Build report ──────────────────────────────────────────────────────
     const vitals     = calculateVitals(subjectProgress)
     const actionPlan = generateActionPlan(subjectProgress)
-    const isJunior   = student.grade <= 9
+    const isJunior   = student.grade >= 7 && student.grade <= 9  // Grade 7–9 = Junior School
 
     const studentProfile: StudentProfile = {
       id:       student.id,
@@ -162,14 +162,16 @@ export async function POST(req: Request) {
       school:   student.school,
     }
 
-    const juniorGuidance = isJunior  ? generateJuniorGuidance(subjectProgress)  : undefined
-    const seniorGuidance = !isJunior ? generateSeniorGuidance(subjectProgress) : undefined
+    const firstName      = student.name.split(' ')[0]
+    const juniorGuidance = isJunior  ? generateJuniorGuidance(subjectProgress)                  : undefined
+    const seniorGuidance = !isJunior ? generateSeniorGuidance(subjectProgress, firstName)       : undefined
 
     const report = generateReport(
       studentProfile,
       subjectProgress,
       vitals,
       actionPlan,
+      assessments,
       juniorGuidance,
       seniorGuidance
     )

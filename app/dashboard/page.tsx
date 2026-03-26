@@ -59,7 +59,13 @@ export default async function DashboardPage() {
       .limit(3),
   ])
 
-  const firstName      = profile?.full_name?.split(' ')[0] || 'Parent'
+  const firstName      = profile?.full_name?.split(' ')[0]
+    || user.user_metadata?.full_name?.split(' ')[0]
+    || user.email?.split('@')[0]
+    || 'there'
+
+  const hour    = new Date().getHours()
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   const tokenBalance   = tokens?.balance || 0
   const hasSubscription = !!subscription
   const planType       = subscription?.plan || (tokenBalance > 0 ? 'Token' : 'Free')
@@ -91,7 +97,7 @@ export default async function DashboardPage() {
         {/* Welcome */}
         <div className="mb-8 animate-in fade-in slide-in-from-top duration-700">
           <h1 className="text-4xl font-black text-white mb-2">
-            Welcome back, {firstName}! 👋
+            {greeting}, {firstName}! 👋
           </h1>
           <p className="text-white/50 text-lg">Your learning command center</p>
         </div>
@@ -183,7 +189,7 @@ export default async function DashboardPage() {
               <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -translate-y-48 translate-x-48 blur-3xl" />
               <div className="absolute bottom-0 left-0 w-80 h-80 bg-white/5 rounded-full translate-y-40 -translate-x-40 blur-3xl" />
               <div className="relative p-8 md:p-12">
-                <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
+                <div className="flex flex-col lg:flex-row justify-between items-start gap-8">
                   <div className="flex-1 space-y-5">
                     <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full text-sm font-black text-white">
                       <Sparkles className="w-4 h-4 text-yellow-300" />

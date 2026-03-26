@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
 import { Sparkles, X, Users, Clock } from 'lucide-react'
 
@@ -18,10 +17,12 @@ function MarketingNav() {
         </Link>
 
         {/* Links */}
-        <div className="hidden md:flex gap-8 animate-in fade-in duration-700" style={{ animationDelay: '100ms' }}>
-          <a href="/#features"      className="text-sm font-bold text-white/60 hover:text-purple-400 transition-colors">Features</a>
-          <a href="/#pricing"       className="text-sm font-bold text-white/60 hover:text-purple-400 transition-colors">Pricing</a>
-          <a href="/#testimonials"  className="text-sm font-bold text-white/60 hover:text-purple-400 transition-colors">Testimonials</a>
+        <div className="hidden md:flex gap-6 animate-in fade-in duration-700" style={{ animationDelay: '100ms' }}>
+          <a href="/#compass"       className="text-sm font-bold text-white/60 hover:text-amber-400 transition-colors">Compass</a>
+          <a href="/#boarding"      className="text-sm font-bold text-white/60 hover:text-blue-400 transition-colors">Boarding</a>
+          <a href="/#features"      className="text-sm font-bold text-white/60 hover:text-white transition-colors">Features</a>
+          <a href="/#clinic"        className="text-sm font-bold text-white/60 hover:text-violet-400 transition-colors">Clinic</a>
+          <Link href="/pricing"     className="text-sm font-bold text-white/60 hover:text-pink-400 transition-colors">Pricing</Link>
         </div>
 
         {/* CTA */}

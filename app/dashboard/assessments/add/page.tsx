@@ -1,209 +1,204 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { supabase, type Student } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback, Suspense } from 'react'
+import { createClient } from '@/utils/supabase/client'
+import { calculateJuniorPathwayAffinity } from '@/lib/pathwayCalculator'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { 
-  PlusCircle, History, ChevronRight, Sparkles, GraduationCap, 
-  Calendar, Users, BookOpen, CheckCircle2, AlertCircle, Heart, Zap 
-} from 'lucide-react'
+import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 
-// ============================================
-// ALL SUBJECTS DEFINED HERE
-// ============================================
+// ─── Types ────────────────────────────────────────────────────────────────────
+interface Student {
+  id: string
+  name: string
+  grade: number
+  current_pathway?: string | null
+  user_id: string
+}
 
-// JUNIOR SCHOOL (Grades 7-9) - 8 Core Subjects
+// ─── Subject definitions ──────────────────────────────────────────────────────
+
+// Junior School (Grades 7-9) — 8 core + 1 religious
 const JUNIOR_CORE = [
-  { key: 'mathematics', label: 'Mathematics', emoji: '🔢' },
-  { key: 'english', label: 'English', emoji: '📚' },
-  { key: 'kiswahili', label: 'Kiswahili', emoji: '🗣️' },
-  { key: 'integrated_science', label: 'Integrated Science', emoji: '🔬' },
-  { key: 'social_studies', label: 'Social Studies', emoji: '🌍' },
-  { key: 'pre_technical', label: 'Pre-Technical Studies', emoji: '⚙️' },
-  { key: 'creative_arts_sports', label: 'Creative Arts & Sports', emoji: '🎨' },
-  { key: 'agriculture_nutrition', label: 'Agriculture & Nutrition', emoji: '🌾' }
+  { key: 'mathematics',          label: 'Mathematics',             emoji: '🔢' },
+  { key: 'english',              label: 'English',                 emoji: '📚' },
+  { key: 'kiswahili',            label: 'Kiswahili',               emoji: '🗣️' },
+  { key: 'integrated_science',   label: 'Integrated Science',      emoji: '🔬' },
+  { key: 'social_studies',       label: 'Social Studies',          emoji: '🌍' },
+  { key: 'pre_technical_studies',label: 'Pre-Technical Studies',   emoji: '⚙️' },
+  { key: 'creative_arts_sports', label: 'Creative Arts & Sports',  emoji: '🎨' },
+  { key: 'agriculture_nutrition',label: 'Agriculture & Nutrition', emoji: '🌾' },
 ]
 
-// JUNIOR SCHOOL - Religious Education (Choose 1)
 const JUNIOR_RELIGIOUS = [
   { key: 'cre', label: 'Christian Religious Education', emoji: '⛪' },
-  { key: 'ire', label: 'Islamic Religious Education', emoji: '🕌' },
-  { key: 'hre', label: 'Hindu Religious Education', emoji: '🕉️' }
+  { key: 'ire', label: 'Islamic Religious Education',   emoji: '🕌' },
+  { key: 'hre', label: 'Hindu Religious Education',     emoji: '🕉️' },
 ]
 
-// SENIOR SCHOOL - Compulsory Subjects (3 - Mathematics is separate)
+// Senior School — compulsory 3 (Math is separate)
 const SENIOR_COMPULSORY = [
-  { key: 'english', label: 'English', emoji: '📚' },
-  { key: 'kiswahili_ksl', label: 'Kiswahili/KSL', emoji: '🗣️' },
-  { key: 'community_service', label: 'Community Service Learning', emoji: '❤️' }
+  { key: 'english',                   label: 'English',                   emoji: '📚' },
+  { key: 'kiswahili_ksl',             label: 'Kiswahili / KSL',           emoji: '🗣️' },
+  { key: 'community_service_learning',label: 'Community Service Learning',emoji: '❤️' },
 ]
 
-// SENIOR SCHOOL - STEM Pathway Electives
-const STEM_ELECTIVES = [
-  { key: 'biology', label: 'Biology', emoji: '🧬' },
-  { key: 'chemistry', label: 'Chemistry', emoji: '⚗️' },
-  { key: 'physics', label: 'Physics', emoji: '⚡' },
-  { key: 'general_science', label: 'General Science', emoji: '🔬' },
-  { key: 'agriculture', label: 'Agriculture', emoji: '🌱' },
-  { key: 'computer_studies', label: 'Computer Studies', emoji: '💻' },
-  { key: 'home_science', label: 'Home Science', emoji: '🏠' },
-  { key: 'drawing_design', label: 'Drawing & Design', emoji: '✏️' },
-  { key: 'aviation_technology', label: 'Aviation Technology', emoji: '✈️' },
-  { key: 'building_construction', label: 'Building & Construction', emoji: '🏗️' },
-  { key: 'electrical_technology', label: 'Electrical Technology', emoji: '⚡' },
-  { key: 'metal_technology', label: 'Metal Technology', emoji: '🔧' },
-  { key: 'power_machines', label: 'Power Machines', emoji: '⚙️' },
-  { key: 'wood_technology', label: 'Wood Technology', emoji: '🪚' },
-  { key: 'media_technology', label: 'Media Technology', emoji: '📹' },
-  { key: 'marine_fisheries', label: 'Marine & Fisheries Technology', emoji: '🐟' }
-]
+// Senior pathway electives
+const PATHWAY_ELECTIVES: Record<string, { key: string; label: string; emoji: string }[]> = {
+  'STEM': [
+    { key: 'biology',              label: 'Biology',                      emoji: '🧬' },
+    { key: 'chemistry',            label: 'Chemistry',                    emoji: '⚗️' },
+    { key: 'physics',              label: 'Physics',                      emoji: '⚡' },
+    { key: 'general_science',      label: 'General Science',              emoji: '🔬' },
+    { key: 'agriculture',          label: 'Agriculture',                  emoji: '🌱' },
+    { key: 'computer_studies',     label: 'Computer Studies',             emoji: '💻' },
+    { key: 'home_science',         label: 'Home Science',                 emoji: '🏠' },
+    { key: 'drawing_design',       label: 'Drawing & Design',             emoji: '✏️' },
+    { key: 'aviation_technology',  label: 'Aviation Technology',          emoji: '✈️' },
+    { key: 'building_construction',label: 'Building & Construction',      emoji: '🏗️' },
+    { key: 'electrical_technology',label: 'Electrical Technology',        emoji: '⚡' },
+    { key: 'metal_technology',     label: 'Metal Technology',             emoji: '🔧' },
+    { key: 'power_machines',       label: 'Power Machines',               emoji: '⚙️' },
+    { key: 'wood_technology',      label: 'Wood Technology',              emoji: '🪚' },
+    { key: 'media_technology',     label: 'Media Technology',             emoji: '📹' },
+    { key: 'marine_fisheries',     label: 'Marine & Fisheries Technology',emoji: '🐟' },
+  ],
+  'Social Sciences': [
+    { key: 'advanced_english',     label: 'Advanced English',             emoji: '📖' },
+    { key: 'literature_english',   label: 'Literature in English',        emoji: '📝' },
+    { key: 'indigenous_language',  label: 'Indigenous Language',          emoji: '🗣️' },
+    { key: 'kiswahili_kipevu',     label: 'Kiswahili Kipevu',             emoji: '📚' },
+    { key: 'fasihi_kiswahili',     label: 'Fasihi ya Kiswahili',          emoji: '✍️' },
+    { key: 'sign_language',        label: 'Sign Language',                emoji: '🤟' },
+    { key: 'arabic',               label: 'Arabic',                       emoji: '🕋' },
+    { key: 'french',               label: 'French',                       emoji: '🥖' },
+    { key: 'german',               label: 'German',                       emoji: '🍺' },
+    { key: 'mandarin',             label: 'Mandarin Chinese',             emoji: '🥢' },
+    { key: 'history_citizenship',  label: 'History & Citizenship',        emoji: '📜' },
+    { key: 'geography',            label: 'Geography',                    emoji: '🗺️' },
+    { key: 'cre',                  label: 'Christian Religious Education',emoji: '⛪' },
+    { key: 'ire',                  label: 'Islamic Religious Education',  emoji: '🕌' },
+    { key: 'hre',                  label: 'Hindu Religious Education',    emoji: '🕉️' },
+    { key: 'business_studies',     label: 'Business Studies',             emoji: '💼' },
+  ],
+  'Arts & Sports Science': [
+    { key: 'sports_recreation',    label: 'Sports and Recreation',        emoji: '⚽' },
+    { key: 'physical_education',   label: 'Physical Education',           emoji: '🏃' },
+    { key: 'music_dance',          label: 'Music and Dance',              emoji: '🎵' },
+    { key: 'theatre_film',         label: 'Theatre and Film',             emoji: '🎭' },
+    { key: 'fine_arts',            label: 'Fine Arts',                    emoji: '🎨' },
+  ],
+}
 
-// SENIOR SCHOOL - Social Sciences Pathway Electives
-const SOCIAL_SCIENCES_ELECTIVES = [
-  // Languages & Literature
-  { key: 'advanced_english', label: 'Advanced English', emoji: '📖' },
-  { key: 'literature_english', label: 'Literature in English', emoji: '📝' },
-  { key: 'indigenous_language', label: 'Indigenous Language', emoji: '🗣️' },
-  { key: 'kiswahili_kipevu', label: 'Kiswahili Kipevu', emoji: '📚' },
-  { key: 'fasihi_kiswahili', label: 'Fasihi ya Kiswahili', emoji: '✍️' },
-  { key: 'sign_language', label: 'Sign Language', emoji: '🤟' },
-  
-  // Foreign Languages
-  { key: 'arabic', label: 'Arabic', emoji: '🕋' },
-  { key: 'french', label: 'French', emoji: '🥖' },
-  { key: 'german', label: 'German', emoji: '🍺' },
-  { key: 'mandarin', label: 'Mandarin Chinese', emoji: '🥢' },
-  
-  // Humanities
-  { key: 'history_citizenship', label: 'History & Citizenship', emoji: '📜' },
-  { key: 'geography', label: 'Geography', emoji: '🗺️' },
-  
-  // Religious Education
-  { key: 'cre', label: 'Christian Religious Education', emoji: '⛪' },
-  { key: 'ire', label: 'Islamic Religious Education', emoji: '🕌' },
-  { key: 'hre', label: 'Hindu Religious Education', emoji: '🕉️' },
-  
-  // Business
-  { key: 'business_studies', label: 'Business Studies', emoji: '💼' }
-]
-
-// SENIOR SCHOOL - Arts & Sports Science Pathway Electives
-const ARTS_SPORTS_ELECTIVES = [
-  { key: 'sports_recreation', label: 'Sports and Recreation', emoji: '⚽' },
-  { key: 'physical_education', label: 'Physical Education', emoji: '🏃' },
-  { key: 'music_dance', label: 'Music and Dance', emoji: '🎵' },
-  { key: 'theatre_film', label: 'Theatre and Film', emoji: '🎭' },
-  { key: 'fine_arts', label: 'Fine Arts', emoji: '🎨' }
-]
-
-// Helper function to get electives based on pathway
 function getPathwayElectives(pathway: string) {
-  switch(pathway) {
-    case 'STEM':
-      return STEM_ELECTIVES
-    case 'Social Sciences':
-      return SOCIAL_SCIENCES_ELECTIVES
-    case 'Arts & Sports Science':
-      return ARTS_SPORTS_ELECTIVES
-    default:
-      return []
-  }
+  return PATHWAY_ELECTIVES[pathway] || []
 }
 
-// Helper function to format subject names
-function formatSubjectName(key: string): string {
-  const allSubjects = [
-    ...JUNIOR_CORE,
-    ...JUNIOR_RELIGIOUS,
-    ...SENIOR_COMPULSORY,
-    ...STEM_ELECTIVES,
-    ...SOCIAL_SCIENCES_ELECTIVES,
-    ...ARTS_SPORTS_ELECTIVES,
-    { key: 'core_mathematics', label: 'Core Mathematics' },
-    { key: 'essential_mathematics', label: 'Essential Mathematics' }
-  ]
-  
-  const subject = allSubjects.find(s => s.key === key)
-  if (subject) return subject.label
-  
-  // Fallback
-  return key.split('_').map(word => 
-    word.charAt(0).toUpperCase() + word.slice(1)
-  ).join(' ')
+// ─── Score button component ───────────────────────────────────────────────────
+function ScoreButtons({
+  subjectKey,
+  label,
+  emoji,
+  scores,
+  onScore,
+}: {
+  subjectKey: string
+  label: string
+  emoji?: string
+  scores: Record<string, number>
+  onScore: (key: string, value: number) => void
+}) {
+  const scored = scores[subjectKey]
+
+  return (
+    <div className={`p-4 rounded-2xl border-2 transition-all ${
+      scored ? 'bg-white border-black' : 'bg-white border-slate-100'
+    }`}>
+      <div className="flex items-center gap-2 mb-3">
+        {emoji && <span className="text-xl">{emoji}</span>}
+        <div className="flex-1 min-w-0">
+          <div className="text-xs font-black text-slate-500 uppercase truncate">{label}</div>
+          {scored && (
+            <div className="text-xs text-green-600 font-bold">
+              {scored === 1 ? 'Emerging' : scored === 2 ? 'Developing' : scored === 3 ? 'Proficient' : 'Exemplary'} ✓
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="flex gap-2">
+        {[1, 2, 3, 4].map(v => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => onScore(subjectKey, v)}
+            className={`flex-1 py-2.5 rounded-xl font-black text-sm transition-all ${
+              scores[subjectKey] === v
+                ? 'bg-black text-white shadow-lg scale-105'
+                : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700'
+            }`}
+          >
+            {v}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
 }
 
-// ============================================
-// END OF SUBJECTS DEFINITION
-// ============================================
+// ─── Main page ────────────────────────────────────────────────────────────────
+function AddAssessmentContent() {
+  const supabase    = createClient()
+  const router      = useRouter()
+  const searchParams = useSearchParams()
 
-// Available years (constant)
-const AVAILABLE_YEARS = [2026, 2027, 2028]
-
-// Terms (constant)
-const TERMS = [1, 2, 3]
-
-export default function AddAssessmentPage() {
-  const [students, setStudents] = useState<Student[]>([])
-  const [selectedStudent, setSelectedStudent] = useState<string>('')
-  const [currentStudent, setCurrentStudent] = useState<Student | null>(null)
-  const [term, setTerm] = useState<number>(1)
-  const [year, setYear] = useState<number>(2026)
-  const [scores, setScores] = useState<Record<string, number>>({})
-  const [mathType, setMathType] = useState<'core' | 'essential'>('essential')
+  const [students,          setStudents]          = useState<Student[]>([])
+  const [selectedStudent,   setSelectedStudent]   = useState<string>('')
+  const [currentStudent,    setCurrentStudent]    = useState<Student | null>(null)
+  const [term,              setTerm]              = useState<number>(1)
+  const [year,              setYear]              = useState<number>(new Date().getFullYear())
+  const [scores,            setScores]            = useState<Record<string, number>>({})
+  const [mathType,          setMathType]          = useState<'core' | 'essential'>('essential')
   const [selectedElectives, setSelectedElectives] = useState<string[]>([])
-  const [selectedReligion, setSelectedReligion] = useState<string>('')
-  const [loading, setLoading] = useState(false)
-  const [showAddStudent, setShowAddStudent] = useState(false)
-  const [newStudentName, setNewStudentName] = useState('')
-  const [newStudentGrade, setNewStudentGrade] = useState<number>(7)
-  const [newStudentPathway, setNewStudentPathway] = useState<string>('')
-  const [addingStudent, setAddingStudent] = useState(false)
-  
-  const router = useRouter()
+  const [selectedReligion,  setSelectedReligion]  = useState<string>('')
+  const [loading,           setLoading]           = useState(false)
+  const [error,             setError]             = useState<string | null>(null)
 
-  // Load students on mount
+  // ── Load students ───────────────────────────────────────────────────────────
+  const loadStudents = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { router.push('/login'); return }
+
+    const { data } = await supabase
+      .from('students')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('name')
+
+    if (data) setStudents(data)
+  }, [router, supabase])
+
   useEffect(() => {
     loadStudents()
-  }, [])
+    const studentId = searchParams.get('student')
+    if (studentId) setSelectedStudent(studentId)
+  }, [searchParams, loadStudents])
 
-  const loadStudents = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data } = await supabase
-        .from('students')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('name')
-
-      if (data) setStudents(data)
-    } catch (err) {
-      console.error('Error loading students:', err)
-    }
-  }
-
-  // Update current student when selected
+  // ── When student changes ────────────────────────────────────────────────────
   useEffect(() => {
-    if (selectedStudent) {
-      const student = students.find(s => s.id === selectedStudent)
-      setCurrentStudent(student || null)
-      setScores({})
-      setSelectedElectives([])
-      setSelectedReligion('')
-      
-      // Set default math type based on pathway
-      if (student?.current_pathway === 'STEM') {
-        setMathType('core')
-      } else {
-        setMathType('essential')
-      }
-    }
+    if (!selectedStudent) return
+    const student = students.find(s => s.id === selectedStudent)
+    setCurrentStudent(student || null)
+    setScores({})
+    setSelectedElectives([])
+    setSelectedReligion('')
+    setMathType(student?.current_pathway === 'STEM' ? 'core' : 'essential')
   }, [selectedStudent, students])
 
-  const isJunior = currentStudent && currentStudent.grade >= 7 && currentStudent.grade <= 9
-  const isSenior = currentStudent && currentStudent.grade >= 10 && currentStudent.grade <= 12
+  const isJunior = !!currentStudent && currentStudent.grade >= 7 && currentStudent.grade <= 9
+  const isSenior = !!currentStudent && currentStudent.grade >= 10 && currentStudent.grade <= 12
+
+  const setScore = (key: string, value: number) =>
+    setScores(prev => ({ ...prev, [key]: value }))
 
   const toggleElective = (key: string) => {
     if (selectedElectives.includes(key)) {
@@ -211,611 +206,545 @@ export default function AddAssessmentPage() {
     } else if (selectedElectives.length < 3) {
       setSelectedElectives(p => [...p, key])
     } else {
-      alert('Maximum 3 electives! ⚠️')
+      setError('Maximum 3 electives only!')
+      setTimeout(() => setError(null), 3000)
     }
   }
 
-  const handleAddStudent = async () => {
-    if (!newStudentName.trim()) return
-    
-    setAddingStudent(true)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
+  // ── Progress counts ─────────────────────────────────────────────────────────
+  const juniorScoredCount  = JUNIOR_CORE.filter(s => scores[s.key]).length +
+                             (selectedReligion && scores[selectedReligion] ? 1 : 0)
+  const juniorTotalNeeded  = JUNIOR_CORE.length + 1 // 8 core + 1 religion
+  const seniorScoredCount  = SENIOR_COMPULSORY.filter(s => scores[s.key]).length +
+                             (scores[mathType === 'core' ? 'core_mathematics' : 'essential_mathematics'] ? 1 : 0) +
+                             selectedElectives.filter(e => scores[e]).length
+  const seniorTotalNeeded  = 7 // 3 compulsory + math + 3 electives
 
-      const { data, error } = await supabase
-        .from('students')
-        .insert({
-          name: newStudentName,
-          grade: newStudentGrade,
-          current_pathway: newStudentPathway || null,
-          user_id: user.id
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-
-      // Refresh students list
-      await loadStudents()
-      
-      // Select the new student
-      if (data) {
-        setSelectedStudent(data.id)
-      }
-      
-      // Reset form
-      setShowAddStudent(false)
-      setNewStudentName('')
-      setNewStudentGrade(7)
-      setNewStudentPathway('')
-      
-    } catch (err) {
-      console.error('Error adding student:', err)
-      alert('Failed to add student')
-    } finally {
-      setAddingStudent(false)
-    }
-  }
-
+  // ── Submit ──────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    if (!selectedStudent || !currentStudent) {
-      alert('Please select a student')
-      return
-    }
-
-    // Validation
-    if (isJunior) {
-      if (!selectedReligion) {
-        alert('Please select a Religious Education subject (CRE/IRE/HRE)')
-        return
-      }
-      if (Object.keys(scores).length === 0) {
-        alert('Please enter at least one subject score')
-        return
-      }
-    }
-
-    if (isSenior) {
-      if (!currentStudent.current_pathway) {
-        alert('Senior student needs a pathway. Please edit student profile.')
-        return
-      }
-      if (selectedElectives.length !== 3) {
-        alert('Please select exactly 3 elective subjects')
-        return
-      }
-      
-      // Check if all compulsory subjects are scored
-      const compulsoryKeys = ['english', 'kiswahili_ksl', 'community_service']
-      const mathKey = mathType === 'core' ? 'core_mathematics' : 'essential_mathematics'
-      const allSubjects = [...compulsoryKeys, mathKey, ...selectedElectives]
-      
-      const missingSubjects = allSubjects.filter(subj => !scores[subj])
-      if (missingSubjects.length > 0) {
-        alert('Please score all compulsory subjects and selected electives')
-        return
-      }
-    }
-
+    setError(null)
     setLoading(true)
+
     try {
-      // Build subject scores including religion for junior
-      let finalScores = { ...scores }
-      if (isJunior && selectedReligion) {
-        finalScores[selectedReligion] = scores[selectedReligion] || 0
+      if (!selectedStudent || !currentStudent) throw new Error('Select a student first')
+
+      // ── Junior validation ──────────────────────────────────────────────────
+      if (isJunior) {
+        const missedCore = JUNIOR_CORE.filter(s => !scores[s.key]).map(s => s.label)
+        if (missedCore.length > 0) {
+          throw new Error(`Please score all core subjects. Missing: ${missedCore.join(', ')}`)
+        }
+        if (!selectedReligion) {
+          throw new Error('Please select a Religious Education subject (CRE / IRE / HRE)')
+        }
+        if (!scores[selectedReligion]) {
+          throw new Error('Please score your selected Religious Education subject')
+        }
       }
 
-      const assessmentData = {
-        student_id: selectedStudent,
-        grade: currentStudent.grade,
+      // ── Senior validation ──────────────────────────────────────────────────
+      if (isSenior) {
+        if (!currentStudent.current_pathway) {
+          throw new Error('This student needs a pathway set. Go to Dashboard → edit student.')
+        }
+        if (selectedElectives.length !== 3) {
+          throw new Error(`Select exactly 3 electives (you have ${selectedElectives.length})`)
+        }
+        const mathKey        = mathType === 'core' ? 'core_mathematics' : 'essential_mathematics'
+        const requiredKeys   = [...SENIOR_COMPULSORY.map(s => s.key), mathKey, ...selectedElectives]
+        const missingLabels  = requiredKeys.filter(k => !scores[k])
+        if (missingLabels.length > 0) {
+          throw new Error(`Score all 7 subjects. Missing ${missingLabels.length} subject(s).`)
+        }
+      }
+
+      // ── Build data ─────────────────────────────────────────────────────────
+      const finalScores = { ...scores }
+
+      // Include religion score for junior
+      if (isJunior && selectedReligion) {
+        finalScores[selectedReligion] = scores[selectedReligion]
+        // Remove other religion scores that weren't selected
+        JUNIOR_RELIGIOUS.forEach(r => {
+          if (r.key !== selectedReligion) delete finalScores[r.key]
+        })
+      }
+
+      const assessmentData: Record<string, unknown> = {
+        student_id:        selectedStudent,
+        grade:             currentStudent.grade,
         term,
         year,
-        grade_level: isJunior ? 'junior' : 'senior',
-        subject_scores: finalScores,
-        mathematics_type: isSenior ? mathType : null,
-        pathway_electives: isSenior ? selectedElectives : null
+        grade_level:       isJunior ? 'junior' : 'senior',
+        subject_scores:    finalScores,
+        mathematics_type:  isSenior ? mathType : null,
+        pathway_electives: isSenior ? selectedElectives : null,
       }
 
-      const { error } = await supabase
+      // Calculate pathway affinity for junior
+      if (isJunior) {
+        const recommendations = calculateJuniorPathwayAffinity(finalScores)
+        assessmentData.pathway_recommendations = recommendations
+      }
+
+      const { error: insertError } = await supabase
         .from('assessments')
         .insert(assessmentData)
 
-      if (error) throw error
+      if (insertError) throw insertError
 
-      alert('Assessment saved successfully! ✅')
-      router.push(`/dashboard/assessments/history?student=${selectedStudent}`)
-      
+      // ── Route on success ───────────────────────────────────────────────────
+      if (isJunior) {
+        // Junior → Pathway guidance (which senior pathway to choose)
+        router.push(`/dashboard/assessments/guidance?student=${selectedStudent}`)
+      } else {
+        // Senior → Career recommendations (honest, AI-powered)
+        router.push(`/dashboard/assessments/career-guidance?student=${selectedStudent}`)
+      }
+
     } catch (err) {
-      console.error('Error saving assessment:', err)
-      alert('Failed to save assessment')
+      setError(err instanceof Error ? err.message : 'Failed to save. Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
-  const ScoreButton = ({ subjectKey, label, emoji }: { subjectKey: string, label: string, emoji: string }) => (
-    <div className="bg-white rounded-2xl border-2 border-slate-200 p-4 hover:border-violet-300 transition-all">
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-2xl">{emoji}</span>
-        <span className="font-bold text-sm text-slate-700">{label}</span>
-      </div>
-      <div className="flex gap-1">
-        {[1, 2, 3, 4].map(score => (
-          <button
-            key={score}
-            onClick={() => setScores(prev => ({ ...prev, [subjectKey]: score }))}
-            className={`flex-1 py-2 rounded-lg font-bold transition-all ${
-              scores[subjectKey] === score
-                ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white scale-105 shadow-lg'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            {score}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-
+  // ─────────────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-      {/* Header */}
-      <div className="border-b-4 border-black bg-white sticky top-0 z-50 shadow-md">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <Link href="/dashboard" className="font-bold text-black hover:text-violet-600 transition-colors">
+    <div className="min-h-screen bg-white">
+
+      {/* Nav */}
+      <nav className="border-b-4 border-black bg-white sticky top-0 z-50">
+        <div className="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
+          <Link href="/dashboard" className="text-sm font-black uppercase tracking-wider hover:underline">
             ← Dashboard
           </Link>
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-violet-600" />
-            <span className="font-black text-sm text-black">EDUNEXUS</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Header with action buttons */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-          <div>
-            <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tight text-black">
-              New <span className="bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">Assessment</span>
-            </h1>
-            <p className="text-slate-600 mt-2 font-medium">Add performance scores for your student</p>
-          </div>
-          
-          <div className="flex gap-3">
-            <button
-              onClick={() => setShowAddStudent(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full font-bold hover:bg-violet-900 transition-all shadow-lg"
-            >
-              <PlusCircle className="w-5 h-5 text-white" />
-              Add Student
-            </button>
-            
-            {selectedStudent && (
-              <Link
-                href={`/dashboard/assessments/history?student=${selectedStudent}`}
-                className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-slate-200 rounded-full font-bold text-black hover:border-violet-300 transition-all shadow-lg"
-              >
-                <History className="w-5 h-5 text-black" />
-                View History
-              </Link>
-            )}
-          </div>
-        </div>
-
-        {/* Student Selection */}
-        <div className="mb-8 bg-white rounded-3xl border-4 border-slate-200 p-6 shadow-xl">
-          <div className="flex items-center gap-2 mb-4">
-            <Users className="w-5 h-5 text-violet-600" />
-            <h2 className="font-black uppercase text-sm text-slate-500">STEP 1: SELECT STUDENT</h2>
-          </div>
-          
-          {students.length === 0 ? (
-            <div className="text-center py-8">
-              <GraduationCap className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-              <h3 className="text-xl font-bold text-black mb-2">No students yet</h3>
-              <p className="text-slate-600 mb-6">Add your first student to start tracking assessments</p>
-              <button
-                onClick={() => setShowAddStudent(true)}
-                className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-full font-bold hover:scale-105 transition-all shadow-xl"
-              >
-                <PlusCircle className="w-5 h-5 text-white" />
-                Add Your First Student
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {students.map(student => (
-                <button
-                  key={student.id}
-                  onClick={() => setSelectedStudent(student.id)}
-                  className={`relative p-5 rounded-2xl border-3 text-left transition-all ${
-                    selectedStudent === student.id
-                      ? 'border-violet-600 bg-gradient-to-br from-violet-50 to-indigo-50 shadow-xl scale-105'
-                      : 'border-slate-200 bg-white hover:border-violet-300 hover:shadow-lg'
-                  }`}
-                >
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <div className="font-black text-lg text-black">{student.name}</div>
-                      <div className="text-sm text-slate-600">Grade {student.grade}</div>
-                    </div>
-                    {student.current_pathway && (
-                      <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-bold">
-                        {student.current_pathway}
-                      </span>
-                    )}
-                  </div>
-                  
-                  {selectedStudent === student.id && (
-                    <div className="absolute top-2 right-2 w-3 h-3 bg-violet-600 rounded-full animate-pulse" />
-                  )}
-                  
-                  <div className="flex items-center gap-1 text-xs text-slate-500">
-                    <Calendar className="w-3 h-3 text-slate-500" />
-                    <span>{student.grade >= 10 ? 'Senior' : 'Junior'} School</span>
-                  </div>
-                </button>
-              ))}
+          {currentStudent && (
+            <div className="text-sm font-black text-slate-500 uppercase">
+              {currentStudent.name} • Grade {currentStudent.grade}
             </div>
           )}
         </div>
+      </nav>
 
-        {/* Quick Add Student Modal */}
-        {showAddStudent && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl">
-              <h3 className="text-2xl font-black text-black mb-6">Add New Student</h3>
-              
-              <div className="space-y-4">
+      <div className="max-w-5xl mx-auto px-6 py-12">
+
+        {/* Title */}
+        <h1 className="text-5xl font-black mb-2 uppercase">New Assessment</h1>
+        <div className="h-2 w-32 bg-black mb-12" />
+
+        {/* Error */}
+        {error && (
+          <div className="flex items-start gap-3 bg-red-100 border-4 border-red-600 text-red-900 p-5 rounded-3xl mb-8 font-black">
+            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            {error}
+          </div>
+        )}
+
+        {/* ── STEP 1: Assessment info ─────────────────────────────────────────── */}
+        <section className="mb-10 p-8 bg-slate-50 rounded-3xl border-2 border-slate-200">
+          <h2 className="text-xs font-black mb-6 uppercase tracking-widest text-slate-400">
+            Step 1 — Assessment Info
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <label className="block text-xs font-black text-slate-400 mb-2 uppercase">Student</label>
+              <select
+                value={selectedStudent}
+                onChange={e => setSelectedStudent(e.target.value)}
+                className="w-full p-4 bg-white rounded-xl font-bold border-2 border-slate-200 focus:border-black focus:outline-none text-slate-900"
+              >
+                <option value="">— Choose student —</option>
+                {students.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} (Grade {s.grade})
+                  </option>
+                ))}
+              </select>
+              {students.length === 0 && (
+                <p className="text-xs text-slate-400 mt-2 font-bold">
+                  No students yet.{' '}
+                  <Link href="/dashboard/students/add" className="underline">Add one →</Link>
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-black text-slate-400 mb-2 uppercase">Term</label>
+              <select
+                value={term}
+                onChange={e => setTerm(Number(e.target.value))}
+                className="w-full p-4 bg-white rounded-xl font-bold border-2 border-slate-200 focus:border-black focus:outline-none text-slate-900"
+              >
+                <option value={1}>Term 1</option>
+                <option value={2}>Term 2</option>
+                <option value={3}>Term 3</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-black text-slate-400 mb-2 uppercase">Year</label>
+              <input
+                type="number"
+                value={year}
+                onChange={e => setYear(Number(e.target.value))}
+                min={2020}
+                max={2035}
+                className="w-full p-4 bg-white rounded-xl font-bold border-2 border-slate-200 focus:border-black focus:outline-none text-slate-900"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* ── JUNIOR SCHOOL ──────────────────────────────────────────────────── */}
+        {isJunior && currentStudent && (
+          <div className="space-y-8">
+
+            {/* Banner */}
+            <div className="flex items-center justify-between p-6 bg-green-50 rounded-3xl border-4 border-green-200">
+              <div className="flex items-center gap-3">
+                <span className="text-4xl">🎯</span>
                 <div>
-                  <label className="block text-sm font-bold text-black mb-2">Student Name</label>
-                  <input
-                    type="text"
-                    value={newStudentName}
-                    onChange={(e) => setNewStudentName(e.target.value)}
-                    placeholder="e.g., John Doe"
-                    className="w-full p-4 border-2 border-slate-200 rounded-xl font-medium text-black placeholder:text-slate-400"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-bold text-black mb-2">Grade</label>
-                  <select
-                    value={newStudentGrade}
-                    onChange={(e) => setNewStudentGrade(Number(e.target.value))}
-                    className="w-full p-4 border-2 border-slate-200 rounded-xl font-medium text-black"
-                  >
-                    {[7,8,9,10,11,12].map(g => (
-                      <option key={g} value={g} className="text-black">Grade {g}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                {newStudentGrade >= 10 && (
-                  <div>
-                    <label className="block text-sm font-bold text-black mb-2">Pathway</label>
-                    <select
-                      value={newStudentPathway}
-                      onChange={(e) => setNewStudentPathway(e.target.value)}
-                      className="w-full p-4 border-2 border-slate-200 rounded-xl font-medium text-black"
-                    >
-                      <option value="" className="text-black">Select Pathway</option>
-                      <option value="STEM" className="text-black">STEM</option>
-                      <option value="Social Sciences" className="text-black">Social Sciences</option>
-                      <option value="Arts & Sports Science" className="text-black">Arts & Sports Science</option>
-                    </select>
-                  </div>
-                )}
-                
-                <div className="flex gap-3 pt-4">
-                  <button
-                    onClick={() => setShowAddStudent(false)}
-                    className="flex-1 py-4 border-2 border-slate-200 rounded-full font-bold text-black hover:bg-slate-100 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleAddStudent}
-                    disabled={addingStudent}
-                    className="flex-1 py-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-full font-bold disabled:opacity-50"
-                  >
-                    {addingStudent ? 'Adding...' : 'Add Student'}
-                  </button>
+                  <h2 className="text-2xl font-black uppercase text-green-900">Junior School</h2>
+                  <p className="text-sm font-bold text-green-600">
+                    Grade {currentStudent.grade} • Pathway guidance will be generated
+                  </p>
                 </div>
               </div>
+              {/* Progress */}
+              <div className="text-right">
+                <div className="text-2xl font-black text-green-800">
+                  {juniorScoredCount}/{juniorTotalNeeded}
+                </div>
+                <div className="text-xs font-bold text-green-600">Subjects Scored</div>
+              </div>
+            </div>
+
+            {/* Core subjects */}
+            <section className="p-8 bg-blue-50 rounded-3xl border-2 border-blue-200">
+              <h2 className="text-xs font-black mb-1 uppercase tracking-widest text-blue-400">
+                Step 2 — Core Subjects (8)
+              </h2>
+              <p className="text-xs text-blue-500 font-bold mb-6">All 8 required</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {JUNIOR_CORE.map(subject => (
+                  <ScoreButtons
+                    key={subject.key}
+                    subjectKey={subject.key}
+                    label={subject.label}
+                    emoji={subject.emoji}
+                    scores={scores}
+                    onScore={setScore}
+                  />
+                ))}
+              </div>
+            </section>
+
+            {/* Religious education */}
+            <section className="p-8 bg-rose-50 rounded-3xl border-2 border-rose-200">
+              <h2 className="text-xs font-black mb-1 uppercase tracking-widest text-rose-400">
+                Step 3 — Religious Education (Choose 1)
+              </h2>
+              <p className="text-xs text-rose-500 font-bold mb-6">Select one then score it</p>
+
+              {/* Choose religion */}
+              <div className="grid grid-cols-3 gap-3 mb-6">
+                {JUNIOR_RELIGIOUS.map(r => (
+                  <button
+                    key={r.key}
+                    type="button"
+                    onClick={() => {
+                      // Clear old religion score if switching
+                      if (selectedReligion && selectedReligion !== r.key) {
+                        setScores(prev => {
+                          const next = { ...prev }
+                          delete next[selectedReligion]
+                          return next
+                        })
+                      }
+                      setSelectedReligion(r.key)
+                    }}
+                    className={`p-4 rounded-2xl border-2 text-center transition-all ${
+                      selectedReligion === r.key
+                        ? 'bg-rose-700 text-white border-rose-700 scale-105 shadow-lg'
+                        : 'bg-white text-rose-700 border-rose-200 hover:border-rose-400'
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">{r.emoji}</div>
+                    <div className="text-xs font-black">{r.label}</div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Score selected religion */}
+              {selectedReligion && (
+                <div className="max-w-sm">
+                  <ScoreButtons
+                    subjectKey={selectedReligion}
+                    label={JUNIOR_RELIGIOUS.find(r => r.key === selectedReligion)?.label || ''}
+                    emoji={JUNIOR_RELIGIOUS.find(r => r.key === selectedReligion)?.emoji}
+                    scores={scores}
+                    onScore={setScore}
+                  />
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+
+        {/* ── SENIOR SCHOOL ──────────────────────────────────────────────────── */}
+        {isSenior && currentStudent && (
+          <div className="space-y-8">
+
+            {/* Banner */}
+            <div className="flex items-center justify-between p-6 bg-purple-50 rounded-3xl border-4 border-purple-200">
+              <div className="flex items-center gap-3">
+                <span className="text-4xl">🎓</span>
+                <div>
+                  <h2 className="text-2xl font-black uppercase text-purple-900">Senior School</h2>
+                  <p className="text-sm font-bold text-purple-600">
+                    Grade {currentStudent.grade} • 7 subjects required
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {currentStudent.current_pathway ? (
+                  <div className="px-5 py-2 bg-purple-900 text-white rounded-full font-black text-sm">
+                    {currentStudent.current_pathway}
+                  </div>
+                ) : (
+                  <div className="px-5 py-2 bg-red-600 text-white rounded-full font-black text-sm">
+                    ⚠️ No Pathway Set
+                  </div>
+                )}
+                {/* Progress */}
+                <div className="text-right">
+                  <div className="text-2xl font-black text-purple-800">
+                    {seniorScoredCount}/7
+                  </div>
+                  <div className="text-xs font-bold text-purple-600">Scored</div>
+                </div>
+              </div>
+            </div>
+
+            {/* No pathway warning */}
+            {!currentStudent.current_pathway ? (
+              <div className="p-8 bg-red-50 rounded-3xl border-4 border-red-300 text-center">
+                <div className="text-6xl mb-4">🚫</div>
+                <h3 className="text-2xl font-black text-red-900 mb-2">Pathway Required!</h3>
+                <p className="text-red-700 font-bold mb-6">
+                  Edit this student's profile to set their pathway (STEM / Social Sciences / Arts & Sports Science).
+                </p>
+                <Link
+                  href="/dashboard"
+                  className="inline-block px-8 py-4 bg-red-600 text-white rounded-full font-black"
+                >
+                  Go to Dashboard
+                </Link>
+              </div>
+            ) : (
+              <>
+                {/* Part 1: Compulsory */}
+                <section className="p-8 bg-green-50 rounded-3xl border-2 border-green-200">
+                  <h2 className="text-xs font-black mb-1 uppercase tracking-widest text-green-400">
+                    Step 2 — Compulsory Subjects (4)
+                  </h2>
+                  <p className="text-xs text-green-600 font-bold mb-6">
+                    Required for ALL students regardless of pathway
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {SENIOR_COMPULSORY.map(subject => (
+                      <ScoreButtons
+                        key={subject.key}
+                        subjectKey={subject.key}
+                        label={subject.label}
+                        emoji={subject.emoji}
+                        scores={scores}
+                        onScore={setScore}
+                      />
+                    ))}
+
+                    {/* Mathematics (auto-set by pathway) */}
+                    <div className="md:col-span-2">
+                      <div className="flex items-center justify-between p-4 bg-yellow-100 rounded-2xl mb-3 border-2 border-yellow-300">
+                        <div>
+                          <div className="text-xs font-black text-yellow-800 uppercase">
+                            Mathematics — auto-set by pathway
+                          </div>
+                          <div className="text-sm font-bold text-yellow-700 mt-1">
+                            {currentStudent.current_pathway === 'STEM'
+                              ? '📐 Core Mathematics (STEM)'
+                              : '📊 Essential Mathematics (Non-STEM)'}
+                          </div>
+                        </div>
+                        <span className="text-3xl">
+                          {currentStudent.current_pathway === 'STEM' ? '🔬' : '🎨'}
+                        </span>
+                      </div>
+                      <div className="max-w-sm">
+                        <ScoreButtons
+                          subjectKey={mathType === 'core' ? 'core_mathematics' : 'essential_mathematics'}
+                          label={mathType === 'core' ? 'Core Mathematics' : 'Essential Mathematics'}
+                          emoji={mathType === 'core' ? '📐' : '📊'}
+                          scores={scores}
+                          onScore={setScore}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Part 2: Pathway electives */}
+                <section className="p-8 bg-purple-50 rounded-3xl border-2 border-purple-200">
+                  <h2 className="text-xs font-black mb-1 uppercase tracking-widest text-purple-400">
+                    Step 3 — {currentStudent.current_pathway} Electives
+                  </h2>
+                  <p className="text-xs font-black text-purple-400 mb-6 uppercase">
+                    Choose exactly 3 • Selected: {selectedElectives.length}/3
+                  </p>
+
+                  {/* Elective picker */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
+                    {getPathwayElectives(currentStudent.current_pathway).map(elective => (
+                      <button
+                        key={elective.key}
+                        type="button"
+                        onClick={() => toggleElective(elective.key)}
+                        className={`p-3 rounded-2xl text-left text-xs font-black border-2 transition-all ${
+                          selectedElectives.includes(elective.key)
+                            ? 'bg-purple-900 text-white border-purple-900 scale-105 shadow-lg'
+                            : selectedElectives.length >= 3
+                            ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'
+                            : 'bg-white text-purple-600 border-purple-200 hover:border-purple-500 hover:bg-purple-50'
+                        }`}
+                        disabled={selectedElectives.length >= 3 && !selectedElectives.includes(elective.key)}
+                      >
+                        <span className="text-lg mr-1">{elective.emoji}</span>
+                        {elective.label}
+                        {selectedElectives.includes(elective.key) && (
+                          <span className="ml-1 text-white">✓</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Score selected electives */}
+                  {selectedElectives.length > 0 && (
+                    <div className="pt-6 border-t-2 border-purple-200">
+                      <p className="text-xs font-black text-purple-600 uppercase mb-4">
+                        📝 Score your {selectedElectives.length} selected elective{selectedElectives.length > 1 ? 's' : ''}
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {selectedElectives.map(key => {
+                          const elective = getPathwayElectives(currentStudent.current_pathway!).find(e => e.key === key)
+                          if (!elective) return null
+                          return (
+                            <ScoreButtons
+                              key={key}
+                              subjectKey={key}
+                              label={elective.label}
+                              emoji={elective.emoji}
+                              scores={scores}
+                              onScore={setScore}
+                            />
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </section>
+
+                {/* Summary */}
+                <div className="p-6 bg-slate-50 rounded-3xl border-2 border-slate-200">
+                  <p className="text-xs font-black text-slate-400 uppercase mb-3">Assessment Summary</p>
+                  <div className="grid grid-cols-4 gap-3 text-center">
+                    {[
+                      { value: 4,                        label: 'Compulsory', color: 'text-blue-600'   },
+                      { value: selectedElectives.length, label: 'Electives',  color: 'text-purple-600' },
+                      { value: seniorScoredCount,        label: 'Scored',     color: 'text-green-600'  },
+                      { value: 7,                        label: 'Required',   color: 'text-orange-600' },
+                    ].map(({ value, label, color }) => (
+                      <div key={label} className="p-3 bg-white rounded-2xl">
+                        <div className={`text-3xl font-black ${color}`}>{value}</div>
+                        <div className="text-xs font-bold text-slate-500 mt-1">{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── Score guide ────────────────────────────────────────────────────── */}
+        {currentStudent && (
+          <div className="mt-8 p-5 bg-slate-50 rounded-2xl border border-slate-200">
+            <p className="text-xs font-black text-slate-400 uppercase mb-3">CBC Score Guide</p>
+            <div className="grid grid-cols-4 gap-3 text-center text-xs font-bold">
+              {[
+                { v: 1, label: 'Emerging',   bg: 'bg-red-100',    text: 'text-red-700'    },
+                { v: 2, label: 'Developing', bg: 'bg-amber-100',  text: 'text-amber-700'  },
+                { v: 3, label: 'Proficient', bg: 'bg-green-100',  text: 'text-green-700'  },
+                { v: 4, label: 'Exemplary',  bg: 'bg-purple-100', text: 'text-purple-700' },
+              ].map(({ v, label, bg, text }) => (
+                <div key={v} className={`${bg} ${text} p-2 rounded-xl`}>
+                  <div className="text-lg font-black">{v}</div>
+                  <div>{label}</div>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* Assessment Form - Only show if student selected */}
-        {selectedStudent && currentStudent && (
-          <>
-            {/* Step 2: Term & Year */}
-            <div className="mb-8 bg-white rounded-3xl border-4 border-slate-200 p-6 shadow-xl">
-              <div className="flex items-center gap-2 mb-4">
-                <Calendar className="w-5 h-5 text-violet-600" />
-                <h2 className="font-black uppercase text-sm text-slate-500">STEP 2: TERM & YEAR</h2>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4 max-w-md">
-                <div>
-                  <label className="block text-sm font-bold text-black mb-2">Term</label>
-                  <select
-                    value={term}
-                    onChange={(e) => setTerm(Number(e.target.value))}
-                    className="w-full p-4 border-2 border-slate-200 rounded-xl font-bold text-black bg-white"
-                  >
-                    {TERMS.map(t => (
-                      <option key={t} value={t} className="text-black">Term {t}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-bold text-black mb-2">Year</label>
-                  <select
-                    value={year}
-                    onChange={(e) => setYear(Number(e.target.value))}
-                    className="w-full p-4 border-2 border-slate-200 rounded-xl font-bold text-black bg-white"
-                  >
-                    {AVAILABLE_YEARS.map(y => (
-                      <option key={y} value={y} className="text-black">{y}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Step 3: Subject Scores */}
-            <div className="bg-white rounded-3xl border-4 border-slate-200 p-6 shadow-xl">
-              <div className="flex items-center gap-2 mb-4">
-                <BookOpen className="w-5 h-5 text-violet-600" />
-                <h2 className="font-black uppercase text-sm text-slate-500">
-                  STEP 3: {currentStudent.grade >= 10 ? 'SENIOR SUBJECTS' : 'JUNIOR SUBJECTS'}
-                </h2>
-              </div>
-
-              {/* Student Info Card */}
-              <div className="mb-6 p-4 bg-gradient-to-r from-violet-50 to-indigo-50 rounded-2xl">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-violet-600 rounded-full flex items-center justify-center text-white font-black">
-                    {currentStudent.grade}
-                  </div>
-                  <div>
-                    <div className="font-black text-black">{currentStudent.name}</div>
-                    <div className="text-sm text-slate-600">
-                      {currentStudent.grade >= 10 ? 'Senior School' : 'Junior School'}
-                      {currentStudent.current_pathway && ` • ${currentStudent.current_pathway}`}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* JUNIOR SCHOOL */}
-              {isJunior && (
+        {/* ── Submit ─────────────────────────────────────────────────────────── */}
+        {currentStudent && (isSenior ? !!currentStudent.current_pathway : true) && (
+          <div className="mt-10 flex gap-4">
+            <Link
+              href="/dashboard"
+              className="px-8 py-5 bg-slate-100 text-slate-600 rounded-full font-black uppercase tracking-widest hover:bg-slate-200 transition-all"
+            >
+              Cancel
+            </Link>
+            <button
+              onClick={handleSubmit}
+              disabled={loading}
+              className="flex-1 py-5 bg-black text-white rounded-full font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+            >
+              {loading ? (
                 <>
-                  {/* Core Subjects */}
-                  <h3 className="font-black text-lg text-black mb-4">Core Subjects (8)</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-                    {JUNIOR_CORE.map(subject => (
-                      <ScoreButton
-                        key={subject.key}
-                        subjectKey={subject.key}
-                        label={subject.label}
-                        emoji={subject.emoji}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Religious Education - Choose 1 */}
-                  <div className="mt-8 pt-6 border-t-4 border-slate-200">
-                    <h3 className="font-black text-lg text-black mb-4 flex items-center gap-2">
-                      <Heart className="w-5 h-5 text-red-500" />
-                      Religious Education (Choose 1)
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {JUNIOR_RELIGIOUS.map(religion => (
-                        <button
-                          key={religion.key}
-                          onClick={() => {
-                            setSelectedReligion(religion.key)
-                            // Remove any other religion score
-                            const newScores = { ...scores }
-                            JUNIOR_RELIGIOUS.forEach(r => {
-                              if (r.key !== religion.key) delete newScores[r.key]
-                            })
-                            setScores(newScores)
-                          }}
-                          className={`p-5 rounded-2xl border-3 text-center transition-all ${
-                            selectedReligion === religion.key
-                              ? 'bg-gradient-to-r from-red-600 to-pink-600 text-white border-transparent scale-105 shadow-xl'
-                              : 'bg-white border-slate-200 text-black hover:border-red-300'
-                          }`}
-                        >
-                          <div className="text-3xl mb-2">{religion.emoji}</div>
-                          <div className="font-bold text-sm">{religion.label}</div>
-                          {selectedReligion === religion.key && (
-                            <div className="mt-2 text-xs text-white">
-                              <CheckCircle2 className="w-4 h-4 inline mr-1" />
-                              Selected
-                            </div>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Show score buttons for selected religion */}
-                    {selectedReligion && (
-                      <div className="mt-6">
-                        <h4 className="font-bold text-black mb-3">Score for {JUNIOR_RELIGIOUS.find(r => r.key === selectedReligion)?.label}</h4>
-                        <div className="max-w-md">
-                          <ScoreButton
-                            subjectKey={selectedReligion}
-                            label={JUNIOR_RELIGIOUS.find(r => r.key === selectedReligion)?.label || ''}
-                            emoji={JUNIOR_RELIGIOUS.find(r => r.key === selectedReligion)?.emoji || '⛪'}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-5 h-5" />
+                  Save Assessment
+                  {isJunior && ' → Get Pathway Guidance'}
+                  {isSenior && ' → Get Career Guidance'}
                 </>
               )}
-
-              {/* SENIOR SCHOOL */}
-              {isSenior && currentStudent.current_pathway && (
-                <>
-                  {/* Compulsory Subjects */}
-                  <h3 className="font-black text-lg text-black mb-4">Compulsory Subjects (4)</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                    {SENIOR_COMPULSORY.map(subject => (
-                      <ScoreButton
-                        key={subject.key}
-                        subjectKey={subject.key}
-                        label={subject.label}
-                        emoji={subject.emoji}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Mathematics - Based on Pathway */}
-                  <div className="mb-8 p-6 bg-blue-50 rounded-2xl border-2 border-blue-200">
-                    <h4 className="font-bold text-black mb-3 flex items-center gap-2">
-                      <span className="text-2xl">📐</span>
-                      Mathematics Track
-                    </h4>
-                    <p className="text-sm text-slate-600 mb-4">
-                      {currentStudent.current_pathway === 'STEM' 
-                        ? 'STEM pathway requires Core Mathematics' 
-                        : 'Social Sciences & Arts pathways require Essential Mathematics'}
-                    </p>
-                    
-                    <div className="flex gap-4 mb-4">
-                      <button
-                        type="button"
-                        onClick={() => setMathType('core')}
-                        disabled={currentStudent.current_pathway !== 'STEM'}
-                        className={`flex-1 p-4 rounded-2xl border-3 font-bold text-center transition-all ${
-                          mathType === 'core'
-                            ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-transparent scale-105 shadow-xl'
-                            : currentStudent.current_pathway === 'STEM'
-                            ? 'bg-white border-purple-200 text-purple-700 hover:border-purple-400'
-                            : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                        }`}
-                      >
-                        <div className="text-2xl mb-1">📐</div>
-                        <div>Core Mathematics</div>
-                        <div className="text-xs mt-1">(For STEM)</div>
-                      </button>
-                      
-                      <button
-                        type="button"
-                        onClick={() => setMathType('essential')}
-                        disabled={currentStudent.current_pathway === 'STEM'}
-                        className={`flex-1 p-4 rounded-2xl border-3 font-bold text-center transition-all ${
-                          mathType === 'essential'
-                            ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-transparent scale-105 shadow-xl'
-                            : currentStudent.current_pathway !== 'STEM'
-                            ? 'bg-white border-purple-200 text-purple-700 hover:border-purple-400'
-                            : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                        }`}
-                      >
-                        <div className="text-2xl mb-1">📊</div>
-                        <div>Essential Mathematics</div>
-                        <div className="text-xs mt-1">(For Social Sciences & Arts)</div>
-                      </button>
-                    </div>
-
-                    {/* Mathematics Score */}
-                    <ScoreButton 
-                      subjectKey={mathType === 'core' ? 'core_mathematics' : 'essential_mathematics'}
-                      label={mathType === 'core' ? 'Core Mathematics' : 'Essential Mathematics'}
-                      emoji={mathType === 'core' ? '📐' : '📊'}
-                    />
-                  </div>
-
-                  {/* Pathway Electives */}
-                  <div className="mt-8 pt-6 border-t-4 border-slate-200">
-                    <h3 className="font-black text-lg text-black mb-2">{currentStudent.current_pathway} Pathway Electives</h3>
-                    <p className="text-sm text-slate-600 mb-4">Select exactly 3 electives</p>
-
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
-                      {getPathwayElectives(currentStudent.current_pathway).map(elective => (
-                        <button
-                          key={elective.key}
-                          onClick={() => toggleElective(elective.key)}
-                          className={`p-4 rounded-xl border-2 text-center transition-all ${
-                            selectedElectives.includes(elective.key)
-                              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-transparent scale-105 shadow-lg'
-                              : 'bg-white border-slate-200 text-black hover:border-purple-300'
-                          }`}
-                        >
-                          <div className="text-2xl mb-1">{elective.emoji}</div>
-                          <div className="text-xs font-bold">{elective.label}</div>
-                          {selectedElectives.includes(elective.key) && (
-                            <div className="mt-1 text-xs text-white">✓ Selected</div>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="flex items-center gap-2 mb-4 text-sm font-bold text-purple-700">
-                      <Zap className="w-4 h-4" />
-                      Selected: {selectedElectives.length}/3
-                    </div>
-
-                    {/* Score buttons for selected electives */}
-                    {selectedElectives.length > 0 && (
-                      <div className="mt-6">
-                        <h4 className="font-bold text-black mb-4">Score Your Selected Electives</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {selectedElectives.map(electiveKey => {
-                            const elective = getPathwayElectives(currentStudent.current_pathway)
-                              .find(e => e.key === electiveKey)
-                            if (!elective) return null
-                            
-                            return (
-                              <ScoreButton
-                                key={elective.key}
-                                subjectKey={elective.key}
-                                label={elective.label}
-                                emoji={elective.emoji}
-                              />
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {/* Submit Button */}
-              <div className="mt-8 pt-6 border-t-2 border-slate-200">
-                <button
-                  onClick={handleSubmit}
-                  disabled={loading}
-                  className="w-full py-5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-full font-black text-lg hover:scale-105 transition-all shadow-xl disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {loading ? (
-                    'Saving...'
-                  ) : (
-                    <>
-                      Save Assessment
-                      <ChevronRight className="w-5 h-5 text-white" />
-                    </>
-                  )}
-                </button>
-                
-                <p className="text-center text-sm text-slate-500 mt-4">
-                  Score guide: 1 = Emerging, 2 = Developing, 3 = Proficient, 4 = Exemplary
-                </p>
-              </div>
-            </div>
-          </>
+            </button>
+          </div>
         )}
       </div>
     </div>
+  )
+}
+
+// ─── Page export with Suspense (required for useSearchParams) ─────────────────
+export default function AddAssessmentPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="font-black uppercase text-slate-400">Loading...</p>
+        </div>
+      </div>
+    }>
+      <AddAssessmentContent />
+    </Suspense>
   )
 }
