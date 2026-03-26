@@ -8,27 +8,20 @@ import {
   Smartphone,
   Loader2,
   Sparkles,
-  ShieldCheck,
   Crown,
   Gift,
-  Clock,
   ArrowLeft,
-  Zap,
   Star,
-  Users,
-  Brain,
-  FileText,
-  Headphones,
-  Infinity
 } from 'lucide-react'
 import Link from 'next/link'
+
+// ─── Products ─────────────────────────────────────────────────────────────────
 
 const PRODUCTS = [
   {
     id: 'starter',
     name: 'Try It',
     price: 500,
-    tokens: 15,
     billing: 'one-time',
     tagline: 'See what EduNexus can do',
     badge: null,
@@ -36,45 +29,43 @@ const PRODUCTS = [
     color: 'from-blue-500 to-cyan-500',
     icon: Gift,
     features: [
-      '15 tokens (≈ 7 full reports)',
-      'Academic Clinic analysis',
-      'Learning Compass AI tutor',
+      '15 sessions (tokens)',
+      'Academic Clinic reports',
+      'Learning Compass sessions',
       'PDF report downloads',
       'Tokens never expire',
     ],
     cta: 'Get Started',
-    note: 'No subscription. Pay once, use anytime.'
+    note: 'No subscription. Pay once, use anytime.',
   },
   {
     id: 'term',
     name: 'Term Plan',
     price: 3200,
-    tokens: 'Unlimited',
     billing: 'per term',
     tagline: 'Everything your child needs this term',
     badge: 'MOST POPULAR',
     highlight: true,
-    color: 'from-purple-500 to-pink-500',
+    color: 'from-violet-500 to-purple-500',
     icon: Star,
     features: [
       'Unlimited Academic Clinic reports',
       'Unlimited Learning Compass sessions',
-      'Track 1 student (all subjects)',
-      'Weekly progress snapshots',
+      'Track 1 student — all subjects',
+      'Holiday learning plan included',
       'PDF downloads',
       'Email support',
     ],
-    cta: 'Start This Term',
-    note: 'Cheaper than one tuition session per month.'
+    cta: 'Book This Plan',
+    note: 'Less than one private tuition session per month.',
   },
   {
     id: 'premium',
     name: 'Premium',
     price: 7000,
-    tokens: 'Unlimited',
     billing: 'per term',
-    tagline: 'For parents who want it all',
-    badge: 'BEST RESULTS',
+    tagline: 'For parents who want the full picture',
+    badge: 'BEST VALUE',
     highlight: false,
     color: 'from-amber-500 to-orange-500',
     icon: Crown,
@@ -82,46 +73,33 @@ const PRODUCTS = [
       'Everything in Term Plan',
       'Track up to 3 students',
       'Family performance dashboard',
-      'Priority AI responses',
-      'Priority WhatsApp support',
+      'Priority support via WhatsApp',
       'Early access to new features',
     ],
     cta: 'Go Premium',
-    note: 'Used by parents already paying for private tuition.'
-  }
+    note: 'For families with more than one child in school.',
+  },
 ]
 
+// ─── Pricing content ──────────────────────────────────────────────────────────
+
 function PricingContent() {
-  const router = useRouter()
+  const router       = useRouter()
   const searchParams = useSearchParams()
-  const supabase = createClient()
+  const supabase     = createClient()
 
-  const [selected, setSelected] = useState<any>(PRODUCTS[1]) // default to popular
-  const [phone, setPhone] = useState('')
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
+  const [selected,      setSelected]      = useState<any>(PRODUCTS[1])
+  const [phone,         setPhone]         = useState('')
+  const [user,          setUser]          = useState<any>(null)
+  const [loading,       setLoading]       = useState(false)
   const [autoTriggered, setAutoTriggered] = useState(false)
-  const [timeLeft, setTimeLeft] = useState('')
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const now = new Date()
-      const end = new Date()
-      end.setHours(23, 59, 59, 999)
-      const diff = end.getTime() - now.getTime()
-      const hours = Math.floor(diff / (1000 * 60 * 60))
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-      setTimeLeft(`${hours}h ${minutes}m`)
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [])
 
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
 
-      const productId = searchParams.get('product') || localStorage.getItem('pending_plan')
+      const productId  = searchParams.get('product') || localStorage.getItem('pending_plan')
       const savedPhone = localStorage.getItem('pending_phone')
 
       if (savedPhone) setPhone(savedPhone)
@@ -143,15 +121,15 @@ function PricingContent() {
   const handlePay = async (product: any, phoneNum: string, email: string) => {
     setLoading(true)
     try {
-      const res = await fetch('/api/payments/initialize', {
-        method: 'POST',
+      const res  = await fetch('/api/payments/initialize', {
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          productId: product.id,
+          productId:   product.id,
           phoneNumber: phoneNum,
-          amount: product.price,
-          email
-        })
+          amount:      product.price,
+          email,
+        }),
       })
       const data = await res.json()
       if (data.authorization_url) {
@@ -159,11 +137,10 @@ function PricingContent() {
         localStorage.removeItem('pending_phone')
         window.location.href = data.authorization_url
       } else {
-        alert(data.error || 'Payment failed')
+        alert(data.error || 'Payment failed. Please try again.')
         setLoading(false)
       }
-    } catch (err) {
-      console.error('Payment error:', err)
+    } catch {
       alert('Network error. Please try again.')
       setLoading(false)
     }
@@ -193,32 +170,35 @@ function PricingContent() {
   return (
     <div className="min-h-screen bg-slate-950 text-white overflow-hidden pb-40">
 
-      {/* Gradient orbs */}
+      {/* Ambient background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-1/2 -left-1/4 w-[800px] h-[800px] bg-purple-600/8 rounded-full blur-[120px]" />
+        <div className="absolute -top-1/2 -left-1/4 w-[800px] h-[800px] bg-violet-600/8 rounded-full blur-[120px]" />
         <div className="absolute -bottom-1/4 -right-1/4 w-[800px] h-[800px] bg-amber-600/6 rounded-full blur-[120px]" />
       </div>
 
-      {/* Urgency banner */}
-      <div className="bg-gradient-to-r from-amber-600 to-orange-600 py-2.5 sticky top-0 z-50">
-        <div className="max-w-5xl mx-auto px-4 flex items-center justify-center gap-3">
-          <Clock className="w-4 h-4 animate-pulse flex-shrink-0" />
-          <span className="text-sm font-black tracking-wide">
-            🚀 LAUNCH PRICING ENDS IN {timeLeft} — Lock in your rate today
+      {/* Early access banner */}
+      <div className="bg-gradient-to-r from-violet-700 to-indigo-700 py-3 sticky top-0 z-50">
+        <div className="max-w-5xl mx-auto px-4 flex items-center justify-center gap-2">
+          <Sparkles className="w-4 h-4 animate-pulse flex-shrink-0" />
+          <span className="text-sm font-black tracking-wide text-center">
+            🇰🇪 Live payments launching soon — book your spot at launch pricing today
           </span>
         </div>
       </div>
 
       {/* Nav */}
-      <nav className="border-b border-white/5 bg-slate-950/70 backdrop-blur-xl sticky top-9 z-40">
+      <nav className="border-b border-white/5 bg-slate-950/70 backdrop-blur-xl sticky top-10 z-40">
         <div className="max-w-5xl mx-auto px-6 py-4 flex justify-between items-center">
           <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20 group-hover:scale-105 transition">
+            <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition">
               <Sparkles className="w-4 h-4 text-white" />
             </div>
             <span className="text-lg font-black tracking-tight">EduNexus</span>
           </Link>
-          <Link href="/dashboard" className="text-sm text-white/50 hover:text-white flex items-center gap-1.5 transition font-bold">
+          <Link
+            href="/dashboard"
+            className="text-sm text-white/50 hover:text-white flex items-center gap-1.5 transition font-bold"
+          >
             <ArrowLeft className="w-4 h-4" /> Dashboard
           </Link>
         </div>
@@ -227,48 +207,70 @@ function PricingContent() {
       <div className="relative z-10 max-w-5xl mx-auto px-6 py-16">
 
         {/* Header */}
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 text-purple-300 px-4 py-2 rounded-full text-xs font-black uppercase tracking-wider mb-6">
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center gap-2 bg-violet-500/10 border border-violet-500/20 text-violet-300 px-4 py-2 rounded-full text-xs font-black uppercase tracking-wider mb-6">
             <Sparkles className="w-3.5 h-3.5" />
             Simple, Honest Pricing
           </div>
           <h1 className="text-5xl md:text-7xl font-black leading-[0.95] mb-5">
             <span className="text-white/90">Invest in</span>
-            <span className="block bg-gradient-to-r from-purple-400 via-pink-400 to-amber-400 bg-clip-text text-transparent mt-1">
+            <span className="block bg-gradient-to-r from-violet-400 via-purple-400 to-amber-400 bg-clip-text text-transparent mt-1">
               Your Child's Future
             </span>
           </h1>
-          <p className="text-lg text-white/50 max-w-xl mx-auto leading-relaxed">
+          <p className="text-lg text-white/50 max-w-xl mx-auto leading-relaxed mb-6">
             Your child isn't slow — they're just being taught like everyone else.
-            Pick a plan and change that today.
+            Book your spot now at launch pricing.
           </p>
+
+          {/* Early access notice */}
+          <div className="inline-flex items-center gap-3 bg-violet-500/10 border border-violet-500/20 rounded-2xl px-6 py-4">
+            <div className="w-2 h-2 bg-violet-400 rounded-full animate-pulse flex-shrink-0" />
+            <p className="text-sm text-violet-300 font-bold text-left">
+              Early access members lock in launch pricing.
+              Price increases once we go fully live.
+            </p>
+          </div>
+        </div>
+
+        {/* What you get free */}
+        <div className="flex flex-wrap justify-center gap-6 mb-14 text-sm text-white/50">
+          {[
+            '1 free Learning Compass session on signup',
+            '1 free Academic Clinic report on signup',
+            'No card needed to start',
+          ].map((item, i) => (
+            <span key={i} className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0" />
+              {item}
+            </span>
+          ))}
         </div>
 
         {/* Pricing cards */}
-        <div className="grid md:grid-cols-3 gap-6 mb-16">
-          {PRODUCTS.map((product) => {
-            const Icon = product.icon
+        <div className="grid md:grid-cols-3 gap-6 mb-12">
+          {PRODUCTS.map(product => {
+            const Icon       = product.icon
             const isSelected = selected?.id === product.id
+
             return (
               <div
                 key={product.id}
                 onClick={() => setSelected(product)}
                 className={`relative rounded-3xl cursor-pointer transition-all duration-300 group ${
-                  product.highlight
-                    ? 'md:-mt-4 md:mb-4'
-                    : ''
+                  product.highlight ? 'md:-mt-4 md:mb-4' : ''
                 }`}
               >
                 {/* Glow */}
-                <div className={`absolute -inset-0.5 bg-gradient-to-br ${product.color} rounded-3xl blur opacity-0 transition-opacity duration-300 ${
-                  isSelected ? 'opacity-40' : 'group-hover:opacity-20'
+                <div className={`absolute -inset-0.5 bg-gradient-to-br ${product.color} rounded-3xl blur transition-opacity duration-300 ${
+                  isSelected ? 'opacity-40' : 'opacity-0 group-hover:opacity-20'
                 }`} />
 
                 <div className={`relative rounded-3xl p-7 border-2 transition-all duration-300 h-full flex flex-col ${
                   isSelected
                     ? 'bg-white/10 border-white/30'
                     : product.highlight
-                    ? 'bg-white/8 border-purple-500/30'
+                    ? 'bg-white/8 border-violet-500/30'
                     : 'bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/8'
                 }`}>
 
@@ -284,7 +286,7 @@ function PricingContent() {
                     <Icon className="w-6 h-6 text-white" />
                   </div>
 
-                  {/* Name + tagline */}
+                  {/* Name */}
                   <div className="mb-5">
                     <h3 className="text-2xl font-black text-white mb-1">{product.name}</h3>
                     <p className="text-sm text-white/50 leading-snug">{product.tagline}</p>
@@ -297,7 +299,7 @@ function PricingContent() {
                         KES {product.price.toLocaleString()}
                       </span>
                     </div>
-                    <span className="text-sm text-white/40 font-medium">{product.billing}</span>
+                    <span className="text-sm text-white/40">{product.billing}</span>
                   </div>
 
                   {/* Features */}
@@ -305,17 +307,19 @@ function PricingContent() {
                     {product.features.map((f, i) => (
                       <li key={i} className="flex items-start gap-2.5 text-sm text-white/70">
                         <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
-                        <span>{f}</span>
+                        {f}
                       </li>
                     ))}
                   </ul>
 
                   {/* Note */}
-                  <p className="text-xs text-white/30 mb-5 italic leading-relaxed">{product.note}</p>
+                  <p className="text-xs text-white/30 mb-5 italic leading-relaxed">
+                    {product.note}
+                  </p>
 
-                  {/* CTA */}
+                  {/* Select button */}
                   <button
-                    onClick={(e) => { e.stopPropagation(); setSelected(product) }}
+                    onClick={e => { e.stopPropagation(); setSelected(product) }}
                     className={`w-full py-3.5 rounded-2xl font-black text-sm transition-all ${
                       isSelected
                         ? `bg-gradient-to-r ${product.color} text-white shadow-xl hover:scale-105`
@@ -330,23 +334,26 @@ function PricingContent() {
           })}
         </div>
 
-        {/* Comparison hint */}
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-16 max-w-2xl mx-auto text-center">
+        {/* Comparison note */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-12 max-w-2xl mx-auto text-center">
           <p className="text-white/60 text-sm leading-relaxed">
-            💡 <strong className="text-white/80">Quick math:</strong> A private tutor in Nairobi costs
-            KES 500–1,500 <em>per session.</em> The Term Plan gives your child
-            unlimited AI tutoring across every subject for an entire term — for less
-            than 3 sessions.
+            💡 <strong className="text-white/80">Quick comparison:</strong> A private tutor
+            in Nairobi costs KES 500–1,500 <em>per session.</em> The Term Plan gives your
+            child unlimited personal tutoring across every subject for an entire term —
+            for less than 3 tuition sessions.
           </p>
         </div>
 
-        {/* Trust row */}
-        <div className="text-center">
-          <p className="text-white/30 text-xs font-medium tracking-wide mb-2">
-            🔒 256-bit SSL • Paystack Gateway • M-PESA Express
+        {/* Trust */}
+        <div className="text-center space-y-2">
+          <p className="text-white/30 text-xs font-medium tracking-wide">
+            🔒 256-bit SSL • Paystack Gateway • M-PESA supported
           </p>
           <p className="text-white/20 text-xs">
-            Tokens never expire • 14-day money-back guarantee • Made in Kenya 🇰🇪
+            Tokens never expire • Full refund if not satisfied • Made in Kenya 🇰🇪
+          </p>
+          <p className="text-white/20 text-xs">
+            🚀 Going fully live soon — early members get the best rate
           </p>
         </div>
       </div>
@@ -357,17 +364,21 @@ function PricingContent() {
           <div className="max-w-5xl mx-auto px-6 py-4">
             <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
 
-              {/* Selected plan info */}
+              {/* Plan info */}
               <div className="text-center md:text-left">
-                <p className="text-xs font-black text-white/40 uppercase tracking-widest mb-0.5">Selected Plan</p>
+                <p className="text-xs font-black text-white/40 uppercase tracking-widest mb-0.5">
+                  Selected Plan
+                </p>
                 <div className="flex items-baseline gap-2 justify-center md:justify-start">
                   <h4 className="text-xl font-black text-white">{selected.name}</h4>
-                  <span className="text-xl font-black text-purple-400">— KES {selected.price.toLocaleString()}</span>
+                  <span className="text-xl font-black text-violet-400">
+                    — KES {selected.price.toLocaleString()}
+                  </span>
                   <span className="text-xs text-white/40">{selected.billing}</span>
                 </div>
               </div>
 
-              {/* Input + button */}
+              {/* Phone + CTA */}
               <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
                 <div className="relative">
                   <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 w-4 h-4" />
@@ -375,29 +386,32 @@ function PricingContent() {
                     type="tel"
                     placeholder="0712 345 678 (M-PESA)"
                     value={phone}
-                    onChange={(e) => formatPhone(e.target.value)}
-                    className="w-full sm:w-64 bg-white/5 border border-white/15 pl-9 pr-4 py-3 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 outline-none font-medium text-white placeholder:text-white/25 text-sm"
+                    onChange={e => formatPhone(e.target.value)}
+                    className="w-full sm:w-64 bg-white/5 border border-white/15 pl-9 pr-4 py-3 rounded-xl focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 outline-none font-medium text-white placeholder:text-white/25 text-sm"
                     autoFocus={!!user}
                   />
                 </div>
                 <button
                   onClick={handleAction}
-                  disabled={loading || (phone.length > 0 && phone.length !== 10 && phone.length !== 9)}
-                  className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-8 py-3 rounded-xl font-black hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-xl shadow-purple-500/20 text-sm whitespace-nowrap"
+                  disabled={loading}
+                  className="bg-gradient-to-r from-violet-500 to-purple-500 text-white px-8 py-3 rounded-xl font-black hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-xl shadow-violet-500/20 text-sm whitespace-nowrap"
                 >
                   {loading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <>
                       <Smartphone className="w-4 h-4" />
-                      {user ? `Pay KES ${selected.price.toLocaleString()}` : 'Login to Pay'}
+                      {user
+                        ? `Book Spot — KES ${selected.price.toLocaleString()}`
+                        : 'Login to Book'}
                     </>
                   )}
                 </button>
               </div>
             </div>
+
             <p className="text-xs text-center text-white/25 mt-2">
-              You'll receive an M-PESA STK push to complete payment
+              🔒 Your spot is secured at launch pricing. M-PESA activates on full launch.
             </p>
           </div>
         </div>
@@ -406,11 +420,13 @@ function PricingContent() {
   )
 }
 
+// ─── Page export ──────────────────────────────────────────────────────────────
+
 export default function PricingPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
       </div>
     }>
       <PricingContent />
