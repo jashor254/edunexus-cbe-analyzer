@@ -43,7 +43,7 @@ const FEATURES = [
       'Learns from your child every session',
       'Adjusts difficulty as they improve',
       'Kenyan examples — chapatis, matatus, shambas',
-      'All CBC subjects, Grade 7–12',
+      'CBC Kenya & Cambridge IGCSE — Grade 7–12',
       'Sessions pick up where they left off',
     ],
     badge: '★ Most loved feature',
@@ -75,14 +75,14 @@ const FEATURES = [
     title: 'Pathway Guide',
     subtitle: 'Junior School — Grade 7–9',
     tagline: 'Choose the right Senior School path.',
-    desc: 'By Grade 9, your child must choose STEM, Arts & Sports, or Social Sciences. Most families guess. Pathway Guide analyses three terms of real assessment data and tells you — clearly — which path fits your child best.',
+    desc: 'By Grade 9 (CBC) or Year 9 (IGCSE), your child faces critical path choices. Pathway Guide analyses real assessment data and tells you — clearly — which path fits best. CBC students get STEM/Arts/Social Sciences guidance. IGCSE students get optimal subject combination recommendations.',
     gradient: 'from-green-500 to-emerald-500',
     link: '/signup',
     cta: 'See the pathway report',
     highlights: [
-      'Grade 7–9 Junior School only',
-      'Based on real term-by-term data',
-      'STEM / Arts & Sports / Social Sciences',
+      'CBC: STEM / Arts & Sports / Social Sciences',
+      'IGCSE: Subject combination recommendations',
+      'Based on real term-by-term performance',
       'Prevents costly wrong-path choices',
       'Career direction preview included',
     ],
@@ -149,6 +149,26 @@ const FEATURES = [
     badge: '🌤️ Holiday-ready',
     badgeColor: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-300',
   },
+  {
+    rank: 7,
+    icon: Users,
+    title: 'Study Groups',
+    subtitle: 'Holiday peer learning',
+    tagline: 'Learn together. Compete together.',
+    desc: 'Students from the same boarding school scatter to 47 counties every holiday. Study Groups keep them learning together — daily challenges, leaderboards, and peer teaching powered by the Learning Compass.',
+    gradient: 'from-pink-500 to-rose-500',
+    link: '/signup',
+    cta: 'Join a group',
+    highlights: [
+      'Daily Compass-generated challenges',
+      'Class leaderboards and streaks',
+      'Peer teaching earns most points',
+      'Anonymous questions — no judgment',
+      'Max 8 members per group',
+    ],
+    badge: '👥 Holiday feature',
+    badgeColor: 'bg-pink-500/10 border-pink-500/20 text-pink-300',
+  },
 ]
 
 const BOARDING_TIMELINE = [
@@ -189,7 +209,11 @@ export default function LandingPage() {
 
           <div className="inline-flex items-center gap-2 bg-amber-500/10 backdrop-blur-sm border border-amber-500/20 text-amber-300 px-4 py-2 rounded-full text-sm font-black mb-8 animate-in fade-in slide-in-from-top duration-700">
             <Moon className="w-4 h-4" />
-            BUILT FOR CBC KENYA — GRADE 7 TO 12
+            CBC KENYA · CAMBRIDGE IGCSE · GRADE 7–12
+            <span className="w-px h-3 bg-amber-500/40" />
+            <span className="text-amber-200/60 text-xs">
+              🇰🇪 & 🌍
+            </span>
           </div>
 
           <h1
@@ -235,6 +259,12 @@ export default function LandingPage() {
               <Compass className="w-5 h-5" />
               Start with 1 free session
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            </Link>
+            <Link
+              href="/early-access"
+              className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-5 rounded-2xl font-black hover:scale-105 transition-all shadow-2xl shadow-green-500/20 text-lg"
+            >
+              🚀 Early Access
             </Link>
             <Link
               href="/pricing"
@@ -326,6 +356,123 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── IGCSE SECTION ── */}
+      <section id="igcse" className="py-20 relative">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-950/10 to-transparent pointer-events-none" />
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="relative">
+            <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-3xl blur-xl opacity-15" />
+            <div className="relative bg-gradient-to-br from-blue-900/30 to-cyan-900/30 backdrop-blur-xl border border-blue-500/20 rounded-3xl p-8 md:p-12">
+              <div className="grid md:grid-cols-2 gap-12 items-center">
+                {/* Left side */}
+                <div>
+                  <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 text-blue-300 px-4 py-2 rounded-full text-sm font-black mb-5">
+                    🌍 NOW SUPPORTING CAMBRIDGE IGCSE
+                  </div>
+                  <h2 className="text-3xl md:text-5xl font-black text-white mb-4 leading-[0.95]">
+                    Braeburn. Brookhouse.
+                    <span className="block bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent mt-1">
+                      Hillcrest. ISK.
+                    </span>
+                  </h2>
+                  <p className="text-xl text-white/60 mb-6 leading-relaxed">
+                    If your child attends a Cambridge school in Kenya, EduNexus now adapts to their curriculum — IGCSE subjects, A*–G grading, and subject selection guidance for Year 10.
+                  </p>
+                  <div className="space-y-3 mb-8">
+                    {[
+                      'Year 7–11 Cambridge Lower Secondary & IGCSE',
+                      'Grades A*–G with color-coded performance',
+                      'Subject combination recommendations for Year 10',
+                      'A-Level pathway preview after IGCSE',
+                      'Learning Compass uses Cambridge exam framing',
+                      'International career paths included',
+                    ].map((item, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-blue-400 flex-shrink-0" />
+                        <span className="text-white/80">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <Link
+                      href="/signup"
+                      className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-8 py-4 rounded-2xl font-black hover:scale-105 transition-all shadow-xl shadow-blue-500/20"
+                    >
+                      Start with IGCSE →
+                    </Link>
+                    <span className="text-white/30 text-sm">Free first session</span>
+                  </div>
+                </div>
+
+                {/* Right side — comparison */}
+                <div className="space-y-4">
+                  {/* CBC card */}
+                  <div className="bg-white/5 border border-amber-500/20 rounded-2xl p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="text-lg">🇰🇪</span>
+                      <div>
+                        <div className="font-black text-white text-sm">CBC Kenya</div>
+                        <div className="text-xs text-white/40">Grade 7–12 · Levels 1–4</div>
+                      </div>
+                      <span className="ml-auto text-xs font-black text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg">
+                        Boarding schools
+                      </span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {[
+                        { s: 'Mathematics', v: 3, l: 'Meets' },
+                        { s: 'English', v: 2, l: 'Approaching' },
+                        { s: 'Science', v: 4, l: 'Exceeds' },
+                      ].map((item, i) => (
+                        <div key={i} className="flex items-center gap-3 text-xs">
+                          <span className="text-white/50 w-28 flex-shrink-0">{item.s}</span>
+                          <div className="flex-1 bg-white/10 rounded-full h-1">
+                            <div className="h-1 rounded-full bg-amber-500" style={{ width: `${item.v * 25}%` }} />
+                          </div>
+                          <span className="text-amber-300 font-bold w-20 text-right">{item.v}/4 {item.l}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* IGCSE card */}
+                  <div className="bg-white/5 border border-blue-500/20 rounded-2xl p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="text-lg">🌍</span>
+                      <div>
+                        <div className="font-black text-white text-sm">Cambridge IGCSE</div>
+                        <div className="text-xs text-white/40">Year 7–11 · Grades A*–G</div>
+                      </div>
+                      <span className="ml-auto text-xs font-black text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded-lg">
+                        International schools
+                      </span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {[
+                        { s: 'Mathematics', g: 'B', c: 'text-green-400' },
+                        { s: 'English Lang', g: 'A*', c: 'text-purple-400' },
+                        { s: 'Biology', g: 'C', c: 'text-amber-400' },
+                      ].map((item, i) => (
+                        <div key={i} className="flex items-center justify-between text-xs">
+                          <span className="text-white/50">{item.s}</span>
+                          <span className={`font-black text-base ${item.c}`}>{item.g}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Same compass */}
+                  <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/20 rounded-2xl p-4 text-center">
+                    <p className="text-sm font-black text-white/80">Same Learning Compass.</p>
+                    <p className="text-xs text-white/40 mt-1">Adapts to CBC or IGCSE automatically.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── LEARNING COMPASS ──────────────────────────────────────────────────── */}
       <section id="compass" className="py-24 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-amber-600/4 via-orange-600/4 to-transparent pointer-events-none" />
@@ -373,6 +520,18 @@ export default function LandingPage() {
                   </div>
                 </div>
 
+                <div className="mt-4 pt-3 border-t border-white/10 flex gap-2">
+                  <span className="text-xs text-white/30 font-bold uppercase tracking-wider mr-1">
+                    Curriculum:
+                  </span>
+                  <span className="text-xs bg-amber-500/20 border border-amber-500/30 text-amber-300 px-2 py-1 rounded-lg font-bold">
+                    🇰🇪 CBC Kenya
+                  </span>
+                  <span className="text-xs bg-white/10 border border-white/10 text-white/30 px-2 py-1 rounded-lg font-bold">
+                    🌍 IGCSE
+                  </span>
+                </div>
+
                 <div className="mt-5 pt-4 border-t border-white/10 flex items-center gap-3">
                   <div className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white/30">
                     Uliza swali lolote la CBC...
@@ -406,7 +565,8 @@ export default function LandingPage() {
                   { text: 'Learns from how your child responds', icon: Zap },
                   { text: 'Kenyan examples — unga, matatus, KCSE past papers', icon: Globe },
                   { text: 'Remembers where they got stuck last session', icon: Target },
-                  { text: 'All CBC subjects, Grade 7 to 12', icon: BookOpen },
+                  { text: 'CBC Kenya & Cambridge IGCSE — Grade 7–12', icon: BookOpen },
+                  { text: 'IGCSE: Cambridge-aware exam technique tips', icon: Globe },
                   { text: 'Works at midnight. No scheduling needed.', icon: Moon },
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-3">
@@ -601,7 +761,7 @@ export default function LandingPage() {
             <h2 className="text-4xl md:text-5xl font-black mb-3 text-white">Parents across Kenya</h2>
             <p className="text-white/50 text-lg">Nairobi. Kisumu. Mombasa. Nakuru. Eldoret.</p>
           </div>
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
               {
                 quote: 'Learning Compass explained simultaneous equations using unga prices at 11pm. My son finally got it after struggling the whole term.',
@@ -624,6 +784,13 @@ export default function LandingPage() {
                 feature: 'Pathway Guide',
                 color: 'from-green-500 to-emerald-500',
               },
+              {
+                quote: "My son is at Brookhouse. I couldn't find anything that understood IGCSE grading. EduNexus showed me exactly which subjects he needs for medicine A-Levels. Worth every shilling.",
+                author: 'Dr. Wanjiku K.',
+                location: 'Karen, Nairobi',
+                feature: 'Cambridge IGCSE',
+                color: 'from-blue-500 to-cyan-500',
+              },
             ].map((t, idx) => (
               <div key={idx} className="group relative">
                 <div className={`absolute -inset-0.5 bg-gradient-to-r ${t.color} rounded-3xl blur opacity-10 group-hover:opacity-20 transition`} />
@@ -644,6 +811,139 @@ export default function LandingPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FOR TEACHERS ──────────────────────────────────────────────────────── */}
+      <section id="teachers" className="py-20 px-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="relative">
+            <div className="absolute -inset-1 bg-gradient-to-r from-teal-600 to-blue-600 rounded-3xl blur-xl opacity-20" />
+            <div className="relative bg-gradient-to-br from-teal-900/40 to-blue-900/40 backdrop-blur-xl border border-teal-500/20 rounded-3xl p-8 md:p-12">
+              <div className="flex flex-col md:flex-row gap-8 items-start">
+                <div className="flex-1">
+                  <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-500/20 text-teal-300 px-4 py-2 rounded-full text-sm font-black mb-5">
+                    👨‍🏫 ARE YOU A TEACHER?
+                  </div>
+                  <h2 className="text-3xl md:text-4xl font-black text-white mb-4 leading-tight">
+                    Free class management,<br />
+                    <span className="bg-gradient-to-r from-teal-400 to-cyan-400 bg-clip-text text-transparent">
+                      built for CBC teachers.
+                    </span>
+                  </h2>
+                  <p className="text-white/60 mb-6 leading-relaxed">
+                    Track every student's progress, identify learning gaps by subject and strand,
+                    set Compass-guided assignments, and export KNEC CBA data with one click.
+                  </p>
+                  <div className="grid sm:grid-cols-2 gap-3 mb-8">
+                    {[
+                      '✅ Class performance dashboard',
+                      '✅ Learning gap radar per subject',
+                      '✅ Compass-guided assignments',
+                      '✅ Early warning student alerts',
+                      '✅ KNEC CBA export (one click)',
+                      '✅ Holiday bridge tracking',
+                      '✅ Supports CBC & IGCSE classes',
+                      '✅ WhatsApp parent integration',
+                    ].map((f, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm text-white/80">
+                        <span>{f}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <Link
+                      href="/signup"
+                      className="inline-flex items-center gap-2 bg-gradient-to-r from-teal-500 to-cyan-500 text-white px-8 py-4 rounded-2xl font-black hover:scale-105 transition-all shadow-xl shadow-teal-500/20"
+                    >
+                      Create Teacher Account Free →
+                    </Link>
+                  </div>
+                  <div className="flex flex-wrap gap-3 mt-4">
+                    <span className="text-xs bg-teal-500/10 border border-teal-500/20 text-teal-300 px-3 py-1.5 rounded-full font-bold">
+                      🇰🇪 CBC Kenya
+                    </span>
+                    <span className="text-xs bg-blue-500/10 border border-blue-500/20 text-blue-300 px-3 py-1.5 rounded-full font-bold">
+                      🌍 Cambridge IGCSE
+                    </span>
+                    <span className="text-xs bg-white/5 border border-white/10 text-white/40 px-3 py-1.5 rounded-full font-bold">
+                      More curricula coming
+                    </span>
+                  </div>
+                  <p className="text-white/30 text-xs mt-3">Free forever. No credit card needed.</p>
+                </div>
+                <div className="w-full md:w-64 shrink-0">
+                  <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3">
+                    <div className="text-xs font-black text-white/40 uppercase tracking-wider mb-2">Class 8B — Mathematics</div>
+                    {[
+                      { name: 'Brian Otieno',  level: 'Below',       color: 'text-red-400',    bar: 20 },
+                      { name: 'Grace Wanjiku', level: 'Approaching',  color: 'text-amber-400',  bar: 45 },
+                      { name: 'Amina Juma',    level: 'Meets',        color: 'text-green-400',  bar: 70 },
+                      { name: 'Kamau N.',      level: 'Exceeds',      color: 'text-purple-400', bar: 92 },
+                    ].map((s, i) => (
+                      <div key={i}>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-white/70 font-medium">{s.name}</span>
+                          <span className={`font-bold ${s.color}`}>{s.level}</span>
+                        </div>
+                        <div className="w-full bg-white/10 rounded-full h-1.5">
+                          <div className={`h-1.5 rounded-full ${s.color.replace('text-', 'bg-')}`} style={{ width: `${s.bar}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                    <div className="pt-2 border-t border-white/10 text-xs text-red-400 font-bold">
+                      ⚠️ Brian inactive 8 days — send reminder?
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── STUDY GROUPS ── */}
+      <section id="groups" className="py-20 px-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 bg-pink-500/10 border border-pink-500/20 text-pink-300 px-4 py-2 rounded-full text-sm font-black mb-5">
+            <Users className="w-4 h-4" />
+            STUDY GROUPS — HOLIDAY FEATURE
+          </div>
+          <h2 className="text-4xl md:text-5xl font-black text-white mb-5 leading-[0.95]">
+            Your classmates are scattered.
+            <span className="block bg-gradient-to-r from-pink-400 to-rose-400 bg-clip-text text-transparent mt-1">
+              Study together anyway.
+            </span>
+          </h2>
+          <p className="text-xl text-white/60 max-w-2xl mx-auto mb-10 leading-relaxed">
+            Boarding school students go home to 47 different counties every holiday.
+            Study Groups keep the class connected — daily challenges, leaderboards, and
+            the student who explains it best earns the most points.
+          </p>
+          <div className="grid md:grid-cols-4 gap-4 mb-10">
+            {[
+              { icon: '🏆', title: 'Daily Challenge', desc: 'Compass generates one question daily per subject' },
+              { icon: '🥇', title: 'Leaderboard', desc: 'Compete with classmates — streaks earn bonus points' },
+              { icon: '🤝', title: 'Peer Teaching', desc: 'Explain to a classmate and earn 2.5x points' },
+              { icon: '🙈', title: 'Anonymous Ask', desc: 'Ask questions without anyone knowing it was you' },
+            ].map((item, i) => (
+              <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-5 hover:bg-white/[0.08] transition-all">
+                <div className="text-3xl mb-3">{item.icon}</div>
+                <div className="font-black text-white text-sm mb-2">{item.title}</div>
+                <p className="text-xs text-white/50 leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link
+              href="/signup"
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white px-8 py-4 rounded-2xl font-black hover:scale-105 transition-all shadow-xl shadow-pink-500/20"
+            >
+              <Users className="w-5 h-5" />
+              Create a Study Group →
+            </Link>
+            <p className="text-white/30 text-sm self-center">Max 8 members · Any subject</p>
           </div>
         </div>
       </section>
@@ -687,9 +987,10 @@ export default function LandingPage() {
           </div>
           <div className="flex flex-wrap justify-center gap-6 mt-8 text-sm text-white/30">
             <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400" /> M-PESA accepted</span>
-            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400" /> CBC Grade 7–12</span>
+            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400" /> CBC & Cambridge IGCSE</span>
             <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400" /> Made in Kenya 🇰🇪</span>
             <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400" /> Works at midnight</span>
+            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400" /> Teachers free forever</span>
           </div>
         </div>
       </section>

@@ -7,6 +7,7 @@
 
 import { callDeepSeek } from './deepseek'  // Changed from callGemini
 import { analyzePerformance, getLearningTier } from '@/lib/adaptiveLearning'
+import type { CurriculumType } from '@/lib/curriculum'
 
 // ==================== TYPES ====================
 
@@ -49,12 +50,16 @@ export interface LearnerState {
   currentConcept: string
   timeOnTask: number // minutes in current session
   attemptsOnConcept: number
+  consecutiveSuccesses: number
   breaksTaken: number
   lastBreakTime?: Date
-  
+
   // History
   masteredConcepts: string[]
   strugglingConcepts: string[]
+
+  // Curriculum
+  curriculumType: CurriculumType
 }
 
 export interface Task {
@@ -136,11 +141,13 @@ export class LearningCompass {
       currentConcept: '',
       timeOnTask: 0,
       attemptsOnConcept: 0,
+      consecutiveSuccesses: 0,
       breaksTaken: 0,
       masteredConcepts: [],
-      strugglingConcepts: []
+      strugglingConcepts: [],
+      curriculumType: 'cbc'
     }
-    
+
     this.learnerHistory.set(learnerId, initialState)
     
     return learner
@@ -158,12 +165,17 @@ export class LearningCompass {
       timeSpent: number
       struggled: boolean
       confidence: 'low' | 'medium' | 'high'
-    }
+    },
+    ragSystemPrompt?: string,
+    curriculumType?: CurriculumType
   ): Promise<CompassDecision> {
-    
+
     // 1. Get current learner state
     const state = this.learnerHistory.get(learnerId)
     if (!state) throw new Error('Learner not initialized')
+
+    // Apply curriculum type if provided
+    if (curriculumType) state.curriculumType = curriculumType
     
     // 2. Update state based on previous task result
     if (previousTaskResult) {
@@ -187,7 +199,8 @@ export class LearningCompass {
       subject || state.currentSubject,
       difficulty,
       state,
-      needsVisuals
+      needsVisuals,
+      ragSystemPrompt
     )
     
     // 7. Queue next tasks for efficiency
@@ -364,9 +377,10 @@ export class LearningCompass {
     subject: string,
     difficulty: 1 | 2 | 3 | 4 | 5,
     state: LearnerState,
-    needsVisuals: boolean = false
+    needsVisuals: boolean = false,
+    ragSystemPrompt?: string
   ): Promise<Task> {
-    
+
     // Check if we have preloaded tasks
     const queue = this.taskQueue.get(learnerId) || []
     if (queue.length > 0) {
@@ -374,10 +388,10 @@ export class LearningCompass {
       this.taskQueue.set(learnerId, queue)
       if (nextTask) return nextTask
     }
-    
+
     // Generate fresh task based on difficulty
-    const task = await this.createTaskForDifficulty(subject, difficulty, state, needsVisuals)
-    
+    const task = await this.createTaskForDifficulty(subject, difficulty, state, needsVisuals, ragSystemPrompt)
+
     return task
   }
   
@@ -389,14 +403,15 @@ export class LearningCompass {
     subject: string,
     difficulty: 1 | 2 | 3 | 4 | 5,
     state: LearnerState,
-    needsVisuals: boolean = false
+    needsVisuals: boolean = false,
+    ragSystemPrompt?: string
   ): Promise<Task> {
-    
+
     // Build prompt for DeepSeek to generate appropriate task
-    const prompt = this.buildTaskPrompt(subject, difficulty, state, needsVisuals)
-    
+    const prompt = this.buildTaskPrompt(subject, difficulty, state, needsVisuals, state.curriculumType || 'cbc')
+
     try {
-      const response = await callDeepSeek(prompt)  // Changed to DeepSeek
+      const response = await callDeepSeek(prompt, ragSystemPrompt)  // Changed to DeepSeek
       const task = this.parseTaskResponse(response, subject, difficulty, state)
       
       // If it's a visual subject but no visual was generated, add a fallback
@@ -903,14 +918,43 @@ export class LearningCompass {
    * BUILD task prompt with specific difficulty instructions
    */
   private buildTaskPrompt(
-    subject: string, 
-    difficulty: 1 | 2 | 3 | 4 | 5, 
+    subject: string,
+    difficulty: 1 | 2 | 3 | 4 | 5,
     state: LearnerState,
-    needsVisuals: boolean = false
+    needsVisuals: boolean = false,
+    curriculumType: CurriculumType = 'cbc'
   ): string {
     
     // DIFFICULTY LEVEL DEFINITIONS
-    const difficultyDescriptions = {
+    const difficultyDescriptions = curriculumType === 'igcse' ? {
+      1: `FOUNDATION - Grade E-G level (needs support)
+- Break into small steps using Cambridge foundation style
+- Use simple vocabulary; every sentence max 10 words
+- Focus on one key fact or skill at a time
+- Cambridge command word: "State" or "Identify"
+- Success = they can recall a key fact`,
+      2: `DEVELOPING - Grade C-D level (approaching target)
+- Clear step-by-step approach
+- One worked example in Cambridge exam style
+- Connect to something already known
+- Cambridge command words: "Describe" or "Outline"
+- Success = they can follow and apply the example`,
+      3: `ACHIEVING - Grade B-C level (meeting expectations)
+- Standard Cambridge IGCSE difficulty
+- Require application of knowledge to a scenario
+- Cambridge command words: "Explain" or "Calculate"
+- Success = they can apply to similar exam questions`,
+      4: `EXCEEDING - Grade A level (above expectations)
+- Push analytical and evaluative thinking
+- Require connecting multiple ideas or concepts
+- Cambridge command words: "Analyse" or "Compare"
+- Success = they can justify and explain their reasoning`,
+      5: `DISTINCTION - Grade A* level (outstanding)
+- Complex multi-step problems requiring synthesis
+- Evaluation, judgement, and extended writing
+- Cambridge command word: "Evaluate" or "To what extent..."
+- Success = they can construct a well-argued response`
+    } : {
       1: `EXTREMELY SIMPLE - For learners BELOW expectations
 - Break into TINY steps (max 2-3 steps)
 - Use ONLY basic vocabulary
@@ -919,27 +963,27 @@ export class LearningCompass {
 - Example MUST be from daily Kenyan life
 - Celebrate each micro-step
 - Success = they can do one tiny piece`,
-      
+
       2: `SIMPLE - For learners APPROACHING expectations
 - Clear, straightforward steps
 - Simple vocabulary
 - One clear example
 - Connect to things they already know
 - Success = they can follow the example`,
-      
+
       3: `GRADE LEVEL - For learners MEETING expectations
 - Standard difficulty for Grade ${state.learner.grade}
 - Mix of simple and slightly challenging
 - Require some thinking but not too much
 - Success = they can apply to similar problems`,
-      
+
       4: `CHALLENGING - For learners EXCEEDING expectations
 - Push them to think deeper
 - Require connecting multiple ideas
 - Ask "what if" questions
 - Success = they can explain their reasoning
 - NOT TOO HARD - keep them engaged, not frustrated`,
-      
+
       5: `ADVANCED - Only for learners who've MASTERED level 4
 - Complex problems requiring synthesis
 - Multiple steps with reasoning
@@ -980,13 +1024,20 @@ STUDENT CONTEXT:
 - Interests: ${state.learner.interests.join(', ') || 'learning through stories'}
 - Dream Career: ${state.learner.dreamCareer || 'not sure yet'}
 
-🇰🇪 KENYAN CONTEXT (MUST USE THESE):
+${curriculumType === 'igcse' ? `🌍 CONTEXT GUIDELINES (Cambridge IGCSE student):
+- Use international examples primarily (London, New York, Tokyo, Nairobi)
+- Reference Cambridge exam style: structured questions, mark schemes
+- Connect concepts to global contexts and international data
+- Frame progress in Cambridge grade terms (targeting Grade C and above, pushing for A/A*)
+- Phrases: "Well done!", "Excellent effort!", "Keep pushing for that A*!", "Good thinking!"
+- Mention real-world global applications (e.g., multinational companies, international research)
+- For exam questions: use command words (Describe, Explain, Analyse, Evaluate, Calculate)` : `🇰🇪 KENYAN CONTEXT (MUST USE THESE):
 - Places: Nairobi, Mombasa, Kisumu, Eldoret, local market, shamba, duka
 - Transport: matatu, boda boda, tuk-tuk, train
 - Food: ugali, sukuma, nyama choma, chai, mandazi, mangoes
 - Money: KES (coins: 1,5,10,20 | notes: 50,100,200,500,1000)
 - Names: Wanjiku, Otieno, Achieng, Kamau, Njeri, Juma
-- Phrases: "Sawa!", "Vizuri sana!", "Hongera!", "Jaribu tena!"
+- Phrases: "Sawa!", "Vizuri sana!", "Hongera!", "Jaribu tena!"`}
 
 ${visualInstruction}
 
@@ -1007,6 +1058,27 @@ RESPOND WITH JSON:
   "realWorldContext": "...",
   "successCriteria": "..."
 }
+
+CRITICAL TEACHING RULES — ALWAYS FOLLOW:
+- NEVER give the answer directly on first ask
+- ALWAYS respond with a guiding question first
+- After student attempts: give a HINT not the answer
+- After 3 failed attempts: show worked example + give a similar NEW problem to try
+- Response format must be:
+  "What do you think would happen if...?"
+  "You're very close! What about the second step?"
+  "Interesting approach — why did you choose that?"
+- Celebrate effort always:
+  "Vizuri! Your thinking is right, let's refine it"
+  "Jaribu tena! Every attempt makes you stronger"
+- NEVER say "Wrong" — say "Almost!" or "Good try!"
+- For struggling students (difficulty 1-2):
+  Break into ONE tiny step at a time
+  Ask ONE question only per response
+- For excelling students (difficulty 4-5):
+  Ask multi-step reasoning questions
+  "Can you explain WHY that works?"
+  "How would you teach this to a friend?"
 `
   }
   
@@ -1026,8 +1098,14 @@ RESPOND WITH JSON:
     // Update attempts
     if (result.struggled) {
       state.attemptsOnConcept++
+      state.consecutiveSuccesses = 0
     } else {
-      state.attemptsOnConcept = 0 // Reset if successful
+      state.consecutiveSuccesses = (state.consecutiveSuccesses || 0) + 1
+      // Only reset attempts after 2 consecutive successes
+      if (state.consecutiveSuccesses >= 2) {
+        state.attemptsOnConcept = 0
+        state.consecutiveSuccesses = 0
+      }
     }
     
     // Update cognitive load based on performance
@@ -1405,9 +1483,10 @@ RESPOND WITH JSON:
       confidenceLevel:    state.confidenceLevel,
       currentSubject:     state.currentSubject,
       currentConcept:     state.currentConcept,
-      timeOnTask:         state.timeOnTask,
-      attemptsOnConcept:  state.attemptsOnConcept,
-      breaksTaken:        state.breaksTaken,
+      timeOnTask:           state.timeOnTask,
+      attemptsOnConcept:    state.attemptsOnConcept,
+      consecutiveSuccesses: state.consecutiveSuccesses,
+      breaksTaken:          state.breaksTaken,
       masteredConcepts:   state.masteredConcepts,
       strugglingConcepts: state.strugglingConcepts,
     }

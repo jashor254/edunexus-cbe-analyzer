@@ -280,3 +280,63 @@ CREATE TRIGGER trg_check_pathway_is_junior
 --   app/api/tokens/check/route.ts   → uses expires_at + plan + token_balances (was end_date + plan_type + user_tokens)
 --   app/api/clinic/download/route.tsx → isJunior = grade >= 7 && grade <= 9 (was grade <= 9)
 -- =============================================================================
+
+
+-- =============================================================================
+-- CLINIC REBUILD PATCH (March 2026)
+-- Run this in Supabase SQL Editor → SQL Editor → New query → paste → Run
+-- =============================================================================
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- FIX 8: assessments — add user_id and pathway_recommendations columns
+--
+-- PROBLEM:
+--   • assessments table was created without user_id (no direct ownership link)
+--   • assessments table was created without pathway_recommendations (junior pathway
+--     affinity data was being inserted by add/page.tsx but column didn't exist,
+--     causing PGRST204 errors that silently blocked ALL junior assessment saves)
+--
+-- FIX: Add both columns. user_id nullable (existing rows have none).
+--      pathway_recommendations nullable jsonb — stores pre-calculated CBC pathway
+--      affinity scores so guidance page doesn't need to recalculate every load.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+ALTER TABLE assessments
+  ADD COLUMN IF NOT EXISTS user_id                uuid REFERENCES auth.users(id),
+  ADD COLUMN IF NOT EXISTS pathway_recommendations jsonb;
+
+-- Backfill user_id from the parent student's user_id for existing rows
+UPDATE assessments a
+SET user_id = s.user_id
+FROM students s
+WHERE a.student_id = s.id
+  AND a.user_id IS NULL;
+
+-- =============================================================================
+-- SUMMARY — CLINIC REBUILD PATCH
+-- 8. assessments.user_id              → added (nullable), backfilled from students
+-- 9. assessments.pathway_recommendations → added (nullable jsonb)
+-- =============================================================================
+
+
+-- =============================================================================
+-- IGCSE SUPPORT PATCH (April 2026)
+-- =============================================================================
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- FIX 10: students — add curriculum_type column
+--
+-- PROBLEM: students table had no curriculum_type column — CBC and IGCSE
+--          students could not be distinguished.
+-- FIX:     Add curriculum_type with default 'cbc' so existing students are
+--          unaffected. Supports 'cbc', 'igcse', 'ib', 'other'.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+ALTER TABLE students
+  ADD COLUMN IF NOT EXISTS curriculum_type TEXT NOT NULL DEFAULT 'cbc'
+    CHECK (curriculum_type IN ('cbc', 'igcse', 'ib', 'other'));
+
+-- =============================================================================
+-- SUMMARY — IGCSE SUPPORT PATCH
+-- 10. students.curriculum_type → added (default 'cbc'), existing rows unaffected
+-- =============================================================================

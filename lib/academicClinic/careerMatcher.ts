@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/utils/supabase/service';
 import { careerEngine, CareerIntelligence } from './careerIntelligence';
 
 // ==================== TYPES ====================
@@ -76,10 +76,7 @@ export interface MatchReport {
 // ==================== THE ENGINE ====================
 
 export class CareerMatcher {
-  private supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  private supabase = createServiceClient();
 
   // ==================== MAIN METHODS ====================
 
@@ -115,7 +112,7 @@ export class CareerMatcher {
         .slice(0, 3);
 
       const avoidThese = scoredMatches
-        .filter(m => ['doctor', 'lawyer', 'engineer'].includes(m.career.id) && m.matchScore < 50)
+        .filter(m => m.matchScore < 40)
         .slice(0, 2);
 
       const developmentPlan = this.createDevelopmentPlan(topMatches[0], assessment);
@@ -160,7 +157,7 @@ export class CareerMatcher {
   }> {
     // Fetch student profile
     const { data: student, error: studentError } = await this.supabase
-      .from('learner_profiles')
+      .from('students')
       .select('*')
       .eq('id', studentId)
       .single();
@@ -332,8 +329,11 @@ export class CareerMatcher {
     const scores = assessment.academic.subjectScores;
     if (reqs.length === 0) return 70;
 
-    const matched = reqs.filter(r => scores[r] && scores[r] >= 3).length;
-    return Math.round((matched / reqs.length) * 100);
+    const total = reqs.reduce((sum, subject) => {
+      const score = scores[subject] || 0;
+      return sum + (score / 4);
+    }, 0);
+    return Math.round((total / reqs.length) * 100);
   }
 
   private calculatePersonalityFit(career: CareerIntelligence, assessment: StudentAssessment): number {

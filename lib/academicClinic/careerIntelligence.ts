@@ -2,7 +2,7 @@
 // The brain - combines AI generation with local Kenyan data
 
 import { DEEPSEEK_CONFIG } from '@/lib/config/api';
-import { createClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/utils/supabase/service';
 
 // ==================== ENHANCED TYPES ====================
 
@@ -115,10 +115,7 @@ const KENYAN_MARKET_REALITIES: Record<string, Partial<KenyanMarketData>> = {
 // ==================== THE INTELLIGENCE ENGINE ====================
 
 export class CareerIntelligenceEngine {
-  private supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  private supabase = createServiceClient();
 
   /**
    * Get comprehensive career intelligence with multiple fallback layers
@@ -233,12 +230,35 @@ export class CareerIntelligenceEngine {
   }
 
   private async generateFromScratch(name: string): Promise<CareerIntelligence> {
-    const prompt = this.buildComprehensivePrompt(name);
+    let webContext = '';
+    try {
+      const searchQuery = encodeURIComponent(name + ' career Kenya salary requirements 2025');
+      const ddgRes = await fetch(
+        'https://api.duckduckgo.com/?q=' + searchQuery + '&format=json&no_html=1',
+        { signal: AbortSignal.timeout(3000) }
+      );
+      const ddgData = await ddgRes.json();
+      webContext = ddgData.Abstract || ddgData.RelatedTopics?.[0]?.Text || '';
+    } catch {
+      webContext = ''; // fail silently
+    }
+
+    const prompt = this.buildComprehensivePrompt(name) +
+      (webContext ? '\n\nWEB CONTEXT: ' + webContext : '');
     const aiData = await this.callDeepSeek(prompt);
-    
+
+    // Save to career_intelligence table
+    await this.supabase.from('career_intelligence').upsert({
+      id: name,
+      name: aiData.name,
+      ...aiData,
+      verification_status: 'ai_generated',
+      last_updated: new Date().toISOString(),
+    }, { onConflict: 'id' });
+
     // Flag for expert review
     await this.flagForReview(name, aiData);
-    
+
     return {
       ...aiData,
       verificationStatus: 'ai_generated',
@@ -419,10 +439,9 @@ export class CareerIntelligenceEngine {
     return data as CareerIntelligence[] || [];
   }
 
-  private isCareerVisibleToGrade(career: CareerIntelligence, grade: number): boolean {
-    if (grade <= 6) return ['teacher', 'doctor', 'pilot', 'engineer'].includes(career.id);
-    if (grade <= 9) return true; // All careers visible
-    return true;
+  private isCareerVisibleToGrade(_career: CareerIntelligence, grade: number): boolean {
+    if (grade <= 9) return true; // Junior school (7-9): pathway guidance
+    return true; // Senior school (10-12): full career matching
   }
 
   private buildCBCPathway(career: CareerIntelligence, currentGrade: number): {

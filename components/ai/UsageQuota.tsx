@@ -10,7 +10,7 @@ interface QuotaData {
 
 interface Props {
   userId: string
-  tier: 'free' | 'family' | 'school'
+  tier: 'free' | 'starter' | 'term' | 'premium' | 'admin'
 }
 
 export default function UsageQuota({ userId, tier }: Props) {
@@ -27,13 +27,23 @@ export default function UsageQuota({ userId, tier }: Props) {
       const data = await response.json()
       
       if (data.success) {
-        setQuota(data.usage)
+        setQuota(data.data.usage)
       }
     } catch (error) {
       console.error('Failed to fetch quota:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  if (tier === 'admin') {
+    return (
+      <div className="bg-slate-900 rounded-xl border-2 border-red-500/30 p-6 text-center">
+        <div className="text-2xl mb-2">👑</div>
+        <p className="text-red-400 font-black">Administrator Account</p>
+        <p className="text-white/50 text-sm mt-1">Unlimited access to all features</p>
+      </div>
+    )
   }
 
   if (loading) {
@@ -59,9 +69,26 @@ export default function UsageQuota({ userId, tier }: Props) {
   }
 
   const tierLabels = {
-    free: { name: 'Free Plan', color: 'bg-gray-100 text-gray-800' },
-    family: { name: 'Family Plan', color: 'bg-blue-100 text-blue-800' },
-    school: { name: 'School Plan', color: 'bg-purple-100 text-purple-800' }
+    free: {
+      name: 'Free Plan',
+      color: 'bg-gray-100 text-gray-800'
+    },
+    starter: {
+      name: 'Starter — KES 500',
+      color: 'bg-blue-100 text-blue-800'
+    },
+    term: {
+      name: 'Term Plan — KES 3,200',
+      color: 'bg-violet-100 text-violet-800'
+    },
+    premium: {
+      name: 'Premium — KES 7,000',
+      color: 'bg-amber-100 text-amber-800'
+    },
+    admin: {
+      name: '👑 Administrator',
+      color: 'bg-red-100 text-red-800'
+    }
   }
 
   return (
@@ -135,13 +162,13 @@ export default function UsageQuota({ userId, tier }: Props) {
         </div>
       </div>
 
-      {tier === 'free' && (
+      {(tier === 'free' || tier === 'starter') && (
         <div className="mt-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 border-2 border-blue-200">
           <div className="text-sm font-semibold text-blue-900 mb-2">
             🚀 Want More AI Power?
           </div>
           <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
-            Upgrade to Family Plan
+            Upgrade to Term Plan — KES 3,200
           </button>
         </div>
       )}

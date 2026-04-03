@@ -1,921 +1,532 @@
-// app/dashboard/assessments/history/page.tsx
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { supabase, type Student, type Assessment, COMPETENCY_LEVELS } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { 
-  analyzePerformance, 
-  getTierConfig,
-  type SubjectRecommendation 
-} from '@/lib/adaptiveLearning'
-import { 
-  ChevronLeft, 
-  Download, 
-  Sparkles, 
-  TrendingUp, 
-  TrendingDown, 
-  Minus, 
-  Calendar,
-  BookOpen,
-  Award,
-  AlertTriangle,
-  Brain,
-  FileText,
-  MessageCircle,
-  PlusCircle,
-  BarChart3,
-  Heart,
-  Zap,
-  Loader2
+import { Suspense } from 'react'
+import {
+  ChevronDown, ChevronUp, Calendar, BookOpen, Filter,
+  MessageCircle, PlusCircle, Loader2, AlertCircle,
+  GraduationCap, BarChart3, FileText, ArrowLeft,
 } from 'lucide-react'
+import { getGradeColor, getGradeLabel, getCurriculumConfig } from '@/lib/curriculum'
 
-// ============================================
-// ALL SUBJECTS DEFINED HERE - NO EXTERNAL FILE
-// ============================================
-
-// JUNIOR SCHOOL (Grades 7-9) - 8 Core Subjects
-const JUNIOR_CORE = [
-  { key: 'mathematics', label: 'Mathematics', emoji: '🔢' },
-  { key: 'english', label: 'English', emoji: '📚' },
-  { key: 'kiswahili', label: 'Kiswahili', emoji: '🗣️' },
-  { key: 'integrated_science', label: 'Integrated Science', emoji: '🔬' },
-  { key: 'social_studies', label: 'Social Studies', emoji: '🌍' },
-  { key: 'pre_technical', label: 'Pre-Technical Studies', emoji: '⚙️' },
-  { key: 'creative_arts_sports', label: 'Creative Arts & Sports', emoji: '🎨' },
-  { key: 'agriculture_nutrition', label: 'Agriculture & Nutrition', emoji: '🌾' }
-]
-
-// JUNIOR SCHOOL - Religious Education (Choose 1)
-const JUNIOR_RELIGIOUS = [
-  { key: 'cre', label: 'Christian Religious Education', emoji: '⛪' },
-  { key: 'ire', label: 'Islamic Religious Education', emoji: '🕌' },
-  { key: 'hre', label: 'Hindu Religious Education', emoji: '🕉️' }
-]
-
-// SENIOR SCHOOL - Compulsory Subjects (3 - Mathematics is separate)
-const SENIOR_COMPULSORY = [
-  { key: 'english', label: 'English', emoji: '📚' },
-  { key: 'kiswahili_ksl', label: 'Kiswahili/KSL', emoji: '🗣️' },
-  { key: 'community_service', label: 'Community Service Learning', emoji: '❤️' }
-]
-
-// SENIOR SCHOOL - STEM Pathway Electives
-const STEM_ELECTIVES = [
-  { key: 'biology', label: 'Biology', emoji: '🧬' },
-  { key: 'chemistry', label: 'Chemistry', emoji: '⚗️' },
-  { key: 'physics', label: 'Physics', emoji: '⚡' },
-  { key: 'general_science', label: 'General Science', emoji: '🔬' },
-  { key: 'agriculture', label: 'Agriculture', emoji: '🌱' },
-  { key: 'computer_studies', label: 'Computer Studies', emoji: '💻' },
-  { key: 'home_science', label: 'Home Science', emoji: '🏠' },
-  { key: 'drawing_design', label: 'Drawing & Design', emoji: '✏️' },
-  { key: 'aviation_technology', label: 'Aviation Technology', emoji: '✈️' },
-  { key: 'building_construction', label: 'Building & Construction', emoji: '🏗️' },
-  { key: 'electrical_technology', label: 'Electrical Technology', emoji: '⚡' },
-  { key: 'metal_technology', label: 'Metal Technology', emoji: '🔧' },
-  { key: 'power_machines', label: 'Power Machines', emoji: '⚙️' },
-  { key: 'wood_technology', label: 'Wood Technology', emoji: '🪚' },
-  { key: 'media_technology', label: 'Media Technology', emoji: '📹' },
-  { key: 'marine_fisheries', label: 'Marine & Fisheries Technology', emoji: '🐟' }
-]
-
-// SENIOR SCHOOL - Social Sciences Pathway Electives
-const SOCIAL_SCIENCES_ELECTIVES = [
-  // Languages & Literature
-  { key: 'advanced_english', label: 'Advanced English', emoji: '📖' },
-  { key: 'literature_english', label: 'Literature in English', emoji: '📝' },
-  { key: 'indigenous_language', label: 'Indigenous Language', emoji: '🗣️' },
-  { key: 'kiswahili_kipevu', label: 'Kiswahili Kipevu', emoji: '📚' },
-  { key: 'fasihi_kiswahili', label: 'Fasihi ya Kiswahili', emoji: '✍️' },
-  { key: 'sign_language', label: 'Sign Language', emoji: '🤟' },
-  
-  // Foreign Languages
-  { key: 'arabic', label: 'Arabic', emoji: '🕋' },
-  { key: 'french', label: 'French', emoji: '🥖' },
-  { key: 'german', label: 'German', emoji: '🍺' },
-  { key: 'mandarin', label: 'Mandarin Chinese', emoji: '🥢' },
-  
-  // Humanities
-  { key: 'history_citizenship', label: 'History & Citizenship', emoji: '📜' },
-  { key: 'geography', label: 'Geography', emoji: '🗺️' },
-  
-  // Religious Education
-  { key: 'cre', label: 'Christian Religious Education', emoji: '⛪' },
-  { key: 'ire', label: 'Islamic Religious Education', emoji: '🕌' },
-  { key: 'hre', label: 'Hindu Religious Education', emoji: '🕉️' },
-  
-  // Business
-  { key: 'business_studies', label: 'Business Studies', emoji: '💼' }
-]
-
-// SENIOR SCHOOL - Arts & Sports Science Pathway Electives
-const ARTS_SPORTS_ELECTIVES = [
-  { key: 'sports_recreation', label: 'Sports and Recreation', emoji: '⚽' },
-  { key: 'physical_education', label: 'Physical Education', emoji: '🏃' },
-  { key: 'music_dance', label: 'Music and Dance', emoji: '🎵' },
-  { key: 'theatre_film', label: 'Theatre and Film', emoji: '🎭' },
-  { key: 'fine_arts', label: 'Fine Arts', emoji: '🎨' }
-]
-
-// Helper function to format subject names
-function formatSubjectName(key: string): string {
-  const allSubjects = [
-    ...JUNIOR_CORE,
-    ...JUNIOR_RELIGIOUS,
-    ...SENIOR_COMPULSORY,
-    ...STEM_ELECTIVES,
-    ...SOCIAL_SCIENCES_ELECTIVES,
-    ...ARTS_SPORTS_ELECTIVES,
-    { key: 'core_mathematics', label: 'Core Mathematics' },
-    { key: 'essential_mathematics', label: 'Essential Mathematics' }
-  ]
-  
-  const subject = allSubjects.find(s => s.key === key)
-  if (subject) return subject.label
-  
-  // Fallback
-  return key.split('_').map(word => 
-    word.charAt(0).toUpperCase() + word.slice(1)
-  ).join(' ')
+// ─── Types ────────────────────────────────────────────────────────────────────
+interface AssessmentRecord {
+  id:               string
+  student_id:       string
+  student_name:     string
+  student_grade:    number
+  student_pathway:  string | null
+  grade:            number
+  term:             number
+  year:             number
+  grade_level:      string
+  subject_scores:   Record<string, number | string>
+  curriculum_type?: string | null
+  assessment_style?: string | null
+  mathematics_type: 'core' | 'essential' | null
+  pathway_electives: string[] | null
+  created_at:       string
 }
 
-// ============================================
-// END OF SUBJECTS DEFINITION
-// ============================================
+interface StudentMeta {
+  id:    string
+  name:  string
+  grade: number
+}
 
-export default function CompleteHistoryPage() {
-  const [student, setStudent] = useState<Student | null>(null)
-  const [assessments, setAssessments] = useState<Assessment[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear())
-  const [showLearningPlan, setShowLearningPlan] = useState(false)
-  const [aiLoading, setAiLoading] = useState(false)
-  const [pdfLoading, setPdfLoading] = useState(false)
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
-  const [selectedSubject, setSelectedSubject] = useState<string | 'all'>('all')
-  const [expandedSubjects, setExpandedSubjects] = useState<string[]>([])
-  const [downloadError, setDownloadError] = useState<string | null>(null)
-  
-  const router = useRouter()
+// ─── Subject label map ────────────────────────────────────────────────────────
+const SUBJECT_LABELS: Record<string, string> = {
+  mathematics:               'Mathematics',
+  english:                   'English',
+  kiswahili:                 'Kiswahili',
+  integrated_science:        'Integrated Science',
+  social_studies:            'Social Studies',
+  pre_technical_studies:     'Pre-Technical Studies',
+  pre_technical:             'Pre-Technical Studies',
+  creative_arts_sports:      'Creative Arts & Sports',
+  agriculture_nutrition:     'Agriculture & Nutrition',
+  cre:                       'Christian RE',
+  ire:                       'Islamic RE',
+  hre:                       'Hindu RE',
+  core_mathematics:          'Core Mathematics',
+  essential_mathematics:     'Essential Mathematics',
+  kiswahili_ksl:             'Kiswahili / KSL',
+  community_service_learning:'Community Service Learning',
+  community_service:         'Community Service',
+  biology:                   'Biology',
+  chemistry:                 'Chemistry',
+  physics:                   'Physics',
+  computer_studies:          'Computer Studies',
+  agriculture:               'Agriculture',
+  geography:                 'Geography',
+  history_citizenship:       'History & Citizenship',
+  business_studies:          'Business Studies',
+  home_science:              'Home Science',
+  fine_arts:                 'Fine Arts',
+  music_dance:               'Music & Dance',
+  sports_recreation:         'Sports & Recreation',
+  theatre_film:              'Theatre & Film',
+  physical_education:        'Physical Education',
+  drawing_design:            'Drawing & Design',
+  general_science:           'General Science',
+  // IGCSE subjects
+  english_first_language:    'English First Language',
+  english_second_language:   'English Second Language',
+  french:                    'French',
+  history:                   'History',
+  economics:                 'Economics',
+  global_perspectives:       'Global Perspectives',
+  combined_science:          'Combined Science',
+  environmental_management:  'Environmental Management',
+  additional_mathematics:    'Additional Mathematics',
+  computer_science:          'Computer Science',
+  art_design:                'Art & Design',
+  music:                     'Music',
+  drama:                     'Drama',
+  accounting:                'Accounting',
+  science:                   'Sciences',
+  humanities:                'Humanities',
+  ict:                       'ICT / Computer Studies',
+  pshe:                      'PSHE',
+}
+
+function subjectLabel(key: string) {
+  return SUBJECT_LABELS[key] ?? key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+}
+
+// ─── CBC Level config ─────────────────────────────────────────────────────────
+const LEVEL: Record<number, { label: string; bar: string; badge: string; text: string }> = {
+  1: { label: 'Below Expectations',       bar: 'bg-red-500',    badge: 'bg-red-100 text-red-700',     text: 'text-red-700'    },
+  2: { label: 'Approaching Expectations', bar: 'bg-amber-500',  badge: 'bg-amber-100 text-amber-700', text: 'text-amber-700'  },
+  3: { label: 'Meets Expectations',       bar: 'bg-green-500',  badge: 'bg-green-100 text-green-700', text: 'text-green-700'  },
+  4: { label: 'Exceeds Expectations',     bar: 'bg-purple-500', badge: 'bg-purple-100 text-purple-700',text: 'text-purple-700' },
+}
+
+function getLvl(score: number) {
+  const n = Math.max(1, Math.min(4, Math.round(score))) as 1|2|3|4
+  return LEVEL[n]
+}
+
+function ScoreBar({ score }: { score: number }) {
+  const pct   = Math.round((score / 4) * 100)
+  const level = getLvl(score)
+  return (
+    <div className="flex items-center gap-2 flex-1">
+      <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+        <div className={`h-full ${level.bar} rounded-full`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className={`text-xs font-bold w-4 ${level.text}`}>{score}</span>
+    </div>
+  )
+}
+
+// ─── IGCSE grade badge ────────────────────────────────────────────────────────
+function IGCSEGradeBadge({ grade }: { grade: string }) {
+  const color = getGradeColor('igcse', grade)
+  const label = getGradeLabel('igcse', grade)
+  return (
+    <div className="flex items-center gap-1.5">
+      <span
+        className="inline-flex items-center justify-center w-8 h-8 rounded-lg font-black text-sm text-white"
+        style={{ backgroundColor: color }}
+      >
+        {grade}
+      </span>
+      <span className="text-xs text-slate-600 font-medium">{label}</span>
+    </div>
+  )
+}
+
+// ─── Average utils ────────────────────────────────────────────────────────────
+function calcCBCAvg(scores: Record<string, number | string>): number | null {
+  const vals = Object.values(scores).filter(v => typeof v === 'number' && (v as number) >= 1 && (v as number) <= 4) as number[]
+  if (!vals.length) return null
+  return vals.reduce((a, b) => a + b, 0) / vals.length
+}
+
+function calcIGCSEAvg(scores: Record<string, number | string>): { grade: string; label: string; color: string } | null {
+  const config = getCurriculumConfig('igcse')
+  const entries = Object.values(scores).filter(v => typeof v === 'string')
+  const nums = entries.map(v => {
+    const gl = config.gradeLabels.find(g => g.value == v)
+    return gl ? gl.numericEquivalent : 0
+  }).filter(n => n > 0)
+  if (!nums.length) return null
+  const avg = nums.reduce((a, b) => a + b, 0) / nums.length
+  let closest = config.gradeLabels[0]
+  let minDiff = Infinity
+  for (const gl of config.gradeLabels) {
+    const diff = Math.abs(gl.numericEquivalent - avg)
+    if (diff < minDiff) { minDiff = diff; closest = gl }
+  }
+  return { grade: String(closest.value), label: closest.label, color: closest.color }
+}
+
+// ─── Assessment style label ───────────────────────────────────────────────────
+const STYLE_LABELS: Record<string, string> = {
+  formative:           'Term Assessment',
+  mock_exam:           'Mock Exam',
+  end_of_term:         'End of Term',
+  cambridge_predicted: 'Predicted Grades',
+  summative:           'Internal Exam',
+}
+
+function assessmentPeriodLabel(a: AssessmentRecord): string {
+  if (a.curriculum_type === 'igcse') {
+    const style = a.assessment_style ? (STYLE_LABELS[a.assessment_style] ?? a.assessment_style) : 'Assessment'
+    return `${style}, ${a.year}`
+  }
+  return `Term ${a.term}, ${a.year}`
+}
+
+// ─── WhatsApp share ───────────────────────────────────────────────────────────
+function shareOnWhatsApp(a: AssessmentRecord) {
+  const isIGCSE = a.curriculum_type === 'igcse'
+
+  if (isIGCSE) {
+    const avgData = calcIGCSEAvg(a.subject_scores)
+    const subjects = Object.entries(a.subject_scores)
+      .slice(0, 5)
+      .map(([k, v]) => `  • ${subjectLabel(k)}: ${v} (${getGradeLabel('igcse', v)})`)
+      .join('\n')
+    const text = encodeURIComponent(
+      `📚 *${a.student_name}'s IGCSE Progress Report*\n` +
+      `Year ${a.grade} | ${assessmentPeriodLabel(a)}\n\n` +
+      `*Overall: Grade ${avgData?.grade ?? '—'} — ${avgData?.label ?? 'N/A'}*\n\n` +
+      `Subject highlights:\n${subjects}\n\n` +
+      `_Generated via EduNexus Academic Clinic_`
+    )
+    window.open(`https://wa.me/?text=${text}`, '_blank')
+  } else {
+    const avg      = calcCBCAvg(a.subject_scores)
+    const avgLabel = avg !== null ? getLvl(avg).label : 'N/A'
+    const subjects = Object.entries(a.subject_scores)
+      .slice(0, 5)
+      .map(([k, v]) => `  • ${subjectLabel(k)}: ${v}/4 (${typeof v === 'number' ? getLvl(v).label : v})`)
+      .join('\n')
+    const text = encodeURIComponent(
+      `📚 *${a.student_name}'s CBC Progress Report*\n` +
+      `Grade ${a.grade} | Term ${a.term}, ${a.year}\n\n` +
+      `*Overall: ${avgLabel}*\n\n` +
+      `Subject highlights:\n${subjects}\n\n` +
+      `_Generated via EduNexus Academic Clinic_`
+    )
+    window.open(`https://wa.me/?text=${text}`, '_blank')
+  }
+}
+
+// ─── Assessment Card ──────────────────────────────────────────────────────────
+function AssessmentCard({ a }: { a: AssessmentRecord }) {
+  const [expanded, setExpanded] = useState(false)
+
+  const isIGCSE    = a.curriculum_type === 'igcse'
+  const entries    = Object.entries(a.subject_scores)
+  const preview    = entries.slice(0, 3)
+  const rest       = entries.slice(3)
+  const date       = new Date(a.created_at).toLocaleDateString('en-KE', { month: 'short', year: 'numeric' })
+
+  // CBC avg
+  const cbcAvg      = !isIGCSE ? calcCBCAvg(a.subject_scores) : null
+  const cbcAvgLevel = cbcAvg !== null ? getLvl(cbcAvg) : null
+
+  // IGCSE avg
+  const igcseAvg = isIGCSE ? calcIGCSEAvg(a.subject_scores) : null
+
+  return (
+    <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden hover:border-blue-100 transition-colors">
+      {/* Card header */}
+      <div className="p-5 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <GraduationCap className="w-4 h-4 text-blue-500" />
+              <span className="font-black text-slate-900">{a.student_name}</span>
+              {/* Curriculum badge */}
+              {isIGCSE ? (
+                <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs font-bold">
+                  🌍 IGCSE · Year {a.grade}
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-bold">
+                  🇰🇪 CBC · Grade {a.grade}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 text-sm text-slate-500">
+              <span className="flex items-center gap-1">
+                <BookOpen className="w-3.5 h-3.5" />
+                {assessmentPeriodLabel(a)}
+              </span>
+              <span className="flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5" />
+                {date}
+              </span>
+            </div>
+          </div>
+
+          {/* CBC average badge */}
+          {!isIGCSE && cbcAvgLevel && cbcAvg !== null && (
+            <div className="flex flex-col items-end gap-1">
+              <span className={`px-3 py-1 rounded-full text-xs font-bold ${cbcAvgLevel.badge}`}>
+                {cbcAvgLevel.label}
+              </span>
+              <span className="text-xs text-slate-400">avg {cbcAvg.toFixed(1)}/4.0</span>
+            </div>
+          )}
+
+          {/* IGCSE average badge */}
+          {isIGCSE && igcseAvg && (
+            <div className="flex flex-col items-end gap-1">
+              <span
+                className="px-3 py-1 rounded-full text-xs font-bold text-white"
+                style={{ backgroundColor: igcseAvg.color }}
+              >
+                Grade {igcseAvg.grade} — {igcseAvg.label}
+              </span>
+              <span className="text-xs text-slate-400">avg grade</span>
+            </div>
+          )}
+        </div>
+
+        {/* Subject preview */}
+        <div className="space-y-2">
+          {preview.map(([key, score]) => (
+            <div key={key} className="flex items-center gap-3">
+              <span className="text-xs text-slate-600 w-40 shrink-0 truncate">{subjectLabel(key)}</span>
+              {isIGCSE ? (
+                <IGCSEGradeBadge grade={String(score)} />
+              ) : (
+                <ScoreBar score={Number(score)} />
+              )}
+            </div>
+          ))}
+
+          {rest.length > 0 && expanded && rest.map(([key, score]) => (
+            <div key={key} className="flex items-center gap-3">
+              <span className="text-xs text-slate-600 w-40 shrink-0 truncate">{subjectLabel(key)}</span>
+              {isIGCSE ? (
+                <IGCSEGradeBadge grade={String(score)} />
+              ) : (
+                <ScoreBar score={Number(score)} />
+              )}
+            </div>
+          ))}
+        </div>
+
+        {rest.length > 0 && (
+          <button
+            onClick={() => setExpanded(e => !e)}
+            className="mt-3 flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700"
+          >
+            {expanded
+              ? <><ChevronUp   className="w-3.5 h-3.5" /> Show less</>
+              : <><ChevronDown className="w-3.5 h-3.5" /> +{rest.length} more subjects</>
+            }
+          </button>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex flex-wrap gap-2 px-5 sm:px-6 pb-5">
+        <Link
+          href={`/dashboard/clinic/reports/${a.student_id}`}
+          className="flex items-center gap-1.5 px-4 py-2 bg-linear-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-xs font-bold hover:from-blue-700 hover:to-indigo-700 transition-all"
+        >
+          <FileText className="w-3.5 h-3.5" />
+          View Full Report
+        </Link>
+        <button
+          onClick={() => shareOnWhatsApp(a)}
+          className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-xl text-xs font-bold hover:bg-green-700 transition-colors"
+        >
+          <MessageCircle className="w-3.5 h-3.5" />
+          Share with Teacher
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main (inner) ─────────────────────────────────────────────────────────────
+function HistoryContent() {
+  const router       = useRouter()
   const searchParams = useSearchParams()
-  const studentId = searchParams.get('student')
 
-  // Available years (matches add page)
-  const AVAILABLE_YEARS = [2026, 2027, 2028]
+  const [assessments,  setAssessments]  = useState<AssessmentRecord[]>([])
+  const [students,     setStudents]     = useState<StudentMeta[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [error,        setError]        = useState<string | null>(null)
 
-  const loadStudentData = useCallback(async () => {
-    if (!studentId) return
+  const [filterStudent, setFilterStudent] = useState<string>(searchParams.get('student_id') ?? '')
+  const [filterYear,    setFilterYear]    = useState<string>('')
+  const [filterTerm,    setFilterTerm]    = useState<string>('')
 
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('students')
-        .select('*')
-        .eq('id', studentId)
-        .single()
-
-      if (fetchError) throw fetchError
-      if (data) setStudent(data)
-    } catch (err) {
-      console.error('Error loading student:', err)
-      setError('Failed to load student data')
-    }
-  }, [studentId])
-
-  const loadAssessments = useCallback(async () => {
-    if (!studentId) return
-
+  const loadHistory = useCallback(async () => {
     setLoading(true)
     setError(null)
-
     try {
-      let query = supabase
-        .from('assessments')
-        .select('*')
-        .eq('student_id', studentId)
+      const params = new URLSearchParams()
+      if (filterStudent) params.set('student_id', filterStudent)
+      if (filterYear)    params.set('year', filterYear)
+      if (filterTerm)    params.set('term', filterTerm)
 
-      if (selectedYear !== 'all') {
-        query = query.eq('year', selectedYear)
-      }
-
-      const { data, error: fetchError } = await query
-        .order('grade', { ascending: true })
-        .order('year', { ascending: true })
-        .order('term', { ascending: true })
-
-      if (fetchError) throw fetchError
-      if (data) setAssessments(data)
+      const res = await fetch(`/api/assessments/history?${params}`)
+      if (res.status === 401) { router.push('/login'); return }
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error ?? 'Failed to load')
+      setAssessments(json.data.assessments ?? [])
+      setStudents(json.data.students ?? [])
     } catch (err) {
-      console.error('Error loading assessments:', err)
-      setError('Failed to load assessments')
+      setError(err instanceof Error ? err.message : 'Failed to load history')
     } finally {
       setLoading(false)
     }
-  }, [studentId, selectedYear])
+  }, [router, filterStudent, filterYear, filterTerm])
 
-  useEffect(() => {
-    if (!studentId) {
-      router.push('/dashboard')
-      return
-    }
+  useEffect(() => { loadHistory() }, [loadHistory])
 
-    loadStudentData()
-    loadAssessments()
-  }, [studentId, loadStudentData, loadAssessments, router])
-
-  const getCompetencyLevel = (score: number) => {
-    return COMPETENCY_LEVELS.find(level => level.value === score)
-  }
-
-  const getCompetencyBadge = (score: number) => {
-    const level = getCompetencyLevel(score)
-    if (!level) return null
-    
-    const colors = {
-      1: 'bg-red-100 text-red-700 border-red-200',
-      2: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-      3: 'bg-green-100 text-green-700 border-green-200',
-      4: 'bg-purple-100 text-purple-700 border-purple-200'
-    }
-    
-    return (
-      <span className={`px-3 py-1 rounded-full text-xs font-bold border ${colors[score as keyof typeof colors]}`}>
-        Level {score} • {level.label}
-      </span>
-    )
-  }
-
-  const getMathTypeBadge = (type: string | null) => {
-    if (!type) return null
-    return type === 'core' 
-      ? <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-bold">📐 Core</span>
-      : <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold">📊 Essential</span>
-  }
-
-  const allSubjects = useMemo(() => {
-    const subjectsSet = new Set<string>()
-    assessments.forEach(assessment => {
-      if (assessment.subject_scores) {
-        Object.keys(assessment.subject_scores).forEach(subject => {
-          subjectsSet.add(subject)
-        })
-      }
-    })
-    return Array.from(subjectsSet).sort()
+  const availableYears = useMemo(() => {
+    const years = [...new Set(assessments.map(a => a.year))].sort((a, b) => b - a)
+    return years
   }, [assessments])
-
-  const calculateAverage = useCallback((subjectKey: string) => {
-    const scores = assessments
-      .map(a => a.subject_scores?.[subjectKey])
-      .filter((score): score is number => score !== undefined && score !== null)
-    
-    if (scores.length === 0) return null
-    return (scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(1)
-  }, [assessments])
-
-  const getSubjectProgress = useCallback((subjectKey: string) => {
-    return assessments.map(assessment => ({
-      grade: assessment.grade,
-      year: assessment.year,
-      term: assessment.term,
-      score: assessment.subject_scores?.[subjectKey] || null,
-      date: `${assessment.year} T${assessment.term}`,
-      mathType: assessment.mathematics_type
-    }))
-  }, [assessments])
-
-  const getTrendIcon = useCallback((subjectKey: string) => {
-    const progress = getSubjectProgress(subjectKey)
-    const validScores = progress.filter(p => p.score !== null)
-    
-    if (validScores.length < 2) return null
-
-    const first = validScores[0].score!
-    const last = validScores[validScores.length - 1].score!
-
-    if (last > first) {
-      return { icon: TrendingUp, color: 'text-green-600', text: 'Improving' }
-    }
-    if (last < first) {
-      return { icon: TrendingDown, color: 'text-red-600', text: 'Declining' }
-    }
-    return { icon: Minus, color: 'text-blue-600', text: 'Stable' }
-  }, [getSubjectProgress])
-
-  const persistentStruggles = useMemo(() => {
-    return allSubjects.filter(subject => {
-      const scores = assessments
-        .map(a => a.subject_scores?.[subject])
-        .filter((s): s is number => s !== null && s !== undefined)
-      
-      if (scores.length < 2) return false
-      
-      const avgScore = scores.reduce((sum, s) => sum + s, 0) / scores.length
-      const strugglingCount = scores.filter(s => s < 2.5).length
-      
-      return avgScore < 2.5 && strugglingCount >= Math.ceil(scores.length / 2)
-    })
-  }, [assessments, allSubjects])
-
-  const overallStats = useMemo(() => {
-    if (assessments.length === 0) return null
-    
-    const allScores = assessments.flatMap(a => 
-      Object.values(a.subject_scores || {}) as number[]
-    )
-    
-    if (allScores.length === 0) return null
-    
-    const avg = allScores.reduce((sum, s) => sum + s, 0) / allScores.length
-    const highest = Math.max(...allScores)
-    const lowest = Math.min(...allScores)
-    
-    return {
-      average: avg.toFixed(1),
-      highest,
-      lowest,
-      totalAssessments: assessments.length,
-      totalSubjects: allSubjects.length
-    }
-  }, [assessments, allSubjects])
-
-  const performanceAnalysis = useMemo(() => {
-    if (assessments.length === 0) return null
-
-    const latestAssessment = assessments[assessments.length - 1]
-    if (!latestAssessment.subject_scores) return null
-
-    const historicalData: Record<string, Array<{ term: number; score: number }>> = {}
-    assessments.forEach(assessment => {
-      Object.entries(assessment.subject_scores || {}).forEach(([subject, score]) => {
-        if (!historicalData[subject]) {
-          historicalData[subject] = []
-        }
-        historicalData[subject].push({
-          term: assessment.term,
-          score: score as number
-        })
-      })
-    })
-
-    return analyzePerformance(latestAssessment.subject_scores, historicalData)
-  }, [assessments])
-
-  const toggleSubjectExpand = (subject: string) => {
-    setExpandedSubjects(prev =>
-      prev.includes(subject)
-        ? prev.filter(s => s !== subject)
-        : [...prev, subject]
-    )
-  }
-
-  const handleAIAnalysis = async () => {
-    setAiLoading(true)
-    try {
-      router.push(`/dashboard/ai-career?student=${studentId}`)
-    } catch (err) {
-      console.error('AI Analysis error:', err)
-      alert('AI Analysis feature coming soon!')
-    } finally {
-      setAiLoading(false)
-    }
-  }
-
-  const handlePDFDownload = async () => {
-    if (assessments.length === 0) {
-      alert('No assessments to generate report')
-      return
-    }
-
-    setPdfLoading(true)
-    setDownloadError(null)
-    
-    try {
-      // Send ALL assessments for historical data
-      const payload = {
-        studentId: student!.id,
-        assessments: assessments,
-        profile: {
-          name: student!.name,
-          grade: student!.grade,
-          pathway: student!.current_pathway,
-          dateOfBirth: student!.date_of_birth
-          // REMOVED: school property completely since it doesn't exist in Student type
-        }
-      }
-
-      console.log('Sending payload with', assessments.length, 'assessments')
-
-      const response = await fetch('/api/clinic/download', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('PDF generation failed:', errorData)
-        throw new Error(errorData.error || 'Failed to generate report')
-      }
-
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${student!.name.replace(/\s+/g, '_')}_Academic_Report_${new Date().toISOString().split('T')[0]}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-      
-      alert('Report downloaded successfully! ✅')
-    } catch (err) {
-      console.error('PDF Download error:', err)
-      setDownloadError(err instanceof Error ? err.message : 'Failed to download report')
-      alert('Failed to download report. Please try again.')
-    } finally {
-      setPdfLoading(false)
-    }
-  }
-
-  if (error && !student) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="bg-red-50 border-4 border-red-200 rounded-3xl p-12 max-w-md text-center">
-          <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-black text-red-900 mb-2">Error</h2>
-          <p className="text-red-700 mb-6">{error}</p>
-          <Link 
-            href="/dashboard"
-            className="inline-block bg-red-600 text-white px-8 py-3 rounded-full font-bold hover:bg-red-700 transition-colors"
-          >
-            Back to Dashboard
-          </Link>
-        </div>
-      </div>
-    )
-  }
-
-  if (!student && loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <div className="text-xl font-bold animate-pulse">Loading...</div>
-        </div>
-      </div>
-    )
-  }
-
-  if (!student) return null
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-      {/* Header */}
-      <div className="border-b-4 border-black bg-white sticky top-0 z-50 shadow-md">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <Link href="/dashboard" className="font-bold hover:text-violet-600 transition-colors flex items-center gap-1">
-            <ChevronLeft className="w-4 h-4" />
-            Dashboard
-          </Link>
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-violet-600" />
-            <span className="font-black text-sm">EDUNEXUS</span>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-white to-indigo-50/30">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6">
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Student Header */}
-        <div className="mb-8 bg-white rounded-3xl border-4 border-slate-200 p-6 shadow-xl">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tight">
-                {student.name}
-              </h1>
-              <div className="flex flex-wrap gap-3 mt-3">
-                <span className="px-4 py-2 bg-slate-100 rounded-full text-sm font-bold">
-                  Grade {student.grade}
-                </span>
-                <span className="px-4 py-2 bg-slate-100 rounded-full text-sm font-bold">
-                  {student.grade >= 10 ? 'Senior School' : 'Junior School'}
-                </span>
-                {student.current_pathway && (
-                  <span className="px-4 py-2 bg-purple-100 text-purple-700 rounded-full text-sm font-bold">
-                    {student.current_pathway}
-                  </span>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex gap-3">
-              <Link
-                href={`/dashboard/assessments/add?student=${student.id}`}
-                className="flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full font-bold hover:bg-violet-900 transition-all shadow-lg"
-              >
-                <PlusCircle className="w-5 h-5" />
-                Add Assessment
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        {/* Stats Cards */}
-        {overallStats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-gradient-to-br from-violet-50 to-indigo-50 rounded-2xl p-6 border-2 border-violet-200">
-              <div className="text-sm font-bold text-violet-600 mb-2">Average Score</div>
-              <div className="text-4xl font-black text-violet-900">{overallStats.average}</div>
-            </div>
-            
-            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 border-2 border-green-200">
-              <div className="text-sm font-bold text-green-600 mb-2">Highest</div>
-              <div className="text-4xl font-black text-green-900">{overallStats.highest}</div>
-            </div>
-            
-            <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl p-6 border-2 border-orange-200">
-              <div className="text-sm font-bold text-orange-600 mb-2">Lowest</div>
-              <div className="text-4xl font-black text-orange-900">{overallStats.lowest}</div>
-            </div>
-            
-            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-6 border-2 border-blue-200">
-              <div className="text-sm font-bold text-blue-600 mb-2">Assessments</div>
-              <div className="text-4xl font-black text-blue-900">{overallStats.totalAssessments}</div>
-            </div>
-          </div>
-        )}
-
-        {/* Persistent Struggles Alert */}
-        {persistentStruggles.length > 0 && (
-          <div className="mb-8 bg-gradient-to-r from-red-50 to-orange-50 border-4 border-red-200 rounded-3xl p-6">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center flex-shrink-0">
-                <AlertTriangle className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-black text-red-900 mb-2">Attention Needed</h3>
-                <p className="text-red-800 mb-3">
-                  {student.name} needs extra support in: {persistentStruggles.map(s => formatSubjectName(s)).join(', ')}
-                </p>
-                <button
-                  onClick={() => setShowLearningPlan(true)}
-                  className="px-4 py-2 bg-red-600 text-white rounded-full text-sm font-bold hover:bg-red-700 transition-colors"
-                >
-                  View Learning Plan
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Download Error Alert */}
-        {downloadError && (
-          <div className="mb-8 bg-red-50 border-4 border-red-200 rounded-3xl p-4">
-            <p className="text-red-700 font-bold">Download Error: {downloadError}</p>
-          </div>
-        )}
-
-        {/* Filters */}
-        <div className="mb-8 flex flex-wrap gap-4">
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs font-bold text-slate-500 mb-2">FILTER BY YEAR</label>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-              className="w-full p-4 bg-white border-2 border-slate-200 rounded-xl font-bold focus:border-violet-600 focus:outline-none"
-            >
-              <option value="all">All Years</option>
-              {AVAILABLE_YEARS.map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
-          </div>
-          
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs font-bold text-slate-500 mb-2">FILTER BY SUBJECT</label>
-            <select
-              value={selectedSubject}
-              onChange={(e) => setSelectedSubject(e.target.value)}
-              className="w-full p-4 bg-white border-2 border-slate-200 rounded-xl font-bold focus:border-violet-600 focus:outline-none"
-            >
-              <option value="all">All Subjects</option>
-              {allSubjects.map(subject => (
-                <option key={subject} value={subject}>{formatSubjectName(subject)}</option>
-              ))}
-            </select>
-          </div>
-          
-          <div className="flex items-end">
-            <button
-              onClick={() => setViewMode(viewMode === 'table' ? 'cards' : 'table')}
-              className="px-6 py-4 bg-white border-2 border-slate-200 rounded-xl font-bold hover:border-violet-300 transition-colors flex items-center gap-2"
-            >
-              <BarChart3 className="w-5 h-5" />
-              {viewMode === 'table' ? 'Card View' : 'Table View'}
-            </button>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="bg-white rounded-3xl border-4 border-slate-200 p-20 text-center">
-            <div className="w-12 h-12 border-4 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <div className="text-lg font-bold">Loading assessments...</div>
-          </div>
-        ) : assessments.length === 0 ? (
-          <div className="bg-white rounded-3xl border-4 border-slate-200 p-20 text-center">
-            <BookOpen className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-            <h3 className="text-2xl font-black mb-2">No Assessments Yet</h3>
-            <p className="text-slate-600 mb-6">Add your first assessment to start tracking progress</p>
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
             <Link
-              href={`/dashboard/assessments/add?student=${studentId}`}
-              className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-full font-bold hover:scale-105 transition-all shadow-xl"
+              href="/dashboard/clinic"
+              className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-2 font-medium"
             >
-              <PlusCircle className="w-5 h-5" />
-              Add First Assessment
+              <ArrowLeft className="w-4 h-4" /> Back to Clinic
+            </Link>
+            <h1 className="text-3xl font-black text-slate-900">Assessment History</h1>
+            <p className="text-slate-500 text-sm mt-1">All assessments for all your students</p>
+          </div>
+          <Link
+            href="/dashboard/assessments/add"
+            className="flex items-center gap-2 px-5 py-3 bg-linear-to-r from-blue-600 to-indigo-600 text-white rounded-2xl font-bold hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md"
+          >
+            <PlusCircle className="w-4 h-4" />
+            Add Assessment
+          </Link>
+        </div>
+
+        {/* Filter bar */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Filter className="w-4 h-4 text-slate-400" />
+            <span className="text-sm font-bold text-slate-600">Filter</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Student</label>
+              <select
+                value={filterStudent}
+                onChange={e => setFilterStudent(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 bg-white focus:outline-none focus:border-blue-400"
+              >
+                <option value="">All Students</option>
+                {students.map(s => (
+                  <option key={s.id} value={s.id}>{s.name} (Gr {s.grade})</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Year</label>
+              <select
+                value={filterYear}
+                onChange={e => setFilterYear(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 bg-white focus:outline-none focus:border-blue-400"
+              >
+                <option value="">All Years</option>
+                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Term (CBC)</label>
+              <select
+                value={filterTerm}
+                onChange={e => setFilterTerm(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-800 bg-white focus:outline-none focus:border-blue-400"
+              >
+                <option value="">All Terms</option>
+                <option value="1">Term 1</option>
+                <option value="2">Term 2</option>
+                <option value="3">Term 3</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {loading && (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+          </div>
+        )}
+
+        {error && !loading && (
+          <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <span className="font-medium">{error}</span>
+          </div>
+        )}
+
+        {!loading && !error && (
+          <p className="text-sm text-slate-500 font-medium">
+            {assessments.length === 0
+              ? 'No assessments found'
+              : `${assessments.length} assessment${assessments.length !== 1 ? 's' : ''} found`
+            }
+          </p>
+        )}
+
+        {!loading && !error && assessments.length > 0 && (
+          <div className="space-y-4">
+            {assessments.map(a => <AssessmentCard key={a.id} a={a} />)}
+          </div>
+        )}
+
+        {!loading && !error && assessments.length === 0 && (
+          <div className="bg-white rounded-3xl p-12 text-center border-2 border-dashed border-slate-200">
+            <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <BarChart3 className="w-8 h-8 text-blue-400" />
+            </div>
+            <h3 className="text-xl font-black text-slate-900 mb-2">No assessments yet</h3>
+            <p className="text-slate-500 mb-6 max-w-xs mx-auto">
+              Add your first assessment to see history here.
+            </p>
+            <Link
+              href="/dashboard/assessments/add"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-linear-to-r from-blue-600 to-indigo-600 text-white rounded-2xl font-bold hover:from-blue-700 hover:to-indigo-700 transition-all"
+            >
+              <PlusCircle className="w-4 h-4" />
+              Add Assessment
             </Link>
           </div>
-        ) : (
-          <>
-            {/* Table View */}
-            {viewMode === 'table' ? (
-              <div className="bg-white rounded-3xl border-4 border-slate-200 overflow-hidden mb-8">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-slate-100">
-                      <tr>
-                        <th className="px-6 py-5 text-left text-xs font-black uppercase">Subject</th>
-                        {assessments.map((assessment, idx) => (
-                          <th key={idx} className="px-4 py-5 text-center text-xs font-black uppercase whitespace-nowrap">
-                            <div>G{assessment.grade}</div>
-                            <div className="text-slate-500">{assessment.year}</div>
-                            <div>T{assessment.term}</div>
-                            {assessment.mathematics_type && (
-                              <div className="mt-1">
-                                {getMathTypeBadge(assessment.mathematics_type)}
-                              </div>
-                            )}
-                          </th>
-                        ))}
-                        <th className="px-6 py-5 text-center text-xs font-black uppercase">Avg</th>
-                        <th className="px-6 py-5 text-center text-xs font-black uppercase">Trend</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {allSubjects
-                        .filter(s => selectedSubject === 'all' || s === selectedSubject)
-                        .map((subjectKey, index) => {
-                          const average = calculateAverage(subjectKey)
-                          const trend = getTrendIcon(subjectKey)
-                          const TrendIcon = trend?.icon
-
-                          return (
-                            <tr key={subjectKey} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                              <td className="px-6 py-5 font-black uppercase text-sm">
-                                {formatSubjectName(subjectKey)}
-                                {(subjectKey === 'core_mathematics' || subjectKey === 'essential_mathematics') && (
-                                  <div className="mt-1">
-                                    {getMathTypeBadge(subjectKey === 'core_mathematics' ? 'core' : 'essential')}
-                                  </div>
-                                )}
-                              </td>
-                              
-                              {assessments.map((assessment, idx) => {
-                                const score = assessment.subject_scores?.[subjectKey] as number | undefined
-                                
-                                return (
-                                  <td key={idx} className="px-4 py-5 text-center">
-                                    {score ? (
-                                      <span className={`inline-block w-8 h-8 rounded-full font-bold flex items-center justify-center mx-auto ${
-                                        score === 1 ? 'bg-red-100 text-red-700' :
-                                        score === 2 ? 'bg-yellow-100 text-yellow-700' :
-                                        score === 3 ? 'bg-green-100 text-green-700' :
-                                        'bg-purple-100 text-purple-700'
-                                      }`}>
-                                        {score}
-                                      </span>
-                                    ) : (
-                                      <span className="text-slate-300">—</span>
-                                    )}
-                                  </td>
-                                )
-                              })}
-
-                              <td className="px-6 py-5 text-center font-black text-xl">{average || '—'}</td>
-
-                              <td className="px-6 py-5 text-center">
-                                {trend && TrendIcon ? (
-                                  <TrendIcon className={`w-5 h-5 mx-auto ${trend.color}`} />
-                                ) : (
-                                  <span className="text-slate-300">—</span>
-                                )}
-                              </td>
-                            </tr>
-                          )
-                        })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : (
-              /* Card View */
-              <div className="space-y-4 mb-8">
-                {allSubjects
-                  .filter(s => selectedSubject === 'all' || s === selectedSubject)
-                  .map(subject => {
-                    const progress = getSubjectProgress(subject)
-                    const average = calculateAverage(subject)
-                    const trend = getTrendIcon(subject)
-                    const TrendIcon = trend?.icon
-                    const isExpanded = expandedSubjects.includes(subject)
-                    
-                    return (
-                      <div key={subject} className="bg-white rounded-3xl border-4 border-slate-200 overflow-hidden">
-                        {/* Subject Header */}
-                        <div 
-                          onClick={() => toggleSubjectExpand(subject)}
-                          className="p-6 cursor-pointer hover:bg-slate-50 transition-colors"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 bg-gradient-to-br from-violet-600 to-indigo-600 rounded-2xl flex items-center justify-center">
-                                <BookOpen className="w-6 h-6 text-white" />
-                              </div>
-                              <div>
-                                <h3 className="text-xl font-black">{formatSubjectName(subject)}</h3>
-                                <div className="flex items-center gap-3 mt-1">
-                                  <span className="text-sm text-slate-600">Avg: {average || '—'}</span>
-                                  {trend && TrendIcon && (
-                                    <span className={`flex items-center gap-1 text-sm ${trend.color}`}>
-                                      <TrendIcon className="w-4 h-4" />
-                                      {trend.text}
-                                    </span>
-                                  )}
-                                </div>
-                                {(subject === 'core_mathematics' || subject === 'essential_mathematics') && (
-                                  <div className="mt-1">
-                                    {getMathTypeBadge(subject === 'core_mathematics' ? 'core' : 'essential')}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <span className="text-sm font-bold text-slate-400">
-                                {progress.filter(p => p.score).length} assessments
-                              </span>
-                              <ChevronLeft className={`w-5 h-5 transform transition-transform ${isExpanded ? '-rotate-90' : ''}`} />
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Expanded Content */}
-                        {isExpanded && (
-                          <div className="px-6 pb-6 border-t-2 border-slate-200">
-                            <div className="pt-4 space-y-3">
-                              {progress.map((item, idx) => (
-                                <div key={idx} className="flex items-center gap-4">
-                                  <div className="w-24 text-sm font-bold text-slate-500">
-                                    {item.date}
-                                    {item.mathType && (
-                                      <div className="text-xs mt-1">
-                                        {getMathTypeBadge(item.mathType)}
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="flex-1">
-                                    {item.score ? (
-                                      <div className="flex items-center gap-3">
-                                        <div className="flex-1 h-3 bg-slate-100 rounded-full overflow-hidden">
-                                          <div 
-                                            className={`h-full ${
-                                              item.score === 1 ? 'bg-red-500' :
-                                              item.score === 2 ? 'bg-yellow-500' :
-                                              item.score === 3 ? 'bg-green-500' :
-                                              'bg-purple-500'
-                                            }`}
-                                            style={{ width: `${(item.score / 4) * 100}%` }}
-                                          />
-                                        </div>
-                                        {getCompetencyBadge(item.score)}
-                                      </div>
-                                    ) : (
-                                      <span className="text-slate-400">No score</span>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-              </div>
-            )}
-
-            {/* Learning Plan Section */}
-            {performanceAnalysis && (
-              <div className="mb-8">
-                <button
-                  onClick={() => setShowLearningPlan(!showLearningPlan)}
-                  className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white p-6 rounded-3xl font-black text-xl flex items-center justify-between hover:from-violet-700 hover:to-indigo-700 transition-all shadow-xl"
-                >
-                  <span className="flex items-center gap-3">
-                    <Brain className="w-6 h-6" />
-                    Personalized Learning Plan
-                  </span>
-                  <span className="text-2xl">{showLearningPlan ? '▼' : '▶'}</span>
-                </button>
-
-                {showLearningPlan && (
-                  <div className="mt-4 space-y-4">
-                    {performanceAnalysis.recommendations.map((rec: SubjectRecommendation, idx: number) => {
-                      const config = getTierConfig(rec.tier)
-                      
-                      return (
-                        <div key={idx} className={`border-4 ${config.borderClass} rounded-3xl p-6 ${config.bgClass} shadow-xl`}>
-                          <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-xl font-black uppercase">{formatSubjectName(rec.subject)}</h3>
-                            <span className={`px-4 py-2 rounded-full font-bold ${config.badgeClass}`}>
-                              {config.icon} {rec.tierLabel}
-                            </span>
-                          </div>
-
-                          <p className="mb-4 font-medium">{rec.description}</p>
-
-                          <div className="bg-white rounded-2xl p-4 mb-4">
-                            <h4 className="font-black uppercase text-sm mb-3 flex items-center gap-2">
-                              <FileText className="w-4 h-4" />
-                              Action Steps
-                            </h4>
-                            <ol className="space-y-2">
-                              {rec.actionSteps.map((step, i) => (
-                                <li key={i} className="flex gap-2 text-sm">
-                                  <span className="font-black">{i + 1}.</span>
-                                  <span>{step}</span>
-                                </li>
-                              ))}
-                            </ol>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-white rounded-xl p-3">
-                              <div className="font-black text-xs mb-1">⏱️ Timeline</div>
-                              <div className="text-sm">{rec.estimatedTime}</div>
-                            </div>
-                            <div className="bg-white rounded-xl p-3">
-                              <div className="font-black text-xs mb-1">🎯 Target</div>
-                              <div className="text-sm">Level {rec.targetLevel}</div>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <button
-                onClick={handleAIAnalysis}
-                disabled={aiLoading}
-                className="flex items-center justify-center gap-2 p-5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full font-bold hover:scale-105 transition-all shadow-xl disabled:opacity-50"
-              >
-                {aiLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-                {aiLoading ? 'Loading...' : 'Career Analysis'}
-              </button>
-
-              <Link
-                href={`/chat?student=${studentId}`}
-                className="flex items-center justify-center gap-2 p-5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-full font-bold hover:scale-105 transition-all shadow-xl"
-              >
-                <MessageCircle className="w-5 h-5" />
-                Ask Tutor
-              </Link>
-
-              <button
-                onClick={handlePDFDownload}
-                disabled={pdfLoading}
-                className="flex items-center justify-center gap-2 p-5 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-full font-bold hover:scale-105 transition-all shadow-xl disabled:opacity-50"
-              >
-                {pdfLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
-                {pdfLoading ? 'Generating...' : 'Download Report'}
-              </button>
-
-              <Link
-                href={`/dashboard/assessments/add?student=${studentId}`}
-                className="flex items-center justify-center gap-2 p-5 bg-black text-white rounded-full font-bold hover:bg-violet-900 transition-all shadow-xl"
-              >
-                <PlusCircle className="w-5 h-5" />
-                New Assessment
-              </Link>
-            </div>
-          </>
         )}
+
       </div>
     </div>
+  )
+}
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+export default function HistoryPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      </div>
+    }>
+      <HistoryContent />
+    </Suspense>
   )
 }

@@ -1,27 +1,34 @@
 // lib/ai/rateLimit.ts
 // Rate Limiting System
 
-import { createClient } from '@supabase/supabase-js'
+import { createServiceClient } from '@/utils/supabase/service'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+const supabase = createServiceClient()
 
-export type UsageTier = 'free' | 'family' | 'school'
+export type UsageTier = 'free' | 'starter' | 'term' | 'premium' | 'admin'
 
 export const RATE_LIMITS = {
   free: {
-    careerAnalysis: 3,
-    learningPlans: 5,
-    chatMessages: 10,
+    careerAnalysis: 1,
+    learningPlans: 1,
+    chatMessages: 3,
   },
-  family: {
-    careerAnalysis: 30,
-    learningPlans: 50,
-    chatMessages: 100,
+  starter: {
+    careerAnalysis: 10,
+    learningPlans: 15,
+    chatMessages: 50,
   },
-  school: {
+  term: {
+    careerAnalysis: -1,
+    learningPlans: -1,
+    chatMessages: -1,
+  },
+  premium: {
+    careerAnalysis: -1,
+    learningPlans: -1,
+    chatMessages: -1,
+  },
+  admin: {
     careerAnalysis: -1,
     learningPlans: -1,
     chatMessages: -1,
@@ -33,7 +40,12 @@ export async function checkRateLimit(
   feature: 'careerAnalysis' | 'learningPlans' | 'chatMessages',
   tier: UsageTier = 'free'
 ): Promise<{ allowed: boolean; remaining: number; limit: number }> {
-  
+
+  // Admin always allowed — unlimited everything
+  if (tier === 'admin') {
+    return { allowed: true, remaining: -1, limit: -1 }
+  }
+
   const limit = RATE_LIMITS[tier][feature]
   
   if (limit === -1) {

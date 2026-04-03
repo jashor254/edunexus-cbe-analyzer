@@ -4,6 +4,8 @@
 // ✅ Never prefix these with NEXT_PUBLIC_
 // ============================================================
 
+import type { UsageTier } from '@/lib/ai/rateLimit'
+
 // ============================================================
 // AI PROVIDER CONFIG
 // ============================================================
@@ -157,15 +159,21 @@ export const TOKEN_CONFIG = {
 // ============================================================
 
 export const ADMIN_CONFIG = {
-  get adminEmail() {
-    return process.env.ADMIN_EMAIL || 'denniskariuki092@gmail.com'
-  },
+  adminEmail: 'kariukidennis092@gmail.com',
 
   get adminSecret() {
     return process.env.ADMIN_SECRET
   },
 
+  adminEmails: [
+    'kariukidennis092@gmail.com',
+  ],
+
   isAdmin(email: string) {
-    return email === this.adminEmail
+    return this.adminEmails.includes(email.toLowerCase().trim())
+  },
+
+  getAdminTier(): UsageTier {
+    return 'admin'
   }
 }

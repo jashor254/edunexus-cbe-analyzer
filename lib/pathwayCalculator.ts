@@ -2,6 +2,188 @@
 
 export type SubjectScores = Record<string, number>
 
+// ─── IGCSE types ──────────────────────────────────────────────────────────────
+
+export type IGCSEGradeString = 'A*' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'U'
+
+export type IGCSEPathway = 'Sciences' | 'Humanities' | 'Languages' | 'Mathematics' | 'Technology'
+
+export type IGCSESubjectRating = 'strongly_recommended' | 'recommended' | 'consider' | 'not_recommended'
+
+export interface IGCSEPathwayStrength {
+  pathway: IGCSEPathway
+  score: number          // 0–100
+  label: string
+  emoji: string
+  description: string
+  universityOptions: string[]
+  aLevelSubjects: string[]
+}
+
+export interface IGCSESubjectRecommendation {
+  subject: string
+  rating: IGCSESubjectRating
+  numericScore: number
+  gradeLabel: IGCSEGradeString | null
+}
+
+export interface IGCSERecommendation {
+  pathwayStrengths: IGCSEPathwayStrength[]
+  topPathway: IGCSEPathway
+  subjectRecommendations: IGCSESubjectRecommendation[]
+  iceAwardNote: string | null
+  calculated_at: string
+}
+
+// Grade → numeric (A*=9, A=8 … U=1)
+const IGCSE_GRADE_NUMERIC: Record<string, number> = {
+  'A*': 9, 'A': 8, 'B': 7, 'C': 6, 'D': 5, 'E': 4, 'F': 3, 'G': 2, 'U': 1,
+}
+
+// Subject → pathway group(s)
+const IGCSE_SUBJECT_GROUPS: Record<string, IGCSEPathway[]> = {
+  // Sciences
+  biology:           ['Sciences'],
+  chemistry:         ['Sciences'],
+  physics:           ['Sciences'],
+  combined_science:  ['Sciences'],
+  environmental_management: ['Sciences'],
+  // Humanities
+  history:           ['Humanities'],
+  geography:         ['Humanities'],
+  literature_english:['Humanities'],
+  global_perspectives:['Humanities'],
+  sociology:         ['Humanities'],
+  // Languages
+  english_language:  ['Languages'],
+  kiswahili:         ['Languages'],
+  french:            ['Languages'],
+  arabic:            ['Languages'],
+  // Mathematics
+  mathematics:       ['Mathematics'],
+  additional_mathematics: ['Mathematics'],
+  // Technology
+  computer_science:  ['Technology'],
+  ict:               ['Technology'],
+  design_technology: ['Technology'],
+  // Cross-group subjects
+  economics:         ['Humanities', 'Mathematics'],
+  business_studies:  ['Humanities', 'Technology'],
+  accounting:        ['Mathematics', 'Humanities'],
+}
+
+const PATHWAY_META: Record<IGCSEPathway, { label: string; emoji: string; description: string; universityOptions: string[]; aLevelSubjects: string[] }> = {
+  Sciences: {
+    label: 'Science & Medicine',
+    emoji: '🔬',
+    description: 'Strong foundation for Medicine, Engineering, and Research',
+    universityOptions: ['University of Nairobi (Medicine)', 'JKUAT (Engineering)', 'UK Russell Group', 'International medical schools'],
+    aLevelSubjects: ['Biology', 'Chemistry', 'Physics', 'Mathematics'],
+  },
+  Humanities: {
+    label: 'Humanities & Social Sciences',
+    emoji: '📚',
+    description: 'Ideal for Law, International Relations, Journalism, and Teaching',
+    universityOptions: ['University of Nairobi (Law)', 'Strathmore University', 'UK universities', 'African Leadership University'],
+    aLevelSubjects: ['History', 'Geography', 'English Literature', 'Economics'],
+  },
+  Languages: {
+    label: 'Languages & Communication',
+    emoji: '🗣️',
+    description: 'Opens doors in Diplomacy, Translation, Media, and Global Business',
+    universityOptions: ['University of Nairobi (Languages)', 'USIU-Africa', 'European universities', 'AU multilateral institutions'],
+    aLevelSubjects: ['English Language', 'French', 'Spanish', 'Global Perspectives'],
+  },
+  Mathematics: {
+    label: 'Mathematics & Economics',
+    emoji: '📐',
+    description: 'Pathway to Finance, Data Science, Actuarial Science, and Economics',
+    universityOptions: ['Strathmore University (Finance)', 'University of Nairobi (Economics)', 'LSE', 'Top US universities'],
+    aLevelSubjects: ['Mathematics', 'Further Mathematics', 'Economics', 'Physics'],
+  },
+  Technology: {
+    label: 'Technology & Computing',
+    emoji: '💻',
+    description: 'Leads to Software Engineering, Cybersecurity, and Tech entrepreneurship',
+    universityOptions: ['JKUAT (ICT)', 'Strathmore (iLab Africa)', 'Carnegie Mellon Africa', 'Global tech bootcamps'],
+    aLevelSubjects: ['Computer Science', 'Mathematics', 'Physics', 'Further Mathematics'],
+  },
+}
+
+/**
+ * Calculate pathway strengths and subject recommendations for IGCSE students
+ */
+export function calculateIGCSESubjectRecommendation(
+  scores: Record<string, string | number>,
+  yearLevel: number = 10
+): IGCSERecommendation {
+  // Convert all scores to numeric (string grades → number, numeric pass-through)
+  const numeric: Record<string, number> = {}
+  for (const [subj, val] of Object.entries(scores)) {
+    if (typeof val === 'number') {
+      numeric[subj] = val
+    } else {
+      numeric[subj] = IGCSE_GRADE_NUMERIC[val] ?? 0
+    }
+  }
+
+  // Calculate average score per pathway
+  const pathwayTotals: Record<IGCSEPathway, { total: number; count: number }> = {
+    Sciences:    { total: 0, count: 0 },
+    Humanities:  { total: 0, count: 0 },
+    Languages:   { total: 0, count: 0 },
+    Mathematics: { total: 0, count: 0 },
+    Technology:  { total: 0, count: 0 },
+  }
+
+  for (const [subj, num] of Object.entries(numeric)) {
+    const groups = IGCSE_SUBJECT_GROUPS[subj] || []
+    for (const g of groups) {
+      pathwayTotals[g].total += num
+      pathwayTotals[g].count += 1
+    }
+  }
+
+  // Convert to 0–100 scores (max numeric is 9 = A*)
+  const pathwayStrengths: IGCSEPathwayStrength[] = (Object.keys(pathwayTotals) as IGCSEPathway[])
+    .map(pathway => {
+      const { total, count } = pathwayTotals[pathway]
+      const avg = count > 0 ? total / count : 0
+      const score = Math.round((avg / 9) * 100)
+      return { pathway, score, ...PATHWAY_META[pathway] }
+    })
+    .sort((a, b) => b.score - a.score)
+
+  const topPathway = pathwayStrengths[0]?.pathway ?? 'Sciences'
+
+  // Per-subject recommendations
+  const subjectRecommendations: IGCSESubjectRecommendation[] = Object.entries(numeric).map(([subj, num]) => {
+    let rating: IGCSESubjectRating
+    if (num >= 8)      rating = 'strongly_recommended'
+    else if (num >= 6) rating = 'recommended'
+    else if (num >= 4) rating = 'consider'
+    else               rating = 'not_recommended'
+
+    const gradeEntry = Object.entries(IGCSE_GRADE_NUMERIC).find(([, v]) => v === num)
+    const gradeLabel = (gradeEntry?.[0] as IGCSEGradeString | undefined) ?? null
+
+    return { subject: subj, rating, numericScore: num, gradeLabel }
+  }).sort((a, b) => b.numericScore - a.numericScore)
+
+  // ICE Award note (only Upper Secondary Year 10-11)
+  const iceAwardNote = yearLevel >= 10
+    ? 'Cambridge ICE Award: Pass requires 7 subjects across 5 groups. Distinction = majority A*/A grades.'
+    : null
+
+  return {
+    pathwayStrengths,
+    topPathway,
+    subjectRecommendations,
+    iceAwardNote,
+    calculated_at: new Date().toISOString(),
+  }
+}
+
 export type PathwayRecommendation = {
   stem_score: number
   arts_sports_score: number

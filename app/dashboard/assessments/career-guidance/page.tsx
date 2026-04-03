@@ -86,11 +86,13 @@ function CareerCard({
   rank,
   studentId,
   studentName,
+  isIGCSE = false,
 }: {
   career: CareerRecommendation
   rank: number
   studentId: string
   studentName: string
+  isIGCSE?: boolean
 }) {
   const [expanded, setExpanded]         = useState(rank === 1)
   const [showPlan, setShowPlan]         = useState(false)
@@ -199,6 +201,18 @@ function CareerCard({
               {career.kenyanMarketReality}
             </p>
           </div>
+
+          {/* IGCSE: global opportunities note */}
+          {isIGCSE && (
+            <div className="bg-indigo-50 border-2 border-indigo-200 rounded-2xl p-4">
+              <h4 className="font-black text-indigo-900 text-sm mb-2 flex items-center gap-2">
+                🌍 Global Opportunities (IGCSE Advantage)
+              </h4>
+              <p className="text-sm text-indigo-800 leading-relaxed">
+                Your Cambridge IGCSE qualification is recognised by universities in 160+ countries. Strong grades open doors to UK, US, Canadian, and European institutions — not just Kenyan universities. Pair this career path with the right A-Level choices to maximise your options.
+              </p>
+            </div>
+          )}
 
           {/* Gaps — honest */}
           {career.currentGaps.length > 0 && (
@@ -342,6 +356,8 @@ function CareerGuidanceContent() {
   const [error,      setError]      = useState<string | null>(null)
   const [activeTab,  setActiveTab]  = useState<'careers' | 'subjects'>('careers')
 
+  const isIGCSE = student?.curriculum_type === 'igcse'
+
   useEffect(() => {
     if (!studentId) { router.push('/dashboard'); return }
     loadData()
@@ -482,6 +498,11 @@ function CareerGuidanceContent() {
                 Grade {student.grade} • {student.current_pathway} Pathway •
                 Term {assessment.term} {assessment.year}
               </p>
+              {isIGCSE && (
+                <span className="inline-flex items-center gap-1.5 mt-2 px-3 py-1 bg-indigo-500/30 border border-indigo-400/40 text-indigo-200 rounded-full text-xs font-bold">
+                  🌍 Cambridge IGCSE Student
+                </span>
+              )}
             </div>
             <div className="text-center bg-white/10 rounded-2xl px-6 py-4 flex-shrink-0">
               <div className="text-4xl font-black">{avgScore}</div>
@@ -512,6 +533,56 @@ function CareerGuidanceContent() {
             </p>
           </div>
         </div>
+
+        {/* IGCSE Post-Pathway section */}
+        {isIGCSE && (
+          <div className="bg-gradient-to-br from-indigo-950 to-slate-900 rounded-3xl p-6 text-white border border-indigo-500/20">
+            <h2 className="font-black text-lg mb-4 flex items-center gap-2">
+              🎓 Post-IGCSE Pathways
+            </h2>
+            <p className="text-slate-300 text-sm mb-5">
+              Your IGCSE results open these routes. Each leads to university — the path depends on your grades and goals.
+            </p>
+            <div className="grid sm:grid-cols-3 gap-4">
+              <div className="bg-white/10 rounded-2xl p-4 border border-white/10">
+                <div className="text-2xl mb-2">📘</div>
+                <h3 className="font-black text-white text-sm mb-1">A-Levels</h3>
+                <p className="text-xs text-slate-300 leading-relaxed mb-3">
+                  The classic route. 2 years, 3–4 subjects in depth. Required for most UK universities and strongly valued globally.
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {['Sciences → Medicine', 'Maths → Engineering', 'Humanities → Law'].map(s => (
+                    <span key={s} className="text-xs px-2 py-0.5 bg-indigo-500/30 text-indigo-200 rounded-full">{s}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="bg-white/10 rounded-2xl p-4 border border-white/10">
+                <div className="text-2xl mb-2">🌐</div>
+                <h3 className="font-black text-white text-sm mb-1">IB Diploma</h3>
+                <p className="text-xs text-slate-300 leading-relaxed mb-3">
+                  Internationally recognised. 6 subjects + Theory of Knowledge. Ideal for students targeting global top-50 universities.
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {['US Ivy League', 'European unis', 'Canadian schools'].map(s => (
+                    <span key={s} className="text-xs px-2 py-0.5 bg-violet-500/30 text-violet-200 rounded-full">{s}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="bg-white/10 rounded-2xl p-4 border border-white/10">
+                <div className="text-2xl mb-2">🏛️</div>
+                <h3 className="font-black text-white text-sm mb-1">Direct Entry</h3>
+                <p className="text-xs text-slate-300 leading-relaxed mb-3">
+                  Some universities accept strong IGCSE results directly. Foundation year programmes also bridge IGCSE to degree level.
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {['Foundation year', 'Diploma programmes', 'Vocational routes'].map(s => (
+                    <span key={s} className="text-xs px-2 py-0.5 bg-amber-500/30 text-amber-200 rounded-full">{s}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex gap-2 bg-slate-100 p-1.5 rounded-2xl">
@@ -571,6 +642,7 @@ function CareerGuidanceContent() {
                   rank={i + 1}
                   studentId={studentId!}
                   studentName={student.name}
+                  isIGCSE={isIGCSE}
                 />
               ))
             )}

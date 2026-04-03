@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback, Suspense } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { calculateJuniorPathwayAffinity } from '@/lib/pathwayCalculator'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { getCurriculumConfig, getGradeColor, getGradeLabel } from '@/lib/curriculum'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Student {
@@ -13,10 +13,12 @@ interface Student {
   name: string
   grade: number
   current_pathway?: string | null
+  curriculum_type?: string | null
+  year_level?: string | null
   user_id: string
 }
 
-// ─── Subject definitions ──────────────────────────────────────────────────────
+// ─── Subject definitions (CBC — unchanged) ────────────────────────────────────
 
 // Junior School (Grades 7-9) — 8 core + 1 religious
 const JUNIOR_CORE = [
@@ -94,7 +96,15 @@ function getPathwayElectives(pathway: string) {
   return PATHWAY_ELECTIVES[pathway] || []
 }
 
-// ─── Score button component ───────────────────────────────────────────────────
+// ─── IGCSE constants ──────────────────────────────────────────────────────────
+const IGCSE_ASSESSMENT_STYLES = [
+  { value: 'end_of_term',         label: 'End of Term',         emoji: '📚' },
+  { value: 'mock_exam',           label: 'Mock Exam',           emoji: '📝' },
+  { value: 'cambridge_predicted', label: 'Cambridge Predicted', emoji: '🎯' },
+  { value: 'summative',           label: 'Internal Exam',       emoji: '📋' },
+]
+
+// ─── CBC Score button component ───────────────────────────────────────────────
 function ScoreButtons({
   subjectKey,
   label,
@@ -145,23 +155,84 @@ function ScoreButtons({
   )
 }
 
+// ─── IGCSE Score button component ─────────────────────────────────────────────
+function IGCSEScoreButtons({
+  subjectId,
+  label,
+  scores,
+  onScore,
+}: {
+  subjectId: string
+  label: string
+  scores: Record<string, string>
+  onScore: (id: string, grade: string) => void
+}) {
+  const config  = getCurriculumConfig('igcse')
+  const scored  = scores[subjectId]
+  const color   = scored ? getGradeColor('igcse', scored) : null
+  const glLabel = scored ? getGradeLabel('igcse', scored) : null
+
+  return (
+    <div className={`p-4 rounded-2xl border-2 transition-all ${
+      scored ? 'bg-white border-black' : 'bg-white border-slate-100'
+    }`}>
+      <div className="flex items-center gap-2 mb-3">
+        <div className="flex-1 min-w-0">
+          <div className="text-xs font-black text-slate-500 uppercase truncate">{label}</div>
+          {scored && color && glLabel && (
+            <div className="text-xs font-bold" style={{ color }}>
+              {scored} — {glLabel} ✓
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="flex gap-1 flex-wrap">
+        {config.gradeLabels.map(gl => {
+          const val = String(gl.value)
+          const isSelected = scored === val
+          return (
+            <button
+              key={val}
+              type="button"
+              onClick={() => onScore(subjectId, val)}
+              className={`flex-1 min-w-[2.2rem] py-2 rounded-xl font-black text-xs transition-all ${
+                isSelected
+                  ? 'text-white shadow-lg scale-105'
+                  : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700'
+              }`}
+              style={isSelected ? { backgroundColor: gl.color } : {}}
+            >
+              {val}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 function AddAssessmentContent() {
   const supabase    = createClient()
   const router      = useRouter()
   const searchParams = useSearchParams()
 
-  const [students,          setStudents]          = useState<Student[]>([])
-  const [selectedStudent,   setSelectedStudent]   = useState<string>('')
-  const [currentStudent,    setCurrentStudent]    = useState<Student | null>(null)
-  const [term,              setTerm]              = useState<number>(1)
-  const [year,              setYear]              = useState<number>(new Date().getFullYear())
-  const [scores,            setScores]            = useState<Record<string, number>>({})
-  const [mathType,          setMathType]          = useState<'core' | 'essential'>('essential')
-  const [selectedElectives, setSelectedElectives] = useState<string[]>([])
-  const [selectedReligion,  setSelectedReligion]  = useState<string>('')
-  const [loading,           setLoading]           = useState(false)
-  const [error,             setError]             = useState<string | null>(null)
+  const [students,           setStudents]           = useState<Student[]>([])
+  const [selectedStudent,    setSelectedStudent]    = useState<string>('')
+  const [currentStudent,     setCurrentStudent]     = useState<Student | null>(null)
+  const [term,               setTerm]               = useState<number>(1)
+  const [year,               setYear]               = useState<number>(new Date().getFullYear())
+  const [scores,             setScores]             = useState<Record<string, number>>({})
+  const [mathType,           setMathType]           = useState<'core' | 'essential'>('essential')
+  const [selectedElectives,  setSelectedElectives]  = useState<string[]>([])
+  const [selectedReligion,   setSelectedReligion]   = useState<string>('')
+  const [loading,            setLoading]            = useState(false)
+  const [error,              setError]              = useState<string | null>(null)
+
+  // IGCSE state
+  const [igcseSelectedSubjects, setIgcseSelectedSubjects] = useState<string[]>([])
+  const [igcseScores,           setIgcseScores]           = useState<Record<string, string>>({})
+  const [assessmentStyle,       setAssessmentStyle]       = useState<string>('end_of_term')
 
   // ── Load students ───────────────────────────────────────────────────────────
   const loadStudents = useCallback(async () => {
@@ -192,13 +263,59 @@ function AddAssessmentContent() {
     setSelectedElectives([])
     setSelectedReligion('')
     setMathType(student?.current_pathway === 'STEM' ? 'core' : 'essential')
+    setIgcseScores({})
+
+    // Pre-select compulsory IGCSE subjects
+    if (student?.curriculum_type === 'igcse') {
+      const phase = student.grade <= 9 ? 'junior' : 'senior'
+      const config = getCurriculumConfig('igcse')
+      const phaseSubjects = config.phases.find(p => p.phaseType === phase)?.subjects || []
+      const compulsory = phaseSubjects.filter(s => s.isCompulsory).map(s => s.id)
+      setIgcseSelectedSubjects(compulsory)
+    } else {
+      setIgcseSelectedSubjects([])
+    }
   }, [selectedStudent, students])
 
   const isJunior = !!currentStudent && currentStudent.grade >= 7 && currentStudent.grade <= 9
   const isSenior = !!currentStudent && currentStudent.grade >= 10 && currentStudent.grade <= 12
+  const isIGCSE  = currentStudent?.curriculum_type === 'igcse'
+
+  // IGCSE phase subjects
+  const igcsePhase = isIGCSE && currentStudent
+    ? getCurriculumConfig('igcse').phases.find(p => p.phaseType === (isJunior ? 'junior' : 'senior'))
+    : null
+  const igcsePhaseSubjects = igcsePhase?.subjects || []
+
+  // Group IGCSE subjects by group (for senior phase)
+  const igcseGroups: Record<string, typeof igcsePhaseSubjects> = {}
+  for (const s of igcsePhaseSubjects) {
+    const g = s.group ?? 'Other'
+    if (!igcseGroups[g]) igcseGroups[g] = []
+    igcseGroups[g].push(s)
+  }
 
   const setScore = (key: string, value: number) =>
     setScores(prev => ({ ...prev, [key]: value }))
+
+  const setIgcseScore = (id: string, grade: string) =>
+    setIgcseScores(prev => ({ ...prev, [id]: grade }))
+
+  const toggleIgcseSubject = (id: string, isCompulsory: boolean) => {
+    if (isCompulsory) return // Can't deselect compulsory
+    setIgcseSelectedSubjects(prev =>
+      prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]
+    )
+    // Remove score if deselected
+    setIgcseScores(prev => {
+      if (igcseSelectedSubjects.includes(id)) {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      }
+      return prev
+    })
+  }
 
   const toggleElective = (key: string) => {
     if (selectedElectives.includes(key)) {
@@ -214,11 +331,11 @@ function AddAssessmentContent() {
   // ── Progress counts ─────────────────────────────────────────────────────────
   const juniorScoredCount  = JUNIOR_CORE.filter(s => scores[s.key]).length +
                              (selectedReligion && scores[selectedReligion] ? 1 : 0)
-  const juniorTotalNeeded  = JUNIOR_CORE.length + 1 // 8 core + 1 religion
+  const juniorTotalNeeded  = JUNIOR_CORE.length + 1
   const seniorScoredCount  = SENIOR_COMPULSORY.filter(s => scores[s.key]).length +
                              (scores[mathType === 'core' ? 'core_mathematics' : 'essential_mathematics'] ? 1 : 0) +
                              selectedElectives.filter(e => scores[e]).length
-  const seniorTotalNeeded  = 7 // 3 compulsory + math + 3 electives
+  const igcseScoredCount   = igcseSelectedSubjects.filter(id => igcseScores[id]).length
 
   // ── Submit ──────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
@@ -228,7 +345,44 @@ function AddAssessmentContent() {
     try {
       if (!selectedStudent || !currentStudent) throw new Error('Select a student first')
 
-      // ── Junior validation ──────────────────────────────────────────────────
+      // ── IGCSE submit ───────────────────────────────────────────────────────
+      if (isIGCSE) {
+        if (igcseSelectedSubjects.length === 0) {
+          throw new Error('Select at least one subject')
+        }
+        const unscored = igcseSelectedSubjects.filter(id => !igcseScores[id])
+        if (unscored.length > 0) {
+          const names = unscored
+            .map(id => igcsePhaseSubjects.find(s => s.id === id)?.displayName ?? id)
+            .join(', ')
+          throw new Error(`Please grade all selected subjects. Missing: ${names}`)
+        }
+
+        const assessmentData = {
+          student_id:       selectedStudent,
+          grade:            currentStudent.grade,
+          term:             1, // placeholder for IGCSE
+          year,
+          grade_level:      isJunior ? 'junior' : 'senior',
+          subject_scores:   igcseScores,
+          curriculum_type:  'igcse',
+          assessment_style: assessmentStyle,
+          mathematics_type: null,
+          pathway_electives: null,
+        }
+
+        const { error: insertError } = await supabase.from('assessments').insert(assessmentData)
+        if (insertError) throw insertError
+
+        if (isJunior) {
+          router.push(`/dashboard/assessments/guidance?student=${selectedStudent}`)
+        } else {
+          router.push(`/dashboard/assessments/career-guidance?student=${selectedStudent}`)
+        }
+        return
+      }
+
+      // ── CBC Junior validation ──────────────────────────────────────────────
       if (isJunior) {
         const missedCore = JUNIOR_CORE.filter(s => !scores[s.key]).map(s => s.label)
         if (missedCore.length > 0) {
@@ -242,7 +396,7 @@ function AddAssessmentContent() {
         }
       }
 
-      // ── Senior validation ──────────────────────────────────────────────────
+      // ── CBC Senior validation ──────────────────────────────────────────────
       if (isSenior) {
         if (!currentStudent.current_pathway) {
           throw new Error('This student needs a pathway set. Go to Dashboard → edit student.')
@@ -250,21 +404,19 @@ function AddAssessmentContent() {
         if (selectedElectives.length !== 3) {
           throw new Error(`Select exactly 3 electives (you have ${selectedElectives.length})`)
         }
-        const mathKey        = mathType === 'core' ? 'core_mathematics' : 'essential_mathematics'
-        const requiredKeys   = [...SENIOR_COMPULSORY.map(s => s.key), mathKey, ...selectedElectives]
-        const missingLabels  = requiredKeys.filter(k => !scores[k])
+        const mathKey      = mathType === 'core' ? 'core_mathematics' : 'essential_mathematics'
+        const requiredKeys = [...SENIOR_COMPULSORY.map(s => s.key), mathKey, ...selectedElectives]
+        const missingLabels = requiredKeys.filter(k => !scores[k])
         if (missingLabels.length > 0) {
           throw new Error(`Score all 7 subjects. Missing ${missingLabels.length} subject(s).`)
         }
       }
 
-      // ── Build data ─────────────────────────────────────────────────────────
+      // ── CBC Build data ─────────────────────────────────────────────────────
       const finalScores = { ...scores }
 
-      // Include religion score for junior
       if (isJunior && selectedReligion) {
         finalScores[selectedReligion] = scores[selectedReligion]
-        // Remove other religion scores that weren't selected
         JUNIOR_RELIGIOUS.forEach(r => {
           if (r.key !== selectedReligion) delete finalScores[r.key]
         })
@@ -277,14 +429,10 @@ function AddAssessmentContent() {
         year,
         grade_level:       isJunior ? 'junior' : 'senior',
         subject_scores:    finalScores,
+        curriculum_type:   'cbc',
+        assessment_style:  'formative',
         mathematics_type:  isSenior ? mathType : null,
         pathway_electives: isSenior ? selectedElectives : null,
-      }
-
-      // Calculate pathway affinity for junior
-      if (isJunior) {
-        const recommendations = calculateJuniorPathwayAffinity(finalScores)
-        assessmentData.pathway_recommendations = recommendations
       }
 
       const { error: insertError } = await supabase
@@ -293,12 +441,9 @@ function AddAssessmentContent() {
 
       if (insertError) throw insertError
 
-      // ── Route on success ───────────────────────────────────────────────────
       if (isJunior) {
-        // Junior → Pathway guidance (which senior pathway to choose)
         router.push(`/dashboard/assessments/guidance?student=${selectedStudent}`)
       } else {
-        // Senior → Career recommendations (honest, AI-powered)
         router.push(`/dashboard/assessments/career-guidance?student=${selectedStudent}`)
       }
 
@@ -320,8 +465,12 @@ function AddAssessmentContent() {
             ← Dashboard
           </Link>
           {currentStudent && (
-            <div className="text-sm font-black text-slate-500 uppercase">
-              {currentStudent.name} • Grade {currentStudent.grade}
+            <div className="text-sm font-black text-slate-500 uppercase flex items-center gap-2">
+              {currentStudent.name}
+              {currentStudent.curriculum_type === 'igcse'
+                ? <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs normal-case font-bold">🌍 IGCSE · Year {currentStudent.grade}</span>
+                : <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs normal-case font-bold">🇰🇪 CBC · Grade {currentStudent.grade}</span>
+              }
             </div>
           )}
         </div>
@@ -336,7 +485,7 @@ function AddAssessmentContent() {
         {/* Error */}
         {error && (
           <div className="flex items-start gap-3 bg-red-100 border-4 border-red-600 text-red-900 p-5 rounded-3xl mb-8 font-black">
-            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
             {error}
           </div>
         )}
@@ -348,6 +497,7 @@ function AddAssessmentContent() {
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Student */}
             <div>
               <label className="block text-xs font-black text-slate-400 mb-2 uppercase">Student</label>
               <select
@@ -358,31 +508,47 @@ function AddAssessmentContent() {
                 <option value="">— Choose student —</option>
                 {students.map(s => (
                   <option key={s.id} value={s.id}>
-                    {s.name} (Grade {s.grade})
+                    {s.name} ({s.curriculum_type === 'igcse' ? `Year ${s.grade}` : `Grade ${s.grade}`})
                   </option>
                 ))}
               </select>
               {students.length === 0 && (
                 <p className="text-xs text-slate-400 mt-2 font-bold">
                   No students yet.{' '}
-                  <Link href="/dashboard/students/add" className="underline">Add one →</Link>
+                  <Link href="/dashboard/clinic" className="underline">Add one →</Link>
                 </p>
               )}
             </div>
 
+            {/* Term / Assessment style */}
             <div>
-              <label className="block text-xs font-black text-slate-400 mb-2 uppercase">Term</label>
-              <select
-                value={term}
-                onChange={e => setTerm(Number(e.target.value))}
-                className="w-full p-4 bg-white rounded-xl font-bold border-2 border-slate-200 focus:border-black focus:outline-none text-slate-900"
-              >
-                <option value={1}>Term 1</option>
-                <option value={2}>Term 2</option>
-                <option value={3}>Term 3</option>
-              </select>
+              <label className="block text-xs font-black text-slate-400 mb-2 uppercase">
+                {isIGCSE ? 'Assessment Type' : 'Term'}
+              </label>
+              {isIGCSE ? (
+                <select
+                  value={assessmentStyle}
+                  onChange={e => setAssessmentStyle(e.target.value)}
+                  className="w-full p-4 bg-white rounded-xl font-bold border-2 border-slate-200 focus:border-black focus:outline-none text-slate-900"
+                >
+                  {IGCSE_ASSESSMENT_STYLES.map(s => (
+                    <option key={s.value} value={s.value}>{s.emoji} {s.label}</option>
+                  ))}
+                </select>
+              ) : (
+                <select
+                  value={term}
+                  onChange={e => setTerm(Number(e.target.value))}
+                  className="w-full p-4 bg-white rounded-xl font-bold border-2 border-slate-200 focus:border-black focus:outline-none text-slate-900"
+                >
+                  <option value={1}>Term 1</option>
+                  <option value={2}>Term 2</option>
+                  <option value={3}>Term 3</option>
+                </select>
+              )}
             </div>
 
+            {/* Year */}
             <div>
               <label className="block text-xs font-black text-slate-400 mb-2 uppercase">Year</label>
               <input
@@ -397,8 +563,164 @@ function AddAssessmentContent() {
           </div>
         </section>
 
-        {/* ── JUNIOR SCHOOL ──────────────────────────────────────────────────── */}
-        {isJunior && currentStudent && (
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* ── IGCSE FLOW ──────────────────────────────────────────────────── */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {isIGCSE && currentStudent && (
+          <div className="space-y-8">
+
+            {/* IGCSE Banner */}
+            <div className="flex items-center justify-between p-6 bg-indigo-50 rounded-3xl border-4 border-indigo-200">
+              <div className="flex items-center gap-3">
+                <span className="text-4xl">🌍</span>
+                <div>
+                  <h2 className="text-2xl font-black uppercase text-indigo-900">Cambridge IGCSE</h2>
+                  <p className="text-sm font-bold text-indigo-600">
+                    Year {currentStudent.grade} · {isJunior ? 'Lower Secondary (Key Stage 3)' : 'IGCSE Upper Secondary'}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-black text-indigo-800">
+                  {igcseScoredCount}/{igcseSelectedSubjects.length}
+                </div>
+                <div className="text-xs font-bold text-indigo-600">Subjects Graded</div>
+              </div>
+            </div>
+
+            {/* Subject selection */}
+            <section className="p-8 bg-blue-50 rounded-3xl border-2 border-blue-200">
+              <h2 className="text-xs font-black mb-1 uppercase tracking-widest text-blue-400">
+                Step 2 — Which Subjects Is Your Child Taking?
+              </h2>
+              <p className="text-xs text-blue-500 font-bold mb-6">
+                Compulsory subjects are pre-selected. Add any optional subjects.
+              </p>
+
+              {/* Junior: flat list */}
+              {isJunior && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {igcsePhaseSubjects.map(subject => {
+                    const isSelected = igcseSelectedSubjects.includes(subject.id)
+                    return (
+                      <button
+                        key={subject.id}
+                        type="button"
+                        onClick={() => toggleIgcseSubject(subject.id, subject.isCompulsory)}
+                        className={`flex items-center gap-3 p-3 rounded-2xl border-2 text-left transition-all ${
+                          isSelected
+                            ? 'bg-blue-700 text-white border-blue-700'
+                            : 'bg-white text-blue-700 border-blue-200 hover:border-blue-400'
+                        } ${subject.isCompulsory ? 'cursor-default' : 'cursor-pointer'}`}
+                      >
+                        <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${
+                          isSelected ? 'bg-white border-white' : 'border-blue-300'
+                        }`}>
+                          {isSelected && <CheckCircle2 className="w-3 h-3 text-blue-700" />}
+                        </div>
+                        <span className="text-sm font-bold">{subject.displayName}</span>
+                        {subject.isCompulsory && (
+                          <span className="text-xs opacity-70 ml-auto">Required</span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Senior: grouped */}
+              {!isJunior && (
+                <div className="space-y-6">
+                  {Object.entries(igcseGroups).map(([group, subjects]) => (
+                    <div key={group}>
+                      <p className="text-xs font-black text-blue-500 uppercase tracking-widest mb-3">
+                        {group}
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {subjects.map(subject => {
+                          const isSelected = igcseSelectedSubjects.includes(subject.id)
+                          return (
+                            <button
+                              key={subject.id}
+                              type="button"
+                              onClick={() => toggleIgcseSubject(subject.id, subject.isCompulsory)}
+                              className={`flex items-center gap-3 p-3 rounded-2xl border-2 text-left transition-all ${
+                                isSelected
+                                  ? 'bg-blue-700 text-white border-blue-700'
+                                  : 'bg-white text-blue-700 border-blue-200 hover:border-blue-400'
+                              } ${subject.isCompulsory ? 'cursor-default' : 'cursor-pointer'}`}
+                            >
+                              <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${
+                                isSelected ? 'bg-white border-white' : 'border-blue-300'
+                              }`}>
+                                {isSelected && <CheckCircle2 className="w-3 h-3 text-blue-700" />}
+                              </div>
+                              <span className="text-sm font-bold truncate">{subject.displayName}</span>
+                              {subject.isCompulsory && (
+                                <span className="text-xs opacity-70 ml-auto flex-shrink-0">Required</span>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* IGCSE Grade inputs */}
+            {igcseSelectedSubjects.length > 0 && (
+              <section className="p-8 bg-white rounded-3xl border-2 border-slate-200">
+                <h2 className="text-xs font-black mb-1 uppercase tracking-widest text-slate-400">
+                  Step 3 — Enter Grades
+                </h2>
+                <p className="text-xs text-slate-500 font-bold mb-6">
+                  Cambridge grades: A* (highest) → U (ungraded)
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {igcseSelectedSubjects.map(subjectId => {
+                    const subject = igcsePhaseSubjects.find(s => s.id === subjectId)
+                    if (!subject) return null
+                    return (
+                      <IGCSEScoreButtons
+                        key={subjectId}
+                        subjectId={subjectId}
+                        label={subject.displayName}
+                        scores={igcseScores}
+                        onScore={setIgcseScore}
+                      />
+                    )
+                  })}
+                </div>
+              </section>
+            )}
+
+            {/* IGCSE Grade guide */}
+            <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200">
+              <p className="text-xs font-black text-slate-400 uppercase mb-3">Cambridge Grade Guide</p>
+              <div className="flex flex-wrap gap-2">
+                {getCurriculumConfig('igcse').gradeLabels.map(gl => (
+                  <div
+                    key={String(gl.value)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white"
+                    style={{ backgroundColor: gl.color }}
+                  >
+                    <span className="font-black">{String(gl.value)}</span>
+                    <span className="opacity-80">{gl.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* ── CBC FLOW (unchanged) ────────────────────────────────────────── */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+
+        {/* ── CBC JUNIOR SCHOOL ───────────────────────────────────────────── */}
+        {!isIGCSE && isJunior && currentStudent && (
           <div className="space-y-8">
 
             {/* Banner */}
@@ -408,11 +730,10 @@ function AddAssessmentContent() {
                 <div>
                   <h2 className="text-2xl font-black uppercase text-green-900">Junior School</h2>
                   <p className="text-sm font-bold text-green-600">
-                    Grade {currentStudent.grade} • Pathway guidance will be generated
+                    Grade {currentStudent.grade} · Pathway guidance will be generated
                   </p>
                 </div>
               </div>
-              {/* Progress */}
               <div className="text-right">
                 <div className="text-2xl font-black text-green-800">
                   {juniorScoredCount}/{juniorTotalNeeded}
@@ -448,14 +769,12 @@ function AddAssessmentContent() {
               </h2>
               <p className="text-xs text-rose-500 font-bold mb-6">Select one then score it</p>
 
-              {/* Choose religion */}
               <div className="grid grid-cols-3 gap-3 mb-6">
                 {JUNIOR_RELIGIOUS.map(r => (
                   <button
                     key={r.key}
                     type="button"
                     onClick={() => {
-                      // Clear old religion score if switching
                       if (selectedReligion && selectedReligion !== r.key) {
                         setScores(prev => {
                           const next = { ...prev }
@@ -477,7 +796,6 @@ function AddAssessmentContent() {
                 ))}
               </div>
 
-              {/* Score selected religion */}
               {selectedReligion && (
                 <div className="max-w-sm">
                   <ScoreButtons
@@ -493,8 +811,8 @@ function AddAssessmentContent() {
           </div>
         )}
 
-        {/* ── SENIOR SCHOOL ──────────────────────────────────────────────────── */}
-        {isSenior && currentStudent && (
+        {/* ── CBC SENIOR SCHOOL ───────────────────────────────────────────── */}
+        {!isIGCSE && isSenior && currentStudent && (
           <div className="space-y-8">
 
             {/* Banner */}
@@ -504,7 +822,7 @@ function AddAssessmentContent() {
                 <div>
                   <h2 className="text-2xl font-black uppercase text-purple-900">Senior School</h2>
                   <p className="text-sm font-bold text-purple-600">
-                    Grade {currentStudent.grade} • 7 subjects required
+                    Grade {currentStudent.grade} · 7 subjects required
                   </p>
                 </div>
               </div>
@@ -518,7 +836,6 @@ function AddAssessmentContent() {
                     ⚠️ No Pathway Set
                   </div>
                 )}
-                {/* Progress */}
                 <div className="text-right">
                   <div className="text-2xl font-black text-purple-800">
                     {seniorScoredCount}/7
@@ -528,7 +845,6 @@ function AddAssessmentContent() {
               </div>
             </div>
 
-            {/* No pathway warning */}
             {!currentStudent.current_pathway ? (
               <div className="p-8 bg-red-50 rounded-3xl border-4 border-red-300 text-center">
                 <div className="text-6xl mb-4">🚫</div>
@@ -566,7 +882,6 @@ function AddAssessmentContent() {
                       />
                     ))}
 
-                    {/* Mathematics (auto-set by pathway) */}
                     <div className="md:col-span-2">
                       <div className="flex items-center justify-between p-4 bg-yellow-100 rounded-2xl mb-3 border-2 border-yellow-300">
                         <div>
@@ -605,7 +920,6 @@ function AddAssessmentContent() {
                     Choose exactly 3 • Selected: {selectedElectives.length}/3
                   </p>
 
-                  {/* Elective picker */}
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
                     {getPathwayElectives(currentStudent.current_pathway).map(elective => (
                       <button
@@ -630,7 +944,6 @@ function AddAssessmentContent() {
                     ))}
                   </div>
 
-                  {/* Score selected electives */}
                   {selectedElectives.length > 0 && (
                     <div className="pt-6 border-t-2 border-purple-200">
                       <p className="text-xs font-black text-purple-600 uppercase mb-4">
@@ -678,8 +991,8 @@ function AddAssessmentContent() {
           </div>
         )}
 
-        {/* ── Score guide ────────────────────────────────────────────────────── */}
-        {currentStudent && (
+        {/* ── CBC Score guide ─────────────────────────────────────────────── */}
+        {!isIGCSE && currentStudent && (
           <div className="mt-8 p-5 bg-slate-50 rounded-2xl border border-slate-200">
             <p className="text-xs font-black text-slate-400 uppercase mb-3">CBC Score Guide</p>
             <div className="grid grid-cols-4 gap-3 text-center text-xs font-bold">
@@ -699,7 +1012,9 @@ function AddAssessmentContent() {
         )}
 
         {/* ── Submit ─────────────────────────────────────────────────────────── */}
-        {currentStudent && (isSenior ? !!currentStudent.current_pathway : true) && (
+        {currentStudent && (
+          (!isIGCSE && isSenior ? !!currentStudent.current_pathway : true)
+        ) && (
           <div className="mt-10 flex gap-4">
             <Link
               href="/dashboard"
@@ -733,7 +1048,7 @@ function AddAssessmentContent() {
   )
 }
 
-// ─── Page export with Suspense (required for useSearchParams) ─────────────────
+// ─── Page export with Suspense ────────────────────────────────────────────────
 export default function AddAssessmentPage() {
   return (
     <Suspense fallback={

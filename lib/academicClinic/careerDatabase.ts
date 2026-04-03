@@ -1404,6 +1404,675 @@ export const CAREER_DATABASE: CareerData[] = [
     },
   },
 
+  // ============================================
+  // STEM PATHWAY (7 additional careers)
+  // ============================================
+  {
+    id: 'cybersecurity_analyst',
+    name: 'Cybersecurity Analyst',
+    pathway: 'STEM',
+    matchRequirements: {
+      primarySubjects: ['mathematics', 'computer_studies', 'physics'],
+      minimumLevels: { mathematics: 3, computer_studies: 3 },
+    },
+    marketReality: {
+      earningPotential: 'very_lucrative',
+      jobSecurity: 'very_high',
+      demandLevel: 'very_high',
+      kenyanContext: 'Banks, telcos, government all under cyberattack. Massive shortage of skilled professionals. Can work remotely for international firms. Fastest growing tech specialization in EA.',
+    },
+    cbeReadiness: {
+      coreCompetencies: ['Critical Thinking', 'Digital Literacy', 'Problem Solving', 'Ethical Awareness'],
+      recommendedSeniorPath: 'STEM - Computer Science & ICT',
+      universities: ['UoN', 'Strathmore', 'KCA University', 'JKUAT'],
+      tvetOptions: ['Zetech College', 'NIBS Tech'],
+    },
+    aiImpact: {
+      disruptionRisk: 'low',
+      disruptionPercentage: 15,
+      growthOutlook: 'booming',
+      growthPercentage: 220,
+      timeline: {
+        shortTerm: 'AI creates new attack vectors — demand for defenders rising fast.',
+        midTerm: 'Automated threat detection needs humans to interpret and respond.',
+        longTerm: 'Human creativity in adversarial thinking irreplaceable.',
+      },
+      survivalStrategy: [
+        'Get certified (CISSP, CEH, CompTIA Security+)',
+        'Specialize in cloud security or ethical hacking',
+        'AI creates new attack vectors — humans needed to defend',
+        'Build bug bounty portfolio on HackerOne',
+      ],
+    },
+    realityCheck: {
+      pros: ['Job security', 'High pay', 'Can work remotely', 'Always in demand'],
+      challenges: ['Constant learning', 'High stress', 'Irregular hours', 'Heavy responsibility'],
+      typicalDay: 'Monitor network threats, respond to incidents, conduct penetration testing, advise on security policies, patch vulnerabilities, train staff on security awareness.',
+    },
+  },
+
+  {
+    id: 'ux_ui_designer',
+    name: 'UX/UI Designer',
+    pathway: 'STEM',
+    matchRequirements: {
+      primarySubjects: ['creative_arts_sports', 'mathematics', 'computer_studies'],
+      minimumLevels: { creative_arts_sports: 3, mathematics: 2 },
+    },
+    marketReality: {
+      earningPotential: 'lucrative',
+      jobSecurity: 'high',
+      demandLevel: 'very_high',
+      kenyanContext: 'Every app and website needs UX. Fintech boom (M-PESA, banking apps) driving massive demand. Can freelance globally. Nairobi design scene growing fast with iHub, Nailab.',
+    },
+    cbeReadiness: {
+      coreCompetencies: ['Creativity', 'Digital Literacy', 'Critical Thinking', 'Communication'],
+      recommendedSeniorPath: 'STEM - Computer Science & Design',
+      universities: ['Multimedia University', 'USIU', 'Strathmore', 'Kenyatta'],
+      tvetOptions: ['NIBS', 'Nairobi Institute of Technology'],
+    },
+    aiImpact: {
+      disruptionRisk: 'moderate',
+      disruptionPercentage: 35,
+      growthOutlook: 'booming',
+      growthPercentage: 160,
+      timeline: {
+        shortTerm: 'Fintech boom drives unprecedented UX demand in Nairobi.',
+        midTerm: 'AI generates wireframes — UX researchers become more valuable.',
+        longTerm: 'Human empathy and user research irreplaceable.',
+      },
+      survivalStrategy: [
+        'Master AI design tools (Figma AI, Midjourney)',
+        'Focus on user research — AI can\'t talk to users',
+        'Specialize in fintech or healthtech UX',
+        'Build strong portfolio on Behance/Dribbble',
+      ],
+    },
+    realityCheck: {
+      pros: ['Creative + technical', 'Remote work possible', 'High demand', 'Diverse projects'],
+      challenges: ['Constant revision cycles', 'Subjective feedback', 'Need to justify design decisions', 'Fast-changing tools'],
+      typicalDay: 'User research, wireframing, prototyping in Figma, usability testing, presenting to stakeholders, iterating on feedback.',
+    },
+  },
+
+  {
+    id: 'renewable_energy_engineer',
+    name: 'Renewable Energy Engineer',
+    pathway: 'STEM',
+    matchRequirements: {
+      primarySubjects: ['mathematics', 'integrated_science', 'physics'],
+      minimumLevels: { mathematics: 4, integrated_science: 3 },
+    },
+    marketReality: {
+      earningPotential: 'very_lucrative',
+      jobSecurity: 'very_high',
+      demandLevel: 'very_high',
+      kenyanContext: 'Kenya leads Africa in renewable energy (geothermal, solar, wind). Last Mile Connectivity, rural solar boom. KenGen, KPLC, solar companies all hiring. Government priority sector.',
+    },
+    cbeReadiness: {
+      coreCompetencies: ['Problem Solving', 'Innovation', 'Environmental Stewardship', 'Critical Thinking'],
+      recommendedSeniorPath: 'STEM - Engineering & Technology',
+      universities: ['JKUAT', 'UoN', 'TUK', 'Moi University'],
+      tvetOptions: ['Kenya Power Training School', 'Eldoret National Polytechnic'],
+    },
+    aiImpact: {
+      disruptionRisk: 'very_low',
+      disruptionPercentage: 8,
+      growthOutlook: 'booming',
+      growthPercentage: 190,
+      timeline: {
+        shortTerm: 'Government renewable energy projects create massive hiring wave.',
+        midTerm: 'Solar and storage technology advancement requires engineers.',
+        longTerm: 'Site work, safety, and grid management stay human.',
+      },
+      survivalStrategy: [
+        'Specialize in solar installation and maintenance',
+        'Learn energy storage systems (batteries)',
+        'Get certified by Energy Regulatory Commission',
+        'Combine engineering with project management',
+      ],
+    },
+    realityCheck: {
+      pros: ['Future-proof career', 'Government support', 'Meaningful environmental impact', 'Good pay'],
+      challenges: ['Field work in remote areas', 'Project delays', 'Government bureaucracy', 'Weather-dependent'],
+      typicalDay: 'Site assessments, system design, supervise installations, troubleshoot faults, coordinate with contractors, prepare technical reports, client training.',
+    },
+  },
+
+  {
+    id: 'drone_pilot_gis',
+    name: 'Drone Pilot / GIS Specialist',
+    pathway: 'STEM',
+    matchRequirements: {
+      primarySubjects: ['mathematics', 'geography', 'integrated_science'],
+      minimumLevels: { mathematics: 3, geography: 3 },
+    },
+    marketReality: {
+      earningPotential: 'lucrative',
+      jobSecurity: 'high',
+      demandLevel: 'high',
+      kenyanContext: 'Surveying, agriculture, construction, conservation all using drones. Survey of Kenya, county governments, NGOs hiring. New frontier with few qualified professionals. KCAA licensing required.',
+    },
+    cbeReadiness: {
+      coreCompetencies: ['Digital Literacy', 'Spatial Intelligence', 'Problem Solving', 'Attention to Detail'],
+      recommendedSeniorPath: 'STEM - Geospatial & Environmental Science',
+      universities: ['Survey of Kenya Training Institute', 'UoN - Surveying', 'JKUAT'],
+      tvetOptions: ['Kenya Aeronautical College', 'Nairobi Aviation College'],
+    },
+    aiImpact: {
+      disruptionRisk: 'low',
+      disruptionPercentage: 20,
+      growthOutlook: 'booming',
+      growthPercentage: 175,
+      timeline: {
+        shortTerm: 'Every county government starting GIS mapping projects.',
+        midTerm: 'Autonomous drones need pilots for oversight and maintenance.',
+        longTerm: 'Data interpretation and field operations stay human.',
+      },
+      survivalStrategy: [
+        'Get KCAA Remote Pilot License',
+        'Learn GIS software (ArcGIS, QGIS)',
+        'Specialize in a sector (agriculture, construction, wildlife)',
+        'Build portfolio of aerial surveys and maps',
+      ],
+    },
+    realityCheck: {
+      pros: ['Exciting cutting-edge work', 'Few competitors', 'Work outdoors', 'Growing field'],
+      challenges: ['Weather dependent', 'Strict regulations', 'Expensive equipment', 'Rural deployment'],
+      typicalDay: 'Flight planning, drone operations, data collection, GIS data processing, create maps and reports, coordinate with clients and ground teams.',
+    },
+  },
+
+  {
+    id: 'actuary',
+    name: 'Actuary',
+    pathway: 'STEM',
+    matchRequirements: {
+      primarySubjects: ['mathematics', 'business_studies'],
+      minimumLevels: { mathematics: 4, business_studies: 3 },
+    },
+    marketReality: {
+      earningPotential: 'exceptional',
+      jobSecurity: 'very_high',
+      demandLevel: 'very_high',
+      kenyanContext: 'Nairobi is East Africa insurance capital. Every insurance company needs actuaries. Very few qualified professionals in Kenya — severe shortage. IRA requires actuarial certification for insurance companies.',
+    },
+    cbeReadiness: {
+      coreCompetencies: ['Analytical Thinking', 'Critical Thinking', 'Attention to Detail', 'Problem Solving'],
+      recommendedSeniorPath: 'STEM - Mathematics & Statistics',
+      universities: ['UoN', 'Strathmore', 'USIU', 'KU'],
+      tvetOptions: [],
+    },
+    aiImpact: {
+      disruptionRisk: 'moderate',
+      disruptionPercentage: 30,
+      growthOutlook: 'growing',
+      growthPercentage: 85,
+      timeline: {
+        shortTerm: 'Severe shortage means immediate employment for qualified actuaries.',
+        midTerm: 'AI handles routine calculations; actuaries focus on complex modeling.',
+        longTerm: 'Strategic risk advisory and regulatory oversight stay human.',
+      },
+      survivalStrategy: [
+        'Complete professional exams (IFoA, SOA, CAS)',
+        'Combine with data science skills',
+        'Specialize (life, health, pension, general insurance)',
+        'Move into risk management and consulting',
+      ],
+    },
+    realityCheck: {
+      pros: ['Exceptional pay', 'High prestige', 'Severe talent shortage', 'Stable'],
+      challenges: ['Very difficult professional exams', 'Years of study alongside work', 'Complex mathematical work', 'High responsibility'],
+      typicalDay: 'Statistical modeling, pricing insurance products, reserving calculations, risk assessment, regulatory reporting, advising management on financial risk.',
+    },
+  },
+
+  {
+    id: 'quantity_surveyor',
+    name: 'Quantity Surveyor',
+    pathway: 'STEM',
+    matchRequirements: {
+      primarySubjects: ['mathematics', 'pre_technical_studies'],
+      minimumLevels: { mathematics: 3, pre_technical_studies: 3 },
+    },
+    marketReality: {
+      earningPotential: 'lucrative',
+      jobSecurity: 'high',
+      demandLevel: 'very_high',
+      kenyanContext: 'Construction boom (affordable housing, infrastructure) driving demand. Every building project needs a QS. Government, private contractors, consulting firms all hiring. Can start own practice.',
+    },
+    cbeReadiness: {
+      coreCompetencies: ['Attention to Detail', 'Analytical Thinking', 'Problem Solving', 'Communication'],
+      recommendedSeniorPath: 'STEM - Engineering & Construction',
+      universities: ['UoN', 'TUK', 'Moi University', 'JKUAT'],
+      tvetOptions: ['Kenya Polytechnic', 'Mombasa Technical Training Institute'],
+    },
+    aiImpact: {
+      disruptionRisk: 'moderate',
+      disruptionPercentage: 30,
+      growthOutlook: 'growing',
+      growthPercentage: 80,
+      timeline: {
+        shortTerm: 'Affordable housing agenda creates massive QS demand.',
+        midTerm: 'BIM software assists cost planning; judgment stays human.',
+        longTerm: 'Dispute resolution and complex project management irreplaceable.',
+      },
+      survivalStrategy: [
+        'Get registered with BORAQS (Board of Registration)',
+        'Learn BIM (Building Information Modeling)',
+        'Specialize in government or large infrastructure',
+        'Develop dispute resolution and arbitration skills',
+      ],
+    },
+    realityCheck: {
+      pros: ['Good pay', 'Stable demand', 'Can own firm', 'Variety of projects'],
+      challenges: ['Contractor disputes stressful', 'Site visits in tough conditions', 'Payment delays common', 'Tight project deadlines'],
+      typicalDay: 'Cost estimation, bills of quantities, tender evaluation, contract management, site measurements, valuations, final accounts preparation.',
+    },
+  },
+
+  {
+    id: 'digital_health_specialist',
+    name: 'Digital Health Specialist',
+    pathway: 'STEM',
+    matchRequirements: {
+      primarySubjects: ['integrated_science', 'mathematics', 'computer_studies'],
+      minimumLevels: { integrated_science: 3, mathematics: 3 },
+    },
+    marketReality: {
+      earningPotential: 'very_lucrative',
+      jobSecurity: 'high',
+      demandLevel: 'high',
+      kenyanContext: 'Telemedicine, health apps, digital records all growing post-COVID. WHO, MOH, NGOs, private health tech companies hiring. Combines health and tech uniquely. Remote work possible for international orgs.',
+    },
+    cbeReadiness: {
+      coreCompetencies: ['Digital Literacy', 'Critical Thinking', 'Communication', 'Innovation'],
+      recommendedSeniorPath: 'STEM - Health Informatics',
+      universities: ['KU', 'UoN', 'Aga Khan University', 'USIU'],
+      tvetOptions: ['Kenya Medical Training College (KMTC)'],
+    },
+    aiImpact: {
+      disruptionRisk: 'low',
+      disruptionPercentage: 20,
+      growthOutlook: 'booming',
+      growthPercentage: 140,
+      timeline: {
+        shortTerm: 'Post-COVID telemedicine adoption accelerates across Kenya.',
+        midTerm: 'AI diagnostics need human oversight and patient communication.',
+        longTerm: 'Health data governance and ethics require human specialists.',
+      },
+      survivalStrategy: [
+        'Get both health and tech qualifications',
+        'Learn health informatics and EMR systems',
+        'Understand health data privacy (HIPAA, Kenya Data Act)',
+        'Specialize in telemedicine or AI diagnostics',
+      ],
+    },
+    realityCheck: {
+      pros: ['Meaningful impact on health outcomes', 'Combines two growing fields', 'International opportunities', 'Remote work possible'],
+      challenges: ['Requires dual expertise', 'Complex regulations', 'Slow adoption in rural areas', 'Interoperability challenges'],
+      typicalDay: 'Design health information systems, analyze patient data, implement telemedicine platforms, train healthcare workers on digital tools, ensure data security and compliance.',
+    },
+  },
+
+  // ============================================
+  // ARTS & SPORTS PATHWAY (3 additional careers)
+  // ============================================
+  {
+    id: 'fashion_designer',
+    name: 'Fashion Designer / Textile Entrepreneur',
+    pathway: 'Arts & Sports',
+    matchRequirements: {
+      primarySubjects: ['creative_arts_sports', 'home_science'],
+      minimumLevels: { creative_arts_sports: 3, home_science: 2 },
+    },
+    marketReality: {
+      earningPotential: 'lucrative',
+      jobSecurity: 'moderate',
+      demandLevel: 'moderate',
+      kenyanContext: 'Kenyan fashion growing internationally. Local designers gaining recognition. Wedding, corporate, African print market growing. Export opportunities to diaspora. Social media enables direct sales.',
+    },
+    cbeReadiness: {
+      coreCompetencies: ['Creativity', 'Entrepreneurship', 'Cultural Awareness', 'Attention to Detail'],
+      recommendedSeniorPath: 'Arts & Sports - Visual Arts & Design',
+      universities: ['Kenyatta University', 'USIU', 'Nairobi Fashion Institute'],
+      tvetOptions: ['Kenya Textile Training Institute', 'Utalii College - Fashion', 'Various polytechnics'],
+    },
+    aiImpact: {
+      disruptionRisk: 'low',
+      disruptionPercentage: 18,
+      growthOutlook: 'growing',
+      growthPercentage: 75,
+      timeline: {
+        shortTerm: 'African fashion gaining international recognition and export markets.',
+        midTerm: 'AI assists pattern design; human creativity drives collections.',
+        longTerm: 'Unique cultural identity and craftsmanship irreplaceable.',
+      },
+      survivalStrategy: [
+        'Build strong social media presence (Instagram, TikTok)',
+        'Focus on uniquely Kenyan/African identity',
+        'Master both design AND business/marketing',
+        'Explore sustainable and ethical fashion',
+      ],
+    },
+    realityCheck: {
+      pros: ['Creative freedom', 'Can start small', 'Growing local appreciation', 'Export opportunities'],
+      challenges: ['Irregular income especially starting', 'Sourcing quality materials challenging', 'Copying and counterfeit issues', 'Need business skills'],
+      typicalDay: 'Design new collections, source fabrics, supervise tailors, meet clients for fittings, marketing on social media, manage orders, attend fashion events.',
+    },
+  },
+
+  {
+    id: 'sports_manager',
+    name: 'Sports Manager / Athlete Agent',
+    pathway: 'Arts & Sports',
+    matchRequirements: {
+      primarySubjects: ['physical_education', 'business_studies', 'english'],
+      minimumLevels: { physical_education: 3, business_studies: 3 },
+    },
+    marketReality: {
+      earningPotential: 'very_lucrative',
+      jobSecurity: 'moderate',
+      demandLevel: 'moderate',
+      kenyanContext: 'Kenyan athletes world class (Kipchoge, Chemutai). Football, rugby, athletics growing. Sports marketing, sponsorships, events all need managers. Can manage international athletes and earn in foreign currency.',
+    },
+    cbeReadiness: {
+      coreCompetencies: ['Communication', 'Entrepreneurship', 'Leadership', 'Negotiation'],
+      recommendedSeniorPath: 'Arts & Sports - Sports Science & Management',
+      universities: ['Kenyatta University - Sports Management', 'Moi University', 'USIU'],
+      tvetOptions: ['Kenya Academy of Sports'],
+    },
+    aiImpact: {
+      disruptionRisk: 'very_low',
+      disruptionPercentage: 8,
+      growthOutlook: 'growing',
+      growthPercentage: 90,
+      timeline: {
+        shortTerm: 'Global recognition of Kenyan athletes opens international management opportunities.',
+        midTerm: 'Sports analytics tools assist; relationships and negotiation stay human.',
+        longTerm: 'Athlete welfare and career planning require human judgment.',
+      },
+      survivalStrategy: [
+        'Build network with athletes, clubs, sponsors early',
+        'Get sports law and contract knowledge',
+        'Specialize in one sport (athletics, football, rugby)',
+        'Develop international connections for athlete placement',
+      ],
+    },
+    realityCheck: {
+      pros: ['Exciting sports environment', 'International travel', 'High earning if managing top athletes', 'Growing industry'],
+      challenges: ['Irregular income especially starting', 'Athlete careers are short', 'Demanding clients', 'Competitive field'],
+      typicalDay: 'Negotiate contracts and sponsorships, manage athlete schedules, coordinate with clubs, marketing and PR, attend competitions, financial planning for athletes.',
+    },
+  },
+
+  {
+    id: 'animator_game_developer',
+    name: 'Animator / Game Developer',
+    pathway: 'Arts & Sports',
+    matchRequirements: {
+      primarySubjects: ['creative_arts_sports', 'mathematics', 'computer_studies'],
+      minimumLevels: { creative_arts_sports: 3, mathematics: 2 },
+    },
+    marketReality: {
+      earningPotential: 'lucrative',
+      jobSecurity: 'moderate',
+      demandLevel: 'high',
+      kenyanContext: 'Global remote work enables Kenyan animators to work for international studios. African-themed games growing market. Advertising industry needs animation. YouTube content creation booming. Can earn in USD.',
+    },
+    cbeReadiness: {
+      coreCompetencies: ['Creativity', 'Digital Literacy', 'Problem Solving', 'Storytelling'],
+      recommendedSeniorPath: 'Arts & Sports - Digital Media & Animation',
+      universities: ['Multimedia University', 'USIU', 'Kenyatta'],
+      tvetOptions: ['Nairobi Institute of Technology', 'iHub programs', 'Online (Coursera, Unity)'],
+    },
+    aiImpact: {
+      disruptionRisk: 'moderate',
+      disruptionPercentage: 40,
+      growthOutlook: 'booming',
+      growthPercentage: 130,
+      timeline: {
+        shortTerm: 'African-themed games and content see international demand growth.',
+        midTerm: 'AI speeds animation; concept art and direction stay creative.',
+        longTerm: 'Cultural storytelling and game design require human creativity.',
+      },
+      survivalStrategy: [
+        'Specialize in African/Kenyan cultural content',
+        'Learn AI animation tools as competitive advantage',
+        'Build portfolio on ArtStation and YouTube',
+        'Target international remote studios',
+      ],
+    },
+    realityCheck: {
+      pros: ['Creative work', 'Remote work globally', 'Growing industry', 'Can freelance'],
+      challenges: ['Portfolio takes years to build', 'Competitive global market', 'AI disrupting basic animation', 'Irregular freelance income'],
+      typicalDay: 'Create character animations, design game levels, code game mechanics, render scenes, collaborate with writers and musicians, test gameplay, pitch to clients.',
+    },
+  },
+
+  // ============================================
+  // SOCIAL SCIENCES PATHWAY (5 additional careers)
+  // ============================================
+  {
+    id: 'diplomat',
+    name: 'Diplomat / Foreign Affairs Officer',
+    pathway: 'Social Sciences',
+    matchRequirements: {
+      primarySubjects: ['english', 'kiswahili', 'history_citizenship'],
+      minimumLevels: { english: 4, history_citizenship: 3 },
+    },
+    marketReality: {
+      earningPotential: 'very_lucrative',
+      jobSecurity: 'very_high',
+      demandLevel: 'moderate',
+      kenyanContext: 'Kenya is EA diplomatic hub with most UN agencies in Africa. Ministry of Foreign Affairs, embassies, UN bodies all need officers. Prestigious career with international postings and benefits.',
+    },
+    cbeReadiness: {
+      coreCompetencies: ['Communication', 'Cultural Awareness', 'Critical Thinking', 'Ethical Decision Making'],
+      recommendedSeniorPath: 'Social Sciences - Law & Governance',
+      universities: ['UoN', 'USIU', 'Kenyatta', 'Strathmore School of Law'],
+      tvetOptions: [],
+    },
+    aiImpact: {
+      disruptionRisk: 'very_low',
+      disruptionPercentage: 5,
+      growthOutlook: 'stable',
+      growthPercentage: 30,
+      timeline: {
+        shortTerm: 'Kenya\'s regional leadership role grows, more diplomatic posts needed.',
+        midTerm: 'AI assists research and translation; negotiations stay human.',
+        longTerm: 'Relationship-building and cultural intelligence irreplaceable.',
+      },
+      survivalStrategy: [
+        'Learn multiple languages (French, Mandarin, Arabic)',
+        'Build expertise in international law and trade',
+        'Network through Model UN and international forums',
+        'Specialize in trade, peace, or climate diplomacy',
+      ],
+    },
+    realityCheck: {
+      pros: ['International postings and travel', 'Prestigious career', 'Good benefits', 'Influence on national policy'],
+      challenges: ['Very competitive entry', 'Postings away from family', 'Political changes affect careers', 'Slow bureaucratic progression'],
+      typicalDay: 'Represent Kenya in negotiations, prepare diplomatic cables and reports, attend international meetings, support Kenyan citizens abroad, analyze foreign policy developments.',
+    },
+  },
+
+  {
+    id: 'tourism_safari_manager',
+    name: 'Tourism & Safari Manager',
+    pathway: 'Social Sciences',
+    matchRequirements: {
+      primarySubjects: ['geography', 'english', 'business_studies'],
+      minimumLevels: { geography: 3, english: 3, business_studies: 2 },
+    },
+    marketReality: {
+      earningPotential: 'lucrative',
+      jobSecurity: 'moderate',
+      demandLevel: 'high',
+      kenyanContext: 'Tourism is Kenya\'s top forex earner. Safari, eco-tourism, beach tourism all recovering post-COVID. Hotels, tour companies, KWS, conservancies all hiring. Can start own tour company. Seasonal but high-earning.',
+    },
+    cbeReadiness: {
+      coreCompetencies: ['Communication', 'Cultural Awareness', 'Entrepreneurship', 'Environmental Stewardship'],
+      recommendedSeniorPath: 'Social Sciences - Hospitality & Tourism',
+      universities: ['Kenya Utalii College', 'KU', 'Moi University', 'Multimedia University'],
+      tvetOptions: ['Kenya Utalii College (diploma)', 'Various hospitality colleges'],
+    },
+    aiImpact: {
+      disruptionRisk: 'very_low',
+      disruptionPercentage: 10,
+      growthOutlook: 'booming',
+      growthPercentage: 110,
+      timeline: {
+        shortTerm: 'Post-COVID tourism recovery brings record visitor numbers.',
+        midTerm: 'Digital marketing skills become essential for tour operators.',
+        longTerm: 'Authentic human experiences drive tourism growth.',
+      },
+      survivalStrategy: [
+        'Learn digital marketing for tourism',
+        'Build relationships with international operators',
+        'Specialize (luxury, eco-tourism, cultural tourism)',
+        'Get Kenya Professional Safari Guide certification',
+      ],
+    },
+    realityCheck: {
+      pros: ['Work in beautiful locations', 'Meet international visitors', 'Can own tour company', 'Good income in peak season'],
+      challenges: ['Seasonal income fluctuations', 'Security issues affect bookings', 'Physically demanding guiding', 'Weather-dependent'],
+      typicalDay: 'Plan itineraries, meet and guide tourists, coordinate with lodges and airlines, social media marketing, manage bookings, ensure safety, handle client complaints.',
+    },
+  },
+
+  {
+    id: 'supply_chain_manager',
+    name: 'Supply Chain & Logistics Manager',
+    pathway: 'Social Sciences',
+    matchRequirements: {
+      primarySubjects: ['mathematics', 'business_studies', 'geography'],
+      minimumLevels: { mathematics: 3, business_studies: 3 },
+    },
+    marketReality: {
+      earningPotential: 'lucrative',
+      jobSecurity: 'high',
+      demandLevel: 'very_high',
+      kenyanContext: 'Mombasa Port is East Africa gateway. Nairobi is regional hub. SGR, LAPPSET corridor all need logistics experts. Manufacturing, retail, agriculture all need supply chain managers. Very high demand, low supply of qualified people.',
+    },
+    cbeReadiness: {
+      coreCompetencies: ['Analytical Thinking', 'Problem Solving', 'Organization', 'Communication'],
+      recommendedSeniorPath: 'Social Sciences - Business & Commerce',
+      universities: ['JKUAT', 'Strathmore', 'KCA', 'Kenyatta', 'USIU'],
+      tvetOptions: ['Kenya Institute of Management', 'Chartered Institute of Procurement & Supply (CIPS)'],
+    },
+    aiImpact: {
+      disruptionRisk: 'moderate',
+      disruptionPercentage: 35,
+      growthOutlook: 'growing',
+      growthPercentage: 95,
+      timeline: {
+        shortTerm: 'Regional trade growth creates urgent need for logistics experts.',
+        midTerm: 'AI optimizes routes and inventory; human judgment manages exceptions.',
+        longTerm: 'Crisis management and supplier relationships stay human.',
+      },
+      survivalStrategy: [
+        'Get CIPS or APICS professional certification',
+        'Learn supply chain software (SAP, Oracle)',
+        'Specialize in cold chain or humanitarian logistics',
+        'Develop supplier relationship management skills',
+      ],
+    },
+    realityCheck: {
+      pros: ['High demand', 'Good pay', 'Critical role in any industry', 'International opportunities'],
+      challenges: ['High pressure when things go wrong', 'Complex coordination challenges', 'Corruption in procurement', 'Irregular hours during crises'],
+      typicalDay: 'Manage supplier relationships, monitor inventory levels, coordinate transport, negotiate contracts, analyze costs, solve disruptions, prepare reports.',
+    },
+  },
+
+  {
+    id: 'insurance_specialist',
+    name: 'Insurance Specialist / Underwriter',
+    pathway: 'Social Sciences',
+    matchRequirements: {
+      primarySubjects: ['mathematics', 'business_studies', 'english'],
+      minimumLevels: { mathematics: 3, business_studies: 3 },
+    },
+    marketReality: {
+      earningPotential: 'lucrative',
+      jobSecurity: 'very_high',
+      demandLevel: 'very_high',
+      kenyanContext: 'Nairobi is East and Central Africa insurance capital. Every major African insurer has regional HQ here. IRA requires licensed professionals. Growing middle class buying more insurance. Stable, well-paying career.',
+    },
+    cbeReadiness: {
+      coreCompetencies: ['Analytical Thinking', 'Attention to Detail', 'Ethical Decision Making', 'Communication'],
+      recommendedSeniorPath: 'Social Sciences - Commerce & Finance',
+      universities: ['College of Insurance', 'UoN', 'Strathmore', 'KCA University'],
+      tvetOptions: ['College of Insurance (diploma)', 'Kenya School of Insurance'],
+    },
+    aiImpact: {
+      disruptionRisk: 'high',
+      disruptionPercentage: 55,
+      growthOutlook: 'stable',
+      growthPercentage: 35,
+      timeline: {
+        shortTerm: 'Steady demand as insurance penetration grows in Kenya.',
+        midTerm: 'AI automates routine underwriting; complex risk assessment stays human.',
+        longTerm: 'Emerging risks (cyber, climate) need human expertise.',
+      },
+      survivalStrategy: [
+        'Get ACII (Associate Chartered Insurance Institute)',
+        'Move to complex risk assessment AI cannot do',
+        'Develop client relationship and advisory skills',
+        'Specialize in emerging risks (cyber, climate)',
+      ],
+    },
+    realityCheck: {
+      pros: ['Stable well-paying career', 'Clear professional qualifications', 'Multiple sectors to work in', 'Good benefits packages'],
+      challenges: ['AI disrupting routine underwriting', 'Dealing with fraud cases', 'Complex regulations', 'Claims disputes stressful'],
+      typicalDay: 'Assess insurance applications, price risk, underwrite policies, review claims, advise brokers and clients, ensure regulatory compliance, analyze loss ratios.',
+    },
+  },
+
+  {
+    id: 'urban_planner',
+    name: 'Urban Planner / City Development Officer',
+    pathway: 'Social Sciences',
+    matchRequirements: {
+      primarySubjects: ['geography', 'mathematics', 'social_studies'],
+      minimumLevels: { geography: 3, mathematics: 3 },
+    },
+    marketReality: {
+      earningPotential: 'lucrative',
+      jobSecurity: 'high',
+      demandLevel: 'high',
+      kenyanContext: 'Rapid urbanization (Nairobi, Mombasa, Kisumu, Eldoret all expanding fast). County governments, national government, World Bank projects all need planners. Affordable housing agenda creates demand. Growing field as cities need smart planning.',
+    },
+    cbeReadiness: {
+      coreCompetencies: ['Spatial Intelligence', 'Critical Thinking', 'Communication', 'Environmental Stewardship'],
+      recommendedSeniorPath: 'Social Sciences - Geography & Urban Studies',
+      universities: ['UoN', 'JKUAT', 'TUK', 'Moi University'],
+      tvetOptions: ['Kenya Institute of Planners'],
+    },
+    aiImpact: {
+      disruptionRisk: 'low',
+      disruptionPercentage: 20,
+      growthOutlook: 'growing',
+      growthPercentage: 85,
+      timeline: {
+        shortTerm: 'All 47 counties urgently need urban planners for land use.',
+        midTerm: 'AI assists spatial analysis; community engagement stays human.',
+        longTerm: 'Policy interpretation and political navigation require humans.',
+      },
+      survivalStrategy: [
+        'Get registered with Physical Planners Registration Board',
+        'Learn GIS and urban modeling software',
+        'Specialize in smart cities or affordable housing',
+        'Develop community engagement skills',
+      ],
+    },
+    realityCheck: {
+      pros: ['Shape how cities grow', 'Government and private opportunities', 'Meaningful impact on peoples lives', 'Stable career'],
+      challenges: ['Bureaucratic processes slow', 'Political interference in planning', 'Informal settlements complex to manage', 'Public resistance to change'],
+      typicalDay: 'Develop land use plans, conduct site visits, community consultations, prepare planning reports, review development applications, coordinate with engineers and architects.',
+    },
+  },
+
   {
     id: 'economist',
     name: 'Economist / Policy Analyst',

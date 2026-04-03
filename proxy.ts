@@ -17,7 +17,6 @@ export async function proxy(request: NextRequest) {
           return request.cookies.get(name)?.value
         },
         set(name: string, value: string, options: CookieOptions) {
-          // Hii ni muhimu kwa Next.js 16 Turbopack
           response.cookies.set({ name, value, ...options })
         },
         remove(name: string, options: CookieOptions) {
@@ -27,12 +26,53 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  // Hii ndio inatufuta session na ku-refresh token kama ime-expire
   const { data: { user } } = await supabase.auth.getUser()
+  const { pathname } = request.nextUrl
 
-  if (!user && request.nextUrl.pathname.startsWith('/api/payments')) {
-    console.log("❌ Auth Debug: Auth session missing inside Proxy!");
-    // Usirudishe 401 hapa, acha API route yenyewe iamue ili tuone kosa vizuri
+  // ── Public teacher auth routes (no redirect needed) ──────────────────────
+  if (pathname === '/teacher/login' || pathname === '/teacher/signup') {
+    return response
+  }
+
+  // ── Admin routes: only kariukidennis092@gmail.com ─────────────────────────
+  if (pathname.startsWith('/admin')) {
+    if (!user || user.email !== 'kariukidennis092@gmail.com') {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+    return response
+  }
+
+  // ── Dashboard routes: must be logged in ──────────────────────────────────
+  if (pathname.startsWith('/dashboard')) {
+    if (!user) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+    return response
+  }
+
+  // ── Teacher routes: must be logged in + have teacher record ──────────────
+  if (pathname.startsWith('/teacher')) {
+    if (!user) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+
+    // /teacher/setup is allowed for logged-in users without a teacher record
+    if (pathname === '/teacher/setup') {
+      return response
+    }
+
+    // All other /teacher/* routes need a teacher record
+    const { data: teacher } = await supabase
+      .from('teachers')
+      .select('id')
+      .eq('user_id', user.id)
+      .single()
+
+    if (!teacher) {
+      return NextResponse.redirect(new URL('/teacher/setup', request.url))
+    }
+
+    return response
   }
 
   return response

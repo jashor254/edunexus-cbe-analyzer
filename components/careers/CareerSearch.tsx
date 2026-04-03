@@ -97,7 +97,7 @@ export function CareerSearch() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyPress}
             placeholder="Try: Blockchain Developer, UX Designer, Data Scientist..."
             className="w-full px-4 py-3 pr-10 border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-semibold"
             disabled={loading || rateLimited}

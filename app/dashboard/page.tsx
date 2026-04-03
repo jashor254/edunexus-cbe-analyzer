@@ -1,376 +1,918 @@
-// app/dashboard/page.tsx
-export const dynamic = 'force-dynamic'
+'use client'
 
-import { createClient } from '@/utils/supabase/server'
-import { redirect } from 'next/navigation'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
-  Compass,
-  Sparkles,
   Users,
-  BookOpen,
-  Target,
-  GraduationCap,
-  Zap,
-  Heart,
-  Clock,
-  Crown,
-  TrendingUp,
-  ChevronRight,
-  PlusCircle,
   FileText,
+  Compass,
+  ClipboardList,
   BarChart3,
-  ArrowRight
+  BookOpen,
+  Search,
+  Calendar,
+  TrendingUp,
+  PlusCircle,
+  X,
+  CheckCircle2,
+  AlertTriangle,
+  ChevronRight,
+  Zap,
 } from 'lucide-react'
 
-export default async function DashboardPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-  // ✅ Run all queries in parallel — much faster than sequential
-  const [
-    { data: profile },
-    { data: tokens },
-    { data: subscription },
-    { data: students, count: studentsCount },
-  ] = await Promise.all([
-    supabase.from('profiles').select('*').eq('id', user.id).single(),
+interface DashboardStats {
+  studentsCount: number
+  assessmentsCount: number
+  sessionsCount: number
+  subscription: { plan: string; expiresAt: string } | null
+  tokenBalance: number
+  pendingAssignments: number
+  isAdmin: boolean
+  hasTeacherAccount: boolean
+  teacherStudentsCount: number
+  teacherAssignmentsCount: number
+}
 
-    // ✅ Fixed: user_tokens → token_balances
-    supabase.from('token_balances').select('balance').eq('user_id', user.id).single(),
+interface Assessment {
+  id: string
+  term: number
+  year: number
+  grade: number
+  subject_scores: Record<string, number>
+  created_at: string
+}
 
-    // ✅ Fixed: sub_status → status, plan_type → plan, end_date → expires_at
-    supabase
-      .from('subscriptions')
-      .select('plan, expires_at')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .gt('expires_at', new Date().toISOString()) // only truly active
-      .order('expires_at', { ascending: false })
-      .limit(1)
-      .single(),
+interface Student {
+  id: string
+  name: string
+  grade: number
+  school: string | null
+  current_pathway: string | null
+  curriculum_type: 'cbc' | 'igcse' | 'ib' | 'other'
+  created_at: string
+  assessments: Assessment[]
+}
 
-    supabase
-      .from('students')
-      .select('*', { count: 'exact' })
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(3),
-  ])
+interface Assignment {
+  id: string
+  title: string
+  subject: string
+  topic: string
+  instructions: string
+  due_date: string
+  type: string
+  is_compass_guided: boolean
+  daysLeft: number
+  isOverdue: boolean
+  submissionStatus: string
+  teachers?: { full_name: string }
+  teacher_classes?: { name: string; grade: number; subject: string }
+}
 
-  const firstName      = profile?.full_name?.split(' ')[0]
-    || user.user_metadata?.full_name?.split(' ')[0]
-    || user.email?.split('@')[0]
-    || 'there'
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-  const hour    = new Date().getHours()
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
-  const tokenBalance   = tokens?.balance || 0
-  const hasSubscription = !!subscription
-  const planType       = subscription?.plan || (tokenBalance > 0 ? 'Token' : 'Free')
+const ADMIN_EMAIL = 'kariukidennis092@gmail.com'
 
-  // Days left on subscription
-  let daysLeft = 0
-  if (subscription?.expires_at) {
-    const end = new Date(subscription.expires_at)
-    daysLeft  = Math.ceil((end.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+function getGreeting(): string {
+  const h = new Date().getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
+function getGreetingEmoji(): string {
+  const h = new Date().getHours()
+  if (h < 12) return '☀️'
+  if (h < 17) return '👋'
+  return '🌙'
+}
+
+function cbcLevelLabel(avg: number): { label: string; color: string; border: string } {
+  if (avg >= 3.5) return { label: 'Exceeding (EE)', color: 'text-purple-600', border: 'border-l-purple-500' }
+  if (avg >= 2.5) return { label: 'Meets (ME)', color: 'text-green-600', border: 'border-l-green-500' }
+  if (avg >= 1.5) return { label: 'Approaching (AE)', color: 'text-amber-600', border: 'border-l-amber-500' }
+  return { label: 'Below (BE)', color: 'text-red-600', border: 'border-l-red-500' }
+}
+
+function cbcLevelBadge(avg: number): string {
+  if (avg >= 3.5) return 'bg-purple-100 text-purple-700'
+  if (avg >= 2.5) return 'bg-green-100 text-green-700'
+  if (avg >= 1.5) return 'bg-amber-100 text-amber-700'
+  return 'bg-red-100 text-red-700'
+}
+
+function igcseGradeColor(grade: string): { color: string; border: string } {
+  if (grade === 'A*' || grade === 'A') return { color: 'text-purple-600', border: 'border-l-purple-500' }
+  if (grade === 'B') return { color: 'text-green-600', border: 'border-l-green-500' }
+  if (grade === 'C') return { color: 'text-blue-600', border: 'border-l-blue-500' }
+  if (grade === 'D' || grade === 'E') return { color: 'text-amber-600', border: 'border-l-amber-500' }
+  return { color: 'text-red-600', border: 'border-l-red-500' }
+}
+
+function getStudentSummary(student: Student): {
+  label: string
+  colorClass: string
+  borderClass: string
+  badgeClass: string
+  pct: number
+} {
+  const latest = student.assessments?.[0]
+  if (!latest || !latest.subject_scores || Object.keys(latest.subject_scores).length === 0) {
+    return { label: 'No data', colorClass: 'text-slate-400', borderClass: 'border-l-slate-300', badgeClass: 'bg-slate-100 text-slate-500', pct: 0 }
+  }
+
+  if (student.curriculum_type === 'igcse') {
+    const scores = Object.values(latest.subject_scores) as number[]
+    const avg = scores.reduce((a, b) => a + b, 0) / scores.length
+    // IGCSE: scores stored as 1-7 (7=A*, 1=G)
+    const gradeMap: Record<number, string> = { 7: 'A*', 6: 'A', 5: 'B', 4: 'C', 3: 'D', 2: 'E', 1: 'F' }
+    const rounded = Math.round(avg)
+    const grade = gradeMap[rounded] || 'C'
+    const { color, border } = igcseGradeColor(grade)
+    return { label: grade, colorClass: color, borderClass: border, badgeClass: 'bg-blue-100 text-blue-700', pct: (avg / 7) * 100 }
+  }
+
+  // CBC: 1–4
+  const scores = Object.values(latest.subject_scores) as number[]
+  const avg = scores.reduce((a, b) => a + b, 0) / scores.length
+  const { label, color, border } = cbcLevelLabel(avg)
+  return { label, colorClass: color, borderClass: border, badgeClass: cbcLevelBadge(avg), pct: (avg / 4) * 100 }
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function planDisplayName(plan: string): string {
+  const names: Record<string, string> = { term: 'Term Plan', premium: 'Premium', school: 'School Plan', admin: 'Admin' }
+  return names[plan] || plan
+}
+
+// ─── Skeleton ──────────────────────────────────────────────────────────────────
+
+function Skeleton({ className }: { className?: string }) {
+  return <div className={`animate-pulse bg-slate-200 rounded-xl ${className ?? ''}`} />
+}
+
+// ─── Add Student Modal ────────────────────────────────────────────────────────
+
+const CBC_GRADES = [7, 8, 9, 10, 11, 12]
+const IGCSE_YEARS = [7, 8, 9, 10, 11]
+
+function AddStudentModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const [name, setName] = useState('')
+  const [curriculum, setCurriculum] = useState<'cbc' | 'igcse'>('cbc')
+  const [grade, setGrade] = useState(7)
+  const [school, setSchool] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const gradeOptions = curriculum === 'igcse' ? IGCSE_YEARS : CBC_GRADES
+
+  // Reset grade when curriculum changes
+  useEffect(() => {
+    setGrade(curriculum === 'igcse' ? 7 : 7)
+  }, [curriculum])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!name.trim()) { setError('Student name is required'); return }
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch('/api/students/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), grade, school: school.trim() || null, curriculum_type: curriculum }),
+      })
+      const json = await res.json()
+      if (!json.success) { setError(json.error || 'Failed to add student'); setLoading(false); return }
+      onSuccess()
+      onClose()
+    } catch {
+      setError('Network error. Please try again.')
+      setLoading(false)
+    }
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 relative overflow-hidden">
-
-      {/* Ambient orbs */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-1/2 -left-1/2 w-[1000px] h-[1000px] bg-purple-600/10 rounded-full blur-[120px] animate-pulse" style={{ animationDuration: '8s' }} />
-        <div className="absolute -bottom-1/2 -right-1/2 w-[1000px] h-[1000px] bg-blue-600/10 rounded-full blur-[120px] animate-pulse" style={{ animationDuration: '10s', animationDelay: '2s' }} />
-        <div className="absolute top-1/2 left-1/2 w-[800px] h-[800px] bg-amber-600/5 rounded-full blur-[100px] animate-pulse" style={{ animationDuration: '12s', animationDelay: '4s' }} />
-      </div>
-
-      {/* Grain */}
-      <div className="fixed inset-0 opacity-[0.02] pointer-events-none"
-        style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 400 400\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' /%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\' /%3E%3C/svg%3E")' }}
-      />
-
-      <div className="relative z-10 max-w-7xl mx-auto px-6 py-8">
-
-        {/* Welcome */}
-        <div className="mb-8 animate-in fade-in slide-in-from-top duration-700">
-          <h1 className="text-4xl font-black text-white mb-2">
-            {greeting}, {firstName}! 👋
-          </h1>
-          <p className="text-white/50 text-lg">Your learning command center</p>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-slate-100">
+          <h2 className="text-xl font-black text-slate-900">Add Student</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {/* Name */}
+          <div>
+            <label className="block text-sm font-black text-slate-700 mb-1.5">Student Name *</label>
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="e.g. Grace Wanjiku"
+              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+            />
+          </div>
 
-          {/* Plan */}
-          <div className="group relative animate-in fade-in slide-in-from-bottom duration-700" style={{ animationDelay: '100ms' }}>
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition" />
-            <div className="relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 hover:bg-white/10 transition-all">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  {hasSubscription
-                    ? <Crown className="w-5 h-5 text-amber-400" />
-                    : <Zap className="w-5 h-5 text-blue-400" />
-                  }
-                  <span className="text-xs font-black text-white/40 uppercase tracking-wider">Plan</span>
-                </div>
-                {hasSubscription && daysLeft <= 7 && daysLeft > 0 && (
-                  <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-bold">
-                    {daysLeft}d left
-                  </span>
-                )}
-              </div>
-              <div className="text-2xl font-black text-white mb-1">
-                {hasSubscription ? (
-                  <span className="bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent capitalize">
-                    ✨ {planType}
-                  </span>
-                ) : planType === 'Token' ? 'Pay-as-Go' : 'Free Trial'}
-              </div>
-              {!hasSubscription && tokenBalance > 0 && (
-                <div className="text-sm text-white/60">{tokenBalance} tokens</div>
-              )}
-              {!hasSubscription && tokenBalance === 0 && (
-                <Link href="/pricing" className="text-xs text-purple-400 hover:text-purple-300 inline-flex items-center gap-1 mt-1 font-bold">
-                  Upgrade <ArrowRight className="w-3 h-3" />
-                </Link>
-              )}
+          {/* Curriculum */}
+          <div>
+            <label className="block text-sm font-black text-slate-700 mb-2">Curriculum</label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setCurriculum('cbc')}
+                className={`p-3 rounded-xl border-2 text-left transition-all ${
+                  curriculum === 'cbc'
+                    ? 'border-amber-500 bg-amber-50'
+                    : 'border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <div className="text-xl mb-1">🇰🇪</div>
+                <div className="font-black text-sm text-slate-900">CBC Kenya</div>
+                <div className="text-xs text-slate-500">Grade 7–12</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurriculum('igcse')}
+                className={`p-3 rounded-xl border-2 text-left transition-all ${
+                  curriculum === 'igcse'
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <div className="text-xl mb-1">🌍</div>
+                <div className="font-black text-sm text-slate-900">Cambridge IGCSE</div>
+                <div className="text-xs text-slate-500">Year 7–11</div>
+              </button>
             </div>
           </div>
 
-          {/* Students */}
-          <div className="group relative animate-in fade-in slide-in-from-bottom duration-700" style={{ animationDelay: '200ms' }}>
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition" />
-            <div className="relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 hover:bg-white/10 transition-all">
-              <Users className="w-5 h-5 text-blue-400 mb-3" />
-              <div className="text-2xl font-black text-white mb-1">{studentsCount || 0}</div>
-              <div className="text-sm text-white/60">Students</div>
-              {!studentsCount && (
-                <Link href="/dashboard/students/add" className="text-xs text-blue-400 hover:text-blue-300 inline-flex items-center gap-1 mt-1 font-bold">
-                  <PlusCircle className="w-3 h-3" /> Add student
-                </Link>
-              )}
-            </div>
-          </div>
-
-          {/* Assessments */}
-          <div className="group relative animate-in fade-in slide-in-from-bottom duration-700" style={{ animationDelay: '300ms' }}>
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition" />
-            <div className="relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 hover:bg-white/10 transition-all">
-              <BookOpen className="w-5 h-5 text-green-400 mb-3" />
-              <div className="text-2xl font-black text-white mb-1">—</div>
-              <div className="text-sm text-white/60">Assessments</div>
-              <Link href="/dashboard/assessments/add" className="text-xs text-green-400 hover:text-green-300 inline-flex items-center gap-1 mt-1 font-bold">
-                <PlusCircle className="w-3 h-3" /> Add first
-              </Link>
-            </div>
-          </div>
-
-          {/* Streak */}
-          <div className="group relative animate-in fade-in slide-in-from-bottom duration-700" style={{ animationDelay: '400ms' }}>
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-rose-500 to-pink-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition" />
-            <div className="relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 hover:bg-white/10 transition-all">
-              <Heart className="w-5 h-5 text-rose-400 mb-3" />
-              <div className="text-2xl font-black text-white mb-1">3</div>
-              <div className="text-sm text-white/60">Day streak</div>
-              <div className="text-xs text-rose-400 mt-1 font-bold">🔥 On fire!</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Learning Compass Hero */}
-        <div className="mb-12 animate-in fade-in slide-in-from-bottom duration-1000" style={{ animationDelay: '500ms' }}>
-          <div className="relative group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 rounded-3xl blur-2xl opacity-30 group-hover:opacity-50 transition duration-700" />
-            <div className="relative bg-gradient-to-br from-purple-900/40 via-pink-900/40 to-blue-900/40 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden">
-              <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -translate-y-48 translate-x-48 blur-3xl" />
-              <div className="absolute bottom-0 left-0 w-80 h-80 bg-white/5 rounded-full translate-y-40 -translate-x-40 blur-3xl" />
-              <div className="relative p-8 md:p-12">
-                <div className="flex flex-col lg:flex-row justify-between items-start gap-8">
-                  <div className="flex-1 space-y-5">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full text-sm font-black text-white">
-                      <Sparkles className="w-4 h-4 text-yellow-300" />
-                      EXPERT LEARNING GUIDANCE
-                    </div>
-                    <h2 className="text-4xl md:text-5xl font-black text-white leading-tight">
-                      Learning Compass
-                    </h2>
-                    <p className="text-white/80 text-lg max-w-xl leading-relaxed">
-                      Your child's personal learning companion that adapts to their unique style.
-                      Available 24/7, completely personalized for Kenyan CBC curriculum.
-                    </p>
-                    <div className="flex flex-wrap gap-4 pt-2">
-                      {[
-                        { icon: Zap, label: 'Instant answers', color: 'text-yellow-300' },
-                        { icon: Clock, label: '24/7 available', color: 'text-green-300' },
-                        { icon: BookOpen, label: 'All CBC subjects', color: 'text-blue-300' },
-                      ].map((f, i) => (
-                        <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
-                          <f.icon className={`w-4 h-4 ${f.color}`} />
-                          <span className="text-sm text-white/90 font-bold">{f.label}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex flex-wrap gap-3 pt-4">
-                      <Link
-                        href="/chat"
-                        className="group/btn px-8 py-4 bg-white text-slate-950 rounded-2xl font-black hover:scale-105 transition-all flex items-center gap-2 shadow-2xl shadow-white/20"
-                      >
-                        <Compass className="w-5 h-5" />
-                        Start Learning Now
-                        <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
-                      </Link>
-                      <Link
-                        href="/dashboard/learning-compass"
-                        className="px-8 py-4 bg-white/10 backdrop-blur-sm text-white rounded-2xl font-black hover:bg-white/20 transition-all flex items-center gap-2 border border-white/20"
-                      >
-                        Learn More <ChevronRight className="w-4 h-4" />
-                      </Link>
-                    </div>
-                  </div>
-
-                  {/* Chat preview */}
-                  <div className="relative w-full lg:w-80">
-                    <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-2xl blur opacity-20" />
-                    <div className="relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
-                      <div className="flex items-center gap-3 mb-5 pb-4 border-b border-white/10">
-                        <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
-                          <Compass className="w-5 h-5 text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <span className="text-sm font-black text-white">Learning Compass</span>
-                          <div className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                            <span className="text-xs text-green-300 font-bold">Online</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 text-sm text-white border border-white/20">
-                          Help me understand fractions 📚
-                        </div>
-                        <div className="bg-gradient-to-r from-purple-500/30 to-pink-500/30 backdrop-blur-sm rounded-xl p-3 text-sm text-white ml-4 border border-purple-400/30">
-                          Sawa! Imagine cutting a chapati into 4 equal pieces...
-                        </div>
-                        <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 text-sm text-white border border-white/20">
-                          Oh now I get it! 3/4 means 3 pieces! 🎉
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
-          {[
-            { href: '/dashboard/assessments/add', icon: FileText,     title: 'Add Assessment',  desc: 'Record scores',    color: 'from-indigo-500 to-purple-500' },
-            { href: '/dashboard/clinic',          icon: BarChart3,    title: 'Academic Clinic', desc: 'Deep insights',    color: 'from-purple-500 to-pink-500'   },
-            { href: '/dashboard/pathway',         icon: Target,       title: 'Pathway Analysis',desc: 'Find your path',   color: 'from-green-500 to-emerald-500' },
-            { href: '/dashboard/career-explorer', icon: GraduationCap,title: 'Career Explorer', desc: 'Discover careers', color: 'from-amber-500 to-orange-500'  },
-          ].map((action, idx) => (
-            <Link
-              key={idx}
-              href={action.href}
-              className="group relative animate-in fade-in slide-in-from-bottom duration-700"
-              style={{ animationDelay: `${600 + idx * 100}ms` }}
+          {/* Grade/Year */}
+          <div>
+            <label className="block text-sm font-black text-slate-700 mb-1.5">
+              {curriculum === 'igcse' ? 'Year' : 'Grade'}
+            </label>
+            <select
+              value={grade}
+              onChange={e => setGrade(Number(e.target.value))}
+              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
             >
-              <div className={`absolute -inset-0.5 bg-gradient-to-r ${action.color} rounded-2xl blur opacity-20 group-hover:opacity-40 transition`} />
-              <div className="relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 hover:bg-white/10 transition-all h-full">
-                <div className={`w-12 h-12 bg-gradient-to-br ${action.color} rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-lg`}>
-                  <action.icon className="w-6 h-6 text-white" />
-                </div>
-                <div className="font-black text-white text-sm mb-1">{action.title}</div>
-                <div className="text-xs text-white/60">{action.desc}</div>
-              </div>
-            </Link>
-          ))}
-        </div>
+              {gradeOptions.map(g => (
+                <option key={g} value={g}>
+                  {curriculum === 'igcse' ? `Year ${g}` : `Grade ${g}`}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        {/* Students */}
-        <div className="relative mb-12 animate-in fade-in slide-in-from-bottom duration-1000" style={{ animationDelay: '1000ms' }}>
-          <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-3xl blur-xl opacity-10" />
-          <div className="relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6">
-            <div className="flex justify-between items-center mb-5">
-              <h2 className="text-2xl font-black text-white flex items-center gap-2">
-                <Users className="w-6 h-6 text-blue-400" /> Your Students
-              </h2>
-              <Link href="/dashboard/students" className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1 font-bold">
-                View All <ChevronRight className="w-4 h-4" />
-              </Link>
+          {/* School */}
+          <div>
+            <label className="block text-sm font-black text-slate-700 mb-1.5">
+              School <span className="text-slate-400 font-normal">(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={school}
+              onChange={e => setSchool(e.target.value)}
+              placeholder="e.g. Nairobi School"
+              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+            />
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+              {error}
             </div>
+          )}
 
-            {students && students.length > 0 ? (
-              <div className="space-y-3">
-                {students.map((student) => (
-                  <div key={student.id} className="group relative">
-                    <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl blur opacity-0 group-hover:opacity-20 transition" />
-                    <div className="relative flex items-center justify-between p-4 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 hover:bg-white/10 transition-all">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
-                          <GraduationCap className="w-6 h-6 text-white" />
-                        </div>
-                        <div>
-                          <div className="font-bold text-white">{student.name}</div>
-                          <div className="text-sm text-white/60">Grade {student.grade}</div>
-                        </div>
-                      </div>
-                      <Link href={`/dashboard/students/${student.id}`} className="text-sm text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-bold">
-                        View <ChevronRight className="w-4 h-4" />
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-violet-600 to-purple-600 text-white py-3.5 rounded-xl font-black hover:scale-[1.02] transition-all disabled:opacity-60 disabled:scale-100"
+          >
+            {loading ? 'Adding...' : 'Add Student'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ─── Student Card ─────────────────────────────────────────────────────────────
+
+function StudentCard({ student }: { student: Student }) {
+  const summary = getStudentSummary(student)
+  const latest = student.assessments?.[0]
+  const isCbc = student.curriculum_type !== 'igcse'
+
+  return (
+    <div className={`bg-white border border-slate-200 border-l-4 ${summary.borderClass} rounded-2xl p-5 shadow-sm hover:-translate-y-0.5 hover:shadow-md transition-all`}>
+      {/* Header */}
+      <div className="flex items-start justify-between mb-3">
+        <div>
+          <h3 className="font-black text-slate-900 text-base">{student.name}</h3>
+          <div className="flex items-center gap-2 mt-1">
+            {isCbc ? (
+              <span className="text-xs font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                🇰🇪 CBC · Grade {student.grade}
+              </span>
             ) : (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Users className="w-8 h-8 text-white/30" />
-                </div>
-                <p className="text-white/50 mb-4">No students added yet</p>
-                <Link href="/dashboard/students/add" className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 font-bold">
-                  <PlusCircle className="w-4 h-4" /> Add Your First Student
-                </Link>
-              </div>
+              <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                🌍 IGCSE · Year {student.grade}
+              </span>
             )}
           </div>
         </div>
+        {summary.label !== 'No data' && (
+          <span className={`text-xs font-black px-2.5 py-1 rounded-xl ${summary.badgeClass}`}>
+            {summary.label}
+          </span>
+        )}
+      </div>
 
-        {/* Coming Soon */}
-        <div className="animate-in fade-in slide-in-from-bottom duration-1000" style={{ animationDelay: '1100ms' }}>
-          <h2 className="text-2xl font-black text-white mb-6 flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-amber-400" /> Coming Soon
-          </h2>
-          <div className="grid md:grid-cols-3 gap-4">
+      {/* Latest assessment */}
+      {latest ? (
+        <div className="mb-4">
+          <p className="text-xs text-slate-500 mb-1.5">
+            Last: Term {latest.term}, {latest.year}
+          </p>
+          <div className="w-full bg-slate-100 rounded-full h-2">
+            <div
+              className="h-2 rounded-full bg-gradient-to-r from-violet-500 to-purple-500 transition-all"
+              style={{ width: `${Math.min(100, Math.max(4, summary.pct))}%` }}
+            />
+          </div>
+          <p className={`text-xs font-bold mt-1 ${summary.colorClass}`}>
+            {isCbc ? `Level avg · ${summary.label}` : `Avg grade · ${summary.label}`}
+          </p>
+        </div>
+      ) : (
+        <div className="mb-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-400 text-center">
+          No assessments yet
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex gap-2 flex-wrap">
+        <Link
+          href={`/dashboard/assessments/add?student=${student.id}`}
+          className="text-xs font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+        >
+          <PlusCircle className="w-3.5 h-3.5" /> Add Assessment
+        </Link>
+        <Link
+          href={`/chat?student=${student.id}`}
+          className="text-xs font-bold bg-amber-50 text-amber-700 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+        >
+          <Compass className="w-3.5 h-3.5" /> Compass
+        </Link>
+        <Link
+          href={`/dashboard/assessments/history?student=${student.id}`}
+          className="text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+        >
+          <TrendingUp className="w-3.5 h-3.5" /> History
+        </Link>
+      </div>
+    </div>
+  )
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function DashboardPage() {
+  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [students, setStudents] = useState<Student[]>([])
+  const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [userEmail, setUserEmail] = useState<string>('')
+  const [userName, setUserName] = useState<string>('')
+
+  const [statsLoading, setStatsLoading] = useState(true)
+  const [studentsLoading, setStudentsLoading] = useState(true)
+  const [assignmentsLoading, setAssignmentsLoading] = useState(true)
+
+  const [statsError, setStatsError] = useState('')
+  const [studentsError, setStudentsError] = useState('')
+
+  const [showAddModal, setShowAddModal] = useState(false)
+
+  // ── Fetch user identity (from Supabase client) ────────────────────────────
+  useEffect(() => {
+    import('@/lib/supabase/client').then(({ createClient }) => {
+      const sb = createClient()
+      sb.auth.getUser().then(({ data: { user } }) => {
+        if (!user) return
+        setUserEmail(user.email ?? '')
+        const meta = user.user_metadata
+        const full: string = meta?.full_name || meta?.name || ''
+        setUserName(full ? full.split(' ')[0] : (user.email ?? '').split('@')[0])
+      })
+    })
+  }, [])
+
+  // ── Fetch stats ───────────────────────────────────────────────────────────
+  const fetchStats = useCallback(async () => {
+    setStatsLoading(true)
+    setStatsError('')
+    try {
+      const res = await fetch('/api/dashboard/stats')
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error)
+      setStats(json.data)
+    } catch {
+      setStatsError('Could not load stats.')
+    } finally {
+      setStatsLoading(false)
+    }
+  }, [])
+
+  // ── Fetch students ────────────────────────────────────────────────────────
+  const fetchStudents = useCallback(async () => {
+    setStudentsLoading(true)
+    setStudentsError('')
+    try {
+      const res = await fetch('/api/students/list')
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error)
+      // Sort assessments newest first per student
+      const sorted: Student[] = (json.data.students ?? []).map((s: Student) => ({
+        ...s,
+        assessments: [...(s.assessments ?? [])].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        ),
+      }))
+      setStudents(sorted)
+    } catch {
+      setStudentsError('Could not load students.')
+    } finally {
+      setStudentsLoading(false)
+    }
+  }, [])
+
+  // ── Fetch assignments ─────────────────────────────────────────────────────
+  const fetchAssignments = useCallback(async () => {
+    setAssignmentsLoading(true)
+    try {
+      const res = await fetch('/api/student/assignments')
+      const json = await res.json()
+      if (json.success) setAssignments(json.data.assignments ?? [])
+    } catch {
+      // assignments are optional — fail silently
+    } finally {
+      setAssignmentsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchStats()
+    fetchStudents()
+    fetchAssignments()
+  }, [fetchStats, fetchStudents, fetchAssignments])
+
+  const isAdmin = userEmail === ADMIN_EMAIL || stats?.isAdmin === true
+
+  // Recent assessments (across all students, last 5)
+  const recentAssessments = students
+    .flatMap(s => (s.assessments ?? []).map(a => ({ ...a, studentName: s.name, curriculumType: s.curriculum_type })))
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 5)
+
+  // ── Subscription / plan display ────────────────────────────────────────────
+  function renderPlanBadge() {
+    if (isAdmin) {
+      return (
+        <span className="text-xs font-black bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 rounded-full">
+          👑 Administrator · Unlimited access
+        </span>
+      )
+    }
+    if (stats?.subscription) {
+      return (
+        <span className="text-xs font-black bg-green-100 text-green-700 border border-green-200 px-3 py-1.5 rounded-full">
+          <CheckCircle2 className="w-3.5 h-3.5 inline mr-1" />
+          {planDisplayName(stats.subscription.plan)} · Active until {formatDate(stats.subscription.expiresAt)}
+        </span>
+      )
+    }
+    if (stats && stats.tokenBalance > 0) {
+      return (
+        <span className="text-xs font-black bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-full">
+          <Zap className="w-3.5 h-3.5 inline mr-1" />
+          {stats.tokenBalance} session{stats.tokenBalance !== 1 ? 's' : ''} remaining
+        </span>
+      )
+    }
+    return (
+      <span className="text-xs font-black bg-slate-100 text-slate-500 border border-slate-200 px-3 py-1.5 rounded-full flex items-center gap-1.5">
+        Free account ·{' '}
+        <Link href="/pricing" className="text-violet-600 hover:underline">Upgrade</Link>
+      </span>
+    )
+  }
+
+  const showUpgradeBanner =
+    !isAdmin &&
+    !stats?.subscription &&
+    (stats?.tokenBalance ?? 0) < 3
+
+  return (
+    <div className="bg-white min-h-screen">
+
+      {/* ── SECTION 0: Admin banner ────────────────────────────────────────── */}
+      {isAdmin && (
+        <div className="bg-gradient-to-r from-red-900/50 to-orange-900/50 border-b border-red-500/30 py-3 px-6">
+          <div className="max-w-6xl mx-auto flex items-center justify-between">
+            <span className="text-red-300 font-black text-sm">
+              👑 Admin Mode — {userEmail}
+            </span>
+            <Link
+              href="/admin"
+              className="text-xs bg-red-500/20 border border-red-500/30 text-red-300 px-3 py-1.5 rounded-lg font-black hover:bg-red-500/30 transition"
+            >
+              Open Admin Panel →
+            </Link>
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+
+        {/* ── SECTION 1: Personalized greeting ─────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            {userName ? (
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900">
+                {getGreeting()}, {userName}! {getGreetingEmoji()}
+              </h1>
+            ) : (
+              <Skeleton className="h-9 w-64" />
+            )}
+            <p className="text-slate-500 text-sm mt-1">
+              Welcome to your EduNexus dashboard
+            </p>
+          </div>
+          <div className="flex-shrink-0">
+            {statsLoading ? <Skeleton className="h-8 w-48" /> : renderPlanBadge()}
+          </div>
+        </div>
+
+        {/* ── SECTION 2: Quick stats ────────────────────────────────────────── */}
+        {statsLoading ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-28" />)}
+          </div>
+        ) : statsError ? (
+          <div className="bg-red-50 border border-red-200 rounded-2xl px-5 py-4 flex items-center justify-between">
+            <span className="text-red-700 text-sm font-bold">{statsError}</span>
+            <button onClick={fetchStats} className="text-xs text-red-600 underline font-bold">Retry</button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { icon: Users,        title: 'Study Groups',    desc: 'Collaborate with peers, share notes',       color: 'from-violet-500 to-purple-500' },
-              { icon: Target,       title: 'Mock Exams',      desc: 'Practice for KJSEA & KCSE',                 color: 'from-rose-500 to-pink-500'     },
-              { icon: GraduationCap,title: 'University Guide',desc: 'Course recommendations & requirements',     color: 'from-cyan-500 to-blue-500'     },
-            ].map((feature, idx) => (
-              <div key={idx} className="group relative">
-                <div className={`absolute -inset-0.5 bg-gradient-to-r ${feature.color} rounded-2xl blur opacity-0 group-hover:opacity-20 transition`} />
-                <div className="relative bg-white/5 backdrop-blur-xl border-2 border-dashed border-white/10 rounded-2xl p-6 text-center hover:bg-white/10 hover:border-white/20 transition-all">
-                  <div className={`w-16 h-16 bg-gradient-to-br ${feature.color} rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform shadow-xl`}>
-                    <feature.icon className="w-8 h-8 text-white" />
-                  </div>
-                  <h3 className="font-black text-white mb-2">{feature.title}</h3>
-                  <p className="text-sm text-white/60 mb-4">{feature.desc}</p>
-                  <div className="inline-flex items-center gap-2 text-xs text-amber-400 bg-amber-500/10 px-4 py-2 rounded-full border border-amber-500/20 font-bold">
-                    <Clock className="w-3 h-3" /> Coming soon
-                  </div>
+              {
+                icon: Users,
+                value: stats?.studentsCount ?? 0,
+                label: 'Students',
+                color: 'text-violet-600',
+                bg: 'bg-violet-50',
+                border: 'border-violet-100',
+                extra: stats?.studentsCount === 0 && (
+                  <button onClick={() => setShowAddModal(true)} className="text-xs text-violet-600 hover:underline font-bold mt-1">Add student</button>
+                ),
+              },
+              {
+                icon: FileText,
+                value: stats?.assessmentsCount ?? 0,
+                label: 'Assessments',
+                color: 'text-blue-600',
+                bg: 'bg-blue-50',
+                border: 'border-blue-100',
+              },
+              {
+                icon: Compass,
+                value: stats?.sessionsCount ?? 0,
+                label: 'Compass Sessions',
+                color: 'text-amber-600',
+                bg: 'bg-amber-50',
+                border: 'border-amber-100',
+              },
+              {
+                icon: ClipboardList,
+                value: stats?.pendingAssignments ?? 0,
+                label: 'Pending Assignments',
+                color: stats?.pendingAssignments ? 'text-pink-600' : 'text-slate-400',
+                bg: stats?.pendingAssignments ? 'bg-pink-50' : 'bg-slate-50',
+                border: stats?.pendingAssignments ? 'border-pink-100' : 'border-slate-100',
+              },
+            ].map(({ icon: Icon, value, label, color, bg, border, extra }, i) => (
+              <div key={i} className={`${bg} border ${border} rounded-2xl p-5 flex flex-col`}>
+                <div className={`w-9 h-9 ${bg} border ${border} rounded-xl flex items-center justify-center mb-3`}>
+                  <Icon className={`w-5 h-5 ${color}`} />
                 </div>
+                <div className={`text-3xl font-black ${color}`}>{value}</div>
+                <div className="text-xs font-bold text-slate-500 mt-0.5">{label}</div>
+                {extra ?? null}
               </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── SECTION 3: Teacher portal banner ─────────────────────────────── */}
+        {stats?.hasTeacherAccount && (
+          <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-2xl p-5 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-xl flex items-center justify-center text-lg">
+                👨‍🏫
+              </div>
+              <div>
+                <p className="font-black text-slate-900 text-sm">Teacher Portal</p>
+                <p className="text-teal-700 text-xs">
+                  {stats.teacherStudentsCount} student{stats.teacherStudentsCount !== 1 ? 's' : ''} linked ·{' '}
+                  {stats.teacherAssignmentsCount} assignment{stats.teacherAssignmentsCount !== 1 ? 's' : ''} active
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/teacher/dashboard"
+              className="bg-teal-500/20 border border-teal-500/30 text-teal-700 px-4 py-2 rounded-xl font-black text-sm hover:bg-teal-100 transition flex-shrink-0"
+            >
+              Open Teacher Portal →
+            </Link>
+          </div>
+        )}
+
+        {/* ── SECTION 4: My Students ────────────────────────────────────────── */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+              <Users className="w-5 h-5 text-violet-600" />
+              My Students
+            </h2>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-black px-4 py-2 rounded-xl transition-colors"
+            >
+              <PlusCircle className="w-4 h-4" /> Add Student
+            </button>
+          </div>
+
+          {studentsLoading ? (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-52" />)}
+            </div>
+          ) : studentsError ? (
+            <div className="bg-red-50 border border-red-200 rounded-2xl px-5 py-4 flex items-center justify-between">
+              <span className="text-red-700 text-sm font-bold">{studentsError}</span>
+              <button onClick={fetchStudents} className="text-xs text-red-600 underline font-bold">Retry</button>
+            </div>
+          ) : students.length === 0 ? (
+            <div className="border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center">
+              <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Users className="w-8 h-8 text-slate-400" />
+              </div>
+              <h3 className="font-black text-slate-700 text-lg mb-2">Add your first student</h3>
+              <p className="text-slate-500 text-sm mb-6 max-w-xs mx-auto">
+                Add your child to get started with the Academic Clinic and Learning Compass
+              </p>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="bg-violet-600 hover:bg-violet-700 text-white font-black px-6 py-3 rounded-xl transition-colors"
+              >
+                Add Student
+              </button>
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {students.map(s => <StudentCard key={s.id} student={s} />)}
+            </div>
+          )}
+        </div>
+
+        {/* ── SECTION 5: Quick Actions ──────────────────────────────────────── */}
+        <div>
+          <h2 className="text-xl font-black text-slate-900 mb-4">Quick Actions</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {[
+              {
+                icon: Compass,
+                title: 'Learning Compass',
+                sub: 'Start a session',
+                gradient: 'from-amber-500 to-orange-500',
+                shadow: 'shadow-amber-500/20',
+                href: '/chat',
+              },
+              {
+                icon: BarChart3,
+                title: 'Academic Clinic',
+                sub: 'View reports',
+                gradient: 'from-violet-500 to-purple-500',
+                shadow: 'shadow-violet-500/20',
+                href: '/dashboard/clinic',
+              },
+              {
+                icon: PlusCircle,
+                title: 'Add Assessment',
+                sub: 'Log term scores',
+                gradient: 'from-blue-500 to-cyan-500',
+                shadow: 'shadow-blue-500/20',
+                href: '/dashboard/assessments/add',
+              },
+              {
+                icon: TrendingUp,
+                title: 'History',
+                sub: 'View all assessments',
+                gradient: 'from-green-500 to-emerald-500',
+                shadow: 'shadow-green-500/20',
+                href: '/dashboard/assessments/history',
+              },
+              {
+                icon: Users,
+                title: 'Study Groups',
+                sub: 'Join or create',
+                gradient: 'from-pink-500 to-rose-500',
+                shadow: 'shadow-pink-500/20',
+                href: '/dashboard/groups',
+              },
+              {
+                icon: Search,
+                title: 'Career Explorer',
+                sub: 'Explore careers',
+                gradient: 'from-cyan-500 to-blue-500',
+                shadow: 'shadow-cyan-500/20',
+                href: '/dashboard/career-explorer',
+              },
+            ].map(({ icon: Icon, title, sub, gradient, shadow, href }) => (
+              <Link
+                key={href}
+                href={href}
+                className={`bg-gradient-to-br ${gradient} rounded-2xl p-4 flex flex-col items-start hover:scale-[1.02] transition-transform shadow-lg ${shadow}`}
+              >
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-3">
+                  <Icon className="w-5 h-5 text-white" />
+                </div>
+                <div className="font-black text-white text-sm leading-tight">{title}</div>
+                <div className="text-white/70 text-xs mt-0.5">{sub}</div>
+              </Link>
             ))}
           </div>
         </div>
 
+        {/* ── SECTION 6: Recent Activity ────────────────────────────────────── */}
+        <div className="grid md:grid-cols-2 gap-6">
+
+          {/* Left: Recent Assessments */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-blue-600" />
+                Recent Assessments
+              </h2>
+              <Link href="/dashboard/assessments/history" className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-0.5">
+                View all <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              {studentsLoading ? (
+                <div className="p-4 space-y-3">
+                  {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12" />)}
+                </div>
+              ) : recentAssessments.length === 0 ? (
+                <div className="p-8 text-center">
+                  <p className="text-slate-500 text-sm mb-4">No assessments yet.<br />Add your first assessment to see history here.</p>
+                  <Link
+                    href="/dashboard/assessments/add"
+                    className="inline-flex items-center gap-1.5 bg-blue-600 text-white text-sm font-black px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors"
+                  >
+                    <PlusCircle className="w-4 h-4" /> Add Assessment
+                  </Link>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {recentAssessments.map((a, i) => {
+                    const isCbc = a.curriculumType !== 'igcse'
+                    const scores = Object.values(a.subject_scores ?? {}) as number[]
+                    const avg = scores.length ? scores.reduce((x, y) => x + y, 0) / scores.length : 0
+                    return (
+                      <div key={i} className="px-4 py-3 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-black text-slate-900">{a.studentName}</p>
+                          <p className="text-xs text-slate-500">Term {a.term}, {a.year} · {formatDate(a.created_at)}</p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className={`text-xs font-black px-2 py-0.5 rounded-lg ${isCbc ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {isCbc ? '🇰🇪 CBC' : '🌍 IGCSE'}
+                          </span>
+                          <span className={`text-xs font-black px-2 py-0.5 rounded-lg ${isCbc ? cbcLevelBadge(avg) : 'bg-blue-50 text-blue-700'}`}>
+                            {isCbc ? cbcLevelLabel(avg).label.split(' ')[0] : `${avg.toFixed(1)}`}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right: Assignments */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                <ClipboardList className="w-5 h-5 text-pink-600" />
+                Assignments
+              </h2>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              {assignmentsLoading ? (
+                <div className="p-4 space-y-3">
+                  {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-16" />)}
+                </div>
+              ) : assignments.length === 0 ? (
+                <div className="p-8 text-center">
+                  <p className="text-slate-500 text-sm mb-4">
+                    No assignments from teachers yet.<br />
+                    Join a class to receive assignments.
+                  </p>
+                  <Link
+                    href="/dashboard/settings"
+                    className="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 text-sm font-black px-4 py-2 rounded-xl hover:bg-slate-200 transition-colors"
+                  >
+                    Join a Class →
+                  </Link>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {assignments.slice(0, 5).map(a => (
+                    <div key={a.id} className="px-4 py-3">
+                      <div className="flex items-start justify-between gap-2 mb-1.5">
+                        <div>
+                          <p className="text-sm font-black text-slate-900">{a.title}</p>
+                          <p className="text-xs text-slate-500">{a.teachers?.full_name ?? 'Teacher'} · {a.subject}</p>
+                        </div>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-lg flex-shrink-0 ${
+                          a.isOverdue ? 'bg-red-100 text-red-700' : a.daysLeft <= 2 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {a.isOverdue ? '⚠ Overdue' : `${a.daysLeft}d left`}
+                        </span>
+                      </div>
+                      {a.is_compass_guided && (
+                        <Link
+                          href={`/chat?assignmentId=${a.id}&topic=${encodeURIComponent(a.topic)}&instructions=${encodeURIComponent(a.instructions)}`}
+                          className="inline-flex items-center gap-1.5 text-xs bg-gradient-to-r from-violet-500 to-purple-500 text-white px-3 py-1.5 rounded-lg font-black hover:scale-105 transition-all"
+                        >
+                          <Compass className="w-3.5 h-3.5" /> Start with Compass
+                        </Link>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── SECTION 7: Upgrade banner ─────────────────────────────────────── */}
+        {!statsLoading && showUpgradeBanner && (
+          <div className="bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-200 rounded-2xl p-6 text-center">
+            <p className="font-black text-slate-900 text-lg mb-2">🚀 Ready to unlock full access?</p>
+            <p className="text-slate-500 mb-5 text-sm">
+              Get unlimited Learning Compass sessions, Academic Clinic reports, and more.
+            </p>
+            <div className="flex flex-wrap justify-center gap-3">
+              <Link
+                href="/early-access"
+                className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-black hover:scale-105 transition-all text-sm shadow-lg shadow-green-500/20"
+              >
+                💚 Pay via M-PESA (Early Access)
+              </Link>
+              <Link
+                href="/pricing"
+                className="bg-violet-600 hover:bg-violet-700 text-white px-6 py-3 rounded-xl font-black hover:scale-105 transition-all text-sm shadow-lg shadow-violet-500/20"
+              >
+                View Plans →
+              </Link>
+            </div>
+          </div>
+        )}
+
       </div>
+
+      {/* ── Add Student Modal ─────────────────────────────────────────────────── */}
+      {showAddModal && (
+        <AddStudentModal
+          onClose={() => setShowAddModal(false)}
+          onSuccess={() => { fetchStudents(); fetchStats() }}
+        />
+      )}
     </div>
   )
 }

@@ -291,11 +291,15 @@ function ChatContent() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isLoading])
 
+  const ADMIN_EMAIL = 'kariukidennis092@gmail.com'
+
   const initSession = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
     setLearnerId(user.id)
+
+    const isAdmin = user.email === ADMIN_EMAIL
 
     // Check access
     const [{ data: tokenData }, { data: subscription }] = await Promise.all([
@@ -310,9 +314,9 @@ function ChatContent() {
       streakDays:       3,
       conceptsMastered: 0,
       tokens,
-      hasSubscription,
+      hasSubscription: hasSubscription || isAdmin,
     })
-    setHasAccess(true) // everyone gets free message
+    setHasAccess(true) // everyone gets free message (admin always gets access)
 
     // Load or create session
     const { data: existing } = await supabase
@@ -532,6 +536,15 @@ function ChatContent() {
     }
   }
 
+  // ── Loading screen (while initSession runs) ──────────────────────────────────
+  if (!initDone && !hasAccess) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="w-10 h-10 border-2 border-white/20 border-t-violet-400 rounded-full animate-spin" />
+      </div>
+    )
+  }
+
   // ── Locked screen ────────────────────────────────────────────────────────────
   if (!hasAccess && !showUpgrade) {
     return (
@@ -572,7 +585,7 @@ function ChatContent() {
             <span className="font-black text-white/80 text-sm tracking-tight">Compass</span>
           </Link>
           <button
-            onClick={() => learnerId && createNewSession(learnerId)}
+            onClick={async () => { if (learnerId) await createNewSession(learnerId) }}
             className="w-8 h-8 bg-white/5 hover:bg-white/10 rounded-xl flex items-center justify-center transition-colors group"
             title="New session"
           >
@@ -675,7 +688,7 @@ function ChatContent() {
           <div className="flex items-center gap-2">
             {/* Mobile new session */}
             <button
-              onClick={() => learnerId && createNewSession(learnerId)}
+              onClick={async () => { if (learnerId) await createNewSession(learnerId) }}
               className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 bg-white/5 rounded-xl text-xs font-bold text-white/50 hover:bg-white/10 hover:text-white/70 transition-all"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -726,7 +739,7 @@ function ChatContent() {
               </div>
 
               {/* Free message banner */}
-              {freeLeft > 0 && (
+              {freeLeft > 0 && !stats?.hasSubscription && (stats?.tokens || 0) === 0 && (
                 <div className="mt-8 flex items-center gap-2 px-5 py-2.5 bg-green-500/10 border border-green-500/20 rounded-full">
                   <Sparkles className="w-4 h-4 text-green-400" />
                   <span className="text-sm font-bold text-green-300">
@@ -775,7 +788,7 @@ function ChatContent() {
         <div className="px-4 md:px-6 py-4 border-t border-white/5 bg-[#0a0a14]/90 backdrop-blur-xl">
 
           {/* Free message indicator */}
-          {freeLeft > 0 && messages.length > 0 && (
+          {freeLeft > 0 && messages.length > 0 && !stats?.hasSubscription && (stats?.tokens || 0) === 0 && (
             <div className="flex justify-center mb-3">
               <span className="text-xs font-bold text-green-400/70 bg-green-500/10 px-4 py-1.5 rounded-full border border-green-500/15">
                 🎁 {freeLeft} free message remaining

@@ -6,7 +6,7 @@ export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
 
   const code = requestUrl.searchParams.get('code')
-  const returnTo = requestUrl.searchParams.get('returnTo') || '/pricing'
+  const returnTo = requestUrl.searchParams.get('returnTo') || '/dashboard'
   const product = requestUrl.searchParams.get('product')
 
   if (!code) {

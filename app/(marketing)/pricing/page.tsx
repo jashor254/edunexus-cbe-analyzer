@@ -34,6 +34,7 @@ const PRODUCTS = [
       'Learning Compass sessions',
       'PDF report downloads',
       'Tokens never expire',
+      'Supports CBC & Cambridge IGCSE',
     ],
     cta: 'Get Started',
     note: 'No subscription. Pay once, use anytime.',
@@ -55,6 +56,7 @@ const PRODUCTS = [
       'Holiday learning plan included',
       'PDF downloads',
       'Email support',
+      'Supports CBC & Cambridge IGCSE',
     ],
     cta: 'Book This Plan',
     note: 'Less than one private tuition session per month.',
@@ -75,6 +77,7 @@ const PRODUCTS = [
       'Family performance dashboard',
       'Priority support via WhatsApp',
       'Early access to new features',
+      'Supports CBC & Cambridge IGCSE',
     ],
     cta: 'Go Premium',
     note: 'For families with more than one child in school.',
@@ -176,12 +179,15 @@ function PricingContent() {
         <div className="absolute -bottom-1/4 -right-1/4 w-[800px] h-[800px] bg-amber-600/6 rounded-full blur-[120px]" />
       </div>
 
-      {/* Early access banner */}
-      <div className="bg-gradient-to-r from-violet-700 to-indigo-700 py-3 sticky top-0 z-50">
-        <div className="max-w-5xl mx-auto px-4 flex items-center justify-center gap-2">
-          <Sparkles className="w-4 h-4 animate-pulse flex-shrink-0" />
+      {/* M-PESA early access banner */}
+      <div className="bg-gradient-to-r from-green-700 to-emerald-700 py-3 sticky top-0 z-50">
+        <div className="max-w-5xl mx-auto px-4 flex items-center justify-center gap-2 flex-wrap">
           <span className="text-sm font-black tracking-wide text-center">
-            🇰🇪 Live payments launching soon — book your spot at launch pricing today
+            💚 Pay via M-PESA today →{' '}
+            <Link href="/early-access" className="underline underline-offset-2 hover:text-green-200 transition-colors">
+              Join Early Access
+            </Link>
+            {' '}· Full payments launching soon
           </span>
         </div>
       </div>
@@ -218,10 +224,23 @@ function PricingContent() {
               Your Child's Future
             </span>
           </h1>
-          <p className="text-lg text-white/50 max-w-xl mx-auto leading-relaxed mb-6">
+          <p className="text-lg text-white/50 max-w-xl mx-auto leading-relaxed mb-4">
             Your child isn't slow — they're just being taught like everyone else.
             Book your spot now at launch pricing.
           </p>
+
+          {/* Curriculum support badge */}
+          <div className="flex items-center justify-center gap-2 mb-6">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-500/15 border border-green-500/30 text-green-300 rounded-full text-xs font-black">
+              🇰🇪 CBC Kenya
+            </span>
+            <span className="text-white/30 text-xs">·</span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 rounded-full text-xs font-black">
+              🌍 Cambridge IGCSE
+            </span>
+            <span className="text-white/30 text-xs">·</span>
+            <span className="text-xs text-white/30 font-medium">More coming</span>
+          </div>
 
           {/* Early access notice */}
           <div className="inline-flex items-center gap-3 bg-violet-500/10 border border-violet-500/20 rounded-2xl px-6 py-4">
@@ -342,6 +361,22 @@ function PricingContent() {
             child unlimited personal tutoring across every subject for an entire term —
             for less than 3 tuition sessions.
           </p>
+        </div>
+
+        {/* Teachers — Always Free */}
+        <div className="bg-gradient-to-r from-teal-900/30 to-blue-900/30 border border-teal-500/20 rounded-3xl p-8 mb-12 max-w-2xl mx-auto text-center">
+          <div className="text-4xl mb-3">👨‍🏫</div>
+          <h3 className="text-xl font-black text-white mb-2">Teachers — Always Free</h3>
+          <p className="text-white/60 text-sm mb-4 leading-relaxed">
+            Full class management, student insights, assignment tools, early warning alerts,
+            and KNEC CBA export. No credit card. No expiry.
+          </p>
+          <Link
+            href="/signup"
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-teal-500 to-cyan-500 text-white px-6 py-3 rounded-xl font-black hover:scale-105 transition-all text-sm"
+          >
+            Get Teacher Access →
+          </Link>
         </div>
 
         {/* Trust */}

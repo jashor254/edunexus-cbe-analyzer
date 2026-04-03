@@ -3,7 +3,7 @@
 
 import { DEEPSEEK_CONFIG } from '@/lib/config/api'
 
-export async function callDeepSeek(prompt: string): Promise<string> {
+export async function callDeepSeek(prompt: string, systemPrompt?: string): Promise<string> {
   const response = await fetch(`${DEEPSEEK_CONFIG.baseURL}/v1/chat/completions`, {
     method: 'POST',
     headers: {
@@ -15,8 +15,8 @@ export async function callDeepSeek(prompt: string): Promise<string> {
       messages: [
         {
           role: 'system',
-          content:
-            'You are a helpful assistant. Always respond with valid JSON only — no markdown, no explanation, just the raw JSON.',
+          content: systemPrompt ||
+            'You are a helpful Kenyan CBC tutor. Always respond with valid JSON only — no markdown, no explanation, just the raw JSON.',
         },
         {
           role: 'user',

@@ -40,12 +40,20 @@ export async function updateSession(request: NextRequest) {
 
   // IMPORTANT: Refresh session or get user
   const { data: { user } } = await supabase.auth.getUser()
-  
-  // Kama hana user na anajaribu kuingia dashboard, mpeleke login
-  if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
+  const { pathname } = request.nextUrl
+
+  // Unauthenticated users trying to access dashboard → login
+  if (!user && pathname.startsWith('/dashboard')) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
+  }
+
+  // Admin routes: only kariukidennis092@gmail.com is allowed
+  if (pathname.startsWith('/admin')) {
+    if (user?.email !== 'kariukidennis092@gmail.com') {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
   }
 
   return response

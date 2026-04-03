@@ -16,7 +16,7 @@ function LoginContent() {
   const searchParams = useSearchParams()
   const supabase     = createClient()
 
-  const returnTo = searchParams?.get('returnTo') || '/pricing'
+  const returnTo = searchParams?.get('returnTo') || '/dashboard'
   const product  = searchParams?.get('product')
 
   // Redirect if already logged in

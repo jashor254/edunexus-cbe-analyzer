@@ -1,8 +1,9 @@
 // app/api/chat/route.ts
-import { NextResponse } from 'next/server'
 import { learningCompass } from '@/lib/ai/learningCompass'
+import { buildStudentRAGContext, buildRAGSystemPrompt } from '@/lib/ai/ragContext'
 import { createClient } from '@/utils/supabase/server'       // ✅ correct path
 import { createServiceClient } from '@/utils/supabase/service'
+import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
 
 export async function POST(req: Request) {
   try {
@@ -12,7 +13,6 @@ export async function POST(req: Request) {
       sessionId,
       learnerId,
       subjectId,
-      grade,
       sessionState,   // optional — sent on subsequent messages
     } = await req.json()
 
@@ -21,11 +21,25 @@ export async function POST(req: Request) {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return apiUnauthorized()
     }
 
     // ── 3. Check access — subscription OR token balance ──────────────────────
     const db = createServiceClient()
+
+    // Verify learnerId belongs to this user
+    if (learnerId && learnerId !== user.id) {
+      const { data: student } = await db
+        .from('students')
+        .select('id')
+        .eq('id', learnerId)
+        .eq('user_id', user.id)
+        .single()
+
+      if (!student) {
+        return apiForbidden()
+      }
+    }
 
     const [{ data: subscription }, { data: tokenData }] = await Promise.all([
       db
@@ -48,10 +62,7 @@ export async function POST(req: Request) {
     const tokenBalance    = tokenData?.balance || 0
 
     if (!hasSubscription && tokenBalance < 1) {
-      return NextResponse.json(
-        { error: 'Insufficient tokens', tokensRemaining: 0 },
-        { status: 403 }
-      )
+      return apiError('Insufficient tokens', 403)
     }
 
     // ── 4. Load or initialize learner state from DB ──────────────────────────
@@ -61,6 +72,7 @@ export async function POST(req: Request) {
       .select('session_state')
       .eq('id', sessionId)
       .eq('learner_id', user.id)
+      .eq('status', 'active')
       .single()
 
     // If compass doesn't know this learner yet, initialize from their assessments
@@ -96,7 +108,21 @@ export async function POST(req: Request) {
       learningCompass.restoreState(learnerId || user.id, savedState.session_state)
     }
 
-    // ── 5. Detect struggle / confidence from message ─────────────────────────
+    // ── 5. RAG: Retrieve full student context for personalized responses ────────
+    let ragSystemPrompt = ''
+    let ragCurriculumType: 'cbc' | 'igcse' | 'ib' | 'other' = 'cbc'
+    try {
+      const ragContext = await buildStudentRAGContext(
+        learnerId || user.id,
+        sessionId
+      )
+      ragSystemPrompt = buildRAGSystemPrompt(ragContext)
+      ragCurriculumType = ragContext.curriculumType
+    } catch (ragError) {
+      console.error('[chat] RAG context failed (continuing without personalization):', ragError)
+    }
+
+    // ── 7. Detect struggle / confidence from message ─────────────────────────
     const msgLower = message.toLowerCase()
 
     const struggled =
@@ -118,7 +144,7 @@ export async function POST(req: Request) {
     const confidence: 'low' | 'medium' | 'high' =
       confident ? 'high' : struggled ? 'low' : 'medium'
 
-    // ── 6. Detect subject from message ───────────────────────────────────────
+    // ── 8. Detect subject from message ───────────────────────────────────────
     const subjectKeywords: Record<string, string[]> = {
       mathematics:        ['math', 'algebra', 'fraction', 'percentage', 'geometry', 'equation', 'number', 'hesabu'],
       english:            ['english', 'grammar', 'reading', 'writing', 'essay', 'vocabulary'],
@@ -140,7 +166,38 @@ export async function POST(req: Request) {
       }
     }
 
-    // ── 7. Get compass decision ──────────────────────────────────────────────
+    // ── 9. Detect preferred example type and persist to session state ────────
+    let detectedExampleType: string | null = null
+    if (
+      msgLower.includes('food') || msgLower.includes('chapati') ||
+      msgLower.includes('ugali') || msgLower.includes('cook')
+    ) {
+      detectedExampleType = 'food'
+    } else if (
+      msgLower.includes('money') || msgLower.includes('kes') ||
+      msgLower.includes('pay') || msgLower.includes('buy')
+    ) {
+      detectedExampleType = 'money'
+    } else if (
+      msgLower.includes('sport') || msgLower.includes('football') ||
+      msgLower.includes('run') || msgLower.includes('play')
+    ) {
+      detectedExampleType = 'sports'
+    }
+
+    if (detectedExampleType && savedState?.session_state) {
+      await db
+        .from('compass_sessions')
+        .update({
+          session_state: {
+            ...savedState.session_state,
+            preferredExampleType: detectedExampleType,
+          },
+        })
+        .eq('id', sessionId)
+    }
+
+    // ── 10. Get compass decision ─────────────────────────────────────────────
     const compassResponse = await learningCompass.getNextTask(
       learnerId || user.id,
       subject,
@@ -149,7 +206,9 @@ export async function POST(req: Request) {
         timeSpent: sessionState?.timeOnTask || 0,
         struggled,
         confidence,
-      }
+      },
+      ragSystemPrompt,
+      ragCurriculumType
     )
 
     // ── 8. Persist updated learner state to DB ───────────────────────────────
@@ -221,7 +280,7 @@ export async function POST(req: Request) {
       `\n\n💡 ${compassResponse.encouragement}`
 
     // ✅ Response shape matches exactly what chat UI destructures
-    return NextResponse.json({
+    return apiSuccess({
       text:      responseText,
       visualAid: task.content.visualAid || null,
 
@@ -258,9 +317,6 @@ export async function POST(req: Request) {
 
   } catch (error: any) {
     console.error('[chat] error:', error.message)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return apiError('Internal server error')
   }
 }

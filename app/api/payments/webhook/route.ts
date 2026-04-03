@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { apiSuccess, apiError, apiUnauthorized, apiBadRequest } from '@/lib/api/response';
 import { createClient } from '@supabase/supabase-js';
 import { paystackClient } from '@/lib/payments/paystack';
 
@@ -18,14 +19,14 @@ export async function POST(request: NextRequest) {
     
     if (!signature || !paystackClient.verifyWebhookSignature(signature, body)) {
       console.error('❌ Invalid Webhook Signature');
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return apiUnauthorized();
     }
 
     const event = JSON.parse(body);
     
     // Only process successful charges
     if (event.event !== 'charge.success') {
-      return NextResponse.json({ status: 'ignored' });
+      return apiSuccess({ status: 'ignored' });
     }
 
     const { reference, metadata, amount, customer } = event.data;
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     if (!user_id) {
       console.error('❌ Missing user_id in metadata for ref:', reference);
-      return NextResponse.json({ error: 'Missing user_id in metadata' }, { status: 400 });
+      return apiBadRequest('Missing user_id in metadata');
     }
 
     // ============================================
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
     if (existingPayment) {
       if (existingPayment.status === 'completed' || existingPayment.status === 'successful') {
         console.log(`⚠️ Transaction ${reference} already processed. Skipping.`);
-        return NextResponse.json({ status: 'already_processed' });
+        return apiSuccess({ status: 'already_processed' });
       }
     }
 
@@ -85,15 +86,15 @@ export async function POST(request: NextRequest) {
       });
       
       // Return 500 so Paystack retries
-      return NextResponse.json({ error: 'Database update failed' }, { status: 500 });
+      return apiError('Database update failed');
     }
 
     console.log(`✅ Success! Payment processed for User: ${user_id}`);
-    return NextResponse.json({ status: 'success' }, { status: 200 });
+    return apiSuccess({ status: 'success' });
 
   } catch (error: any) {
     console.error('❌ Webhook Critical Error:', error.message);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return apiError('Internal Server Error');
   }
 }
 

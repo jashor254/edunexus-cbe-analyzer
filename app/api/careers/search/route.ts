@@ -1,6 +1,7 @@
 // app/api/careers/search/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { NextRequest } from 'next/server';
+import { apiSuccess, apiError, apiBadRequest } from '@/lib/api/response';
+import { createClient } from '@/utils/supabase/server';
 import { findCareerByName } from '@/lib/academicClinic/careerDatabase';
 import { generateDynamicCareer } from '@/lib/academicClinic/dynamicCareerGenerator';
 
@@ -12,7 +13,7 @@ export async function GET(req: NextRequest) {
   const careerName = searchParams.get('name')?.trim();
   
   if (!careerName) {
-    return NextResponse.json({ error: "Search query required" }, { status: 400 });
+    return apiBadRequest("Search query required");
   }
 
   // 1. RATE LIMITING (Basic)
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (userLimit.count >= 20) {
-    return NextResponse.json({ error: "Too many searches. Relax kidogo!" }, { status: 429 });
+    return apiError("Too many searches. Relax kidogo!", 429);
   }
   userLimit.count++;
   rateLimitMap.set(ip, userLimit);
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
     // Angalia kama iko kwa static database kwanza
     const staticResult = findCareerByName(careerName);
     if (staticResult) {
-      return NextResponse.json({ source: 'static', career: staticResult });
+      return apiSuccess({ source: 'static', career: staticResult });
     }
 
     // Angalia kama ilishawahi kutafutwa na AI ikahifadhiwa kwa DB
@@ -49,7 +50,7 @@ export async function GET(req: NextRequest) {
       .maybeSingle();
 
     if (!cacheError && cachedCareer) {
-      return NextResponse.json({ source: 'database', career: cachedCareer });
+      return apiSuccess({ source: 'database', career: cachedCareer });
     }
 
     // 3. GENERATE DYNAMICALLY (AI Research)
@@ -82,17 +83,15 @@ export async function GET(req: NextRequest) {
       console.error("Failed to persist dynamic career:", saveError);
     }
 
-    return NextResponse.json({ 
-      source: 'dynamic', 
+    return apiSuccess({
+      source: 'dynamic',
       career: dynamicCareer,
-      message: "AI researched this specifically for you!" 
+      message: "AI researched this specifically for you!"
     });
 
   } catch (err) {
     console.error("Career Search Error:", err);
-    return NextResponse.json({ 
-      error: "Failed to research career. Please try again." 
-    }, { status: 500 });
+    return apiError("Failed to research career. Please try again.");
   }
 }
 

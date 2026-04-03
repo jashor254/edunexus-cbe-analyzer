@@ -1,26 +1,27 @@
 // app/api/ai/usage/route.ts
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { checkRateLimit } from '@/lib/ai/rateLimit'
+import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
+import type { UsageTier } from '@/lib/ai/rateLimit'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
-    const tier = (searchParams.get('tier') as 'free' | 'family' | 'school') || 'free'
-    
+    const tier = (searchParams.get('tier') as UsageTier) || 'free'
+
     if (!userId) {
-      return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
+      return apiUnauthorized()
     }
-    
+
     // Hapa tunacheki kama amefika kikomo (Rate Limits)
     const [careerAnalysis, learningPlans, chatMessages] = await Promise.all([
       checkRateLimit(userId, 'careerAnalysis', tier),
       checkRateLimit(userId, 'learningPlans', tier),
       checkRateLimit(userId, 'chatMessages', tier)
     ])
-    
-    return NextResponse.json({
-      success: true,
+
+    return apiSuccess({
       tier,
       usage: {
         careerAnalysis, // Hii itarudisha { allowed: boolean, remaining: number }
@@ -29,10 +30,10 @@ export async function GET(request: NextRequest) {
       },
       resetDate: getNextMonthStart()
     })
-    
+
   } catch (error) {
     console.error('Usage check API error:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    return apiError('Internal Server Error', 500)
   }
 }
 

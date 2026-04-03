@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server'; // Tumia ile helper ya server!
+import { NextRequest } from 'next/server';
+import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response';
+import { createClient } from '@/utils/supabase/server';
 import { careerMatcher } from '@/lib/academicClinic/careerMatcher';
 
 export async function POST(req: NextRequest) {
@@ -9,13 +10,13 @@ export async function POST(req: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return apiUnauthorized();
     }
 
     const { studentId, action, careerName } = await req.json();
 
     if (!studentId) {
-      return NextResponse.json({ error: 'Student ID required' }, { status: 400 });
+      return apiBadRequest('Student ID required');
     }
 
     // 2. Security Check: Je, huyu student ni wa huyu user aliyelog-in?
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (studentError || !student) {
-      return NextResponse.json({ error: 'Student not found or access denied' }, { status: 403 });
+      return apiForbidden();
     }
 
     // 3. Process the AI Matching
@@ -36,28 +37,25 @@ export async function POST(req: NextRequest) {
     switch (action) {
       case 'full-assessment':
         // Hii inatumia DeepSeek/Gemini kupiga mahesabu ya CBC subjects vs Careers
-        result = await careerMatcher.generateMatches(studentId);
+        result = await careerMatcher.generateMatches(studentId, true);
         break;
-      
+
       case 'specific-career':
         if (!careerName) {
-          return NextResponse.json({ error: 'Career name required' }, { status: 400 });
+          return apiBadRequest('Career name required');
         }
         result = await careerMatcher.assessSpecificCareer(studentId, careerName);
         break;
-      
+
       default:
-        result = await careerMatcher.generateMatches(studentId);
+        result = await careerMatcher.generateMatches(studentId, true);
     }
 
     // 4. Return the result to the Dashboard
-    return NextResponse.json(result);
+    return apiSuccess(result);
 
   } catch (error: any) {
     console.error('Career matching error:', error);
-    return NextResponse.json(
-      { error: 'Failed to generate career matches. Please try again later.' },
-      { status: 500 }
-    );
+    return apiError('Failed to generate career matches. Please try again later.');
   }
 }

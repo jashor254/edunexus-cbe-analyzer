@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
+import { apiSuccess, apiError, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
 
 // 🔒 Single source of truth — backend only, never trust frontend
 const PRODUCTS: Record<string, { price: number; type: string; label: string; tokens?: number }> = {
@@ -19,13 +19,13 @@ export async function POST(req: Request) {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Please login first' }, { status: 401 })
+      return apiUnauthorized()
     }
 
     // 🧠 2. Validate product
     const product = PRODUCTS[productId]
     if (!product) {
-      return NextResponse.json({ error: 'Invalid product selected' }, { status: 400 })
+      return apiBadRequest('Invalid product selected')
     }
 
     // 📱 3. Format phone → 254XXXXXXXXX
@@ -37,10 +37,7 @@ export async function POST(req: Request) {
     else                            formattedPhone = '254' + clean
 
     if (formattedPhone.length !== 12) {
-      return NextResponse.json(
-        { error: 'Invalid M-PESA number. Use format: 0712345678' },
-        { status: 400 }
-      )
+      return apiBadRequest('Invalid M-PESA number. Use format: 0712345678')
     }
 
     // 🆔 4. Unique reference
@@ -65,10 +62,7 @@ export async function POST(req: Request) {
 
     if (insertError) {
       console.error('[initialize] DB error:', insertError.code, insertError.message)
-      return NextResponse.json(
-        { error: 'Could not save transaction. Try again.' },
-        { status: 500 }
-      )
+      return apiError('Could not save transaction. Try again.')
     }
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
@@ -101,22 +95,16 @@ export async function POST(req: Request) {
 
     if (!data.status) {
       console.error('[initialize] Paystack error:', data.message)
-      return NextResponse.json(
-        { error: data.message || 'Paystack initialization failed' },
-        { status: 400 }
-      )
+      return apiBadRequest(data.message || 'Paystack initialization failed')
     }
 
-    return NextResponse.json({
+    return apiSuccess({
       authorization_url: data.data.authorization_url,
       reference:         data.data.reference,
     })
 
   } catch (error: any) {
     console.error('[initialize] Unhandled error:', error.message)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return apiError('Internal server error')
   }
 }

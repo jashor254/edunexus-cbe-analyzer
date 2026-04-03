@@ -22,7 +22,19 @@ function MarketingNav() {
           <a href="/#boarding"      className="text-sm font-bold text-white/60 hover:text-blue-400 transition-colors">Boarding</a>
           <a href="/#features"      className="text-sm font-bold text-white/60 hover:text-white transition-colors">Features</a>
           <a href="/#clinic"        className="text-sm font-bold text-white/60 hover:text-violet-400 transition-colors">Clinic</a>
+          <a href="/#igcse"         className="text-sm font-bold text-white/60 hover:text-blue-400 transition-colors">IGCSE</a>
+          <a href="/#teachers"      className="text-sm font-bold text-white/60 hover:text-teal-400 transition-colors">Teachers</a>
           <Link href="/pricing"     className="text-sm font-bold text-white/60 hover:text-pink-400 transition-colors">Pricing</Link>
+          <Link
+            href="/early-access"
+            className="text-sm font-bold text-green-400 hover:text-green-300 transition-colors flex items-center gap-1"
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400" />
+            </span>
+            🚀 Early Access
+          </Link>
         </div>
 
         {/* CTA */}

@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     const { profile, userId, tier = 'free' } = body as { 
       profile: CareerProfile
       userId: string
-      tier?: 'free' | 'family' | 'school'
+      tier?: 'free' | 'starter' | 'term' | 'premium'
     }
     
     if (!profile || !userId) {
