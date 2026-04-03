@@ -679,7 +679,7 @@ function ChatContent() {
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
                 <span className="text-[10px] text-green-400 font-bold">
-                  Adapting to your level
+                  AI adapting to your level · Parent can see all sessions
                 </span>
               </div>
             </div>
@@ -736,6 +736,12 @@ function ChatContent() {
                     {s}
                   </button>
                 ))}
+              </div>
+
+              <div className="mt-6 bg-white/5 border border-white/10 rounded-xl px-5 py-3 max-w-md mx-auto">
+                <p className="text-xs text-white/40 text-center leading-relaxed">
+                  🤖 <strong className="text-white/60">Powered by AI</strong> · This tutor adapts to your child&apos;s level. Parents can view all sessions from their dashboard.
+                </p>
               </div>
 
               {/* Free message banner */}
@@ -908,6 +914,7 @@ function ChatContent() {
               {[
                 'Unlimited tutoring sessions',
                 'Adapts to your child\'s CBC level',
+                'AI tutoring that adapts in real time',
                 'Visual diagrams for Science & Geography',
                 'Parent insights after every session',
                 'Kenyan context — chapati, matatu & more',

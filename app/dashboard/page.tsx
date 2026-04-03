@@ -18,6 +18,8 @@ import {
   AlertTriangle,
   ChevronRight,
   Zap,
+  Sparkles,
+  Shield,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -557,6 +559,16 @@ export default function DashboardPage() {
             <p className="text-slate-500 text-sm mt-1">
               Welcome to your EduNexus dashboard
             </p>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="inline-flex items-center gap-1.5 bg-violet-50 border border-violet-200 text-violet-600 px-3 py-1 rounded-full text-xs font-bold">
+                <Sparkles className="w-3 h-3" />
+                AI-Powered Learning
+              </span>
+              <span className="inline-flex items-center gap-1.5 bg-green-50 border border-green-200 text-green-600 px-3 py-1 rounded-full text-xs font-bold">
+                <Shield className="w-3 h-3" />
+                You are in control
+              </span>
+            </div>
           </div>
           <div className="flex-shrink-0">
             {statsLoading ? <Skeleton className="h-8 w-48" /> : renderPlanBadge()}
@@ -703,7 +715,7 @@ export default function DashboardPage() {
               {
                 icon: Compass,
                 title: 'Learning Compass',
-                sub: 'Start a session',
+                sub: 'AI tutoring · adapts to your child',
                 gradient: 'from-amber-500 to-orange-500',
                 shadow: 'shadow-amber-500/20',
                 href: '/chat',
@@ -711,7 +723,7 @@ export default function DashboardPage() {
               {
                 icon: BarChart3,
                 title: 'Academic Clinic',
-                sub: 'View reports',
+                sub: 'AI-generated reports · parent verified',
                 gradient: 'from-violet-500 to-purple-500',
                 shadow: 'shadow-violet-500/20',
                 href: '/dashboard/clinic',

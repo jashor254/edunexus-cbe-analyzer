@@ -105,6 +105,12 @@ function MarketingFooter() {
           </a>
         </div>
 
+        <div className="flex justify-center mb-4">
+          <span className="inline-flex items-center gap-2 bg-white/5 border border-white/10 text-white/30 px-4 py-2 rounded-full text-xs font-bold">
+            <Sparkles className="w-3 h-3 text-violet-400" />
+            AI-powered · Parents in control · Compliant with Kenya AI standards
+          </span>
+        </div>
         <p className="text-sm text-white/40">© 2026 EduNexus. Made in Kenya 🇰🇪</p>
       </div>
     </footer>

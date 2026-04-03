@@ -84,11 +84,13 @@ const PLANS = [
     icon: Star,
     features: [
       'Unlimited tutoring sessions',
+      "🤖 AI tutoring that learns your child's pace",
       'All CBC subjects',
       'Academic Clinic reports',
       'Holiday learning plan',
       'Share with teacher',
       'Track 1 student',
+      'AI-powered · parents in control',
     ],
   },
   {

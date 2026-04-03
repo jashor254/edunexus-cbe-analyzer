@@ -52,6 +52,7 @@ const PRODUCTS = [
     features: [
       'Unlimited Academic Clinic reports',
       'Unlimited Learning Compass sessions',
+      '🤖 AI tutoring that adapts in real time',
       'Track 1 student — all subjects',
       'Holiday learning plan included',
       'PDF downloads',
@@ -390,6 +391,12 @@ function PricingContent() {
           <p className="text-white/20 text-xs">
             🚀 Going fully live soon — early members get the best rate
           </p>
+          <div className="flex justify-center pt-1">
+            <span className="inline-flex items-center gap-1.5 text-white/20 text-xs">
+              <Sparkles className="w-4 h-4 text-violet-400" />
+              AI-powered learning
+            </span>
+          </div>
         </div>
       </div>
 

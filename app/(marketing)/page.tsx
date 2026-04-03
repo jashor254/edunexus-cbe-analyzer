@@ -207,13 +207,15 @@ export default function LandingPage() {
       <section className="max-w-7xl mx-auto px-6 pt-20 pb-16 md:pt-32 md:pb-24">
         <div className="text-center">
 
-          <div className="inline-flex items-center gap-2 bg-amber-500/10 backdrop-blur-sm border border-amber-500/20 text-amber-300 px-4 py-2 rounded-full text-sm font-black mb-8 animate-in fade-in slide-in-from-top duration-700">
-            <Moon className="w-4 h-4" />
-            CBC KENYA · CAMBRIDGE IGCSE · GRADE 7–12
-            <span className="w-px h-3 bg-amber-500/40" />
-            <span className="text-amber-200/60 text-xs">
-              🇰🇪 & 🌍
-            </span>
+          <div className="flex flex-col sm:flex-row items-center gap-3 mb-8">
+            <div className="inline-flex items-center gap-2 bg-amber-500/10 backdrop-blur-sm border border-amber-500/20 text-amber-300 px-4 py-2 rounded-full text-sm font-black animate-in fade-in slide-in-from-top duration-700">
+              <Moon className="w-4 h-4" />
+              CBC KENYA · CAMBRIDGE IGCSE · GRADE 7–12
+            </div>
+            <div className="inline-flex items-center gap-2 bg-violet-500/10 backdrop-blur-sm border border-violet-500/20 text-violet-300 px-4 py-2 rounded-full text-sm font-black animate-in fade-in slide-in-from-top duration-700">
+              <Sparkles className="w-4 h-4" />
+              AI-POWERED · PARENTS IN CONTROL · MADE IN KENYA 🇰🇪
+            </div>
           </div>
 
           <h1
@@ -577,7 +579,15 @@ export default function LandingPage() {
                   </div>
                 ))}
               </div>
-              <div className="flex flex-col sm:flex-row items-start gap-4">
+              <div className="bg-white/5 border border-violet-500/20 rounded-2xl p-4 mt-6">
+                <p className="text-sm font-black text-violet-300 mb-1">
+                  🤖 How the AI works
+                </p>
+                <p className="text-xs text-white/50 leading-relaxed">
+                  EduNexus uses AI to understand your child's learning pace and adjust every session in real time. You can see every conversation. Teachers can see reports you choose to share. The AI guides — parents and teachers decide.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row items-start gap-4 mt-6">
                 <Link
                   href="/signup"
                   className="group inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-8 py-4 rounded-2xl font-black hover:scale-105 transition-all shadow-xl shadow-amber-500/25"
@@ -948,6 +958,86 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* AI TRANSPARENCY SECTION */}
+      <section className="py-16 px-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-gradient-to-br from-violet-900/30 to-slate-900/50 border border-violet-500/20 rounded-3xl p-8 md:p-10">
+
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center gap-2 bg-violet-500/10 border border-violet-500/20 text-violet-300 px-4 py-2 rounded-full text-sm font-black mb-4">
+                <Sparkles className="w-4 h-4" />
+                HOW WE USE AI
+              </div>
+              <h2 className="text-3xl md:text-4xl font-black text-white mb-3">
+                AI that guides.
+                <span className="block bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent">
+                  People who decide.
+                </span>
+              </h2>
+              <p className="text-white/60 max-w-xl mx-auto">
+                EduNexus uses AI openly and honestly. Here is exactly what our AI does — and what it never does.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+
+              {/* What AI does */}
+              <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-6">
+                <h3 className="font-black text-green-300 mb-4 flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5" />
+                  What our AI does
+                </h3>
+                <ul className="space-y-3">
+                  {[
+                    "Adapts lesson difficulty to your child's level in real time",
+                    'Identifies subject and topic gaps from assessment scores',
+                    'Generates personalized practice questions',
+                    'Recommends career paths based on actual performance',
+                    'Detects when a student is struggling and adjusts',
+                    'Produces Academic Clinic reports from your data',
+                  ].map((item, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-white/70">
+                      <span className="text-green-400 mt-0.5 flex-shrink-0">✓</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* What AI never does */}
+              <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-6">
+                <h3 className="font-black text-red-300 mb-4 flex items-center gap-2">
+                  <Shield className="w-5 h-5" />
+                  What our AI never does
+                </h3>
+                <ul className="space-y-3">
+                  {[
+                    "Make final decisions about your child's education",
+                    "Share your child's data with anyone without your consent",
+                    'Replace teachers or parents in the learning process',
+                    'Give medical or psychological diagnoses',
+                    "Access your child's device or personal files",
+                    'Operate without a parent or guardian account',
+                  ].map((item, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-white/70">
+                      <span className="text-red-400 mt-0.5 flex-shrink-0">✕</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            <div className="mt-6 bg-white/5 border border-white/10 rounded-2xl p-5 text-center">
+              <p className="text-white/60 text-sm leading-relaxed">
+                <strong className="text-white">Human oversight, always.</strong>{' '}
+                Every AI recommendation in EduNexus is visible to parents and can be reviewed or overridden. Teachers see only what parents choose to share. We are designed for Kenya's AI governance standards.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── FINAL CTA ─────────────────────────────────────────────────────────── */}
       <section className="relative py-24 px-6 mb-10">
         <div className="absolute inset-0 bg-gradient-to-r from-amber-600/8 via-purple-600/8 to-blue-600/8 rounded-3xl blur-3xl" />
@@ -986,11 +1076,26 @@ export default function LandingPage() {
             </Link>
           </div>
           <div className="flex flex-wrap justify-center gap-6 mt-8 text-sm text-white/30">
-            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400" /> M-PESA accepted</span>
-            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400" /> CBC & Cambridge IGCSE</span>
-            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400" /> Made in Kenya 🇰🇪</span>
-            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400" /> Works at midnight</span>
-            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400" /> Teachers free forever</span>
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-green-400" />
+              M-PESA accepted
+            </span>
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-green-400" />
+              CBC & Cambridge IGCSE
+            </span>
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-violet-400" />
+              AI-powered learning
+            </span>
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-green-400" />
+              Parents always in control
+            </span>
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-green-400" />
+              Made in Kenya 🇰🇪
+            </span>
           </div>
         </div>
       </section>
