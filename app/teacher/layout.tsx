@@ -11,16 +11,18 @@ import {
   Settings,
   GraduationCap,
   LogOut,
+  Scroll,
 } from 'lucide-react'
 
 const NAV = [
-  { href: '/teacher/dashboard',    icon: LayoutDashboard, label: 'Dashboard'   },
-  { href: '/teacher/classes',      icon: BookOpen,        label: 'My Classes'  },
-  { href: '/teacher/assignments',  icon: FileText,        label: 'Assignments' },
-  { href: '/teacher/insights',     icon: BarChart3,       label: 'Insights'    },
-  { href: '/teacher/alerts',       icon: AlertTriangle,   label: 'Alerts'      },
-  { href: '/teacher/reports',      icon: ClipboardList,   label: 'Reports'     },
-  { href: '/teacher/settings',     icon: Settings,        label: 'Settings'    },
+  { href: '/teacher/dashboard',        icon: LayoutDashboard, label: 'Dashboard',      badge: null  },
+  { href: '/teacher/classes',          icon: BookOpen,        label: 'My Classes',     badge: null  },
+  { href: '/teacher/assignments',      icon: FileText,        label: 'Assignments',    badge: null  },
+  { href: '/teacher/scheme-of-work',   icon: Scroll,          label: 'Scheme of Work', badge: 'NEW' },
+  { href: '/teacher/insights',         icon: BarChart3,       label: 'Insights',       badge: null  },
+  { href: '/teacher/alerts',           icon: AlertTriangle,   label: 'Alerts',         badge: null  },
+  { href: '/teacher/reports',          icon: ClipboardList,   label: 'Reports',        badge: null  },
+  { href: '/teacher/settings',         icon: Settings,        label: 'Settings',       badge: null  },
 ]
 
 const MOBILE_NAV = [
@@ -92,7 +94,12 @@ export default async function TeacherLayout({ children }: { children: React.Reac
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 hover:text-teal-700 transition-all group"
             >
               <item.icon className="w-5 h-5 text-gray-400 group-hover:text-teal-600 transition-colors" />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {item.badge && (
+                <span className="text-[10px] bg-teal-100 text-teal-700 border border-teal-200 px-1.5 py-0.5 rounded-full font-black">
+                  {item.badge}
+                </span>
+              )}
             </Link>
           ))}
         </nav>

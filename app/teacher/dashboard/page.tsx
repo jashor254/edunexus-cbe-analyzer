@@ -7,7 +7,7 @@ import Link from 'next/link'
 import {
   Users, BookOpen, FileText, AlertTriangle,
   PlusCircle, ChevronRight, Eye, Clock,
-  TrendingUp, CheckCircle2,
+  TrendingUp, CheckCircle2, Scroll,
 } from 'lucide-react'
 
 function getTermInfo() {
@@ -51,7 +51,7 @@ export default async function TeacherDashboardPage() {
   const today = new Date().toLocaleDateString('en-KE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
   // Fetch dashboard data in parallel
-  const [classesResult, alertsResult, assignmentsResult] = await Promise.all([
+  const [classesResult, alertsResult, assignmentsResult, schemesResult] = await Promise.all([
     db.from('teacher_classes')
       .select('id, name, grade, subject, class_code, academic_year')
       .eq('teacher_id', teacher.id)
@@ -69,11 +69,18 @@ export default async function TeacherDashboardPage() {
       .eq('teacher_id', teacher.id)
       .eq('status', 'active')
       .order('due_date', { ascending: true }),
+
+    db.from('schemes_of_work')
+      .select('id, grade, learning_area, term, year, curriculum_mode, created_at')
+      .eq('teacher_id', teacher.id)
+      .order('created_at', { ascending: false })
+      .limit(5),
   ])
 
   const classes = classesResult.data || []
   const alerts = alertsResult.data || []
   const activeAssignments = assignmentsResult.data || []
+  const recentSchemes = schemesResult.data || []
 
   // Get student counts + avg per class
   const classesWithStats = await Promise.all(
@@ -380,10 +387,11 @@ export default async function TeacherDashboardPage() {
       )}
 
       {/* Quick actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
         {[
           { href: '/teacher/classes',           icon: PlusCircle,    label: 'New Class',       color: 'bg-teal-600'   },
           { href: '/teacher/assignments/new',    icon: FileText,      label: 'New Assignment',  color: 'bg-blue-600'   },
+          { href: '/teacher/scheme-of-work',     icon: Scroll,        label: 'Scheme of Work',  color: 'bg-indigo-600' },
           { href: '/teacher/reports',            icon: TrendingUp,    label: 'Class Reports',   color: 'bg-violet-600' },
           { href: '/teacher/alerts',             icon: CheckCircle2,  label: 'Review Alerts',   color: 'bg-amber-600'  },
         ].map((action, i) => (
@@ -397,6 +405,44 @@ export default async function TeacherDashboardPage() {
           </Link>
         ))}
       </div>
+
+      {/* My Schemes */}
+      {recentSchemes.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-black text-gray-900 flex items-center gap-2">
+              <Scroll className="w-5 h-5 text-indigo-600" />
+              My Schemes of Work
+            </h2>
+            <Link
+              href="/teacher/scheme-of-work"
+              className="text-sm text-gray-500 hover:text-gray-700 font-bold flex items-center gap-1"
+            >
+              Create New <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100 shadow-sm overflow-hidden">
+            {recentSchemes.map((s: any) => (
+              <div key={s.id} className="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition">
+                <div>
+                  <div className="font-bold text-gray-900 text-sm">
+                    {s.learning_area} · {s.grade}
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    Term {s.term} {s.year} · {new Date(s.created_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </div>
+                </div>
+                <Link
+                  href="/teacher/scheme-of-work"
+                  className="text-xs text-indigo-600 font-bold hover:underline flex items-center gap-1"
+                >
+                  Create New <ChevronRight className="w-3 h-3" />
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

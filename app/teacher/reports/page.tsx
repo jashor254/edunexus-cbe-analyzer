@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Download, FileText, BarChart3, ClipboardList, GraduationCap, Loader2 } from 'lucide-react'
+import { Download, FileText, BarChart3, ClipboardList, GraduationCap, Loader2, Scroll } from 'lucide-react'
+import Link from 'next/link'
 
 interface TeacherClass { id: string; name: string; grade: number; subject: string; academic_year: string }
 
@@ -10,6 +11,7 @@ const REPORT_TYPES = [
   { id: 'subject',     icon: FileText,      label: 'Subject Gap Report',  desc: 'Concept-by-concept breakdown per subject'     },
   { id: 'assignment',  icon: ClipboardList, label: 'Assignment Summary',  desc: 'Submission rates, scores and common mistakes' },
   { id: 'knec',        icon: GraduationCap, label: 'KNEC CBA Export',     desc: 'CSV ready to upload to KNEC CBA portal'       },
+  { id: 'sow',         icon: Scroll,        label: 'Scheme of Work',       desc: 'AI-generated KICD-aligned SOW · CBC & 8-4-4'  },
 ]
 
 const TERMS = ['1', '2', '3']
@@ -159,7 +161,32 @@ export default function ReportsPage() {
             </div>
           )}
 
-          {activeReport !== 'knec' && (
+          {/* SOW specific UI */}
+          {activeReport === 'sow' && (
+            <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-5 mb-5">
+              <h3 className="font-black text-indigo-800 mb-2 flex items-center gap-2">
+                <Scroll className="w-4 h-4" /> AI Scheme of Work Generator
+              </h3>
+              <p className="text-sm text-indigo-700 mb-4">
+                Generate a complete, KICD-aligned Scheme of Work in minutes using DeepSeek AI.
+                Supports both CBC and 8-4-4 curricula. Download as PDF or save to your account.
+              </p>
+              <div className="text-xs text-indigo-600 font-medium space-y-1 mb-4">
+                <div>✅ CBC Junior (Grade 7–9) & Senior (Grade 10)</div>
+                <div>✅ 8-4-4 Form 3 & Form 4</div>
+                <div>✅ KICD aligned · PDF download in seconds</div>
+                <div>✅ Strand, substrand, outcomes, experiences, assessment</div>
+              </div>
+              <Link
+                href="/teacher/scheme-of-work"
+                className="inline-flex items-center gap-2 bg-indigo-600 text-white px-5 py-3 rounded-xl font-bold hover:bg-indigo-700 transition text-sm"
+              >
+                <Scroll className="w-4 h-4" /> Go to SOW Generator →
+              </Link>
+            </div>
+          )}
+
+          {activeReport !== 'knec' && activeReport !== 'sow' && (
             <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 mb-5 text-center">
               <FileText className="w-8 h-8 text-gray-300 mx-auto mb-2" />
               <p className="text-sm text-gray-500">
@@ -168,16 +195,18 @@ export default function ReportsPage() {
             </div>
           )}
 
-          <button
-            onClick={activeReport === 'knec' ? downloadKNEC : undefined}
-            disabled={downloading || !selectedClass || activeReport !== 'knec'}
-            className="flex items-center gap-2 bg-teal-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-teal-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {downloading
-              ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</>
-              : <><Download className="w-4 h-4" /> {activeReport === 'knec' ? 'Download KNEC CSV' : 'Download PDF (coming soon)'}</>
-            }
-          </button>
+          {activeReport !== 'sow' && (
+            <button
+              onClick={activeReport === 'knec' ? downloadKNEC : undefined}
+              disabled={downloading || !selectedClass || activeReport !== 'knec'}
+              className="flex items-center gap-2 bg-teal-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-teal-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {downloading
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</>
+                : <><Download className="w-4 h-4" /> {activeReport === 'knec' ? 'Download KNEC CSV' : 'Download PDF (coming soon)'}</>
+              }
+            </button>
+          )}
         </div>
       )}
 
