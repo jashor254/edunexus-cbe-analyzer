@@ -92,7 +92,7 @@ export async function POST(req: Request) {
 
       const { data: interests } = await db
         .from('student_interests')
-        .select('*')
+        .select('id, student_id, interests, learning_style, created_at')
         .eq('student_id', learnerId || user.id)
         .single()
 

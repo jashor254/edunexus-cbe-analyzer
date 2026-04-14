@@ -45,7 +45,9 @@ export async function GET() {
       return apiError('Failed to fetch schemes')
     }
 
-    return apiSuccess({ schemes: schemes || [] })
+    const response = apiSuccess({ schemes: schemes || [] })
+    response.headers.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=60')
+    return response
   } catch (err: any) {
     console.error('[sow/list]', err)
     return apiError(err.message || 'List failed')

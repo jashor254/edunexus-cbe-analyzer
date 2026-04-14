@@ -15,7 +15,7 @@ async function processPayment(
   // 1. Fetch payment record
   const { data: payment, error: fetchError } = await db
     .from('payments')
-    .select('*')
+    .select('id, status, user_id, product_id')
     .eq('transaction_id', reference)
     .single()
 

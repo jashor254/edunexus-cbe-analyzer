@@ -14,8 +14,8 @@ import {
   Loader2, Sparkles, MessageCircle, Heart,
   GraduationCap, Clock, Shield
 } from 'lucide-react'
-import { analyzeCareerOptions, generateCareerIntegratedLearningPlan } from '@/lib/ai/careerAnalysis'
-import type { CareerRecommendation, CareerProfile } from '@/lib/ai/careerAnalysis'
+import { analyzeCareerOptions, generateCareerIntegratedLearningPlan } from '@/lib/academicClinic/careerIntelligence'
+import type { CareerRecommendation, CareerProfile } from '@/lib/academicClinic/careerIntelligence'
 import IntegratedLearningPlanDisplay from '@/components/integratedlearningplan'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

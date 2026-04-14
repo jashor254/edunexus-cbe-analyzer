@@ -31,15 +31,17 @@ export async function syncUserData(userId: string) {
   try {
     const { data: students } = await supabase
       .from('students')
-      .select('*')
+      .select('id, user_id, name, grade, curriculum_type, year_level, school, created_at')
       .eq('user_id', userId)
 
     const ids = students?.map(s => s.id) || []
 
     const { data: assessments } = await supabase
       .from('assessments')
-      .select('*')
+      .select('id, student_id, subject_scores, term, year, grade, curriculum_type, created_at')
       .in('student_id', ids)
+      .order('created_at', { ascending: false })
+      .limit(200)
 
     SyncState.lastSync = Date.now()
 

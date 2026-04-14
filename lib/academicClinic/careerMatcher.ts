@@ -82,8 +82,15 @@ export class CareerMatcher {
 
   async generateMatches(studentId: string, isPremium: boolean = false): Promise<MatchReport> {
     try {
+      const { data: studentMeta } = await this.supabase
+        .from('students')
+        .select('id, name, grade, curriculum_type, year_level')
+        .eq('id', studentId)
+        .single();
+
+      const curriculumType = studentMeta?.curriculum_type || 'cbc';
       const assessment = await this.compileStudentAssessment(studentId);
-      const careers = await this.getRelevantCareers(assessment.academic.grade);
+      const careers = await this.getRelevantCareers(assessment.academic.grade, curriculumType);
       const scoredMatches = await this.scoreAllCareers(careers, assessment);
 
       const topMatches = scoredMatches.slice(0, 5);
@@ -158,7 +165,7 @@ export class CareerMatcher {
     // Fetch student profile
     const { data: student, error: studentError } = await this.supabase
       .from('students')
-      .select('*')
+      .select('id, name, grade, curriculum_type, year_level')
       .eq('id', studentId)
       .single();
 
@@ -169,7 +176,7 @@ export class CareerMatcher {
     // Fetch specific career
     const { data: career, error: careerError } = await this.supabase
       .from('career_intelligence')
-      .select('*')
+      .select('id, name, description, category, salary_range_kes, required_subjects, cbc_mapping, ai_forecast, pathway')
       .ilike('name', `%${careerName}%`)
       .single();
 
@@ -246,7 +253,7 @@ export class CareerMatcher {
   private async getPsychometricData(studentId: string) {
     const { data } = await this.supabase
       .from('psychometric_assessments')
-      .select('*')
+      .select('personality_type, holland_codes, work_values, stress_tolerance')
       .eq('student_id', studentId)
       .single();
 
@@ -447,12 +454,21 @@ export class CareerMatcher {
     };
   }
 
-  private async getRelevantCareers(grade: number): Promise<CareerIntelligence[]> {
-    const { data } = await this.supabase
+  private async getRelevantCareers(grade: number, curriculumType: string = 'cbc'): Promise<CareerIntelligence[]> {
+    let query = this.supabase
       .from('career_intelligence')
-      .select('*')
+      .select('id, name, description, category, salary_range_kes, required_subjects, cbc_mapping, ai_forecast, kenyan_market, pathway, university_path')
       .limit(20);
-    return data || [];
+
+    // IGCSE students get international careers too; CBC students get local focus
+    if (curriculumType === 'igcse') {
+      query = query.or('curriculum_type.eq.igcse,curriculum_type.eq.both');
+    } else {
+      query = query.or('curriculum_type.eq.cbc,curriculum_type.eq.both,curriculum_type.is.null');
+    }
+
+    const { data } = await query;
+    return (data as unknown as CareerIntelligence[]) || [];
   }
 
   private async saveMatchReport(studentId: string, matches: CareerMatch[]) {

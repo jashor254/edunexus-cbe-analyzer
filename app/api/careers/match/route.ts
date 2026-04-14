@@ -2,10 +2,10 @@ import { NextRequest } from 'next/server';
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response';
 import { createClient } from '@/utils/supabase/server';
 import { careerMatcher } from '@/lib/academicClinic/careerMatcher';
+import { unstable_cache, revalidateTag } from 'next/cache';
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Authenticate the User (Parent/Guardian)
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -19,43 +19,59 @@ export async function POST(req: NextRequest) {
       return apiBadRequest('Student ID required');
     }
 
-    // 2. Security Check: Je, huyu student ni wa huyu user aliyelog-in?
+    // Security: confirm student belongs to this user
     const { data: student, error: studentError } = await supabase
       .from('students')
-      .select('id')
+      .select('id, curriculum_type')
       .eq('id', studentId)
-      .eq('user_id', user.id) // Muhimu sana!
+      .eq('user_id', user.id)
       .single();
 
     if (studentError || !student) {
       return apiForbidden();
     }
 
-    // 3. Process the AI Matching
-    let result;
+    const curriculumType = (student as any).curriculum_type || 'cbc';
+
+    let result: any;
 
     switch (action) {
-      case 'full-assessment':
-        // Hii inatumia DeepSeek/Gemini kupiga mahesabu ya CBC subjects vs Careers
-        result = await careerMatcher.generateMatches(studentId, true);
-        break;
-
       case 'specific-career':
-        if (!careerName) {
-          return apiBadRequest('Career name required');
-        }
+        if (!careerName) return apiBadRequest('Career name required');
         result = await careerMatcher.assessSpecificCareer(studentId, careerName);
         break;
 
-      default:
-        result = await careerMatcher.generateMatches(studentId, true);
+      case 'full-assessment':
+      default: {
+        // Cache per-student for 6 hours; IGCSE gets different tag
+        const cacheTag = `career-match-${studentId}`;
+        const getCachedMatch = unstable_cache(
+          () => careerMatcher.generateMatches(studentId, true),
+          [cacheTag],
+          { revalidate: 21600, tags: [cacheTag] }
+        );
+        result = await getCachedMatch();
+
+        // Attach curriculum metadata for the client
+        result = { ...result, curriculumType };
+        break;
+      }
     }
 
-    // 4. Return the result to the Dashboard
     return apiSuccess(result);
 
   } catch (error: any) {
     console.error('Career matching error:', error);
     return apiError('Failed to generate career matches. Please try again later.');
   }
+}
+
+// Call this when a new assessment is saved to bust the cached match
+export async function DELETE(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const studentId = searchParams.get('studentId');
+  if (studentId) {
+    revalidateTag(`career-match-${studentId}`, 'default');
+  }
+  return apiSuccess({ cleared: true });
 }

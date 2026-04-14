@@ -73,7 +73,9 @@ export async function GET() {
       })
     )
 
-    return apiSuccess({ classes: classesWithStats })
+    const response = apiSuccess({ classes: classesWithStats })
+    response.headers.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=60')
+    return response
   } catch (e: any) {
     console.error('[teacher/classes GET]', e.message)
     return apiError('Internal server error')

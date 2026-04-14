@@ -1,6 +1,6 @@
 'use client'
 
-import type { IntegratedLearningPlan } from '@/lib/ai/careerAnalysis'
+import type { IntegratedLearningPlan } from '@/lib/academicClinic/careerIntelligence'
 
 interface Props {
   plan: IntegratedLearningPlan

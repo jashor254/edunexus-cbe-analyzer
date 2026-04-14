@@ -210,12 +210,12 @@ export class CareerIntelligenceEngine {
   private async getVerifiedCareer(name: string): Promise<CareerIntelligence | null> {
     const { data } = await this.supabase
       .from('career_intelligence')
-      .select('*')
+      .select('id, name, category, description, kenyan_market, cbc_mapping, ai_forecast, real_stories, verification_status, last_updated')
       .eq('id', name)
       .eq('verification_status', 'profession_validated')
       .single();
 
-    return data as CareerIntelligence | null;
+    return data as unknown as CareerIntelligence | null;
   }
 
   private async generateWithLocalContext(
@@ -350,7 +350,7 @@ export class CareerIntelligenceEngine {
   }
 
   private async callDeepSeek(prompt: string): Promise<any> {
-    const response = await fetch(`${DEEPSEEK_CONFIG.baseURL}/v1/chat/completions`, {
+    const response = await fetch(`${DEEPSEEK_CONFIG.baseURL}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -432,11 +432,11 @@ export class CareerIntelligenceEngine {
     // Query database for career matches
     const { data } = await this.supabase
       .from('career_intelligence')
-      .select('*')
-      .overlaps('cbcMapping->keyLearningAreas', strengths)
+      .select('id, name, category, description, kenyan_market, cbc_mapping, ai_forecast, real_stories, verification_status, last_updated')
+      .overlaps('cbc_mapping->keyLearningAreas', strengths)
       .limit(10);
 
-    return data as CareerIntelligence[] || [];
+    return (data as unknown as CareerIntelligence[]) || [];
   }
 
   private isCareerVisibleToGrade(_career: CareerIntelligence, grade: number): boolean {
@@ -471,3 +471,173 @@ export class CareerIntelligenceEngine {
 
 // Singleton
 export const careerEngine = new CareerIntelligenceEngine();
+
+// ==================== CACHED CAREER ANALYSIS ====================
+
+import { unstable_cache } from 'next/cache';
+
+export const getCachedCareerAnalysis = (careerName: string) =>
+  unstable_cache(
+    () => careerEngine.getCareerIntelligence(careerName),
+    [`career_intel_${careerName.toLowerCase().replace(/\s+/g, '_')}`],
+    { revalidate: 21600, tags: ['career-intelligence'] }
+  )();
+
+// ==================== TYPES + FUNCTIONS RE-EXPORTED FROM careerAnalysis ====================
+// These were previously in lib/ai/careerAnalysis.ts.
+// They are standalone DeepSeek callers used by the career-guidance page.
+
+import type { SubjectScores } from '@/lib/pathwayCalculator';
+
+export type CareerProfile = {
+  studentName: string;
+  grade: number;
+  pathway: string;
+  subjectScores: SubjectScores;
+  strengths: string[];
+  weaknesses: string[];
+  pathwayConfidence: 'high' | 'medium' | 'low';
+};
+
+export type CareerRecommendation = {
+  career: string;
+  matchScore: number;
+  reasoning: string;
+  requiredSubjects: string[];
+  currentGaps: string[];
+  kenyanUniversities: string[];
+  tvetOptions: string[];
+  internationalOptions: string[];
+  industryDemand: 'very_high' | 'high' | 'moderate' | 'low';
+  earningPotential: 'exceptional' | 'very_lucrative' | 'lucrative' | 'moderate' | 'lower_but_stable';
+  jobSecurity: 'very_high' | 'high' | 'moderate' | 'low';
+  kenyanMarketReality: string;
+  aiDisruptionRisk: 'very_low' | 'low' | 'moderate' | 'high' | 'very_high';
+  careerPath: string[];
+};
+
+export type IntegratedLearningPlan = {
+  career: string;
+  subject: string;
+  currentLevel: number;
+  targetLevel: number;
+  whyItMatters: string;
+  careerSpecificSteps: string[];
+  careerSpecificResources: string[];
+  successStories: string[];
+  milestones: Array<{ month: number; goal: string; careerRelevance: string }>;
+};
+
+async function callDeepSeekStandalone(prompt: string): Promise<string> {
+  const response = await fetch(`${DEEPSEEK_CONFIG.baseURL}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${DEEPSEEK_CONFIG.getKeyOrThrow()}`,
+    },
+    body: JSON.stringify({
+      model: DEEPSEEK_CONFIG.model,
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a helpful assistant. Always respond with valid JSON only — no markdown, no explanation, just the raw JSON.',
+        },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.7,
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`DeepSeek API error ${response.status}: ${err}`);
+  }
+
+  const data = await response.json();
+  return data.choices[0].message.content as string;
+}
+
+export async function analyzeCareerOptions(
+  profile: CareerProfile
+): Promise<CareerRecommendation[]> {
+  const prompt = `You are an expert Kenyan education and career counselor specializing in the CBC (Competency-Based Curriculum) system.
+
+STUDENT PROFILE:
+- Name: ${profile.studentName}
+- Grade: ${profile.grade}
+- Current Pathway Affinity: ${profile.pathway}
+- Pathway Confidence: ${profile.pathwayConfidence}
+
+PERFORMANCE DATA:
+Strengths (Score ≥ 3): ${profile.strengths.join(', ')}
+Weaknesses (Score ≤ 2): ${profile.weaknesses.join(', ')}
+
+Subject Scores (1-4 CBC scale):
+${Object.entries(profile.subjectScores).map(([subject, score]) => `- ${subject}: ${score}`).join('\n')}
+
+TASK: Provide 5 career recommendations that match the student's strengths, are realistic for Kenya's job market, consider TVET options, and account for AI disruption.
+
+For EACH career return:
+- career, matchScore (0-100), reasoning, requiredSubjects, currentGaps
+- kenyanUniversities (top 3), tvetOptions, internationalOptions
+- industryDemand (very_high/high/moderate/low)
+- earningPotential (exceptional/very_lucrative/lucrative/moderate/lower_but_stable)
+- jobSecurity (very_high/high/moderate/low)
+- kenyanMarketReality (2-3 sentences), aiDisruptionRisk (very_low/low/moderate/high/very_high)
+- careerPath (3-5 steps)
+
+CRITICAL: DO NOT include specific salary numbers. Return as a JSON array ONLY.`;
+
+  try {
+    const text = await callDeepSeekStandalone(prompt);
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) throw new Error('Failed to parse AI response');
+    const careers: CareerRecommendation[] = JSON.parse(jsonMatch[0]);
+    return careers.slice(0, 5);
+  } catch (error) {
+    console.error('Career analysis error:', error);
+    throw new Error('Failed to generate career recommendations');
+  }
+}
+
+export async function generateCareerIntegratedLearningPlan(
+  career: string,
+  subject: string,
+  currentLevel: number,
+  targetLevel: number,
+  studentName: string
+): Promise<IntegratedLearningPlan> {
+  const prompt = `You are a personalized learning coach for ${studentName}, a Kenyan CBC student.
+
+CONTEXT:
+- Career Goal: ${career}
+- Subject: ${subject}
+- Current CBC Level: ${currentLevel} (1=Below Expectations, 2=Approaching, 3=Meeting, 4=Exceeding)
+- Target Level: ${targetLevel}
+
+Create a personalized learning plan. Return as JSON ONLY:
+{
+  "whyItMatters": "...",
+  "careerSpecificSteps": ["step1", "step2", "step3"],
+  "careerSpecificResources": ["resource1", "resource2", "resource3"],
+  "successStories": ["story1", "story2"],
+  "milestones": [
+    {"month": 1, "goal": "...", "careerRelevance": "..."},
+    {"month": 2, "goal": "...", "careerRelevance": "..."},
+    {"month": 3, "goal": "Reach level ${targetLevel}", "careerRelevance": "..."}
+  ]
+}
+
+Make it INSPIRING and SPECIFIC to ${career}. Use Kenyan context. Prioritize FREE resources.`;
+
+  try {
+    const text = await callDeepSeekStandalone(prompt);
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('Failed to parse AI response');
+    const plan = JSON.parse(jsonMatch[0]);
+    return { career, subject, currentLevel, targetLevel, ...plan };
+  } catch (error) {
+    console.error('Integrated learning plan error:', error);
+    throw new Error('Failed to generate integrated learning plan');
+  }
+}

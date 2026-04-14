@@ -4,61 +4,63 @@ import { apiSuccess, apiError, apiBadRequest } from '@/lib/api/response';
 import { createClient } from '@/utils/supabase/server';
 import { findCareerByName } from '@/lib/academicClinic/careerDatabase';
 import { generateDynamicCareer } from '@/lib/academicClinic/dynamicCareerGenerator';
-
-// In-memory rate limiting (simplest for now)
-const rateLimitMap = new Map<string, { count: number, reset: number }>();
+import { checkRateLimit } from '@/lib/ai/rateLimit';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const careerName = searchParams.get('name')?.trim();
-  
+  const gradeParam = searchParams.get('grade');
+
   if (!careerName) {
-    return apiBadRequest("Search query required");
+    return apiBadRequest('Search query required');
   }
-
-  // 1. RATE LIMITING (Basic)
-  const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
-  const now = Date.now();
-  const userLimit = rateLimitMap.get(ip) || { count: 0, reset: now + 3600000 };
-
-  if (now > userLimit.reset) {
-    userLimit.count = 0;
-    userLimit.reset = now + 3600000;
-  }
-
-  if (userLimit.count >= 20) {
-    return apiError("Too many searches. Relax kidogo!", 429);
-  }
-  userLimit.count++;
-  rateLimitMap.set(ip, userLimit);
 
   const supabase = await createClient();
 
+  // Auth check for proper rate limiting
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Rate limit: 20 searches/hour per user (or IP for anonymous)
+  const rateLimitKey = user?.id || req.headers.get('x-forwarded-for') || '127.0.0.1';
   try {
-    // 2. CHECK STATIC & DB FIRST (Zero Cost)
-    // Angalia kama iko kwa static database kwanza
+    const rateLimit = await checkRateLimit(rateLimitKey, 'careerAnalysis', 'free');
+    if (!rateLimit.allowed) {
+      return apiError('Too many searches. Relax kidogo! Try again in an hour.', 429);
+    }
+  } catch {
+    // rateLimit table missing: fall through
+  }
+
+  try {
+    // 1. Check static database first (zero cost)
     const staticResult = findCareerByName(careerName);
     if (staticResult) {
       return apiSuccess({ source: 'static', career: staticResult });
     }
 
-    // Angalia kama ilishawahi kutafutwa na AI ikahifadhiwa kwa DB
-    const { data: cachedCareer, error: cacheError } = await supabase
+    // 2. Check DB cache — specific columns, with optional grade filter
+    let query = supabase
       .from('careers')
-      .select('*')
-      .ilike('name', `%${careerName}%`)
-      .maybeSingle();
+      .select('id, name, description, salary_range, education_path, education_duration, outlook, demand_in_kenya, ai_disruption_risk, required_subjects, required_subjects_display, universities_in_kenya, tvet_options, career_path')
+      .ilike('name', `%${careerName}%`);
+
+    if (gradeParam) {
+      const grade = parseInt(gradeParam, 10);
+      if (!isNaN(grade)) {
+        query = query.lte('min_grade', grade);
+      }
+    }
+
+    const { data: cachedCareer, error: cacheError } = await query.limit(1).maybeSingle();
 
     if (!cacheError && cachedCareer) {
       return apiSuccess({ source: 'database', career: cachedCareer });
     }
 
-    // 3. GENERATE DYNAMICALLY (AI Research)
-    // Ikiwa haipo popote, sasa AI inachukua usukani
+    // 3. Generate dynamically via DeepSeek AI
     const dynamicCareer = await generateDynamicCareer(careerName);
 
-    // 4. AUTO-PERSIST (Grow the database automatically)
-    // Save this new research to Supabase so it's "Static" for the next user
+    // 4. Auto-persist to DB for future lookups
     const { error: saveError } = await supabase
       .from('careers')
       .insert([{
@@ -76,22 +78,22 @@ export async function GET(req: NextRequest) {
         tvet_options: dynamicCareer.tvet_options,
         career_path: dynamicCareer.career_path,
         is_ai_generated: true,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       }]);
 
     if (saveError) {
-      console.error("Failed to persist dynamic career:", saveError);
+      console.error('Failed to persist dynamic career:', saveError);
     }
 
     return apiSuccess({
       source: 'dynamic',
       career: dynamicCareer,
-      message: "AI researched this specifically for you!"
+      message: 'AI researched this specifically for you!',
     });
 
   } catch (err) {
-    console.error("Career Search Error:", err);
-    return apiError("Failed to research career. Please try again.");
+    console.error('Career Search Error:', err);
+    return apiError('Failed to research career. Please try again.');
   }
 }
 

@@ -89,7 +89,7 @@ Return JSON only:
 Rules: Use real Kenyan companies and universities. Be honest about Kenyan job market realities. Consider CBC curriculum structure.`;
 
   try {
-    const response = await fetch(`${DEEPSEEK_CONFIG.baseURL}/v1/chat/completions`, {
+    const response = await fetch(`${DEEPSEEK_CONFIG.baseURL}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -173,7 +173,7 @@ Return JSON only:
 }`;
 
   try {
-    const response = await fetch(`${DEEPSEEK_CONFIG.baseURL}/v1/chat/completions`, {
+    const response = await fetch(`${DEEPSEEK_CONFIG.baseURL}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

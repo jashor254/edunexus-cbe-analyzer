@@ -1,10 +1,11 @@
 // lib/utils/cache.ts
-// ✅ Simple in-memory cache - no Redis needed
-// ✅ Reduces AI API costs for repeated queries
-// ✅ Auto-expires after set time
+// Uses Next.js unstable_cache for persistent caching across serverless invocations.
+// Falls back to in-process SimpleCache for non-Next.js contexts (e.g. scripts).
+
+import { unstable_cache, revalidateTag } from 'next/cache'
 
 // ============================================================
-// SIMPLE CACHE
+// SIMPLE IN-PROCESS CACHE (scripts / non-Next.js contexts)
 // ============================================================
 
 interface CacheEntry<T> {
@@ -24,15 +25,11 @@ class SimpleCache {
 
   get<T>(key: string): T | null {
     const entry = this.store.get(key)
-
     if (!entry) return null
-
-    // Expired? Delete and return null
     if (Date.now() > entry.expiresAt) {
       this.store.delete(key)
       return null
     }
-
     return entry.data as T
   }
 
@@ -53,96 +50,59 @@ class SimpleCache {
   }
 }
 
-// ✅ Singleton - one cache for whole app
+// Singleton — one cache per process (useful for deduplification within a request)
 export const cache = new SimpleCache()
 
 // ============================================================
-// CAREER SEARCH CACHE
+// CAREER SUGGESTIONS — persistent, 24-hour TTL
+// Wraps the caller's fetch function with unstable_cache so the
+// result survives across serverless cold starts.
+// Usage:
+//   const career = await getCachedCareerSuggestions(
+//     query,
+//     () => callDeepSeekForCareers(query)
+//   )
 // ============================================================
 
-// Cache career suggestions for 24 hours
-// Same query = no API call = saves money!
 export async function getCachedCareerSuggestions(
   query: string,
   fetchFn: () => Promise<any>
 ): Promise<any> {
-  const cacheKey = `career_${query.toLowerCase().trim()}`
-
-  // Cache hit?
-  const cached = cache.get(cacheKey)
-  if (cached) {
-    console.log('✅ Cache hit for:', query)
-    return cached
-  }
-
-  // Cache miss - fetch fresh
-  console.log('🔄 Cache miss, fetching:', query)
-  const result = await fetchFn()
-
-  // Cache for 24 hours
-  cache.set(cacheKey, result, 24 * 60)
-
-  return result
+  const key = `career_${query.toLowerCase().trim()}`
+  const fn = unstable_cache(
+    async () => fetchFn(),
+    [key],
+    { revalidate: 86400, tags: ['careers'] }
+  )
+  return fn()
 }
 
 // ============================================================
-// PATHWAY CACHE
+// PATHWAY RECOMMENDATIONS — persistent, 6-hour TTL per student
+// Usage:
+//   const pathway = await getCachedPathwayRecommendation(
+//     studentId,
+//     () => generatePathway(studentId)
+//   )
 // ============================================================
 
-// Cache pathway recommendations per student
-// These don't change often
 export async function getCachedPathwayRecommendation(
   studentId: string,
   fetchFn: () => Promise<any>
 ): Promise<any> {
-  const cacheKey = `pathway_${studentId}`
-
-  const cached = cache.get(cacheKey)
-  if (cached) return cached
-
-  const result = await fetchFn()
-  cache.set(cacheKey, result, 6 * 60) // 6 hours
-
-  return result
-}
-
-// Invalidate pathway cache when new assessment added
-export function invalidatePathwayCache(studentId: string): void {
-  cache.delete(`pathway_${studentId}`)
-}
-
-// ============================================================
-// HOW TO USE IN YOUR ROUTES:
-// ============================================================
-
-/*
-// In app/api/careers/search/route.ts:
-
-import { getCachedCareerSuggestions } from '@/lib/utils/cache'
-
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const query = searchParams.get('q') || ''
-
-  const results = await getCachedCareerSuggestions(
-    query,
-    () => callDeepSeekForCareers(query) // Your existing AI call
+  const fn = unstable_cache(
+    async () => fetchFn(),
+    [`pathway_${studentId}`],
+    { revalidate: 21600, tags: [`pathway-${studentId}`] }
   )
-
-  return NextResponse.json(results)
+  return fn()
 }
-*/
 
-/*
-// In your assessment service - invalidate when new assessment:
+// ============================================================
+// INVALIDATION
+// Call after a new assessment is saved to bust the per-student cache.
+// ============================================================
 
-import { invalidatePathwayCache } from '@/lib/utils/cache'
-
-async function addAssessment(studentId: string, data: any) {
-  // Save assessment...
-  await supabase.from('assessments').insert(data)
-
-  // ✅ Clear old pathway cache so fresh recommendation generated
-  invalidatePathwayCache(studentId)
+export function invalidatePathwayCache(studentId: string): void {
+  revalidateTag(`pathway-${studentId}`, 'default')
 }
-*/

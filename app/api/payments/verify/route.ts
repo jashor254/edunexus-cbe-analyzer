@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     // ============================================
     const { data: payment, error: paymentError } = await supabase
       .from('payments')
-      .select('*')
+      .select('id, status, amount, user_id, transaction_id, plan, created_at, product_id, payment_type, metadata')
       .eq('transaction_id', transactionId)
       .single();
 

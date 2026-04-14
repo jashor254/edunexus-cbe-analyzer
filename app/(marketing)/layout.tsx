@@ -1,34 +1,34 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
-import { Sparkles, X, Users, Clock } from 'lucide-react'
+import { Sparkles, X, Users, Clock, Menu } from 'lucide-react'
 
 // ─── Shared Nav ────────────────────────────────────────────────────────────────
 function MarketingNav() {
+  const [menuOpen, setMenuOpen] = useState(false)
+
   return (
     <nav className="border-b border-white/5 bg-slate-950/50 backdrop-blur-xl sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-3 animate-in fade-in slide-in-from-left duration-700">
-          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/20">
+          <div className="w-10 h-10 bg-linear-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/20">
             <Sparkles className="w-5 h-5 text-white" />
           </div>
           <span className="text-xl font-black tracking-tight text-white">EduNexus</span>
         </Link>
 
-        {/* Links */}
+        {/* Desktop links */}
         <div className="hidden md:flex gap-6 animate-in fade-in duration-700" style={{ animationDelay: '100ms' }}>
-          <a href="/#compass"       className="text-sm font-bold text-white/60 hover:text-amber-400 transition-colors">Compass</a>
-          <a href="/#boarding"      className="text-sm font-bold text-white/60 hover:text-blue-400 transition-colors">Boarding</a>
-          <a href="/#features"      className="text-sm font-bold text-white/60 hover:text-white transition-colors">Features</a>
-          <a href="/#clinic"        className="text-sm font-bold text-white/60 hover:text-violet-400 transition-colors">Clinic</a>
-          <a href="/#igcse"         className="text-sm font-bold text-white/60 hover:text-blue-400 transition-colors">IGCSE</a>
-          <a href="/#teachers"      className="text-sm font-bold text-white/60 hover:text-teal-400 transition-colors">Teachers</a>
-          <Link href="/pricing"     className="text-sm font-bold text-white/60 hover:text-pink-400 transition-colors">Pricing</Link>
-          <Link
-            href="/early-access"
-            className="text-sm font-bold text-green-400 hover:text-green-300 transition-colors flex items-center gap-1"
-          >
+          <a href="/#compass"   className="text-sm font-bold text-white/60 hover:text-amber-400 transition-colors">Compass</a>
+          <a href="/#boarding"  className="text-sm font-bold text-white/60 hover:text-blue-400 transition-colors">Boarding</a>
+          <a href="/#features"  className="text-sm font-bold text-white/60 hover:text-white transition-colors">Features</a>
+          <a href="/#clinic"    className="text-sm font-bold text-white/60 hover:text-violet-400 transition-colors">Clinic</a>
+          <a href="/#igcse"     className="text-sm font-bold text-white/60 hover:text-blue-400 transition-colors">IGCSE</a>
+          <a href="/#teachers"  className="text-sm font-bold text-white/60 hover:text-teal-400 transition-colors">Teachers</a>
+          <Link href="/pricing" className="text-sm font-bold text-white/60 hover:text-pink-400 transition-colors">Pricing</Link>
+          <Link href="/early-access" className="text-sm font-bold text-green-400 hover:text-green-300 transition-colors flex items-center gap-1">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400" />
@@ -37,22 +37,63 @@ function MarketingNav() {
           </Link>
         </div>
 
-        {/* CTA */}
-        <div className="flex gap-3 animate-in fade-in slide-in-from-right duration-700" style={{ animationDelay: '200ms' }}>
-          <Link
-            href="/login"
-            className="text-sm font-bold text-white/60 hover:text-white px-4 py-2 transition-colors"
-          >
+        {/* Desktop CTA + Mobile hamburger */}
+        <div className="flex items-center gap-3 animate-in fade-in slide-in-from-right duration-700" style={{ animationDelay: '200ms' }}>
+          {/* Desktop CTA */}
+          <Link href="/login" className="hidden md:block text-sm font-bold text-white/60 hover:text-white px-4 py-2 transition-colors">
             Login
           </Link>
-          <Link
-            href="/signup"
-            className="text-sm bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-2 rounded-xl hover:scale-105 transition-all shadow-lg shadow-purple-500/20 font-bold"
-          >
+          <Link href="/signup" className="hidden md:block text-sm bg-linear-to-r from-purple-500 to-pink-500 text-white px-6 py-2 rounded-xl hover:scale-105 transition-all shadow-lg shadow-purple-500/20 font-bold">
             Start Free
           </Link>
+
+          {/* Mobile: Early Access + hamburger */}
+          <Link href="/early-access" className="md:hidden text-xs font-black text-green-400 border border-green-500/30 bg-green-500/10 px-3 py-2 rounded-xl">
+            🚀 Early Access
+          </Link>
+          <button
+            onClick={() => setMenuOpen((o) => !o)}
+            className="md:hidden w-10 h-10 flex items-center justify-center bg-white/5 border border-white/10 rounded-xl text-white/70 hover:text-white transition-colors"
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+          >
+            {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
       </div>
+
+      {/* Mobile dropdown menu */}
+      {menuOpen && (
+        <div className="md:hidden border-t border-white/5 bg-slate-950/95 backdrop-blur-xl">
+          <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col gap-1">
+            {[
+              { href: '/#compass',  label: 'Learning Compass',   color: 'hover:text-amber-400' },
+              { href: '/#boarding', label: 'Boarding Schools',   color: 'hover:text-blue-400' },
+              { href: '/#features', label: 'All Features',       color: 'hover:text-white' },
+              { href: '/#clinic',   label: 'Academic Clinic',    color: 'hover:text-violet-400' },
+              { href: '/#igcse',    label: 'IGCSE Support',      color: 'hover:text-blue-400' },
+              { href: '/#teachers', label: 'Teacher Portal',     color: 'hover:text-teal-400' },
+              { href: '/pricing',   label: 'Pricing',            color: 'hover:text-pink-400' },
+            ].map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                onClick={() => setMenuOpen(false)}
+                className={`text-sm font-bold text-white/60 ${item.color} transition-colors py-3 border-b border-white/5 last:border-0`}
+              >
+                {item.label}
+              </a>
+            ))}
+            <div className="flex gap-3 pt-3">
+              <Link href="/login" onClick={() => setMenuOpen(false)} className="flex-1 text-center text-sm font-bold text-white/60 border border-white/10 py-3 rounded-xl hover:text-white transition-colors">
+                Login
+              </Link>
+              <Link href="/signup" onClick={() => setMenuOpen(false)} className="flex-1 text-center text-sm font-black bg-linear-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl hover:scale-105 transition-all">
+                Start Free
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   )
 }
