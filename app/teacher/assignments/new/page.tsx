@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { FileText, ChevronRight, Compass } from 'lucide-react'
+import { FileText, ChevronRight, Compass, Home } from 'lucide-react'
 
 function NewAssignmentForm() {
   const router = useRouter()
@@ -24,6 +24,8 @@ function NewAssignmentForm() {
     type: 'practice' as 'practice' | 'graded' | 'exam',
     max_score: 100,
     is_compass_guided: true,
+    is_holiday_assignment: false,
+    holiday_period: '',
   })
 
   useEffect(() => {
@@ -239,6 +241,48 @@ function NewAssignmentForm() {
                 ✅ Students click "Start with Compass 🧭" and Compass guides them Socratically.
                 Performance is automatically summarized for marking.
               </p>
+            )}
+          </div>
+
+          {/* Holiday Assignment toggle */}
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
+                  <Home className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <div className="font-black text-gray-900 text-sm">Holiday Assignment</div>
+                  <div className="text-xs text-gray-500">
+                    Mark this as a holiday assignment — students see it tagged
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setForm(p => ({ ...p, is_holiday_assignment: !p.is_holiday_assignment, holiday_period: !p.is_holiday_assignment ? p.holiday_period : '' }))}
+                className={`relative w-12 h-6 rounded-full transition-colors ${
+                  form.is_holiday_assignment ? 'bg-blue-600' : 'bg-gray-200'
+                }`}
+              >
+                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${
+                  form.is_holiday_assignment ? 'left-7' : 'left-1'
+                }`} />
+              </button>
+            </div>
+            {form.is_holiday_assignment && (
+              <div className="mt-3">
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                  Holiday Period (optional)
+                </label>
+                <input
+                  type="text"
+                  value={form.holiday_period}
+                  onChange={e => setForm(p => ({ ...p, holiday_period: e.target.value }))}
+                  placeholder="e.g. August 2026 Holidays"
+                  className="w-full px-3 py-2.5 rounded-xl border border-blue-200 focus:border-blue-500 outline-none text-gray-900 bg-white"
+                />
+              </div>
             )}
           </div>
 

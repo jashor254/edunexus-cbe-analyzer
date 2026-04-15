@@ -719,6 +719,7 @@ export default function DashboardPage() {
                 gradient: 'from-amber-500 to-orange-500',
                 shadow: 'shadow-amber-500/20',
                 href: '/chat',
+                badge: null,
               },
               {
                 icon: BarChart3,
@@ -727,6 +728,7 @@ export default function DashboardPage() {
                 gradient: 'from-violet-500 to-purple-500',
                 shadow: 'shadow-violet-500/20',
                 href: '/dashboard/clinic',
+                badge: null,
               },
               {
                 icon: PlusCircle,
@@ -735,6 +737,7 @@ export default function DashboardPage() {
                 gradient: 'from-blue-500 to-cyan-500',
                 shadow: 'shadow-blue-500/20',
                 href: '/dashboard/assessments/add',
+                badge: null,
               },
               {
                 icon: TrendingUp,
@@ -743,6 +746,7 @@ export default function DashboardPage() {
                 gradient: 'from-green-500 to-emerald-500',
                 shadow: 'shadow-green-500/20',
                 href: '/dashboard/assessments/history',
+                badge: null,
               },
               {
                 icon: Users,
@@ -751,6 +755,7 @@ export default function DashboardPage() {
                 gradient: 'from-pink-500 to-rose-500',
                 shadow: 'shadow-pink-500/20',
                 href: '/dashboard/groups',
+                badge: null,
               },
               {
                 icon: Search,
@@ -759,13 +764,28 @@ export default function DashboardPage() {
                 gradient: 'from-cyan-500 to-blue-500',
                 shadow: 'shadow-cyan-500/20',
                 href: '/dashboard/career-explorer',
+                badge: null,
               },
-            ].map(({ icon: Icon, title, sub, gradient, shadow, href }) => (
+              {
+                icon: ClipboardList,
+                title: 'My Assignments',
+                sub: stats?.pendingAssignments ? `${stats.pendingAssignments} pending` : 'View all assignments',
+                gradient: 'from-amber-500 to-orange-600',
+                shadow: 'shadow-amber-500/20',
+                href: '/dashboard/assignments',
+                badge: stats?.pendingAssignments && stats.pendingAssignments > 0 ? stats.pendingAssignments : null,
+              },
+            ].map(({ icon: Icon, title, sub, gradient, shadow, href, badge }) => (
               <Link
                 key={href}
                 href={href}
-                className={`bg-gradient-to-br ${gradient} rounded-2xl p-4 flex flex-col items-start hover:scale-[1.02] transition-transform shadow-lg ${shadow}`}
+                className={`bg-gradient-to-br ${gradient} rounded-2xl p-4 flex flex-col items-start hover:scale-[1.02] transition-transform shadow-lg ${shadow} relative`}
               >
+                {badge && (
+                  <span className="absolute top-2 right-2 bg-white text-orange-600 text-xs font-black w-5 h-5 rounded-full flex items-center justify-center shadow">
+                    {badge}
+                  </span>
+                )}
                 <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-3">
                   <Icon className="w-5 h-5 text-white" />
                 </div>
