@@ -1,160 +1,226 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { X, ChevronRight, ChevronLeft, Sparkles, Trophy, Rocket } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 import confetti from 'canvas-confetti'
-import { markOnboardingComplete } from '@/lib/user-actions'
 
-// 1. WEKA AINA (TYPES) HAPA JUU
-type TutorialStep = {
+type Step = {
   title: string
   description: string
   icon: string
-  color: string
-  tip?: string
-  action?: string
+  gradient: string
+  highlight?: string
+  extra?: string
 }
 
-interface OnboardingTutorialProps {
-  userId: string
-  userName?: string
-}
-
-// 2. DATA YA TUTORIAL (Hapa ndipo 'tutorialSteps' ilikuwa inakosekana)
-const tutorialSteps: TutorialStep[] = [
+const steps: Step[] = [
   {
-    title: 'Karibu EduNexus! 🇰🇪',
-    description: 'The only platform built specifically for Kenyan CBC parents. Track competencies, get AI insights, and guide your child to the right career pathway.',
+    title: 'Welcome to EduNexus! 🎓',
+    description:
+      "Kenya's first AI education platform built for CBC and IGCSE parents. Track your child's real learning — competencies, not just exam scores.",
     icon: '🎓',
-    color: 'from-blue-500 to-purple-600',
-    tip: 'Unlike traditional report cards, we focus on CBC competencies, not just exam scores.',
+    gradient: 'from-violet-500 to-indigo-600',
   },
   {
-    title: 'Your Child\'s CBC Journey',
-    description: 'Add your child\'s profile to start tracking their competency levels across all learning areas.',
-    icon: '👨‍👩‍👧‍👦',
-    color: 'from-green-500 to-teal-600',
-    action: 'Click "Add Student" on your dashboard after this tutorial',
+    title: 'Add Your Child',
+    description:
+      'Create a student profile in seconds. Supports CBC (Grade 7–12) and Cambridge IGCSE. Track multiple children from one account.',
+    icon: '👨‍👩‍👧',
+    gradient: 'from-blue-500 to-cyan-500',
+    extra: 'showCurriculumBadges',
   },
   {
-    title: 'Guardian Tutor AI',
-    description: 'Chat with our AI tutor trained on CBC curriculum. Get specific advice on how to support your child\'s learning at home.',
-    icon: '🤖',
-    color: 'from-purple-500 to-pink-600',
-    tip: 'Ask: "How can I help with Grade 7 Math during holidays?"',
+    title: 'Enter Assessment Results 📋',
+    description:
+      "Log your child's term results by competency level. We break it down strand by strand — not just 'C in Maths' but exactly which topics need work.",
+    icon: '📋',
+    gradient: 'from-teal-500 to-emerald-500',
+    highlight: 'Based on the KICD competency framework',
   },
   {
-    title: 'Academic Clinic Reports',
-    description: 'Get AI-powered career recommendations based on your child\'s competency profile.',
+    title: 'Learning Compass AI 🧭',
+    description:
+      'Chat with an AI tutor trained on CBC and IGCSE curriculum. Uses Kenyan examples — unga, matatus, KES. Available at midnight during school holidays.',
+    icon: '🧭',
+    gradient: 'from-amber-500 to-orange-500',
+    highlight: '✨ First session is on us — no card needed',
+  },
+  {
+    title: 'Academic Clinic Reports 📊',
+    description:
+      'AI-powered reports that pinpoint exactly which competency strands your child is struggling with. Share with their teacher in one click.',
     icon: '📊',
-    color: 'from-orange-500 to-red-600',
+    gradient: 'from-rose-500 to-pink-600',
+    highlight: '✨ First report is on us',
   },
   {
-    title: 'Ready to Transform Learning!',
-    description: 'You\'re all set! Start by adding your child, then input their latest assessment.',
+    title: 'Career Intelligence 🎯',
+    description:
+      'Grade 10+ students get AI career matching. 200+ real Kenyan careers with actual KES salary ranges, matched to your child\'s competency profile.',
+    icon: '🎯',
+    gradient: 'from-purple-500 to-violet-600',
+  },
+  {
+    title: "You're Ready! 🚀",
+    description:
+      "Start by adding your child and their latest results. Your first AI session is free — no card needed.",
     icon: '🚀',
-    color: 'from-indigo-500 to-blue-600',
+    gradient: 'from-green-500 to-emerald-500',
+    highlight: 'Mtoto wako anastahili zaidi ya average. 🇰🇪',
   },
 ]
 
-export function OnboardingTutorial({ userId, userName }: OnboardingTutorialProps) {
-  const [mounted, setMounted] = useState(false)
-  const [show, setShow] = useState(false)
-  const [currentStep, setCurrentStep] = useState(0)
-  const [isCompleting, setIsCompleting] = useState(false)
+const TOTAL = steps.length
+const LS_KEY = 'hasSeenParentTutorial'
+
+export function OnboardingTutorial({ userId }: { userId: string }) {
+  const [show, setShow]               = useState(false)
+  const [current, setCurrent]         = useState(0)
+  const [completing, setCompleting]   = useState(false)
+  const [touchStartX, setTouchStartX] = useState<number | null>(null)
 
   useEffect(() => {
-    setMounted(true)
-    const hasSeen = localStorage.getItem('hasSeenTutorial')
-    if (!hasSeen) {
-      const timer = setTimeout(() => setShow(true), 1000)
-      return () => clearTimeout(timer)
-    }
+    if (localStorage.getItem(LS_KEY)) return
+    fetch('/api/users/onboarding-status')
+      .then(r => r.json())
+      .then(d => { if (!d?.completed) setShow(true) })
+      .catch(() => setShow(true))
   }, [])
 
-  const handleComplete = async () => {
-    setIsCompleting(true)
-    confetti({
-      particleCount: 200,
-      spread: 100,
-      origin: { y: 0.5 },
-      colors: ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b']
-    })
-
-    localStorage.setItem('hasSeenTutorial', 'true')
-    
-    if (userId) {
-      try {
-        await markOnboardingComplete(userId)
-      } catch (error) {
-        console.error('Error marking onboarding complete:', error)
-      }
-    }
-
+  const handleComplete = useCallback(async () => {
+    if (completing) return
+    setCompleting(true)
+    confetti({ particleCount: 180, spread: 80, origin: { y: 0.6 } })
+    localStorage.setItem(LS_KEY, 'true')
+    try {
+      await fetch('/api/users/onboarding-status', { method: 'POST' })
+    } catch { /* silent */ }
     setTimeout(() => {
       setShow(false)
-      setIsCompleting(false)
-    }, 1500)
-  }
+      window.location.href = '/dashboard'
+    }, 800)
+  }, [completing])
 
-  const handleSkip = () => {
-    localStorage.setItem('hasSeenTutorial', 'true')
+  const dismiss = useCallback(() => {
+    localStorage.setItem(LS_KEY, 'true')
     setShow(false)
+  }, [])
+
+  const goNext = useCallback(() => { if (current < TOTAL - 1) setCurrent(s => s + 1) }, [current])
+  const goPrev = useCallback(() => { if (current > 0) setCurrent(s => s - 1) }, [current])
+
+  const onTouchStart = (e: React.TouchEvent) => setTouchStartX(e.touches[0].clientX)
+  const onTouchEnd   = (e: React.TouchEvent) => {
+    if (touchStartX === null) return
+    const diff = touchStartX - e.changedTouches[0].clientX
+    if (diff > 50) goNext()
+    if (diff < -50) goPrev()
+    setTouchStartX(null)
   }
 
-  if (!mounted || !show) return null
+  if (!show) return null
 
-  const step = tutorialSteps[currentStep]
-  const isFirstStep = currentStep === 0
-  const isLastStep = currentStep === tutorialSteps.length - 1
-  const progress = ((currentStep + 1) / tutorialSteps.length) * 100
+  const step   = steps[current]
+  const isLast = current === TOTAL - 1
+  const pct    = ((current + 1) / TOTAL) * 100
 
   return (
-    <div className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-4 backdrop-blur-md overflow-y-auto">
-      {/* Animated background gradient */}
-      <div className={`absolute inset-0 bg-gradient-to-br ${step.color} opacity-10 transition-all duration-700`} />
-      
-      {/* Main tutorial card */}
-      <div className="bg-white rounded-3xl max-w-3xl w-full relative animate-in zoom-in-95 duration-300 shadow-2xl overflow-hidden">
-        
+    <div className="fixed inset-0 bg-black/90 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
+      <div
+        className="bg-slate-900 border border-white/10 rounded-t-3xl sm:rounded-3xl w-full sm:max-w-lg relative overflow-hidden"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
         {/* Progress bar */}
-        <div className="absolute top-0 left-0 right-0 h-1.5 bg-slate-100">
-          <div 
-            className={`h-full bg-gradient-to-r ${step.color} transition-all duration-500 ease-out`}
-            style={{ width: `${progress}%` }}
+        <div className="h-1 bg-white/10">
+          <div
+            className={`h-full bg-gradient-to-r ${step.gradient} transition-all duration-500`}
+            style={{ width: `${pct}%` }}
           />
         </div>
 
-        {/* Content */}
-        <div className="p-8 md:p-12 flex flex-col items-center">
-          <div className={`w-24 h-24 rounded-3xl bg-gradient-to-br ${step.color} flex items-center justify-center mb-8 animate-bounce shadow-lg text-5xl`}>
-            {step.icon}
+        {/* Dismiss */}
+        <button
+          onClick={dismiss}
+          className="absolute top-5 right-5 w-8 h-8 bg-white/10 rounded-xl flex items-center justify-center hover:bg-white/20 transition z-10"
+        >
+          <X className="w-4 h-4 text-white" />
+        </button>
+
+        <div className="p-8 pt-6">
+          <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">
+            Step {current + 1} of {TOTAL}
+          </p>
+
+          <div className={`w-20 h-20 rounded-3xl bg-gradient-to-br ${step.gradient} flex items-center justify-center mb-6 mx-auto`}>
+            <span className="text-4xl">{step.icon}</span>
           </div>
 
-          <h2 className="text-3xl font-black text-center mb-4 tracking-tight text-slate-900">
+          <h2 className="text-2xl font-black text-white text-center mb-3 leading-tight">
             {step.title}
           </h2>
-
-          <p className="text-lg text-slate-600 text-center mb-8 leading-relaxed max-w-md">
+          <p className="text-slate-300 text-center leading-relaxed mb-4">
             {step.description}
           </p>
 
-          <div className="flex items-center justify-between w-full mt-4">
+          {step.highlight && (
+            <div className={`mx-auto w-fit px-4 py-2 bg-gradient-to-r ${step.gradient} rounded-full text-sm font-black text-white text-center mb-4 opacity-90`}>
+              {step.highlight}
+            </div>
+          )}
+
+          {step.extra === 'showCurriculumBadges' && (
+            <div className="flex gap-3 justify-center mb-4">
+              <div className="flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/30 rounded-xl">
+                <span className="text-lg">🇰🇪</span>
+                <span className="text-sm font-black text-green-400">CBC Kenya</span>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+                <span className="text-lg">🌍</span>
+                <span className="text-sm font-black text-blue-400">Cambridge IGCSE</span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between mt-6">
             <button
-              disabled={isFirstStep}
-              onClick={() => setCurrentStep(prev => prev - 1)}
-              className="text-slate-400 font-bold disabled:opacity-0 flex items-center gap-2"
+              onClick={goPrev}
+              disabled={current === 0}
+              className="flex items-center gap-1 text-slate-400 font-bold text-sm disabled:opacity-0 hover:text-white transition"
             >
-              <ChevronLeft className="w-5 h-5" /> Previous
+              <ChevronLeft className="w-4 h-4" /> Previous
             </button>
 
-            <button
-              onClick={() => isLastStep ? handleComplete() : setCurrentStep(prev => prev + 1)}
-              disabled={isCompleting}
-              className={`bg-gradient-to-r ${step.color} text-white px-8 py-3 rounded-full font-black flex items-center gap-2`}
-            >
-              {isLastStep ? 'Let\'s Go!' : 'Next'} <ChevronRight className="w-5 h-5" />
-            </button>
+            <div className="flex gap-1.5">
+              {steps.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrent(i)}
+                  className={`rounded-full transition-all ${
+                    i === current
+                      ? `w-6 h-2 bg-gradient-to-r ${step.gradient}`
+                      : 'w-2 h-2 bg-white/20 hover:bg-white/40'
+                  }`}
+                />
+              ))}
+            </div>
+
+            {isLast ? (
+              <button
+                onClick={handleComplete}
+                disabled={completing}
+                className={`flex items-center gap-2 bg-gradient-to-r ${step.gradient} text-white px-5 py-2.5 rounded-xl font-black hover:scale-105 transition-all text-sm disabled:opacity-70`}
+              >
+                Let's Go! 🚀
+              </button>
+            ) : (
+              <button
+                onClick={goNext}
+                className={`flex items-center gap-2 bg-gradient-to-r ${step.gradient} text-white px-5 py-2.5 rounded-xl font-black hover:scale-105 transition-all text-sm`}
+              >
+                Next <ChevronRight className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>
