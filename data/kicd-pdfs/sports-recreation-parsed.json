@@ -1,0 +1,102 @@
+{
+  "assessment_methods": [],
+  "learning_resources": [],
+  "non_formal_activities": [],
+  "strands": [
+    {
+      "strand_title": "COACHING",
+      "sub_strands": [
+        {
+          "title": "Introduction to Coaching",
+          "suggested_lessons": 20,
+          "learning_outcomes": [
+            "a) examine the concept of coaching in games and sports,",
+            "b) evaluate the qualities of a coach in games and sports,",
+            "c) Create a checklist to appraise the relationship between the coach and athlete in enhancing sports,",
+            "d) Coach a team during school competitions,",
+            "e) appreciate coaching in games and sports."
+          ],
+          "learning_experiences": [
+            "use different media to observe the concept of coaching in games and sports,",
+            "discuss the qualities of a coach in games and sports (organised, knowledgeable, supportive, punctual, disciplined and empathetic).",
+            "create a coach-athlete checklist for the appraisal of the relationship.",
+            "use different media and/or watch live sports/games and observe the role played by the coach,",
+            "appraise the coach-athlete relationship using the checklist created and share feedback,",
+            "identify a team in the school and apply coaching skills during athletic training."
+          ],
+          "key_inquiry_questions": [
+            "How can coach performance be analysed in a coaching session?",
+            "Why is feedback necessary in a coaching session?"
+          ]
+        },
+        {
+          "title": "Improvisation of equipment and facilities",
+          "suggested_lessons": 20,
+          "learning_outcomes": [
+            "a) evaluate varied equipment and facilities for use in sports and recreation,",
+            "b) determine materials required for improvisation of sports and recreation equipment and facilities,",
+            "c) improvise varied equipment and facilities for use in sports and recreation,",
+            "d) embrace the improvisation of equipment and facilities for self-sufficiency in sports and recreation ."
+          ],
+          "learning_experiences": [
+            "use different media to evaluate varied equipment and facilities for use in sports and recreation,",
+            "select materials that can be used for improvisation of equipment and facilities, using recyclable and reusable materials,",
+            "improvise varied sports and recreation equipment and facilities while observing safety measures",
+            "tidy the environment after improvisation of equipment,",
+            "display improvised equipment and facilities and appreciate each other’s effort."
+          ],
+          "key_inquiry_questions": [
+            "Why is improvisation of facilities and equipment necessary in sports and recreation?",
+            "What are the considerations when selecting materials for improvisation of facilities and equipment necessary in sports and recreation?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "OFFICIATING",
+      "sub_strands": [
+        {
+          "title": "Principles of officiating",
+          "suggested_lessons": 10,
+          "learning_outcomes": [
+            "a) interpret the principles of officiating in athletics,",
+            "b) assess the equipment and facilities in athletics for correct dimensions, standards and safety,",
+            "c) Appreciate the use of safe facilities and equipment in officiating events in athletics."
+          ],
+          "learning_experiences": [
+            "use digital media to identify and discuss the principles of officiating in Athletics: (discipline, enthusiasm, dedication and conflict resolution)",
+            "visit school and/or community athletics facility to critique the equipment and markings of the track and field event areas ,",
+            "select the right material for marking the athletic event areas,",
+            "undertake different roles when collaboratively marking the track and field event areas in the school playgrounds.",
+            "engage in officiating school athletic events while observing safety."
+          ],
+          "key_inquiry_questions": [
+            "What are the best materials to use for clear markings of track and field event areas in Athletics?",
+            "How can the Athletics facilities and equipment be safe for use?"
+          ]
+        },
+        {
+          "title": "Responsibilities of Technical and Meet officials",
+          "suggested_lessons": 10,
+          "learning_outcomes": [
+            "a) distinguish between technical and meet officials in athletics,",
+            "b) discuss qualities of officials in Athletics,",
+            "c) analyse duties and responsibilities of technical and meet officials in Athletics,",
+            "d) execute the role of technical and meet officials during athletic events,",
+            "e) appreciate the role officiating during athletic events."
+          ],
+          "learning_experiences": [
+            "use different media to research and tabulate the differences between technical and meet officials,",
+            "identify and present the qualities of technical and meet officials (dedication, punctuality, integrity, respect),",
+            "discuss the duties of meet officials and technical officials,",
+            "use appropriate signals to officiate track and field events."
+          ],
+          "key_inquiry_questions": [
+            "Why is integrity important in officiating events in Athletics?",
+            "How does the use of signals enhance officiating of Athletics events?"
+          ]
+        }
+      ]
+    }
+  ]
+}

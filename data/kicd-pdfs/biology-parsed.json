@@ -1,0 +1,149 @@
+{
+  "assessment_methods": [],
+  "learning_resources": [],
+  "non_formal_activities": [],
+  "strands": [
+    {
+      "strand_title": "CELL BIOLOGY AND BIODIVERSITY",
+      "sub_strands": [
+        {
+          "title": "Introduction to Biology",
+          "suggested_lessons": 6,
+          "learning_outcomes": [
+            "a) explain the application of Biology in everyday life",
+            "b) relate fields of study in Biology to career opportunities",
+            "c) Illustrate the careers related to fields of study in Biology",
+            "d) appreciate the importance of Biology in everyday life"
+          ],
+          "learning_experiences": [
+            "search for information on the meaning and application of Biology in everyday life and share with peers",
+            "collaboratively search for information from print and non-print media on fields of study in Biology (include Botany, Zoology, Taxonomy, Anatomy, Physiology, Ecology, Biochemistry, Biotechnology, Genetics, Parasitology, Microbiology, Entomology) and relate them to career opportunities",
+            "discuss the factors that influences career choices (include interest, ability). Reinforce on those that should not (gender, culture, disability, environment and stereotypes)",
+            "use locally available material to design a career wheel to relate fields of study in Biology to careers and make presentations",
+            "use flash cards, fishing games or other available materials to present information on fields and careers related to Biology",
+            "where possible interact with resource persons whose careers are related to Biology"
+          ],
+          "key_inquiry_questions": [
+            "Why is it important to study Biology?"
+          ]
+        },
+        {
+          "title": "Specimen Collection and Preservation",
+          "suggested_lessons": 14,
+          "learning_outcomes": [
+            "a) identify apparatus and materials used for collecting, processing and preserving specimens",
+            "b) collect, process and preserve specimens for biological studies using improvised and conventional apparatus",
+            "c) appreciate the importance of collecting, processing and preserving specimens in Biology"
+          ],
+          "learning_experiences": [
+            "in groups search for information on apparatus and materials for collecting specimens, (such as pooter/aspirator, pitfall trap, soapy water, pair of forceps, sweep net/aerial net, light traps, Tullgren funnel, envelopes for butterflies, labels, pencils or permanent ink pens, tracing paper, hand lens, knife/ pair of secateurs, collecting bags labels, hand gloves, digger)",
+            "improvise apparatus from locally available materials and use them for collecting, processing and preserving specimens",
+            "make a herbarium to preserve specimens (pressing, drying, mounting, labeling to include common/local name and locality, storage and protection)",
+            "collect small animals using appropriate apparatus (such as pooter/aspirator, pitfall trap, forceps, sweep net/aerial net, light traps, Tullgren funnel, bait trap)",
+            "search for information on preservatives used in preservation of specimens and discuss with peers",
+            "process and preserve animal specimens (sorting, mounting on soft boards, ethanol/wet preservation, labeling)"
+          ],
+          "key_inquiry_questions": [
+            "How are specimens collected and preserved?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "ANATOMY AND PHYSIOLOGY OF PLANTS",
+      "sub_strands": [
+        {
+          "title": "Nutrition",
+          "suggested_lessons": 12,
+          "learning_outcomes": [
+            "a) describe types of nutrition in plants,",
+            "b) relate the structure of the chloroplast to its function in plant cells,",
+            "c) illustrate the light and dark stages of photosynthesis in plants,",
+            "d) appreciate the significance of photosynthesis in nature."
+          ],
+          "learning_experiences": [
+            "search for information on different types of nutrition in plants and share with peers,",
+            "discuss the structure of chloroplast in relation to its function,",
+            "watch animations/video clips on the process of photosynthesis and discuss,",
+            "in groups use illustrations to show reactions during the light and dark stages of photosynthesis (flow charts, animations, equations)"
+          ],
+          "key_inquiry_questions": [
+            "How do plants obtain food?"
+          ]
+        },
+        {
+          "title": "Transport",
+          "suggested_lessons": 18,
+          "learning_outcomes": [
+            "a) relate structures of the plant transport system to their functions in plants,",
+            "b) illustrate the arrangement of vascular tissues in monocotyledonous and dicotyledonous plants,",
+            "c) demonstrate the uptake of water and mineral salts from the roots to the leaves,",
+            "d) demonstrate factors that affect the rate of transpiration in plants,",
+            "e) describe the translocation of manufactured food in plants,",
+            "f) appreciate the significance of transport in plants."
+          ],
+          "learning_experiences": [
+            "discuss the structures of external parts of a plant in relation to functions (roots, stems and leaves),",
+            "use a microscope/hand lens to observe and draw cross-sections of monocotyledonous and dicotyledonous roots and stems; identify the similarities and differences,",
+            "search for information on mechanisms of water and mineral salt uptake in plants and discuss with peers (include: root pressure, capillarity, transpiration pull),",
+            "carry out experiments to demonstrate uptake of water in plants using locally available materials (such as transparent bags, dye/ink experiment) and report findings to peers (where possible, observe exudation, guttation, and root pressure),",
+            "use digital devices to search for animations on uptake of water and mineral salts and translocation of manufactured food from the leaves; share with peers,",
+            "search for information from available resources on structural and environmental factors that affect the rate of transpiration and share with peers,",
+            "carry out experiments to demonstrate factors that affect the rate of transpiration (use locally available materials like improvised fan, transparent polythene bags, light/heat bulbs),",
+            "carry out a bark ringing/girdling experiment to demonstrate evidence of translocation (to be done responsibly at home or school)."
+          ],
+          "key_inquiry_questions": [
+            "How are materials transported in plants?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "ANATOMY AND PHYSIOLOGY OF ANIMALS",
+      "sub_strands": [
+        {
+          "title": "Nutrition",
+          "suggested_lessons": 12,
+          "learning_outcomes": [
+            "a) relate the structure of mouthparts of insects to their functions",
+            "b) illustrate mouthparts in different insects",
+            "c) relate the structure of beaks of birds to their functions",
+            "d) appreciate diversity in feeding modes of insects and birds."
+          ],
+          "learning_experiences": [
+            "collect fresh specimens of locust/grasshopper/cockroach. Observe the mouthparts using a hand lens or dissecting microscope, discuss with peers and draw",
+            "search for information on mouthparts of locust/ grasshopper/ cockroach (biting and chewing), mosquito (piercing and sucking), butterfly/moth (siphoning), tsetse fly (cutting) and share with peers",
+            "watch animations/videos; study illustrations and photographs/photomicrographs of mouthparts of different insects and discuss how the mouthparts are related to the mode of feeding",
+            "in groups observe images/animations/charts of beaks of birds showing different modes of feeding (include grains/seeds, nectar, fish, flesh, filter feeders, multipurpose, wood chippers, insect eaters, fruit eaters). Discuss how the beaks are adapted to the mode of feeding",
+            "undertake a nature walk to observe different birds and their feeding habits. Write a short report on the observed birds."
+          ],
+          "key_inquiry_questions": [
+            "How do insects and birds feed?"
+          ]
+        },
+        {
+          "title": "Transport",
+          "suggested_lessons": 14,
+          "learning_outcomes": [
+            "a) explain the importance of transport in animals",
+            "b) illustrate structure of the transport systems in insects, fish, amphibians, reptiles and mammals",
+            "c) describe the pumping mechanism of the mammalian heart",
+            "d) describe the human lymphatic and immune systems, and blood clotting mechanism",
+            "e) explain the ABO and rhesus factor blood grouping systems in humans",
+            "f) appreciate the diversity of transport systems in animals."
+          ],
+          "learning_experiences": [
+            "search and discuss information on the meaning and importance of transport systems in animals",
+            "search and discuss information on the structures of transport in insects, fish and amphibians, reptiles and mammals",
+            "search for information from available sources and resources on different transport systems in animals (open and closed, single and double circulatory systems), illustrate the systems and share",
+            "study illustrations/ photographs and where possible watch animations illustrating transport systems in fish"
+          ],
+          "key_inquiry_questions": [
+            "Why is transport important in animals?",
+            "How do transport systems in animals differ?"
+          ]
+        }
+      ]
+    }
+  ]
+}

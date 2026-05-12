@@ -1,0 +1,215 @@
+{
+  "subject": "Kiswahili Fasihi Grade 10",
+  "topics": [
+    {
+      "topic_id": 1,
+      "topic_name": "Mada 1: Misingi ya Fasihi Simulizi, Ushairi na Bunilizi",
+      "subtopic_count": 9,
+      "subtopics": [
+        "Fasihi Simulizi - Misingi ya Fasihi Simulizi - Dhana ya Fasihi",
+        "Fasihi Simulizi - Misingi ya Fasihi Simulizi - Sifa za Fasihi Simulizi",
+        "Fasihi Simulizi - Misingi ya Fasihi Simulizi - Umuhimu wa Fasihi Simulizi",
+        "Ushairi - Uainishaji wa Mashairi - Dhana ya Ushairi",
+        "Ushairi - Uainishaji wa Mashairi - Sifa za Ushairi",
+        "Ushairi - Uainishaji wa Mashairi - Dhima ya Ushairi",
+        "Bunilizi na Kazi za Kihalisia - Bunilizi na Kazi za Kihalisia - Dhana ya Bunilizi",
+        "Bunilizi na Kazi za Kihalisia - Bunilizi na Kazi za Kihalisia - Vipengele vya Bunilizi",
+        "Bunilizi na Kazi za Kihalisia - Bunilizi na Kazi za Kihalisia - Kazi za Kihalisia"
+      ]
+    },
+    {
+      "topic_id": 2,
+      "topic_name": "Mada 2: Uchanganuzi wa Hadithi, Makundi ya Mashairi na Tamthilia",
+      "subtopic_count": 14,
+      "subtopics": [
+        "Fasihi Simulizi - Uchanganuzi wa Hadithi - Hekaya",
+        "Fasihi Simulizi - Uchanganuzi wa Hadithi - Wahusika na Ujumbe wa Hekaya",
+        "Fasihi Simulizi - Uchanganuzi wa Hadithi - Uwasilishaji wa Hekaya",
+        "Fasihi Simulizi - Uchanganuzi wa Hadithi - Hurafa",
+        "Fasihi Simulizi - Uchanganuzi wa Hadithi - Uwasilishaji wa Hurafa",
+        "Ushairi - Makundi ya Mashairi - Mashairi ya Arudhi",
+        "Ushairi - Makundi ya Mashairi - Mashairi Huru",
+        "Ushairi - Makundi ya Mashairi - Ulinganisho",
+        "Ushairi - Makundi ya Mashairi - Utambuzi",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Tamthilia - Maudhui",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Tamthilia - Dhamira",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Tamthilia - Wahusika",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Tamthilia - Usawiri wa Wahusika",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Tamthilia - Tathmini"
+      ]
+    },
+    {
+      "topic_id": 3,
+      "topic_name": "Mada 3: Uchanganuzi wa Semi na Uchambuzi wa Mashairi na Tamthilia",
+      "subtopic_count": 13,
+      "subtopics": [
+        "Fasihi Simulizi - Uchanganuzi wa Semi - Dhana ya Semi",
+        "Fasihi Simulizi - Uchanganuzi wa Semi - Vipera vya Semi",
+        "Fasihi Simulizi - Uchanganuzi wa Semi - Umuhimu wa Semi",
+        "Fasihi Simulizi - Uchanganuzi wa Semi - Matumizi ya Semi",
+        "Ushairi - Uchambuzi wa Mashairi - Maudhui",
+        "Ushairi - Uchambuzi wa Mashairi - Dhamira",
+        "Ushairi - Uchambuzi wa Mashairi - Maudhui na Dhamira",
+        "Ushairi - Uchambuzi wa Mashairi - Ulinganisho",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Tamthilia - Mandhari",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Tamthilia - Muundo",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Tamthilia - Mtindo",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Tamthilia - Umuhimu",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Tamthilia - Tathmini"
+      ]
+    },
+    {
+      "topic_id": 4,
+      "topic_name": "Mada 4: Ushairi Simulizi - Nyimbo na Uchambuzi wa Riwaya",
+      "subtopic_count": 15,
+      "subtopics": [
+        "Fasihi Simulizi - Ushairi Simulizi - Nyimbo",
+        "Fasihi Simulizi - Ushairi Simulizi - Sifa",
+        "Fasihi Simulizi - Ushairi Simulizi - Dhana ya Nyimbo",
+        "Fasihi Simulizi - Ushairi Simulizi - Sifa za Nyimbo",
+        "Fasihi Simulizi - Ushairi Simulizi - Uwasilishaji wa Nyimbo",
+        "Ushairi - Uchambuzi wa Mashairi - Maudhui",
+        "Ushairi - Uchambuzi wa Mashairi - Dhamira",
+        "Ushairi - Uchambuzi wa Mashairi - Ulinganisho",
+        "Ushairi - Uchambuzi wa Mashairi - Tathmini",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Riwaya - Dhana ya Riwaya",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Riwaya - Maudhui",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Riwaya - Dhamira",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Riwaya - Wahusika",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Riwaya - Usawiri",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Riwaya - Tathmini"
+      ]
+    },
+    {
+      "topic_id": 5,
+      "topic_name": "Mada 5: Uchanganuzi wa Mazungumzo na Uchambuzi wa Mashairi na Riwaya",
+      "subtopic_count": 14,
+      "subtopics": [
+        "Fasihi Simulizi - Uchanganuzi wa Mazungumzo - Dhana",
+        "Fasihi Simulizi - Uchanganuzi wa Mazungumzo - Sifa",
+        "Fasihi Simulizi - Uchanganuzi wa Mazungumzo - Umuhimu",
+        "Fasihi Simulizi - Uchanganuzi wa Mazungumzo - Matumizi",
+        "Ushairi - Uchambuzi wa Mashairi - Mandhari",
+        "Ushairi - Uchambuzi wa Mashairi - Wahusika",
+        "Ushairi - Uchambuzi wa Mashairi - Mandhari na Wahusika",
+        "Ushairi - Uchambuzi wa Mashairi - Tathmini",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Riwaya - Mandhari",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Riwaya - Muundo",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Riwaya - Mtindo",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Riwaya - Mandhari, Muundo, Mtindo",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Riwaya - Umuhimu",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Riwaya - Tathmini Jumla"
+      ]
+    },
+    {
+      "topic_id": 6,
+      "topic_name": "Mada 6: Uchanganuzi wa Maigizo, Muundo wa Mashairi na Tawasifu",
+      "subtopic_count": 14,
+      "subtopics": [
+        "Fasihi Simulizi - Uchanganuzi wa Maigizo - Utangulizi",
+        "Fasihi Simulizi - Uchanganuzi wa Maigizo - Vipengele",
+        "Fasihi Simulizi - Uchanganuzi wa Maigizo - Sifa za Mwigizaji",
+        "Fasihi Simulizi - Uchanganuzi wa Maigizo - Maigizo ya Vitendo",
+        "Ushairi - Uchambuzi wa Mashairi - Muundo",
+        "Ushairi - Uchambuzi wa Mashairi - Vipengele vya Muundo",
+        "Ushairi - Uchambuzi wa Mashairi - Uchambuzi wa Muundo",
+        "Ushairi - Uchambuzi wa Mashairi - Mazoezi",
+        "Ushairi - Uchambuzi wa Mashairi - Tathmini ya Muundo",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Tawasifu - Maudhui, Dhamira",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Tawasifu - Wahusika",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Tawasifu - Umuhimu",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Tawasifu - Uhalisia wa Wahusika",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Tawasifu - Tathmini"
+      ]
+    },
+    {
+      "topic_id": 7,
+      "topic_name": "Mada 7: Ngano za Mazimwi, Tamathali za Ushairi na Tawasifu",
+      "subtopic_count": 15,
+      "subtopics": [
+        "Fasihi Simulizi - Uchanganuzi wa Hadithi - Ngano za Mazimwi",
+        "Fasihi Simulizi - Uchanganuzi wa Hadithi - Vipengele vya Ngano",
+        "Fasihi Simulizi - Uchanganuzi wa Hadithi - Mighani",
+        "Fasihi Simulizi - Uchanganuzi wa Hadithi - Uwasilishaji",
+        "Fasihi Simulizi - Uchanganuzi wa Hadithi - Utafiti",
+        "Ushairi - Uchambuzi wa Mashairi - Tashbihi",
+        "Ushairi - Uchambuzi wa Mashairi - Sitiari",
+        "Ushairi - Uchambuzi wa Mashairi - Tashihisi",
+        "Ushairi - Uchambuzi wa Mashairi - Uchambuzi wa Tamathali",
+        "Ushairi - Uchambuzi wa Mashairi - Tathmini ya Tamathali",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Tawasifu - Mandhari",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Tawasifu - Muundo",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Tawasifu - Mtindo",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Tawasifu - Uchambuzi wa Jumla",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Tawasifu - Tathmini"
+      ]
+    },
+    {
+      "topic_id": 8,
+      "topic_name": "Mada 8: Misemo, Nahau na Hadithi Fupi",
+      "subtopic_count": 14,
+      "subtopics": [
+        "Fasihi Simulizi - Uchanganuzi wa Semi - Misemo",
+        "Fasihi Simulizi - Uchanganuzi wa Semi - Nahau",
+        "Fasihi Simulizi - Uchanganuzi wa Semi - Matumizi",
+        "Fasihi Simulizi - Uchanganuzi wa Semi - Uwasilishaji",
+        "Ushairi - Uchambuzi wa Mashairi - Misemo",
+        "Ushairi - Uchambuzi wa Mashairi - Nahau",
+        "Ushairi - Uchambuzi wa Mashairi - Chuku",
+        "Ushairi - Uchambuzi wa Mashairi - Uchambuzi wa Mtindo",
+        "Ushairi - Uchambuzi wa Mashairi - Tathmini ya Mtindo",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Hadithi Fupi - Maudhui, Dhamira",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Hadithi Fupi - Wahusika",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Hadithi Fupi - Usawiri",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Hadithi Fupi - Uhalisia",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Hadithi Fupi - Tathmini"
+      ]
+    },
+    {
+      "topic_id": 9,
+      "topic_name": "Mada 9: Maghani, Majigambo, Pembezi, Tondozi na Uhuru wa Kishairi",
+      "subtopic_count": 17,
+      "subtopics": [
+        "Fasihi Simulizi - Uchanganuzi wa Ushairi - Maghani",
+        "Fasihi Simulizi - Uchanganuzi wa Ushairi - Majigambo",
+        "Fasihi Simulizi - Uchanganuzi wa Ushairi - Pembezi",
+        "Fasihi Simulizi - Uchanganuzi wa Ushairi - Tondozi",
+        "Fasihi Simulizi - Uchanganuzi wa Ushairi - Utafiti",
+        "Ushairi - Uchambuzi wa Mashairi - Uhuru wa Kishairi",
+        "Ushairi - Uchambuzi wa Mashairi - Inkisari, Mazida",
+        "Ushairi - Uchambuzi wa Mashairi - Tabdila, Kuboronga",
+        "Ushairi - Uchambuzi wa Mashairi - Lahaja, Utohozi",
+        "Ushairi - Uchambuzi wa Mashairi - Lugha ya Kale",
+        "Ushairi - Uchambuzi wa Mashairi - Uchambuzi wa Uhuru",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Hadithi Fupi - Mandhari",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Hadithi Fupi - Muundo",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Hadithi Fupi - Mtindo",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Hadithi Fupi - Umuhimu wa Vipengele",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Hadithi Fupi - Uchambuzi wa Jumla",
+        "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Hadithi Fupi - Maigizo"
+      ]
+    },
+    {
+      "topic_id": 10,
+      "topic_name": "Mada 10: Utafiti wa Fasihi Simulizi na Utunzi",
+      "subtopic_count": 15,
+      "subtopics": [
+        "Fasihi Simulizi - Utafiti - Maana",
+        "Fasihi Simulizi - Utafiti - Aina za Utafiti",
+        "Fasihi Simulizi - Utafiti - Utafiti wa Maktabani",
+        "Fasihi Simulizi - Utafiti - Uwasilishaji",
+        "Ushairi - Utunzi wa Mashairi - Vipengele",
+        "Ushairi - Utunzi wa Mashairi - Hatua",
+        "Ushairi - Utunzi wa Mashairi - Utunzi wa Ubeti",
+        "Ushairi - Utunzi wa Mashairi - Tathmini",
+        "Ushairi - Utunzi wa Mashairi - Uwasilishaji",
+        "Bunilizi na Kazi za Kihalisia - Utunzi wa Bunilizi - Vipengele",
+        "Bunilizi na Kazi za Kihalisia - Utunzi wa Bunilizi - Hatua",
+        "Bunilizi na Kazi za Kihalisia - Utunzi wa Bunilizi - Utunzi",
+        "Bunilizi na Kazi za Kihalisia - Utunzi wa Kazi za Kihalisia - Tawasifu",
+        "Bunilizi na Kazi za Kihalisia - Utunzi wa Kazi za Kihalisia - Tathmini",
+        "Bunilizi na Kazi za Kihalisia - Utunzi wa Kazi za Kihalisia - Uwasilishaji"
+      ]
+    }
+  ]
+}

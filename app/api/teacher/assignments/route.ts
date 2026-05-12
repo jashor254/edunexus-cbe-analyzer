@@ -75,7 +75,7 @@ export async function POST(req: Request) {
     if (!teacher) return apiForbidden()
 
     const body = await req.json()
-    const { class_id, title, subject, topic, instructions, due_date, type, max_score, is_compass_guided, is_holiday_assignment, holiday_period } = body
+    const { class_id, title, subject, topic, instructions, due_date, type, max_score, is_compass_guided, is_holiday_assignment, holiday_period, lesson_plan_id } = body
 
     if (!class_id || !title || !subject || !topic || !instructions || !due_date) {
       return apiError('Missing required fields', 400)
@@ -106,6 +106,7 @@ export async function POST(req: Request) {
         is_compass_guided: is_compass_guided !== false,
         is_holiday_assignment: is_holiday_assignment === true,
         holiday_period: is_holiday_assignment ? (holiday_period || null) : null,
+        lesson_plan_id: lesson_plan_id || null,
         status: 'active',
       })
       .select()

@@ -460,7 +460,7 @@ function AddAssessmentContent() {
 
       {/* Nav */}
       <nav className="border-b-4 border-black bg-white sticky top-0 z-50">
-        <div className="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between gap-3 flex-wrap">
           <Link href="/dashboard" className="text-sm font-black uppercase tracking-wider hover:underline">
             ← Dashboard
           </Link>
@@ -476,10 +476,10 @@ function AddAssessmentContent() {
         </div>
       </nav>
 
-      <div className="max-w-5xl mx-auto px-6 py-12">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
 
         {/* Title */}
-        <h1 className="text-5xl font-black mb-2 uppercase">New Assessment</h1>
+        <h1 className="text-3xl sm:text-5xl font-black mb-2 uppercase">New Assessment</h1>
         <div className="h-2 w-32 bg-black mb-12" />
 
         {/* Error */}
@@ -769,7 +769,7 @@ function AddAssessmentContent() {
               </h2>
               <p className="text-xs text-rose-500 font-bold mb-6">Select one then score it</p>
 
-              <div className="grid grid-cols-3 gap-3 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
                 {JUNIOR_RELIGIOUS.map(r => (
                   <button
                     key={r.key}
@@ -972,7 +972,7 @@ function AddAssessmentContent() {
                 {/* Summary */}
                 <div className="p-6 bg-slate-50 rounded-3xl border-2 border-slate-200">
                   <p className="text-xs font-black text-slate-400 uppercase mb-3">Assessment Summary</p>
-                  <div className="grid grid-cols-4 gap-3 text-center">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
                     {[
                       { value: 4,                        label: 'Compulsory', color: 'text-blue-600'   },
                       { value: selectedElectives.length, label: 'Electives',  color: 'text-purple-600' },
@@ -995,7 +995,7 @@ function AddAssessmentContent() {
         {!isIGCSE && currentStudent && (
           <div className="mt-8 p-5 bg-slate-50 rounded-2xl border border-slate-200">
             <p className="text-xs font-black text-slate-400 uppercase mb-3">CBC Score Guide</p>
-            <div className="grid grid-cols-4 gap-3 text-center text-xs font-bold">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-xs font-bold">
               {[
                 { v: 1, label: 'Emerging',   bg: 'bg-red-100',    text: 'text-red-700'    },
                 { v: 2, label: 'Developing', bg: 'bg-amber-100',  text: 'text-amber-700'  },

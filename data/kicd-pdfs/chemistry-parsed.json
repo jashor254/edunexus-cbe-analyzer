@@ -1,0 +1,113 @@
+{
+  "assessment_methods": [],
+  "learning_resources": [],
+  "non_formal_activities": [],
+  "strands": [
+    {
+      "strand_title": "INORGANIC CHEMISTRY",
+      "sub_strands": [
+        {
+          "title": "Introduction to Chemistry",
+          "suggested_lessons": 6,
+          "learning_outcomes": [
+            "a) explain the meaning of Chemistry as a field of science,",
+            "b) explore the role of Chemistry in day to day life,",
+            "c) examine the effects of drug and substance use in day to day life,",
+            "d) promote the rights and responsibilities to a safe and healthy learning environment."
+          ],
+          "learning_experiences": [
+            "brainstorm on concepts covered in junior school that relate to Chemistry,",
+            "discuss with peers the meaning of Chemistry as a field of science,",
+            "discuss with peers the branches of Chemistry,",
+            "brainstorm the importance of Chemistry in our daily lives,",
+            "search for information using electronic and/or print media on the career opportunities related to Chemistry and how gender stereotyping influences career choices,",
+            "discuss with peers the meaning of drug, prescription, dosage and substance use,",
+            "brainstorm on the consumer rights and protection in relation to drug prescription, substance use and side effects for awareness,",
+            "Develop posters to sensitise the peers/community on the risks of drug and substance use."
+          ],
+          "key_inquiry_questions": [
+            "How is the study of Chemistry important in our society?"
+          ]
+        },
+        {
+          "title": "The Atom",
+          "suggested_lessons": 24,
+          "learning_outcomes": [
+            "a) describe the structure of the atom,",
+            "b) determine the relative atomic mass of elements,",
+            "c) write the electron arrangement of elements using s and p notation,",
+            "d) develop interest in the study of structure of the atom."
+          ],
+          "learning_experiences": [
+            "review with peers the concept of the structure of the atom, atomic number and mass number,",
+            "discuss with peers the relationship between atomic number, mass number and number of electrons in an atom,",
+            "illustrate the structure of the atom using Dalton and Rutherford's models,",
+            "brainstorm the meaning of the terms isotopes and relative atomic mass,",
+            "calculate the relative atomic mass of elements from isotopic abundances,",
+            "discuss the relationship between energy levels and orbitals in an atom,",
+            "carry out simple activities to illustrate the order of filling the electrons in the orbitals,"
+          ],
+          "key_inquiry_questions": [
+            "How are electrons arranged in an atom?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "PHYSICAL CHEMISTRY",
+      "sub_strands": [
+        {
+          "title": "Acids and bases",
+          "suggested_lessons": 28,
+          "learning_outcomes": [
+            "a) explain the characteristics of acids and bases in aqueous solutions",
+            "b) describe the chemical properties of acids and bases",
+            "c) classify acids and bases into strong and weak using universal indicator",
+            "d) outline the uses of acids and bases in day to day life",
+            "e) Appreciate the uses of acids and bases in day to day activities."
+          ],
+          "learning_experiences": [
+            "review the concept of acids and bases as learned in JS",
+            "observe safety when handling acids and bases",
+            "carry out experiment to demonstrate dissociation of acids and bases in water",
+            "carry out experiments on chemical properties of acids",
+            "perform experiments to investigate which metal oxides and hydroxides reacts with both acids and base",
+            "collect and test for gases produced during the experiments",
+            "conduct experiments to determine strength of acids and bases using universal indicator",
+            "carry out activities to compare the electrical conductivity of strong and weak acids and bases",
+            "properly dispose waste after experiments",
+            "search for information on the applications of acids and bases."
+          ],
+          "key_inquiry_questions": [
+            "What common household substances are acidic and/or basic in nature?"
+          ]
+        },
+        {
+          "title": "Introduction to Salts",
+          "suggested_lessons": 30,
+          "learning_outcomes": [
+            "a) classify different salts based on their properties",
+            "b) prepare salts using appropriate methods in the laboratory",
+            "c) describe the behaviour of salts when exposed to air",
+            "d) outline applications of salts in day to day life",
+            "e) appreciate applications of salts in day to day life."
+          ],
+          "learning_experiences": [
+            "brainstorm and carry out activities in groups, to establish the meaning of salt (samples of inorganic fertilisers/table salt/commercial salts found at home and in the school laboratory)",
+            "discuss with peers and categorise salts as normal, acidic, basic and double",
+            "carry out experiments to determine the solubility of salts in water and classify them as either soluble or insoluble (chlorides, carbonates, nitrates and sulphates)",
+            "carry out experiments to prepare salts (direct synthesis, reactions between; acids and metals, acids and bases, acids and carbonates/hydrogen carbonates, precipitation reaction)",
+            "brainstorm on learner’s rights and responsibilities to a safe learning environment when preparing salts",
+            "write balanced chemical equations for reactions involved in the preparation of salts (ionic equations limited to precipitation reactions)",
+            "carry out experiments to investigate the behaviour of different salts when exposed to the atmosphere (hygroscopic, deliquescent and efflorescent salts)",
+            "discuss with peers, the applications of salts (Agriculture, food industry, medicine, paper industry, paints industry, glass industry"
+          ],
+          "key_inquiry_questions": [
+            "How do salts behave when exposed to air?",
+            "How can salts be prepared in the laboratory?"
+          ]
+        }
+      ]
+    }
+  ]
+}

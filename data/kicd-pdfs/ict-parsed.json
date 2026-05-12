@@ -1,0 +1,126 @@
+{
+  "assessment_methods": [],
+  "learning_resources": [],
+  "non_formal_activities": [],
+  "strands": [
+    {
+      "strand_title": "ICT AND SOCIETY",
+      "sub_strands": [
+        {
+          "title": "Introduction to ICT",
+          "suggested_lessons": 4,
+          "learning_outcomes": [
+            "a) identify technologies used in Communication,",
+            "b) explain the components of ICT infrastructure in an organisation,",
+            "c) use ICT to interact with information on a topical issue,",
+            "d) appreciate the importance of ICT in the society."
+          ],
+          "learning_experiences": [
+            "brainstorm on the meaning of the terms; information, process, communication, technology, information technology, Information and Communication technology (ICT),",
+            "use print or digital media to search for information on technologies used in Communication,",
+            "discuss the components of ICT infrastructure in an organisation,",
+            "engage in an activity to send and receive information using an ICT device,",
+            "share experiences on importance of ICT in the society."
+          ],
+          "key_inquiry_questions": [
+            "How do different digital technologies facilitate communication and information exchange in a society?"
+          ]
+        },
+        {
+          "title": "Application Areas of ICT",
+          "suggested_lessons": 4,
+          "learning_outcomes": [
+            "a) identify application areas of ICT in the society,",
+            "b) relate the application areas of ICT to solving community problems,",
+            "c) appreciate the role of ICT in the society."
+          ],
+          "learning_experiences": [
+            "use print or digital media to search for information on areas where ICTs are used and share the findings,",
+            "visit school community areas such as the school administration office, accounts office, and nearby supermarket to observe how ICT is used,",
+            "discuss the use of ICT in solving community problems,",
+            "share experiences on the challenges posed by ICT in society."
+          ],
+          "key_inquiry_questions": [
+            "1. How is ICT used to solve problems in daily life?",
+            "2. What are the trends in ICT application areas?"
+          ]
+        },
+        {
+          "title": "Operating Systems",
+          "suggested_lessons": 6,
+          "learning_outcomes": [
+            "a) explain the importance of operating systems in digital devices,",
+            "b) identify types of operating systems used in digital devices,",
+            "c) use operating system to organise files and folders in a computing device,",
+            "d) implement security control measure on files and folders in a"
+          ],
+          "learning_experiences": [
+            "brainstorm the meaning and importance of operating systems in a digital device,",
+            "identify and discuss types of operating systems in digital devices (windows, Linux, macOS, Android, iOS) including those in dedicated digital devices,",
+            "explore the operating system interface used for interaction (GUI, command line, menu driven),",
+            "engage in basic operating system manipulations such as changing the desktop background, adjusting system settings, locating applications,",
+            "use the file explorer to navigate through a computer system,",
+            "manipulate files and folders (creating, renaming, moving, copying, searching and deleting files and folders) within the"
+          ],
+          "key_inquiry_questions": [
+            "What role do operating systems play in supporting user operations in a digital device?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "INTERNET AND WEB TECHNOLOGIES",
+      "sub_strands": [
+        {
+          "title": "The Internet",
+          "suggested_lessons": 6,
+          "learning_outcomes": [
+            "a) explain the purpose of the internet in the society",
+            "b) explore the common services offered through the internet for various needs and interests",
+            "c) identify the fundamental components required to set up an internet connection.",
+            "d) use search engine to gather relevant information",
+            "e) use email application to communicate with peers",
+            "f) appreciate the positive impacts of the internet on society"
+          ],
+          "learning_experiences": [
+            "brainstorm on the meaning, history and purpose of the Internet",
+            "use print or digital media to search for the meaning of common terms used in the internet such as intranet, www, extranet, website, webpage, URL, Server, web browser, search engine, web application, Internet service provider and surfing",
+            "identify common services offered through the internet for various needs and interests such as communication, e-commerce, education, social media, financial services, remote work tools, gaming.",
+            "research and present information on the fundamental components required to set up an internet connection.",
+            "simulate setting up an internet connection using provided equipment such as hotspot, ethernet cables, wireless routers, tethering and portable hotspot",
+            "use search engines to find and access information on the internet (keyword search, operators, filters, Boolean operators, related search, autocomplete, settings, images and videos)",
+            "compose and send an email to peers.",
+            "customise aspects of email application to suit workflow, enhance productivity, and effectively manage emails (account setup, organize folders, email filters, notifications, signature, default settings, security, sync settings, layout customization, backup and storage)",
+            "explore and share experiences of positive impacts of the internet on various aspects of society",
+            "share experiences on the positive impact of the Internet on society"
+          ],
+          "key_inquiry_questions": [
+            "How can the Internet be harnessed to facilitate communication and information gathering?"
+          ]
+        },
+        {
+          "title": "Digital Communication",
+          "suggested_lessons": 10,
+          "learning_outcomes": [
+            "a) explain the importance of digital communication in the society.",
+            "b) identify online platforms used to support digital communication",
+            "c) use digital online platforms to communicate",
+            "d) use online forums to collaborate and share content",
+            "e) appreciate the impact of Artificial Intelligence (AI) in digital communication platforms"
+          ],
+          "learning_experiences": [
+            "brainstorm on the meaning and importance of digital communication in the society.",
+            "search for information on digital communication platforms used for personal and professional communication, such as email, chat apps, video conferencing, instant messaging (IM), collaboration platforms, learning management and social media.",
+            "explore the key features of online platforms used to support digital communication such as user profiles, customisable interfaces, accessibility, search functionality, privacy and security, integration with other services, support and help resources.",
+            "use various online digital platforms such as social medial to communicate with peers such as discussion forums where students can post questions and answer on any topical issue.",
+            "explore various digital collaboration tools such as cloud-based documents platforms (Google Docs, Zoho docs), file-sharing services platforms (Dropbox, Google drive, One drive), and project management platforms (Asana, Jira)",
+            "use digital collaboration tools like cloud-based document platforms, file-sharing services platforms, and project management platforms to work collaboratively, share resources, manage projects, and enhance productivity through seamles"
+          ],
+          "key_inquiry_questions": [
+            "How can various digital communication platforms be effectively utilised to create communication, connection and learning?"
+          ]
+        }
+      ]
+    }
+  ]
+}

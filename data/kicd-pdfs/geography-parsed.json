@@ -1,0 +1,185 @@
+{
+  "assessment_methods": [],
+  "learning_resources": [],
+  "non_formal_activities": [],
+  "strands": [
+    {
+      "strand_title": "PRACTICAL GEOGRAPHY",
+      "sub_strands": [
+        {
+          "title": "Introduction to Geography",
+          "suggested_lessons": 8,
+          "learning_outcomes": [
+            "a) analyse the branches of Geography for in-depth understanding of the subject",
+            "b) examine the importance of studying Geography for sustainable development",
+            "c) explore the relationship between Geography and other disciplines for identification of career pathways",
+            "d) select possible careers from branches of Geography in the society",
+            "e) appreciate the significance of Geography in day-to-today life."
+          ],
+          "learning_experiences": [
+            "Brainstorm on the meaning and branches of Geography and make class presentations",
+            "Use print or digital resources to establish the importance of studying Geography and write notes",
+            "Discuss the relationship between Geography and other disciplines and present in class",
+            "Engage with resource person on meaning of career, factors to consider in choosing a career and careers related to Geography and take notes.",
+            "Create posters on careers related to Geography and display in school",
+            "Engage in work shadowing on a possible career in Geography and share experiences in class.",
+            "Conduct a digital or library research on the significance of Geography in day-to-today life and make class presentations"
+          ],
+          "key_inquiry_questions": [
+            "How does the study of Geography impact on peoples lives?"
+          ]
+        },
+        {
+          "title": "Map Reading and Interpretation",
+          "suggested_lessons": 13,
+          "learning_outcomes": [
+            "a) illustrate the various methods of representing relief on topographical maps",
+            "b) interpret relief, drainage and vegetation on topographical maps for resource mapping",
+            "c) draw sketch sections from topographical maps for interpreting relief",
+            "d) appreciate the use of map reading and interpretation skills for national development."
+          ],
+          "learning_experiences": [
+            "Brainstorm on meaning and types of maps and share in class",
+            "Use print or digital resources to research on the various methods of representing relief, drainage and vegetation on topographical maps and draw sketches",
+            "Discuss how relief, drainage and vegetation are interpreted on topographical maps and make class presentations",
+            "Watch video clips on relief, drainage, and vegetation and take notes",
+            "Draw sketch sections from topographical maps and display in class.",
+            "Use relief, drainage and vegetation on topographic maps to identify various economic activities that can be undertaken in a given area."
+          ],
+          "key_inquiry_questions": [
+            "How do we read and interpret topographical maps?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "NATURAL SYSTEMS AND PROCESSES",
+      "sub_strands": [
+        {
+          "title": "Rocks",
+          "suggested_lessons": 18,
+          "learning_outcomes": [
+            "a) examine the classification of rocks according to the mode of formation and age,",
+            "b) describe the distribution of rocks in Kenya,",
+            "c) analyse the significance of rocks in Kenya,",
+            "d) sample rock types in your locality,",
+            "e) appreciate the significance of rocks in Kenya."
+          ],
+          "learning_experiences": [
+            "Brainstorm the meaning of rocks and share in class",
+            "Use print or digital resources to establish the classification of rocks (according to mode of formation and age), download images and display in class",
+            "Discuss the characteristics of rocks (igneous, metamorphic and sedimentary) and make presentations in class",
+            "Draw a sketch map of Kenya showing the distribution of rocks and display strategically in the school",
+            "Carry out library research on the significance of rocks in Kenya and write an essay",
+            "Carry out field study on rocks within the local environment, collect, classify and display the samples in class",
+            "Make a collage showing the distribution of rocks in Kenya and display in class"
+          ],
+          "key_inquiry_questions": [
+            "Why are there different types of rocks?"
+          ]
+        },
+        {
+          "title": "Folding",
+          "suggested_lessons": 12,
+          "learning_outcomes": [
+            "a) distinguish the types of folds resulting from tectonic forces,",
+            "b) describe the resultant features of folding on the Earth’s surface,",
+            "c) analyse the significance of folding and the resultant features,",
+            "d) illustrate the distribution of fold mountains in the world,",
+            "e) appreciate the influence of folding and the resultant features on human activities."
+          ],
+          "learning_experiences": [
+            "Brainstorm on the meaning of folding and share in class",
+            "Discuss types of folds resulting from tectonic forces and make presentations in class",
+            "Use print or digital resources to research on the resultant features of folding on the Earth’s surface and make notes",
+            "Draw sketches of the resultant features of folding on the Earth’s surface and display in class",
+            "Model resultant features of folding on the Earth’s surface and display in class",
+            "Draw a world map showing the distribution of fold mountains and display in class",
+            "Debate on the significance of folding and the resultant features"
+          ],
+          "key_inquiry_questions": [
+            "How does folding influence our day-to-day life?"
+          ]
+        },
+        {
+          "title": "Vulcanicity",
+          "suggested_lessons": 13,
+          "learning_outcomes": [
+            "a) investigate the causes of vulcanicity in the Earth,",
+            "b) describe features resulting from vulcanic activities in the"
+          ],
+          "learning_experiences": [
+            "Brainstorm on the meaning and causes of vulcanicity in Earth and make notes",
+            "Use print or digital resources to research on features resulting from vulcanicity in the world and make presentations in cl"
+          ],
+          "key_inquiry_questions": [
+            "Why study vulcanicity?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "HUMAN AND ECONOMIC ACTIVITIES",
+      "sub_strands": [
+        {
+          "title": "Agriculture",
+          "suggested_lessons": 15,
+          "learning_outcomes": [
+            "a) explore types of agriculture in the world",
+            "b) explain the importance of agriculture in the society",
+            "c) analyse the trends in agriculture in Africa",
+            "d) examine challenges facing agriculture in Kenya",
+            "e) design strategies towards enhancing agricultural productivity in Kenya",
+            "f) appreciate the role of agriculture towards food security in Kenya."
+          ],
+          "learning_experiences": [
+            "Brainstorm on the types of agriculture in the world (subsistence, commercial, urban agriculture) and present in class",
+            "Engage a resource person on the importance of agriculture in the society",
+            "Use print or digital resources to research on trends in agriculture in Africa",
+            "Watch video clips on urban agriculture and hydroponics and take notes",
+            "Develop communication messages on challenges facing agriculture in Kenya",
+            "Conduct a field study within the locality on strategies for enhancing agricultural productivity",
+            "Create posters on possible strategies towards enhancing agricultural productivity in Kenya"
+          ],
+          "key_inquiry_questions": [
+            "How is the future of agriculture in Kenya?"
+          ]
+        },
+        {
+          "title": "Mining",
+          "suggested_lessons": 20,
+          "learning_outcomes": [
+            "a) examine the factors influencing occurrence and exploitation of minerals",
+            "b) describe the methods used in extraction of minerals in the world",
+            "c) explore the mining of limestone in Kenya, diamond in Botswana and iron ore in Australia",
+            "d) analyse the effects of mining on the environment and possible solutions",
+            "e) apply statistical skills to establish trends in mineral production in East Africa",
+            "f) recognize the significance of minerals to the economy of Kenya."
+          ],
+          "learning_experiences": [
+            "Brainstorm on the meaning of minerals and mining and share in class",
+            "Carry out library research to establish occurrence of minerals and make notes",
+            "Discuss the factors influencing occurrence and exploitation of minerals and present in class",
+            "Use print or digital resources to research on methods used in extraction of minerals and make notes",
+            "Watch video clips on methods used in extraction of minerals and take notes",
+            "Watch documentaries on mining of limestone in Kenya, diamond in Botswana, and iron ore in Australia and take notes",
+            "Write an article on the effects of mining on environment and possible solutions and publish",
+            "Create communication messages on the importance of rehabilitating mining sites and display on the school noticeboards"
+          ],
+          "key_inquiry_questions": [
+            "How can we exploit minerals sustainably?"
+          ]
+        },
+        {
+          "title": "Energy",
+          "suggested_lessons": 2,
+          "learning_outcomes": [],
+          "learning_experiences": [],
+          "key_inquiry_questions": [
+            "Why renewable"
+          ]
+        }
+      ]
+    }
+  ]
+}

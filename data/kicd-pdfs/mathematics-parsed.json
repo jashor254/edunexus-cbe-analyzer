@@ -1,0 +1,187 @@
+{
+  "assessment_methods": [],
+  "learning_resources": [],
+  "non_formal_activities": [],
+  "strands": [
+    {
+      "strand_title": "NUMBERS AND ALGEBRA",
+      "sub_strands": [
+        {
+          "title": "Real Numbers",
+          "suggested_lessons": 8,
+          "learning_outcomes": [
+            "a) classify whole numbers as odd, even, prime and composite in different situations",
+            "b) classify real numbers as rational and irrational in different situations",
+            "c) determine the reciprocal of real numbers by division",
+            "d) determine the reciprocal of real numbers by use of mathematical tables and calculators",
+            "e) apply reciprocal of real numbers in mathematical computations",
+            "f) promote the use of real numbers in day-to-day activities"
+          ],
+          "learning_experiences": [
+            "discuss with peers to identify and categorise whole numbers as odd, even, prime and composite",
+            "discuss in a group the meaning of real numbers",
+            "categorise real numbers as rational and irrational numbers",
+            "work out the reciprocal of real numbers by division",
+            "read the values of the reciprocals of real numbers from mathematical tables",
+            "work out the reciprocal of real numbers using a calculator",
+            "use reciprocal of real numbers to work out tasks",
+            "use digital devices or other resources such as books to work out the reciprocal of real numbers"
+          ],
+          "key_inquiry_questions": [
+            "How do we use real numbers in day-to-day activities?"
+          ]
+        },
+        {
+          "title": "Indices and Logarithms",
+          "suggested_lessons": 8,
+          "learning_outcomes": [
+            "a) express numbers in index form",
+            "b) derive the laws of indices using factors",
+            "c) apply the laws of indices in different situations",
+            "d) relate index notation to logarithm notation to base 10",
+            "e) determine common logarithms of numbers from mathematical tables and calculators",
+            "f) apply common logarithms in multiplication, division, powers and roots of numbers",
+            "g) appreciate the use of indices and common logarithms in mathematical computations"
+          ],
+          "learning_experiences": [
+            "write numbers in terms of bases and indices and share them with peers",
+            "discuss in a group and generate the laws of indices",
+            "use the laws of indices to work out mathematical computations",
+            "discuss in a group and relate index notation to logarithm notation to base 10",
+            "read and obtain common logarithms of numbers from tables and calculators",
+            "use common logarithms of numbers to work out mathematical tasks",
+            "use digital devices or other resources to work out mathematical tasks involving common logarithms"
+          ],
+          "key_inquiry_questions": [
+            "Why do we use indices and logarithms?"
+          ]
+        },
+        {
+          "title": "Quadratic Expressions and Equations",
+          "suggested_lessons": 14,
+          "learning_outcomes": [
+            "a) form quadratic expressions from different situations",
+            "b) derive the quadratic identities from the concept of area"
+          ],
+          "learning_experiences": [
+            "generate quadratic expressions from given statements",
+            "discuss with peers and come up with quadratic identities and write them on a chart"
+          ],
+          "key_inquiry_questions": [
+            "How do we apply the concept of quadratic equations?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "MEASUREMENTS AND GEOMETRY",
+      "sub_strands": [
+        {
+          "title": "Similarity and enlargement",
+          "suggested_lessons": 12,
+          "learning_outcomes": [
+            "a) determine the centre of enlargement and the linear scale factor for similar figures,",
+            "b) construct the image of an object under an enlargement given the centre and the linear scale factor,",
+            "c) determine the area and volume scale factor of different figures and solids,",
+            "d) relate linear scale factor, area scale factor, and volume scale factor in enlargements",
+            "e) apply similarity and enlargement to real-life situations,",
+            "f) appreciate the use of similarity and enlargement in real-life situations."
+          ],
+          "learning_experiences": [
+            "discuss in a group and review the properties of similar figures and enlargement,",
+            "use an object and its image to establish the centre of enlargement and the ratio of the lengths of corresponding sides, Linear Scale Factor (L.S.F)",
+            "discuss in a group and draw on a plane surface the images of objects under enlargement given the centres and linear scale factors",
+            "draw on the Cartesian plane the images of objects under enlargement given the centres and linear scale factors.",
+            "discuss in a group and establish Linear Scale Factor (L.S.F) from similar plane figures. Work out the ratio of the area of similar plane figures, Area Scale Factor (A.S.F). Work out the ratio of volume of similar solids, Volume Scale Factor (V.S.F)",
+            "discuss in a group and establish the relationship between L.S.F, A.S.F and V.S.F using two similar solids.",
+            "work out tasks involving similarity and enlargements in real life situations.",
+            "use digital devices and other resources to learn more on the use and application of similarity and enlargement"
+          ],
+          "key_inquiry_questions": [
+            "How is similarity and enlargement applied in day-to-day life?"
+          ]
+        },
+        {
+          "title": "Reflection and congruence",
+          "suggested_lessons": 12,
+          "learning_outcomes": [
+            "a) identify lines of symmetry in plane figures,",
+            "b) determine the properties of reflection in different situations",
+            "c) draw an image given an object and a mirror line on plane surface and Cartesian plane,",
+            "d) determine the equation of the mirror line given an object and its image,",
+            "e) carry out congruence tests for triangles,",
+            "f) appreciate use of reflection and congruence in real-life situations."
+          ],
+          "learning_experiences": [
+            "collect and observe different objects from the immediate environment and illustrate the lines and planes of symmetry.",
+            "use a plane mirror to locate the image of an object placed at a point in front of the mirror.",
+            "draw a plane figure and a mirror line on tracing paper. Fold the paper along the mirror line and trace out the plane figure. Use the two plane figures and the mirror line to generate the properties of reflection.",
+            "draw on plain paper a given object and a mirror line. Use the properties of reflection to locate the corresponding image",
+            "draw on a Cartesian plane given objects and mirror lines. Use the properties of reflection to draw the"
+          ],
+          "key_inquiry_questions": [
+            "How do we use reflection in day-to-day life?",
+            "Where do we use congruence in real life?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "STATISTICS AND PROBABILITY",
+      "sub_strands": [
+        {
+          "title": "Statistics I",
+          "suggested_lessons": 16,
+          "learning_outcomes": [
+            "a) collect data from real-life sources,",
+            "b) draw a frequency distribution table for grouped and ungrouped data,",
+            "c) determine mean, mode and median of grouped and ungrouped data,",
+            "d) represent data using histograms and frequency polygons,",
+            "e) interpret data from histograms and frequency polygons,",
+            "f) promote data collection, organisation and representation for informed decision making."
+          ],
+          "learning_experiences": [
+            "discuss with peers the meaning of the term data. Explore data sources and use different and appropriate methods to collect and record data,",
+            "use the collected data or any other data to prepare a frequency distribution table for an ungrouped data,",
+            "group collected data or any other data into appropriate classes and generate a frequency distribution table,",
+            "discuss in pairs and identify the modal class for grouped data,",
+            "use data collected from different sources and work out the mode, median and mean for grouped and ungrouped data,",
+            "work in a group and use collected data to draw histograms (with equal and unequal class-width) and frequency polygons,",
+            "use the histograms and frequency polygons to examine data to make conclusions,",
+            "use digital devices and other resources to draw histograms and frequency polygons."
+          ],
+          "key_inquiry_questions": [
+            "1. What is statistics?",
+            "2. How do we represent data?",
+            "3. How do we use statistics in day to day life?"
+          ]
+        },
+        {
+          "title": "Probability 1",
+          "suggested_lessons": 12,
+          "learning_outcomes": [
+            "a) perform experiments involving probabilities in different situations,",
+            "b) identify the range of probability in different situations,",
+            "c) generate probability space of different events",
+            "d) determine the probability of mutually exclusive and independent events",
+            "e) apply the laws of probability in different situations,",
+            "f) determine the probability of independent events using tree diagrams",
+            "g) appreciate the application of probability in real life situations."
+          ],
+          "learning_experiences": [
+            "carry out experiments in a group such as tossing coins or throwing dice to illustrate experimental probability,",
+            "discuss in a group the probabilities of events and show the range of probability.",
+            "list down all the possible outcomes of different events in real life situations",
+            "work out in pairs the probability of mutually exclusive events and independent events.",
+            "work out probability of events using addition and multiplication law",
+            "in pairs use tree diagram to work out probability of two independent and mutually events",
+            "discuss, create and play games related to probability."
+          ],
+          "key_inquiry_questions": [
+            "How is probability applied in real life situations?"
+          ]
+        }
+      ]
+    }
+  ]
+}

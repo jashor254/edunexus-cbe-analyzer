@@ -1,0 +1,174 @@
+{
+  "assessment_methods": [],
+  "learning_resources": [],
+  "non_formal_activities": [],
+  "strands": [
+    {
+      "strand_title": "CREATING",
+      "sub_strands": [
+        {
+          "title": "Play Writing",
+          "suggested_lessons": 25,
+          "learning_outcomes": [
+            "a) describe the elements of play writing,",
+            "b) write a three-act structure play based on a Pertinent and Contemporary Issue,",
+            "c) develop a community engagement story addressing a Pertinent and Contemporary Issue,",
+            "d) acknowledge the value of artistic creation in addressing societal issues."
+          ],
+          "learning_experiences": [
+            "read scripts to identify and discuss the elements of play writing (story, plot, character, dramatic style, setting, dialogue, dramatic action),",
+            "watch live or recorded plays to identify a three-act structure,",
+            "research to identify a theme based on Pertinent and Contemporary Issues for scripting,",
+            "brainstorm to generate a story using characters, dialogue, conflict and setting,",
+            "discuss elements of a plot (exposition, rising action, climax, falling action and resolution) for script writing,",
+            "write a script using appropriate dramatic language and style such as dialogue, monologue, dramatic irony, suspense and imagery to address the theme developed,",
+            "research to identify a PCI for community engagement,",
+            "write a story outline based on the PCI for community engagement,",
+            "create a reflective logbook/journal (manual or digital),",
+            "make entries in the reflective logbook/journal on experiences of playwriting."
+          ],
+          "key_inquiry_questions": [
+            "1. Why is Theatre important in Community Engagement?",
+            "2. How does a playwright creatively employ elements of writing a script in theatre?"
+          ]
+        },
+        {
+          "title": "Poetry writing",
+          "suggested_lessons": 15,
+          "learning_outcomes": [
+            "a) describe the characteristics of a spoken word poem,",
+            "b) select a relevant theme for writing a spoken word poem,",
+            "c) develop a character bible for a suitable persona to convey a message in a spoken word poem,",
+            "d) compose a spoken word poem using poetic elements,",
+            "e) value the spoken word poem as a means of self-expression."
+          ],
+          "learning_experiences": [
+            "research to identify the characteristics of a spoken word poem,",
+            "read a variety of spoken word poems to help identify how poetic elements (theme, persona, form, and language, word play, rhyme patterns) are used to convey the intended message,",
+            "research on relevant issues that affect the society for scripting of spoken word poem,",
+            "present research findings to enrich experiences for scripting of spoken word poem,",
+            "research to identify elements and components of a character bible (physical and emotional traits, relationship with other characters, character background)"
+          ],
+          "key_inquiry_questions": [
+            "1. How can spoken word poetry be used to address issues affecting society?",
+            "2. Why is spoken word poetry a powerful tool of communication?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "PRODUCTION",
+      "sub_strands": [
+        {
+          "title": "Acting",
+          "suggested_lessons": 35,
+          "learning_outcomes": [
+            "a) demonstrate the use of theatre games and exercises in preparation for rehearsal and performance",
+            "b) master the lines in a stage piece for a performance",
+            "c) perform a selected character role using the actors tools",
+            "d) appreciate acting as a key component of creative expression"
+          ],
+          "learning_experiences": [
+            "research and identify theatre games and exercises (vocal, physical, mind) used before performances",
+            "participate in various theatre games and exercises",
+            "read the selected script to understand the play",
+            "interpret the script to perform the assigned character role",
+            "watch live or recorded performances to improve acting skills",
+            "commit to memory (memorise) the lines of the assigned character role in the script",
+            "research to identify the actor’s tools (voice, body, imagination)",
+            "perform the assigned character role incorporating the actors tools",
+            "record the play performance for future reference",
+            "give and receive feedback from peers",
+            "de-role from the role played (warm up/down, theatre games, debrief, counselling)",
+            "make entries in the reflective logbook/journal (manual or digital) on experiences of acting"
+          ],
+          "key_inquiry_questions": [
+            "Why is it important to engage in theatre games and exercises before a performance?",
+            "How does one effectively portray a character in a theatre performance?"
+          ]
+        },
+        {
+          "title": "Theatre Directing",
+          "suggested_lessons": 35,
+          "learning_outcomes": [
+            "a) describe the director’s responsibilities in theatre production",
+            "b) describe the different types of performance stages",
+            "c) develop a directorial concept for a stage performance",
+            "d) create a prompt book for a stage performance",
+            "e) direct a stage performance using the directorial concept",
+            "f) appreciate a director’s role in performance"
+          ],
+          "learning_experiences": [
+            "research and identify the duties and responsibilities of a stage director",
+            "watch videos to identify the different types of stages (proscenium, thrust, arena, theatre in the round, found spaces)",
+            "visit an actual or virtual performance space to observe the parts of a stage",
+            "draw and label the different parts of a stage (up stage, mid-stage right, mid-stage left, down stage left, down stage right, centre stage, apron, back stage, left wing, right wing)",
+            "watch a professional director, live or recorded, describing the directorial vision and concept for a theatre performance",
+            "identify and apply the direc"
+          ],
+          "key_inquiry_questions": [
+            "How does the type of stage impact a performance?",
+            "How does theatre directing enhance an effective performance?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "THEATRE FILM AND SOCIETY",
+      "sub_strands": [
+        {
+          "title": "Theatre Adjudication",
+          "suggested_lessons": 20,
+          "learning_outcomes": [
+            "a) examine the criteria for adjudicating theatre performances",
+            "b) develop a criteria for adjudicating theatrical performances",
+            "c) adjudicate theatrical performances using a criteria",
+            "d) develop a report on the adjudication process",
+            "e) appreciate the process of adjudication in adding value to a performance."
+          ],
+          "learning_experiences": [
+            "research on the criteria for adjudicating stage (play and poetry) performances (script, theme, use of voice and body, movement, lighting, sound, costume, make-up, stage set, creativity, originality, improvisation, overall impression)",
+            "develop a criteria for adjudicating a play",
+            "develop a criteria for adjudicating a spoken word",
+            "adjudicate stage plays using the set-out criteria",
+            "adjudicate poetry using the set-out criteria",
+            "write an adjudication report and present it orally to peers for experience sharing",
+            "keep a portfolio of the adjudication reports",
+            "make entries in the reflective logbook/journal (manual or digital) on experiences of adjudication."
+          ],
+          "key_inquiry_questions": [
+            "How important is adjudication to the theatre production process?",
+            "Why is it important to have a criteria when adjudicating a stage performance?"
+          ]
+        },
+        {
+          "title": "Theatre and Community",
+          "suggested_lessons": 25,
+          "learning_outcomes": [
+            "a) analyse the role of theatre in society",
+            "b) analyse principles guiding theatre and Film club management",
+            "c) execute a community theatre piece addressing a Pertinent and Contemporary Issue",
+            "d) appreciate the role of management in theatre."
+          ],
+          "learning_experiences": [
+            "research on the role of theatre in the society (entertainment, education, health, advocacy and occupation)",
+            "watch theatrical performances to establish how theatre influences society",
+            "research on the principles guiding theatre and film club management (club constitution, record keeping, resource mobilisation and management, organisation of activities, publicity of club activities)",
+            "interview resource persons to gather information on theatre and film club management",
+            "participate in the management of the theatre and film club in school",
+            "identify the community in which to carry out the community engagement piece (such as school, religious setting, estate, market, school outings, festivals among others)",
+            "identify the found space to stage the community piece",
+            "engage in mobilisation exercise",
+            "perform the community engagement piece",
+            "engage in a feedback session with the community audience and peers",
+            "write a report on the community engagement experience"
+          ],
+          "key_inquiry_questions": [
+            "How does theatre influence and reflect societal values and issues?",
+            "How can we ensure that theatre and film clubs are well managed?"
+          ]
+        }
+      ]
+    }
+  ]
+}

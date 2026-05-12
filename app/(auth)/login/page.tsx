@@ -246,7 +246,7 @@ function LoginContent() {
       </div>
 
       {/* ── RIGHT PANEL — form ── */}
-      <div className="w-full md:w-1/2 h-screen overflow-y-auto flex flex-col justify-center bg-slate-900 px-8 py-12">
+      <div className="w-full md:w-1/2 h-screen overflow-y-auto flex flex-col justify-center bg-slate-900 px-5 sm:px-8 py-10 sm:py-12">
         <div className="w-full max-w-sm mx-auto">
 
           {/* Mobile logo (hidden on md+) */}

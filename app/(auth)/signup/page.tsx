@@ -251,7 +251,7 @@ function SignupForm() {
       </div>
 
       {/* ── RIGHT PANEL — form ── */}
-      <div className="w-full md:w-1/2 h-screen overflow-y-auto flex flex-col justify-center bg-slate-900 px-8 py-12">
+      <div className="w-full md:w-1/2 h-screen overflow-y-auto flex flex-col justify-center bg-slate-900 px-5 sm:px-8 py-10 sm:py-12">
 
         {/* Mobile logo */}
         <Link href="/" className="flex items-center gap-2 mb-8 md:hidden">

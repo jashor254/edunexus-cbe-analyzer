@@ -1,0 +1,195 @@
+{
+  "subject": "Kiswahili Lugha Grade 10",
+  "topics": [
+    {
+      "topic_id": 1,
+      "topic_name": "Mikondo ya Fursa za Ajira",
+      "subtopic_count": 12,
+      "subtopics": [
+        "Kusikiliza na Kuzungumza - Ufahamu wa Kusikiliza – Ujumbe katika matini simulizi",
+        "Kusoma - Kusoma kwa Ufasaha – Vipengele vya kusoma kifungu simulizi",
+        "Kuandika - Viakifishi – Herufi kubwa",
+        "Matumizi ya Lugha - Aina za Maneno – Nomino",
+        "Kusikiliza na Kuzungumza - Ufahamu wa Kusikiliza – Fani katika matini simulizi",
+        "Kusoma - Kusoma kwa Ufasaha – Kasi, kiimbo na kiwango cha sauti",
+        "Kuandika - Viakifishi – Nukta",
+        "Matumizi ya Lugha - Aina za Maneno – Vitenzi",
+        "Kusikiliza na Kuzungumza - Ufahamu wa Kusikiliza – Uwasilishaji wa uchambuzi",
+        "Kusoma - Kusoma kwa Ufasaha – Viziada lugha na ujirekodi",
+        "Kuandika - Viakifishi – Kipumuo na Alama za Mtajo",
+        "Matumizi ya Lugha - Aina za Maneno – Viwakilishi na Vivumishi"
+      ]
+    },
+    {
+      "topic_id": 2,
+      "topic_name": "Kukabiliana na Shinikizorika",
+      "subtopic_count": 12,
+      "subtopics": [
+        "Kusikiliza na Kuzungumza - Matamshi Bora – Sauti /b/ na /mb/",
+        "Kusoma - Kusoma kwa Ufahamu – Habari mahususi katika kifungu simulizi",
+        "Kuandika - Uandishi wa Kiuamilifu – Muundo wa barua ya kirafiki",
+        "Matumizi ya Lugha - Ngeli za Nomino – Ngeli ya A-WA",
+        "Kusikiliza na Kuzungumza - Matamshi Bora – Sauti /bw/ na /mbw/",
+        "Kusoma - Kusoma kwa Ufahamu – Msamiati na ufasiri wa kifungu simulizi",
+        "Kuandika - Uandishi wa Kiuamilifu – Kuandika barua ya kirafiki",
+        "Matumizi ya Lugha - Ngeli za Nomino – Ngeli ya U-I na KI-VI",
+        "Kusikiliza na Kuzungumza - Matamshi Bora – Vitanzandimi na uboreshaji wa matamshi",
+        "Kusoma - Kusoma kwa Ufahamu – Ufasiri na tathmini ya kifungu simulizi",
+        "Kuandika - Uandishi wa Kiuamilifu – Kujibu barua ya kirafiki",
+        "Matumizi ya Lugha - Ngeli za Nomino – Ngeli ya I-ZI"
+      ]
+    },
+    {
+      "topic_id": 3,
+      "topic_name": "Utambuzi wa Uwezo na Vipaji Mbalimbali",
+      "subtopic_count": 12,
+      "subtopics": [
+        "Kusikiliza na Kuzungumza - Kuzungumza kwa Kupasha Habari – Maana na miktadha",
+        "Kusoma - Ufupisho – Maana na vipengele vya kufupisha kifungu cha kupasha habari",
+        "Kuandika - Uandishi wa Kiuamilifu – Maana na muundo wa insha ya wasifu",
+        "Matumizi ya Lugha - Nyakati na Hali – Wakati uliopo",
+        "Kusikiliza na Kuzungumza - Kuzungumza kwa Kupasha Habari – Vipengele vya usahihi, uangavu na mvuto",
+        "Kusoma - Ufupisho – Kufupisha kifungu cha kupasha habari",
+        "Kuandika - Uandishi wa Kiuamilifu – Kuandika insha ya wasifu",
+        "Matumizi ya Lugha - Nyakati na Hali – Wakati uliopita",
+        "Kusikiliza na Kuzungumza - Kuzungumza kwa Kupasha Habari – Uwasilishaji darasani",
+        "Kusoma - Ufupisho – Tathmini na uboreshaji wa ufupisho",
+        "Kuandika - Uandishi wa Kiuamilifu – Kurekebisha na kuwasilisha insha ya wasifu",
+        "Matumizi ya Lugha - Nyakati na Hali – Wakati ujao"
+      ]
+    },
+    {
+      "topic_id": 4,
+      "topic_name": "Usalama Barabarani",
+      "subtopic_count": 12,
+      "subtopics": [
+        "Kusikiliza na Kuzungumza - Kusikiliza kwa Kupata Habari – Maana na Miktadha",
+        "Kusoma - Kusoma kwa Mapana – Vipengele na Umuhimu",
+        "Kuandika - Uandishi wa Kiuamilifu – Maana na Umuhimu wa Ratiba",
+        "Matumizi ya Lugha - Mnyambuliko wa Vitenzi – Kauli ya Kutenda",
+        "Kusikiliza na Kuzungumza - Kusikiliza kwa Kupata Habari – Vipengele vya Kuzingatia",
+        "Kusoma - Kusoma kwa Mapana – Kusoma Matini ya Kujichagulia",
+        "Kuandika - Uandishi wa Kiuamilifu – Vipengele vya Ratiba",
+        "Matumizi ya Lugha - Mnyambuliko wa Vitenzi – Kauli ya Kutendea",
+        "Kusikiliza na Kuzungumza - Kusikiliza kwa Kupata Habari – Mazungumzo Kuhusu Usalama Barabarani",
+        "Kusoma - Kusoma kwa Mapana – Msamiati na Muhtasari",
+        "Kuandika - Uandishi wa Kiuamilifu – Kuandika Ratiba ya Uhamasishaji",
+        "Matumizi ya Lugha - Mnyambuliko wa Vitenzi – Kauli ya Kutendwa na Kutendewa"
+      ]
+    },
+    {
+      "topic_id": 5,
+      "topic_name": "Kukabiliana na Mabadiliko ya Maisha ya Kibinafsi",
+      "subtopic_count": 12,
+      "subtopics": [
+        "Kusikiliza na Kuzungumza - Kusikiliza kwa Kupambanua – Maana na Vipengele",
+        "Kusoma - Kusoma kwa Kina – Maana na Umuhimu wa Mbinu ya Kurashia",
+        "Kuandika - Uhariri – Maana na Umuhimu wa Kuhariri Matini",
+        "Matumizi ya Lugha - Ukanushaji – Wakati Uliopita",
+        "Kusikiliza na Kuzungumza - Kusikiliza kwa Kupambanua – Kupambanua Maana na Mielekeo",
+        "Kusoma - Kusoma kwa Kina – Kutumia Mbinu ya Kurashia",
+        "Kuandika - Uhariri – Hatua na Kanuni za Kuhariri Matini",
+        "Matumizi ya Lugha - Ukanushaji – Wakati Uliopo",
+        "Kusikiliza na Kuzungumza - Kusikiliza kwa Kupambanua – Mazungumzo Kuhusu Mabadiliko ya Maisha",
+        "Kusoma - Kusoma kwa Kina – Msamiati na Ujumbe kutoka Matini iliyorashiwa",
+        "Kuandika - Uhariri – Kuhariri Matini ya Mwanafunzi",
+        "Matumizi ya Lugha - Ukanushaji – Wakati Ujao"
+      ]
+    },
+    {
+      "topic_id": 6,
+      "topic_name": "Kudhibiti Taka katika Mazingira",
+      "subtopic_count": 12,
+      "subtopics": [
+        "Kusikiliza na Kuzungumza - Uzungumzaji wa Papo kwa Hapo – Maana na Miktadha",
+        "Kusoma - Kusoma kwa Ufasaha – Vipengele vya Kuzingatia",
+        "Kuandika - Uandishi wa Kiuamilifu – Maana na Umuhimu wa Notisi",
+        "Matumizi ya Lugha - Aina za Maneno – Vielezi",
+        "Kusikiliza na Kuzungumza - Uzungumzaji wa Papo kwa Hapo – Kanuni za Kuzingatia",
+        "Kusoma - Kusoma kwa Ufasaha – Kusoma Kifungu cha Maelezo",
+        "Kuandika - Uandishi wa Kiuamilifu – Vipengele vya Notisi",
+        "Matumizi ya Lugha - Aina za Maneno – Viunganishi",
+        "Kusikiliza na Kuzungumza - Uzungumzaji wa Papo kwa Hapo – Mazoezi ya Kuzungumza",
+        "Kusoma - Kusoma kwa Ufasaha – Msamiati na Ujumbe kutoka Kifungu cha Maelezo",
+        "Kuandika - Uandishi wa Kiuamilifu – Kuandika Notisi ya Mkutano",
+        "Matumizi ya Lugha - Aina za Maneno – Vihusishi na Vihisishi"
+      ]
+    },
+    {
+      "topic_id": 7,
+      "topic_name": "Uadilifu katika Uongozi Shuleni",
+      "subtopic_count": 12,
+      "subtopics": [
+        "Kusikiliza na Kuzungumza - Kuzungumza kwa Ufasaha – Maana na Sifa za Mjadala",
+        "Kusoma - Kusoma kwa Ufahamu – Maana na Vipengele vya Kifungu Simulizi",
+        "Kuandika - Uandishi wa Kiuamilifu – Maana na Umuhimu wa Shajara",
+        "Matumizi ya Lugha - Uundaji wa Maneno – Mbinu ya Mkato",
+        "Kusikiliza na Kuzungumza - Kuzungumza kwa Ufasaha – Kanuni za Kuandaa Mjadala",
+        "Kusoma - Kusoma kwa Ufahamu – Kusoma Kifungu Simulizi na Kutambua Ujumbe",
+        "Kuandika - Uandishi wa Kiuamilifu – Vipengele na Aina za Shajara",
+        "Matumizi ya Lugha - Uundaji wa Maneno – Mbinu ya Kuambatanisha",
+        "Kusikiliza na Kuzungumza - Kuzungumza kwa Ufasaha – Mazoezi ya Kushiriki Mjadala",
+        "Kusoma - Kusoma kwa Ufahamu – Msamiati na Maswali ya Ufahamu",
+        "Kuandika - Uandishi wa Kiuamilifu – Kuandika Shajara ya Uchaguzi wa Viongozi",
+        "Matumizi ya Lugha - Uundaji wa Maneno – Mbinu ya Uradidi"
+      ]
+    },
+    {
+      "topic_id": 8,
+      "topic_name": "Jinsia na Taaluma",
+      "subtopic_count": 12,
+      "subtopics": [
+        "Kusikiliza na Kuzungumza - Kuzungumza kwa Ufasaha – Ushawishi kuhusu ukweli fulani",
+        "Kusoma - Ufupisho – Kifungu cha kupasha habari",
+        "Kuandika - Uandishi wa Kiubunifu – Masimulizi kutokana na picha",
+        "Matumizi ya Lugha - Vinyume – Vinyume vya nomino",
+        "Kusikiliza na Kuzungumza - Kuzungumza kwa Ufasaha – Ushawishi kuhusu ukweli fulani",
+        "Kusoma - Ufupisho – Kifungu cha kupasha habari",
+        "Kuandika - Uandishi wa Kiubunifu – Masimulizi kutokana na picha",
+        "Matumizi ya Lugha - Vinyume – Vinyume vya vitenzi",
+        "Kusikiliza na Kuzungumza - Kuzungumza kwa Ufasaha – Ushawishi kuhusu ukweli fulani",
+        "Kusoma - Ufupisho – Kifungu cha kupasha habari",
+        "Kuandika - Uandishi wa Kiubunifu – Masimulizi kutokana na picha",
+        "Matumizi ya Lugha - Vinyume – Vinyume vya vivumishi na vihusishi"
+      ]
+    },
+    {
+      "topic_id": 9,
+      "topic_name": "Kuheshimu Tamaduni za Wengine",
+      "subtopic_count": 12,
+      "subtopics": [
+        "Kusikiliza na Kuzungumza - Usikilizaji Husishi",
+        "Kusoma - Kusoma kwa Mapana – Matini ya kujichagulia",
+        "Kuandika - Uandishi wa Kiuamilifu – Insha fafanuzi",
+        "Matumizi ya Lugha - Aina za Sentensi – Sentensi sahili",
+        "Kusikiliza na Kuzungumza - Usikilizaji Husishi",
+        "Kusoma - Kusoma kwa Mapana – Matini ya kujichagulia",
+        "Kuandika - Uandishi wa Kiuamilifu – Insha fafanuzi",
+        "Matumizi ya Lugha - Aina za Sentensi – Sentensi ambatano",
+        "Kusikiliza na Kuzungumza - Usikilizaji Husishi",
+        "Kusoma - Kusoma kwa Mapana – Matini ya kujichagulia",
+        "Kuandika - Uandishi wa Kiuamilifu – Insha fafanuzi",
+        "Matumizi ya Lugha - Aina za Sentensi – Sentensi changamano"
+      ]
+    },
+    {
+      "topic_id": 10,
+      "topic_name": "Huduma ya Kwanza",
+      "subtopic_count": 12,
+      "subtopics": [
+        "Kusikiliza na Kuzungumza - Kusikiliza kwa Kuhakiki – Matini ya kusikiliza",
+        "Kusoma - Kusoma kwa Kina – Mbinu ya kuduhushi",
+        "Kuandika - Tafsiri",
+        "Matumizi ya Lugha - Isimujamii – Kaida za matumizi ya lugha",
+        "Kusikiliza na Kuzungumza - Kusikiliza kwa Kuhakiki – Matini ya kusikiliza",
+        "Kusoma - Kusoma kwa Kina – Mbinu ya kuduhushi",
+        "Kuandika - Tafsiri",
+        "Matumizi ya Lugha - Isimujamii – Sajili",
+        "Kusikiliza na Kuzungumza - Kusikiliza kwa Kuhakiki – Matini ya kusikiliza",
+        "Kusoma - Kusoma kwa Kina – Mbinu ya kuduhushi",
+        "Kuandika - Tafsiri",
+        "Matumizi ya Lugha - Isimujamii – Sajili"
+      ]
+    }
+  ]
+}

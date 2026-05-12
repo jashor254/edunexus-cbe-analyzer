@@ -41,15 +41,22 @@ export async function POST(req: Request) {
 
     const db = createServiceClient()
 
+    // Check if teacher already exists (determines whether to assign pioneer number)
+    const { data: existing } = await db
+      .from('teachers')
+      .select('id, pioneer_number')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
     const { data: teacher, error } = await db
       .from('teachers')
       .upsert({
         user_id: user.id,
         full_name,
         school,
-        subject: subject || null,
+        subject:      subject      || null,
         grade_levels: grade_levels || [7, 8, 9, 10, 11, 12],
-        phone: phone || null,
+        phone:        phone        || null,
       }, { onConflict: 'user_id' })
       .select()
       .single()
@@ -57,6 +64,21 @@ export async function POST(req: Request) {
     if (error) {
       console.error('[teacher/profile POST]', error)
       return apiError('Failed to save teacher profile')
+    }
+
+    // Assign pioneer number only on first-ever setup
+    if (!existing && !teacher.pioneer_number) {
+      const { data: pioneerNum, error: rpcErr } = await db.rpc('increment_beta_teacher_count')
+      if (!rpcErr && pioneerNum) {
+        const { data: updated } = await db
+          .from('teachers')
+          .update({ pioneer_number: pioneerNum })
+          .eq('user_id', user.id)
+          .select()
+          .single()
+
+        return apiSuccess({ teacher: updated ?? teacher })
+      }
     }
 
     return apiSuccess({ teacher })

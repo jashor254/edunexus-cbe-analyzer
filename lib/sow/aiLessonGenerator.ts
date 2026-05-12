@@ -6,7 +6,7 @@
 import { validateLesson } from './validators'
 import type { CurriculumMode } from './types'
 
-const MAX_RETRIES = 3
+const MAX_RETRIES = 5
 const MAX_CONFIDENCE = 0.92
 
 // ─── DeepSeek API call ──────────────────────────────────────────────────────
@@ -54,6 +54,8 @@ function buildLessonPrompt({
   lessonNumber,
   totalLessons,
   curriculumMode,
+  subjectType = 'default',
+  kicdContext,
 }: {
   learningArea: string
   grade: string
@@ -62,8 +64,43 @@ function buildLessonPrompt({
   lessonNumber: number
   totalLessons: number
   curriculumMode: CurriculumMode
-}): string {
+  subjectType?: string
+  kicdContext?: { subjectData: Record<string, any>; strandData: Array<{ title: string; kicd_data: any[] }>; subtopicMap?: Record<string, string[]> }
+}, retryNote = ''): string {
   const isCBC = curriculumMode.startsWith('cbc')
+  const isMaths = subjectType === 'mathematics'
+
+  const skillWords = substrand
+    .split(/[\s\-:,\/()]+/)
+    .filter(w => w.length >= 4)
+    .slice(0, 3)
+    .join(', ')
+
+  // Estimate page range based on lesson position (early topics = p.1-50, later = p.50-150+)
+  const topicFraction = totalLessons > 1 ? (lessonNumber - 1) / (totalLessons - 1) : 0
+  const estimatedPage = Math.round(1 + topicFraction * 149)
+  const estimatedPageEnd = estimatedPage + 3
+
+  const subtopics = kicdContext?.subtopicMap?.[strand]
+  const subtopicsSection = subtopics?.length
+    ? `\nSYLLABUS CONTENT for this topic (distribute across ${totalLessons} lessons):\n${subtopics.join(' | ')}\n\nCover these points progressively across lessons. Lesson ${lessonNumber} should focus on points ${lessonNumber}–${Math.min(lessonNumber + 1, subtopics.length)}.\n`
+    : ''
+
+  const kicdStrand = kicdContext?.strandData
+    ?.find(s => s.title.toLowerCase().includes(strand.toLowerCase().slice(0, 10)))
+
+  const kicdSection = kicdStrand?.kicd_data?.length
+    ? `
+OFFICIAL KICD CONTENT FOR THIS STRAND (use as your base):
+${JSON.stringify(kicdStrand.kicd_data[0], null, 2)}
+
+Instructions:
+- Use these official outcomes as your BASE for lesson ${lessonNumber} of ${totalLessons}
+- Adapt the language for this specific lesson focus
+- Maintain CBC competency-based approach
+- Do not copy verbatim — generate lesson-specific content
+`
+    : ''
 
   const curriculumContext = isCBC
     ? `Kenya CBC Competency-Based Curriculum
@@ -74,6 +111,52 @@ function buildLessonPrompt({
        Assessment: Summative exams (marks-based)
        Approach: Content mastery, exam preparation
        Context: Kenyan secondary school`
+
+  const outcomeBlock = !isCBC ? '' : isMaths ? `
+MANDATORY MATHS OUTCOME STRUCTURE:
+Write EXACTLY 3 learning outcomes in THIS progression:
+
+Outcome a) MUST start with: identify / state / define / describe / list / name / recognize / recall
+Example: 'identify the steps in solving ${substrand}'
+
+Outcome b) MUST start with: solve / calculate / apply / compute / determine / evaluate / find / work out / construct / draw / plot / measure
+Example: 'solve problems involving ${substrand}'
+
+Outcome c) MUST start with: appreciate / value / recognize the importance of / develop interest / show confidence
+Example: 'appreciate the application of ${substrand} in real life situations'
+
+WRONG — will be REJECTED:
+❌ a) explain ${substrand}     (explain is level 2, not level 1)
+❌ b) appreciate ${substrand}  (appreciate is level 3, not level 2)
+❌ c) solve ${substrand}       (solve belongs at level 1 or 2, not level 3)
+` : `
+CRITICAL — TSC INSPECTION REQUIREMENT:
+Write EXACTLY 3 learning outcomes in THIS progression:
+
+Outcome a) MUST start with ONE of these LEVEL 1 words:
+identify, describe, define, list, name, state,
+outline, locate, observe, collect, note, read,
+record, recognize, select, match, label
+
+Outcome b) MUST start with ONE of these LEVEL 2 words:
+explain, discuss, analyze, compare, examine,
+classify, interpret, differentiate, investigate,
+express, predict, relate, demonstrate, apply
+
+Outcome c) MUST start with ONE of these LEVEL 3 words:
+appreciate, value, evaluate, reflect, advocate,
+promote, create, develop, recognize the importance of
+
+CORRECT EXAMPLE for "${substrand}":
+a) identify the key features of ${substrand} in context,
+b) explain how ${substrand} is applied in communication,
+c) appreciate the role of ${substrand} in effective language use.
+
+WRONG — will be REJECTED:
+❌ a) understand ${substrand}  ('understand' not allowed)
+❌ a) explain ${substrand}     (explain is level 2, not level 1)
+❌ b) appreciate ${substrand}  (appreciate is level 3, not level 2)
+`
 
   return `
 You are a Kenyan curriculum expert preparing ONE lesson only.
@@ -105,13 +188,13 @@ ${isCBC ? 'Grade' : 'Form'}: ${grade}
 Strand/Topic: ${strand}
 Substrand/Subtopic: ${substrand}
 Lesson: ${lessonNumber} of ${totalLessons}
-
+${outcomeBlock}
 MANDATORY JSON FORMAT:
 {
   "learning_outcomes": [
-    "By end of lesson learner should...",
-    "Learner should be able to...",
-    "Learner should apply/appreciate..."
+    "identify [specific knowledge from this substrand]",
+    "explain [understanding of concept]",
+    "appreciate [value or relevance to learner's life]"
   ],
   "learning_experiences": [
     "Learners work in groups to...",
@@ -129,9 +212,10 @@ MANDATORY JSON FORMAT:
     "Written exercise"
   ],
   "learning_resources": [
-    "Textbooks",
-    "Charts",
-    "Real objects"
+    "KLB ${learningArea} ${grade} pg. ${estimatedPage}-${estimatedPageEnd}",
+    "Charts showing [specific aspect of topic]",
+    "Real objects: [relevant specimen or material]",
+    "Digital: YouTube — [topic] explanation"
   ],
   "core_competencies": "${
     isCBC
@@ -146,12 +230,31 @@ MANDATORY JSON FORMAT:
   }"
 }
 
+RESOURCES REQUIREMENT:
+"learning_resources" MUST include exactly 4 items in this order:
+1. The specific textbook with page range — Format: '[Publisher] [Subject] Grade [N] pg. [X]-[Y]'
+   For this lesson (${lessonNumber} of ${totalLessons}): use pages around ${estimatedPage}–${estimatedPageEnd}
+   Example: 'KLB ${learningArea} ${grade} pg. ${estimatedPage}–${estimatedPageEnd}'
+   (Substitute correct publisher if not KLB. Use realistic consecutive page numbers.)
+2. A specific chart or diagram relevant to ${substrand}
+3. Real objects, specimens, or materials specific to this lesson
+4. A digital resource (YouTube video, educational website) about ${substrand}
+
+KEYWORD REQUIREMENT:
+Your lesson is about: ${substrand}
+You MUST use at least ONE of these exact words or their direct forms in your outcomes/experiences:
+${skillWords}
+
+Example — for 'Previewing and Predicting':
+MUST include 'preview' or 'predict' somewhere ✅
+
+${kicdSection}${subtopicsSection}
 IMPORTANT:
-- Exactly 3 learning outcomes minimum
+- Exactly 3 learning outcomes: Level 1 verb → Level 2 verb → Level 3 verb
 - Use ${isCBC ? 'Kenyan CBC' : 'KCSE'} terminology
-- Outcomes must progress in complexity
+- Outcomes must progress from knowledge → understanding → values
 - Output VALID JSON ONLY
-  `
+${retryNote}  `
 }
 
 // ─── Main export ─────────────────────────────────────────────────────────────
@@ -164,6 +267,12 @@ export interface LessonGenerationContext {
   lessonNumber: number
   totalLessons: number
   curriculumMode: CurriculumMode
+  subjectType?: string
+  kicdContext?: {
+    subjectData: Record<string, any>
+    strandData: Array<{ title: string; kicd_data: any[] }>
+    subtopicMap?: Record<string, string[]>
+  }
 }
 
 export interface ValidatedLessonResult {
@@ -188,10 +297,30 @@ export async function generateValidatedLesson(
   let attempt = 0
   let lastError: string | null = null
 
+  const skillWords = context.substrand
+    .split(/[\s\-:,\/()]+/)
+    .filter(w => w.length >= 4)
+    .slice(0, 3)
+    .join(', ')
+
   while (attempt < MAX_RETRIES) {
     attempt++
 
-    const prompt = buildLessonPrompt(context)
+    let retryNote = ''
+    if (attempt > 1 && lastError) {
+      const isMathsRetry = (context.subjectType ?? 'default') === 'mathematics'
+      const progressReminder = isMathsRetry
+        ? 'REMINDER: Maths outcomes — a)=identify/state/define/solve, b)=calculate/apply/compute, c)=appreciate/value'
+        : 'REMINDER: outcome a)=identify/describe, b)=explain/discuss, c)=appreciate/value'
+      retryNote = `
+PREVIOUS ATTEMPT FAILED BECAUSE: ${lastError}
+Fix this specific issue in your next response.
+${lastError.includes('progress') ? progressReminder : ''}
+${lastError.includes('aligned') ? `REMINDER: Must include at least one word from: ${skillWords}` : ''}
+`
+    }
+
+    const prompt = buildLessonPrompt(context, retryNote)
 
     let aiResponse: string
     try {
@@ -215,7 +344,7 @@ export async function generateValidatedLesson(
       continue
     }
 
-    const validation = validateLesson(lesson, context.substrand)
+    const validation = validateLesson(lesson, context.substrand, context.subjectType ?? 'default')
 
     if (validation.isValid) {
       return {

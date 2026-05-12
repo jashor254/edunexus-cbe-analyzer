@@ -19,6 +19,35 @@ export interface PipelineInput {
   context: SOWContext
 }
 
+function detectSubjectType(name: string): string {
+  const n = name.toLowerCase()
+  if (n.includes('math')) return 'mathematics'
+  if (n.includes('biology') || n.includes('chemistry') || n.includes('physics') || n.includes('science'))
+    return 'science'
+  return 'default'
+}
+
+/**
+ * Distributes totalSlots evenly across substrands.
+ * All substrands are treated as equal weight (lessonsRequired coming in are all 1).
+ * First `remainder` substrands get base+1, rest get base. Guarantees sum === totalSlots.
+ */
+function distributeSlots(
+  totalSlots: number,
+  substrands: SelectedSubstrand[]
+): SelectedSubstrand[] {
+  if (substrands.length === 0) return []
+  if (totalSlots <= 0) throw new Error('No teaching slots available')
+
+  const base = Math.floor(totalSlots / substrands.length)
+  const remainder = totalSlots % substrands.length
+
+  return substrands.map((sub, i) => ({
+    ...sub,
+    lessonsRequired: Math.max(1, base + (i < remainder ? 1 : 0)),
+  }))
+}
+
 export async function generateSchemePipeline(
   input: PipelineInput
 ): Promise<SOWGenerationResult> {
@@ -28,59 +57,74 @@ export async function generateSchemePipeline(
     throw new Error('Timeline and substrands are required')
   }
 
-  // STEP 1: Allocate lessons to slots
+  // STEP 1: Scale substrands to fill every teaching slot
+  const teachingSlots = timeline.filter(s => !s.isBreak).length
+  const scaledSubstrands = distributeSlots(teachingSlots, selectedSubstrands)
+  const subjectType = detectSubjectType(context.learningAreaName)
+
   const allocatedLessons = allocateLessons({
     timeline,
-    selectedSubstrands,
+    selectedSubstrands: scaledSubstrands,
   })
 
   const lessons: GeneratedLesson[] = []
   const failures: SOWGenerationResult['failures'] = []
 
-  // STEP 2: Generate lessons one by one (safe & traceable)
-  for (const slot of allocatedLessons) {
-    const { week, lesson, strand, substrand, lessonInSubstrand } = slot
+  const BATCH_SIZE = 10
 
-    const totalLessonsForSubstrand =
-      selectedSubstrands.find(s => s.substrandTitle === substrand)
-        ?.lessonsRequired || 1
+  // STEP 2: Generate lessons in parallel batches
+  for (let i = 0; i < allocatedLessons.length; i += BATCH_SIZE) {
+    const batch = allocatedLessons.slice(i, i + BATCH_SIZE)
 
-    const result = await generateValidatedLesson({
-      learningArea: context.learningAreaName,
-      grade: context.gradeName,
-      strand,
-      substrand,
-      lessonNumber: lessonInSubstrand,
-      totalLessons: totalLessonsForSubstrand,
-      curriculumMode: context.curriculumMode,
-    })
+    const batchResults = await Promise.all(
+      batch.map(slot => {
+        const totalLessonsForSubstrand =
+          scaledSubstrands.find(s => s.substrandTitle === slot.substrand)
+            ?.lessonsRequired || 1
 
-    if (result._validated) {
-      lessons.push({
-        week,
-        lesson,
-        strand,
-        substrand,
-        learningOutcomes: result.learning_outcomes || [],
-        learningExperiences: result.learning_experiences || [],
-        keyInquiryQuestions: result.key_inquiry_questions || [],
-        learningResources: result.learning_resources || [],
-        assessmentMethods: result.assessment_methods || [],
-        coreCompetencies: result.core_competencies || '',
-        values: result.values || '',
-        pciLinks: result.pci_links || '',
-        reflection: '',
-        _validated: true,
-        _confidence: result._confidence,
+        return generateValidatedLesson({
+          learningArea: context.learningAreaName,
+          grade: context.gradeName,
+          strand: slot.strand,
+          substrand: slot.substrand,
+          lessonNumber: slot.lessonInSubstrand,
+          totalLessons: totalLessonsForSubstrand,
+          curriculumMode: context.curriculumMode,
+          subjectType,
+          kicdContext: context.kicdContext,
+        }).then(result => ({ slot, result }))
       })
-    } else {
-      failures.push({
-        week,
-        lesson,
-        strand,
-        substrand,
-        error: result.details || 'Generation failed',
-      })
+    )
+
+    for (const { slot, result } of batchResults) {
+      const { week, lesson, strand, substrand } = slot
+      if (result._validated) {
+        lessons.push({
+          week,
+          lesson,
+          strand,
+          substrand,
+          learningOutcomes: result.learning_outcomes || [],
+          learningExperiences: result.learning_experiences || [],
+          keyInquiryQuestions: result.key_inquiry_questions || [],
+          learningResources: result.learning_resources || [],
+          assessmentMethods: result.assessment_methods || [],
+          coreCompetencies: result.core_competencies || '',
+          values: result.values || '',
+          pciLinks: result.pci_links || '',
+          reflection: '',
+          _validated: true,
+          _confidence: result._confidence,
+        })
+      } else {
+        failures.push({
+          week,
+          lesson,
+          strand,
+          substrand,
+          error: result.details || 'Generation failed',
+        })
+      }
     }
   }
 
@@ -93,7 +137,7 @@ export async function generateSchemePipeline(
         ? 'failed'
         : 'partial',
     summary: {
-      totalSlots: allocatedLessons.length,
+      totalSlots: teachingSlots,
       generated: lessons.length,
       failed: failures.length,
     },

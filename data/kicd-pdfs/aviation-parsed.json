@@ -1,0 +1,218 @@
+{
+  "assessment_methods": [],
+  "learning_resources": [],
+  "non_formal_activities": [],
+  "strands": [
+    {
+      "strand_title": "FOUNDATIONS OF AVIATION TECHNOLOGY",
+      "sub_strands": [
+        {
+          "title": "Introduction to Aviation Technology",
+          "suggested_lessons": 10,
+          "learning_outcomes": [
+            "a) explain the historical milestones in the development of aircraft,",
+            "b) relate the contribution of key pioneers to the development of aircraft,",
+            "c) categorise the types of aircraft in aviation,",
+            "d) demonstrate heavier and lighter-than-air aircraft in aviation,",
+            "e) evaluate the functions of different types of aircraft in aviation,",
+            "f) appreciate the milestones of aircraft development in the aviation industry."
+          ],
+          "learning_experiences": [
+            "search on the internet using digital devices to watch video clips on the key historical milestones in the evolution of Aviation Technology (hot air balloon, glider, fixed wing, rotary wing),",
+            "use charts to showcase the historical milestones in the evolution of aviation technology,",
+            "discuss the contribution of key pioneers to the development of aviation technology (Montgolfier brothers, George Cayley, Wright brothers, Igor Sikorsky),",
+            "use visual aids and digital devices to search for information on various types of aircraft,",
+            "develop a checklist on the different types of aircraft.",
+            "use a chart to categorise aircraft as either lighter or heavier than air aircraft,",
+            "use an inflated balloon to create lighter-than-air aircraft,",
+            "construct a kite or a hand glider using locally available materials to create heavier-than-air aircraft,",
+            "brainstorm on the functions of different types of aircraft in aviation,",
+            "tour a local aerodrome and observe different types of aircraft."
+          ],
+          "key_inquiry_questions": [
+            "What are the benefits of studying Aviation Technology?",
+            "Why is the history of Aviation important?"
+          ]
+        },
+        {
+          "title": "Safety in the Aviation Workplace",
+          "suggested_lessons": 15,
+          "learning_outcomes": [
+            "a) explain the general rules related to personal safety in the aviation workplace,",
+            "b) describe the hazards related to personal safety in the aviation workplace,"
+          ],
+          "learning_experiences": [
+            "search for information on the internet to discuss the general rules relating to personal safety in the aviation workplace (classroom, workshop, environment),",
+            "use visual aids and watch video clips on the hazards to personal safety in the aviation"
+          ],
+          "key_inquiry_questions": [
+            "Why is personal safety important in the aviation field?",
+            "What causes injuries in the aviation workplace?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "AIRCRAFT BASIC CONSTRUCTION",
+      "sub_strands": [
+        {
+          "title": "Aircraft Components",
+          "suggested_lessons": 10,
+          "learning_outcomes": [
+            "a) explain the functions of the parts of an aircraft in aviation,",
+            "b) illustrate the parts of an aircraft in aviation,",
+            "c) model a heavier-than-air aircraft in aviation,",
+            "d) appreciate the role of different parts in the operation of an aircraft in aviation."
+          ],
+          "learning_experiences": [
+            "search on the internet for information on the functions of the major parts of the aircraft,",
+            "use audio visual devices to identify the major parts of an aircraft,",
+            "discuss the functions of the major parts of an aircraft (fuselage, wing, empennage, landing gear, power plant / main rotor, tail rotor),",
+            "use freehand sketches to illustrate the major parts of an aircraft and present to class (fixed wing, rotary wing),",
+            "use locally available materials to create a model of a heavier-than-air aircraft,",
+            "engage with a resource person on the role of different parts in the operation of an aircraft."
+          ],
+          "key_inquiry_questions": [
+            "Why does an aircraft have different parts?",
+            "Why are some aircrafts regarded as lighter-than-air?"
+          ]
+        },
+        {
+          "title": "Aircraft Tools and Materials",
+          "suggested_lessons": 20,
+          "learning_outcomes": [
+            "a) explain the properties of common materials used in aircraft construction,",
+            "b) describe the functions of aircraft tools used in aircraft construction,",
+            "c) describe the safety precautions observed in the use of aircraft tools in workshop practice,",
+            "d) create a model of a heavier than air aircraft in aviation,",
+            "e) maintain tools in aircraft construction,",
+            "f) appreciate the use of tools and materials in aircraft construction."
+          ],
+          "learning_experiences": [
+            "search on the internet for information on the categories of aircraft materials in workshop practice (metals, non-metals),",
+            "brainstorm on the properties of aircraft materials in workshop practice (physical, mechanical),",
+            "perform experiments to investigate the properties of aircraft materials used in aircraft construction (physical and mechanical),",
+            "use charts to categorise aircraft tools in construction (non-powered, powered),",
+            "use realia to group the tools for aircraft construction according to functions (cutting, striking, holding, marking, and measuring tools),",
+            "use digital devices to discuss the safety precautions observed in the use of tools and materials in aircraft construction,",
+            "demonstrate the safe use of tools and materials in aircraft construction,",
+            "use aircraft tools and materials to develop an aircraft model and present to class,",
+            "practice care and maintenance of the tools and materials in aircraft construction,"
+          ],
+          "key_inquiry_questions": [
+            "How do the properties of materials influence aircraft construction?",
+            "Why are tools and materials important in aircraft construction?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "FLIGHT OPERATIONS",
+      "sub_strands": [
+        {
+          "title": "Aviation weather",
+          "suggested_lessons": 15,
+          "learning_outcomes": [
+            "a) explain the elements of weather in the atmosphere,",
+            "b) describe the effects of the elements of weather on an aircraft in flight,",
+            "c) analyse the types of clouds in flight operations,",
+            "d) measure the elements of weather in flight operations.",
+            "e) appreciate the role of aviation weather in flight operations"
+          ],
+          "learning_experiences": [
+            "use audio-visual devices to discuss the elements of weather (wind, temperature, pressure, humidity, clouds, and precipitation),",
+            "search on the internet for information and discuss the effects of the elements of weather on an aircraft,",
+            "brainstorm on the effects of weather elements on an aircraft in flight,",
+            "use visual aids to make a gallery walk on the effects of the elements of weather and present to the class,",
+            "use aviation related literature to discuss the types of clouds in flight operations (cirrus, stratus, cumulus),",
+            "use charts to draw the types of clouds in flight operations,",
+            "use locally available resources to carry out experiments on the measurement of the elements of weather (wind, temperature, humidity, precipitation),",
+            "engage with a resource person on careers related to aviation weather,",
+            "visit a local meteorological department to observe activities related to aviation weather."
+          ],
+          "key_inquiry_questions": [
+            "1. Why is the study of aviation weather important?",
+            "2. How does weather affect flight?"
+          ]
+        },
+        {
+          "title": "Aviation Communication",
+          "suggested_lessons": 15,
+          "learning_outcomes": [
+            "a) identify the ICAO phonetics in aviation communication,",
+            "b) interpret standard words and phrases in aviation communication,",
+            "c) describe the transmission techniques used in aviation communication,",
+            "d) perform aircraft marshalling signals in aviation communication,",
+            "e) appreciate the careers related to aviation communication in aviation industry"
+          ],
+          "learning_experiences": [
+            "search on the internet for information on the ICAO phonetics used in aviation communication,",
+            "practice in pairs the pronunciation of ICAO phonetics used in aviation communication (letters, numerals, time, call signs),",
+            "discuss the standard words and phrases in aviation communication (ground-to-ground),",
+            "make a gallery walk on the standard words and phrases in aviation communication,",
+            "role-play in pairs the meaning of standard words and phrases in aviation. communication (ground-to-ground),",
+            "use digital devices to explain the transmission techniques used in aviation communication (use of radio devices, listening and speaking),",
+            "role-play in pairs the transmission techniques using locally available resources,"
+          ],
+          "key_inquiry_questions": [
+            "1. What is the importance of communication in aviation?",
+            "2. How does aviation communication influence flight operations?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "AIRPORT OPERATIONS",
+      "sub_strands": [
+        {
+          "title": "The Airport",
+          "suggested_lessons": 20,
+          "learning_outcomes": [
+            "a) describe the categories of airports in aviation",
+            "b) explain the functions of the major areas of an airport",
+            "c) illustrate the arrangement of an airport layout in aviation",
+            "d) model a layout of the physical components of an airport",
+            "e) appreciate the role of an airport in the economy."
+          ],
+          "learning_experiences": [
+            "search for information on the internet to identify the categories of airports in aviation (categories A, B, C, D and E)",
+            "brainstorm with peers on the identified categories of airports",
+            "use audio-visual aids to discuss with peers the functions of the major areas of an airport (landside, airside and terminal)",
+            "use charts to draw the arrangement of an airport layout (landside, airside and terminal)",
+            "use locally available materials to make a model of the physical components of an airport layout for presentation to the class",
+            "participate in an excursion to the nearest aerodrome to observe the activities related to airport operations."
+          ],
+          "key_inquiry_questions": [
+            "1. Why is an airport important to the Aviation industry?",
+            "2. Why are there different categories of airports in aviation?"
+          ]
+        },
+        {
+          "title": "Airport Business Services",
+          "suggested_lessons": 20,
+          "learning_outcomes": [
+            "a) identify key business services in airport operations",
+            "b) explain the services offered by key businesses in airport operations",
+            "c) describe the financial concepts in aviation business services",
+            "d) analyse the rights of consumers in airport operations",
+            "e) evaluate the roles of consumer protection agencies in airport operations",
+            "f) recognize the role of aviation businesses in airport operations."
+          ],
+          "learning_experiences": [
+            "use audio-visual aids to identify key business services in airport operations (landside and airside)",
+            "discuss the services offered by key businesses in airport operations (landside and airside)",
+            "use aviation related literature to discuss the financial concepts in aviation business services (budgeting, revenue, expenses, profit/loss, savings, investment, and borrowing)",
+            "search on the internet for information on the rights of consumers in airport operations (quality, information, health, safety and compensation)",
+            "discuss on the rights of consumers in an airport (quality, information, health, safety and compensation)",
+            "engage with a resource person on the role of consumer protection agencies in airport operations (ICAO, IATA, KCAA and KAA)",
+            "participate in an excursion to a local aerodrome to observe and relate the role of aviation businesses in airport operations."
+          ],
+          "key_inquiry_questions": [
+            "1. Why are business services important in airport operations?",
+            "2. How are consumers protected in airport operations?"
+          ]
+        }
+      ]
+    }
+  ]
+}

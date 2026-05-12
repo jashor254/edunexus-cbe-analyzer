@@ -1,0 +1,107 @@
+{
+  "assessment_methods": [],
+  "learning_resources": [],
+  "non_formal_activities": [],
+  "strands": [
+    {
+      "strand_title": "ELECTRICAL INSTALLATION",
+      "sub_strands": [
+        {
+          "title": "Generation, Transmission and Distribution of Electricity",
+          "suggested_lessons": 14,
+          "learning_outcomes": [
+            "a) describe methods of generation of electrical energy",
+            "b) explain the functions of components in the electrical power transmission network",
+            "c) draw a 3-phase 4 wire distribution circuit of a power line",
+            "d) model an electric power Grid network",
+            "e) appreciate the importance of a grid system in a country"
+          ],
+          "learning_experiences": [
+            "use digital or print media to search for information on methods of generation of electrical power and present findings to peers",
+            "use print or audio visual media search for information on the functions of components of a power transmission system",
+            "use locally available materials to model a 3-phase 4 wire distribution circuit in power lines.(phase symmetry and voltages - line to line and line to neutral)",
+            "create a model of electric power grid network using locally available materials",
+            "discuss with peers the importance of a grid system in a country"
+          ],
+          "key_inquiry_questions": [
+            "How is electricity generated and transmitted to the consumer?",
+            "What is the importance of a power grid?"
+          ]
+        },
+        {
+          "title": "Equipment at Consumers intake point",
+          "suggested_lessons": 12,
+          "learning_outcomes": [
+            "a) identify equipment at consumers electrical power intake point",
+            "b) describe the functions of control equipment at the consumer's intake point",
+            "c) install control equipment at the consumer's intake point in the correct sequence",
+            "d) prepare consumer earthing point according to guiding regulations in a building",
+            "e) appreciate the importance of the control equipment at the consumer intake point"
+          ],
+          "learning_experiences": [
+            "use digital devices or print media, to search for information on the equipment at the consumer's electrical power intake point",
+            "visit a consumer intake point within a building or watch a video to identify the functions of equipment used in the supply of electricity to a consumer (isolation switch, meter, circuit breaker, cartridge fuse)",
+            "use workshop materials and tools to install of equipment at the consumer's intake point in the correct sequence, (isolation switch, meter, main switch, cartridge fuse, consumer control unit)",
+            "use appropriate hand tools to excavate and drive in and/or bury an earth electrode at an appropriate building location and connect to the installation",
+            "discuss with peers about on the importance of equipment at the consumer intake point"
+          ],
+          "key_inquiry_questions": [
+            "How is electrical power controlled at the intake point?",
+            "Why does input equipment at the intake point follow a certain sequence of connection?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "ELECTRONICS",
+      "sub_strands": [
+        {
+          "title": "Semiconductor Theory",
+          "suggested_lessons": 15,
+          "learning_outcomes": [
+            "a) explain the characteristics of semiconductor materials,",
+            "b) describe the doping process in semiconductors,",
+            "c) simulate covalent bonding in extrinsic semiconductors,",
+            "d) illustrate formation of a PN junction of a semiconductor,",
+            "e) appreciate the importance of electronic materials in electronic engineering."
+          ],
+          "learning_experiences": [
+            "use digital and print media to search for information on characteristics of semiconductor materials (atomic structure, intrinsic, extrinsic and conductivity),",
+            "use audio visual and printed resources to search for information on the doping process of semiconductors,",
+            "use role playing to simulate covalent bonding of P-type and N-type semiconductors (holes, electrons),",
+            "create a model of PN junction using locally available materials,",
+            "watch videos on formation of depletion layer in a PN junction,",
+            "brainstorm with peers on the importance of doping in electronics."
+          ],
+          "key_inquiry_questions": [
+            "1. How does a semiconductor material conduct electricity?",
+            "2. How is doping in semiconductors achieved?"
+          ]
+        },
+        {
+          "title": "Semiconductor Diodes",
+          "suggested_lessons": 16,
+          "learning_outcomes": [
+            "a) describe the operation of a semiconductor diode,",
+            "b) explain the current – voltage characteristics of semiconductor diodes,",
+            "c) construct diode circuits for use in a workplace,",
+            "d) Troubleshoot diode circuits in electrical appliances,",
+            "e) appreciate the importance of semiconductor diodes in day to day life."
+          ],
+          "learning_experiences": [
+            "use digital and print media to search for information on the principle of operation of semiconductor diode (Forward biasing, reverse biasing, electron-hole recombination),",
+            "perform experiments using a diode, power supply, voltmeter and ammeter to establish the voltage -current characteristics of diodes",
+            "assemble and test diode circuits for different applications (rectification, regulation, display, switching),",
+            "Use measuring and test equipment to trace faults in diode circuits (short circuit, open circuit, faulty diodes)",
+            "brainstorm with peers on the types of diodes and their application in home and public transport systems (LEDs, Zener, power diodes, infrared, signal),",
+            "use diode based concepts to design domestic and public transport safety solutions. (Smart traffic lights and sensors for pedestrian crossings)."
+          ],
+          "key_inquiry_questions": [
+            "1.How does a semiconductor diode work?",
+            "2.How are diodes selected for use in a given circuit?"
+          ]
+        }
+      ]
+    }
+  ]
+}

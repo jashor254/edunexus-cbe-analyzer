@@ -18,6 +18,7 @@ import type {
   LessonStructure,
   SelectedSubstrand,
   BreakItem,
+  TimelineSlot,
 } from '@/lib/sow/types'
 import type { BreakWithSlots } from '@/lib/sow/breakEngine'
 import { weekLessonToSlot } from '@/lib/sow/termSchedule'
@@ -49,39 +50,47 @@ export async function POST(req: Request) {
       lessonStructure,
       selectedSubstrands,
       breaks = [],
+      timeline: prebuiltTimeline,
     }: {
       context: SOWContext
-      lessonStructure: LessonStructure
+      lessonStructure?: LessonStructure
       selectedSubstrands: SelectedSubstrand[]
-      breaks: BreakItem[]
+      breaks?: BreakItem[]
+      timeline?: TimelineSlot[]
     } = body
 
     // ── Validate required fields ──────────────────────────────────────────────
     if (!context?.learningArea) return apiBadRequest('Missing context.learningArea')
     if (!context?.grade) return apiBadRequest('Missing context.grade')
     if (!context?.curriculumMode) return apiBadRequest('Missing context.curriculumMode')
-    if (!lessonStructure?.lessonsPerWeek) return apiBadRequest('Missing lessonStructure.lessonsPerWeek')
     if (!selectedSubstrands?.length) return apiBadRequest('No substrands selected')
 
-    // ── Build timeline ────────────────────────────────────────────────────────
-    const termSchedule = buildTermSchedule({
-      lessonsPerWeek: lessonStructure.lessonsPerWeek,
-      firstWeek: lessonStructure.firstWeek,
-      firstLesson: lessonStructure.firstLesson,
-      lastWeek: lessonStructure.lastWeek,
-      lastLesson: lessonStructure.lastLesson,
-      doubleLessonOption: lessonStructure.doubleLessonOption,
-      doubleLessonCombination: lessonStructure.doubleLessonCombination,
-    })
+    // ── Build or use pre-built timeline ───────────────────────────────────────
+    let timeline: TimelineSlot[]
 
-    // Convert breaks to include startSlot/endSlot
-    const breaksWithSlots: BreakWithSlots[] = breaks.map(b => ({
-      ...b,
-      startSlot: weekLessonToSlot(b.startWeek, b.startLesson, lessonStructure.lessonsPerWeek),
-      endSlot: weekLessonToSlot(b.endWeek, b.endLesson, lessonStructure.lessonsPerWeek),
-    }))
+    if (prebuiltTimeline?.length) {
+      timeline = prebuiltTimeline
+    } else {
+      if (!lessonStructure?.lessonsPerWeek) return apiBadRequest('Missing lessonStructure.lessonsPerWeek')
 
-    const timeline = applyBreaksToSchedule(termSchedule, breaksWithSlots)
+      const termSchedule = buildTermSchedule({
+        lessonsPerWeek: lessonStructure.lessonsPerWeek,
+        firstWeek: lessonStructure.firstWeek,
+        firstLesson: lessonStructure.firstLesson,
+        lastWeek: lessonStructure.lastWeek,
+        lastLesson: lessonStructure.lastLesson,
+        doubleLessonOption: lessonStructure.doubleLessonOption,
+        doubleLessonCombination: lessonStructure.doubleLessonCombination,
+      })
+
+      const breaksWithSlots: BreakWithSlots[] = breaks.map(b => ({
+        ...b,
+        startSlot: weekLessonToSlot(b.startWeek, b.startLesson, lessonStructure!.lessonsPerWeek),
+        endSlot: weekLessonToSlot(b.endWeek, b.endLesson, lessonStructure!.lessonsPerWeek),
+      }))
+
+      timeline = applyBreaksToSchedule(termSchedule, breaksWithSlots)
+    }
 
     // ── Run pipeline ──────────────────────────────────────────────────────────
     const result = await generateSchemePipeline({

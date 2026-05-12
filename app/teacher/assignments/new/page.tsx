@@ -9,6 +9,11 @@ function NewAssignmentForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const prefillClassId = searchParams.get('classId') || ''
+  const planId        = searchParams.get('planId') || ''
+  const planSubject   = searchParams.get('subject') || ''
+  const planTopic     = searchParams.get('topic') || ''
+  const planStrand    = searchParams.get('strand') || ''
+  const planWeek      = searchParams.get('week') || ''
 
   const [classes, setClasses] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -26,7 +31,21 @@ function NewAssignmentForm() {
     is_compass_guided: true,
     is_holiday_assignment: false,
     holiday_period: '',
+    lesson_plan_id: '',
   })
+
+  // Pre-fill from lesson plan URL params
+  useEffect(() => {
+    if (!planId) return
+    setForm(prev => ({
+      ...prev,
+      title: `${planTopic} — Week ${planWeek} Assignment`,
+      subject: planSubject,
+      topic: planTopic,
+      lesson_plan_id: planId,
+    }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planId])
 
   useEffect(() => {
     fetch('/api/teacher/classes')
@@ -41,7 +60,7 @@ function NewAssignmentForm() {
       })
   }, [prefillClassId])
 
-  // Auto-fill subject from selected class
+  // Auto-fill subject from selected class (only when not pre-filled from plan)
   useEffect(() => {
     const cls = classes.find((c: any) => c.id === form.class_id)
     if (cls && !form.subject) {
@@ -79,12 +98,25 @@ function NewAssignmentForm() {
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
       <div className="mb-6">
-        <Link href="/teacher/assignments" className="text-sm text-gray-400 hover:text-gray-600 font-medium">
-          ← Back to Assignments
+        <Link
+          href={planId ? `/teacher/lesson-plans/${planId}` : '/teacher/assignments'}
+          className="text-sm text-gray-400 hover:text-gray-600 font-medium"
+        >
+          ← {planId ? 'Back to Lesson Plan' : 'Back to Assignments'}
         </Link>
         <h1 className="text-3xl font-black text-gray-900 mt-3">New Assignment</h1>
         <p className="text-gray-500">Create a new assignment for your students</p>
       </div>
+
+      {planId && (
+        <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 mb-6 flex items-center gap-3">
+          <span className="text-2xl">📋</span>
+          <div>
+            <p className="font-bold text-teal-800 text-sm">Pre-filled from Lesson Plan</p>
+            <p className="text-teal-600 text-xs">{planSubject} — {planTopic}{planStrand ? ` · ${planStrand}` : ''}{planWeek ? ` · Week ${planWeek}` : ''}</p>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6">
         <form onSubmit={handleSubmit} className="space-y-5">

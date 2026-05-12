@@ -1,0 +1,104 @@
+{
+  "assessment_methods": [],
+  "learning_resources": [],
+  "non_formal_activities": [],
+  "strands": [
+    {
+      "strand_title": "THEMES IN KENYAN HISTORY AND CITIZENSHIP",
+      "sub_strands": [
+        {
+          "title": "Linguistic groups in Kenya",
+          "suggested_lessons": 10,
+          "learning_outcomes": [
+            "a) explore the linguistic groups in Kenya",
+            "b) discuss the causes and effects of migration, settlement and expansion of the linguistic groups",
+            "c) trace the migration routes and settlement areas of the linguistic groups in Kenya",
+            "d) apply the knowledge of diverse communities of Kenya to promote social cohesion",
+            "e) appreciate the diversity of communities in Kenya"
+          ],
+          "learning_experiences": [
+            "brainstorm on the identities of the linguistic groups in Kenya",
+            "discuss and write on charts/posters the linguistic groups in Kenya",
+            "investigate the causes and effects of migration, settlement and expansion of the linguistic groups",
+            "using an atlas draw a map of Kenya and locate the migration routes and settlement areas of the linguistic groups in Kenya",
+            "role play cultural exchange among the linguistic groups in Kenya",
+            "compose a song or poem or develop a documentary on cultural diversity of linguistic groups in Kenya"
+          ],
+          "key_inquiry_questions": [
+            "How can you promote harmonious living among the diverse communities of Kenya?"
+          ]
+        },
+        {
+          "title": "Establishment of colonial rule",
+          "suggested_lessons": 12,
+          "learning_outcomes": [
+            "a) examine the reasons for the establishment of colonial rule",
+            "b) evaluate the methods applied by the British in the establishment of colonial rule in Kenya",
+            "c) discuss the process of establishment of colonial rule in Kenya",
+            "d) apply lesson learnt from the process of establishment of colonial rule in Kenya",
+            "e) desire to maintain independence and unity in Kenya"
+          ],
+          "learning_experiences": [
+            "use digital devices or print materials to research on reasons for the establishment of colonial rule in Kenya and present in class",
+            "roleplay the methods used by the British in the establishment of colonial rule",
+            "watch a documentary on establishment of colonial rule Kenya and make notes",
+            "develop a chart on the process of establishment of colonial rule and share in class",
+            "identify situations in the school where the best practices from the process of colonial establishment can be applied by learners",
+            "develop communication messages on independence and unity and display"
+          ],
+          "key_inquiry_questions": [
+            "How can we maintain independence in daily lives?",
+            "Why was wrong for the British to impose their rule on Africans in Kenya?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "CONTEMPORARY THEMES IN HISTORY AND CITIZENSHIP",
+      "sub_strands": [
+        {
+          "title": "Peace and Conflict transformations in Kenya",
+          "suggested_lessons": 8,
+          "learning_outcomes": [
+            "a) identify national activities that contribute peace in Kenya for harmonious living.",
+            "b) examine ways in which the Constitution (2010) strives to prevent conflicts in Kenya;",
+            "c) deduce incidences where the constitution has been applied to foster peace and curb conflicts in a community;",
+            "d) desire to uphold peace and curb conflicts in Kenya."
+          ],
+          "learning_experiences": [
+            "hold a discussion to identify national activities that are used to promote peace in Kenya and share in class",
+            "engage a resource person/watch a documentary/watch a video clip on ways in which the Constitution (2010) strives to prevent conflicts in Kenya",
+            "research on incidences where the constitution has been applied to foster peace and curb conflicts in a community and summarise main points on charts/posters",
+            "role play how to uphold peace and curb conflicts in Kenya in different situation."
+          ],
+          "key_inquiry_questions": [
+            "What are the benefits of a peaceful nation?",
+            "How do you promote peace and conflict transformation in the community?"
+          ]
+        },
+        {
+          "title": "The 4th industrial and technologies revolution",
+          "suggested_lessons": 9,
+          "learning_outcomes": [
+            "a) trace the technological advancements in the 4th generation,",
+            "b) analyse the role of information and communication technology in the 4th generation,",
+            "c) discuss the impact of technology in the 4th generation,",
+            "d) exploit the opportunities provided by the 4Th Industrial revolution for promotion of growth and sustainability in the society",
+            "e) appreciate the importance of technology in life"
+          ],
+          "learning_experiences": [
+            "use digital or print resources to trace the technological advancements in the 4th Industrial revolution and share in class",
+            "engage a resource person in a discussion on the role of ICT in the 4th Industrial revolution",
+            "debate on the impact of technology in the 4th Industrial revolution in Africa",
+            "create an online platform that can enhance communication, financial interactions and sharing of ideas within the school community",
+            "Create a gallery in class to showcase the technological advancements in the society"
+          ],
+          "key_inquiry_questions": [
+            "What are the benefits of the 4th generation technologies?",
+            "How has technology revolutional acquisition of historical information?"
+          ]
+        }
+      ]
+    }
+  ]
+}

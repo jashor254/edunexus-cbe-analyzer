@@ -1,0 +1,178 @@
+{
+  "assessment_methods": [],
+  "learning_resources": [],
+  "non_formal_activities": [],
+  "strands": [
+    {
+      "strand_title": "CROP PRODUCTION",
+      "sub_strands": [
+        {
+          "title": "Agricultural Land",
+          "suggested_lessons": 10,
+          "learning_outcomes": [
+            "a) describe ways of accessing land for agricultural use,",
+            "b) evaluate utility of land for agricultural production purposes,",
+            "c) analyse natural factors that determine productivity of land in agriculture,",
+            "d) appreciate importance of land in agricultural production."
+          ],
+          "learning_experiences": [
+            "discuss with resource person ways of accessing land for agricultural use including leasing, inheriting, buying and donation.",
+            "take an excursion in the community to study and assess different forms of land and discuss the possible utilities of the land.",
+            "use digital devices to search for information on natural factors that determine productivity of land such as climate, altitude, soil factors, topography and biotic factors.",
+            "make class presentations on importance of land in agricultural production."
+          ],
+          "key_inquiry_questions": [
+            "How is land productivity determined for agriculture?",
+            "Why is land put into different agricultural uses?"
+          ]
+        },
+        {
+          "title": "Properties of soil",
+          "suggested_lessons": 12,
+          "learning_outcomes": [
+            "a) describe properties of a soil for crop production,",
+            "b) investigate the properties of soil for crop production,",
+            "c) relate importance of soil profile to crop production,",
+            "d) acknowledge importance of soil properties in crop production."
+          ],
+          "learning_experiences": [
+            "discuss on physical, chemical and biological properties of soil for crop production.",
+            "conduct experiments to test physical properties (porosity, texture) chemical properties (soil pH) and biological properties (humus).",
+            "take field excursion, observe and relate soil profile to crop farming activities.",
+            "Use digital and non-digital resources to search for importance of soil properties in crop production."
+          ],
+          "key_inquiry_questions": [
+            "How do properties of soil influence crop production?"
+          ]
+        },
+        {
+          "title": "Land Preparation",
+          "suggested_lessons": 12,
+          "learning_outcomes": [
+            "a) describe activities of fallow land preparation to appropriate seedbed,",
+            "b) carry out land preparation operations for selected crop,",
+            "c) apply conservation tillage in crop production,"
+          ],
+          "learning_experiences": [
+            "brainstorm on the activities carried out on fallow land to prepare appropriate seedbed (land clearing, primary cultivation, secondary cultivation, tertiary operations).",
+            "carry out applicable activities on fallow land to prepare it for establishment of a selected crop.",
+            "assess status of land for production of selected"
+          ],
+          "key_inquiry_questions": [
+            "How does proper land preparation contribute to crop production?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "ANIMAL PRODUCTION",
+      "sub_strands": [
+        {
+          "title": "Breeds of Livestock",
+          "suggested_lessons": 10,
+          "learning_outcomes": [
+            "a) describe breeds of livestock based on their uses",
+            "b) distinguish common breed livestock based on their characteristics",
+            "c) appreciate diversity of productivity from different livestock breeds."
+          ],
+          "learning_experiences": [
+            "use information from digital and print resources to describe breeds of cattle, pigs, rabbits, sheep and goats.",
+            "take a field trip, excursion or observe resource media to distinguish common breed livestock based on their observable characteristics.",
+            "discuss and make presentations on comparative productivity from various livestock breeds."
+          ],
+          "key_inquiry_questions": [
+            "How does livestock breeds affect productivity of animals?"
+          ]
+        },
+        {
+          "title": "Animal handling and safety",
+          "suggested_lessons": 9,
+          "learning_outcomes": [
+            "a) examine forms of animal handling in the community",
+            "b) describe the structures used to ensure safety in handling domestic animals",
+            "c) use tools and equipment to ensure safety in handling domestic animals",
+            "d) explain ways of ensuring safety of persons handling domestic animals",
+            "e) participate in promoting safety of domestic animal in the community."
+          ],
+          "learning_experiences": [
+            "discuss inhumane treatments such as beating, poor restraining, inappropriate castration, poor transport methods, inappropriate harnessing, inhumane slaughtering, overloading draught animals, and over working.",
+            "use digital devices to observe and describe structures used to ensure safe handling of domestic animals.",
+            "discuss ways of ensuring safety of persons handling domestic animals through methods such as restraining animals, correct position when handling, holding appropriate parts and ensuring safe distance.",
+            "use tools and equipment used to ensure safety in handling domestic animals; tools to include halter, restraining rope, bull ring and lead stick.",
+            "take an excursion to nearby farms to observe animal handling and present suggestions on how animal safety could be enhanced in the community."
+          ],
+          "key_inquiry_questions": [
+            "How can we ensure safety when handling animals?"
+          ]
+        },
+        {
+          "title": "General Animal Health",
+          "suggested_lessons": 12,
+          "learning_outcomes": [
+            "a) explain the benefits of keeping animals healthy in livestock production",
+            "b) identify signs of ill health in livestock production",
+            "c) propose general control measures of ill health in livestock production",
+            "d) adopt practices that maintain animal health in livestock production"
+          ],
+          "learning_experiences": [
+            "use information from digital and print resources to explain the benefits of keeping animals healthy in livestock production.",
+            "discuss with resource person and observe animals in a herd to identify signs of ill health.",
+            "discuss and suggest general preventative and control measures of ill health in livestock production",
+            "practise applicable measures that"
+          ],
+          "key_inquiry_questions": [
+            "How is animal health important in livestock production?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "AGRICULTURAL TECHNOLOGIES AND ENTREPRENEURSHIP",
+      "sub_strands": [
+        {
+          "title": "Tools and Equipment",
+          "suggested_lessons": 14,
+          "learning_outcomes": [
+            "a) identify tools and equipment used for various agricultural tasks",
+            "b) carry out various agricultural tasks using appropriate tools and equipment",
+            "c) carry out appropriate maintenance practices on selected tools and equipment",
+            "d) apply safety measures in the use of tools and equipment",
+            "e) acknowledge importance of maintaining tools and equipment for efficient working"
+          ],
+          "learning_experiences": [
+            "observe and analyse tools and equipment used for various agricultural tasks (tasks to include: gardening tasks; livestock production tasks; assembling and dissembling tasks).",
+            "conduct various agricultural tasks (gardening tasks; livestock production tasks; assembling and dissembling tasks) using appropriate tools and equipment.",
+            "carry out maintenance practices (such as cleaning, sharpening, lubrication, part repairs and replacements, parts tightening, painting) on selected tools and equipment.",
+            "practise the care and safety in use of tools and equipment such as appropriate storage, correct usage, safe distance, appropriate personal protective equipment.",
+            "discuss and make presentations on importance of maintaining tools and equipment used in agricultural tasks."
+          ],
+          "key_inquiry_questions": [
+            "How do tools and equipment contribute to efficiency of farm operations?"
+          ]
+        },
+        {
+          "title": "Product Processing and Value Addition",
+          "suggested_lessons": 20,
+          "learning_outcomes": [
+            "a) suggest methods of value addition for selected agricultural produce",
+            "b) carry out processing of agricultural produce of plant origin",
+            "c) carry out processing of agricultural produce of animal origin",
+            "d) carry out home-based packaging and branding of processed agricultural products",
+            "e) design innovative value addition equipment for agricultural produce",
+            "f) appraise ethical issues in the processing and value addition processes"
+          ],
+          "learning_experiences": [
+            "use digital and non-digital resources to search for information and suggest methods applicable for value addition of selected agricultural produce.",
+            "discuss with resource person on use of applicable methods/techniques to carry out processing of agricultural produce of plant origin such as vegetables, nuts, fruits, cereals, tubers and pulses into Jam, butter, marmalade, ketchup, juices, flour, puree/concentrate of semi-solid fruit extracts, crisps among others.",
+            "discuss with resource person applicable methods/techniques to carry out processing of produce of animal origin such as honey, milk, hides and skins, meat or fish.",
+            "visit market outlets to observe and study applicable methods to carry out home-based packaging and branding of processed agricultural products.",
+            "discuss and present ethical concerns in processing and value addition of various agricultural produce."
+          ],
+          "key_inquiry_questions": [
+            "How does value addition enhance nutrition and food security?"
+          ]
+        }
+      ]
+    }
+  ]
+}

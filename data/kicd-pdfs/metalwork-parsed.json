@@ -1,0 +1,102 @@
+{
+  "assessment_methods": [],
+  "learning_resources": [],
+  "non_formal_activities": [],
+  "strands": [
+    {
+      "strand_title": "FUNDAMENTALS OF METAL TECHNOLOGY",
+      "sub_strands": [
+        {
+          "title": "Introduction to metal technology",
+          "suggested_lessons": 4,
+          "learning_outcomes": [
+            "a) define the terms used in metal technology as a learning area",
+            "b) explain the importance of studying metal technology as a career",
+            "c) Describe businesses related to metal technology in the community",
+            "d) appreciate importance of metal technology in day to day life"
+          ],
+          "learning_experiences": [
+            "Brainstorm on the terms used in metal technology as a learning area (metal, metal technology, material, tools, machines, personal protective equipment, workshop)",
+            "Use print or digital media to search for information on the meaning of the terms used in metal technology as a learning area",
+            "Discuss the importance of studying metal technology as career",
+            "Explore on the metal technology related business in the community",
+            "Visit metal technology related businesses within the locality and share their experiences in class"
+          ],
+          "key_inquiry_questions": [
+            "What is the importance of studying metal technology?"
+          ]
+        },
+        {
+          "title": "Safety at workshop",
+          "suggested_lessons": 8,
+          "learning_outcomes": [
+            "a) explain safety in a metal workshop",
+            "b) explore the general workshop rules and regulations as outlined in occupational safety and health act (OSHA)",
+            "c) describe the possible causes of accidents in a metal workshop",
+            "d) outline the first aid procedures for accident casualties in a metal workshop.",
+            "e) describe the component of a metal workshop layout",
+            "f) appreciate the importance of safety in a metal workshop"
+          ],
+          "learning_experiences": [
+            "Brainstorm on the aspects of safety in a metal workshop (personal, equipment and environment)",
+            "Use print or digital media to search for information on workshop safety rules and regulations",
+            "Discus the possible causes of accident in a metal workshop",
+            "Demonstrate first aid procedures for accident casualties in a metal technology workshop",
+            "Watch videos on different workshop layout and discuss with peers",
+            "Visit a workshop in the locality to observe safety measures in place"
+          ],
+          "key_inquiry_questions": [
+            "How does workshop layout impact on workshop safety?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "TOOLS AND MATERIALS IN METAL TECHNOLOGY",
+      "sub_strands": [
+        {
+          "title": "Hand tools and bench tools",
+          "suggested_lessons": 20,
+          "learning_outcomes": [
+            "a) select hand and bench tools for a given task in a metal workshop",
+            "b) perform a given task using hand and bench tools in a metal workshop",
+            "c) maintain hand and bench tools in a metal workshop",
+            "d) appreciate the importance of hand and bench tools in a metal workshop"
+          ],
+          "learning_experiences": [
+            "use visual aids or realia to identify hand and bench tools used in a workshop (cutting tools, driving tools, holding tools, measuring tools and marking out tools)",
+            "discuss the use of hand and bench tools in the workshop",
+            "watch audio visual aids on the safe use of hand and bench tools in the workshop",
+            "demonstrate safe use of hand and bench tools for a given task",
+            "maintain and store hand and bench tools in the workshop"
+          ],
+          "key_inquiry_questions": [
+            "What are the benefits of using appropriate tools in the workshop?",
+            "How does care and maintenance of tools enhance to efficiency in a workshop?"
+          ]
+        },
+        {
+          "title": "Measuring and marking out tools",
+          "suggested_lessons": 20,
+          "learning_outcomes": [
+            "a) identify measuring and marking out tools used in a metal workshop",
+            "b) Perform a given task using measuring and marking out tools in a metal workshop",
+            "c) maintain measuring and marking out tools in a metal workshop",
+            "d) acknowledge the importance of measuring and marking out tools in metal workshop"
+          ],
+          "learning_experiences": [
+            "use visual aids or realia to identify measuring and marking out tools used in a metal workshop (steel rule, try square, dot punch, centre punch, outside calliper, inside calliper, scriber, divider, odd leg calliper, vee-block, angle blocks, surface table, scribing block, and trammel)",
+            "discuss the use of measuring and marking tools in the workshop",
+            "watch audio visual aids on the safe use of measuring and marking tools in the workshop",
+            "demonstrate safe use of measuring and marking tools for a given task",
+            "maintain and store measuring and marking out tools in the workshop"
+          ],
+          "key_inquiry_questions": [
+            "What are the benefits of using appropriate measuring and marking out tools in the workshop?",
+            "How does care and maintenance of measuring and marking out tools enhance precision in a workshop?"
+          ]
+        }
+      ]
+    }
+  ]
+}

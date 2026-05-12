@@ -144,7 +144,7 @@ na kuwasaidia vizuri zaidi darasani.
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-3 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
         <div className="bg-white border border-gray-200 rounded-2xl p-4 text-center shadow-sm">
           <div className="text-2xl font-black text-gray-900">{students.length}</div>
           <div className="text-sm text-gray-500">Students</div>
@@ -266,7 +266,7 @@ na kuwasaidia vizuri zaidi darasani.
                     <div className="w-full bg-gray-100 rounded-full h-3 mb-3">
                       <div className={`h-3 rounded-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
                     </div>
-                    <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
                       {[
                         { label: '🔴 Below',      val: si.distribution.below,      cls: 'text-red-600 bg-red-50' },
                         { label: '🟡 Approaching', val: si.distribution.approaching, cls: 'text-amber-600 bg-amber-50' },

@@ -16,7 +16,14 @@ export function validateBreak(
   existingBreaks: BreakWithSlots[],
   termSchedule: TermScheduleResult
 ): { valid: boolean; error?: string; startSlot?: number; endSlot?: number } {
-  const { lessonsPerWeek, startSlot: termStart, endSlot: termEnd } = termSchedule
+  const lessonsPerWeek = Number(termSchedule.lessonsPerWeek)
+  const termStart = termSchedule.startSlot
+  const termEnd = termSchedule.endSlot
+
+  if (!lessonsPerWeek || lessonsPerWeek < 1) {
+    console.error('lessonsPerWeek invalid:', termSchedule.lessonsPerWeek)
+    return { valid: false, error: 'Schedule not configured. Go back to Step 3.' }
+  }
 
   const startSlot = weekLessonToSlot(
     Number(newBreak.startWeek),
@@ -29,6 +36,12 @@ export function validateBreak(
     Number(newBreak.endLesson),
     lessonsPerWeek
   )
+
+  console.log('validateBreak startSlot:', startSlot,
+              'endSlot:', endSlot,
+              'termStart:', termStart,
+              'termEnd:', termEnd,
+              'startSlot > endSlot:', startSlot > endSlot)
 
   if (startSlot > endSlot) {
     return { valid: false, error: 'Break start is after break end' }

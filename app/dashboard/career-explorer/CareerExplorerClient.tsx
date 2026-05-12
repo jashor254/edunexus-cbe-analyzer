@@ -140,7 +140,7 @@ function CareerModal({
           {market.salaryRangeKES && (
             <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
               <p className="text-xs font-black uppercase tracking-wider text-slate-400 mb-2">💰 Salary Range (KES/month)</p>
-              <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="grid grid-cols-3 gap-3 text-center sm:grid-cols-3">
                 {[
                   { label: 'Entry', val: market.salaryRangeKES.entry },
                   { label: 'Mid',   val: market.salaryRangeKES.mid   },

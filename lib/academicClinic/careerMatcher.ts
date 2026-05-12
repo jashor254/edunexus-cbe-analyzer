@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/utils/supabase/service';
 import { careerEngine, CareerIntelligence } from './careerIntelligence';
+import { CAREER_DATABASE } from './careerDatabase';
 
 // ==================== TYPES ====================
 
@@ -455,6 +456,41 @@ export class CareerMatcher {
   }
 
   private async getRelevantCareers(grade: number, curriculumType: string = 'cbc'): Promise<CareerIntelligence[]> {
+    const dbFallback: CareerIntelligence[] = CAREER_DATABASE.map((c) => ({
+      id: c.id,
+      name: c.name,
+      cbcMapping: {
+        juniorSchoolFocus: c.matchRequirements.primarySubjects,
+        seniorSchoolPathways: [c.pathway] as ('STEM' | 'Arts & Sports' | 'Social Sciences' | 'TVET')[],
+        keyLearningAreas: c.matchRequirements.primarySubjects,
+        suggestedCCAs: [],
+        portfolioProjects: [],
+      },
+      aiForecast: {
+        automationRisk: c.aiImpact.disruptionPercentage,
+        pivotOpportunities: c.aiImpact.survivalStrategy,
+        humanAdvantage: [],
+        timeline: '5_years' as const,
+      },
+      kenyanMarket: {
+        sectorGrowth: c.aiImpact.growthOutlook === 'booming' ? 'booming' : (c.aiImpact.growthOutlook as any),
+        keyEmployers: [],
+        saturationLevel: 'balanced' as const,
+        entryBarriers: 'medium' as const,
+        ruralVsUrban: 'hybrid' as const,
+        salaryRangeKES: { entry: 50000, mid: 120000, senior: 250000 },
+      },
+      category: 'traditional' as const,
+      description: c.realityCheck.typicalDay,
+      realStories: {
+        successProfile: '',
+        challengesFaced: c.realityCheck.challenges,
+        adviceForStudents: '',
+      },
+      verificationStatus: 'ai_generated' as const,
+      lastUpdated: new Date(),
+    }));
+
     let query = this.supabase
       .from('career_intelligence')
       .select('id, name, description, category, salary_range_kes, required_subjects, cbc_mapping, ai_forecast, kenyan_market, pathway, university_path')
@@ -468,7 +504,8 @@ export class CareerMatcher {
     }
 
     const { data } = await query;
-    return (data as unknown as CareerIntelligence[]) || [];
+    if (!data || data.length === 0) return dbFallback;
+    return data as unknown as CareerIntelligence[];
   }
 
   private async saveMatchReport(studentId: string, matches: CareerMatch[]) {

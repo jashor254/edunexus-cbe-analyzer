@@ -117,7 +117,7 @@ export default function InsightsPage() {
                     <div className="w-full bg-gray-100 rounded-full h-3 mb-4">
                       <div className={`h-3 rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
                     </div>
-                    <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
                       {[
                         { label: 'Below',       val: si.distribution.below,       cls: 'text-red-600 bg-red-50' },
                         { label: 'Approaching', val: si.distribution.approaching,  cls: 'text-amber-600 bg-amber-50' },

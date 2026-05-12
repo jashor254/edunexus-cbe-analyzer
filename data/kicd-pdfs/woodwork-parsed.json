@@ -1,0 +1,164 @@
+{
+  "assessment_methods": [],
+  "learning_resources": [],
+  "non_formal_activities": [],
+  "strands": [
+    {
+      "strand_title": "FOUNDATIONS OF WOOD TECHNOLOGY",
+      "sub_strands": [
+        {
+          "title": "Overview of Wood Technology",
+          "suggested_lessons": 6,
+          "learning_outcomes": [
+            "a) explore the development of Wood Technology as an area of study",
+            "b) relate the benefits of studying Wood Technology to different careers for self-development",
+            "c) appreciate the role of wood technology in the development of the economy"
+          ],
+          "learning_experiences": [
+            "brainstorm on the development of Wood Technology as an area of study",
+            "search online on the evolution of Wood Technology",
+            "discuss in groups the benefits and careers in Wood Technology",
+            "participate in a career talk by resource persons from different wood related sectors",
+            "discuss in groups, the importance of Wood Technology in economic development"
+          ],
+          "key_inquiry_questions": [
+            "Why is wood technology important as an area of study?",
+            "What are the careers related to wood technology?"
+          ]
+        },
+        {
+          "title": "Wood Workshop",
+          "suggested_lessons": 12,
+          "learning_outcomes": [
+            "a) describe features of a wood workshop",
+            "b) illustrate the layout of a wood workshop",
+            "c) explain reasons for observing safety in the wood workshop",
+            "d) appreciate the importance of different features in a Wood workshop"
+          ],
+          "learning_experiences": [
+            "brainstorm on features of a wood workshop",
+            "visit workshops in the school and community to identify different features",
+            "use digital devices to search for features of a wood workshop",
+            "sketch and display the layout of a wood workshop",
+            "discuss reasons for observing safety in the wood workshop"
+          ],
+          "key_inquiry_questions": [
+            "Why is it important to have specific features in a wood workshop?",
+            "Why should a wood workshop have a proper layout?"
+          ]
+        },
+        {
+          "title": "Hand Tools and Equipment",
+          "suggested_lessons": 26,
+          "learning_outcomes": [
+            "a) identify different types of hand tools and equipment in the workshop",
+            "b) classify different hand tools in the wood workshop",
+            "c) demonstrate safe use of hand tools and equipment in wood workshop"
+          ],
+          "learning_experiences": [
+            "use visual aids to identify hand tools used in wood workshop",
+            "categorise the classes of woodworking hand tools; measuring, marking out, cutting, sharpening, boring, planing, impelling, holding/clamping, tools shaping",
+            "brainstorm different types of hand tools and equipment in wood workshop"
+          ],
+          "key_inquiry_questions": [
+            "Why is it important to use hand tools correctly?",
+            "Why is it important to care for and maintain hand tools in the wood workshop?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "WOOD PROCESSES AND PRODUCTS",
+      "sub_strands": [
+        {
+          "title": "Preparation of Wood",
+          "suggested_lessons": 18,
+          "learning_outcomes": [
+            "a) select appropriate tools and equipment for wood preparation",
+            "b) describe the processes involved in wood preparation",
+            "c) carry out different operations on prepared wood",
+            "d) appreciate the importance of wood preparation for a product."
+          ],
+          "learning_experiences": [
+            "discuss in groups tools and equipment used for wood preparation (handsaw, tenon saw, jack plane, try square, marking gauge, bench hook)",
+            "brainstorm on the procedure of truing up the stock in preparation of wood",
+            "search online on procedures of truing up stock (face side, face edge, width/thickness, length)",
+            "execute different processes on timber; (chamfering, beveling, rebating, grooving, housing, mitring, shaping, boring holes)",
+            "visit a nearby workshop to observe the preparation of wood."
+          ],
+          "key_inquiry_questions": [
+            "Why is it necessary to carry out wood preparations?"
+          ]
+        },
+        {
+          "title": "Wood Working Joints",
+          "suggested_lessons": 26,
+          "learning_outcomes": [
+            "a) identify different types of joints in wood work",
+            "b) classify types of joints in wood work",
+            "c) prepare joints used in wood work",
+            "d) identify fasteners used in strengthening woodworking joints",
+            "e) appreciate the role of wood working joints in making of wood product."
+          ],
+          "learning_experiences": [
+            "discuss different types of joints in wood work",
+            "discuss classification of wood joints (lengthening, widening and framing)",
+            "sketch woodworking joints (lengthening, widening and framing)",
+            "use video clips to show how to prepare and assemble different woodworking joints",
+            "use visual aids to identify different fasteners used in wood working joints (screws nails dowels)",
+            "visit nearby wood workshops to observe the application of wood joints."
+          ],
+          "key_inquiry_questions": [
+            "How are wood joints constructed?",
+            "Why are wood fasteners important?"
+          ]
+        },
+        {
+          "title": "Surface Preparation",
+          "suggested_lessons": 16,
+          "learning_outcomes": [
+            "a) explain the reasons for finishing a wood product",
+            "b) select materials and tools for surface preparation",
+            "c) prepare a wood surface to receive clear varnish",
+            "d) appreciate the importance of preparing of wood surfaces to receive finishes."
+          ],
+          "learning_experiences": [
+            "discuss in groups reasons for finishing a product.",
+            "discuss in groups materials, tools that are required for surface preparation( scraper, sand paper, files hot iron and cloth)",
+            "visit a neighborhood workshop to learn the preparation of surface (Scraping, raising the grain, hand sanding)",
+            "search online for"
+          ],
+          "key_inquiry_questions": [
+            "Why is surface preparation in wood finishing important?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "RELATED DRAWING AND DESIGN",
+      "sub_strands": [
+        {
+          "title": "Drawing and sketching",
+          "suggested_lessons": 14,
+          "learning_outcomes": [
+            "a) identify different types of pictorial drawings used in wood technology",
+            "b) draw shapes of items to be made in isometric projection",
+            "c) draw orthographic views from isometric projections",
+            "d) make freehand sketches of items for designs purposes",
+            "e) embrace the use of drawing in design of items to be produced in the workshop."
+          ],
+          "learning_experiences": [
+            "use digital device to identify different types of pictorial drawings (oblique, isometric, perspective)",
+            "use drawing instruments to make isometric drawings",
+            "interpret drawings from isometric to orthographic projection",
+            "make freehand sketches of possible designs for use in production"
+          ],
+          "key_inquiry_questions": [
+            "What is the importance of drawing in wood technology?",
+            "How can you make use of drawings in the design process?"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -20,8 +20,8 @@ import {
   Clock,
   Users
 } from 'lucide-react'
-import { 
-  generateReport, 
+import {
+  generateReport,
   formatSubjectName,
   calculateVitals,
   generateActionPlan,
@@ -34,6 +34,7 @@ import {
   type JuniorGuidance,
   type SeniorGuidance
 } from '@/lib/academicClinic/reportGenerator'
+import { DownloadReportButton } from '@/components/clinic/DownloadReportButton'
 
 export default async function StudentReportPage({
   params
@@ -224,37 +225,17 @@ export default async function StudentReportPage({
 
             {/* Download Button */}
             {hasAccess && (
-              <button
-                onClick={async () => {
-                  const response = await fetch('/api/clinic/download', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      studentId: student.id,
-                      assessments,
-                      profile: {
-                        name: student.name,
-                        grade: student.grade,
-                        pathway: student.current_pathway,
-                        dateOfBirth: student.date_of_birth
-                      }
-                    })
-                  })
-                  
-                  if (response.ok) {
-                    const blob = await response.blob()
-                    const url = window.URL.createObjectURL(blob)
-                    const a = document.createElement('a')
-                    a.href = url
-                    a.download = `${student.name.replace(/\s+/g, '_')}_Report.pdf`
-                    a.click()
-                  }
+              <DownloadReportButton
+                studentId={student.id}
+                studentName={student.name}
+                assessments={assessments}
+                profile={{
+                  name: student.name,
+                  grade: student.grade,
+                  pathway: student.current_pathway,
+                  dateOfBirth: student.date_of_birth,
                 }}
-                className="flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-bold hover:scale-105 transition-all shadow-xl"
-              >
-                <Download className="w-5 h-5" />
-                Download PDF Report
-              </button>
+              />
             )}
           </div>
         </div>
@@ -394,6 +375,72 @@ export default async function StudentReportPage({
             )}
           </div>
         </div>
+
+        {/* Clinical Assessment */}
+        {report.clinicalOverview && (
+          <div className="bg-amber-50 border-l-4 border-amber-400 rounded-2xl p-6">
+            <h2 className="font-black text-slate-900 mb-3 flex items-center gap-2">
+              <Brain className="w-5 h-5 text-amber-600" />
+              Clinical Assessment
+            </h2>
+            <p className="text-slate-700 leading-relaxed">
+              {report.clinicalOverview.clinicalParagraph}
+            </p>
+          </div>
+        )}
+
+        {/* Holiday Plan */}
+        {report.holidayPlan && (
+          <div className="bg-white rounded-3xl p-8 border-2 border-slate-100">
+            <h2 className="text-2xl font-black text-slate-900 mb-6">📅 3-Week Holiday Study Plan</h2>
+            <div className="grid md:grid-cols-3 gap-4">
+              {report.holidayPlan.weeks.map((week: { weekNumber: number; theme: string; goal: string; activities: string[] }, i: number) => (
+                <div key={i} className="bg-slate-50 rounded-2xl p-5">
+                  <div className="font-black text-slate-900 mb-1">Week {week.weekNumber}</div>
+                  <div className="text-sm font-bold text-blue-600 mb-2">{week.theme}</div>
+                  <div className="text-xs text-slate-500 mb-3">{week.goal}</div>
+                  <div className="space-y-1">
+                    {week.activities.slice(0, 3).map((a: string, j: number) => (
+                      <div key={j} className="text-xs text-slate-600 flex gap-2">
+                        <span className="text-blue-400">▸</span>
+                        <span>{a}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Learning Compass */}
+        {report.learningCompassRec && (
+          <div className="bg-slate-900 rounded-3xl p-8 text-white">
+            <h2 className="text-xl font-black mb-4 flex items-center gap-2">
+              🧭 Learning Compass — Start Here
+            </h2>
+            <p className="text-2xl font-black text-yellow-400 mb-2">
+              {report.learningCompassRec.firstSessionSubject}
+            </p>
+            <p className="text-slate-300 mb-4">
+              {report.learningCompassRec.sessionGoal}
+            </p>
+            <div className="space-y-2">
+              {report.learningCompassRec.topicsToAsk.map((t: string, i: number) => (
+                <div key={i} className="flex gap-3 text-sm text-slate-300">
+                  <span className="text-yellow-400 font-bold w-5">{i + 1}.</span>
+                  <span>{t}</span>
+                </div>
+              ))}
+            </div>
+            <a
+              href="/chat"
+              className="inline-flex items-center gap-2 mt-6 px-6 py-3 bg-yellow-400 text-slate-900 rounded-xl font-black hover:bg-yellow-300 transition-colors"
+            >
+              Start Learning Compass Session →
+            </a>
+          </div>
+        )}
 
         {/* Report ID */}
         <div className="text-center text-xs text-slate-400">

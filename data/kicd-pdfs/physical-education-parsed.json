@@ -1,0 +1,60 @@
+{
+  "assessment_methods": [],
+  "learning_resources": [],
+  "non_formal_activities": [],
+  "strands": [
+    {
+      "strand_title": "BALL GAMES",
+      "sub_strands": [
+        {
+          "title": "Football",
+          "suggested_lessons": 10,
+          "learning_outcomes": [
+            "a) identify the facility and equipment used in a game of Football",
+            "b) perform lofted pass in Football for skill mastery",
+            "c) execute marking and dodging in Football for skill acquisition",
+            "d) perform goalkeeping in Football for skill mastery",
+            "e) value playing Football for enjoyment."
+          ],
+          "learning_experiences": [
+            "observe pictures / real facility /charts or search and watch a live/ videos of Football facility to identify facility and equipment used in Football",
+            "engage in marking Football playing field and improvising equipment for use in playing football",
+            "observe virtual or live performances of Football to note the execution of lofted pass, goal keeping, marking, and dodging",
+            "demonstrate stance, contact, follow through techniques in the execution of lofted pass",
+            "demonstrate positioning, anticipation, techniques of effective marking",
+            "demonstrate Feinting, faking, turning accelerating and decelerating in dodging",
+            "demonstrate, quick reactions, dives, positioning, catching, and punching in goalkeeping skills",
+            "practice marking and dodging in Football with peers",
+            "play mini Football games applying lofted pass, goalkeeping, marking and dodging skills while observing safety and rules of the game",
+            "reflects on their own abilities and share feedback with peers."
+          ],
+          "key_inquiry_questions": [
+            "Why is marking and dodging essential when playing Football?",
+            "How does the equipment and skills of Football make it a popular game?"
+          ]
+        },
+        {
+          "title": "Netball",
+          "suggested_lessons": 10,
+          "learning_outcomes": [
+            "a) identify facility and equipment for use in Netball game",
+            "b) execute flip pass and side pass in Netball for skill acquisition",
+            "c) appreciate basic rules while playing Netball for enjoyment."
+          ],
+          "learning_experiences": [
+            "observe a live or recorded Netball match and observe the equipment",
+            "take turns to demonstrate the stance, grip, release and follow through in flip pass",
+            "demonstrate the stance, timing, release and accuracy in side pass while observing safety",
+            "practise combination of flip pass and side pass while observing basic rules of Netball and safety",
+            "play mini Netball games applying the skill of flip pass and side pass while observing safety",
+            "observe and give feedback on others'"
+          ],
+          "key_inquiry_questions": [
+            "Why is passing a necessary skill in Netball?",
+            "How can equipment for Netball be improvised?"
+          ]
+        }
+      ]
+    }
+  ]
+}

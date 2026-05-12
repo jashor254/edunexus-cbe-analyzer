@@ -9,6 +9,8 @@ export type CurriculumMode =
 
 export interface SOWContext {
   school: string
+  teacherName?: string
+  tscNumber?: string
   grade: string
   gradeName: string
   learningArea: string
@@ -17,6 +19,11 @@ export interface SOWContext {
   year: number
   curriculumMode: CurriculumMode
   textbook?: string
+  kicdContext?: {
+    subjectData: Record<string, any>
+    strandData: Array<{ title: string; kicd_data: any[] }>
+    subtopicMap?: Record<string, string[]>
+  }
 }
 
 export interface LessonStructure {
@@ -45,6 +52,7 @@ export interface SelectedSubstrand {
   substrandTitle: string
   lessonsRequired: number
   orderIndex: number
+  subtopics?: string[]
 }
 
 export interface TimelineSlot {
@@ -101,6 +109,8 @@ export interface SOWGenerationResult {
 export interface SOWPreviewData {
   meta: {
     school: string
+    teacherName?: string
+    tscNumber?: string
     grade: string
     learningArea: string
     term: string

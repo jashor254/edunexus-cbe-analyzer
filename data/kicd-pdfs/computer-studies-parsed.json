@@ -1,0 +1,110 @@
+{
+  "assessment_methods": [],
+  "learning_resources": [],
+  "non_formal_activities": [],
+  "strands": [
+    {
+      "strand_title": "FOUNDATION OF COMPUTER SCIENCE",
+      "sub_strands": [
+        {
+          "title": "Evolution and Development of Computers",
+          "suggested_lessons": 6,
+          "learning_outcomes": [
+            "a) Identify early computing devices and how they relate to evolution of electronic computers",
+            "b) describe principle technologies that defined development of computers",
+            "c) Relate the principle technologies to respective computer generation",
+            "d) appreciate technological advancement in the development of computers."
+          ],
+          "learning_experiences": [
+            "use available resources to search for information on the ancient and medieval computing devices that necessitated the development of electronic computers (Abacus, Napier’s Bone, Pascaline, Slide Rule, Difference Engine, Analytic Engine, Jacquard loom)",
+            "use available resources to search for information on the principle technologies that defined development of computers (vacuum tubes, transistors, integrated circuits (IC), large scale IC, very large scale IC) and present findings",
+            "discuss various generations of computer (first, second, third, fourth, and fifth generation)",
+            "match different generations of computers to their respective principal technologies",
+            "share ideas on the technological advancement in the development of computers."
+          ],
+          "key_inquiry_questions": [
+            "What is the importance of principles and technologies in the development of computers?",
+            "How have computers evolved over generation?"
+          ]
+        },
+        {
+          "title": "Computer Organisation and Architecture",
+          "suggested_lessons": 4,
+          "learning_outcomes": [
+            "a) describe the functional organisation and architecture of a von Neumann computer",
+            "b) analyse the relationships among functional elements of von Neumann computer",
+            "c) create a model of a computer architecture depicting the structural elements of a von Neumann computer",
+            "d) use binary, octal and hexadecimal number systems to represent data in a von Neumann’s digital computer",
+            "e) appreciate the importance of computer architecture in computing."
+          ],
+          "learning_experiences": [
+            "use available resources to search for information on the general structure of von Neumann computer architecture (input, processing, output, storage, buses, instruction sets)",
+            "brainstorm on the differences between Reduced Instruction Set Computer (RISC) and Complex Instruction Set Computer (CISC) architectures.",
+            "illustrate organisation among functional elements of computer architecture (input, output, control signals, interfaces and ports, CPU, storage)",
+            "discuss how the elements of computer architecture communicate",
+            "watch a video of fetch-execute cycle",
+            "make a model computer architecture with all the structural elements, use locally available materials to",
+            "convert numbers from base ten to binary, octal and hexadecimal systems used to represent data in a modern digital computer base"
+          ],
+          "key_inquiry_questions": [
+            "What is the role of computer architecture on performance of computers?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "SOFTWARE DEVELOPMENT",
+      "sub_strands": [
+        {
+          "title": "Computer Programming Concepts",
+          "suggested_lessons": 14,
+          "learning_outcomes": [
+            "a) explain the terminologies used in programming languages",
+            "b) describe evolution of programming languages in software development",
+            "c) categorise the programming languages according to the paradigms",
+            "d) create simple instructions to simulate low level programming languages",
+            "e) acknowledge the evolution of programming languages in software development."
+          ],
+          "learning_experiences": [
+            "discuss the terminologies used in programming languages (programming, programming language, assembler, compiler, interpreter, syntax, source code, machine code, Integrated Development Environment, software development lifecycle)",
+            "use available resources to search for information on evolution of programming languages, and present findings",
+            "discuss levels of programming languages in computing (low level and high level)",
+            "use available resources to search for information about programming paradigms (structured, procedural, object oriented, functional, logic, event driven) and share findings",
+            "prepare charts showing evolution of programming languages timelines and display in the learning environment, using locally available materials",
+            "write simple instructions to show how the machine language and assembly languages operate",
+            "share experiences on the use of different levels of programming languages in software development."
+          ],
+          "key_inquiry_questions": [
+            "Why are programming languages important in computing?",
+            "How are programming languages executed?"
+          ]
+        },
+        {
+          "title": "Program development",
+          "suggested_lessons": 15,
+          "learning_outcomes": [
+            "a) describe stages of program development in computer programming",
+            "b) write a pseudocode to illustrate the logical flow of an algorithm",
+            "c) represent the logical flow of an algorithm using a flowchart",
+            "d) design an algorithm to solve a real life problem",
+            "e) appreciate the importance of using algorithms in problem solving"
+          ],
+          "learning_experiences": [
+            "discuss the stages of program development cycle (problem definition, program design, coding, testing, implementation, documentation, maintenance)",
+            "discuss characteristics of an algorithm (input, output, finite, definite, effective)",
+            "discuss the keywords (start, variables, input, processing, output, end) used in pseudocodes and demonstrate how they are used to represent algorithms",
+            "use the keywords (start, variables, input, processing, output, end) to write a pseudocode that illustrates the logical flow of an algorithm",
+            "discuss the standard symbols (start, input, processing, decision, repetition, continuation, output, end) used in flowcharts and demonstrate how they are used to represent an algorithm",
+            "draw a flowchart to illustrate the logical flow of an algorithm",
+            "use pseudocodes and flowcharts to solve a real life problem",
+            "share experiences on the significance of algorithms in problem solving."
+          ],
+          "key_inquiry_questions": [
+            "What is the essence of the program development cycle?",
+            "Why are algorithms designed?"
+          ]
+        }
+      ]
+    }
+  ]
+}

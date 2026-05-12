@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Sparkles, X, Users, Clock, Menu } from 'lucide-react'
+import { Sparkles, X, Users, Clock, Menu, GraduationCap } from 'lucide-react'
 
 // ─── Shared Nav ────────────────────────────────────────────────────────────────
 function MarketingNav() {
@@ -20,37 +20,29 @@ function MarketingNav() {
         </Link>
 
         {/* Desktop links */}
-        <div className="hidden md:flex gap-6 animate-in fade-in duration-700" style={{ animationDelay: '100ms' }}>
-          <a href="/#compass"   className="text-sm font-bold text-white/60 hover:text-amber-400 transition-colors">Compass</a>
-          <a href="/#boarding"  className="text-sm font-bold text-white/60 hover:text-blue-400 transition-colors">Boarding</a>
-          <a href="/#features"  className="text-sm font-bold text-white/60 hover:text-white transition-colors">Features</a>
-          <a href="/#clinic"    className="text-sm font-bold text-white/60 hover:text-violet-400 transition-colors">Clinic</a>
-          <a href="/#igcse"     className="text-sm font-bold text-white/60 hover:text-blue-400 transition-colors">IGCSE</a>
-          <a href="/#teachers"  className="text-sm font-bold text-white/60 hover:text-teal-400 transition-colors">Teachers</a>
-          <Link href="/pricing" className="text-sm font-bold text-white/60 hover:text-pink-400 transition-colors">Pricing</Link>
-          <Link href="/early-access" className="text-sm font-bold text-green-400 hover:text-green-300 transition-colors flex items-center gap-1">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400" />
-            </span>
-            🚀 Early Access
+        <div className="hidden md:flex gap-1 animate-in fade-in duration-700" style={{ animationDelay: '100ms' }}>
+          <a href="/#teachers" className="flex items-center gap-1.5 text-sm font-bold text-white/60 hover:text-teal-400 hover:bg-teal-500/10 px-3 py-2 rounded-xl transition-all">
+            <GraduationCap className="w-4 h-4" /> For Teachers
+          </a>
+          <a href="/#parents" className="flex items-center gap-1.5 text-sm font-bold text-white/60 hover:text-violet-400 hover:bg-violet-500/10 px-3 py-2 rounded-xl transition-all">
+            <Users className="w-4 h-4" /> For Parents &amp; Students
+          </a>
+          <Link href="/pricing" className="text-sm font-bold text-white/60 hover:text-white hover:bg-white/5 px-3 py-2 rounded-xl transition-all">
+            Pricing
+          </Link>
+          <Link href="/login" className="text-sm font-bold text-white/60 hover:text-white hover:bg-white/5 px-3 py-2 rounded-xl transition-all">
+            Login
           </Link>
         </div>
 
         {/* Desktop CTA + Mobile hamburger */}
         <div className="flex items-center gap-3 animate-in fade-in slide-in-from-right duration-700" style={{ animationDelay: '200ms' }}>
           {/* Desktop CTA */}
-          <Link href="/login" className="hidden md:block text-sm font-bold text-white/60 hover:text-white px-4 py-2 transition-colors">
-            Login
-          </Link>
-          <Link href="/signup" className="hidden md:block text-sm bg-linear-to-r from-purple-500 to-pink-500 text-white px-6 py-2 rounded-xl hover:scale-105 transition-all shadow-lg shadow-purple-500/20 font-bold">
+          <Link href="/signup" className="hidden md:block text-sm bg-linear-to-r from-teal-500 to-cyan-500 text-white px-5 py-2 rounded-xl hover:scale-105 transition-all shadow-lg shadow-teal-500/20 font-black">
             Start Free
           </Link>
 
-          {/* Mobile: Early Access + hamburger */}
-          <Link href="/early-access" className="md:hidden text-xs font-black text-green-400 border border-green-500/30 bg-green-500/10 px-3 py-2 rounded-xl">
-            🚀 Early Access
-          </Link>
+          {/* Mobile hamburger */}
           <button
             onClick={() => setMenuOpen((o) => !o)}
             className="md:hidden w-10 h-10 flex items-center justify-center bg-white/5 border border-white/10 rounded-xl text-white/70 hover:text-white transition-colors"
@@ -66,13 +58,10 @@ function MarketingNav() {
         <div className="md:hidden border-t border-white/5 bg-slate-950/95 backdrop-blur-xl">
           <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col gap-1">
             {[
-              { href: '/#compass',  label: 'Learning Compass',   color: 'hover:text-amber-400' },
-              { href: '/#boarding', label: 'Boarding Schools',   color: 'hover:text-blue-400' },
-              { href: '/#features', label: 'All Features',       color: 'hover:text-white' },
-              { href: '/#clinic',   label: 'Academic Clinic',    color: 'hover:text-violet-400' },
-              { href: '/#igcse',    label: 'IGCSE Support',      color: 'hover:text-blue-400' },
-              { href: '/#teachers', label: 'Teacher Portal',     color: 'hover:text-teal-400' },
-              { href: '/pricing',   label: 'Pricing',            color: 'hover:text-pink-400' },
+              { href: '/#teachers', label: 'For Teachers', color: 'hover:text-teal-400' },
+              { href: '/#parents',  label: 'For Parents &amp; Students',  color: 'hover:text-violet-400' },
+              { href: '/pricing',   label: 'Pricing',      color: 'hover:text-white' },
+              { href: '/login',     label: 'Login',        color: 'hover:text-white' },
             ].map((item) => (
               <a
                 key={item.href}
@@ -83,11 +72,8 @@ function MarketingNav() {
                 {item.label}
               </a>
             ))}
-            <div className="flex gap-3 pt-3">
-              <Link href="/login" onClick={() => setMenuOpen(false)} className="flex-1 text-center text-sm font-bold text-white/60 border border-white/10 py-3 rounded-xl hover:text-white transition-colors">
-                Login
-              </Link>
-              <Link href="/signup" onClick={() => setMenuOpen(false)} className="flex-1 text-center text-sm font-black bg-linear-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl hover:scale-105 transition-all">
+            <div className="pt-3">
+              <Link href="/signup" onClick={() => setMenuOpen(false)} className="block text-center text-sm font-black bg-linear-to-r from-teal-500 to-cyan-500 text-white py-3 rounded-xl hover:scale-105 transition-all">
                 Start Free
               </Link>
             </div>
@@ -105,21 +91,21 @@ function MarketingFooter() {
       <div className="max-w-7xl mx-auto px-6 text-center">
         {/* Logo */}
         <Link href="/" className="inline-flex items-center gap-2 mb-6 group">
-          <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition">
+          <div className="w-8 h-8 bg-linear-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition">
             <Sparkles className="w-4 h-4 text-white" />
           </div>
           <span className="text-base font-black text-white/60">EduNexus</span>
         </Link>
 
         {/* Legal links */}
-        <div className="flex justify-center gap-8 mb-6">
+        <div className="flex flex-wrap justify-center gap-6 mb-6">
           <Link href="/legal/privacy" className="text-sm text-white/40 hover:text-white transition-colors font-bold">Privacy</Link>
           <Link href="/legal/terms"   className="text-sm text-white/40 hover:text-white transition-colors font-bold">Terms</Link>
           <Link href="/legal/refund"  className="text-sm text-white/40 hover:text-white transition-colors font-bold">Refund</Link>
         </div>
 
         {/* Social hint */}
-        <div className="flex justify-center gap-6 mb-6">
+        <div className="flex flex-wrap justify-center gap-5 mb-6">
           <a
             href="https://tiktok.com/@edunexuscbe"
             target="_blank"
@@ -146,9 +132,9 @@ function MarketingFooter() {
           </a>
         </div>
 
-        <div className="flex justify-center mb-4">
-          <span className="inline-flex items-center gap-2 bg-white/5 border border-white/10 text-white/30 px-4 py-2 rounded-full text-xs font-bold">
-            <Sparkles className="w-3 h-3 text-violet-400" />
+        <div className="flex justify-center mb-4 px-4">
+          <span className="inline-flex items-center gap-2 bg-white/5 border border-white/10 text-white/30 px-4 py-2 rounded-full text-xs font-bold text-center">
+            <Sparkles className="w-3 h-3 text-violet-400 shrink-0" />
             AI-powered · Parents in control · Compliant with Kenya AI standards
           </span>
         </div>
@@ -163,7 +149,7 @@ export function ComingSoonModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-in fade-in duration-200">
       <div className="relative max-w-md w-full">
-        <div className="absolute -inset-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-3xl blur opacity-30" />
+        <div className="absolute -inset-1 bg-linear-to-r from-purple-500 to-pink-500 rounded-3xl blur opacity-30" />
         <div className="relative bg-slate-900 border border-white/10 rounded-3xl p-8">
           <button
             onClick={onClose}
@@ -171,7 +157,7 @@ export function ComingSoonModal({ onClose }: { onClose: () => void }) {
           >
             <X className="w-6 h-6" />
           </button>
-          <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+          <div className="w-16 h-16 bg-linear-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <Users className="w-8 h-8 text-white" />
           </div>
           <h3 className="text-2xl font-black text-center text-white mb-3">Study Groups Coming Soon! 🎉</h3>
@@ -189,7 +175,7 @@ export function ComingSoonModal({ onClose }: { onClose: () => void }) {
           </div>
           <button
             onClick={onClose}
-            className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-2xl font-black hover:scale-105 transition-all"
+            className="w-full bg-linear-to-r from-purple-500 to-pink-500 text-white py-4 rounded-2xl font-black hover:scale-105 transition-all"
           >
             Got it!
           </button>

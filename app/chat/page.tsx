@@ -854,7 +854,7 @@ function ChatContent() {
 
       {/* ── PARENT INSIGHTS PANEL ──────────────────────────────────────────── */}
       {showParent && (
-        <aside className="w-80 border-l border-white/5 bg-[#0d0d1a] flex flex-col overflow-y-auto">
+        <aside className="fixed inset-0 z-30 lg:static lg:inset-auto lg:z-auto lg:w-80 border-l border-white/5 bg-[#0d0d1a] flex flex-col overflow-y-auto">
           <div className="flex items-center justify-between px-5 py-5 border-b border-white/5">
             <div className="flex items-center gap-2">
               <Heart className="w-4 h-4 text-pink-400" />

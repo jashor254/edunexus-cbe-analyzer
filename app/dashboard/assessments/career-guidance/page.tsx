@@ -510,7 +510,7 @@ function CareerGuidanceContent() {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 mt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6">
             <div className="bg-white/10 rounded-2xl p-4 text-center">
               <div className="text-2xl font-black text-green-300">{strengths.length}</div>
               <div className="text-xs text-slate-300 font-bold">Strong Subjects</div>

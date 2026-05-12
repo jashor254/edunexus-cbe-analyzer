@@ -1,0 +1,204 @@
+{
+  "assessment_methods": [],
+  "learning_resources": [],
+  "non_formal_activities": [],
+  "strands": [
+    {
+      "strand_title": "INTRODUCTION TO GENERAL SCIENCE",
+      "sub_strands": [
+        {
+          "title": "Introduction to General Science",
+          "suggested_lessons": 4,
+          "learning_outcomes": [
+            "a) explain the meaning of General Science as a learning area",
+            "b) discuss the branches of General Science",
+            "c) outline the importance of General Science in life, environment and technology",
+            "d) identify career opportunities related to General Science",
+            "e) analyse the principle of inference in science education",
+            "f) appreciate the importance of General Science in day to day living"
+          ],
+          "learning_experiences": [
+            "find out the meaning of general science from a resource person or the internet",
+            "brainstorm on the main branches of General Science and share with peers",
+            "use available digital and/or print media to search for information on main branches of General Science (Biology, Chemistry and Physics)",
+            "consult teachers or parents on the importance of General Science in relation to human life, environment, technology",
+            "use available digital and print media to search for information on career opportunities related to General Science",
+            "draw a chart on careers related to General Science and identify with a particular career path of own interest",
+            "explore the process of collecting evidence for drawing inferences in science education (methods of collecting and analysing data)"
+          ],
+          "key_inquiry_questions": [
+            "How is General Science useful in daily life?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "LIVING THINGS AND ENVIRONMENT",
+      "sub_strands": [
+        {
+          "title": "The Cell",
+          "suggested_lessons": 6,
+          "learning_outcomes": [
+            "a) explain the differences between light and electron microscopes.",
+            "b) describe the plant and animal cell under an electron microscope,",
+            "c) compare plant and animal cell structures under light and electron microscope,",
+            "d) explain the functions of the components of the plant and animal cells",
+            "e) construct a concept map of the levels of cell organisation,",
+            "f) appreciate the function of the cell as a basic unit of life."
+          ],
+          "learning_experiences": [
+            "discuss with peers the differences between light and electron microscopes.",
+            "Use print or non-print media to search for the structures of plant and animal cells under electron microscope,",
+            "observe photomicrographs of plant and animal cells under electron microscope to identify the components of the cells,",
+            "discuss with peers the functions of components of the animal and plant cells",
+            "draw and label the structures of animal and plant cells"
+          ],
+          "key_inquiry_questions": [
+            "What makes up an organism?"
+          ]
+        },
+        {
+          "title": "Nutrition in Animals",
+          "suggested_lessons": 10,
+          "learning_outcomes": [
+            "a) describe digestion of different types of food in each region of the digestive system,",
+            "b) explain the adaptations of parts of the human digestive system,",
+            "c) Perform experiments to determine presence of different nutrients in food.",
+            "d) appreciate the role of different parts of the digestive system"
+          ],
+          "learning_experiences": [
+            "search for information on digestion of different types of food in each region of the digestive system,",
+            "Watch animation or simulation of digestion of food along the alimentary canal,",
+            "discuss the adaptations of parts of the human digestive system to their functions,",
+            "Search for information from print and non-print materials on the enzymes used to breakdown each type of food at different regions of the digestive system and share with peers,",
+            "carry out experiments on food tests in groups and share in the plenary."
+          ],
+          "key_inquiry_questions": [
+            "What is the importance of breaking down food?"
+          ]
+        },
+        {
+          "title": "Transport in plants",
+          "suggested_lessons": 12,
+          "learning_outcomes": [
+            "a) describe transport in plants,",
+            "b) investigate factors affecting transpiration,",
+            "c) describe the significance of"
+          ],
+          "learning_experiences": [
+            "use digital devices or print media to search for information on transport in plants (translocation, absorption of water and mineral salts),",
+            "observe plant specimen to identify tissues responsible for transport in plants,",
+            "discuss with peers how absorption of water and mineral salts in plants"
+          ],
+          "key_inquiry_questions": [
+            "Why is transport important in plants?",
+            "How do plants absorb water?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "MATTER AND CHEMICAL REACTIONS",
+      "sub_strands": [
+        {
+          "title": "The periodic table",
+          "suggested_lessons": 12,
+          "learning_outcomes": [
+            "a) examine electron arrangement of an atom of an element to identify the period and group the element belongs",
+            "b) classify elements into groups and periods of the periodic table",
+            "c) explain the stability and electron affinity of atoms of elements",
+            "d) describe ion formation for the first 20 elements of the periodic table",
+            "e) formulate chemical formula of compounds using valencies of elements and radicals",
+            "f) appreciate the importance of the structure of the atom in the development of the periodic table"
+          ],
+          "learning_experiences": [
+            "carry out activities to review the concepts of the structure of an atom, atomic number, mass number and the electron arrangement of atoms of selected elements",
+            "arrange the first 20 elements using similarities in their electron arrangements",
+            "discuss with peers the order adopted in developing the periodic table (the periodic law)",
+            "discuss with peers in a group how atoms of elements acquire stability (losing or gaining electrons) relating to the atom’s ability to attain the positive or negative charge (cations and anions)",
+            "draw dot (.) and cross (x) diagrams to illustrate ion formation for the first 20 elements of the periodic table",
+            "discuss with peers on how to determine the valency and oxidation numbers of elements and radicals (ammonium ion, sulphate, nitrate, hydroxide, carbonate, phosphate, hydrogen carbonate, sulphite and nitrite)",
+            "watch animations and simulations on ion formation and atomicity of gases using digital devices"
+          ],
+          "key_inquiry_questions": [
+            "1. Why is electron arrangement significant?",
+            "2. How are elements arranged in the periodic table?"
+          ]
+        },
+        {
+          "title": "Chemical Families",
+          "suggested_lessons": 8,
+          "learning_outcomes": [
+            "a) identify chemical families in the periodic table",
+            "b) classify elements of the periodic table into their chemical families",
+            "c) describe the physical and chemical properties of selected elements of the periodic table",
+            "d) explain the unreactive nature of the noble gases",
+            "e) outline the uses of elements of the periodic table",
+            "f) acknowledge the uses of the elements of the periodic table"
+          ],
+          "learning_experiences": [
+            "find out the names assigned to various categories of elements in the periodic table (alkali, alkaline earth metals, halogens, noble gases and transition metals)",
+            "sort and group the first twenty elements of the periodic table into their families (include copper, iron, zinc, lead for transition elements)",
+            "carry out activities to investigate physical properties of alkali metals, alkaline earth metals, halogens, noble gases and transition metals",
+            "observe safety when carrying out activities to investigate"
+          ],
+          "key_inquiry_questions": [
+            "How are elements suited for their use in day to day life?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "GENERAL PHYSICS",
+      "sub_strands": [
+        {
+          "title": "Turning effect of force",
+          "suggested_lessons": 11,
+          "learning_outcomes": [
+            "a) determine moments of a force at a point",
+            "b) calculate the moments of anti-parallel forces using a formula",
+            "c) apply the turning effect of force in real life situations",
+            "d) appreciate the importance of the turning effect of force in everyday life"
+          ],
+          "learning_experiences": [
+            "use digital devices and/or print media to search for information on moments of a force at a point",
+            "watch animations and simulations on moments of anti-parallel forces from the internet and present in a plenary",
+            "demonstrate the principle of moments by balancing a metre rule",
+            "solve numerical problems involving both moments of a force and moments of anti-parallel forces",
+            "walk around the school in groups to identify where turning effect of force is applied",
+            "watch video clips on how the concept of turning effect of force is applied in real life situations",
+            "discuss with peers other instances where the turning effect of force can be utilised"
+          ],
+          "key_inquiry_questions": [
+            "How is the turning effect of force important in daily life?"
+          ]
+        },
+        {
+          "title": "Linear motion with constant acceleration",
+          "suggested_lessons": 16,
+          "learning_outcomes": [
+            "a) explain terms used in linear motion",
+            "b) calculate variables of motion using equations of linear motion",
+            "c) carry out experiments on the effect of gravity on bodies under free fall",
+            "d) appreciate the significance of linear motion and free fall in real life"
+          ],
+          "learning_experiences": [
+            "discuss with their peers the meaning and differences between the terms used in linear motion",
+            "use digital devices/print media to search for the equations of linear motion",
+            "solve numerical problems in linear motion with constant acceleration using equations of linear motion",
+            "discuss with peers the applications of linear motion in real life and present in plenary",
+            "drop objects from a certain height to observe the increase in speed of the objects and infer the effect of gravity on the objects",
+            "observe safety measures when dropping objects to experiment the effect of gravity on objects",
+            "discuss with peers the safety measures put in real life situations to minimise fatal injuries resulting from free fall concept",
+            "do individual assignments on examples of bodies under free fall motion and present the findings in a group discussion"
+          ],
+          "key_inquiry_questions": [
+            "Why do we learn linear motion?",
+            "How is free fall motion important in real life?",
+            "What are the dangers of free fall in our day to day life?"
+          ]
+        }
+      ]
+    }
+  ]
+}

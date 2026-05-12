@@ -1,0 +1,208 @@
+{
+  "subject": "Indigenous Languages Grade 10",
+  "topics": [
+    {
+      "topic_id": 1,
+      "topic_name": "Indigenous Knowledge",
+      "subtopic_count": 16,
+      "subtopics": [
+        "Listening and Speaking - Pronunciation and Vocabulary - Vowel sounds in indigenous language",
+        "Listening and Speaking - Pronunciation and Vocabulary - Consonant sounds in indigenous language",
+        "Listening and Speaking - Pronunciation and Vocabulary - Word stress patterns",
+        "Listening and Speaking - Pronunciation and Vocabulary - Vocabulary acquisition and usage",
+        "Reading - Extensive Reading - Selecting reading materials on traditional food and nutrition",
+        "Reading - Extensive Reading - Reading and responding to texts on traditional food and nutrition",
+        "Reading - Extensive Reading - Extracting and using vocabulary from texts",
+        "Reading - Extensive Reading - Creating word walls and reading for enjoyment",
+        "Grammar - Word Classes - Proper and common nouns in indigenous language",
+        "Grammar - Word Classes - Concrete and abstract nouns",
+        "Grammar - Word Classes - Compound and collective nouns",
+        "Grammar - Word Classes - Building a noun vocabulary bank",
+        "Writing - Mechanics of Writing - Spelling words correctly in indigenous language",
+        "Writing - Mechanics of Writing - Identifying and correcting common spelling mistakes",
+        "Writing - Mechanics of Writing - Writing lower and upper case letters correctly",
+        "Writing - Mechanics of Writing - Spelling drills and consolidation"
+      ]
+    },
+    {
+      "topic_id": 2,
+      "topic_name": "Communication",
+      "subtopic_count": 16,
+      "subtopics": [
+        "Listening and Speaking - Conversational Skills - Polite language and responding appropriately",
+        "Listening and Speaking - Conversational Skills - Turn-taking and developing arguments",
+        "Listening and Speaking - Conversational Skills - Agreeing and disagreeing politely",
+        "Listening and Speaking - Conversational Skills - Engaging in debates on communication",
+        "Reading - Study Skills - Previewing and predicting text content",
+        "Reading - Study Skills - Activating prior knowledge before reading",
+        "Reading - Study Skills - Setting purpose for reading",
+        "Reading - Study Skills - Practising pre-reading activities",
+        "Grammar - Word Classes - Personal pronouns (first, second and third person)",
+        "Grammar - Word Classes - Singular and plural forms of personal pronouns",
+        "Grammar - Word Classes - Demonstrative pronouns",
+        "Grammar - Word Classes - Applying pronouns in sentences and texts",
+        "Writing - Mechanics of Writing - Using comma and full stop",
+        "Writing - Mechanics of Writing - Using question mark and exclamation mark",
+        "Writing - Mechanics of Writing - Using quotation marks",
+        "Writing - Mechanics of Writing - Applying punctuation marks in essays"
+      ]
+    },
+    {
+      "topic_id": 3,
+      "topic_name": "Culture",
+      "subtopic_count": 16,
+      "subtopics": [
+        "Listening and Speaking - Listening for Comprehension - Identifying main ideas in stories on cultural celebrations",
+        "Listening and Speaking - Listening for Comprehension - Sequencing events in stories",
+        "Listening and Speaking - Listening for Comprehension - Retelling stories on cultural celebrations",
+        "Listening and Speaking - Listening for Comprehension - Debating cultural celebrations",
+        "Reading - Reading for Information - Picking out information from texts on cultural celebrations",
+        "Reading - Reading for Information - Making notes from texts on cultural celebrations",
+        "Reading - Reading for Information - Summarising texts on cultural celebrations",
+        "Reading - Reading for Information - Responding to questions and dramatising cultural celebrations",
+        "Grammar - Word Classes - Adjectives of shape and size",
+        "Grammar - Word Classes - Adjectives of opinion and colour",
+        "Grammar - Word Classes - Adjectives of height and age",
+        "Grammar - Word Classes - Composing paragraphs using adjectives",
+        "Writing - Social Writing - Writing thank you notes",
+        "Writing - Social Writing - Writing congratulatory notes",
+        "Writing - Social Writing - Writing condolence notes",
+        "Writing - Social Writing - Writing reminders"
+      ]
+    },
+    {
+      "topic_id": 4,
+      "topic_name": "Health",
+      "subtopic_count": 15,
+      "subtopics": [
+        "Listening and Speaking - Listening for Comprehension - Listening to songs on health themes",
+        "Listening and Speaking - Listening for Comprehension - Identifying themes in health-related songs",
+        "Listening and Speaking - Listening for Comprehension - Critiquing peers' song performances",
+        "Listening and Speaking - Listening for Comprehension - Performing songs on health topics",
+        "Reading - Study Skills - Skimming and scanning health texts",
+        "Reading - Study Skills - Intensive reading of health texts",
+        "Reading - Study Skills - Extensive reading on health topics",
+        "Reading - Study Skills - Applying reading strategies to real-life health situations",
+        "Grammar - Tenses - Simple present tense",
+        "Grammar - Tenses - Present continuous tense",
+        "Grammar - Tenses - Present perfect tense",
+        "Writing - Functional Writing - Identifying features of forms",
+        "Writing - Functional Writing - Filling in personal details in forms",
+        "Writing - Functional Writing - Completing health-related forms",
+        "Writing - Functional Writing - Reviewing and correcting completed forms"
+      ]
+    },
+    {
+      "topic_id": 5,
+      "topic_name": "Environment",
+      "subtopic_count": 16,
+      "subtopics": [
+        "Listening and Speaking - Intensive Listening - Identifying events in oral poems on environment",
+        "Listening and Speaking - Intensive Listening - Discussing themes in environmental oral poems",
+        "Listening and Speaking - Intensive Listening - Deducing moral lessons from environmental oral poems",
+        "Listening and Speaking - Intensive Listening - Performing and recording oral poems",
+        "Reading - Reading Fluency - Reading with fluency and correct pronunciation",
+        "Reading - Reading Fluency - Reading at correct speed with accuracy",
+        "Reading - Reading Fluency - Reading with appropriate intonation",
+        "Reading - Reading Fluency - Building vocabulary on environmental conservation",
+        "Grammar - Word Classes - Defining adverbs and identifying types",
+        "Grammar - Word Classes - Identifying adverbs in stories and texts",
+        "Grammar - Word Classes - Constructing sentences and paragraphs using adverbs",
+        "Grammar - Word Classes - Designing charts showing types of adverbs",
+        "Writing - Functional Writing - Identifying components of public notices and posters",
+        "Writing - Functional Writing - Creating public notices and posters on environmental issues",
+        "Writing - Functional Writing - Writing instructions on environmental conservation",
+        "Writing - Functional Writing - Reviewing and publishing functional writing"
+      ]
+    },
+    {
+      "topic_id": 6,
+      "topic_name": "Gender",
+      "subtopic_count": 15,
+      "subtopics": [
+        "Listening and Speaking - Oral Presentation Skills - Characteristics of fables, trickster and ogre narratives",
+        "Listening and Speaking - Oral Presentation Skills - Narrating with fluency and expression",
+        "Listening and Speaking - Oral Presentation Skills - Using storytelling techniques",
+        "Listening and Speaking - Oral Presentation Skills - Recording narratives and conducting storytelling sessions",
+        "Reading - Extensive Reading - Selecting short stories on gender issues",
+        "Reading - Extensive Reading - Building vocabulary from gender-related texts",
+        "Reading - Extensive Reading - Retelling and relating to real-life experiences",
+        "Reading - Extensive Reading - Participating in debates on gender issues",
+        "Grammar - Word Classes - Conjunctions of addition",
+        "Grammar - Word Classes - Conjunctions of contrast",
+        "Grammar - Word Classes - Using conjunctions in paragraphs on gender roles",
+        "Writing - Creative Writing - Identifying features of narrative and expository compositions",
+        "Writing - Creative Writing - Planning compositions on gender topics",
+        "Writing - Creative Writing - Writing narrative and expository compositions",
+        "Writing - Creative Writing - Reviewing compositions and building portfolios"
+      ]
+    },
+    {
+      "topic_id": 7,
+      "topic_name": "Careers",
+      "subtopic_count": 16,
+      "subtopics": [
+        "Listening and Speaking - Attentive Listening - Identifying main ideas on emerging career trends",
+        "Listening and Speaking - Attentive Listening - Building and using career-related vocabulary",
+        "Listening and Speaking - Attentive Listening - Summarising passages on career trends",
+        "Listening and Speaking - Attentive Listening - Paraphrasing texts on career trends",
+        "Reading - Reading for Comprehension - Applying comprehension strategies to career texts",
+        "Reading - Reading for Comprehension - Building vocabulary on careers",
+        "Reading - Reading for Comprehension - Answering questions on career texts",
+        "Reading - Reading for Comprehension - Participating in reading theatre on careers",
+        "Grammar - Word Classes - Prepositions of time and place",
+        "Grammar - Word Classes - Prepositions of position and direction",
+        "Grammar - Word Classes - Writing dialogues using prepositions",
+        "Grammar - Word Classes - Playing word puzzle games with prepositions",
+        "Writing - Functional Writing - Identifying features of different types of letters",
+        "Writing - Functional Writing - Writing invitation letters",
+        "Writing - Functional Writing - Writing application letters",
+        "Writing - Functional Writing - Writing letters of complaint and building portfolios"
+      ]
+    },
+    {
+      "topic_id": 8,
+      "topic_name": "Business and Entrepreneurship",
+      "subtopic_count": 15,
+      "subtopics": [
+        "Listening and Speaking - Attentive Listening - Note-taking from oral texts on income",
+        "Listening and Speaking - Attentive Listening - Responding to questions on income sources",
+        "Listening and Speaking - Attentive Listening - Role playing and performing on income sources",
+        "Listening and Speaking - Attentive Listening - Presenting talks and observing non-verbal cues",
+        "Reading - Extensive Reading - Silent reading on budgeting and vocabulary building",
+        "Reading - Extensive Reading - Using budgeting vocabulary in sentences and texts",
+        "Reading - Extensive Reading - Making notes and summarising texts on budgeting",
+        "Reading - Extensive Reading - Engaging in reader's theatre on budgeting",
+        "Grammar - Types of Sentences - Basic structure of simple sentences",
+        "Grammar - Types of Sentences - Identifying subject, verb and object",
+        "Grammar - Types of Sentences - Creating simple sentences and dialogues",
+        "Writing - Creative Writing - Understanding structure of songs and poems",
+        "Writing - Creative Writing - Identifying components of dialogues",
+        "Writing - Creative Writing - Creating dialogues, songs and poems on trading",
+        "Writing - Creative Writing - Presenting creative works for peer critique"
+      ]
+    },
+    {
+      "topic_id": 9,
+      "topic_name": "Media and Technology",
+      "subtopic_count": 15,
+      "subtopics": [
+        "Listening and Speaking - Conversational Skills - Establishing rapport and turn-taking in dialogues",
+        "Listening and Speaking - Conversational Skills - Interrupting politely and using non-verbal cues",
+        "Listening and Speaking - Conversational Skills - Role-playing dialogues on impact of media and technology",
+        "Listening and Speaking - Conversational Skills - Providing feedback and applying skills",
+        "Reading - Reading for Information - Inferring meaning from texts on media impact",
+        "Reading - Reading for Information - Relating characters and events to real life",
+        "Reading - Reading for Information - Answering questions on media texts",
+        "Reading - Reading for Information - Making notes and summarising events",
+        "Grammar - Word Formation - Singular and plural forms of words",
+        "Grammar - Word Formation - Using singular and plural forms in sentences",
+        "Grammar - Word Formation - Forming nouns from adjectives",
+        "Writing - Creative Writing - Understanding fundamentals of descriptive essays",
+        "Writing - Creative Writing - Describing items and people in the environment",
+        "Writing - Creative Writing - Writing descriptive essays on media and technology",
+        "Writing - Creative Writing - Revising and displaying descriptive essays"
+      ]
+    }
+  ]
+}

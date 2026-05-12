@@ -1,0 +1,176 @@
+{
+  "subject": "English Grade 10",
+  "topics": [
+    {
+      "topic_id": 1,
+      "topic_name": "Etiquette: Social",
+      "subtopic_count": 12,
+      "subtopics": [
+        "Listening and Speaking - Extensive Listening - Listening for Enjoyment and General Understanding",
+        "Reading - Reading Fluency - Previewing and Predicting",
+        "Writing - Sentence Fluency - Use of the Comma",
+        "Grammar in Use - Word Classes - Common and Proper Nouns",
+        "Listening and Speaking - Extensive Listening - Analysing Audio-Visual Texts for Key Information",
+        "Reading - Reading Fluency - Scanning and Skimming",
+        "Writing - Sentence Fluency - Avoiding Comma Splices and Run-on Sentences",
+        "Grammar in Use - Word Classes - Count and Non-count Nouns",
+        "Listening and Speaking - Speaking Etiquette - Sounds /ɒ/ and /ɔː/ and Polite Expressions",
+        "Reading - Reading Fluency - Collocations and Binomial Phrases",
+        "Writing - Sentence Fluency - Punctuation Practice",
+        "Grammar in Use - Word Classes - Pronouns and Phrasal Quantifiers"
+      ]
+    },
+    {
+      "topic_id": 2,
+      "topic_name": "Environment: Climate Change",
+      "subtopic_count": 12,
+      "subtopics": [
+        "Listening and Speaking - Critical Listening - Context, Audience and Intention",
+        "Reading - Extensive Reading - Selecting and Previewing Texts",
+        "Writing - Mechanics of Writing - Spelling Rules",
+        "Grammar in Use - Word Classes - Main and Auxiliary Verbs",
+        "Listening and Speaking - Critical Listening - Selecting Key Points and Avoiding Distractions",
+        "Reading - Extensive Reading - Reading for Enjoyment and Understanding",
+        "Writing - Mechanics of Writing - Abbreviations and Acronyms",
+        "Grammar in Use - Word Classes - Tense and Aspect",
+        "Listening and Speaking - Conversational Skills - Sounds /ə/, /ɑː/, /ɜː/ and Discourse Markers",
+        "Reading - Extensive Reading - Building Vocabulary",
+        "Writing - Mechanics of Writing - Words with Affixes",
+        "Grammar in Use - Word Classes - Regular and Irregular Verbs"
+      ]
+    },
+    {
+      "topic_id": 3,
+      "topic_name": "Artificial Intelligence and Society: Healthcare",
+      "subtopic_count": 12,
+      "subtopics": [
+        "Listening and Speaking - Intensive Listening - Keywords, Facts and Fixed Phrases",
+        "Reading - Reference Materials - Dictionary and Thesaurus",
+        "Writing - Paragraphing Skills - Cohesion and Linking Words",
+        "Grammar in Use - Word Classes - Simple Prepositions",
+        "Listening and Speaking - Intensive Listening - Inferring Meaning from Context",
+        "Reading - Reference Materials - Atlases, Manuals and Encyclopaedias",
+        "Writing - Paragraphing Skills - Paragraph Structure",
+        "Grammar in Use - Word Classes - Descriptive and Proper Adjectives",
+        "Listening and Speaking - Speaking Fluency - Sounds, Homographs and Non-verbal Cues",
+        "Reading - Reference Materials - Comprehensive Research",
+        "Writing - Paragraphing Skills - The Writing Process",
+        "Grammar in Use - Word Classes - Order of Adjectives and Comparative Forms"
+      ]
+    },
+    {
+      "topic_id": 4,
+      "topic_name": "Travel: Adventure",
+      "subtopic_count": 12,
+      "subtopics": [
+        "Listening and Speaking - Selective Listening - Filtering Information",
+        "Reading - Study Skills - Library Skills",
+        "Writing - Mechanics of Writing - Punctuation (Hyphen and Quotation Marks)",
+        "Grammar in Use - Determiners - Articles, Demonstratives and Possessives",
+        "Listening and Speaking - Selective Listening - Instructions and Directions",
+        "Reading - Study Skills - Library Etiquette and Research",
+        "Writing - Mechanics of Writing - The Dash and Single Slash",
+        "Grammar in Use - Noun and Verb Phrases",
+        "Listening and Speaking - Conversational Skills - Speaking Fluency (Sounds /s/, /z/, /ʃ/, /ʒ/)",
+        "Reading - Study Skills - Visual Information Interpretation",
+        "Writing - Mechanics of Writing - Capitalisation Rules",
+        "Grammar in Use - Using Possessives and Articles as Determiners"
+      ]
+    },
+    {
+      "topic_id": 5,
+      "topic_name": "Careers: Public Sector",
+      "subtopic_count": 12,
+      "subtopics": [
+        "Listening and Speaking - Interactive Listening - Negotiating Meaning and Turn Taking",
+        "Reading - Intensive Reading - Comprehension Strategies",
+        "Writing - Functional Writing - Personal Journals and Diaries",
+        "Grammar in Use - Word Classes - Adverbs (Place, Time and Manner)",
+        "Listening and Speaking - Interactive Listening - Clarifying Meaning and Showing Empathy",
+        "Reading - Intensive Reading - Inferring Meaning from Context",
+        "Writing - Functional Writing - Memos",
+        "Grammar in Use - Word Classes - Gradable Adverbs (Comparatives and Superlatives)",
+        "Listening and Speaking - Conversational Skills - Turn-taking, Interrupting and Disagreeing Politely",
+        "Reading - Intensive Reading - Summarising and Making Connections",
+        "Writing - Functional Writing - Formal and Informal Registers",
+        "Grammar in Use - Phrases - Adverb, Adjective and Prepositional Phrases"
+      ]
+    },
+    {
+      "topic_id": 6,
+      "topic_name": "Culture: Values and Beliefs",
+      "subtopic_count": 12,
+      "subtopics": [
+        "Listening and Speaking - Responsive Listening - Connecting with a Speaker and Avoiding Distractions",
+        "Reading - Reading Fluency - Speed and Accuracy",
+        "Writing - Creative Writing - Features of Descriptive Essays",
+        "Grammar in Use - Relative Pronouns - Who, Whom, Which, That, Whose",
+        "Listening and Speaking - Responsive Listening - Showing Empathy and Providing Feedback",
+        "Reading - Reading Fluency - Expressive Reading (Pitch, Pace, Volume)",
+        "Writing - Creative Writing - Descriptive Essays",
+        "Grammar in Use - Relative Clauses - Defining and Non-defining Clauses",
+        "Listening and Speaking - Speaking Fluency - Sounds /ʊ/ and /u:/, Word Stress, Onomatopoeia and Ideophones",
+        "Reading - Reading Fluency - Reader's Theatre and Choral Reading",
+        "Writing - Creative Writing - Narrative Essays",
+        "Grammar in Use - Adverbial Clauses - Place, Time and Reason"
+      ]
+    },
+    {
+      "topic_id": 7,
+      "topic_name": "Sports and Games: Popular Sports",
+      "subtopic_count": 12,
+      "subtopics": [
+        "Listening and Speaking - Critical Listening - Distinguishing Facts and Opinions",
+        "Reading - Intensive Reading - Making Predictions",
+        "Writing - Functional Writing - Letter of Apology",
+        "Grammar in Use - Noun Clauses - That and What as Subjects",
+        "Listening and Speaking - Critical Listening - Evaluating Accuracy",
+        "Reading - Intensive Reading - Visualising and Inferring Meaning",
+        "Writing - Functional Writing - Letter of Appreciation",
+        "Grammar in Use - Noun Clauses - Using Noun Clauses as Subjects",
+        "Listening and Speaking - Speaking Fluency - Sounds /f/, /ŋ/ and Consonant Blends",
+        "Reading - Intensive Reading - Summarising and Making Connections",
+        "Writing - Functional Writing - Emails and Letter of Acceptance",
+        "Grammar in Use - Noun Clauses - Application in Communication"
+      ]
+    },
+    {
+      "topic_id": 8,
+      "topic_name": "Health and Safety: Personal Safety",
+      "subtopic_count": 12,
+      "subtopics": [
+        "Listening and Speaking - Intensive Listening - Interpreting Visuals",
+        "Reading - Study Skills - Survey, Question, Read",
+        "Writing - Creative Writing - Expository Paragraphs",
+        "Grammar in Use - Clause Patterns - Subject-Verb and Subject-Verb-Object",
+        "Listening and Speaking - Intensive Listening - Interpreting Non-verbal Cues",
+        "Reading - Study Skills - Paraphrasing and Note-making",
+        "Writing - Creative Writing - Persuasive Essays",
+        "Grammar in Use - Clause Patterns - Subject-Verb-Object-Object",
+        "Listening and Speaking - Speaking Fluency - Sense Relations",
+        "Reading - Study Skills - Summarising Information",
+        "Writing - Creative Writing - Expository Essays",
+        "Grammar in Use - Sentence Types - Simple and Compound Sentences"
+      ]
+    },
+    {
+      "topic_id": 9,
+      "topic_name": "Income: Types and Sources",
+      "subtopic_count": 12,
+      "subtopics": [
+        "Listening and Speaking - Selective Listening - Filtering and Extracting Information",
+        "Reading - Critical Reading - Identifying Audience, Purpose and Attitude",
+        "Writing - Functional Writing - Writing Reminders",
+        "Grammar in Use - Sentences - Active Voice",
+        "Listening and Speaking - Selective Listening - Extracting Characters and Events",
+        "Reading - Critical Reading - Inferring Meanings",
+        "Writing - Functional Writing - Incident and Newspaper Reports",
+        "Grammar in Use - Sentences - Passive Voice",
+        "Listening and Speaking - Speaking Fluency - Pronunciation and Intonation",
+        "Reading - Critical Reading - Analysing Structure and Form",
+        "Writing - Functional Writing - Designing Questionnaires",
+        "Grammar in Use - Subject-Verb Agreement - Rules and Applications"
+      ]
+    }
+  ]
+}

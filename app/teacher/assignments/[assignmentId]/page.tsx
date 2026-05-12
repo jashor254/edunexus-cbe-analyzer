@@ -4,8 +4,9 @@ import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
 import {
   CheckCircle2, Clock, AlertTriangle, MessageSquare,
-  ChevronDown, ChevronUp, Send, Users, FileText,
+  ChevronDown, ChevronUp, Send, Users, FileText, Printer,
 } from 'lucide-react'
+import { generateAssignmentPDF } from '@/lib/assignments/pdfRenderer'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -177,6 +178,8 @@ export default function AssignmentMarkingPage({ params }: { params: Promise<{ as
   const [markingStates, setMarkingStates] = useState<Record<string, MarkingState>>({})
   const [showBulkModal, setShowBulkModal] = useState(false)
   const [sentNotice, setSentNotice] = useState<Record<string, string>>({})
+  const [printingLevel, setPrintingLevel] = useState<number | null>(null)
+  const [strugglingAlerts, setStrugglingAlerts] = useState<{ name: string; studentId: string; score: number; maxScore: number }[]>([])
 
   useEffect(() => {
     fetch(`/api/teacher/assignments/${assignmentId}`)
@@ -236,6 +239,24 @@ export default function AssignmentMarkingPage({ params }: { params: Promise<{ as
         [sub.student_id]: `Feedback sent to ${sub.students?.name || 'student'}!`,
       }))
       setTimeout(() => setSentNotice(prev => { const n = { ...prev }; delete n[sub.student_id]; return n }), 3000)
+
+      // Track Level 1 students for WhatsApp alert
+      const savedScore = d.data.submission.score
+      if (savedScore !== null && data) {
+        const level = cbcLevel(savedScore, data.assignment.max_score)
+        if (level === 1) {
+          setStrugglingAlerts(prev => {
+            const exists = prev.some(a => a.studentId === sub.student_id)
+            if (exists) return prev
+            return [...prev, {
+              name: sub.students?.name || 'Student',
+              studentId: sub.student_id,
+              score: savedScore,
+              maxScore: data.assignment.max_score,
+            }]
+          })
+        }
+      }
     } else {
       setMarkingStates(prev => ({ ...prev, [sub.student_id]: { ...prev[sub.student_id], saving: false } }))
       alert('Failed to save mark. Please try again.')
@@ -265,6 +286,77 @@ export default function AssignmentMarkingPage({ params }: { params: Promise<{ as
       return next
     })
     setShowBulkModal(false)
+  }
+
+  function cbcLevel(score: number, max: number): number {
+    const pct = max > 0 ? (score / max) * 100 : 0
+    if (pct >= 75) return 4
+    if (pct >= 55) return 3
+    if (pct >= 40) return 2
+    return 1
+  }
+
+  function printLevel(level: 1 | 2 | 3 | 4) {
+    if (!data) return
+    setPrintingLevel(level)
+    const { assignment } = data
+    const html = generateAssignmentPDF({
+      assignment: {
+        title: assignment.title,
+        subject: assignment.subject,
+        topic: assignment.topic,
+        instructions: '',
+        due_date: assignment.due_date,
+        max_score: assignment.max_score,
+      },
+      meta: {
+        class_name: assignment.teacher_classes?.name,
+        grade: assignment.teacher_classes?.grade ? String(assignment.teacher_classes.grade) : undefined,
+      },
+      level,
+    })
+    const win = window.open('', '_blank')
+    if (win) {
+      win.document.write(html)
+      win.document.close()
+      setTimeout(() => { win.print(); win.close(); setPrintingLevel(null) }, 700)
+    } else {
+      setPrintingLevel(null)
+    }
+  }
+
+  function printClassSet() {
+    if (!data) return
+    setPrintingLevel(0)
+    const { assignment } = data
+    const pages = ([1, 2, 3, 4] as const).map(level =>
+      generateAssignmentPDF({
+        assignment: {
+          title: assignment.title,
+          subject: assignment.subject,
+          topic: assignment.topic,
+          instructions: '',
+          due_date: assignment.due_date,
+          max_score: assignment.max_score,
+        },
+        meta: {
+          class_name: assignment.teacher_classes?.name,
+          grade: assignment.teacher_classes?.grade ? String(assignment.teacher_classes.grade) : undefined,
+        },
+        level,
+      })
+    )
+    const combined = `<html><head><style>@media print{.page-break{page-break-after:always}}</style></head><body>
+      ${pages.map((p, i) => `<div class="page-break">${p.replace(/<!DOCTYPE html>[\s\S]*?<body>/, '').replace(/<\/body>[\s\S]*?<\/html>/, '')}</div>`).join('')}
+    </body></html>`
+    const win = window.open('', '_blank')
+    if (win) {
+      win.document.write(combined)
+      win.document.close()
+      setTimeout(() => { win.print(); win.close(); setPrintingLevel(null) }, 700)
+    } else {
+      setPrintingLevel(null)
+    }
   }
 
   if (loading) {
@@ -297,9 +389,17 @@ export default function AssignmentMarkingPage({ params }: { params: Promise<{ as
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="mb-6">
-        <Link href="/teacher/assignments" className="text-sm text-gray-400 hover:text-gray-600 font-medium">
-          ← Back to Assignments
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link href="/teacher/assignments" className="text-sm text-gray-400 hover:text-gray-600 font-medium">
+            ← Back to Assignments
+          </Link>
+          <Link
+            href={`/teacher/assignments/${assignmentId}/results`}
+            className="text-sm font-bold text-teal-600 hover:text-teal-800 border border-teal-200 hover:border-teal-400 px-3 py-1.5 rounded-xl transition"
+          >
+            Upload Paper Results
+          </Link>
+        </div>
 
         <div className="mt-3">
           <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -340,6 +440,105 @@ export default function AssignmentMarkingPage({ params }: { params: Promise<{ as
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" /> {markedCount} marked</span>
         </div>
       </div>
+
+      {/* ── Print differentiated papers ────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-5 shadow-sm">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Printer className="w-4 h-4 text-gray-500" />
+            <span className="font-black text-gray-900 text-sm">Print Differentiated Papers</span>
+          </div>
+          <button
+            onClick={printClassSet}
+            disabled={printingLevel !== null}
+            className="flex items-center gap-1.5 bg-gray-900 text-white text-xs font-bold px-4 py-2 rounded-xl hover:bg-gray-700 transition disabled:opacity-60"
+          >
+            {printingLevel === 0
+              ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              : <Printer className="w-3.5 h-3.5" />
+            }
+            Download Class Set (all 4 levels)
+          </button>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {([
+            { level: 1, label: 'Emerging',    colour: 'border-red-300 text-red-700 hover:bg-red-50' },
+            { level: 2, label: 'Approaching', colour: 'border-amber-300 text-amber-700 hover:bg-amber-50' },
+            { level: 3, label: 'Meeting',     colour: 'border-blue-300 text-blue-700 hover:bg-blue-50' },
+            { level: 4, label: 'Exceeding',   colour: 'border-green-300 text-green-700 hover:bg-green-50' },
+          ] as const).map(({ level, label, colour }) => (
+            <button
+              key={level}
+              onClick={() => printLevel(level)}
+              disabled={printingLevel !== null}
+              className={`flex flex-col items-center gap-1 border-2 rounded-xl py-3 px-2 text-xs font-bold transition disabled:opacity-50 ${colour}`}
+            >
+              {printingLevel === level
+                ? <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                : <Printer className="w-4 h-4" />
+              }
+              Level {level}
+              <span className="font-normal opacity-70">{label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Struggling students alert ───────────────────────────────────── */}
+      {strugglingAlerts.length > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 mb-5">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <div className="font-black text-orange-900 text-sm">
+                {strugglingAlerts.length} student{strugglingAlerts.length > 1 ? 's' : ''} scored Level 1 — notify parents?
+              </div>
+              <div className="text-xs text-orange-600 mt-0.5">
+                Recommend 15 min daily Learning Compass sessions this week
+              </div>
+            </div>
+            <button
+              onClick={() => setStrugglingAlerts([])}
+              className="text-xs text-orange-400 hover:text-orange-600 font-bold"
+            >
+              Dismiss
+            </button>
+          </div>
+          <div className="space-y-2">
+            {strugglingAlerts.map(a => (
+              <div key={a.studentId} className="flex items-center justify-between bg-white rounded-xl px-4 py-2.5 border border-orange-100">
+                <div>
+                  <span className="font-bold text-gray-900 text-sm">{a.name}</span>
+                  <span className="text-xs text-orange-600 ml-2">
+                    {a.score}/{a.maxScore} pts · Level 1
+                  </span>
+                </div>
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(
+                    `Hi, your child ${a.name} scored Level 1 in ${assignment.topic} (${assignment.subject}).\n\nRecommended: Ask them to review their Learning Compass session on this topic — 15 mins daily this week.\n\n— ${assignment.teacher_classes?.name || 'EduNexus'}`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs font-black text-green-700 bg-green-50 border border-green-200 px-3 py-2 rounded-xl hover:bg-green-100 transition whitespace-nowrap"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" /> Alert Parent
+                </a>
+              </div>
+            ))}
+            {strugglingAlerts.length > 1 && (
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(
+                  `Hi, ${strugglingAlerts.length} students scored Level 1 in ${assignment.topic} (${assignment.subject}).\n\nPlease encourage 15 min daily Learning Compass practice this week.\n\n— EduNexus`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full bg-green-600 text-white py-2.5 rounded-xl font-black text-sm hover:bg-green-700 transition"
+              >
+                <MessageSquare className="w-4 h-4" /> Alert All {strugglingAlerts.length} Parents
+              </a>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Tabs ───────────────────────────────────────────────────────────── */}
       <div className="flex gap-2 mb-5">

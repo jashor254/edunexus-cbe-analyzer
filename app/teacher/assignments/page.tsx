@@ -101,6 +101,7 @@ export default function AssignmentsPage() {
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
@@ -178,6 +179,7 @@ export default function AssignmentsPage() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

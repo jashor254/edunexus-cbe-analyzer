@@ -437,6 +437,19 @@ function StudentCard({ student }: { student: Student }) {
           Add Assessment
           <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
         </Link>
+        {count > 0 ? (
+          <Link
+            href={`/dashboard/clinic/reports/${student.id}`}
+            className="w-full py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:from-violet-700 hover:to-indigo-700 transition-all"
+          >
+            <Sparkles className="w-4 h-4" />
+            Generate Clinical Report
+          </Link>
+        ) : (
+          <p className="text-xs text-center text-slate-400 py-2">
+            Add an assessment to generate a report
+          </p>
+        )}
       </div>
     </div>
   )

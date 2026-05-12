@@ -1,0 +1,212 @@
+{
+  "assessment_methods": [],
+  "learning_resources": [],
+  "non_formal_activities": [],
+  "strands": [
+    {
+      "strand_title": "FOUNDATION OF BUILDING CONSTRUCTION",
+      "sub_strands": [
+        {
+          "title": "Introduction to Building Construction",
+          "suggested_lessons": 6,
+          "learning_outcomes": [
+            "a) outline the functions of a building in day-to-day life,",
+            "b) explain the historical development of buildings through ages,",
+            "c) illustrate the basic components of a building to detail,",
+            "d) categorise buildings based on their use,",
+            "e) appreciate the importance of buildings in the locality."
+          ],
+          "learning_experiences": [
+            "brainstorm on the meaning of the term ‘building’,",
+            "discuss the functions of a building,",
+            "use print or digital media to search for information on the historical development of buildings (from caves to modern buildings),",
+            "use visual aids to discuss the components of a building,",
+            "sketch a building showing its basic components (floor, wall, roof, door and window),",
+            "use visual aids to discuss different types of buildings,",
+            "take a walk in the locality to observe buildings used for different purposes (commercial, social and residential),",
+            "use charts to list buildings based on their uses,",
+            "prepare a portfolio of different types of buildings."
+          ],
+          "key_inquiry_questions": [
+            "How are buildings classified?",
+            "Why are buildings important?"
+          ]
+        },
+        {
+          "title": "Site Preparation",
+          "suggested_lessons": 12,
+          "learning_outcomes": [
+            "a) explain factors to consider when selecting a site for a given building,",
+            "b) describe the safety measures to observe in site preparation,",
+            "c) clear a site for construction using appropriate hand tools,",
+            "d) strip off the top soil of a building site,",
+            "e) illustrate methods of levelising a site for building construction,",
+            "f) appreciate the importance of proper site selection and preparation before construction of a building."
+          ],
+          "learning_experiences": [
+            "use the building code to discuss the factors to consider when selecting a building construction site,",
+            "brainstorm on appropriate safety measures to observe when preparing a site,",
+            "use print or digital media to search for the meaning of the terms used in site preparation (site selection, site clearing, and site levelling),",
+            "use hand tools and equipment to carry out site clearing (slasher, panga, jembe, rake, spade, axe, wheelbarrow),",
+            "use appropriate hand tools and equipment to carry out site stripping (jembe, panga, axe, mattock, spade, wheelbarrow),",
+            "use visual aids to discuss the methods of leveling a building site (cut, fill, cut and fill),",
+            "sketch the methods of leveling a site,",
+            "conduct a debate on the importance of proper site selection and preparation."
+          ],
+          "key_inquiry_questions": [
+            "Why are site preliminaries important in building construction?",
+            "Why is it important to observe safety when preparing a building site?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "RELATED DRAWING",
+      "sub_strands": [
+        {
+          "title": "Isometric Drawing",
+          "suggested_lessons": 8,
+          "learning_outcomes": [
+            "a) explain the characteristics of isometric drawings,",
+            "b) draw a shaped block in isometric projection,",
+            "c) dimension shaped blocks drawn in isometric projection,",
+            "d) appreciate the importance of isometric projection in construction."
+          ],
+          "learning_experiences": [
+            "use visual aids to discuss characteristics of isometric drawings,",
+            "discuss the steps to follow when drawing shaped blocks in isometric projection,",
+            "use drawing instruments to construct shaped blocks in isometric projection,",
+            "use print or digital media to discuss the procedure for dimensioning drawings in isometric projection,",
+            "dimension blocks drawn in isometric projection,",
+            "make a presentation on the importance of isometric projection in construction."
+          ],
+          "key_inquiry_questions": [
+            "Why is isometric drawing important in building construction?"
+          ]
+        },
+        {
+          "title": "Computer Aided Drawing",
+          "suggested_lessons": 12,
+          "learning_outcomes": [
+            "a) identify types of CAD software used in building drawing,",
+            "b) set up a CAD drawing environment on a digital device,",
+            "c) draw plane shapes using CAD software,",
+            "d) appreciate the importance of CAD in building drawing."
+          ],
+          "learning_experiences": [
+            "engage a resource person on the types of CAD software used in building drawing,",
+            "engage the resource person on the steps to follow when setting up a CAD drawing environment,",
+            "practice how to set up a CAD drawing environment,",
+            "engage the resource person on the steps to follow when using CAD to draw plane shapes",
+            "develop plane shapes using a CAD software,",
+            "create an e-portfolio of plane shapes made using CAD software."
+          ],
+          "key_inquiry_questions": [
+            "How important is CAD in building construction?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "BUILDING CONSTRUCTION PROCESSES",
+      "sub_strands": [
+        {
+          "title": "Concreting",
+          "suggested_lessons": 20,
+          "learning_outcomes": [
+            "a) explain the constituent materials for concrete",
+            "b) select hand tools and equipment used for concrete production",
+            "c) describe the process of producing concrete",
+            "d) perform the tasks for producing concrete",
+            "e) appreciate the importance of concreting in building construction"
+          ],
+          "learning_experiences": [
+            "brainstorm the meaning of the term ‘concrete’",
+            "use print or digital media to discuss the constituent materials for concrete (cement, sand, coarse aggregates and water)",
+            "use visual aids to discuss hand tools and equipment used for concrete production",
+            "discuss the steps to follow when making concrete (batching, mixing, transporting, placing, compacting and curing)",
+            "discuss safety precautions to observe when concreting",
+            "use appropriate tools and equipment to perform tasks in making concrete (batching, mixing, transporting, placing, compacting and curing)",
+            "make presentations on the importance of concreting in building construction"
+          ],
+          "key_inquiry_questions": [
+            "How is concrete essential in building construction?"
+          ]
+        },
+        {
+          "title": "Foundations",
+          "suggested_lessons": 25,
+          "learning_outcomes": [
+            "a) describe types of foundations used in building construction",
+            "b) set out a strip foundation from working drawings",
+            "c) prepare trenches for construction of a strip foundation",
+            "d) lay a strip foundation for a building",
+            "e) acknowledge the importance of foundations in a building"
+          ],
+          "learning_experiences": [
+            "brainstorm on the functions of a foundation in a building",
+            "use the building code to discuss the functional requirements of a foundation in a building",
+            "use visual aids to discuss types of foundations used in building construction (strip, pad, raft)",
+            "use appropriate drawing tools to sketch different types of shallow foundations",
+            "interpret a strip foundation plan for a building",
+            "discuss appropriate safety measures to observe when constructing a strip foundation",
+            "use appropriate hand tools and equipment to set out a strip foundation (3-4-5, builder’s square and trammel methods)",
+            "use appropriate hand tools to prepare a trench for laying a strip foundation (excavate, align the sides, level and compact the base)",
+            "use appropriate hand tools to lay a strip foundation (set the thickness of the concrete strip, prepare concrete material, place concrete, compact concrete, cure concrete)",
+            "make a presentation on the"
+          ],
+          "key_inquiry_questions": [
+            "Why is a foundation important to a building?"
+          ]
+        }
+      ]
+    },
+    {
+      "strand_title": "BUILDING SERVICES",
+      "sub_strands": [
+        {
+          "title": "Plumbing Tools and Equipment",
+          "suggested_lessons": 15,
+          "learning_outcomes": [
+            "a) identify tools and equipment for plumbing works",
+            "b) explain the safety measures to observe when handling plumbing tools and equipment",
+            "c) use plumbing tools and equipment to perform a given task",
+            "d) maintain plumbing tools and equipment at the workplace",
+            "e) appreciate the importance of tools and equipment in plumbing."
+          ],
+          "learning_experiences": [
+            "use a gallery walk to identify tools and equipment used in plumbing works (die stock, pipe vice, pipe wrench, reamer, file, anvil, pipe cutter, pipe bender, caulking tool)",
+            "use print or digital media to search for information on the safety precautions to observe when using plumbing tools and equipment",
+            "discuss how to perform tasks using plumbing tools and equipment (cutting, forming, bending)",
+            "perform tasks using plumbing tools and equipment (cutting, forming, bending)",
+            "carry out care and maintenance of plumbing tools and equipment (sharpening, oiling, storing, cleaning)",
+            "make presentations on the importance of using tools and equipment in plumbing works."
+          ],
+          "key_inquiry_questions": [
+            "How important are tools and equipment in plumbing?",
+            "Why is it important to care for and maintain plumbing tools and equipment?"
+          ]
+        },
+        {
+          "title": "Plumbing Materials",
+          "suggested_lessons": 10,
+          "learning_outcomes": [
+            "a) identify materials used in plumbing",
+            "b) describe the properties of materials used in plumbing",
+            "c) select materials for specified plumbing use",
+            "d) recognise importance of materials used in plumbing."
+          ],
+          "learning_experiences": [
+            "use a gallery walk to identify materials used in plumbing (plastic, metal, ceramic, concrete)",
+            "use print or digital media to search for information on the properties of materials used in plumbing (corrosion, thermal properties, malleability, ductility)",
+            "match different materials to their uses in plumbing",
+            "make presentations on the importance of materials used in plumbing."
+          ],
+          "key_inquiry_questions": [
+            "Why is selection of materials important in plumbing?"
+          ]
+        }
+      ]
+    }
+  ]
+}
