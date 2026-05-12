@@ -1,7 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import TeacherSidebar from '@/components/teacher/TeacherSidebar'
-import { TeacherOnboardingTutorial } from '@/app/components/onboarding-tutorial'
+import { TeacherOnboardingTutorial } from '@/components/teacher/TeacherOnboardingTutorial'
 
 export default async function TeacherLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
