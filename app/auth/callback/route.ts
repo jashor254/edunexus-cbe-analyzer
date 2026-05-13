@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
@@ -44,18 +45,21 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL('/login?error=exchange-failed', requestUrl.origin))
   }
 
-  // If the caller didn't specify a returnTo, detect the user's role and route accordingly
+  // Detect teacher role and route accordingly — use service role to bypass RLS
   let resolvedPath = returnTo
-  if (resolvedPath === '/dashboard') {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const { data: teacher } = await supabase
-        .from('teachers')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle()
-      if (teacher?.id) resolvedPath = '/teacher/dashboard'
-    }
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user && (resolvedPath === '/dashboard' || resolvedPath === '/')) {
+    const db = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
+    const { data: teacher } = await db
+      .from('teachers')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (teacher?.id) resolvedPath = '/teacher/dashboard'
   }
 
   if (product) resolvedPath += `?product=${product}`

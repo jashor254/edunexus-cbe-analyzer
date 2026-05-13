@@ -17,6 +17,14 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
+  // Safety net: teachers should never land on the parent dashboard
+  const { data: teacher } = await supabase
+    .from('teachers')
+    .select('id')
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (teacher?.id) redirect('/teacher/dashboard')
+
   return (
     <div className="min-h-screen bg-white">
       <DashboardNavbar />
