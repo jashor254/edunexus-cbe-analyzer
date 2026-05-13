@@ -44,9 +44,21 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL('/login?error=exchange-failed', requestUrl.origin))
   }
 
-  // ✅ Preserve product
-  let redirectPath = returnTo
-  if (product) redirectPath += `?product=${product}`
+  // If the caller didn't specify a returnTo, detect the user's role and route accordingly
+  let resolvedPath = returnTo
+  if (resolvedPath === '/dashboard') {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data: teacher } = await supabase
+        .from('teachers')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (teacher?.id) resolvedPath = '/teacher/dashboard'
+    }
+  }
 
-  return NextResponse.redirect(new URL(redirectPath, requestUrl.origin))
+  if (product) resolvedPath += `?product=${product}`
+
+  return NextResponse.redirect(new URL(resolvedPath, requestUrl.origin))
 }

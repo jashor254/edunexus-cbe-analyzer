@@ -193,11 +193,23 @@ function LoginContent() {
   const returnTo = searchParams?.get('returnTo') || '/dashboard'
   const product  = searchParams?.get('product')
 
+  // Resolves the correct landing page based on teacher status
+  const resolveDestination = async (base: string) => {
+    if (base !== '/dashboard') return product ? `${base}?product=${product}` : base
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data: teacher } = await supabase
+        .from('teachers').select('id').eq('user_id', user.id).maybeSingle()
+      if (teacher?.id) return '/teacher/dashboard'
+    }
+    return product ? `/dashboard?product=${product}` : '/dashboard'
+  }
+
   // Redirect if already logged in
   useEffect(() => {
     const check = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (user) router.push(product ? `${returnTo}?product=${product}` : returnTo)
+      if (user) router.push(await resolveDestination(returnTo))
     }
     check()
   }, [supabase, router, returnTo, product])
@@ -215,7 +227,7 @@ function LoginContent() {
       return
     }
 
-    router.push(product ? `${returnTo}?product=${product}` : returnTo)
+    router.push(await resolveDestination(returnTo))
   }
 
   const handleGoogleLogin = async () => {
