@@ -1,0 +1,29 @@
+{
+  "name": "EduNexus Kenya",
+  "short_name": "EduNexus",
+  "description": "Kenya's AI education platform for CBC and IGCSE students, parents, and teachers.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a23",
+  "theme_color": "#0a0a23",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-16x16.png",
+      "sizes": "16x16",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["education"],
+  "lang": "en-KE"
+}
