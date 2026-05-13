@@ -391,7 +391,7 @@ function PricingContent() {
                 )}
 
                 <p className="text-center text-xs text-white/30 mt-3">
-                  Price goes to KES 1,500/term after beta. Pioneers pay KES 750.
+                  Pioneer teachers always enjoy 50% off — KES 750/term, locked in for life.
                 </p>
               </div>
             </div>
