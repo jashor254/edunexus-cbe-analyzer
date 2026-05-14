@@ -147,6 +147,14 @@ export default function Step2Topics({
       subs.forEach(s => (allSelected ? next.delete(s.id) : next.add(s.id)))
       return next
     })
+    // Auto-expand so the user can see and uncheck individual substrands
+    if (!allSelected) {
+      setExpanded(prev => {
+        const next = new Set(prev)
+        next.add(strandId)
+        return next
+      })
+    }
   }
 
   function selectAll() {
@@ -304,6 +312,7 @@ export default function Step2Topics({
                   <div className="bg-gray-50 px-4 py-3 flex items-center gap-3">
                     <input
                       type="checkbox"
+                      ref={el => { if (el) el.indeterminate = selectedCount > 0 && !allSelected }}
                       checked={allSelected}
                       onChange={() => toggleAllInStrand(strand.id, subs)}
                       className="w-4 h-4 rounded border-gray-300 accent-teal-600"
