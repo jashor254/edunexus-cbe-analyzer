@@ -309,38 +309,32 @@ export default function Step2Topics({
               return (
                 <div key={strand.id} className="border border-gray-200 rounded-xl overflow-hidden">
                   {/* Strand / Topic header */}
-                  <div className="bg-gray-50 px-4 py-3 flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      ref={el => { if (el) el.indeterminate = selectedCount > 0 && !allSelected }}
-                      checked={allSelected}
-                      onChange={() => toggleAllInStrand(strand.id, subs)}
-                      className="w-4 h-4 rounded border-gray-300 accent-teal-600"
-                    />
-                    <button
-                      onClick={() => toggleExpand(strand.id)}
-                      className="flex-1 text-left flex items-center justify-between"
-                    >
-                      <span className="font-bold text-gray-800 text-sm">{strand.title}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-500">
-                          {selectedCount}/{subs.length} selected
-                        </span>
+                  <div className="bg-gray-50 px-4 py-3 flex items-center gap-2">
+                    {/* Clicking the checkbox OR the title both check/uncheck all substrands */}
+                    <label className="flex items-center gap-3 flex-1 cursor-pointer min-w-0">
+                      <input
+                        type="checkbox"
+                        ref={el => { if (el) el.indeterminate = selectedCount > 0 && !allSelected }}
+                        checked={allSelected}
+                        onChange={() => toggleAllInStrand(strand.id, subs)}
+                        className="w-4 h-4 rounded border-gray-300 accent-teal-600 shrink-0"
+                      />
+                      <span className="font-bold text-gray-800 text-sm truncate">{strand.title}</span>
+                    </label>
+
+                    {/* Count badge + expand toggle */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs text-gray-500">{selectedCount}/{subs.length}</span>
+                      <button
+                        onClick={() => toggleExpand(strand.id)}
+                        className="p-1 rounded hover:bg-gray-200 transition"
+                      >
                         {isOpen
                           ? <ChevronUp className="w-4 h-4 text-gray-400" />
                           : <ChevronDown className="w-4 h-4 text-gray-400" />
                         }
-                      </div>
-                    </button>
-
-                    {selectedCount > 0 && (
-                      <div className="shrink-0 ml-2 flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
-                        <span className="text-sm font-bold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg">
-                          {selectedCount}
-                        </span>
-                        <span className="text-[10px] text-gray-400 whitespace-nowrap">selected</span>
-                      </div>
-                    )}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Substrands / Subtopics */}
@@ -379,13 +373,10 @@ export default function Step2Topics({
         )}
 
         {selectedStrandCount > 0 && (
-          <div className="mt-5 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div className="mt-5 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3">
             <span className="text-sm text-teal-700 font-bold">
               {selectedStrandCount} {strandLabel.toLowerCase()}{selectedStrandCount !== 1 ? 's' : ''}
-              &nbsp;·&nbsp;{selected.size} {substrandLabel.toLowerCase()}{selected.size !== 1 ? 's' : ''}
-            </span>
-            <span className="text-sm text-teal-600 font-bold">
-              {totalLessons} subtopics → slots filled at generation
+              &nbsp;·&nbsp;{selected.size} {substrandLabel.toLowerCase()}{selected.size !== 1 ? 's' : ''} selected
             </span>
           </div>
         )}
