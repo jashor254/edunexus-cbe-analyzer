@@ -11,7 +11,7 @@ export async function GET() {
     const db = createServiceClient()
     const { data: teacher, error } = await db
       .from('teachers')
-      .select('*')
+      .select('id, user_id, full_name, school, subject, grade_levels, phone, is_verified, created_at, pioneer_number')
       .eq('user_id', user.id)
       .single()
 
@@ -20,8 +20,9 @@ export async function GET() {
     }
 
     return apiSuccess({ teacher: teacher || null })
-  } catch (e: any) {
-    console.error('[teacher/profile GET]', e.message)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error('[teacher/profile GET]', msg)
     return apiError('Internal server error')
   }
 }
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
 
     if (error) {
       console.error('[teacher/profile POST]', error)
-      return apiError('Failed to save teacher profile')
+      return apiError(`Failed to save teacher profile: ${error.message}`, 500)
     }
 
     // Assign pioneer number only on first-ever setup
@@ -82,8 +83,9 @@ export async function POST(req: Request) {
     }
 
     return apiSuccess({ teacher })
-  } catch (e: any) {
-    console.error('[teacher/profile POST]', e.message)
-    return apiError('Internal server error')
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error('[teacher/profile POST]', msg)
+    return apiError(`Failed to save: ${msg}`)
   }
 }
