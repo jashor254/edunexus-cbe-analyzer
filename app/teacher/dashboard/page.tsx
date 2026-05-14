@@ -41,7 +41,7 @@ export default async function TeacherDashboardPage() {
 
   const { data: teacher } = await db
     .from('teachers')
-    .select('*')
+    .select('id, full_name, school, subject, grade_levels, pioneer_number, is_verified')
     .eq('user_id', user.id)
     .single()
 
@@ -150,25 +150,31 @@ export default async function TeacherDashboardPage() {
         <div className="absolute top-0 left-1/4 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 right-1/4 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-8 lg:py-10">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-10 lg:py-14">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse shrink-0" />
                 <span className="text-teal-400 text-sm font-semibold">{today}</span>
                 <span className="w-1 h-1 rounded-full bg-slate-600" />
                 <span className="text-slate-400 text-sm">{term}, {new Date().getFullYear()}</span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-black text-white leading-tight">
-                {greeting}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-300">{firstName}</span> 👋
+              <p className="text-slate-400 text-sm font-medium mb-1 tracking-wide uppercase">Welcome back</p>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white leading-tight">
+                {greeting},{' '}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-300">
+                  {firstName}
+                </span>{' '}
+                👋
               </h1>
-              <p className="text-slate-400 mt-1 text-sm">
+              <p className="text-slate-400 mt-2 text-sm">
                 {teacher.school}
                 {teacher.subject && <span className="text-slate-500"> · {teacher.subject}</span>}
               </p>
             </div>
             <Link
               href="/teacher/scheme-of-work"
-              className="hidden sm:flex items-center gap-2 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-teal-300 px-4 py-2.5 rounded-xl text-sm font-bold transition-all"
+              className="hidden sm:flex items-center gap-2 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-teal-300 px-4 py-2.5 rounded-xl text-sm font-bold transition-all shrink-0"
             >
               <Sparkles className="w-4 h-4" />
               Generate Scheme
