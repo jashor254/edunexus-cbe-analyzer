@@ -11,6 +11,26 @@ const SUBJECTS = [
 ]
 const GRADES = [7, 8, 9, 10, 11, 12]
 
+// CBC curriculum: which grades each subject is taught in
+const SUBJECT_GRADES: Record<string, number[]> = {
+  'Mathematics':                    [7, 8, 9, 10, 11, 12],
+  'English':                        [7, 8, 9, 10, 11, 12],
+  'Kiswahili':                      [7, 8, 9, 10, 11, 12],
+  'Christian Religious Education':  [7, 8, 9, 10, 11, 12],
+  'Islamic Religious Education':    [7, 8, 9, 10, 11, 12],
+  'All Subjects':                   [7, 8, 9, 10, 11, 12],
+  // Junior Secondary only (Grade 7–9)
+  'Integrated Science':             [7, 8, 9],
+  'Social Studies':                 [7, 8, 9],
+  'Pre-Technical Studies':          [7, 8, 9],
+  'Agriculture and Nutrition':      [7, 8, 9],
+  'Creative Arts & Sports':         [7, 8, 9],
+  // Senior Secondary only (Grade 10–12)
+  'Geography':                      [10, 11, 12],
+  'History & Citizenship':          [10, 11, 12],
+  'Business Studies':               [10, 11, 12],
+}
+
 type TeacherProfile = {
   id: string
   full_name: string
@@ -61,6 +81,16 @@ export default function TeacherProfilePage() {
       grade_levels: prev.grade_levels.includes(g)
         ? prev.grade_levels.filter(x => x !== g)
         : [...prev.grade_levels, g].sort((a, b) => a - b),
+    }))
+  }
+
+  function handleSubjectChange(subject: string) {
+    const suggested = SUBJECT_GRADES[subject]
+    setForm(prev => ({
+      ...prev,
+      subject,
+      // Auto-set grades only when the suggested set is more specific than current
+      grade_levels: suggested ?? prev.grade_levels,
     }))
   }
 
@@ -216,12 +246,17 @@ export default function TeacherProfilePage() {
             <label className="block text-sm font-bold text-gray-700 mb-1.5">Primary Subject</label>
             <select
               value={form.subject}
-              onChange={e => setForm(p => ({ ...p, subject: e.target.value }))}
+              onChange={e => handleSubjectChange(e.target.value)}
               className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-100 outline-none text-gray-900 bg-white text-sm"
             >
               <option value="">Select your main subject...</option>
               {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
+            {form.subject && SUBJECT_GRADES[form.subject] && (
+              <p className="text-xs text-teal-600 mt-1.5 font-medium">
+                ✓ Grade levels auto-set for {form.subject} ({SUBJECT_GRADES[form.subject].join(', ')})
+              </p>
+            )}
           </div>
 
           {/* Grade levels */}
@@ -241,7 +276,7 @@ export default function TeacherProfilePage() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-400 mt-2">Controls which grades appear in the SOW builder</p>
+            <p className="text-xs text-gray-400 mt-2">Controls which grades appear in the SOW builder · tap to adjust</p>
           </div>
 
           {error && (
