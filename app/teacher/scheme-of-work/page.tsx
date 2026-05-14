@@ -194,7 +194,6 @@ export default function SchemeOfWorkPage() {
 
   const totalTeachingSlots = totalAvailableSlots - totalBreakSlots
   const totalNeeded        = selections.reduce((s, sel) => s + sel.lessonsRequired, 0)
-  const isInsufficient     = totalNeeded > totalTeachingSlots
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
 
@@ -265,7 +264,7 @@ export default function SchemeOfWorkPage() {
       substrandTitle: s.substrandTitle, lessonsRequired: s.lessonsRequired, orderIndex: i,
     }))
     try {
-      setProgress(`Generating ${totalNeeded} lessons with DeepSeek AI...`)
+      setProgress(`Generating ${totalTeachingSlots} lessons with DeepSeek AI...`)
       const res  = await fetch('/api/sow/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ context, lessonStructure, selectedSubstrands, breaks: noBreaks ? [] : breaks }) })
       const data = await res.json()
@@ -738,20 +737,22 @@ export default function SchemeOfWorkPage() {
                 </div>
                 <div className="divide-y divide-slate-100">
                   <div className="flex justify-between items-center px-5 py-3 text-sm">
-                    <span className="text-gray-500">Total available slots</span>
+                    <span className="text-gray-500">Total slots</span>
                     <span className="font-black text-gray-900 bg-slate-100 px-3 py-0.5 rounded-full">{totalAvailableSlots}</span>
                   </div>
-                  <div className="flex justify-between items-center px-5 py-3 text-sm">
-                    <span className="text-gray-500">Lessons needed</span>
-                    <span className={`font-black px-3 py-0.5 rounded-full ${
-                      isInsufficient ? 'text-red-700 bg-red-50' : 'text-teal-700 bg-teal-50'
-                    }`}>{totalNeeded}</span>
-                  </div>
-                  {isInsufficient && (
-                    <div className="px-5 py-3 bg-red-50 flex items-center gap-2 text-red-700 text-sm font-bold">
-                      <AlertTriangle className="w-4 h-4" /> Not enough slots — reduce lessons or extend term
+                  {totalBreakSlots > 0 && (
+                    <div className="flex justify-between items-center px-5 py-3 text-sm">
+                      <span className="text-gray-500">Break slots</span>
+                      <span className="font-black text-amber-700 bg-amber-50 px-3 py-0.5 rounded-full">−{totalBreakSlots}</span>
                     </div>
                   )}
+                  <div className="flex justify-between items-center px-5 py-3 text-sm">
+                    <span className="font-bold text-gray-800">Lessons to generate</span>
+                    <span className="font-black text-teal-700 bg-teal-50 px-3 py-0.5 rounded-full">{totalTeachingSlots}</span>
+                  </div>
+                  <div className="px-5 py-3 bg-slate-50 text-xs text-gray-400">
+                    {selections.length} topics distributed proportionally across {totalTeachingSlots} teaching slots
+                  </div>
                 </div>
               </div>
             </div>
