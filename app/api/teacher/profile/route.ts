@@ -41,10 +41,12 @@ export async function POST(req: Request) {
       return apiError('full_name and school are required', 400)
     }
 
-    const db = createServiceClient()
+    // Use the user's own authenticated client for INSERT/UPDATE so RLS
+    // (auth.uid() = user_id) passes without needing service role on user tables.
+    // Service client is reserved for the pioneer counter (touches beta_stats).
 
     // Check if teacher already exists — drives INSERT vs UPDATE and pioneer logic
-    const { data: existing, error: lookupErr } = await db
+    const { data: existing, error: lookupErr } = await supabase
       .from('teachers')
       .select('id, pioneer_number')
       .eq('user_id', user.id)
@@ -68,7 +70,7 @@ export async function POST(req: Request) {
 
     if (existing) {
       // UPDATE — row already exists, just patch it
-      const { data, error } = await db
+      const { data, error } = await supabase
         .from('teachers')
         .update(fields)
         .eq('user_id', user.id)
@@ -81,7 +83,7 @@ export async function POST(req: Request) {
       teacher = data
     } else {
       // INSERT — first time setup
-      const { data, error } = await db
+      const { data, error } = await supabase
         .from('teachers')
         .insert({ user_id: user.id, ...fields })
         .select()
@@ -93,11 +95,12 @@ export async function POST(req: Request) {
       teacher = data
     }
 
-    // Assign pioneer number only on first-ever setup
+    // Pioneer counter needs service role to touch beta_stats
     if (!existing && !teacher.pioneer_number) {
+      const db = createServiceClient()
       const { data: pioneerNum, error: rpcErr } = await db.rpc('increment_beta_teacher_count')
       if (!rpcErr && pioneerNum) {
-        const { data: updated } = await db
+        const { data: updated } = await supabase
           .from('teachers')
           .update({ pioneer_number: pioneerNum })
           .eq('user_id', user.id)
