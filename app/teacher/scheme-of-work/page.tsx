@@ -267,6 +267,10 @@ export default function SchemeOfWorkPage() {
       setProgress(`Generating ${totalTeachingSlots} lessons with DeepSeek AI...`)
       const res  = await fetch('/api/sow/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ context, lessonStructure, selectedSubstrands, breaks: noBreaks ? [] : breaks }) })
+      if (res.status === 401 || res.status === 403) {
+        window.location.href = '/teacher/setup'
+        return
+      }
       const data = await res.json()
       if (data.success) { setResult(data.data.result); setProgress(''); setStep(5) }
       else setProgress('Generation failed: ' + (data.error || 'Unknown error'))
