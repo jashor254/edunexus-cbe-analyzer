@@ -66,8 +66,8 @@ export default function TeacherSidebar({ teacherName, school, subject }: Props) 
           </Link>
         </div>
 
-        {/* Teacher profile card */}
-        <div className="mx-3 mb-4 bg-white/5 border border-white/10 rounded-2xl p-4">
+        {/* Teacher profile card — links to edit profile */}
+        <Link href="/teacher/settings" className="mx-3 mb-4 bg-white/5 hover:bg-white/8 border border-white/10 hover:border-teal-500/30 rounded-2xl p-4 transition-all group block">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center shadow-md shadow-teal-900/30 shrink-0">
               <span className="text-white font-black text-sm">{initials}</span>
@@ -76,6 +76,7 @@ export default function TeacherSidebar({ teacherName, school, subject }: Props) 
               <div className="text-white font-bold text-sm truncate leading-tight">{teacherName}</div>
               <div className="text-slate-400 text-xs truncate mt-0.5">{school}</div>
             </div>
+            <Settings className="w-3.5 h-3.5 text-slate-600 group-hover:text-teal-400 transition-colors shrink-0" />
           </div>
           {subject && (
             <div className="mt-3 flex items-center gap-1.5 text-[11px] text-teal-300 font-semibold bg-teal-500/10 border border-teal-500/20 rounded-lg px-2.5 py-1.5 w-fit">
@@ -83,7 +84,7 @@ export default function TeacherSidebar({ teacherName, school, subject }: Props) 
               {subject}
             </div>
           )}
-        </div>
+        </Link>
 
         {/* Navigation */}
         <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
@@ -146,11 +147,9 @@ export default function TeacherSidebar({ teacherName, school, subject }: Props) 
             <span className="text-teal-400 text-xs font-semibold ml-1.5">Teacher</span>
           </div>
         </Link>
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center shadow">
-            <span className="text-white font-black text-xs">{initials}</span>
-          </div>
-        </div>
+        <Link href="/teacher/settings" className="w-8 h-8 rounded-xl bg-linear-to-br from-teal-400 to-cyan-500 flex items-center justify-center shadow active:scale-95 transition-transform">
+          <span className="text-white font-black text-xs">{initials}</span>
+        </Link>
       </header>
 
       {/* ── Mobile Bottom Nav ─────────────────────────────────────────────────── */}
