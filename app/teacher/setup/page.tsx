@@ -32,6 +32,7 @@ export default function TeacherSetupPage() {
         body: JSON.stringify({
           full_name:    fullName.trim(),
           school:       school.trim(),
+          tsc_number:   tscNumber.trim() || null,
           subject:      null,
           grade_levels: [7, 8, 9, 10, 11, 12],
           phone:        null,
@@ -42,10 +43,6 @@ export default function TeacherSetupPage() {
       if (!data.success) {
         setError(data.error || 'Failed to save profile. Please try again.')
         return
-      }
-
-      if (tscNumber.trim()) {
-        localStorage.setItem('teacher_tsc', tscNumber.trim())
       }
 
       if (data.teacher?.pioneer_number) {

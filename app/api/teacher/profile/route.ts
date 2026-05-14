@@ -11,15 +11,16 @@ export async function GET() {
     const db = createServiceClient()
     const { data: teacher, error } = await db
       .from('teachers')
-      .select('id, user_id, full_name, school, subject, grade_levels, phone, is_verified, created_at, pioneer_number')
+      .select('id, user_id, full_name, school, subject, grade_levels, phone, is_verified, tsc_number, created_at, pioneer_number')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
 
-    if (error && error.code !== 'PGRST116') {
-      return apiError('Failed to fetch teacher profile')
+    if (error) {
+      console.error('[teacher/profile GET]', error)
+      return apiError(`Failed to fetch teacher profile: ${error.message}`)
     }
 
-    return apiSuccess({ teacher: teacher || null })
+    return apiSuccess({ teacher: teacher ?? null })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e)
     console.error('[teacher/profile GET]', msg)
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
     if (!user) return apiUnauthorized()
 
     const body = await req.json()
-    const { full_name, school, subject, grade_levels, phone } = body
+    const { full_name, school, subject, grade_levels, phone, tsc_number } = body
 
     if (!full_name || !school) {
       return apiError('full_name and school are required', 400)
@@ -42,29 +43,54 @@ export async function POST(req: Request) {
 
     const db = createServiceClient()
 
-    // Check if teacher already exists (determines whether to assign pioneer number)
-    const { data: existing } = await db
+    // Check if teacher already exists — drives INSERT vs UPDATE and pioneer logic
+    const { data: existing, error: lookupErr } = await db
       .from('teachers')
       .select('id, pioneer_number')
       .eq('user_id', user.id)
       .maybeSingle()
 
-    const { data: teacher, error } = await db
-      .from('teachers')
-      .upsert({
-        user_id: user.id,
-        full_name,
-        school,
-        subject:      subject      || null,
-        grade_levels: grade_levels || [7, 8, 9, 10, 11, 12],
-        phone:        phone        || null,
-      }, { onConflict: 'user_id' })
-      .select()
-      .single()
+    if (lookupErr) {
+      console.error('[teacher/profile POST] lookup error', lookupErr)
+      return apiError(`Profile lookup failed: ${lookupErr.message}`, 500)
+    }
 
-    if (error) {
-      console.error('[teacher/profile POST]', error)
-      return apiError(`Failed to save teacher profile: ${error.message}`, 500)
+    const fields = {
+      full_name,
+      school,
+      subject:      subject      ?? null,
+      grade_levels: grade_levels ?? [7, 8, 9, 10, 11, 12],
+      phone:        phone        ?? null,
+      tsc_number:   tsc_number   ?? null,
+    }
+
+    let teacher: Record<string, unknown> | null = null
+
+    if (existing) {
+      // UPDATE — row already exists, just patch it
+      const { data, error } = await db
+        .from('teachers')
+        .update(fields)
+        .eq('user_id', user.id)
+        .select()
+        .single()
+      if (error) {
+        console.error('[teacher/profile POST] update error', error)
+        return apiError(`Failed to update teacher profile: ${error.message}`, 500)
+      }
+      teacher = data
+    } else {
+      // INSERT — first time setup
+      const { data, error } = await db
+        .from('teachers')
+        .insert({ user_id: user.id, ...fields })
+        .select()
+        .single()
+      if (error) {
+        console.error('[teacher/profile POST] insert error', error)
+        return apiError(`Failed to create teacher profile: ${error.message}`, 500)
+      }
+      teacher = data
     }
 
     // Assign pioneer number only on first-ever setup

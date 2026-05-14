@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   FileText, ChevronRight, ChevronLeft, CheckCircle2,
   Loader2, Download, Save, Plus, Trash2, AlertTriangle,
@@ -120,9 +120,10 @@ export default function SchemeOfWorkPage() {
   const [learningAreas, setLearningAreas] = useState<Array<{ id: string; name: string }>>([])
 
   // Step 2
-  const [strands, setStrands]         = useState<Strand[]>([])
-  const [selections, setSelections]   = useState<SubstrandSelection[]>([])
+  const [strands, setStrands]           = useState<Strand[]>([])
+  const [selections, setSelections]     = useState<SubstrandSelection[]>([])
   const [strandsLoading, setStrandsLoading] = useState(false)
+  const [expandedStrands, setExpandedStrands] = useState<Set<string>>(new Set())
 
   // Step 3
   const [lessonStructure, setLessonStructure] = useState<LessonStructure>({
@@ -171,7 +172,11 @@ export default function SchemeOfWorkPage() {
     if (!learningArea || !grade) return
     setStrandsLoading(true)
     fetch(`/api/sow/strands?learningAreaId=${encodeURIComponent(learningArea)}&grade=${encodeURIComponent(grade)}`)
-      .then(r => r.json()).then(d => { setStrands(d.data?.strands || []); setStrandsLoading(false) })
+      .then(r => r.json()).then(d => {
+        setStrands(d.data?.strands || [])
+        setExpandedStrands(new Set())
+        setStrandsLoading(false)
+      })
       .catch(() => { setStrands([]); setStrandsLoading(false) })
   }, [learningArea, grade])
 
@@ -214,6 +219,31 @@ export default function SchemeOfWorkPage() {
         lessonsRequired: isCBC ? 4 : 6, orderIndex: all.length })
     }))
     setSelections(all)
+    setExpandedStrands(new Set(strands.map(s => s.id)))
+  }
+
+  function toggleStrand(strand: Strand) {
+    const isCBC = curriculumMode?.startsWith('cbc')
+    const allSelected = strand.substrands.every(sub => selections.find(s => s.substrandId === sub.id))
+    if (allSelected) {
+      // Deselect all + collapse
+      setSelections(prev => prev.filter(s => s.strandId !== strand.id))
+      setExpandedStrands(prev => { const n = new Set(prev); n.delete(strand.id); return n })
+    } else {
+      // Select all missing + expand
+      setSelections(prev => {
+        const existing = new Set(prev.map(s => s.substrandId))
+        const toAdd = strand.substrands
+          .filter(sub => !existing.has(sub.id))
+          .map((sub, i) => ({
+            strandId: strand.id, strandTitle: strand.title,
+            substrandId: sub.id, substrandTitle: sub.title,
+            lessonsRequired: isCBC ? 4 : 6, orderIndex: prev.length + i,
+          }))
+        return [...prev, ...toAdd]
+      })
+      setExpandedStrands(prev => new Set([...prev, strand.id]))
+    }
   }
 
   function addBreak() {
@@ -551,53 +581,77 @@ export default function SchemeOfWorkPage() {
                   </div>
                 )}
 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {strands.map((strand, si) => {
-                    const strandColors = [
-                      { bg: 'bg-indigo-600', light: 'bg-indigo-50 border-indigo-100', check: 'bg-indigo-50' },
-                      { bg: 'bg-teal-600',   light: 'bg-teal-50 border-teal-100',     check: 'bg-teal-50'   },
-                      { bg: 'bg-violet-600', light: 'bg-violet-50 border-violet-100', check: 'bg-violet-50' },
-                    ]
-                    const sc = strandColors[si % strandColors.length]
+                    const SC = [
+                      { bg: 'bg-indigo-600', border: 'border-indigo-100', light: 'bg-indigo-50', subCheck: 'bg-indigo-600', dot: 'bg-indigo-400' },
+                      { bg: 'bg-teal-600',   border: 'border-teal-100',   light: 'bg-teal-50',   subCheck: 'bg-teal-600',   dot: 'bg-teal-400'   },
+                      { bg: 'bg-violet-600', border: 'border-violet-100', light: 'bg-violet-50', subCheck: 'bg-violet-600', dot: 'bg-violet-400' },
+                      { bg: 'bg-amber-600',  border: 'border-amber-100',  light: 'bg-amber-50',  subCheck: 'bg-amber-600',  dot: 'bg-amber-400'  },
+                    ][si % 4]
+
                     const selectedInStrand = strand.substrands.filter(s => selections.find(sel => sel.substrandId === s.id)).length
+                    const allSelected  = selectedInStrand === strand.substrands.length && strand.substrands.length > 0
+                    const someSelected = selectedInStrand > 0 && !allSelected
+                    const isExpanded   = expandedStrands.has(strand.id)
+
                     return (
-                      <div key={strand.id} className={`border rounded-2xl overflow-hidden ${sc.light}`}>
-                        <div className={`${sc.bg} px-5 py-3.5 flex items-center justify-between`}>
-                          <span className="font-black text-white text-sm">{strand.title}</span>
-                          {selectedInStrand > 0 && (
-                            <span className="text-xs bg-white/20 text-white px-2.5 py-0.5 rounded-full font-bold">
-                              {selectedInStrand}/{strand.substrands.length} selected
-                            </span>
-                          )}
+                      <div key={strand.id} className={`border ${SC.border} rounded-2xl overflow-hidden`}>
+                        {/* ── Strand header — click anywhere to toggle ── */}
+                        <div
+                          className={`${SC.bg} px-5 py-3.5 flex items-center gap-3 cursor-pointer select-none hover:opacity-95 transition-opacity`}
+                          onClick={() => toggleStrand(strand)}
+                        >
+                          {/* Strand checkbox */}
+                          <StrandCheckbox checked={allSelected} indeterminate={someSelected} color={SC.bg} />
+
+                          <span className="flex-1 font-black text-white text-sm">{strand.title}</span>
+
+                          <div className="flex items-center gap-2.5">
+                            {selectedInStrand > 0 && (
+                              <span className="text-xs bg-white/20 text-white px-2.5 py-0.5 rounded-full font-bold">
+                                {selectedInStrand}/{strand.substrands.length}
+                              </span>
+                            )}
+                            {/* Collapse arrow */}
+                            <div className={`w-5 h-5 rounded-md bg-white/15 flex items-center justify-center transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                              onClick={e => { e.stopPropagation(); setExpandedStrands(prev => { const n = new Set(prev); isExpanded ? n.delete(strand.id) : n.add(strand.id); return n }) }}>
+                              <ChevronRight className="w-3 h-3 text-white rotate-90" />
+                            </div>
+                          </div>
                         </div>
-                        <div className="divide-y divide-white/60">
-                          {strand.substrands.map(sub => {
-                            const sel = selections.find(s => s.substrandId === sub.id)
-                            const isSelected = !!sel
-                            return (
-                              <div key={sub.id}
-                                className={`flex items-center gap-3 px-5 py-3 cursor-pointer transition-colors ${isSelected ? sc.check : 'hover:bg-white/60'}`}
-                                onClick={() => toggleSubstrand(strand.id, strand.title, sub.id, sub.title)}
-                              >
-                                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${
-                                  isSelected ? `${sc.bg} border-transparent` : 'border-slate-300 bg-white'
-                                }`}>
-                                  {isSelected && <CheckCircle2 className="w-3 h-3 text-white" />}
-                                </div>
-                                <span className={`flex-1 text-sm ${isSelected ? 'text-gray-900 font-medium' : 'text-gray-700'}`}>{sub.title}</span>
-                                {isSelected && (
-                                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                                    <span className="text-xs text-gray-500 font-medium">Lessons:</span>
-                                    <input type="number" min={1} max={20} value={sel.lessonsRequired}
-                                      onChange={e => updateLessonsRequired(sub.id, Number(e.target.value))}
-                                      className={`w-14 text-center px-2 py-1 border-2 ${sc.bg.replace('bg-', 'border-')}/30 rounded-lg text-sm font-black text-gray-800 focus:outline-none bg-white`}
-                                    />
+
+                        {/* ── Substrands — only shown when expanded ── */}
+                        {isExpanded && (
+                          <div className={`divide-y divide-white/40 ${SC.light}`}>
+                            {strand.substrands.map(sub => {
+                              const sel        = selections.find(s => s.substrandId === sub.id)
+                              const isSelected = !!sel
+                              return (
+                                <div key={sub.id}
+                                  className={`flex items-center gap-3 px-5 py-3 cursor-pointer transition-colors ${isSelected ? 'bg-white/60' : 'hover:bg-white/40'}`}
+                                  onClick={e => { e.stopPropagation(); toggleSubstrand(strand.id, strand.title, sub.id, sub.title) }}
+                                >
+                                  <div className={`w-4.5 h-4.5 rounded border-2 flex items-center justify-center shrink-0 transition-all ${
+                                    isSelected ? `${SC.subCheck} border-transparent` : 'border-slate-300 bg-white'
+                                  }`}>
+                                    {isSelected && <CheckCircle2 className="w-2.5 h-2.5 text-white" />}
                                   </div>
-                                )}
-                              </div>
-                            )
-                          })}
-                        </div>
+                                  <span className={`flex-1 text-sm leading-snug ${isSelected ? 'text-gray-900 font-semibold' : 'text-gray-700'}`}>{sub.title}</span>
+                                  {isSelected && (
+                                    <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
+                                      <span className="text-xs text-gray-400 font-medium">Lsn:</span>
+                                      <input type="number" min={1} max={20} value={sel.lessonsRequired}
+                                        onChange={e => updateLessonsRequired(sub.id, Number(e.target.value))}
+                                        className="w-12 text-center px-1.5 py-1 border border-slate-200 rounded-lg text-xs font-black text-gray-800 focus:outline-none focus:border-indigo-400 bg-white"
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -1016,5 +1070,32 @@ function LessonRow({ lesson, defaultExpanded, reflection, onReflectionChange }: 
           placeholder="Reflection..." className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 resize-none focus:outline-none focus:border-indigo-400 min-w-[80px] bg-white" />
       </td>
     </tr>
+  )
+}
+
+// ─── Strand checkbox with indeterminate support ───────────────────────────────
+
+function StrandCheckbox({ checked, indeterminate, color }: { checked: boolean; indeterminate: boolean; color: string }) {
+  const ref = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate
+  }, [indeterminate])
+
+  return (
+    <div className="relative w-5 h-5 shrink-0" onClick={e => e.stopPropagation()}>
+      <input
+        ref={ref}
+        type="checkbox"
+        checked={checked}
+        onChange={() => {}}
+        className="peer sr-only"
+        readOnly
+      />
+      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all
+        ${checked || indeterminate ? 'bg-white/25 border-white' : 'bg-white/10 border-white/40'}`}>
+        {checked && <CheckCircle2 className="w-3 h-3 text-white" />}
+        {indeterminate && !checked && <span className="w-2.5 h-0.5 bg-white rounded-full block" />}
+      </div>
+    </div>
   )
 }
