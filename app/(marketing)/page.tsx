@@ -1,6 +1,5 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   ArrowRight,
@@ -14,61 +13,9 @@ import {
   Globe,
   ChevronRight,
   GraduationCap,
-  FileText,
-  Calendar,
   Users,
   Star,
-  ClipboardList,
-  Shield,
-  Trophy,
 } from 'lucide-react'
-
-type PioneerStats = { claimed: number; total: number; remaining: number }
-
-// ─── Teacher Feature Cards ─────────────────────────────────────────────────────
-
-const TEACHER_FEATURES = [
-  {
-    icon: ClipboardList,
-    title: 'SOW Generator',
-    line1: 'CBC + 8-4-4',
-    line2: 'Grade 7–12',
-    gradient: 'from-teal-500 to-cyan-500',
-    bg: 'bg-teal-500/10',
-    border: 'border-teal-500/20',
-    label: 'text-teal-300',
-  },
-  {
-    icon: Calendar,
-    title: 'Lesson Plans',
-    line1: 'Auto every Friday',
-    line2: 'Break-aware',
-    gradient: 'from-cyan-500 to-blue-500',
-    bg: 'bg-cyan-500/10',
-    border: 'border-cyan-500/20',
-    label: 'text-cyan-300',
-  },
-  {
-    icon: FileText,
-    title: 'Record of Work',
-    line1: 'Auto-fills itself',
-    line2: 'HOD ready',
-    gradient: 'from-blue-500 to-indigo-500',
-    bg: 'bg-blue-500/10',
-    border: 'border-blue-500/20',
-    label: 'text-blue-300',
-  },
-  {
-    icon: BarChart3,
-    title: 'Class Dashboard',
-    line1: 'Every student',
-    line2: 'Level 1–4 view',
-    gradient: 'from-indigo-500 to-violet-500',
-    bg: 'bg-indigo-500/10',
-    border: 'border-indigo-500/20',
-    label: 'text-indigo-300',
-  },
-]
 
 // ─── Parent / Student Feature Cards ───────────────────────────────────────────
 
@@ -164,18 +111,6 @@ const PARENT_FEATURES = [
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
-  const [pioneer, setPioneer] = useState<PioneerStats | null>(null)
-
-  useEffect(() => {
-    fetch('/api/beta/teacher-count')
-      .then(r => r.json())
-      .then(setPioneer)
-      .catch(() => setPioneer({ claimed: 0, total: 500, remaining: 500 }))
-  }, [])
-
-  const pct     = pioneer ? Math.min(100, (pioneer.claimed / pioneer.total) * 100) : 0
-  const isFull  = (pioneer?.remaining ?? 1) <= 0
-
   return (
     <>
       {/* ── HERO ──────────────────────────────────────────────────────────────── */}
@@ -239,167 +174,6 @@ export default function LandingPage() {
             <span className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 px-4 py-2 rounded-full text-blue-300 font-bold">
               <BookOpen className="w-4 h-4" /> Schools — Coming Soon
             </span>
-          </div>
-        </div>
-      </section>
-
-      {/* ── PIONEER TEACHER PROGRAM ───────────────────────────────────────────── */}
-      <section id="teachers" className="py-24 relative">
-        <div className="absolute inset-0 bg-linear-to-b from-transparent via-teal-950/25 to-transparent pointer-events-none" />
-        <div className="max-w-5xl mx-auto px-6">
-
-          {/* Header */}
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-500/20 text-teal-300 px-4 py-2 rounded-full text-sm font-black mb-5">
-              <Trophy className="w-4 h-4" />
-              PIONEER TEACHER PROGRAM · LIMITED SPOTS
-            </div>
-            <h2 className="text-4xl md:text-6xl font-black mb-4 text-white leading-[0.95]">
-              Pioneer Teacher{' '}
-              <span className="bg-linear-to-r from-teal-400 to-cyan-400 bg-clip-text text-transparent">
-                Program
-              </span>
-            </h2>
-            <p className="text-xl text-white/60 max-w-2xl mx-auto">
-              We&apos;re selecting{' '}
-              <strong className="text-white">500 teachers</strong>{' '}
-              to build EduNexus with us
-            </p>
-          </div>
-
-          {/* Counter */}
-          <div className="max-w-2xl mx-auto mb-12">
-            <div className="relative">
-              <div className="absolute -inset-1 bg-linear-to-r from-teal-500 to-cyan-500 rounded-3xl blur-xl opacity-20" />
-              <div className="relative bg-teal-950/40 border border-teal-500/30 rounded-3xl p-7">
-                <div className="flex items-center justify-between mb-3 text-sm font-black">
-                  <span className="text-teal-300">Pioneer spots claimed</span>
-                  {pioneer ? (
-                    <span className="text-white">{pioneer.claimed} / {pioneer.total}</span>
-                  ) : (
-                    <span className="text-white/30 animate-pulse">Loading...</span>
-                  )}
-                </div>
-                <div className="w-full bg-white/10 rounded-full h-3 overflow-hidden mb-3">
-                  <div
-                    className="h-full bg-linear-to-r from-teal-500 to-cyan-400 rounded-full transition-all duration-1000"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-                {pioneer ? (
-                  isFull ? (
-                    <p className="text-center text-amber-300 font-black text-sm">
-                      All 500 pioneer spots are claimed! 🎉
-                    </p>
-                  ) : (
-                    <p className="text-center text-teal-300 font-bold text-sm">
-                      <strong className="text-white">{pioneer.remaining} pioneer spots remaining</strong>
-                      {' '}— going fast
-                    </p>
-                  )
-                ) : (
-                  <p className="text-center text-white/20 text-sm animate-pulse">Checking availability...</p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Two columns: What you get / What we need */}
-          <div className="grid md:grid-cols-2 gap-6 mb-10">
-
-            {/* WHAT YOU GET */}
-            <div className="bg-white/5 border border-teal-500/20 rounded-3xl p-7">
-              <p className="text-xs font-black text-teal-300 uppercase tracking-wider mb-5">
-                What you get during beta
-              </p>
-              <div className="space-y-3">
-                {[
-                  { icon: ClipboardList, text: 'SOW Generator — CBC, 8-4-4, IGCSE' },
-                  { icon: Calendar,      text: 'Lesson Plans — auto-generated every Friday' },
-                  { icon: FileText,      text: 'Record of Work — fills itself' },
-                  { icon: BarChart3,     text: 'Class Dashboard — every student\'s level' },
-                  { icon: Shield,        text: 'TSC Inspection ready — always' },
-                  { icon: CheckCircle2,  text: 'KICD Aligned — automatically' },
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-teal-500/10 border border-teal-500/20 rounded-xl flex items-center justify-center shrink-0">
-                      <item.icon className="w-4 h-4 text-teal-400" />
-                    </div>
-                    <span className="text-white/80 text-sm font-medium">{item.text}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* WHAT WE NEED + PIONEER PROMISE */}
-            <div className="flex flex-col gap-5">
-              <div className="bg-white/5 border border-white/10 rounded-3xl p-7 flex-1">
-                <p className="text-xs font-black text-white/50 uppercase tracking-wider mb-5">
-                  What we need from you
-                </p>
-                <div className="space-y-3">
-                  {[
-                    'Use it in your real classroom',
-                    'Tell us what\'s broken',
-                    'Share with one colleague',
-                  ].map((item, i) => (
-                    <div key={i} className="flex items-start gap-3">
-                      <ArrowRight className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
-                      <span className="text-white/70 text-sm">{item}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Pioneer promise */}
-              <div className="relative">
-                <div className="absolute -inset-0.5 bg-linear-to-r from-amber-500 to-orange-500 rounded-2xl blur opacity-20" />
-                <div className="relative bg-amber-500/10 border border-amber-500/30 rounded-2xl p-5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Trophy className="w-5 h-5 text-amber-400" />
-                    <span className="text-sm font-black text-amber-300 uppercase tracking-wider">Pioneer Promise</span>
-                  </div>
-                  <p className="text-white/80 text-sm leading-relaxed">
-                    Beta teachers lock in{' '}
-                    <strong className="text-amber-300">50% off forever</strong>{' '}
-                    when we go paid.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* CTA */}
-          <div className="text-center">
-            {isFull ? (
-              <>
-                <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 text-amber-300 px-5 py-3 rounded-2xl text-sm font-black mb-5">
-                  🎉 Pioneer spots are full! Join the waitlist for launch pricing.
-                </div>
-                <br />
-                <Link
-                  href="/signup"
-                  className="group inline-flex items-center gap-2 bg-linear-to-r from-amber-500 to-orange-500 text-white px-10 py-5 rounded-2xl font-black hover:scale-105 transition-all shadow-2xl shadow-amber-500/30 text-lg"
-                >
-                  Join Waitlist
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link
-                  href="/signup?returnTo=/teacher/dashboard"
-                  className="group inline-flex items-center gap-2 bg-linear-to-r from-teal-500 to-cyan-500 text-white px-10 py-5 rounded-2xl font-black hover:scale-105 transition-all shadow-2xl shadow-teal-500/30 text-lg"
-                >
-                  <Trophy className="w-5 h-5" />
-                  Claim Your Pioneer Spot
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </Link>
-                <p className="text-sm text-white/40 mt-3">
-                  Pioneer teachers always enjoy 50% off — locked in for life.
-                </p>
-              </>
-            )}
           </div>
         </div>
       </section>
@@ -570,6 +344,10 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
+          <p className="text-center text-white/15 text-xs mt-8">
+            Representative experiences.
+            Individual results vary.
+          </p>
         </div>
       </section>
 
@@ -681,6 +459,21 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      <div className="text-center py-10 border-t border-white/5">
+        <p className="text-white/20 text-xs">
+          Are you a teacher?{' '}
+          <Link
+            href="/signup?role=teacher"
+            className="text-white/35 hover:text-white/50
+                       underline underline-offset-2
+                       transition-colors"
+          >
+            Free planning tools — SOW generator, lesson plans,
+            class dashboard. No card needed →
+          </Link>
+        </p>
+      </div>
     </>
   )
 }
