@@ -11,6 +11,8 @@ import {
   FileText,
   Sparkles,
   Globe,
+  Compass,
+  Users,
 } from 'lucide-react'
 
 const AcademicClinicDemo = dynamic(
@@ -38,6 +40,11 @@ export default function LandingPage() {
           ACADEMIC CLINIC · KENYA&apos;S FIRST AI REPORT CARD
         </div>
 
+        <p className="text-white/35 text-sm leading-relaxed mb-6 max-w-md mx-auto italic">
+          In a class of 45 learners, your child is just another student.
+          <span className="text-white/20"> Not here.</span>
+        </p>
+
         <h1
           className="text-5xl md:text-7xl font-black mb-6 leading-[0.93] animate-in fade-in slide-in-from-bottom duration-1000"
           style={{ animationDelay: '100ms' }}
@@ -55,8 +62,8 @@ export default function LandingPage() {
           One 7-page clinical report shows exactly where they&apos;re struggling,
           why, and what to fix this holiday.
         </p>
-        <p className="text-sm text-white/30 mb-10 font-bold tracking-wide">
-          CBC Grade 7–12 &nbsp;·&nbsp; KCSE Form 1–4 &nbsp;·&nbsp; Cambridge IGCSE
+        <p className="text-teal-400/50 text-xs font-semibold tracking-widest uppercase mb-10">
+          CBC · Cambridge IGCSE · 8-4-4 · Grade 7–12
         </p>
 
         {/* Primary CTA */}
@@ -158,25 +165,60 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── HOW IT WORKS ──────────────────────────────────────────────────────── */}
+      {/* ── THREE PILLARS ─────────────────────────────────────────────────────── */}
       <section className="py-20">
         <div className="max-w-4xl mx-auto px-6">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-5xl font-black text-white mb-3">Ready in 5 minutes</h2>
-            <p className="text-white/40">No app download. No lengthy setup.</p>
+            <h2 className="text-3xl md:text-5xl font-black text-white mb-3">Three things your child gets.</h2>
+            <p className="text-white/40">That a class of 45 cannot give.</p>
           </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              { step: '01', title: 'Enter your child\'s marks', desc: 'Type in their latest exam or report card scores. Takes about 3 minutes.' },
-              { step: '02', title: 'AI runs the analysis',      desc: 'Compared against CBC / KCSE standards. Gaps identified versus their peers.' },
-              { step: '03', title: 'Get the 7-page report',     desc: 'Download as PDF. Share with teachers. Act on it this holiday.' },
-            ].map((item, i) => (
-              <div key={i} className="relative">
-                <div className="text-7xl font-black text-white/4 mb-2 leading-none">{item.step}</div>
-                <h3 className="text-lg font-black text-white mb-2">{item.title}</h3>
-                <p className="text-sm text-white/45 leading-relaxed">{item.desc}</p>
+          <div className="grid md:grid-cols-3 gap-6">
+
+            {/* Card 1 — Learning Compass */}
+            <div className="bg-white/3 border border-white/8 rounded-2xl p-8 flex flex-col">
+              <div className="w-10 h-10 bg-amber-500/15 border border-amber-500/20 rounded-xl flex items-center justify-center mb-4">
+                <Compass className="w-5 h-5 text-amber-400" />
               </div>
-            ))}
+              <h3 className="text-lg font-black text-white mb-2">A tutor that knows them</h3>
+              <p className="text-sm text-white/45 leading-relaxed flex-1">
+                Learning Compass adapts to your child&apos;s exact level — not the class average.
+                Level 1 learner or Level 4, every session is built for them specifically.
+              </p>
+              <span className="inline-block mt-4 px-3 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400/70 self-start">
+                Available 24/7
+              </span>
+            </div>
+
+            {/* Card 2 — Academic Clinic */}
+            <div className="bg-white/3 border border-white/8 rounded-2xl p-8 flex flex-col">
+              <div className="w-10 h-10 bg-teal-500/15 border border-teal-500/20 rounded-xl flex items-center justify-center mb-4">
+                <FileText className="w-5 h-5 text-teal-400" />
+              </div>
+              <h3 className="text-lg font-black text-white mb-2">A diagnosis, not a grade</h3>
+              <p className="text-sm text-white/45 leading-relaxed flex-1">
+                The Academic Clinic produces a 7-page clinical report — strand by strand, subject by subject.
+                A 3-week plan built for your child&apos;s specific gaps.
+              </p>
+              <span className="inline-block mt-4 px-3 py-1 rounded-full text-xs font-medium bg-teal-500/10 text-teal-400/70 self-start">
+                PDF download included
+              </span>
+            </div>
+
+            {/* Card 3 — Teacher Connection */}
+            <div className="bg-white/3 border border-white/8 rounded-2xl p-8 flex flex-col">
+              <div className="w-10 h-10 bg-violet-500/15 border border-violet-500/20 rounded-xl flex items-center justify-center mb-4">
+                <Users className="w-5 h-5 text-violet-400" />
+              </div>
+              <h3 className="text-lg font-black text-white mb-2">Their teacher, in the loop</h3>
+              <p className="text-sm text-white/45 leading-relaxed flex-1">
+                When your child&apos;s teacher marks work or raises a concern, you&apos;re notified instantly.
+                Both you and the teacher see the same picture of your child.
+              </p>
+              <span className="inline-block mt-4 px-3 py-1 rounded-full text-xs font-medium bg-violet-500/10 text-violet-400/70 self-start">
+                WhatsApp + email alerts
+              </span>
+            </div>
+
           </div>
           <div className="text-center mt-12">
             <Link
@@ -339,7 +381,7 @@ export default function LandingPage() {
         <p className="text-white/20 text-xs">
           Are you a teacher?{' '}
           <Link
-            href="/signup?role=teacher"
+            href="/teacher/dashboard"
             className="text-white/35 hover:text-white/50 underline underline-offset-2 transition-colors"
           >
             Free planning tools — SOW generator, lesson plans, class dashboard. No card needed →
