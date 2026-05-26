@@ -39,3 +39,7 @@ export function apiBadRequest(message: string) {
 export function apiNotFound(message: string = 'Not found') {
   return apiError(message, 404)
 }
+
+export function apiFallback(message: string) {
+  return apiError(message, 500)
+}

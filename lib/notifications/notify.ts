@@ -91,11 +91,7 @@ export async function notifyAssignmentMarked(
     // 3 & 4. Student + parent data in one query
     const { data: student } = await db
       .from('students')
-      .select(
-        'id, name, grade, curriculum_type, ' +
-        'parent_email, notification_email, ' +
-        'parent_phone, notification_whatsapp, whatsapp_opted_in, parent_first_name'
-      )
+      .select('id, name, grade, curriculum_type, parent_email, notification_email, parent_phone, notification_whatsapp, whatsapp_opted_in, parent_first_name')
       .eq('id', submission.student_id)
       .single()
 
@@ -210,11 +206,7 @@ export async function notifyAlertCreated(alertId: string): Promise<void> {
     // 2 & 3. Student + parent data
     const { data: student } = await db
       .from('students')
-      .select(
-        'id, name, grade, ' +
-        'parent_email, notification_email, ' +
-        'parent_phone, notification_whatsapp, whatsapp_opted_in, parent_first_name'
-      )
+      .select('id, name, grade, parent_email, notification_email, parent_phone, notification_whatsapp, whatsapp_opted_in, parent_first_name')
       .eq('id', alert.student_id)
       .single()
 
