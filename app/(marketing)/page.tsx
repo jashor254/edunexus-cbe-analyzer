@@ -40,18 +40,15 @@ export default function LandingPage() {
           ACADEMIC CLINIC · KENYA&apos;S FIRST AI REPORT CARD
         </div>
 
-        <p className="text-white/35 text-sm leading-relaxed mb-6 max-w-md mx-auto italic">
-          In a class of 45 learners, your child is just another student.
-          <span className="text-white/20"> Not here.</span>
-        </p>
-
         <h1
-          className="text-5xl md:text-7xl font-black mb-6 leading-[0.93] animate-in fade-in slide-in-from-bottom duration-1000"
+          className="text-5xl md:text-7xl font-black mb-6 leading-[0.95] animate-in fade-in slide-in-from-bottom duration-1000"
           style={{ animationDelay: '100ms' }}
         >
-          <span className="block text-white">Finally know if your</span>
-          <span className="block bg-linear-to-r from-violet-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mt-2">
-            child is truly on track
+          <span className="block text-white/60 text-3xl md:text-4xl font-black mb-3 tracking-tight">In a class of 45,</span>
+          <span className="block text-white">your child is just</span>
+          <span className="block text-white">another student.</span>
+          <span className="block bg-linear-to-r from-violet-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mt-3">
+            Not here.
           </span>
         </h1>
 
