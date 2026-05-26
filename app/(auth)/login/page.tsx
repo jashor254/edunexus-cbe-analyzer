@@ -30,9 +30,9 @@ function LoginContent() {
     if (base !== '/dashboard') return product ? `${base}?product=${product}` : base
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
-      const { data: teacher } = await supabase
-        .from('teachers').select('id').eq('user_id', user.id).maybeSingle()
-      if (teacher?.id) return '/teacher/dashboard'
+      const { data: profile } = await supabase
+        .from('profiles').select('role').eq('user_id', user.id).maybeSingle()
+      if (profile?.role === 'teacher') return '/teacher/dashboard'
     }
     return product ? `/dashboard?product=${product}` : '/dashboard'
   }

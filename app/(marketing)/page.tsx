@@ -1,291 +1,213 @@
 'use client'
 
+import dynamic from 'next/dynamic'
+import { useState } from 'react'
 import Link from 'next/link'
 import {
   ArrowRight,
-  Compass,
   CheckCircle2,
-  BarChart3,
-  Search,
-  Sparkles,
-  Map,
-  BookOpen,
-  Globe,
   ChevronRight,
-  GraduationCap,
-  Users,
   Star,
+  FileText,
+  Sparkles,
+  Globe,
 } from 'lucide-react'
 
-// ─── Parent / Student Feature Cards ───────────────────────────────────────────
-
-const PARENT_FEATURES = [
-  {
-    emoji: '🧭',
-    icon: Compass,
-    title: 'Learning Compass',
-    subtitle: "Your child's personal AI tutor",
-    badge: null as string | null,
-    gradient: 'from-amber-500 to-orange-500',
-    bg: 'bg-amber-500/10',
-    border: 'border-amber-500/20',
-    text: 'text-amber-300',
-    check: 'text-amber-400',
-    quoteBg: 'bg-amber-500/10 border-amber-500/20',
-    quoteText: 'text-amber-300',
-    highlights: [
-      'Adapts to their exact level',
-      'Level 1 (struggling) → breaks topics down',
-      'Level 4 (excelling) → pushes them further',
-      'No direct answers — builds real understanding',
-      'CBC Grade 7–12 + Cambridge IGCSE',
-    ],
-    quote: null as string | null,
-  },
-  {
-    emoji: '🏥',
-    icon: BarChart3,
-    title: 'Academic Clinic',
-    subtitle: 'A clinical report — not just a report card',
-    badge: null,
-    gradient: 'from-violet-500 to-purple-500',
-    bg: 'bg-violet-500/10',
-    border: 'border-violet-500/20',
-    text: 'text-violet-300',
-    check: 'text-violet-400',
-    quoteBg: 'bg-violet-500/10 border-violet-500/20',
-    quoteText: 'text-violet-300',
-    highlights: [
-      '7-page professional PDF report',
-      'Subject-by-subject clinical assessment',
-      '3-week holiday study plan included',
-      'Career & pathway guidance inside',
-      'Teacher collaboration page',
-    ],
-    quote: '"Parents actually cry when they read it"',
-  },
-  {
-    emoji: '🎯',
-    icon: Map,
-    title: 'Pathway Guide',
-    subtitle: 'Know BEFORE Grade 10 which path fits',
-    badge: 'Junior — Grade 7–9',
-    gradient: 'from-green-500 to-emerald-500',
-    bg: 'bg-green-500/10',
-    border: 'border-green-500/20',
-    text: 'text-green-300',
-    check: 'text-green-400',
-    quoteBg: 'bg-green-500/10 border-green-500/20',
-    quoteText: 'text-green-300',
-    highlights: [
-      'STEM vs Social Sciences vs Arts & Sports',
-      'Based on real performance data',
-      'Specific subjects to strengthen now',
-      'Confidence: HIGH / MEDIUM / DEVELOPING',
-    ],
-    quote: null,
-  },
-  {
-    emoji: '💼',
-    icon: Search,
-    title: 'Career Intelligence',
-    subtitle: 'Honest careers — Kenya reality check',
-    badge: 'Senior — Grade 10–12',
-    gradient: 'from-cyan-500 to-blue-500',
-    bg: 'bg-cyan-500/10',
-    border: 'border-cyan-500/20',
-    text: 'text-cyan-300',
-    check: 'text-cyan-400',
-    quoteBg: 'bg-cyan-500/10 border-cyan-500/20',
-    quoteText: 'text-cyan-300',
-    highlights: [
-      '25+ careers with Kenyan market data',
-      'AI disruption risk per career',
-      'Salary ranges (KES, realistic)',
-      'University + TVET pathways shown',
-    ],
-    quote: '"Not just doctor or lawyer — real options"',
-  },
-]
+const AcademicClinicDemo = dynamic(
+  () => import('@/components/demo/AcademicClinicDemo'),
+  { ssr: false }
+)
+const KcseClinicDemo = dynamic(
+  () => import('@/components/demo/kcse/KcseClinicDemo'),
+  { ssr: false }
+)
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
+  const [demoOpen,     setDemoOpen]     = useState(false)
+  const [kcseDemoOpen, setKcseDemoOpen] = useState(false)
+
   return (
     <>
       {/* ── HERO ──────────────────────────────────────────────────────────────── */}
-      <section className="max-w-7xl mx-auto px-6 pt-20 pb-16 md:pt-32 md:pb-24">
-        <div className="text-center">
+      <section className="max-w-5xl mx-auto px-6 pt-20 pb-16 md:pt-32 md:pb-20 text-center">
 
-          <div className="inline-flex items-center gap-2 bg-teal-500/10 backdrop-blur-sm border border-teal-500/20 text-teal-300 px-4 py-2 rounded-full text-sm font-black mb-8 animate-in fade-in slide-in-from-top duration-700">
-            <Sparkles className="w-4 h-4" />
-            KENYA&apos;S COMPLETE EDUCATION PLATFORM
-          </div>
+        <div className="inline-flex items-center gap-2 bg-violet-500/10 border border-violet-500/20 text-violet-300 px-4 py-2 rounded-full text-sm font-black mb-8 animate-in fade-in slide-in-from-top duration-700">
+          <Sparkles className="w-4 h-4" />
+          ACADEMIC CLINIC · KENYA&apos;S FIRST AI REPORT CARD
+        </div>
 
-          <h1
-            className="text-5xl md:text-8xl font-black mb-4 leading-[0.92] animate-in fade-in slide-in-from-bottom duration-1000"
-            style={{ animationDelay: '100ms' }}
+        <h1
+          className="text-5xl md:text-7xl font-black mb-6 leading-[0.93] animate-in fade-in slide-in-from-bottom duration-1000"
+          style={{ animationDelay: '100ms' }}
+        >
+          <span className="block text-white">Finally know if your</span>
+          <span className="block bg-linear-to-r from-violet-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mt-2">
+            child is truly on track
+          </span>
+        </h1>
+
+        <p
+          className="text-xl md:text-2xl text-white/55 max-w-2xl mx-auto mb-3 leading-relaxed animate-in fade-in duration-1000"
+          style={{ animationDelay: '150ms' }}
+        >
+          One 7-page clinical report shows exactly where they&apos;re struggling,
+          why, and what to fix this holiday.
+        </p>
+        <p className="text-sm text-white/30 mb-10 font-bold tracking-wide">
+          CBC Grade 7–12 &nbsp;·&nbsp; KCSE Form 1–4 &nbsp;·&nbsp; Cambridge IGCSE
+        </p>
+
+        {/* Primary CTA */}
+        <Link
+          href="/signup?role=parent"
+          className="group inline-flex items-center justify-center gap-2 bg-linear-to-r from-violet-500 to-purple-500 text-white px-10 py-5 rounded-2xl font-black hover:scale-105 transition-all shadow-2xl shadow-violet-500/30 text-lg mb-6"
+        >
+          Get My Child&apos;s Report — Free
+          <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+        </Link>
+
+        {/* Trust row */}
+        <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-white/35 mb-14">
+          <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400/70" /> Free first report</span>
+          <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400/70" /> No card needed</span>
+          <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400/70" /> M-PESA accepted</span>
+          <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400/70" /> Ready in 5 minutes</span>
+        </div>
+
+        {/* Demo report triggers */}
+        <p className="text-xs font-black text-white/30 uppercase tracking-widest mb-4">
+          See a real sample report
+        </p>
+        <div className="grid sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+
+          {/* Brian — CBC */}
+          <button
+            onClick={() => setDemoOpen(true)}
+            className="group relative text-left"
           >
-            <span className="block text-white/90">Kenya&apos;s Complete</span>
-            <span className="block bg-linear-to-r from-teal-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent mt-2">
-              Education Platform
-            </span>
-          </h1>
+            <div className="absolute -inset-0.5 bg-linear-to-br from-violet-500 to-purple-600 rounded-2xl blur opacity-20 group-hover:opacity-40 transition" />
+            <div className="relative bg-white/5 border border-violet-500/20 rounded-2xl p-5 hover:bg-white/8 transition-all">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-violet-500/15 border border-violet-500/25 rounded-xl flex items-center justify-center shrink-0">
+                  <FileText className="w-5 h-5 text-violet-400" />
+                </div>
+                <div>
+                  <div className="text-[11px] font-black text-violet-300 uppercase tracking-wider mb-0.5">CBC · Grade 8</div>
+                  <div className="text-base font-black text-white">Brian Otieno</div>
+                  <div className="text-xs text-white/40 mt-0.5">Academic Clinic report →</div>
+                </div>
+              </div>
+            </div>
+          </button>
 
-          <p
-            className="text-2xl md:text-3xl font-black text-white/50 mb-10 animate-in fade-in slide-in-from-bottom duration-1000"
-            style={{ animationDelay: '150ms' }}
+          {/* James — KCSE */}
+          <button
+            onClick={() => setKcseDemoOpen(true)}
+            className="group relative text-left"
           >
-            For Teachers. For Parents &amp; Students.
-          </p>
-
-          <div
-            className="flex flex-col sm:flex-row gap-4 justify-center mb-10 animate-in fade-in slide-in-from-bottom duration-1000"
-            style={{ animationDelay: '250ms' }}
-          >
-            <Link
-              href="/signup?role=teacher"
-              className="group inline-flex items-center justify-center gap-2 bg-linear-to-r from-teal-500 to-cyan-500 text-white px-10 py-5 rounded-2xl font-black hover:scale-105 transition-all shadow-2xl shadow-teal-500/30 text-lg"
-            >
-              <GraduationCap className="w-5 h-5" />
-              I&apos;m a Teacher
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </Link>
-            <Link
-              href="/signup?role=parent"
-              className="group inline-flex items-center justify-center gap-2 bg-linear-to-r from-violet-500 to-purple-500 text-white px-10 py-5 rounded-2xl font-black hover:scale-105 transition-all shadow-2xl shadow-violet-500/30 text-lg"
-            >
-              <Users className="w-5 h-5" />
-              I&apos;m a Parent / Student
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </Link>
-          </div>
-
-          <div
-            className="flex flex-wrap justify-center gap-3 text-sm animate-in fade-in duration-1000"
-            style={{ animationDelay: '350ms' }}
-          >
-            <span className="flex items-center gap-2 bg-violet-500/10 border border-violet-500/20 px-4 py-2 rounded-full text-violet-300 font-bold">
-              <Users className="w-4 h-4" /> Parents from KES 500
-            </span>
-            <span className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 px-4 py-2 rounded-full text-blue-300 font-bold">
-              <BookOpen className="w-4 h-4" /> Schools — Coming Soon
-            </span>
-          </div>
+            <div className="absolute -inset-0.5 bg-linear-to-br from-amber-500 to-orange-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition" />
+            <div className="relative bg-white/5 border border-amber-500/20 rounded-2xl p-5 hover:bg-white/8 transition-all">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-500/15 border border-amber-500/25 rounded-xl flex items-center justify-center shrink-0">
+                  <FileText className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <div className="text-[11px] font-black text-amber-300 uppercase tracking-wider mb-0.5">8-4-4 · Form 3</div>
+                  <div className="text-base font-black text-white">James Kamau</div>
+                  <div className="text-xs text-white/40 mt-0.5">KCSE Clinic report →</div>
+                </div>
+              </div>
+            </div>
+          </button>
         </div>
       </section>
 
-      {/* ── FOR STUDENTS & PARENTS ────────────────────────────────────────────── */}
-      <section id="parents" className="py-24 relative">
+      {/* ── WHAT'S IN THE REPORT ──────────────────────────────────────────────── */}
+      <section className="py-20 relative">
         <div className="absolute inset-0 bg-linear-to-b from-transparent via-violet-950/15 to-transparent pointer-events-none" />
-        <div className="max-w-7xl mx-auto px-6">
+        <div className="max-w-5xl mx-auto px-6">
 
-          <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 bg-violet-500/10 border border-violet-500/20 text-violet-300 px-4 py-2 rounded-full text-sm font-black mb-5">
-              <Users className="w-4 h-4" /> FOR STUDENTS & PARENTS
-            </div>
-            <h2 className="text-4xl md:text-6xl font-black mb-4 text-white leading-[0.95]">
-              Learning that{' '}
-              <span className="bg-linear-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent">
-                knows your child
-              </span>
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-5xl font-black text-white mb-3 leading-tight">
+              A report card tells you the score.
             </h2>
-            <p className="text-xl text-white/60 max-w-2xl mx-auto">
-              Not every child learns the same way. EduNexus adapts to yours.
+            <p className="text-xl text-white/40">
+              Academic Clinic tells you the{' '}
+              <span className="text-white/75 font-black">why</span>.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6">
-            {PARENT_FEATURES.map((f, i) => (
-              <div key={i} className="group relative">
-                <div className={`absolute -inset-0.5 bg-linear-to-br ${f.gradient} rounded-3xl blur opacity-10 group-hover:opacity-25 transition`} />
-                <div className="relative bg-white/5 border border-white/10 rounded-3xl p-8 hover:bg-white/8 transition-all h-full">
-                  <div className="flex items-start gap-4 mb-5">
-                    <div className={`w-12 h-12 bg-linear-to-br ${f.gradient} rounded-2xl flex items-center justify-center shrink-0 shadow-lg text-xl`}>
-                      {f.emoji}
-                    </div>
-                    <div>
-                      {f.badge && (
-                        <span className={`text-xs font-black px-2 py-1 rounded-full ${f.bg} border ${f.border} ${f.text} mb-1.5 inline-block`}>
-                          {f.badge}
-                        </span>
-                      )}
-                      <h3 className="text-2xl font-black text-white leading-tight">{f.title}</h3>
-                      <p className={`text-sm font-bold ${f.text} mt-0.5`}>{f.subtitle}</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2 mb-4">
-                    {f.highlights.map((h, j) => (
-                      <div key={j} className="flex items-start gap-2.5">
-                        <CheckCircle2 className={`w-4 h-4 shrink-0 mt-0.5 ${f.check}`} />
-                        <span className="text-white/70 text-sm">{h}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {f.quote && (
-                    <div className={`mt-4 border rounded-xl px-4 py-3 ${f.quoteBg}`}>
-                      <p className={`text-sm font-bold italic ${f.quoteText}`}>{f.quote}</p>
-                    </div>
-                  )}
-                </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[
+              { icon: '🔍', title: 'Subject-by-subject diagnosis',  desc: 'Every subject scored, exact gaps identified — not just marks.' },
+              { icon: '🗺️', title: 'Career & pathway guidance',      desc: 'STEM vs Arts vs Social Sciences — based on real performance data.' },
+              { icon: '📅', title: '3-week holiday study plan',      desc: 'Specific topics to fix, in priority order. Ready to act on today.' },
+              { icon: '🧭', title: 'Learning Compass access',        desc: 'AI tutor that knows your child\'s exact weak points. Adapts as they improve.' },
+              { icon: '👩‍🏫', title: 'Teacher collaboration page',    desc: 'Share one page with their class teacher. Professional, actionable.' },
+              { icon: '📊', title: 'Level 1–4 mastery tracking',     desc: 'CBC-aligned levels so you know exactly how far to the next grade.' },
+            ].map((item, i) => (
+              <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-5 hover:bg-white/8 transition-all">
+                <div className="text-2xl mb-3">{item.icon}</div>
+                <h3 className="text-sm font-black text-white mb-1.5">{item.title}</h3>
+                <p className="text-xs text-white/45 leading-relaxed">{item.desc}</p>
               </div>
             ))}
           </div>
+        </div>
+      </section>
 
-          <div className="text-center mt-10">
+      {/* ── HOW IT WORKS ──────────────────────────────────────────────────────── */}
+      <section className="py-20">
+        <div className="max-w-4xl mx-auto px-6">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-5xl font-black text-white mb-3">Ready in 5 minutes</h2>
+            <p className="text-white/40">No app download. No lengthy setup.</p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              { step: '01', title: 'Enter your child\'s marks', desc: 'Type in their latest exam or report card scores. Takes about 3 minutes.' },
+              { step: '02', title: 'AI runs the analysis',      desc: 'Compared against CBC / KCSE standards. Gaps identified versus their peers.' },
+              { step: '03', title: 'Get the 7-page report',     desc: 'Download as PDF. Share with teachers. Act on it this holiday.' },
+            ].map((item, i) => (
+              <div key={i} className="relative">
+                <div className="text-7xl font-black text-white/4 mb-2 leading-none">{item.step}</div>
+                <h3 className="text-lg font-black text-white mb-2">{item.title}</h3>
+                <p className="text-sm text-white/45 leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="text-center mt-12">
             <Link
-              href="/signup"
+              href="/signup?role=parent"
               className="group inline-flex items-center gap-2 bg-linear-to-r from-violet-500 to-purple-500 text-white px-10 py-5 rounded-2xl font-black hover:scale-105 transition-all shadow-2xl shadow-violet-500/30 text-lg"
             >
-              <Compass className="w-5 h-5" />
-              Start with 1 free session
+              Get My Child&apos;s Free Report
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
-            <p className="text-sm text-white/40 mt-3">
-              1 free Learning Compass session + 1 free Academic Clinic report. No card needed.
-            </p>
           </div>
         </div>
       </section>
 
-      {/* ── IGCSE SUPPORT ─────────────────────────────────────────────────────── */}
-      <section id="igcse" className="py-16">
+      {/* ── IGCSE BANNER ──────────────────────────────────────────────────────── */}
+      <section className="py-12">
         <div className="max-w-5xl mx-auto px-6">
           <div className="relative">
             <div className="absolute -inset-1 bg-linear-to-r from-blue-500 to-indigo-500 rounded-3xl blur-xl opacity-15" />
-            <div className="relative bg-linear-to-br from-blue-950/40 to-indigo-950/40 border border-blue-500/20 rounded-3xl p-10 text-center">
-              <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 text-blue-300 px-4 py-2 rounded-full text-sm font-black mb-5">
-                <Globe className="w-4 h-4" /> INTERNATIONAL SCHOOLS
-              </div>
-              <h2 className="text-3xl md:text-5xl font-black text-white mb-3 leading-tight">
-                International school?{' '}
-                <span className="bg-linear-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-                  We&apos;ve got you.
-                </span>
-              </h2>
-              <div className="flex flex-wrap justify-center gap-3 my-5">
-                {['Brookhouse', 'Hillcrest', 'ISK', 'Braeburn'].map((school) => (
-                  <span key={school} className="bg-blue-500/10 border border-blue-500/20 text-blue-200 px-4 py-2 rounded-xl text-sm font-bold">
-                    {school}
-                  </span>
-                ))}
-              </div>
-              <div className="flex flex-wrap justify-center gap-5 mb-7 text-sm text-white/60">
-                <span className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-blue-400" /> Grade A*–G tracking
-                </span>
-                <span className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-blue-400" /> Cambridge pathway guidance
-                </span>
-                <span className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-blue-400" /> IGCSE subject support
-                </span>
+            <div className="relative bg-linear-to-br from-blue-950/40 to-indigo-950/40 border border-blue-500/20 rounded-3xl px-8 py-7 flex flex-col sm:flex-row items-center gap-6">
+              <Globe className="w-10 h-10 text-blue-400 shrink-0" />
+              <div className="text-center sm:text-left">
+                <h3 className="text-lg font-black text-white mb-1">International school? We&apos;ve got you.</h3>
+                <p className="text-sm text-white/50">
+                  Brookhouse · Hillcrest · ISK · Braeburn · Cambridge IGCSE Grade A*–G tracking supported.
+                </p>
               </div>
               <Link
-                href="/signup"
-                className="inline-flex items-center gap-2 bg-linear-to-r from-blue-500 to-indigo-500 text-white px-8 py-4 rounded-2xl font-black hover:scale-105 transition-all shadow-xl"
+                href="/signup?role=parent"
+                className="shrink-0 inline-flex items-center gap-2 bg-linear-to-r from-blue-500 to-indigo-500 text-white px-6 py-3 rounded-xl font-black hover:scale-105 transition-all text-sm shadow-lg"
               >
-                Learn more <ArrowRight className="w-5 h-5" />
+                Start Free <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
           </div>
@@ -293,46 +215,23 @@ export default function LandingPage() {
       </section>
 
       {/* ── SOCIAL PROOF ──────────────────────────────────────────────────────── */}
-      <section className="py-24">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-14">
-            <h2 className="text-4xl md:text-5xl font-black mb-3 text-white">Heard across Kenya</h2>
-            <p className="text-white/50 text-lg">Teachers. Parents. Students.</p>
+      <section className="py-20">
+        <div className="max-w-4xl mx-auto px-6">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-black text-white mb-2">What parents say</h2>
+            <p className="text-white/40">Across Kenya.</p>
           </div>
-          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-6">
 
-            {/* Teacher quote */}
-            <div className="group relative">
-              <div className="absolute -inset-0.5 bg-linear-to-r from-teal-500 to-cyan-500 rounded-3xl blur opacity-10 group-hover:opacity-20 transition" />
-              <div className="relative bg-white/5 border border-teal-500/20 rounded-3xl p-8 hover:bg-white/8 transition-all h-full flex flex-col">
-                <div className="flex gap-1 mb-4">
-                  {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 text-teal-400 fill-teal-400" />)}
-                </div>
-                <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-500/20 text-teal-300 px-3 py-1 rounded-full text-xs font-black mb-4 w-fit">
-                  <GraduationCap className="w-3.5 h-3.5" /> Teacher
-                </div>
-                <p className="text-white/80 leading-relaxed flex-1 mb-5 text-lg">
-                  &ldquo;I used to spend every Sunday writing lesson plans. Now EduNexus does it Friday night while I sleep.&rdquo;
-                </p>
-                <div className="border-t border-white/10 pt-4">
-                  <div className="font-black text-white">Dennis K.</div>
-                  <div className="text-sm text-teal-300/70">CBC Teacher, Nairobi</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Parent quote */}
             <div className="group relative">
               <div className="absolute -inset-0.5 bg-linear-to-r from-violet-500 to-purple-500 rounded-3xl blur opacity-10 group-hover:opacity-20 transition" />
-              <div className="relative bg-white/5 border border-violet-500/20 rounded-3xl p-8 hover:bg-white/8 transition-all h-full flex flex-col">
+              <div className="relative bg-white/5 border border-violet-500/20 rounded-3xl p-8 h-full flex flex-col">
                 <div className="flex gap-1 mb-4">
                   {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 text-violet-400 fill-violet-400" />)}
                 </div>
-                <div className="inline-flex items-center gap-2 bg-violet-500/10 border border-violet-500/20 text-violet-300 px-3 py-1 rounded-full text-xs font-black mb-4 w-fit">
-                  <Users className="w-3.5 h-3.5" /> Parent
-                </div>
-                <p className="text-white/80 leading-relaxed flex-1 mb-5 text-lg">
-                  &ldquo;The Academic Clinic report showed me my daughter needed help in Chemistry — not because she&apos;s slow, but because she missed a foundational concept. We fixed it in 2 weeks.&rdquo;
+                <p className="text-white/80 leading-relaxed flex-1 mb-5 text-base">
+                  &ldquo;The Academic Clinic report showed me my daughter needed help in Chemistry — not because she&apos;s slow,
+                  but because she missed a foundational concept. We fixed it in 2 weeks.&rdquo;
                 </p>
                 <div className="border-t border-white/10 pt-4">
                   <div className="font-black text-white">Parent</div>
@@ -340,76 +239,66 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
+
+            <div className="group relative">
+              <div className="absolute -inset-0.5 bg-linear-to-r from-amber-500 to-orange-500 rounded-3xl blur opacity-10 group-hover:opacity-20 transition" />
+              <div className="relative bg-white/5 border border-amber-500/20 rounded-3xl p-8 h-full flex flex-col">
+                <div className="flex gap-1 mb-4">
+                  {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 text-amber-400 fill-amber-400" />)}
+                </div>
+                <p className="text-white/80 leading-relaxed flex-1 mb-5 text-base">
+                  &ldquo;Parents actually cry when they read it — because finally someone told them what no teacher
+                  had the time to say.&rdquo;
+                </p>
+                <div className="border-t border-white/10 pt-4">
+                  <div className="font-black text-white">CBC Teacher</div>
+                  <div className="text-sm text-amber-300/70">Nairobi, on parent reactions</div>
+                </div>
+              </div>
+            </div>
           </div>
           <p className="text-center text-white/15 text-xs mt-8">
-            Representative experiences.
-            Individual results vary.
+            Representative experiences. Individual results vary.
           </p>
         </div>
       </section>
 
-      {/* ── PRICING PREVIEW ───────────────────────────────────────────────────── */}
+      {/* ── PRICING ───────────────────────────────────────────────────────────── */}
       <section className="py-16 relative">
-        <div className="max-w-5xl mx-auto px-6">
+        <div className="max-w-4xl mx-auto px-6">
           <div className="text-center mb-10">
-            <h2 className="text-3xl md:text-4xl font-black text-white mb-2">Simple, honest pricing</h2>
-            <p className="text-white/50">The right plan for everyone in a child&apos;s education</p>
+            <h2 className="text-3xl md:text-4xl font-black text-white mb-2">Start free. Pay only if it helps.</h2>
+            <p className="text-white/45">First Academic Clinic report is completely free. No card required.</p>
           </div>
-          <div className="grid md:grid-cols-3 gap-5 mb-8">
-
-            {/* Teachers */}
-            <div className="group relative">
-              <div className="absolute -inset-0.5 bg-linear-to-br from-teal-500 to-cyan-500 rounded-3xl blur opacity-15 group-hover:opacity-30 transition" />
-              <div className="relative bg-teal-950/40 border border-teal-500/30 rounded-3xl p-7 text-center h-full flex flex-col">
-                <div className="text-3xl mb-3">👨‍🏫</div>
-                <h3 className="text-xl font-black text-white mb-1">Teachers</h3>
-                <div className="text-4xl font-black text-teal-300 my-3">Free</div>
-                <p className="text-white/50 text-sm mb-2">forever. always.</p>
-                <p className="text-xs text-white/40 mb-6 flex-1">SOW · Lesson Plans · Class Dashboard · TSC ready</p>
-                <Link href="/signup?role=teacher" className="block w-full bg-linear-to-r from-teal-500 to-cyan-500 text-white py-3 rounded-xl font-black hover:scale-105 transition-all text-sm">
-                  Teacher Sign Up →
-                </Link>
-              </div>
-            </div>
-
-            {/* Parents */}
-            <div className="group relative md:-mt-4 md:mb-4">
-              <div className="absolute -inset-0.5 bg-linear-to-br from-violet-500 to-purple-500 rounded-3xl blur opacity-25 group-hover:opacity-40 transition" />
-              <div className="relative bg-violet-950/40 border border-violet-500/30 rounded-3xl p-7 text-center h-full flex flex-col">
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-linear-to-r from-violet-500 to-purple-500 text-white px-4 py-1 rounded-full text-[11px] font-black tracking-wider shadow-lg whitespace-nowrap">
-                  ⭐ MOST POPULAR
+          <div className="grid sm:grid-cols-3 gap-4 mb-8">
+            {[
+              { label: 'First report',             price: 'Free',      sub: 'No card needed',          highlight: false },
+              { label: 'Per Term · 1 child',        price: 'KES 3,200', sub: 'Full access all term',     highlight: true  },
+              { label: 'Family Plan · 3 children',  price: 'KES 5,500', sub: 'Up to 3 children',         highlight: false },
+            ].map((p, i) => (
+              <div
+                key={i}
+                className={`rounded-2xl p-6 border text-center ${
+                  p.highlight
+                    ? 'bg-violet-950/40 border-violet-500/30'
+                    : 'bg-white/5 border-white/10'
+                }`}
+              >
+                <div className="text-xs font-black text-white/40 mb-1.5">{p.label}</div>
+                <div className={`text-2xl font-black mb-1 ${p.highlight ? 'text-violet-300' : 'text-white'}`}>
+                  {p.price}
                 </div>
-                <div className="text-3xl mb-3">👨‍👩‍👧</div>
-                <h3 className="text-xl font-black text-white mb-1">Parents</h3>
-                <div className="text-4xl font-black text-violet-300 my-3">From KES 500</div>
-                <p className="text-white/50 text-sm mb-2">per term</p>
-                <p className="text-xs text-white/40 mb-6 flex-1">Learning Compass · Academic Clinic · Career Intelligence</p>
-                <Link href="/pricing" className="block w-full bg-linear-to-r from-violet-500 to-purple-500 text-white py-3 rounded-xl font-black hover:scale-105 transition-all text-sm">
-                  Parent Sign Up →
-                </Link>
+                <div className="text-xs text-white/35">{p.sub}</div>
               </div>
-            </div>
-
-            {/* Schools */}
-            <div className="group relative">
-              <div className="absolute -inset-0.5 bg-linear-to-br from-blue-500 to-indigo-500 rounded-3xl blur opacity-10 group-hover:opacity-15 transition" />
-              <div className="relative bg-blue-950/20 border border-blue-500/20 rounded-3xl p-7 text-center h-full flex flex-col opacity-70">
-                <div className="text-3xl mb-3">🏫</div>
-                <h3 className="text-xl font-black text-white mb-1">Schools</h3>
-                <div className="text-4xl font-black text-blue-300/60 my-3">Coming</div>
-                <p className="text-white/40 text-sm mb-2">institutional plans</p>
-                <p className="text-xs text-white/30 mb-6 flex-1">Whole-school dashboard · HOD reports · Admin portal</p>
-                <button disabled className="block w-full bg-white/5 border border-white/10 text-white/30 py-3 rounded-xl font-black text-sm cursor-not-allowed">
-                  Coming Soon
-                </button>
-              </div>
-            </div>
+            ))}
           </div>
-
           <div className="text-center">
-            <p className="text-xs text-white/30 mb-2">*Teacher Pro features KES 1,500/term</p>
-            <Link href="/pricing" className="inline-flex items-center gap-1.5 text-white/50 hover:text-white transition font-bold text-sm">
-              See full pricing details <ChevronRight className="w-4 h-4" />
+            <p className="text-xs text-white/25 mb-4">Tokens from KES 500 for pay-as-you-go · M-PESA accepted · Cancel anytime</p>
+            <Link
+              href="/pricing"
+              className="inline-flex items-center gap-1.5 text-white/40 hover:text-white transition font-bold text-sm"
+            >
+              See full pricing <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
         </div>
@@ -417,60 +306,50 @@ export default function LandingPage() {
 
       {/* ── FINAL CTA ─────────────────────────────────────────────────────────── */}
       <section className="relative py-24 px-6 mb-10">
-        <div className="absolute inset-0 bg-linear-to-r from-teal-600/8 via-purple-600/8 to-blue-600/8 rounded-3xl blur-3xl" />
-        <div className="relative max-w-4xl mx-auto text-center bg-linear-to-br from-teal-900/15 via-purple-900/15 to-blue-900/15 backdrop-blur-xl border border-white/10 rounded-3xl py-20 px-6">
-          <div className="w-16 h-16 bg-linear-to-br from-teal-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-teal-500/30">
-            <Sparkles className="w-8 h-8 text-white" />
-          </div>
-          <h2 className="text-4xl md:text-6xl font-black mb-5 text-white leading-[0.95]">
-            Kenya&apos;s education
-            <span className="block bg-linear-to-r from-teal-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent mt-1">
-              deserves better.
+        <div className="absolute inset-0 bg-linear-to-r from-violet-600/8 via-purple-600/8 to-pink-600/8 rounded-3xl blur-3xl" />
+        <div className="relative max-w-3xl mx-auto text-center bg-linear-to-br from-violet-900/15 via-purple-900/15 to-pink-900/15 backdrop-blur-xl border border-white/10 rounded-3xl py-20 px-6">
+          <h2 className="text-4xl md:text-5xl font-black mb-4 text-white leading-[0.95]">
+            Your child deserves to know
+            <span className="block bg-linear-to-r from-violet-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mt-2">
+              exactly where they stand.
             </span>
           </h2>
-          <p className="text-xl text-white/60 mb-3 max-w-2xl mx-auto leading-relaxed">
-            Teachers save hours. Students learn faster. Parents stay informed.
+          <p className="text-lg text-white/50 mb-8 max-w-xl mx-auto leading-relaxed">
+            Not a guess. Not a vague report card.
+            A clinical diagnosis, a study plan, and a path forward.
           </p>
-          <p className="text-white/40 text-base mb-10">
-            Join Kenyan educators and families already on EduNexus.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              href="/signup"
-              className="inline-flex items-center justify-center gap-2 bg-linear-to-r from-teal-500 to-cyan-500 text-white px-10 py-5 rounded-2xl font-black hover:scale-105 transition-all shadow-2xl shadow-teal-500/30 text-lg"
-            >
-              <GraduationCap className="w-5 h-5" /> I&apos;m a Teacher
-            </Link>
-            <Link
-              href="/signup?role=parent"
-              className="inline-flex items-center justify-center gap-2 bg-linear-to-r from-violet-500 to-purple-500 text-white px-10 py-5 rounded-2xl font-black hover:scale-105 transition-all shadow-2xl shadow-violet-500/30 text-lg"
-            >
-              <Users className="w-5 h-5" /> Start as Parent
-            </Link>
-          </div>
-          <div className="flex flex-wrap justify-center gap-6 mt-8 text-sm text-white/30">
-            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400" /> M-PESA accepted</span>
-            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400" /> CBC + 8-4-4 + IGCSE</span>
-            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400" /> Made in Kenya 🇰🇪</span>
-            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400" /> Free for teachers — always</span>
+          <Link
+            href="/signup?role=parent"
+            className="group inline-flex items-center gap-2 bg-linear-to-r from-violet-500 to-purple-500 text-white px-10 py-5 rounded-2xl font-black hover:scale-105 transition-all shadow-2xl shadow-violet-500/30 text-lg"
+          >
+            Get My Child&apos;s Report — Free
+            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+          </Link>
+          <div className="flex flex-wrap justify-center gap-5 mt-8 text-sm text-white/25">
+            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400/70" /> M-PESA accepted</span>
+            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400/70" /> CBC + 8-4-4 + IGCSE</span>
+            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400/70" /> Made in Kenya 🇰🇪</span>
+            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400/70" /> Free for teachers — always</span>
           </div>
         </div>
       </section>
 
+      {/* ── TEACHER FOOTNOTE ──────────────────────────────────────────────────── */}
       <div className="text-center py-10 border-t border-white/5">
         <p className="text-white/20 text-xs">
           Are you a teacher?{' '}
           <Link
             href="/signup?role=teacher"
-            className="text-white/35 hover:text-white/50
-                       underline underline-offset-2
-                       transition-colors"
+            className="text-white/35 hover:text-white/50 underline underline-offset-2 transition-colors"
           >
-            Free planning tools — SOW generator, lesson plans,
-            class dashboard. No card needed →
+            Free planning tools — SOW generator, lesson plans, class dashboard. No card needed →
           </Link>
         </p>
       </div>
+
+      {/* ── DEMO MODALS ───────────────────────────────────────────────────────── */}
+      <AcademicClinicDemo isOpen={demoOpen}     onClose={() => setDemoOpen(false)}     />
+      <KcseClinicDemo     isOpen={kcseDemoOpen} onClose={() => setKcseDemoOpen(false)} />
     </>
   )
 }

@@ -50,23 +50,28 @@ export async function GET(request: Request) {
   let resolvedPath = returnTo
   const { data: { user } } = await supabase.auth.getUser()
 
+  const db = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+
   if (role === 'teacher') {
     resolvedPath = '/teacher/dashboard'
+    // Persist role so future logins without the role param route correctly
+    if (user) {
+      await db.from('profiles').update({ role: 'teacher' }).eq('user_id', user.id)
+    }
   } else if (role === 'parent' || role === 'student') {
     resolvedPath = '/dashboard'
   } else if (user && (resolvedPath === '/dashboard' || resolvedPath === '/')) {
-    // No role param — returning user via /login; detect from DB
-    const db = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
-    const { data: teacher } = await db
-      .from('teachers')
-      .select('id')
+    // No role param — returning user via /login; detect from profiles
+    const { data: profile } = await db
+      .from('profiles')
+      .select('role')
       .eq('user_id', user.id)
       .maybeSingle()
-    if (teacher?.id) resolvedPath = '/teacher/dashboard'
+    if (profile?.role === 'teacher') resolvedPath = '/teacher/dashboard'
   }
 
   if (product) resolvedPath += `?product=${product}`
