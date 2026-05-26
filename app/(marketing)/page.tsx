@@ -24,15 +24,13 @@ const KcseClinicDemo = dynamic(
   { ssr: false }
 )
 
-// ─── Component ─────────────────────────────────────────────────────────────────
-
 export default function LandingPage() {
-  const [demoOpen,     setDemoOpen]     = useState(false)
-  const [kcseDemoOpen, setKcseDemoOpen] = useState(false)
+  const [demoOpen,      setDemoOpen]      = useState(false)
+  const [kcseDemoOpen,  setKcseDemoOpen]  = useState(false)
 
   return (
     <>
-      {/* ── HERO ──────────────────────────────────────────────────────────────── */}
+      {/* ── HERO ────────────────────────────────────────────────────────────── */}
       <section className="max-w-5xl mx-auto px-6 pt-20 pb-16 md:pt-32 md:pb-20 text-center">
 
         <div className="inline-flex items-center gap-2 bg-violet-500/10 border border-violet-500/20 text-violet-300 px-4 py-2 rounded-full text-sm font-black mb-8 animate-in fade-in slide-in-from-top duration-700">
@@ -44,7 +42,9 @@ export default function LandingPage() {
           className="text-5xl md:text-7xl font-black mb-6 leading-[0.95] animate-in fade-in slide-in-from-bottom duration-1000"
           style={{ animationDelay: '100ms' }}
         >
-          <span className="block text-white/60 text-3xl md:text-4xl font-black mb-3 tracking-tight">In a class of 45,</span>
+          <span className="block text-white/60 text-3xl md:text-4xl font-black mb-3 tracking-tight">
+            In a class of 45,
+          </span>
           <span className="block text-white">your child is just</span>
           <span className="block text-white">another student.</span>
           <span className="block bg-linear-to-r from-violet-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mt-3">
@@ -59,11 +59,11 @@ export default function LandingPage() {
           One 7-page clinical report shows exactly where they&apos;re struggling,
           why, and what to fix this holiday.
         </p>
+
         <p className="text-teal-400/50 text-xs font-semibold tracking-widest uppercase mb-10">
           CBC · Cambridge IGCSE · 8-4-4 · Grade 7–12
         </p>
 
-        {/* Primary CTA */}
         <Link
           href="/signup?role=parent"
           className="group inline-flex items-center justify-center gap-2 bg-linear-to-r from-violet-500 to-purple-500 text-white px-10 py-5 rounded-2xl font-black hover:scale-105 transition-all shadow-2xl shadow-violet-500/30 text-lg mb-6"
@@ -72,7 +72,6 @@ export default function LandingPage() {
           <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
         </Link>
 
-        {/* Trust row */}
         <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-white/35 mb-14">
           <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400/70" /> Free first report</span>
           <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400/70" /> No card needed</span>
@@ -80,17 +79,12 @@ export default function LandingPage() {
           <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400/70" /> Ready in 5 minutes</span>
         </div>
 
-        {/* Demo report triggers */}
         <p className="text-xs font-black text-white/30 uppercase tracking-widest mb-4">
           See a real sample report
         </p>
         <div className="grid sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
 
-          {/* Brian — CBC */}
-          <button
-            onClick={() => setDemoOpen(true)}
-            className="group relative text-left"
-          >
+          <button onClick={() => setDemoOpen(true)} className="group relative text-left">
             <div className="absolute -inset-0.5 bg-linear-to-br from-violet-500 to-purple-600 rounded-2xl blur opacity-20 group-hover:opacity-40 transition" />
             <div className="relative bg-white/5 border border-violet-500/20 rounded-2xl p-5 hover:bg-white/8 transition-all">
               <div className="flex items-center gap-3">
@@ -106,11 +100,7 @@ export default function LandingPage() {
             </div>
           </button>
 
-          {/* James — KCSE */}
-          <button
-            onClick={() => setKcseDemoOpen(true)}
-            className="group relative text-left"
-          >
+          <button onClick={() => setKcseDemoOpen(true)} className="group relative text-left">
             <div className="absolute -inset-0.5 bg-linear-to-br from-amber-500 to-orange-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition" />
             <div className="relative bg-white/5 border border-amber-500/20 rounded-2xl p-5 hover:bg-white/8 transition-all">
               <div className="flex items-center gap-3">
@@ -125,14 +115,14 @@ export default function LandingPage() {
               </div>
             </div>
           </button>
+
         </div>
       </section>
 
-      {/* ── WHAT'S IN THE REPORT ──────────────────────────────────────────────── */}
+      {/* ── WHAT'S IN THE REPORT ────────────────────────────────────────────── */}
       <section className="py-20 relative">
         <div className="absolute inset-0 bg-linear-to-b from-transparent via-violet-950/15 to-transparent pointer-events-none" />
         <div className="max-w-5xl mx-auto px-6">
-
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-5xl font-black text-white mb-3 leading-tight">
               A report card tells you the score.
@@ -142,15 +132,14 @@ export default function LandingPage() {
               <span className="text-white/75 font-black">why</span>.
             </p>
           </div>
-
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
               { icon: '🔍', title: 'Subject-by-subject diagnosis',  desc: 'Every subject scored, exact gaps identified — not just marks.' },
-              { icon: '🗺️', title: 'Career & pathway guidance',      desc: 'STEM vs Arts vs Social Sciences — based on real performance data.' },
-              { icon: '📅', title: '3-week holiday study plan',      desc: 'Specific topics to fix, in priority order. Ready to act on today.' },
-              { icon: '🧭', title: 'Learning Compass access',        desc: 'AI tutor that knows your child\'s exact weak points. Adapts as they improve.' },
-              { icon: '👩‍🏫', title: 'Teacher collaboration page',    desc: 'Share one page with their class teacher. Professional, actionable.' },
-              { icon: '📊', title: 'Level 1–4 mastery tracking',     desc: 'CBC-aligned levels so you know exactly how far to the next grade.' },
+              { icon: '🗺️', title: 'Career & pathway guidance',     desc: 'STEM vs Arts vs Social Sciences — based on real performance data.' },
+              { icon: '📅', title: '3-week holiday study plan',     desc: 'Specific topics to fix, in priority order. Ready to act on today.' },
+              { icon: '🧭', title: 'Learning Compass access',       desc: "AI tutor that knows your child's exact weak points. Adapts as they improve." },
+              { icon: '👩‍🏫', title: 'Teacher collaboration page',   desc: 'Share one page with their class teacher. Professional, actionable.' },
+              { icon: '📊', title: 'Level 1–4 mastery tracking',    desc: 'CBC-aligned levels so you know exactly how far to the next grade.' },
             ].map((item, i) => (
               <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-5 hover:bg-white/8 transition-all">
                 <div className="text-2xl mb-3">{item.icon}</div>
@@ -162,7 +151,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── THREE PILLARS ─────────────────────────────────────────────────────── */}
+      {/* ── THREE PILLARS ───────────────────────────────────────────────────── */}
       <section className="py-20">
         <div className="max-w-4xl mx-auto px-6">
           <div className="text-center mb-12">
@@ -171,7 +160,6 @@ export default function LandingPage() {
           </div>
           <div className="grid md:grid-cols-3 gap-6">
 
-            {/* Card 1 — Learning Compass */}
             <div className="bg-white/3 border border-white/8 rounded-2xl p-8 flex flex-col">
               <div className="w-10 h-10 bg-amber-500/15 border border-amber-500/20 rounded-xl flex items-center justify-center mb-4">
                 <Compass className="w-5 h-5 text-amber-400" />
@@ -186,7 +174,6 @@ export default function LandingPage() {
               </span>
             </div>
 
-            {/* Card 2 — Academic Clinic */}
             <div className="bg-white/3 border border-white/8 rounded-2xl p-8 flex flex-col">
               <div className="w-10 h-10 bg-teal-500/15 border border-teal-500/20 rounded-xl flex items-center justify-center mb-4">
                 <FileText className="w-5 h-5 text-teal-400" />
@@ -201,7 +188,6 @@ export default function LandingPage() {
               </span>
             </div>
 
-            {/* Card 3 — Teacher Connection */}
             <div className="bg-white/3 border border-white/8 rounded-2xl p-8 flex flex-col">
               <div className="w-10 h-10 bg-violet-500/15 border border-violet-500/20 rounded-xl flex items-center justify-center mb-4">
                 <Users className="w-5 h-5 text-violet-400" />
@@ -229,7 +215,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── IGCSE BANNER ──────────────────────────────────────────────────────── */}
+      {/* ── IGCSE BANNER ────────────────────────────────────────────────────── */}
       <section className="py-12">
         <div className="max-w-5xl mx-auto px-6">
           <div className="relative">
@@ -253,7 +239,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── SOCIAL PROOF ──────────────────────────────────────────────────────── */}
+      {/* ── SOCIAL PROOF ────────────────────────────────────────────────────── */}
       <section className="py-20">
         <div className="max-w-4xl mx-auto px-6">
           <div className="text-center mb-12">
@@ -295,6 +281,7 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
+
           </div>
           <p className="text-center text-white/15 text-xs mt-8">
             Representative experiences. Individual results vary.
@@ -302,7 +289,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── PRICING ───────────────────────────────────────────────────────────── */}
+      {/* ── PRICING PREVIEW ─────────────────────────────────────────────────── */}
       <section className="py-16 relative">
         <div className="max-w-4xl mx-auto px-6">
           <div className="text-center mb-10">
@@ -311,16 +298,14 @@ export default function LandingPage() {
           </div>
           <div className="grid sm:grid-cols-3 gap-4 mb-8">
             {[
-              { label: 'First report',             price: 'Free',      sub: 'No card needed',          highlight: false },
-              { label: 'Per Term · 1 child',        price: 'KES 3,200', sub: 'Full access all term',     highlight: true  },
-              { label: 'Family Plan · 3 children',  price: 'KES 5,500', sub: 'Up to 3 children',         highlight: false },
+              { label: 'First report',            price: 'Free',      sub: 'No card needed',       highlight: false },
+              { label: 'Per Term · 1 child',       price: 'KES 3,200', sub: 'Full access all term',  highlight: true  },
+              { label: 'Family Plan · 3 children', price: 'KES 5,500', sub: 'Up to 3 children',      highlight: false },
             ].map((p, i) => (
               <div
                 key={i}
                 className={`rounded-2xl p-6 border text-center ${
-                  p.highlight
-                    ? 'bg-violet-950/40 border-violet-500/30'
-                    : 'bg-white/5 border-white/10'
+                  p.highlight ? 'bg-violet-950/40 border-violet-500/30' : 'bg-white/5 border-white/10'
                 }`}
               >
                 <div className="text-xs font-black text-white/40 mb-1.5">{p.label}</div>
@@ -343,7 +328,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── FINAL CTA ─────────────────────────────────────────────────────────── */}
+      {/* ── FINAL CTA ───────────────────────────────────────────────────────── */}
       <section className="relative py-24 px-6 mb-10">
         <div className="absolute inset-0 bg-linear-to-r from-violet-600/8 via-purple-600/8 to-pink-600/8 rounded-3xl blur-3xl" />
         <div className="relative max-w-3xl mx-auto text-center bg-linear-to-br from-violet-900/15 via-purple-900/15 to-pink-900/15 backdrop-blur-xl border border-white/10 rounded-3xl py-20 px-6">
@@ -373,7 +358,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── TEACHER FOOTNOTE ──────────────────────────────────────────────────── */}
+      {/* ── TEACHER FOOTNOTE ────────────────────────────────────────────────── */}
       <div className="text-center py-10 border-t border-white/5">
         <p className="text-white/20 text-xs">
           Are you a teacher?{' '}
@@ -386,7 +371,7 @@ export default function LandingPage() {
         </p>
       </div>
 
-      {/* ── DEMO MODALS ───────────────────────────────────────────────────────── */}
+      {/* ── DEMO MODALS ─────────────────────────────────────────────────────── */}
       <AcademicClinicDemo isOpen={demoOpen}     onClose={() => setDemoOpen(false)}     />
       <KcseClinicDemo     isOpen={kcseDemoOpen} onClose={() => setKcseDemoOpen(false)} />
     </>
