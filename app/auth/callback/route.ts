@@ -6,9 +6,10 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
 
-  const code = requestUrl.searchParams.get('code')
+  const code     = requestUrl.searchParams.get('code')
   const returnTo = requestUrl.searchParams.get('returnTo') || '/dashboard'
-  const product = requestUrl.searchParams.get('product')
+  const role     = requestUrl.searchParams.get('role')
+  const product  = requestUrl.searchParams.get('product')
 
   if (!code) {
     return NextResponse.redirect(new URL('/login?error=no-code', requestUrl.origin))
@@ -45,10 +46,16 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL('/login?error=exchange-failed', requestUrl.origin))
   }
 
-  // Detect teacher role and route accordingly — use service role to bypass RLS
+  // Route by explicit role first; fall back to DB lookup only for role-less flows
   let resolvedPath = returnTo
   const { data: { user } } = await supabase.auth.getUser()
-  if (user && (resolvedPath === '/dashboard' || resolvedPath === '/')) {
+
+  if (role === 'teacher') {
+    resolvedPath = '/teacher/dashboard'
+  } else if (role === 'parent' || role === 'student') {
+    resolvedPath = '/dashboard'
+  } else if (user && (resolvedPath === '/dashboard' || resolvedPath === '/')) {
+    // No role param — returning user via /login; detect from DB
     const db = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,

@@ -24,14 +24,17 @@ function SignupForm() {
 
   const productId = searchParams.get('product')
   const returnTo  = searchParams.get('returnTo') || '/dashboard'
+  const role      = searchParams.get('role')
 
   const handleGoogleSignup = async () => {
     setLoading(true)
     setError(null)
 
-    const redirectUrl = productId
-      ? `${window.location.origin}/auth/callback?returnTo=${encodeURIComponent(returnTo)}&product=${productId}`
-      : `${window.location.origin}/auth/callback?returnTo=${encodeURIComponent(returnTo)}`
+    const cbUrl = new URL(`${window.location.origin}/auth/callback`)
+    cbUrl.searchParams.set('returnTo', returnTo)
+    if (role)      cbUrl.searchParams.set('role', role)
+    if (productId) cbUrl.searchParams.set('product', productId)
+    const redirectUrl = cbUrl.toString()
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',

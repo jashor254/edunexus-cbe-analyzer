@@ -144,7 +144,7 @@ export default function LandingPage() {
             style={{ animationDelay: '250ms' }}
           >
             <Link
-              href="/signup?returnTo=/teacher/dashboard"
+              href="/signup?role=teacher"
               className="group inline-flex items-center justify-center gap-2 bg-linear-to-r from-teal-500 to-cyan-500 text-white px-10 py-5 rounded-2xl font-black hover:scale-105 transition-all shadow-2xl shadow-teal-500/30 text-lg"
             >
               <GraduationCap className="w-5 h-5" />
@@ -152,7 +152,7 @@ export default function LandingPage() {
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
             <Link
-              href="/signup"
+              href="/signup?role=parent"
               className="group inline-flex items-center justify-center gap-2 bg-linear-to-r from-violet-500 to-purple-500 text-white px-10 py-5 rounded-2xl font-black hover:scale-105 transition-all shadow-2xl shadow-violet-500/30 text-lg"
             >
               <Users className="w-5 h-5" />
@@ -366,7 +366,7 @@ export default function LandingPage() {
                 <div className="text-4xl font-black text-teal-300 my-3">Free</div>
                 <p className="text-white/50 text-sm mb-2">forever. always.</p>
                 <p className="text-xs text-white/40 mb-6 flex-1">SOW · Lesson Plans · Class Dashboard · TSC ready</p>
-                <Link href="/signup?returnTo=/teacher/dashboard" className="block w-full bg-linear-to-r from-teal-500 to-cyan-500 text-white py-3 rounded-xl font-black hover:scale-105 transition-all text-sm">
+                <Link href="/signup?role=teacher" className="block w-full bg-linear-to-r from-teal-500 to-cyan-500 text-white py-3 rounded-xl font-black hover:scale-105 transition-all text-sm">
                   Teacher Sign Up →
                 </Link>
               </div>
@@ -442,7 +442,7 @@ export default function LandingPage() {
               <GraduationCap className="w-5 h-5" /> I&apos;m a Teacher
             </Link>
             <Link
-              href="/signup"
+              href="/signup?role=parent"
               className="inline-flex items-center justify-center gap-2 bg-linear-to-r from-violet-500 to-purple-500 text-white px-10 py-5 rounded-2xl font-black hover:scale-105 transition-all shadow-2xl shadow-violet-500/30 text-lg"
             >
               <Users className="w-5 h-5" /> Start as Parent
