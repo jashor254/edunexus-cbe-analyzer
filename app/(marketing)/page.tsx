@@ -165,9 +165,6 @@ export default function LandingPage() {
             className="flex flex-wrap justify-center gap-3 text-sm animate-in fade-in duration-1000"
             style={{ animationDelay: '350ms' }}
           >
-            <span className="flex items-center gap-2 bg-teal-500/10 border border-teal-500/20 px-4 py-2 rounded-full text-teal-300 font-bold">
-              <GraduationCap className="w-4 h-4" /> Pioneer Teachers — 50% Off, Always
-            </span>
             <span className="flex items-center gap-2 bg-violet-500/10 border border-violet-500/20 px-4 py-2 rounded-full text-violet-300 font-bold">
               <Users className="w-4 h-4" /> Parents from KES 500
             </span>
@@ -442,7 +439,7 @@ export default function LandingPage() {
               href="/signup"
               className="inline-flex items-center justify-center gap-2 bg-linear-to-r from-teal-500 to-cyan-500 text-white px-10 py-5 rounded-2xl font-black hover:scale-105 transition-all shadow-2xl shadow-teal-500/30 text-lg"
             >
-              <GraduationCap className="w-5 h-5" /> Join as Pioneer Teacher
+              <GraduationCap className="w-5 h-5" /> I&apos;m a Teacher
             </Link>
             <Link
               href="/signup"
@@ -455,7 +452,7 @@ export default function LandingPage() {
             <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400" /> M-PESA accepted</span>
             <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400" /> CBC + 8-4-4 + IGCSE</span>
             <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400" /> Made in Kenya 🇰🇪</span>
-            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400" /> Pioneer teachers: 50% off, always</span>
+            <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-400" /> Free for teachers — always</span>
           </div>
         </div>
       </section>
