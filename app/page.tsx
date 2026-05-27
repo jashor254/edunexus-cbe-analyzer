@@ -10,6 +10,7 @@ import {
   BookOpen,
   ClipboardList,
   Star,
+  ArrowRight,
 } from 'lucide-react'
 
 const AcademicClinicDemo = dynamic(
@@ -128,6 +129,13 @@ export default function LandingPage() {
                   <li key={f}>— {f}</li>
                 ))}
               </ul>
+              <Link
+                href="/signup?role=parent"
+                className="group inline-flex items-center gap-2 bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:text-white hover:bg-amber-500/25 px-6 py-3 rounded-xl font-black text-sm transition-all mt-6"
+              >
+                Try Learning Compass Free
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </Link>
             </div>
           </div>
 
@@ -241,28 +249,38 @@ export default function LandingPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setDemoOpen(true)}
-                  className="flex flex-col items-start gap-1 p-4 rounded-xl bg-violet-600/15 border border-violet-500/25 hover:bg-violet-600/25 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <FileText className="w-4 h-4 text-violet-400" />
-                    <span className="text-xs text-violet-300 font-semibold">CBC · Grade 8</span>
-                  </div>
-                  <p className="text-sm font-bold text-white">Brian Otieno</p>
-                  <p className="text-xs text-white/40">See sample report →</p>
-                </button>
-                <button
-                  onClick={() => setKcseDemoOpen(true)}
-                  className="flex flex-col items-start gap-1 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <FileText className="w-4 h-4 text-amber-400" />
-                    <span className="text-xs text-amber-300 font-semibold">8-4-4 · Form 3</span>
-                  </div>
-                  <p className="text-sm font-bold text-white">James Kamau</p>
-                  <p className="text-xs text-white/40">See KCSE report →</p>
-                </button>
+                <div className="flex flex-col gap-1">
+                  <p className="text-[10px] font-black text-violet-300/60 uppercase tracking-widest">
+                    CBC Junior School · Grade 7–9
+                  </p>
+                  <button
+                    onClick={() => setDemoOpen(true)}
+                    className="flex flex-col items-start gap-1 p-4 rounded-xl bg-violet-600/15 border border-violet-500/25 hover:bg-violet-600/25 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <FileText className="w-4 h-4 text-violet-400" />
+                      <span className="text-xs text-violet-300 font-semibold">CBC · Grade 8</span>
+                    </div>
+                    <p className="text-sm font-bold text-white">Brian Otieno</p>
+                    <p className="text-xs text-white/40">See sample report →</p>
+                  </button>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <p className="text-[10px] font-black text-amber-300/60 uppercase tracking-widest">
+                    8-4-4 Senior School · Form 3–4
+                  </p>
+                  <button
+                    onClick={() => setKcseDemoOpen(true)}
+                    className="flex flex-col items-start gap-1 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <FileText className="w-4 h-4 text-amber-400" />
+                      <span className="text-xs text-amber-300 font-semibold">8-4-4 · Form 3</span>
+                    </div>
+                    <p className="text-sm font-bold text-white">James Kamau</p>
+                    <p className="text-xs text-white/40">See KCSE report →</p>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -335,13 +353,23 @@ export default function LandingPage() {
               Everything your class needs.<br />In one place.
             </h2>
             <p className="text-white/50 text-base leading-relaxed max-w-2xl mx-auto">
-              EduNexus gives teachers the tools to plan, track, and connect —
-              without the paperwork.
+              EduNexus works alongside teachers —<br />
+              not around them.
               <br /><br />
-              Your class data flows directly to Learning Compass and Academic Clinic.
-              When you mark work or raise a concern, parents are notified instantly.
+              When a teacher enters class marks,
+              Learning Compass already knows each
+              learner&apos;s level before the next session.
               <br /><br />
-              TSC inspection ready. CBC-aligned.
+              When a teacher marks an assignment
+              or raises a concern, the parent is
+              notified instantly — WhatsApp and email.
+              <br /><br />
+              Teacher planning tools — SOW generator,
+              lesson plans, record of work — are built
+              to CBC standards and TSC inspection ready.
+              <br /><br />
+              The teacher stays in control.<br />
+              EduNexus handles the intelligence layer.
             </p>
           </div>
 
@@ -465,17 +493,64 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── TEACHER FOOTNOTE ── */}
-      <footer className="border-t border-white/5 py-8 px-4 text-center">
-        <p className="text-white/20 text-xs">
-          Are you a teacher?{' '}
-          <Link
-            href="/teacher/dashboard"
-            className="text-white/35 hover:text-white/50 underline underline-offset-2 transition-colors"
-          >
-            Access your tools →
-          </Link>
-        </p>
+      {/* ── FOOTER ── */}
+      <footer className="border-t border-white/5 py-12 px-6">
+        <div className="max-w-5xl mx-auto">
+
+          {/* Teacher link */}
+          <div className="text-center mb-8">
+            <p className="text-white/20 text-xs">
+              Are you a teacher?{' '}
+              <Link
+                href="/teacher/dashboard"
+                className="text-white/35 hover:text-white/50 underline underline-offset-2 transition-colors"
+              >
+                Access your tools →
+              </Link>
+            </p>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-white/5 pt-8">
+
+            {/* Links row */}
+            <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 mb-6">
+              <Link
+                href="/legal/privacy"
+                className="text-white/20 hover:text-white/40 text-xs transition-colors"
+              >
+                Privacy Policy
+              </Link>
+              <Link
+                href="/legal/terms"
+                className="text-white/20 hover:text-white/40 text-xs transition-colors"
+              >
+                Terms of Service
+              </Link>
+              <Link
+                href="/legal/refund"
+                className="text-white/20 hover:text-white/40 text-xs transition-colors"
+              >
+                Refund Policy
+              </Link>
+            </div>
+
+            {/* Developer credit */}
+            <p className="text-center text-white/15 text-xs mb-2">
+              Developed by{' '}
+              <span className="text-white/25 font-semibold">Jashor Technologies</span>
+              {' '}· © 2026
+            </p>
+
+            {/* The phrase */}
+            <p className="text-center text-white/10 text-xs italic max-w-sm mx-auto">
+              Built alongside Kenyan teachers,
+              parents, and learners —
+              growing with the system we serve.
+            </p>
+
+          </div>
+        </div>
       </footer>
 
       {/* ── DEMO MODALS ── */}
