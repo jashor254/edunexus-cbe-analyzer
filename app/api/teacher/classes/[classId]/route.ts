@@ -53,13 +53,13 @@ export async function GET(
     if (studentIds.length > 0) {
       const { data: studentData } = await db
         .from('students')
-        .select('id, name, grade, school')
+        .select('id, name, grade, school, parent_email, parent_phone')
         .in('id', studentIds)
 
       // Get latest assessment per student
       const assessmentPromises = studentIds.map((sid: string) =>
         db.from('assessments')
-          .select('subject_scores, term, year, created_at')
+          .select('id, subject_scores, term, year, created_at')
           .eq('student_id', sid)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -128,8 +128,9 @@ export async function GET(
           lastActive,
           daysInactive,
           assessment: assessment
-            ? { term: assessment.term, year: assessment.year }
+            ? { id: assessment.id, term: assessment.term, year: assessment.year }
             : null,
+          latestAssessmentId: assessment?.id ?? null,
         }
       })
     }

@@ -12,8 +12,8 @@ import {
   Zap,
   DollarSign,
 } from 'lucide-react'
-import type { CareerData } from '@/lib/academicClinic/careerDatabase'
-import type { DynamicCareer } from '@/lib/academicClinic/dynamicCareerGenerator'
+import type { CareerData } from '@/lib/academicClinic/careerEngine'
+import type { DynamicCareer } from '@/lib/academicClinic/careerEngine'
 
 // ============================================================
 // COLOR MAPS

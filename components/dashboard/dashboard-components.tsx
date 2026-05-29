@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useSimpleSync } from '@/lib/sync/multi-device-sync'
 import { analyzePerformance, getTierConfig } from '@/lib/adaptiveLearning'
-import { careerEngine } from '@/lib/academicClinic/careerIntelligence'
+import { careerEngine } from '@/lib/academicClinic/careerEngine'
 import { TrendingUp, Users, BookOpen, Target, AlertCircle, Share2 } from 'lucide-react'
 
 // =====================================

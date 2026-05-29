@@ -8,7 +8,7 @@ import {
   Users, BookOpen, FileText, AlertTriangle,
   PlusCircle, ChevronRight, Eye, Clock,
   TrendingUp, CheckCircle2, Scroll, NotebookPen,
-  Sparkles, ArrowUpRight, Zap,
+  Sparkles, ArrowUpRight, Zap, FlaskConical,
 } from 'lucide-react'
 
 function getTermInfo() {
@@ -355,6 +355,47 @@ export default async function TeacherDashboardPage() {
             </div>
           )}
         </div>
+
+        {/* Academic Clinic Card */}
+        {classesWithStats.length > 0 && (() => {
+          const topClass = classesWithStats[0]
+          return (
+            <div className="bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-200 rounded-2xl p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-violet-100 rounded-2xl flex items-center justify-center shrink-0">
+                    <FlaskConical className="w-6 h-6 text-violet-600" />
+                  </div>
+                  <div>
+                    <h2 className="font-black text-violet-900 text-base flex items-center gap-2">
+                      Academic Clinic
+                    </h2>
+                    <p className="text-sm text-violet-700 mt-0.5">
+                      Generate diagnostic reports for your students. Parents receive reports via WhatsApp and email automatically.
+                    </p>
+                    <p className="text-xs text-violet-500 mt-2 font-medium">
+                      {topClass.name} · {topClass.studentCount} students
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Link
+                    href={`/teacher/classes/${topClass.id}?tab=clinic`}
+                    className="flex items-center gap-2 bg-violet-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-violet-700 transition"
+                  >
+                    <FlaskConical className="w-4 h-4" /> Generate Reports
+                  </Link>
+                  <Link
+                    href="/teacher/reports"
+                    className="flex items-center gap-2 bg-white border border-violet-200 text-violet-600 px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-violet-50 transition"
+                  >
+                    View All Reports
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Active assignments + Recent schemes — two-col on large screens */}
         <div className="grid lg:grid-cols-2 gap-6">

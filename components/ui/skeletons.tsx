@@ -116,7 +116,7 @@ export function ClinicReportSkeleton() {
   );
 }
 
-// NEW: Assessment List Skeleton
+// Assessment List Skeleton
 export function AssessmentListSkeleton() {
   return (
     <div className="animate-pulse space-y-4">
@@ -128,6 +128,94 @@ export function AssessmentListSkeleton() {
               <div className="h-4 w-32 bg-slate-100 rounded"></div>
             </div>
             <div className="h-10 w-24 bg-slate-100 rounded-full"></div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Student Cards Grid Skeleton (for clinic / dashboard student list loading)
+export function StudentCardsSkeleton() {
+  return (
+    <div className="animate-pulse grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="bg-white border-2 border-slate-100 rounded-3xl p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 bg-slate-200 rounded-2xl flex-shrink-0" />
+            <div className="space-y-2 flex-1">
+              <div className="h-5 w-36 bg-slate-200 rounded-xl" />
+              <div className="h-4 w-24 bg-slate-100 rounded-full" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="h-16 bg-slate-50 rounded-xl" />
+            <div className="h-16 bg-slate-50 rounded-xl" />
+          </div>
+          <div className="space-y-2">
+            <div className="h-9 bg-slate-100 rounded-xl" />
+            <div className="h-9 bg-slate-100 rounded-xl" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Teacher Dashboard Skeleton
+export function TeacherDashboardSkeleton() {
+  return (
+    <div className="animate-pulse max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+      {/* Greeting */}
+      <div className="space-y-2">
+        <div className="h-10 w-72 bg-slate-200 rounded-2xl" />
+        <div className="h-5 w-48 bg-slate-100 rounded-lg" />
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="h-28 bg-slate-50 border-2 border-slate-100 rounded-[28px]" />
+        ))}
+      </div>
+
+      {/* Classes section */}
+      <div>
+        <div className="h-7 w-40 bg-slate-200 rounded-xl mb-4" />
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-40 bg-white border-2 border-slate-100 rounded-[28px]" />
+          ))}
+        </div>
+      </div>
+
+      {/* Alerts + quick actions row */}
+      <div className="grid md:grid-cols-2 gap-6">
+        <div className="space-y-3">
+          <div className="h-7 w-32 bg-slate-200 rounded-xl" />
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-16 bg-white border-2 border-slate-100 rounded-2xl" />
+          ))}
+        </div>
+        <div className="h-48 bg-white border-2 border-slate-100 rounded-[28px]" />
+      </div>
+    </div>
+  );
+}
+
+// Alerts Page Skeleton
+export function AlertsPageSkeleton() {
+  return (
+    <div className="animate-pulse space-y-4">
+      <div className="h-8 w-48 bg-slate-200 rounded-xl" />
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div key={i} className="bg-white border-2 border-slate-100 rounded-2xl p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-2 flex-1">
+              <div className="h-5 w-56 bg-slate-200 rounded-xl" />
+              <div className="h-4 w-40 bg-slate-100 rounded" />
+            </div>
+            <div className="h-7 w-20 bg-slate-100 rounded-full" />
           </div>
         </div>
       ))}

@@ -5,6 +5,9 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { calculateJuniorPathwayAffinity, calculateIGCSESubjectRecommendation } from '@/lib/pathwayCalculator'
 import type { IGCSEPathwayStrength, IGCSESubjectRating } from '@/lib/pathwayCalculator'
+import { analyzePerformance } from '@/lib/adaptiveLearning'
+import { generateLearningCompassRec, formatSubjectName } from '@/lib/academicClinic/reportGenerator'
+import type { SubjectProgress } from '@/lib/academicClinic/reportGenerator'
 import Link from 'next/link'
 import {
   Loader2, ArrowLeft, GraduationCap, Target,
@@ -110,7 +113,7 @@ const PATHWAYS = [
     note: 'Strong in Mathematics & Science? This is your path.',
   },
   {
-    key: 'Arts & Sports', label: 'Arts & Sports Pathway', emoji: '🎨',
+    key: 'Arts & Sports Science', label: 'Arts & Sports Pathway', emoji: '🎨',
     bg: 'bg-orange-50', border: 'border-orange-200', bar: 'bg-orange-500', textColor: 'text-orange-700',
     careers: 'Graphic Design, Sports Management, Music, Film, Journalism',
     note: 'Excelling in Creative Arts & Sports? This path is for you.',
@@ -125,7 +128,7 @@ const PATHWAYS = [
 
 function pathwayScore(key: string, rec: PathwayRec): number {
   if (key === 'STEM')          return rec.stem_score
-  if (key === 'Arts & Sports') return rec.arts_sports_score
+  if (key === 'Arts & Sports Science') return rec.arts_sports_score
   return rec.social_sciences_score
 }
 
@@ -231,15 +234,75 @@ function GuidanceContent() {
       // CBC only: use stored recommendations or recalculate
       const isCBC = !s.curriculum_type || s.curriculum_type === 'cbc'
       if (isCBC) {
+        const numericScores: Record<string, number> = {}
+        for (const [k, v] of Object.entries(latest.subject_scores)) {
+          numericScores[k] = typeof v === 'number' ? v : 0
+        }
+
         const stored = latest.pathway_recommendations
-        if (stored && typeof stored.stem_score === 'number') {
-          setRec(stored)
-        } else {
-          const numericScores: Record<string, number> = {}
-          for (const [k, v] of Object.entries(latest.subject_scores)) {
-            numericScores[k] = typeof v === 'number' ? v : 0
-          }
-          setRec(calculateJuniorPathwayAffinity(numericScores))
+        const pathwayRec = (stored && typeof stored.stem_score === 'number')
+          ? stored
+          : calculateJuniorPathwayAffinity(numericScores)
+
+        setRec(pathwayRec)
+
+        // Save full learning context so Compass can load it without recalculating
+        try {
+          const adaptiveAnalysis = analyzePerformance(numericScores)
+
+          const subjectTiers: Record<string, string> = {}
+          const subjectActionSteps: Record<string, string[]> = {}
+          adaptiveAnalysis.recommendations.forEach(rec => {
+            subjectTiers[rec.subject] = rec.tier
+            subjectActionSteps[rec.subject] = rec.actionSteps
+          })
+
+          const subjectVelocities: Record<string, { velocity: number; trend: string; prediction: string }> = {}
+          adaptiveAnalysis.velocities.forEach(v => {
+            subjectVelocities[v.subject] = { velocity: v.velocity, trend: v.trend, prediction: v.prediction }
+          })
+
+          const subjects: SubjectProgress[] = Object.entries(numericScores).map(([key, score]) => ({
+            subject: key,
+            displayName: formatSubjectName(key),
+            level: Math.max(1, Math.min(4, Math.round(score))) as 1 | 2 | 3 | 4,
+            previousScores: [],
+            trend: 'stable' as const,
+            velocity: 0,
+          }))
+          const compassRec = generateLearningCompassRec(subjects)
+
+          await supabase
+            .from('student_learning_context')
+            .upsert({
+              student_id: s.id,
+              user_id: user.id,
+              overall_tier: adaptiveAnalysis.overallTier,
+              subject_tiers: subjectTiers,
+              subject_action_steps: subjectActionSteps,
+              subject_velocities: subjectVelocities,
+              recommended_pathway: pathwayRec.top_pathway,
+              pathway_confidence: pathwayRec.confidence,
+              pathway_scores: {
+                stem: pathwayRec.stem_score,
+                arts_sports: pathwayRec.arts_sports_score,
+                social_sciences: pathwayRec.social_sciences_score,
+              },
+              first_subject: compassRec.firstSessionSubject,
+              session_goal: compassRec.sessionGoal,
+              guided_topics: compassRec.topicsToAsk,
+              overall_level: Math.round(
+                Object.values(numericScores).reduce((a, b) => a + b, 0) /
+                Object.values(numericScores).length
+              ),
+              curriculum_type: s.curriculum_type ?? 'cbc',
+              grade: s.grade,
+              last_assessment_id: latest.id,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'student_id' })
+        } catch (contextErr) {
+          // Non-fatal: Compass falls back to live analysis if this fails
+          console.error('Failed to save learning context:', contextErr)
         }
       }
     } catch (err) {
@@ -686,6 +749,21 @@ function GuidanceContent() {
             ))}
           </div>
         </div>
+
+        {/* Learning Compass CTA */}
+        <Link
+          href="/dashboard/learning-compass"
+          className="flex items-center justify-between w-full p-5 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-3xl text-white hover:scale-[1.01] transition-all shadow-lg"
+        >
+          <div className="flex items-center gap-3">
+            <Compass className="w-6 h-6 text-white" />
+            <div>
+              <p className="font-black text-sm">Start Learning Compass</p>
+              <p className="text-xs text-indigo-200 mt-0.5">Focus: {rec.top_pathway} subjects — personalised AI tutor ready</p>
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-white/70 shrink-0" />
+        </Link>
 
         {/* Next steps CTA */}
         <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-3xl p-6 text-white">

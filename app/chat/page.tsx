@@ -269,6 +269,8 @@ function ChatContent() {
   const [isLoading,       setIsLoading]       = useState(false)
   const [sessionId,       setSessionId]       = useState<string | null>(null)
   const [learnerId,       setLearnerId]       = useState<string | null>(null)
+  const [student,         setStudent]         = useState<{ id: string; name: string; grade: number; curriculum_type: string } | null>(null)
+  const [learningContext, setLearningContext] = useState<{ first_subject: string; session_goal: string; guided_topics: string[]; overall_tier: string; recommended_pathway: string | null } | null>(null)
   const [stats,           setStats]           = useState<Stats | null>(null)
   const [sessionState,    setSessionState]    = useState<SessionState>({ timeOnTask: 0, currentSubject: 'mathematics', currentConcept: '' })
   const [expandedDiagram, setExpandedDiagram] = useState<VisualAid | null>(null)
@@ -297,7 +299,32 @@ function ChatContent() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    setLearnerId(user.id)
+    // Load student profile (first student belonging to this user)
+    const { data: studentData } = await supabase
+      .from('students')
+      .select('id, name, grade, curriculum_type')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .single()
+
+    if (studentData) {
+      setStudent(studentData)
+      setLearnerId(studentData.id)
+    } else {
+      setLearnerId(user.id)
+    }
+
+    const effectiveLearnerId = studentData?.id || user.id
+
+    // Load learning context saved by guidance/career pages
+    const { data: ctx } = await supabase
+      .from('student_learning_context')
+      .select('first_subject, session_goal, guided_topics, overall_tier, recommended_pathway')
+      .eq('student_id', effectiveLearnerId)
+      .single()
+
+    if (ctx) setLearningContext(ctx)
 
     const isAdmin = user.email === ADMIN_EMAIL
 
@@ -371,8 +398,8 @@ function ChatContent() {
       .insert({
         learner_id:    userId,
         title:         'Learning Session',
-        grade:         7,
-        subject_id:    'mathematics',
+        grade:         student?.grade ?? 7,
+        subject_id:    learningContext?.first_subject || 'mathematics',
         status:        'active',
         session_state: {},
       })
@@ -449,8 +476,11 @@ function ChatContent() {
           sessionId,
           learnerId,
           subjectId:    sessionState.currentSubject,
-          grade:        7,
+          grade:        student?.grade ?? 7,
           sessionState,
+          previousMessages: messages
+            .slice(-6)
+            .map(m => ({ role: m.role, content: m.content, metadata: m.metadata })),
         }),
       })
 
@@ -459,6 +489,10 @@ function ChatContent() {
         setHasAccess(false)
         setMessages(prev => prev.filter(m => m.id !== tempId))
         return
+      }
+
+      if (!res.ok) {
+        throw new Error(`Server error ${res.status}`)
       }
 
       const data = await res.json()
@@ -721,22 +755,58 @@ function ChatContent() {
                   <Sparkles className="w-12 h-12 text-white" />
                 </div>
               </div>
-              <h2 className="text-2xl font-black text-white mb-2">Karibu! 🇰🇪</h2>
-              <p className="text-white/50 mb-8 max-w-sm leading-relaxed text-sm">
-                Mimi ni mwalimu wako wa kibinafsi wa AI. Niulize chochote — nitakusaidia kuelewa vizuri.
-              </p>
-              {/* Suggestion chips */}
-              <div className="flex flex-wrap gap-2 justify-center max-w-lg">
-                {SUGGESTIONS.map(s => (
-                  <button
-                    key={s}
-                    onClick={() => sendMessage(s)}
-                    className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-violet-500/40 rounded-full text-sm text-white/60 hover:text-white/90 font-medium transition-all"
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
+
+              {learningContext ? (
+                // ── PERSONALISED WELCOME ──────────────────────────────────
+                <>
+                  <h2 className="text-2xl font-black text-white mb-1">Karibu! 🇰🇪</h2>
+                  <p className="text-white/50 mb-1 text-sm">Today we start with</p>
+                  <p className="text-xl font-black text-violet-300 mb-2 capitalize">
+                    {learningContext.first_subject}
+                  </p>
+                  {learningContext.session_goal && (
+                    <p className="text-white/40 text-xs max-w-sm mb-6 leading-relaxed">
+                      {learningContext.session_goal}
+                    </p>
+                  )}
+                  {/* Guided topic chips */}
+                  <div className="flex flex-wrap gap-2 justify-center max-w-lg mb-6">
+                    {(learningContext.guided_topics || []).map((topic: string) => (
+                      <button
+                        key={topic}
+                        onClick={() => sendMessage(topic)}
+                        className="px-4 py-2 bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/30 hover:border-violet-400/50 rounded-full text-sm text-violet-200 hover:text-white font-medium transition-all"
+                      >
+                        {topic}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Tier badge */}
+                  <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-xs text-white/40 font-bold capitalize mb-4">
+                    Learning level: {learningContext.overall_tier?.replace(/_/g, ' ')}
+                    {learningContext.recommended_pathway && ` · ${learningContext.recommended_pathway} pathway`}
+                  </div>
+                </>
+              ) : (
+                // ── GENERIC WELCOME FALLBACK ──────────────────────────────
+                <>
+                  <h2 className="text-2xl font-black text-white mb-2">Karibu! 🇰🇪</h2>
+                  <p className="text-white/50 mb-8 max-w-sm leading-relaxed text-sm">
+                    Mimi ni mwalimu wako wa kibinafsi wa AI. Niulize chochote — nitakusaidia kuelewa vizuri.
+                  </p>
+                  <div className="flex flex-wrap gap-2 justify-center max-w-lg">
+                    {SUGGESTIONS.map(s => (
+                      <button
+                        key={s}
+                        onClick={() => sendMessage(s)}
+                        className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-violet-500/40 rounded-full text-sm text-white/60 hover:text-white/90 font-medium transition-all"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
 
               <div className="mt-6 bg-white/5 border border-white/10 rounded-xl px-5 py-3 max-w-md mx-auto">
                 <p className="text-xs text-white/40 text-center leading-relaxed">

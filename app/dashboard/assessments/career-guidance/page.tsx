@@ -14,9 +14,10 @@ import {
   Loader2, Sparkles, MessageCircle, Heart,
   GraduationCap, Clock, Shield
 } from 'lucide-react'
-import { analyzeCareerOptions, generateCareerIntegratedLearningPlan } from '@/lib/academicClinic/careerIntelligence'
-import type { CareerRecommendation, CareerProfile } from '@/lib/academicClinic/careerIntelligence'
+import { analyzeCareerOptions, generateCareerIntegratedLearningPlan } from '@/lib/academicClinic/careerEngine'
+import type { CareerRecommendation, CareerProfile } from '@/lib/academicClinic/careerEngine'
 import IntegratedLearningPlanDisplay from '@/components/integratedlearningplan'
+import { CareerAnalysisSkeleton } from '@/components/ui/skeletons'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -78,6 +79,14 @@ const AI_RISK_CONFIG: Record<string, { label: string; color: string }> = {
   moderate: { label: 'Some AI Risk',      color: 'text-amber-700 bg-amber-100'  },
   high:     { label: 'High AI Risk',      color: 'text-orange-700 bg-orange-100'},
   very_high:{ label: 'Very High AI Risk', color: 'text-red-700 bg-red-100'      },
+}
+
+const KENYA_DISRUPTION_CONFIG: Record<string, { label: string; color: string }> = {
+  protected:    { label: 'Protected — Safe 20+ years',   color: 'text-green-700 bg-green-100'   },
+  resilient:    { label: 'Resilient — Safe 10-15 years', color: 'text-blue-700 bg-blue-100'     },
+  evolving:     { label: 'Evolving — Adapt by 2030',     color: 'text-amber-700 bg-amber-100'   },
+  vulnerable:   { label: 'Vulnerable — Specialize now',  color: 'text-orange-700 bg-orange-100' },
+  transforming: { label: 'Transforming — Role changing', color: 'text-red-700 bg-red-100'       },
 }
 
 // ─── Career card ──────────────────────────────────────────────────────────────
@@ -327,7 +336,7 @@ function CareerCard({
 
           {/* Start learning */}
           <Link
-            href={`/chat?student=${studentId}&career=${encodeURIComponent(career.career)}`}
+            href="/dashboard/learning-compass"
             className="flex items-center justify-center gap-2 w-full py-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-2xl font-black hover:scale-[1.02] transition-all shadow-lg"
           >
             <MessageCircle className="w-5 h-5" />
@@ -426,6 +435,30 @@ function CareerGuidanceContent() {
 
       const recommendations = await analyzeCareerOptions(profile)
       setCareers(recommendations)
+
+      // Save career context to DB so Compass can load it without recalculating
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user && recommendations.length > 0) {
+          await supabase
+            .from('student_learning_context')
+            .upsert({
+              student_id: studentData.id,
+              user_id: user.id,
+              top_careers: recommendations.slice(0, 3).map(c => ({
+                career: c.career,
+                matchScore: c.matchScore,
+                gaps: c.currentGaps,
+                requiredSubjects: c.requiredSubjects,
+              })),
+              career_gaps: recommendations[0]?.currentGaps ?? [],
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'student_id' })
+        }
+      } catch (contextErr) {
+        // Non-fatal: Compass falls back to live analysis if this fails
+        console.error('Failed to save career context:', contextErr)
+      }
     } catch (err: any) {
       console.error('Career generation error:', err)
       setError('Could not generate career recommendations. Please try again.')
@@ -436,10 +469,9 @@ function CareerGuidanceContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="font-bold text-slate-600 animate-pulse">Loading student data...</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
+        <div className="max-w-4xl mx-auto px-6 py-10">
+          <CareerAnalysisSkeleton />
         </div>
       </div>
     )
@@ -719,7 +751,7 @@ function CareerGuidanceContent() {
             )}
 
             <Link
-              href={`/chat?student=${studentId}`}
+              href="/dashboard/learning-compass"
               className="flex items-center justify-center gap-2 w-full py-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-2xl font-black hover:scale-[1.02] transition-all shadow-lg mt-4"
             >
               <MessageCircle className="w-5 h-5" />
@@ -738,8 +770,10 @@ function CareerGuidanceContent() {
 export default function CareerGuidancePage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
+        <div className="max-w-4xl mx-auto px-6 py-10">
+          <CareerAnalysisSkeleton />
+        </div>
       </div>
     }>
       <CareerGuidanceContent />

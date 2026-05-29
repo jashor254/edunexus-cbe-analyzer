@@ -7,6 +7,7 @@ import {
   AlertTriangle, ClipboardList, Settings, GraduationCap,
   LogOut, Scroll, NotebookPen, Sparkles, ChevronRight,
 } from 'lucide-react'
+import { RoleSwitcher } from '@/components/layout/RoleSwitcher'
 
 const NAV = [
   { href: '/teacher/dashboard',      icon: LayoutDashboard, label: 'Dashboard'      },
@@ -118,6 +119,9 @@ export default function TeacherSidebar({ teacherName, school, subject }: Props) 
 
         {/* Footer */}
         <div className="px-3 py-4 border-t border-white/5">
+          <div className="mb-3 mx-1">
+            <RoleSwitcher />
+          </div>
           <div className="mb-2 mx-3">
             <div className="text-[10px] text-slate-500 font-semibold uppercase tracking-widest">Free Plan</div>
             <div className="mt-1.5 w-full bg-white/5 rounded-full h-1.5">
@@ -147,9 +151,12 @@ export default function TeacherSidebar({ teacherName, school, subject }: Props) 
             <span className="text-teal-400 text-xs font-semibold ml-1.5">Teacher</span>
           </div>
         </Link>
-        <Link href="/teacher/settings" className="w-8 h-8 rounded-xl bg-linear-to-br from-teal-400 to-cyan-500 flex items-center justify-center shadow active:scale-95 transition-transform">
-          <span className="text-white font-black text-xs">{initials}</span>
-        </Link>
+        <div className="flex items-center gap-2">
+          <RoleSwitcher />
+          <Link href="/teacher/settings" className="w-8 h-8 rounded-xl bg-linear-to-br from-teal-400 to-cyan-500 flex items-center justify-center shadow active:scale-95 transition-transform">
+            <span className="text-white font-black text-xs">{initials}</span>
+          </Link>
+        </div>
       </header>
 
       {/* ── Mobile Bottom Nav ─────────────────────────────────────────────────── */}

@@ -24,6 +24,7 @@ export async function callDeepSeek(prompt: string, systemPrompt?: string): Promi
         },
       ],
       temperature: 0.7,
+      max_tokens: 2048,
     }),
   })
 

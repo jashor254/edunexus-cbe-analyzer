@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { GraduationCap, LogOut, Menu, X } from 'lucide-react'
+import { RoleSwitcher } from '@/components/layout/RoleSwitcher'
 
 const NAV_LINKS = [
   { href: '/chat',                       label: 'Compass',     color: 'hover:text-violet-600'  },
@@ -50,6 +51,7 @@ export default function DashboardNavbar() {
                   {label}
                 </Link>
               ))}
+              <RoleSwitcher />
               <form action="/auth/signout" method="post">
                 <button
                   type="submit"
@@ -99,6 +101,9 @@ export default function DashboardNavbar() {
                   {label}
                 </Link>
               ))}
+              <div className="py-3 px-2">
+                <RoleSwitcher />
+              </div>
             </div>
           </div>
         )}

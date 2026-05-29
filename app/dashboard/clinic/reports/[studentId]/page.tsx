@@ -2,6 +2,7 @@
 export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/utils/supabase/server'
+import { createServiceClient } from '@/utils/supabase/service'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -39,19 +40,23 @@ import { DownloadReportButton } from '@/components/clinic/DownloadReportButton'
 export default async function StudentReportPage({
   params
 }: {
-  params: { studentId: string }
+  params: Promise<{ studentId: string }>
 }) {
+  const { studentId } = await params
+
   const supabase = await createClient()
-  
+
   // 1. Get authenticated user
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) redirect('/login')
 
-  // 2. Verify student belongs to user
-  const { data: student, error: studentError } = await supabase
+  // 2. Verify student belongs to this user — use service client for consistent
+  //    RLS-bypass behaviour (ownership enforced via the user_id filter)
+  const db = createServiceClient()
+  const { data: student, error: studentError } = await db
     .from('students')
     .select('*')
-    .eq('id', params.studentId)
+    .eq('id', studentId)
     .eq('user_id', user.id)
     .single()
 
@@ -60,10 +65,10 @@ export default async function StudentReportPage({
   }
 
   // 3. Fetch assessments
-  const { data: assessments, error: assessmentsError } = await supabase
+  const { data: assessments, error: assessmentsError } = await db
     .from('assessments')
     .select('*')
-    .eq('student_id', params.studentId)
+    .eq('student_id', studentId)
     .order('created_at', { ascending: true })
 
   if (assessmentsError || !assessments || assessments.length === 0) {

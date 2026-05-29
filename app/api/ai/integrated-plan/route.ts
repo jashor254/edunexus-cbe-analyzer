@@ -2,7 +2,7 @@
 // API endpoint for integrated learning plans
 
 import { NextRequest, NextResponse } from 'next/server'
-import { generateCareerIntegratedLearningPlan } from '@/lib/academicClinic/careerIntelligence'
+import { generateCareerIntegratedLearningPlan } from '@/lib/academicClinic/careerEngine'
 import { checkRateLimit, trackUsage } from '@/lib/ai/rateLimit'
 
 function getNextMonthStart(): string {

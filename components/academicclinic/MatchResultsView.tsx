@@ -6,7 +6,7 @@ import {
   ArrowRight, ShieldCheck, Zap, Sparkles
 } from 'lucide-react'
 import { CareerCard } from '@/components/careers/CareerCard'
-import type { MatchReport } from '@/lib/academicClinic/careerMatcher'
+import type { MatchReport } from '@/lib/academicClinic/careerEngine'
 
 interface MatchResultsViewProps {
   report: MatchReport;

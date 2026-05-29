@@ -185,191 +185,201 @@ export function calculateIGCSESubjectRecommendation(
 }
 
 export type PathwayRecommendation = {
-  stem_score: number
-  arts_sports_score: number
+  stem_score:            number
+  arts_sports_score:     number
   social_sciences_score: number
-  top_pathway: string
-  confidence: 'high' | 'medium' | 'low'
-  strengths: string[]
-  development_areas: string[]
-  guidance_message: string
-  calculated_at: string
+  top_pathway:           string
+  confidence:            'high' | 'medium' | 'low'
+  strengths:             string[]
+  development_areas:     string[]
+  guidance_message:      string
+  calculated_at:         string
+  // Performance context
+  performance_tier:      'high' | 'mid' | 'low'
+  stem_viable:           boolean
 }
 
 /**
- * Calculate pathway affinity for Junior School students (Grade 7-9)
+ * Calculate pathway affinity for Junior School students (Grade 7–9).
+ *
+ * Philosophy:
+ *   HIGH performers (CBC avg ≥ 3.0) → push toward STEM first, Social Sciences second.
+ *   MID  performers (CBC avg 2.0–2.9) → balanced with slight STEM preference.
+ *   LOW  performers (CBC avg < 2.0)  → Arts & Sports Science (practical, confidence-building).
+ *
+ * Scores arrive as CBC 1–4 from the assessment pipeline.
  */
 export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRecommendation {
-  // STEM Indicators (weighted by importance)
-  const stemSubjects = {
-    'mathematics': 0.40,
-    'integrated_science': 0.35,
-    'pre_technical_studies': 0.25
+  // Step 1 — Convert CBC 1–4 to 0–100 percentage for precision
+  // ((score - 1) / 3) × 100  →  1→0, 2→33.3, 3→66.7, 4→100
+  const pct: Record<string, number> = {}
+  for (const [subject, score] of Object.entries(scores)) {
+    pct[subject] = ((score - 1) / 3) * 100
   }
-  
-  const stemScore = calculateWeightedScore(scores, stemSubjects)
 
-  // Arts & Sports Indicators
-  const artsSubjects = {
-    'creative_arts_sports': 0.60,
-    'english': 0.20,
-    'kiswahili': 0.20
-  }
-  
-  const artsScore = calculateWeightedScore(scores, artsSubjects)
+  // Step 2 — Raw pathway averages
+  // STEM: Maths carries double weight (primary STEM indicator)
+  const stemRaw = (
+    (pct.mathematics             ?? 0) * 2 +
+    (pct.integrated_science      ?? 0) +
+    (pct.pre_technical_studies   ?? 0)
+  ) / 4
 
-  // Social Sciences Indicators
-  const socialSubjects = {
-    'social_studies': 0.40,
-    'english': 0.30,
-    'kiswahili': 0.30
-  }
-  
-  const socialScore = calculateWeightedScore(scores, socialSubjects)
+  // Social Sciences: languages + humanities
+  const socialRaw = (
+    (pct.english        ?? 0) +
+    (pct.kiswahili      ?? 0) +
+    (pct.social_studies ?? 0) +
+    (pct.cre            ?? 0)
+  ) / 4
 
-  // Determine top pathway
-  const pathways = [
-    { name: 'STEM', score: stemScore },
-    { name: 'Arts & Sports', score: artsScore },
-    { name: 'Social Sciences', score: socialScore }
-  ]
-  pathways.sort((a, b) => b.score - a.score)
-  const topPathway = pathways[0]
+  // Arts & Sports Science: creative + practical
+  const artsRaw = (
+    (pct.creative_arts_sports  ?? 0) +
+    (pct.agriculture_nutrition ?? 0)
+  ) / 2
 
-  // Calculate confidence level
-  const scoreDiff = topPathway.score - pathways[1].score
-  let confidence: 'high' | 'medium' | 'low'
-  
-  if (scoreDiff > 20) {
-    confidence = 'high'
-  } else if (scoreDiff > 10) {
-    confidence = 'medium'
+  // Step 3 — CBC average for tier detection (uses original 1–4 scale)
+  const allCBC         = Object.values(scores)
+  const cbcAvg         = allCBC.reduce((a, b) => a + b, 0) / allCBC.length
+  const performanceTier: 'high' | 'mid' | 'low' =
+    cbcAvg >= 3.0 ? 'high' : cbcAvg >= 2.0 ? 'mid' : 'low'
+
+  // Step 4 — Apply performance-tier bias
+  let stemFinal:   number
+  let socialFinal: number
+  let artsFinal:   number
+
+  if (performanceTier === 'high') {
+    // Capable students should aim for high-demand pathways
+    stemFinal   = stemRaw   + 15
+    socialFinal = socialRaw + 5
+    artsFinal   = artsRaw   - 10
+  } else if (performanceTier === 'mid') {
+    // Balanced with slight STEM preference
+    stemFinal   = stemRaw   + 5
+    socialFinal = socialRaw
+    artsFinal   = artsRaw
   } else {
-    confidence = 'low'
+    // Low performers: practical pathway builds confidence
+    // Never boost STEM for a struggling student — sets them up to fail
+    stemFinal   = stemRaw
+    socialFinal = socialRaw
+    artsFinal   = artsRaw   + 15
   }
 
-  // Identify strengths (subjects with score >= 3)
+  // Step 5 — Top pathway and confidence
+  const pathways = [
+    { name: 'STEM',                  score: stemFinal,   raw: stemRaw   },
+    { name: 'Social Sciences',       score: socialFinal, raw: socialRaw },
+    { name: 'Arts & Sports Science', score: artsFinal,   raw: artsRaw   },
+  ].sort((a, b) => b.score - a.score)
+
+  const topPathway = pathways[0].name
+  const gap        = pathways[0].score - pathways[1].score
+  // >= 15 (not >) so that all-Level-1 students hit HIGH confidence for Arts
+  const confidence: 'high' | 'medium' | 'low' =
+    gap >= 15 ? 'high' : gap >= 8 ? 'medium' : 'low'
+
+  // Step 6 — STEM viability (Maths + Sci both ≥ 55% on CBC scale)
+  const mathsPct   = (scores.mathematics        ?? 0) / 4 * 100
+  const sciPct     = (scores.integrated_science ?? 0) / 4 * 100
+  const stemViable = mathsPct >= 55 && sciPct >= 55
+
+  // Strengths / development areas
   const strengths = Object.entries(scores)
-    .filter(([_, score]) => score >= 3)
-    .map(([subject, _]) => subject)
-    .sort((a, b) => (scores[b] || 0) - (scores[a] || 0))
+    .filter(([, s]) => s >= 3)
+    .map(([k]) => k)
+    .sort((a, b) => (scores[b] ?? 0) - (scores[a] ?? 0))
 
-  // Identify development areas (subjects with score <= 2)
   const developmentAreas = Object.entries(scores)
-    .filter(([_, score]) => score <= 2)
-    .map(([subject, _]) => subject)
-    .sort((a, b) => (scores[a] || 0) - (scores[b] || 0))
+    .filter(([, s]) => s <= 2)
+    .map(([k]) => k)
+    .sort((a, b) => (scores[a] ?? 0) - (scores[b] ?? 0))
 
-  // Generate personalized guidance message
-  const guidanceMessage = generateGuidanceMessage(
-    topPathway.name, 
-    topPathway.score, 
-    confidence, 
-    strengths,
-    developmentAreas,
-    scores
-  )
+  // Step 7 — Guidance message
+  const guidanceMessage = buildGuidanceMessage(topPathway, performanceTier, stemViable, developmentAreas)
 
   return {
-    stem_score: Math.round(stemScore),
-    arts_sports_score: Math.round(artsScore),
-    social_sciences_score: Math.round(socialScore),
-    top_pathway: topPathway.name,
+    stem_score:            Math.round(stemRaw),
+    arts_sports_score:     Math.round(artsRaw),
+    social_sciences_score: Math.round(socialRaw),
+    top_pathway:           topPathway,
     confidence,
     strengths,
-    development_areas: developmentAreas,
-    guidance_message: guidanceMessage,
-    calculated_at: new Date().toISOString()
+    development_areas:     developmentAreas,
+    guidance_message:      guidanceMessage,
+    calculated_at:         new Date().toISOString(),
+    performance_tier:      performanceTier,
+    stem_viable:           stemViable,
   }
 }
 
-/**
- * Calculate weighted score for a pathway
- */
-function calculateWeightedScore(scores: SubjectScores, weights: Record<string, number>): number {
-  let totalScore = 0
-  let totalWeight = 0
-
-  for (const [subject, weight] of Object.entries(weights)) {
-    const score = scores[subject] || 0
-    totalScore += (score / 4) * 100 * weight
-    totalWeight += weight
-  }
-
-  return totalWeight > 0 ? totalScore / totalWeight : 0
-}
-
-/**
- * Generate personalized guidance message
- */
-function generateGuidanceMessage(
-  pathway: string, 
-  score: number, 
-  confidence: string,
-  strengths: string[],
+function buildGuidanceMessage(
+  pathway:         string,
+  tier:            'high' | 'mid' | 'low',
+  stemViable:      boolean,
   developmentAreas: string[],
-  allScores: SubjectScores
 ): string {
-  const baseMessages = {
-    'STEM': {
-      high: `🌟 Exceptional STEM potential! Your child demonstrates outstanding analytical and technical abilities with a ${Math.round(score)}% pathway match.`,
-      medium: `✅ Good STEM aptitude showing! Your child has solid foundations in science and mathematics with a ${Math.round(score)}% pathway match.`,
-      low: `📊 Some STEM capability present. Your child shows potential in technical subjects with a ${Math.round(score)}% pathway match.`
-    },
-    'Arts & Sports': {
-      high: `🎨 Outstanding creative and physical talents! Your child excels in artistic expression and sports with a ${Math.round(score)}% pathway match.`,
-      medium: `✨ Good creative abilities emerging! Your child demonstrates solid artistic and athletic potential with a ${Math.round(score)}% pathway match.`,
-      low: `🎭 Some creative potential showing. Your child has foundational arts and sports abilities with a ${Math.round(score)}% pathway match.`
-    },
-    'Social Sciences': {
-      high: `📚 Excellent humanities and communication skills! Your child shines in languages and social studies with a ${Math.round(score)}% pathway match.`,
-      medium: `📖 Good humanities aptitude! Your child shows strong language and social science abilities with a ${Math.round(score)}% pathway match.`,
-      low: `📝 Some social sciences capability. Your child has developing humanities skills with a ${Math.round(score)}% pathway match.`
-    }
-  }
+  let message: string
 
-  let message = baseMessages[pathway as keyof typeof baseMessages][confidence] || ""
-
-  // Add specific recommendations based on pathway
-  if (pathway === 'STEM') {
-    message += "\n\n💡 Recommendations:\n"
-    if (allScores['mathematics'] >= 3 && allScores['integrated_science'] >= 3) {
-      message += "• Enroll in science competitions (Kenya Science & Engineering Fair)\n"
-      message += "• Join math clubs and coding programs\n"
-      message += "• Explore STEM career talks and mentorship\n"
+  if (tier === 'high') {
+    if (pathway === 'STEM') {
+      message =
+        'This student shows strong capability across all subjects. Their science and mathematics ' +
+        'foundation qualifies them for the STEM pathway — the most in-demand career route in Kenya. ' +
+        'With focused work on Mathematics, they can excel in Engineering, Medicine, or Technology.\n\n' +
+        '💡 Next steps: Science competitions, coding clubs, maths enrichment.'
+    } else if (pathway === 'Social Sciences') {
+      message =
+        'This is a high-achieving student with strong language and humanities performance. ' +
+        'The Social Sciences pathway leads to Law, Business, Education, and Public Service.' +
+        (stemViable
+          ? ' Their science scores also keep the STEM pathway as a viable alternative.'
+          : '') +
+        '\n\n💡 Next steps: Debate club, essay writing, reading widely across subjects.'
     } else {
-      message += "• Strengthen foundation in math and science\n"
-      message += "• Use online resources (Khan Academy, BBC Bitesize)\n"
-      message += "• Practice problem-solving regularly\n"
+      // High performer going Arts — language/creative scores dominate
+      message =
+        'This student excels across the board with a clear strength in creative and expressive subjects. ' +
+        'The Arts & Sports Science pathway leads to Design, Media, Journalism, Sports Management, and the Creative Industries.\n\n' +
+        '💡 Next steps: Competitions in arts, drama, or sports. Explore digital design and media production.'
     }
-    message += "• Likely pathway in Grade 10: STEM"
-  } else if (pathway === 'Arts & Sports') {
-    message += "\n\n💡 Recommendations:\n"
-    message += "• Join arts clubs, drama groups, or music ensembles\n"
-    message += "• Participate in school sports teams and tournaments\n"
-    message += "• Attend arts exhibitions and performances\n"
-    message += "• Explore creative career options early\n"
-    message += "• Likely pathway in Grade 10: Arts & Sports Science"
+  } else if (tier === 'mid') {
+    if (pathway === 'STEM') {
+      message =
+        'This student has developing STEM ability with room to grow. With consistent effort in Mathematics ' +
+        'and Science, the STEM pathway is achievable and worth pursuing.\n\n' +
+        '💡 Next steps: Khan Academy for Maths, BBC Bitesize for Science, regular practice problems.'
+    } else if (pathway === 'Social Sciences') {
+      message =
+        'This student shows solid language and humanities ability. The Social Sciences pathway is a strong fit, ' +
+        'leading to Law, Teaching, Business, and Public Service careers.\n\n' +
+        '💡 Next steps: Reading habit, writing practice, debate and discussion activities.'
+    } else {
+      message =
+        'This student performs best in creative and practical subjects. The Arts & Sports Science pathway ' +
+        'offers hands-on, project-based learning that suits their strengths.\n\n' +
+        '💡 Next steps: School arts club, agriculture projects, sports teams, and creative hobbies.'
+    }
   } else {
-    message += "\n\n💡 Recommendations:\n"
-    message += "• Join debate clubs and Model UN\n"
-    message += "• Increase reading (novels, newspapers, magazines)\n"
-    message += "• Practice essay writing and presentations\n"
-    message += "• Explore social sciences through documentaries\n"
-    message += "• Likely pathway in Grade 10: Social Sciences"
+    // Low performer — always Arts regardless of pathway (Arts always wins with +15 boost for low)
+    message =
+      'This student is still developing foundational skills. The Arts & Sports Science pathway offers ' +
+      'practical, hands-on learning that builds confidence. Focus on Agriculture, Creative Arts, and ' +
+      'Physical Education this term. With consistent effort, other pathways open up.\n\n' +
+      '💡 Priority: Attend every class, complete assignments, ask the teacher for help on missed work.'
   }
 
-  // Add development area guidance
+  // Development areas
   if (developmentAreas.length > 0) {
-    message += "\n\n⚠️ Areas for Improvement:\n"
-    const topDevelopmentAreas = developmentAreas.slice(0, 3)
-    topDevelopmentAreas.forEach(area => {
-      message += `• ${formatSubjectName(area)}: Needs more attention and practice\n`
-    })
+    const top3 = developmentAreas.slice(0, 3).map(a => formatSubjectName(a)).join(', ')
+    message += `\n\n⚠️ Needs attention: ${top3}.`
   }
 
-  // Add important disclaimer
-  message += "\n\n📌 Important: All subjects remain essential in junior school. This guidance helps with planning, but students should continue developing skills across all learning areas. Final pathway decisions should consider the student's interests, teacher input, and long-term goals."
+  message +=
+    '\n\n📌 All subjects remain essential in Junior School. This recommendation helps with planning — ' +
+    'final pathway decisions should consider the student\'s own interests and teacher guidance.'
 
   return message
 }
@@ -435,7 +445,8 @@ export function getPathwayColor(pathway: string): { bg: string, border: string, 
   switch (pathway) {
     case 'STEM':
       return { bg: 'bg-blue-50', border: 'border-blue-500', text: 'text-blue-700' }
-    case 'Arts & Sports':
+    case 'Arts & Sports Science':
+    case 'Arts & Sports': // legacy alias
       return { bg: 'bg-purple-50', border: 'border-purple-500', text: 'text-purple-700' }
     case 'Social Sciences':
       return { bg: 'bg-green-50', border: 'border-green-500', text: 'text-green-700' }

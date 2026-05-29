@@ -21,6 +21,7 @@ import {
   Sparkles,
   Shield,
 } from 'lucide-react'
+import { NoStudentsEmpty } from '@/components/ui/empty-states'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -685,21 +686,7 @@ export default function DashboardPage() {
               <button onClick={fetchStudents} className="text-xs text-red-600 underline font-bold">Retry</button>
             </div>
           ) : students.length === 0 ? (
-            <div className="border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center">
-              <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Users className="w-8 h-8 text-slate-400" />
-              </div>
-              <h3 className="font-black text-slate-700 text-lg mb-2">Add your first student</h3>
-              <p className="text-slate-500 text-sm mb-6 max-w-xs mx-auto">
-                Add your child to get started with the Academic Clinic and Learning Compass
-              </p>
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="bg-violet-600 hover:bg-violet-700 text-white font-black px-6 py-3 rounded-xl transition-colors"
-              >
-                Add Student
-              </button>
-            </div>
+            <NoStudentsEmpty onAddStudent={() => setShowAddModal(true)} />
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {students.map(s => <StudentCard key={s.id} student={s} />)}

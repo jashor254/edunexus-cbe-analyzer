@@ -7,7 +7,7 @@ import {
   TrendingUp, DollarSign, AlertCircle, ChevronRight,
   Globe, BookOpen, Loader2,
 } from 'lucide-react'
-import type { DynamicCareer } from '@/lib/academicClinic/dynamicCareerGenerator'
+import type { DynamicCareer } from '@/lib/academicClinic/careerEngine'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

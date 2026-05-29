@@ -30,9 +30,18 @@ function LoginContent() {
     if (base !== '/dashboard') return product ? `${base}?product=${product}` : base
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
+      // profiles.id = auth user UUID (NOT user_id)
       const { data: profile } = await supabase
-        .from('profiles').select('role').eq('user_id', user.id).maybeSingle()
+        .from('profiles').select('role').eq('id', user.id).maybeSingle()
+
       if (profile?.role === 'teacher') return '/teacher/dashboard'
+
+      // Fallback for accounts where profiles.role hasn't been set yet
+      if (!profile?.role) {
+        const { data: teacherRow } = await supabase
+          .from('teachers').select('id').eq('user_id', user.id).maybeSingle()
+        if (teacherRow?.id) return '/teacher/dashboard'
+      }
     }
     return product ? `/dashboard?product=${product}` : '/dashboard'
   }

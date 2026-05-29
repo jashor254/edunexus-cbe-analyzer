@@ -16,15 +16,22 @@ const GoogleIcon = () => (
 )
 
 function SignupForm() {
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState<string | null>(null)
+  const [loading,        setLoading]        = useState(false)
+  const [error,          setError]          = useState<string | null>(null)
+  const [wantsSecondary, setWantsSecondary] = useState(false)
 
   const searchParams = useSearchParams()
   const supabase     = createClient()
 
   const productId = searchParams.get('product')
   const returnTo  = searchParams.get('returnTo') || '/dashboard'
-  const role      = searchParams.get('role')
+  const role      = searchParams.get('role')          // 'teacher' | 'parent' | null
+
+  // What secondary role the checkbox would grant
+  const secondaryRole  = role === 'teacher' ? 'parent' : role === 'parent' ? 'teacher' : null
+  const secondaryLabel =
+    role === 'teacher' ? 'I also have a child on EduNexus (add parent access)' :
+    role === 'parent'  ? "I'm also a teacher on EduNexus (add teacher access)"  : null
 
   const handleGoogleSignup = async () => {
     setLoading(true)
@@ -32,13 +39,13 @@ function SignupForm() {
 
     const cbUrl = new URL(`${window.location.origin}/auth/callback`)
     cbUrl.searchParams.set('returnTo', returnTo)
-    if (role)      cbUrl.searchParams.set('role', role)
-    if (productId) cbUrl.searchParams.set('product', productId)
-    const redirectUrl = cbUrl.toString()
+    if (role)                            cbUrl.searchParams.set('role',           role)
+    if (productId)                       cbUrl.searchParams.set('product',        productId)
+    if (wantsSecondary && secondaryRole) cbUrl.searchParams.set('secondary_role', secondaryRole)
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options:  { redirectTo: redirectUrl },
+      options:  { redirectTo: cbUrl.toString() },
     })
 
     if (error) {
@@ -65,7 +72,7 @@ function SignupForm() {
             Create your account
           </h1>
           <p className="text-sm text-white/40 text-center mb-8">
-            First Compass session on us 🎁
+            {role === 'teacher' ? 'Join as a teacher 🏫' : 'First Compass session on us 🎁'}
           </p>
 
           {error && (
@@ -86,6 +93,34 @@ function SignupForm() {
             )}
             {loading ? 'Redirecting…' : 'Sign up with Google'}
           </button>
+
+          {/* Optional dual-role checkbox — only shown when role param is set */}
+          {secondaryLabel && (
+            <label className="flex items-start gap-3 mt-5 cursor-pointer group">
+              <div className="relative shrink-0 mt-0.5">
+                <input
+                  type="checkbox"
+                  checked={wantsSecondary}
+                  onChange={e => setWantsSecondary(e.target.checked)}
+                  className="sr-only"
+                />
+                <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                  wantsSecondary
+                    ? 'bg-amber-500 border-amber-500'
+                    : 'bg-white/5 border-white/20 group-hover:border-white/40'
+                }`}>
+                  {wantsSecondary && (
+                    <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none">
+                      <path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </div>
+              </div>
+              <span className="text-xs text-white/50 group-hover:text-white/70 leading-relaxed transition-colors">
+                {secondaryLabel}
+              </span>
+            </label>
+          )}
 
           <p className="text-center text-[11px] text-white/30 mt-5 leading-relaxed">
             By continuing you agree to our{' '}

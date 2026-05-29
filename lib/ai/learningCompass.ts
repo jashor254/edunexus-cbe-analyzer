@@ -30,21 +30,22 @@ export interface Learner {
   challenges: string[]
   interests: string[]
   dreamCareer?: string
+  recommendedPathway: string | null
 }
 
 export interface LearnerState {
   // Reference to learner profile
   learner: Learner
-  
+
   // Current performance level (from assessments)
   currentTier: 'below_expectations' | 'approaching_expectations' | 'meets_expectations' | 'exceeds_expectations'
   subjectTiers: Record<string, string> // per-subject tiers
-  
+
   // Real-time session state
   cognitiveLoad: 'low' | 'optimal' | 'high' | 'overwhelmed'
   engagementLevel: 'disengaged' | 'neutral' | 'engaged' | 'excited'
   confidenceLevel: 'low' | 'medium' | 'high'
-  
+
   // Session tracking
   currentSubject: string
   currentConcept: string
@@ -60,6 +61,13 @@ export interface LearnerState {
 
   // Curriculum
   curriculumType: CurriculumType
+
+  // Compass directives from assessment pipeline
+  sessionGoal: string
+  guidedTopics: string[]
+  careerContext: string
+  subjectActionSteps: Record<string, string[]>
+  subjectVelocities: Record<string, { velocity: number; trend: string; prediction: string }>
 }
 
 export interface Task {
@@ -104,53 +112,114 @@ export class LearningCompass {
   ]
   
   /**
-   * Initialize compass with learner's assessment data
-   * This is where it all begins - compass now KNOWS the learner
+   * Initialize compass with learner's assessment data + optional pre-calculated context
+   * learningContext comes from student_learning_context table (saved by guidance/career pages)
+   * Falls back to live analyzePerformance() when context is absent
    */
   async initializeFromAssessments(
     learnerId: string,
     assessments: any[],
-    interests: any
-  ): Promise<Learner> {
-    // 1. Run full performance analysis
+    interests: any,
+    learningContext?: {
+      overall_tier: string
+      subject_tiers: Record<string, string>
+      subject_action_steps: Record<string, string[]>
+      subject_velocities: Record<string, { velocity: number; trend: string; prediction: string }>
+      recommended_pathway: string | null
+      pathway_confidence: string | null
+      top_careers: Array<{ career: string; matchScore: number; gaps: string[]; requiredSubjects: string[] }>
+      career_gaps: string[]
+      first_subject: string
+      session_goal: string
+      guided_topics: string[]
+      overall_level: number
+      curriculum_type: string
+      grade: number
+    } | null,
+    studentProfile?: {
+      name: string
+      grade: number
+      curriculum_type: string
+      current_pathway: string | null
+    } | null
+  ): Promise<void> {
     const latestAssessment = assessments[0]
     const historicalData = this.buildHistoricalData(assessments)
-    const analysis = analyzePerformance(latestAssessment.subject_scores, historicalData)
-    
-    // 2. Build learner profile with assessment context
+
+    // ── Resolve name + grade from studentProfile > assessment > fallback ──
+    const studentName = studentProfile?.name ?? latestAssessment?.students?.name ?? 'Student'
+    const grade = studentProfile?.grade ?? latestAssessment?.students?.grade ?? 7
+
+    // ── Resolve tier / subject tiers / action steps ──
+    let overallTier: LearnerState['currentTier'] = 'meets_expectations'
+    let subjectTiers: Record<string, string> = {}
+    let subjectActionSteps: Record<string, string[]> = {}
+    let subjectVelocities: Record<string, { velocity: number; trend: string; prediction: string }> = {}
+    let strugglingSubs: string[] = []
+    let masteredSubs: string[] = []
+
+    if (learningContext && Object.keys(learningContext.subject_tiers || {}).length > 0) {
+      // Use pre-calculated context saved by guidance/career pages
+      overallTier = this.mapOverallTier(learningContext.overall_tier)
+      subjectTiers = learningContext.subject_tiers || {}
+      subjectActionSteps = learningContext.subject_action_steps || {}
+      subjectVelocities = learningContext.subject_velocities || {}
+      Object.entries(subjectTiers).forEach(([subj, tier]) => {
+        if (tier === 'remedial' || tier === 'reinforcement') strugglingSubs.push(subj)
+        else if (tier === 'challenge') masteredSubs.push(subj)
+      })
+    } else if (latestAssessment?.subject_scores && Object.keys(latestAssessment.subject_scores).length > 0) {
+      // Fall back: calculate fresh using adaptiveLearning
+      const numericScores: Record<string, number> = {}
+      Object.entries(latestAssessment.subject_scores).forEach(([k, v]) => {
+        numericScores[k] = typeof v === 'number' ? v : 0
+      })
+      const analysis = analyzePerformance(numericScores, historicalData)
+      overallTier = this.mapOverallTier(analysis.overallTier)
+      analysis.recommendations.forEach(rec => {
+        subjectTiers[rec.subject] = this.mapOverallTier(rec.tier)
+        subjectActionSteps[rec.subject] = rec.actionSteps
+        if (rec.tier === 'remedial' || rec.tier === 'reinforcement') strugglingSubs.push(rec.subject)
+        else if (rec.tier === 'challenge') masteredSubs.push(rec.subject)
+      })
+    }
+
     const learner: Learner = {
       id: learnerId,
-      name: latestAssessment.students.name,
-      grade: latestAssessment.students.grade,
-      age: this.calculateAge(latestAssessment.students.grade),
-      strengths: this.extractStrengths(analysis),
-      challenges: this.extractChallenges(analysis),
+      name: studentName,
+      grade,
+      age: this.calculateAge(grade),
+      strengths: masteredSubs,
+      challenges: strugglingSubs,
       interests: interests?.interests || [],
-      dreamCareer: interests?.dream_career
+      dreamCareer: interests?.dream_career ?? learningContext?.top_careers?.[0]?.career,
+      recommendedPathway: learningContext?.recommended_pathway ?? studentProfile?.current_pathway ?? null,
     }
-    
-    // 3. Initialize learner state WITH learner reference
+
     const initialState: LearnerState = {
-      learner: learner,
-      currentTier: this.mapOverallTier(analysis.overallTier),
-      subjectTiers: this.mapSubjectTiers(analysis.recommendations),
+      learner,
+      currentTier: overallTier,
+      subjectTiers,
       cognitiveLoad: 'optimal',
       engagementLevel: 'neutral',
       confidenceLevel: 'medium',
-      currentSubject: '',
+      currentSubject: learningContext?.first_subject || strugglingSubs[0] || 'mathematics',
       currentConcept: '',
       timeOnTask: 0,
       attemptsOnConcept: 0,
       consecutiveSuccesses: 0,
       breaksTaken: 0,
-      masteredConcepts: [],
-      strugglingConcepts: [],
-      curriculumType: 'cbc'
+      masteredConcepts: masteredSubs,
+      strugglingConcepts: strugglingSubs,
+      curriculumType: (learningContext?.curriculum_type ?? studentProfile?.curriculum_type ?? 'cbc') as CurriculumType,
+      sessionGoal: learningContext?.session_goal || '',
+      guidedTopics: learningContext?.guided_topics || [],
+      careerContext: learningContext?.top_careers?.[0]?.career || '',
+      subjectActionSteps,
+      subjectVelocities,
     }
 
     this.learnerHistory.set(learnerId, initialState)
-    
-    return learner
   }
   
   /**
@@ -170,9 +239,12 @@ export class LearningCompass {
     curriculumType?: CurriculumType
   ): Promise<CompassDecision> {
 
-    // 1. Get current learner state
-    const state = this.learnerHistory.get(learnerId)
-    if (!state) throw new Error('Learner not initialized')
+    // 1. Get current learner state — create default if missing (cold start or no assessments)
+    let state = this.learnerHistory.get(learnerId)
+    if (!state) {
+      state = this.createDefaultState(learnerId, curriculumType)
+      this.learnerHistory.set(learnerId, state)
+    }
 
     // Apply curriculum type if provided
     if (curriculumType) state.curriculumType = curriculumType
@@ -1009,6 +1081,25 @@ DIAGRAM:
 └─────────────────┘
 ` : ''
     
+    const actionStepsForSubject = state.subjectActionSteps?.[subject]
+    const actionStepsBlock = actionStepsForSubject?.length ? `
+PERSONALIZED ACTION STEPS FOR THIS LEARNER IN ${subject.toUpperCase()}:
+${actionStepsForSubject.slice(0, 3).map((step, i) => `${i + 1}. ${step}`).join('\n')}
+
+Build your task around these specific steps.
+Learner's tier for this subject: ${state.subjectTiers?.[subject] || 'standard'}
+` : ''
+
+    const sessionGoalBlock = state.sessionGoal ? `
+SESSION GOAL: ${state.sessionGoal}
+GUIDED TOPICS FOR THIS SESSION:
+${(state.guidedTopics || []).map((t, i) => `${i + 1}. ${t}`).join('\n')}
+` : ''
+
+    const careerBlock = state.careerContext ? `
+CAREER CONTEXT: This student is targeting "${state.careerContext}". Connect explanations to this career whenever natural.
+` : ''
+
     return `
 You are the Learning Compass creating a PERFECT task for a Kenyan student.
 
@@ -1023,6 +1114,8 @@ STUDENT CONTEXT:
 - Good at: ${state.masteredConcepts.join(', ') || 'willing to learn'}
 - Interests: ${state.learner.interests.join(', ') || 'learning through stories'}
 - Dream Career: ${state.learner.dreamCareer || 'not sure yet'}
+- Recommended Pathway: ${state.learner.recommendedPathway || 'not set yet'}
+${actionStepsBlock}${sessionGoalBlock}${careerBlock}
 
 ${curriculumType === 'igcse' ? `🌍 CONTEXT GUIDELINES (Cambridge IGCSE student):
 - Use international examples primarily (London, New York, Tokyo, Nairobi)
@@ -1346,6 +1439,41 @@ CRITICAL TEACHING RULES — ALWAYS FOLLOW:
     }
   }
   
+  // ─── Default state for cold-start / no-assessment users ─────────────────────
+  private createDefaultState(learnerId: string, curriculumType?: CurriculumType): LearnerState {
+    return {
+      learner: {
+        id:                 learnerId,
+        name:               'Learner',
+        grade:              7,
+        age:                13,
+        strengths:          [],
+        challenges:         [],
+        interests:          [],
+        recommendedPathway: null,
+      },
+      currentTier:          'meets_expectations',
+      subjectTiers:         {},
+      cognitiveLoad:        'optimal',
+      engagementLevel:      'neutral',
+      confidenceLevel:      'medium',
+      currentSubject:       '',
+      currentConcept:       '',
+      timeOnTask:           0,
+      attemptsOnConcept:    0,
+      consecutiveSuccesses: 0,
+      breaksTaken:          0,
+      masteredConcepts:     [],
+      strugglingConcepts:   [],
+      curriculumType:       curriculumType ?? 'cbc',
+      sessionGoal:          '',
+      guidedTopics:         [],
+      careerContext:        '',
+      subjectActionSteps:   {},
+      subjectVelocities:    {},
+    }
+  }
+
   // Helper methods
   private buildHistoricalData(assessments: any[]) {
     const historical: Record<string, Array<{ term: number; score: number }>> = {}

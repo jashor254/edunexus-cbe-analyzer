@@ -49,37 +49,49 @@ export async function POST(req: Request) {
     }
 
     // ── Load or initialize compass state ──
-    const { data: savedState } = await db
-      .from('compass_sessions')
-      .select('session_state')
-      .eq('id', sessionId)
-      .eq('learner_id', user.id)
-      .eq('status', 'active')
-      .single()
+    const [
+      { data: savedState },
+      { data: learningContext },
+      { data: studentProfile },
+    ] = await Promise.all([
+      db.from('compass_sessions')
+        .select('session_state')
+        .eq('id', sessionId)
+        .eq('learner_id', user.id)
+        .eq('status', 'active')
+        .single(),
+      db.from('student_learning_context')
+        .select('overall_tier, subject_tiers, subject_action_steps, subject_velocities, recommended_pathway, pathway_confidence, top_careers, career_gaps, first_subject, session_goal, guided_topics, overall_level, curriculum_type, grade, compass_bridge')
+        .eq('student_id', learnerId || user.id)
+        .single(),
+      db.from('students')
+        .select('name, grade, curriculum_type, current_pathway')
+        .eq('id', learnerId || user.id)
+        .single(),
+    ])
 
     const compassKnowsLearner = savedState?.session_state?.initialized === true
 
     if (!compassKnowsLearner) {
-      const { data: assessments } = await db
-        .from('assessments')
-        .select(`*, students (name, grade)`)
-        .eq('student_id', learnerId || user.id)
-        .order('created_at', { ascending: false })
-        .limit(5)
+      const [{ data: assessments }, { data: interests }] = await Promise.all([
+        db.from('assessments')
+          .select('*, students(name, grade, curriculum_type)')
+          .eq('student_id', learnerId || user.id)
+          .order('created_at', { ascending: false })
+          .limit(5),
+        db.from('student_interests')
+          .select('*')
+          .eq('student_id', learnerId || user.id)
+          .single(),
+      ])
 
-      const { data: interests } = await db
-        .from('student_interests')
-        .select('*')
-        .eq('student_id', learnerId || user.id)
-        .single()
-
-      if (assessments?.length) {
-        await learningCompass.initializeFromAssessments(
-          learnerId || user.id,
-          assessments,
-          interests
-        )
-      }
+      await learningCompass.initializeFromAssessments(
+        learnerId || user.id,
+        assessments || [],
+        interests,
+        learningContext ?? null,
+        studentProfile ?? null
+      )
     } else if (savedState?.session_state) {
       learningCompass.restoreState(learnerId || user.id, savedState.session_state)
     }
@@ -154,9 +166,22 @@ export async function POST(req: Request) {
     const hasQuestion = !!task.content.question
     const hasVisual = !!task.content.visualAid
 
+    // ── Compass Bridge career context ──
+    type CompassBridgeShape = {
+      summary?: { recommendedPathway?: string }
+      sessionGoal?: string
+      subjectPriorities?: Array<{ displayName?: string; careerReason?: string }>
+      weeklyMilestones?: Array<{ goal?: string }>
+    }
+    const cb = (learningContext as { compass_bridge?: CompassBridgeShape } | null)?.compass_bridge
+    const compassBridgeContext = cb
+      ? `\n## CAREER CONTEXT FOR THIS SESSION:\nCareer Target: ${cb.summary?.recommendedPathway ?? ''}\nSession Goal: ${cb.sessionGoal ?? ''}\nPriority Subject: ${cb.subjectPriorities?.[0]?.displayName ?? ''}\nCareer Reason: ${cb.subjectPriorities?.[0]?.careerReason ?? ''}\nThis Week's Milestone: ${cb.weeklyMilestones?.[0]?.goal ?? ''}\n\nWhen teaching, connect every concept back to this career. If student asks why they need to learn this, use the career reason above.\n`
+      : ''
+
     // ── 🔥 GENERATE ACTUAL RESPONSE USING DEEPSEEK 🔥 ──
     const responsePrompt = `
 You are the Learning Compass tutor for a Kenyan student.
+${compassBridgeContext}
 
 ## WHAT TO TEACH:
 - Instruction: ${task.content.instruction}

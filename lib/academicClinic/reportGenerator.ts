@@ -1,5 +1,6 @@
 // lib/academicClinic/reportGenerator.ts
 
+import { CareerEngine } from './careerEngine'
 import {
   StudentProfile,
   SubjectProgress,
@@ -436,53 +437,28 @@ export function generateJuniorGuidance(subjects: SubjectProgress[]): JuniorGuida
 
 // ─── Career Intelligence (Senior — Page 4B) ───────────────────────────────────
 
-interface CareerDef {
-  name: string
-  keySubjects: string[]
-  supportSubjects: string[]
-  kenyanPathway: string
-}
-
-const CAREER_DEFS: CareerDef[] = [
-  { name: 'Medicine & Surgery',        keySubjects: ['biology', 'chemistry'],                           supportSubjects: ['physics', 'mathematics', 'core_mathematics', 'english'],        kenyanPathway: 'University — KCSE B+ overall, B+ in Biology & Chemistry' },
-  { name: 'Software Engineering',      keySubjects: ['mathematics', 'core_mathematics', 'computer_studies'], supportSubjects: ['physics', 'english'],                                  kenyanPathway: 'University — Computer Science degree. TVET: ICT Diploma' },
-  { name: 'Law & Governance',          keySubjects: ['english', 'history_citizenship', 'history', 'social_studies'], supportSubjects: ['kiswahili_ksl', 'kiswahili', 'geography'],       kenyanPathway: 'University — LLB degree, KCSE B+ required' },
-  { name: 'Engineering',               keySubjects: ['physics', 'mathematics', 'core_mathematics'],     supportSubjects: ['chemistry', 'computer_studies', 'pre_technical'],               kenyanPathway: 'University — Engineering degree. TVET: Technical Diploma' },
-  { name: 'Business & Finance',        keySubjects: ['business_studies', 'mathematics', 'essential_mathematics', 'core_mathematics'], supportSubjects: ['english', 'computer_studies'],  kenyanPathway: 'University — Business/Finance degree. CPA pathway available' },
-  { name: 'Nursing & Healthcare',      keySubjects: ['biology', 'chemistry'],                           supportSubjects: ['home_science', 'english', 'mathematics'],                        kenyanPathway: 'University — BSN Nursing. TVET: Nursing Diploma' },
-  { name: 'Education & Teaching',      keySubjects: ['english', 'mathematics', 'core_mathematics'],     supportSubjects: ['kiswahili_ksl', 'biology', 'history_citizenship'],               kenyanPathway: 'University — BEd degree. PGDE postgraduate pathway' },
-  { name: 'Journalism & Media',        keySubjects: ['english', 'kiswahili_ksl', 'kiswahili'],          supportSubjects: ['history_citizenship', 'social_studies', 'geography'],            kenyanPathway: 'University — Mass Communication. Short courses: digital media' },
-  { name: 'Agriculture & Food Science',keySubjects: ['agriculture_nutrition', 'agriculture', 'biology'],supportSubjects: ['chemistry', 'geography', 'mathematics'],                         kenyanPathway: 'University — BSc Agriculture. TVET: Agricultural Diploma' },
-  { name: 'Architecture & Design',     keySubjects: ['mathematics', 'core_mathematics', 'pre_technical', 'fine_arts'], supportSubjects: ['physics', 'geography', 'computer_studies'],    kenyanPathway: 'University — Architecture degree (5 years). Short course: Interior Design' },
-  { name: 'Sports Science & Coaching', keySubjects: ['physical_education', 'sports_recreation', 'biology'], supportSubjects: ['mathematics', 'home_science'],                             kenyanPathway: 'University — Sports Science. TVET: Sports Management Diploma' },
-  { name: 'Creative Arts & Design',    keySubjects: ['creative_arts_sports', 'fine_arts', 'theatre_film', 'music_dance'], supportSubjects: ['english', 'computer_studies'],              kenyanPathway: 'University — Fine Arts/Design. TVET: Craft Design Diploma' },
-  { name: 'Environmental Science',     keySubjects: ['geography', 'biology', 'chemistry'],              supportSubjects: ['mathematics', 'agriculture_nutrition', 'physics'],               kenyanPathway: 'University — Environmental Science/Management degree' },
-  { name: 'Data Science & ICT',        keySubjects: ['computer_studies', 'mathematics', 'core_mathematics'], supportSubjects: ['physics', 'english', 'business_studies'],               kenyanPathway: 'University — Computer Science/Data Science. TVET: KISE ICT Diploma' },
-]
-
-function scoreCareer(career: CareerDef, subjects: SubjectProgress[]) {
-  const map = new Map(subjects.map(s => [s.subject, s]))
-  const keyHits     = career.keySubjects.map(k => map.get(k)).filter((s): s is SubjectProgress => !!s)
-  const supportHits = career.supportSubjects.map(k => map.get(k)).filter((s): s is SubjectProgress => !!s).slice(0, 2)
-
-  const keyAvg     = keyHits.length     ? keyHits.reduce((s, x) => s + x.level, 0) / keyHits.length     : 0
-  const supportAvg = supportHits.length ? supportHits.reduce((s, x) => s + x.level, 0) / supportHits.length : 0
-  const score      = keyHits.length     ? keyAvg * 0.72 + supportAvg * 0.28 : supportAvg * 0.5
-
-  const matchStrength: 'STRONG' | 'GOOD' | 'POSSIBLE' = score >= 3.2 ? 'STRONG' : score >= 2.6 ? 'GOOD' : 'POSSIBLE'
-  const gapSubjects = career.keySubjects
-    .map(k => ({ key: k, s: map.get(k) }))
-    .filter(({ s }) => !s || s.level <= 2)
-    .map(({ key }) => formatSubjectName(key))
-
-  return { score, matchStrength, keyHits, gapSubjects }
-}
-
 export function generateSeniorGuidance(subjects: SubjectProgress[], firstName = 'This student'): SeniorGuidance {
-  const scored = CAREER_DEFS
-    .map(career => ({ career, ...scoreCareer(career, subjects) }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3)
+  const engine = new CareerEngine()
+  const scores = Object.fromEntries(subjects.map(s => [s.subject, s.level]))
+  const subjectAvg = subjects.reduce((s, x) => s + x.level, 0) / subjects.length
+  const tier: 'high' | 'mid' | 'low' = subjectAvg >= 3.0 ? 'high' : subjectAvg >= 2.0 ? 'mid' : 'low'
+
+  const engineResults = engine.matchCareers(scores, tier).slice(0, 3)
+
+  const scored = engineResults.map(match => {
+    const keyHits = subjects.filter(s => match.career.matchRequirements.primarySubjects.includes(s.subject))
+    const gapSubjects = match.gapSubjects.map(s => formatSubjectName(s))
+    const score = match.matchScore / 25
+    const matchStrength: 'STRONG' | 'GOOD' | 'POSSIBLE' = match.matchScore >= 75 ? 'STRONG' : match.matchScore >= 55 ? 'GOOD' : 'POSSIBLE'
+    return {
+      career: {
+        name: match.career.name,
+        kenyanPathway: match.career.cbeReadiness.recommendedSeniorPath,
+        requiredSubjects: match.career.matchRequirements.primarySubjects,
+      },
+      score, matchStrength, keyHits, gapSubjects,
+    }
+  })
 
   const topCareers: CareerMatch[] = scored.map(({ career, matchStrength, keyHits, gapSubjects }) => {
     const strong = keyHits.filter(s => s.level >= 3).map(s => s.displayName)
@@ -500,12 +476,11 @@ export function generateSeniorGuidance(subjects: SubjectProgress[], firstName = 
       whyItFits,
       keyGap,
       kenyanPathway: career.kenyanPathway,
-      requiredSubjects: career.keySubjects,
+      requiredSubjects: career.requiredSubjects,
     }
   })
 
-  const avg = subjects.reduce((s, x) => s + x.level, 0) / subjects.length
-  const honestAssessment = avg >= 3.0
+  const honestAssessment = subjectAvg >= 3.0
     ? `Based on current performance data, ${topCareers[0]?.name} and ${topCareers[1]?.name} represent realistic and well-matched pathways. With sustained effort and targeted support in identified gap areas, these careers are genuinely achievable through the Kenyan university system.`
     : `Current performance indicates that focused preparation will be required before these career pathways become fully accessible. The holiday action plan and consistent Learning Compass sessions are critical tools for closing the identified gaps before KCSE.`
 

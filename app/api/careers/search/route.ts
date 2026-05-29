@@ -2,8 +2,7 @@
 import { NextRequest } from 'next/server';
 import { apiSuccess, apiError, apiBadRequest } from '@/lib/api/response';
 import { createClient } from '@/utils/supabase/server';
-import { findCareerByName } from '@/lib/academicClinic/careerDatabase';
-import { generateDynamicCareer } from '@/lib/academicClinic/dynamicCareerGenerator';
+import { findCareerByName, generateDynamicCareer } from '@/lib/academicClinic/careerEngine';
 import { checkRateLimit } from '@/lib/ai/rateLimit';
 
 export async function GET(req: NextRequest) {

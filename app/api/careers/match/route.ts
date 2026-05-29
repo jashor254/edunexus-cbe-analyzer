@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response';
 import { createClient } from '@/utils/supabase/server';
-import { careerMatcher } from '@/lib/academicClinic/careerMatcher';
+import { careerMatcher } from '@/lib/academicClinic/careerEngine';
 import { unstable_cache, revalidateTag } from 'next/cache';
 
 export async function POST(req: NextRequest) {
