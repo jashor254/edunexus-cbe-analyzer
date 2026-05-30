@@ -1,6 +1,7 @@
 // app/api/tokens/check/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { isAdmin } from '@/lib/auth/isAdmin'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,6 +34,17 @@ export async function POST(request: NextRequest) {
         { error: 'Invalid feature' },
         { status: 400 }
       )
+    }
+
+    // Admin bypass — always canProceed, no token cost
+    const { data: { user } } = await supabase.auth.admin.getUserById(userId)
+    if (await isAdmin(userId, user?.email)) {
+      return NextResponse.json({
+        canProceed: true,
+        method: 'admin',
+        tokensRequired: 0,
+        tokensAvailable: 'unlimited',
+      })
     }
 
     // ✅ Check active subscription — use expires_at + plan (NOT end_date / plan_type)

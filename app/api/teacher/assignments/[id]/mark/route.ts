@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound } from '@/lib/api/response'
+import { notifyAssignmentMarked } from '@/lib/notifications/notify'
 
 export async function POST(
   req: Request,
@@ -70,39 +71,8 @@ export async function POST(
 
     if (error || !submission) return apiNotFound('Submission not found')
 
-    // Fetch student info for WhatsApp notification
-    try {
-      const { data: studentData } = await db
-        .from('students')
-        .select('name, user_id')
-        .eq('id', submission.student_id)
-        .single()
-
-      if (studentData) {
-        const { data: classStudent } = await db
-          .from('class_students')
-          .select('parent_id')
-          .eq('student_id', submission.student_id)
-          .eq('class_id', assignment.class_id)
-          .single()
-
-        if (classStudent?.parent_id) {
-          const scoreText = score !== undefined && score !== null
-            ? `${score}/${maxScore}`
-            : 'N/A'
-          const feedbackText = feedback || 'No feedback provided'
-          // WhatsApp deep-link message — frontend opens wa.me when parent phone is available
-          console.log(
-            `[WhatsApp] Assignment marked: ${assignment.title} | ` +
-            `Student: ${studentData.name} | Score: ${scoreText} | ` +
-            `Feedback: ${feedbackText} | View: edunexus.co.ke/dashboard`
-          )
-        }
-      }
-    } catch (notifyErr) {
-      // Non-fatal — notification failure must not block the mark save
-      console.warn('[mark] notification error:', notifyErr)
-    }
+    notifyAssignmentMarked(submission.id, assignmentId)
+      .catch(err => console.error('[notify] mark:', err))
 
     return apiSuccess({ submission })
   } catch (e: any) {

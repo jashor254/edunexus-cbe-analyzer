@@ -1,6 +1,7 @@
 // app/api/tokens/deduct/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { isAdmin } from '@/lib/auth/isAdmin'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,6 +35,17 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Invalid feature' },
         { status: 400 }
       )
+    }
+
+    // Admin bypass — unlimited access, no deduction
+    const { data: { user } } = await supabase.auth.admin.getUserById(userId)
+    if (await isAdmin(userId, user?.email)) {
+      return NextResponse.json({
+        success: true,
+        method: 'admin',
+        tokensRemaining: 'unlimited',
+        message: 'Access granted — admin account',
+      })
     }
 
     // ✅ Check active subscription — use expires_at (NOT end_date)

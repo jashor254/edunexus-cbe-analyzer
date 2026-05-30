@@ -76,7 +76,7 @@ export async function GET(request: Request) {
       try {
         const { data: sow } = await db
           .from('schemes_of_work')
-          .select('teacher_id, school, grade_name, learning_area, term, year, curriculum_type')
+          .select('teacher_id, school, grade, learning_area, term, year, curriculum_mode')
           .eq('id', sowId)
           .single()
 
@@ -96,11 +96,11 @@ export async function GET(request: Request) {
               scheme_id: sowId,
               teacher_id: plans[0].teacher_id,
               school: sow.school,
-              grade: sow.grade_name,
+              grade: sow.grade,
               learning_area: sow.learning_area,
               term: String(sow.term),
               year: sow.year,
-              curriculum_mode: sow.curriculum_type,
+              curriculum_mode: sow.curriculum_mode,
               teacher_name: teacher?.full_name ?? '',
             },
             { onConflict: 'scheme_id' }

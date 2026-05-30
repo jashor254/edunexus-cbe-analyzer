@@ -33,7 +33,7 @@ export async function buildRecordOfWork(
 
   const { data: sow, error: sowErr } = await db
     .from('schemes_of_work')
-    .select('teacher_id, school, grade_name, learning_area, term, year')
+    .select('teacher_id, school, grade, learning_area, term, year')
     .eq('id', sowId)
     .single()
 
@@ -62,7 +62,7 @@ export async function buildRecordOfWork(
     teacher_name: teacher?.full_name ?? '',
     tsc_number: teacher?.tsc_number ?? '',
     school: sow.school,
-    grade: sow.grade_name,
+    grade: sow.grade,
     learning_area: sow.learning_area,
     term: sow.term,
     year: sow.year,

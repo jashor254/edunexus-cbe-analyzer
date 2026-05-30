@@ -39,6 +39,20 @@ export async function POST(req: Request) {
 
     const { meta, lessons, breaks } = schemeData
 
+    // timeline: flat array of {week, lesson, isBreak} slots derived from lessons + breaks.
+    // weeklyGenerator reads this to know which weeks are teaching vs break weeks.
+    const teachingSlots = lessons.map(l => ({ week: l.week, lesson: l.lesson, isBreak: false }))
+    const breakSlots = breaks.flatMap(b => {
+      const slots = []
+      for (let w = b.startWeek; w <= b.endWeek; w++) {
+        slots.push({ week: w, lesson: 0, isBreak: true })
+      }
+      return slots
+    })
+    const timeline = [...teachingSlots, ...breakSlots].sort((a, b) =>
+      a.week !== b.week ? a.week - b.week : a.lesson - b.lesson
+    )
+
     // ── Insert scheme record ──────────────────────────────────────────────────
     const { data: scheme, error: schemeErr } = await db
       .from('schemes_of_work')
@@ -54,7 +68,11 @@ export async function POST(req: Request) {
         total_lessons: meta.totalLessons,
         total_weeks: meta.totalWeeks,
         average_confidence: meta.averageConfidence,
-        breaks: breaks,
+        breaks,
+        lessons,
+        timeline,
+        teacher_name: meta.teacherName || null,
+        tsc_number: meta.tscNumber || null,
         status: 'saved',
         created_at: new Date().toISOString(),
       })

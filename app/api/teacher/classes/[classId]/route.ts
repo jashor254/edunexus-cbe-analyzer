@@ -122,6 +122,7 @@ export async function GET(
         return {
           ...student,
           joined_at: link?.joined_at,
+          parent_id: link?.parent_id ?? null,
           overallLevel,
           avgScore: avgScore ? Math.round(avgScore * 10) / 10 : null,
           subjectScores,

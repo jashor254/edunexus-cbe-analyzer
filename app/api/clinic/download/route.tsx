@@ -11,6 +11,7 @@ import {
   formatSubjectName,
 } from '@/lib/academicClinic/reportGenerator'
 import { generateAcademicClinicPDF } from '@/lib/academicClinic/pdfGenerator'
+import { isAdmin } from '@/lib/auth/isAdmin'
 import type {
   SubjectProgress,
   StudentProfile,
@@ -53,59 +54,62 @@ export async function POST(req: Request) {
       )
     }
 
-    // ── 4. Check access — subscription OR token balance ──────────────────────
-    const [{ data: subscription }, { data: tokenBalance }] = await Promise.all([
-      db
-        .from('subscriptions')
-        .select('plan, expires_at')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .gt('expires_at', new Date().toISOString())
-        .single(),
+    // ── 4. Check access — admin bypass, subscription, OR token balance ────────
+    const adminAccess = await isAdmin(user.id, user.email)
 
-      db
-        .from('token_balances')
-        .select('balance')
-        .eq('user_id', user.id)
-        .single(),
-    ])
+    if (!adminAccess) {
+      const [{ data: subscription }, { data: tokenBalance }] = await Promise.all([
+        db
+          .from('subscriptions')
+          .select('plan, expires_at')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .gt('expires_at', new Date().toISOString())
+          .single(),
 
-    const hasSubscription = !!subscription
-    const tokens          = tokenBalance?.balance || 0
-    const hasTokens       = tokens > 0
+        db
+          .from('token_balances')
+          .select('balance')
+          .eq('user_id', user.id)
+          .single(),
+      ])
 
-    if (!hasSubscription && !hasTokens) {
-      return NextResponse.json(
-        { error: 'No active subscription or tokens. Please upgrade.' },
-        { status: 403 }
-      )
-    }
+      const hasSubscription = !!subscription
+      const tokens          = tokenBalance?.balance || 0
+      const hasTokens       = tokens > 0
 
-    // ── 5. Deduct token if not on subscription ───────────────────────────────
-    if (!hasSubscription && hasTokens) {
-      const { error: deductError } = await db
-        .from('token_balances')
-        .update({ balance: tokens - 1 })
-        .eq('user_id', user.id)
-
-      if (deductError) {
-        console.error('[clinic/download] token deduct error:', deductError)
+      if (!hasSubscription && !hasTokens) {
         return NextResponse.json(
-          { error: 'Could not deduct token. Try again.' },
-          { status: 500 }
+          { error: 'No active subscription or tokens. Please upgrade.' },
+          { status: 403 }
         )
       }
 
-      // Log token usage
-      await db.from('token_usage').insert({
-        user_id:     user.id,
-        action:      'clinic_report',
-        tokens_used: 1,
-        metadata: {
-          student_id:   studentId,
-          student_name: student.name,
+      // ── 5. Deduct token if not on subscription ─────────────────────────────
+      if (!hasSubscription && hasTokens) {
+        const { error: deductError } = await db
+          .from('token_balances')
+          .update({ balance: tokens - 1 })
+          .eq('user_id', user.id)
+
+        if (deductError) {
+          console.error('[clinic/download] token deduct error:', deductError)
+          return NextResponse.json(
+            { error: 'Could not deduct token. Try again.' },
+            { status: 500 }
+          )
         }
-      })
+
+        await db.from('token_usage').insert({
+          user_id:     user.id,
+          action:      'clinic_report',
+          tokens_used: 1,
+          metadata: {
+            student_id:   studentId,
+            student_name: student.name,
+          }
+        })
+      }
     }
 
     // ── 6. Build subject progress from assessments ───────────────────────────

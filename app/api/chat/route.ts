@@ -31,14 +31,14 @@ export async function POST(req: Request) {
         .select('id')
         .eq('id', learnerId)
         .eq('user_id', user.id)
-        .single()
+        .maybeSingle()
       if (!student) return apiForbidden()
     }
 
     // ── Check subscription/tokens ──
     const [{ data: subscription }, { data: tokenData }] = await Promise.all([
-      db.from('subscriptions').select('plan, expires_at').eq('user_id', user.id).eq('status', 'active').gt('expires_at', new Date().toISOString()).single(),
-      db.from('token_balances').select('balance').eq('user_id', user.id).single(),
+      db.from('subscriptions').select('plan, expires_at').eq('user_id', user.id).eq('status', 'active').gt('expires_at', new Date().toISOString()).maybeSingle(),
+      db.from('token_balances').select('balance').eq('user_id', user.id).maybeSingle(),
     ])
 
     const hasSubscription = !!subscription
@@ -54,20 +54,22 @@ export async function POST(req: Request) {
       { data: learningContext },
       { data: studentProfile },
     ] = await Promise.all([
-      db.from('compass_sessions')
-        .select('session_state')
-        .eq('id', sessionId)
-        .eq('learner_id', user.id)
-        .eq('status', 'active')
-        .single(),
+      sessionId
+        ? db.from('compass_sessions')
+            .select('session_state')
+            .eq('id', sessionId)
+            .eq('learner_id', user.id)
+            .eq('status', 'active')
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
       db.from('student_learning_context')
         .select('overall_tier, subject_tiers, subject_action_steps, subject_velocities, recommended_pathway, pathway_confidence, top_careers, career_gaps, first_subject, session_goal, guided_topics, overall_level, curriculum_type, grade, compass_bridge')
         .eq('student_id', learnerId || user.id)
-        .single(),
+        .maybeSingle(),
       db.from('students')
         .select('name, grade, curriculum_type, current_pathway')
         .eq('id', learnerId || user.id)
-        .single(),
+        .maybeSingle(),
     ])
 
     const compassKnowsLearner = savedState?.session_state?.initialized === true
@@ -82,7 +84,7 @@ export async function POST(req: Request) {
         db.from('student_interests')
           .select('*')
           .eq('student_id', learnerId || user.id)
-          .single(),
+          .maybeSingle(),
       ])
 
       await learningCompass.initializeFromAssessments(
@@ -208,7 +210,7 @@ ${task.content.realWorldContext}
 5. ${hasQuestion ? `Ask EXACTLY: "${task.content.question}"` : 'Ask if they understand'}
 6. ${hasVisual ? 'Say: "I have a diagram to help visualize this. Click the Diagram button below!"' : ''}
 7. Keep under 200 words
-8. Use Kenyan context naturally (matatu, ugali, Nairobi, shamba, etc.)
+8. Rotate examples naturally — universal, classroom, and Kenyan contexts; don't force Kenyan references into every sentence
 9. ${struggled ? 'Be extra patient and break it down more simply' : 'Keep going at good pace'}
 10. NEVER give the answer directly — guide with questions
 

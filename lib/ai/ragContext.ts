@@ -71,7 +71,7 @@ export async function buildStudentRAGContext(
     db.from('students')
       .select('name, grade, school, curriculum_type, year_level')
       .eq('id', learnerId)
-      .single(),
+      .maybeSingle(),
 
     // 2. All assessments (most recent first)
     db.from('assessments')
@@ -81,10 +81,12 @@ export async function buildStudentRAGContext(
       .limit(5),
 
     // 3. Session state (mastered/struggling concepts)
-    db.from('compass_sessions')
-      .select('session_state')
-      .eq('id', sessionId)
-      .single(),
+    sessionId
+      ? db.from('compass_sessions')
+          .select('session_state')
+          .eq('id', sessionId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
 
     // 4. Recent messages from this session
     db.from('compass_messages')
@@ -377,8 +379,8 @@ Ideal: Level 4 (Exceeds Expectations)
 
 CBC-SPECIFIC TEACHING RULES:
 - Focus on competency development
-- Use Kenyan contexts always
-  (chapati, matatu, shamba, KES)
+- Rotate naturally through example types
+  (universal, classroom, Kenyan — mix it up)
 - Encourage real-world application
 - Assessment is ongoing — every session builds their record
 `
@@ -391,11 +393,13 @@ CBC-SPECIFIC TEACHING RULES:
    "This is exactly what Cambridge examiners look for!"
    "Great exam technique — your marker will love this!"
 ` : `
-7. Encouragement in Swahili/English mix:
-   "Vizuri sana ${firstName}!"
-   "Hongera! You got it!"
-   "Jaribu tena — you're so close!"
-   "Pole pole ndio mwendo!"
+7. Encouragement (varied, human, not repetitive):
+   "Nice thinking."
+   "You're improving."
+   "That step was correct."
+   "You almost got it — keep going."
+   "Excellent observation."
+   Occasional Swahili/English mix is welcome but vary the phrases.
 `
 
   // ── Context examples ──────────────────────────────────────────────────────
@@ -408,12 +412,13 @@ CBC-SPECIFIC TEACHING RULES:
    - Connect to Cambridge exam scenarios
    - Frame answers in exam-technique style when approaching assessment topics
 ` : `
-6. Kenyan examples ALWAYS:
-   - Money: KES coins and notes
-   - Food: ugali, chapati, sukuma, nyama choma, mandazi
-   - Transport: matatu, boda boda, SGR
-   - Places: Nairobi, Mombasa, Kisumu, local market, shamba, duka
-   - Names: Wanjiku, Otieno, Achieng, Kamau, Njeri, Juma, Amina
+6. Context guidelines:
+   Rotate naturally between example types:
+   - Universal: sharing, counting, dividing, patterns
+   - Classroom: books, pencils, groups, tests
+   - Real-world: money, food, sport, transport
+   - Kenyan: KES, matatu, shamba, Nairobi — only when it genuinely helps
+   Never force the same example type every response.
 `
 
   return `

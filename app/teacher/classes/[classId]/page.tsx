@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect, useRef, use } from 'react'
+import { useState, useEffect, useRef, use, Fragment } from 'react'
 import Link from 'next/link'
 import {
   Users, BookOpen, BarChart3, Sun, Copy, Check,
   AlertTriangle, PlusCircle, Share2,
   TrendingUp, Compass, Brain,
   Loader2, X, UserPlus, Mail, Phone, FileText, CheckCircle2,
-  FlaskConical,
+  FlaskConical, ChevronDown, ChevronRight,
 } from 'lucide-react'
 
 type Tab = 'students' | 'gaps' | 'assignments' | 'holiday' | 'compass' | 'clinic'
@@ -697,6 +697,11 @@ export default function ClassDetailPage({ params }: { params: Promise<{ classId:
   const [showAddStudent, setShowAddStudent] = useState(false)
   const [processingId, setProcessingId]     = useState<string | null>(null)
   const [processedIds, setProcessedIds]     = useState<Set<string>>(new Set())
+  const [inviteUrl, setInviteUrl]             = useState<string | null>(null)
+  const [inviteLoading, setInviteLoading]     = useState(false)
+  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [selectedStudentName, setSelectedStudentName] = useState('')
+  const [expandedStudentId, setExpandedStudentId]     = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([
@@ -716,6 +721,22 @@ export default function ClassDetailPage({ params }: { params: Promise<{ classId:
       .then(d => { if (d.success) setCompassData(d.data.students) })
       .finally(() => { setCompassLoading(false); setCompassLoaded(true) })
   }, [tab, classId, compassLoaded])
+
+  async function generateInvite() {
+    setInviteLoading(true)
+    setInviteUrl(null)
+    try {
+      const res = await fetch(`/api/teacher/classes/${classId}/invite`)
+      const json = await res.json()
+      if (!res.ok || !json.success) throw new Error('Failed to generate invite')
+      const code = json.data.invite.invite_code
+      setInviteUrl(`${window.location.origin}/join/${code}`)
+    } catch (err) {
+      console.error('[invite]', err)
+    } finally {
+      setInviteLoading(false)
+    }
+  }
 
   function copyCode() {
     navigator.clipboard.writeText(data?.class?.class_code || '')
@@ -915,71 +936,113 @@ na kuwasaidia vizuri zaidi darasani.
                       </td>
                     </tr>
                   ) : students.map((s: any) => {
-                    const badge     = s.avgScore !== null ? levelBadge(s.avgScore) : null
-                    const isDone    = processedIds.has(s.id)
-                    const isBusy    = processingId === s.id
-                    const hasAssess = !!s.assessment
+                    const badge      = s.avgScore !== null ? levelBadge(s.avgScore) : null
+                    const isDone     = processedIds.has(s.id)
+                    const isBusy     = processingId === s.id
+                    const hasAssess  = !!s.assessment
+                    const isExpanded = expandedStudentId === s.id
+                    const hasScores  = Object.keys(s.subjectScores || {}).length > 0
 
                     return (
-                      <tr key={s.id} className={`border-l-4 ${rowColor(s.avgScore)} hover:bg-gray-50`}>
-                        <td className="px-5 py-4">
-                          <div className="font-bold text-gray-900">{s.name}</div>
-                          <div className="text-xs text-gray-400">Grade {s.grade}</div>
-                        </td>
-                        <td className="px-5 py-4">
-                          {badge ? (
-                            <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${badge.cls}`}>
-                              {badge.label}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-gray-400">No data</span>
-                          )}
-                        </td>
-                        <td className="px-5 py-4">
-                          {s.daysInactive !== null ? (
-                            <span className={`text-sm ${s.daysInactive > 7 ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
-                              {s.daysInactive === 0 ? 'Today' : `${s.daysInactive}d ago`}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-gray-400">Never</span>
-                          )}
-                        </td>
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-1.5">
-                            {s.parent_email ? (
-                              <span title={s.parent_email} className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center">
-                                <Mail className="w-3 h-3" />
+                      <Fragment key={s.id}>
+                        <tr
+                          className={`border-l-4 ${rowColor(s.avgScore)} hover:bg-gray-50 cursor-pointer`}
+                          onClick={() => setExpandedStudentId(isExpanded ? null : s.id)}
+                        >
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-1.5">
+                              {hasScores
+                                ? isExpanded
+                                  ? <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                  : <ChevronRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                : <span className="w-3.5 shrink-0" />
+                              }
+                              <div>
+                                <div className="font-bold text-gray-900">{s.name}</div>
+                                <div className="text-xs text-gray-400">Grade {s.grade}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-5 py-4">
+                            {badge ? (
+                              <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${badge.cls}`}>
+                                {badge.label}
                               </span>
-                            ) : null}
-                            {s.parent_phone ? (
-                              <span title={s.parent_phone} className="w-6 h-6 bg-green-100 text-green-600 rounded-full flex items-center justify-center">
-                                <Phone className="w-3 h-3" />
-                              </span>
-                            ) : null}
-                            {!s.parent_email && !s.parent_phone && (
-                              <span className="text-xs text-gray-400">—</span>
+                            ) : (
+                              <span className="text-xs text-gray-400">No data</span>
                             )}
-                          </div>
-                        </td>
-                        <td className="px-5 py-4">
-                          {isDone ? (
-                            <span className="flex items-center gap-1.5 text-xs text-green-600 font-bold">
-                              <CheckCircle2 className="w-4 h-4" /> Sent
-                            </span>
-                          ) : hasAssess ? (
-                            <button
-                              onClick={() => processStudent(s.id, s.assessment_id || s.latestAssessmentId)}
-                              disabled={isBusy || !!processingId}
-                              className="flex items-center gap-1.5 text-xs bg-violet-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-violet-700 disabled:opacity-50"
-                            >
-                              {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                              {isBusy ? 'Processing…' : 'Send Report'}
-                            </button>
-                          ) : (
-                            <span className="text-xs text-gray-400">No assessment</span>
-                          )}
-                        </td>
-                      </tr>
+                          </td>
+                          <td className="px-5 py-4">
+                            {s.daysInactive !== null ? (
+                              <span className={`text-sm ${s.daysInactive > 7 ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
+                                {s.daysInactive === 0 ? 'Today' : `${s.daysInactive}d ago`}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-400">Never</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
+                            {s.parent_id ? (
+                              <span className="flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 px-2 py-1 rounded-full font-bold">
+                                <Check className="w-3 h-3" /> Connected
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setSelectedStudentName(s.name)
+                                  setShowInviteModal(true)
+                                  generateInvite()
+                                }}
+                                className="text-xs text-teal-600 font-bold border border-teal-300 bg-teal-50 hover:bg-teal-100 px-2.5 py-1 rounded-full transition-colors"
+                              >
+                                Invite parent
+                              </button>
+                            )}
+                          </td>
+                          <td className="px-5 py-4">
+                            {isDone ? (
+                              <span className="flex items-center gap-1.5 text-xs text-green-600 font-bold">
+                                <CheckCircle2 className="w-4 h-4" /> Sent
+                              </span>
+                            ) : hasAssess ? (
+                              <button
+                                onClick={e => { e.stopPropagation(); processStudent(s.id, s.assessment_id || s.latestAssessmentId) }}
+                                disabled={isBusy || !!processingId}
+                                className="flex items-center gap-1.5 text-xs bg-violet-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-violet-700 disabled:opacity-50"
+                              >
+                                {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                                {isBusy ? 'Processing…' : 'Send Report'}
+                              </button>
+                            ) : (
+                              <span className="text-xs text-gray-400">No assessment</span>
+                            )}
+                          </td>
+                        </tr>
+                        {isExpanded && hasScores && (
+                          <tr className="bg-gray-50 border-l-4 border-l-teal-200">
+                            <td colSpan={5} className="px-6 py-3">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">
+                                  Parent-entered assessment
+                                </span>
+                                {s.assessment && (
+                                  <span className="text-[10px] text-gray-300">
+                                    Term {s.assessment.term} · {s.assessment.year}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {Object.entries(s.subjectScores as Record<string, number>).map(([subject, score]) => (
+                                  <div key={subject} className="flex items-center gap-1.5 text-xs bg-white rounded-lg px-2.5 py-1.5 border border-gray-200">
+                                    <span className="text-gray-500 capitalize">{subject.replace(/_/g, ' ')}</span>
+                                    <span className="text-gray-800 font-bold">{score}/4</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     )
                   })}
                 </tbody>
@@ -1295,6 +1358,75 @@ na kuwasaidia vizuri zaidi darasani.
             })
           }}
         />
+      )}
+
+      {/* Invite parent modal */}
+      {showInviteModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md relative">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100">
+              <div>
+                <h3 className="text-lg font-black text-gray-900">
+                  Invite {selectedStudentName}&apos;s parent
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Send this link — one click and they&apos;re connected.
+                </p>
+              </div>
+              <button
+                onClick={() => { setShowInviteModal(false); setInviteUrl(null) }}
+                className="p-2 hover:bg-gray-100 rounded-xl"
+              >
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+            <div className="p-6">
+              {inviteLoading ? (
+                <div className="flex items-center justify-center py-8 gap-3 text-gray-400">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span className="text-sm">Generating link…</span>
+                </div>
+              ) : inviteUrl ? (
+                <div className="space-y-3">
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-mono text-xs text-gray-600 break-all">
+                    {inviteUrl}
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(inviteUrl)
+                      setCopied(true)
+                      setTimeout(() => setCopied(false), 2000)
+                    }}
+                    className="w-full flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-xl transition-colors"
+                  >
+                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    {copied ? 'Copied!' : 'Copy Link'}
+                  </button>
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(
+                      `Habari! Mimi ni mwalimu wa ${selectedStudentName}.\n\nUngependa kupata updates za ${selectedStudentName} moja kwa moja?\n\nBonyeza hapa: ${inviteUrl}\n\n— EduNexus`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl transition-colors"
+                  >
+                    <Share2 className="w-4 h-4" /> Share on WhatsApp
+                  </a>
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <p className="text-sm text-red-500">Failed to generate link.</p>
+                  <button
+                    onClick={generateInvite}
+                    className="mt-3 text-sm text-teal-600 font-bold hover:underline"
+                  >
+                    Try again
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* TAB: Holiday Bridge */}

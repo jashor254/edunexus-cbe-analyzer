@@ -106,9 +106,9 @@ export class LearningCompass {
   
   // Visual subjects that need diagrams
   private visualSubjects = [
-    'biology', 'agriculture', 'geography', 
+    'biology', 'agriculture', 'geography',
     'physics', 'chemistry', 'integrated_science',
-    'creative_arts', 'pre_technical'
+    'creative_arts', 'pre_technical', 'mathematics'
   ]
   
   /**
@@ -469,7 +469,6 @@ export class LearningCompass {
   
   /**
    * CREATE task at specific difficulty level
-   * This is where subject mastery, Kenyan context, and VISUALS come together
    */
   private async createTaskForDifficulty(
     subject: string,
@@ -478,24 +477,201 @@ export class LearningCompass {
     needsVisuals: boolean = false,
     ragSystemPrompt?: string
   ): Promise<Task> {
+    // Level 1 learners get a fully scaffolded, multiple-choice path
+    if (difficulty === 1) {
+      return this.createStrugglingLearnerTask(subject, state, needsVisuals)
+    }
 
-    // Build prompt for DeepSeek to generate appropriate task
     const prompt = this.buildTaskPrompt(subject, difficulty, state, needsVisuals, state.curriculumType || 'cbc')
 
     try {
-      const response = await callDeepSeek(prompt, ragSystemPrompt)  // Changed to DeepSeek
+      const response = await callDeepSeek(prompt, ragSystemPrompt)
       const task = this.parseTaskResponse(response, subject, difficulty, state)
-      
-      // If it's a visual subject but no visual was generated, add a fallback
+
       if (needsVisuals && !task.content.visualAid) {
         task.content.visualAid = await this.generateDiagram(subject, task.concept, difficulty)
       }
-      
+
       return task
     } catch (error) {
       console.error('Task generation failed, using fallback:', error)
       return this.getFallbackTask(subject, difficulty, state, needsVisuals)
     }
+  }
+
+  /**
+   * Specialized task generator for level 1 (struggling) learners.
+   * Ultra-short, high scaffolding, multiple-choice questions, zero overwhelm.
+   */
+  private async createStrugglingLearnerTask(
+    subject: string,
+    state: LearnerState,
+    needsVisuals: boolean
+  ): Promise<Task> {
+    const concept = state.currentConcept || this.getDefaultConceptForSubject(subject)
+
+    const prompt = `
+You are helping a struggling student understand ${subject}.
+
+STUDENT:
+- Level 1 out of 4 (Below Expectations — maximum support needed)
+- Grade: ${state.learner.grade}
+- Concept: ${concept}
+- They lose confidence easily — small wins matter
+
+═══════════════════════════════════════
+CRITICAL RULES — FOLLOW ALL OF THEM
+═══════════════════════════════════════
+
+1. MAX 3 SENTENCES before asking a question. Short sentences. Max 8 words each.
+2. ONE example only. Never give multiple examples.
+3. Question MUST be multiple choice (2-3 options). No open-ended questions.
+4. Start with encouragement, then teach one thing, then ask.
+5. Include a simple visual diagram for any math or science concept.
+6. Context examples: universal first (sharing, counting); local only if it genuinely helps.
+
+RESPONSE STRUCTURE:
+[ENCOURAGEMENT]: One short sentence.
+[TEACHING]: One sentence. Max 8 words.
+[EXAMPLE]: One sentence with one simple example.
+[VISUAL]: Simple ASCII diagram (or empty).
+[QUESTION]: The question they must answer.
+[CHOICES]: A) option1  B) option2  C) option3
+[INSTRUCTION]: "Type A, B, or C."
+
+Return ONLY JSON:
+{
+  "instruction": "One sentence — the one thing to learn. Max 15 words.",
+  "example": "One sentence example. Max 15 words.",
+  "question": "The question they answer.",
+  "choices": "A) option1  B) option2  C) option3",
+  "visualAid": "ASCII diagram using ┌─┐│└┘ and emojis, or empty string.",
+  "realWorldContext": "One sentence connecting to daily life. Max 15 words.",
+  "successCriteria": "They answer the multiple choice correctly."
+}
+
+Subject: ${subject}
+Concept: ${concept}
+${needsVisuals ? 'Visual aid is REQUIRED for this subject.' : ''}
+`
+
+    try {
+      const response = await callDeepSeek(prompt)
+      const parsed = JSON.parse(response)
+
+      const questionWithChoices = parsed.choices
+        ? `${parsed.question}\n\n${parsed.choices}\n\nType A, B, or C.`
+        : parsed.question
+
+      const rawAid = (parsed.visualAid || '').trim()
+      const visualAid: VisualAid | undefined = rawAid.length > 10
+        ? { type: 'simple', content: rawAid, altText: `${concept} diagram`, caption: `${subject} — ${concept}`, subject, concept }
+        : needsVisuals ? this.getFallbackDiagram(subject, concept, 1) : undefined
+
+      return {
+        id: `struggling-${Date.now()}`,
+        type: 'concept_intro',
+        subject,
+        concept,
+        difficulty: 1,
+        content: {
+          instruction: parsed.instruction,
+          example: parsed.example,
+          question: questionWithChoices,
+          visualAid,
+          realWorldContext: parsed.realWorldContext || `This helps you understand ${subject} better.`,
+        },
+        estimatedMinutes: 3,
+        successCriteria: parsed.successCriteria || 'Answer the multiple choice question correctly.',
+        nextTaskRecommended: 'practice_same_concept',
+      }
+    } catch (error) {
+      console.error('Struggling learner task generation failed:', error)
+      return this.getStrugglingLearnerFallback(subject, concept, state)
+    }
+  }
+
+  /** Guaranteed simple fallback when AI fails for level 1 learners */
+  private getStrugglingLearnerFallback(subject: string, concept: string, _state: LearnerState): Task {
+    const fallbacks: Record<string, { instruction: string; example: string; question: string; visualAid?: VisualAid; realWorldContext: string }> = {
+      mathematics: {
+        instruction: '1/2 means one piece out of two equal pieces.',
+        example: 'Share 1 bread between 2 people — each gets 1/2.',
+        question: 'What is 1/2 as a decimal?\n\nA) 0.2\nB) 0.5\nC) 2.0\n\nType A, B, or C.',
+        visualAid: {
+          type: 'simple',
+          content: `  ┌─────────┬─────────┐\n  │   ½     │   ½     │\n  └─────────┴─────────┘\n  1 out of 2 equal parts`,
+          altText: 'Half of a rectangle',
+          caption: '1/2 = one of two equal parts',
+        },
+        realWorldContext: 'Fractions help you share things equally.',
+      },
+      biology: {
+        instruction: 'A plant cell has a strong outer wall.',
+        example: 'Like a fence around a field — it protects what is inside.',
+        question: 'What surrounds a plant cell?\n\nA) Cell wall\nB) Nucleus\nC) Vacuole\n\nType A, B, or C.',
+        visualAid: {
+          type: 'simple',
+          content: `  ┌─────────────────┐\n  │  ┌───────────┐  │\n  │  │  Nucleus  │  │\n  │  └───────────┘  │\n  └─────────────────┘\n  ↑ Cell wall (outer layer)`,
+          altText: 'Plant cell diagram',
+          caption: 'Cell wall is the outer protective layer',
+        },
+        realWorldContext: 'Cells are the building blocks of every living thing.',
+      },
+      geography: {
+        instruction: 'Water from lakes rises and becomes rain.',
+        example: 'Lake water heats up, rises as vapor, forms clouds, then rains.',
+        question: 'What happens to lake water when the sun heats it?\n\nA) It disappears\nB) It rises as vapor\nC) It stays still\n\nType A, B, or C.',
+        visualAid: {
+          type: 'simple',
+          content: `  ☁️ Clouds\n   ↑\n  💧 Lake\n   ↓\n  🌧️ Rain`,
+          altText: 'Simple water cycle',
+          caption: 'Water rises, becomes clouds, falls as rain',
+        },
+        realWorldContext: 'This is why it rains in different seasons.',
+      },
+    }
+
+    const fb = fallbacks[subject.toLowerCase()] ?? {
+      instruction: `Let's learn one small thing about ${subject}.`,
+      example: `Think about how ${subject} shows up in your daily life.`,
+      question: `What did you just learn about ${subject}?\n\nA) A key fact\nB) An example\nC) I'm not sure yet\n\nType A, B, or C.`,
+      realWorldContext: `${subject} connects to things you see every day.`,
+    }
+
+    return {
+      id: `fallback-struggling-${Date.now()}`,
+      type: 'concept_intro',
+      subject,
+      concept: concept || 'basics',
+      difficulty: 1,
+      content: {
+        instruction: fb.instruction,
+        example: fb.example,
+        question: fb.question,
+        visualAid: fb.visualAid,
+        realWorldContext: fb.realWorldContext,
+      },
+      estimatedMinutes: 3,
+      successCriteria: 'Answer the multiple choice question correctly.',
+      nextTaskRecommended: 'practice_same_concept',
+    }
+  }
+
+  /** Default concept to focus on when no session concept is set */
+  private getDefaultConceptForSubject(subject: string): string {
+    const defaults: Record<string, string> = {
+      mathematics:        'fractions',
+      biology:            'cell_structure',
+      chemistry:          'atoms',
+      physics:            'forces',
+      geography:          'water_cycle',
+      english:            'basic_grammar',
+      kiswahili:          'msamiati',
+      agriculture:        'crop_growing',
+      integrated_science: 'scientific_method',
+    }
+    return defaults[subject.toLowerCase()] ?? 'basic_concepts'
   }
   
   /**
@@ -586,6 +762,108 @@ export class LearningCompass {
     
     // 📚 COMPREHENSIVE DIAGRAM LIBRARY 📚
     const diagrams: Record<string, Record<string, VisualAid>> = {
+      mathematics: {
+        fractions: {
+          type: 'simple',
+          content: `
+  🍕 FRACTIONS — Dividing into EQUAL parts
+
+  1/2 (one half):
+  ┌──────┬──────┐
+  │ ████ │      │   ← 1 shaded out of 2
+  └──────┴──────┘
+
+  1/4 (one quarter):
+  ┌──────┬──────┐
+  │ ████ │      │   ← 1 shaded out of 4
+  ├──────┼──────┤
+  │      │      │
+  └──────┴──────┘
+
+  2/3 (two thirds):
+  ┌──────┬──────┬──────┐
+  │ ████ │ ████ │      │   ← 2 shaded out of 3
+  └──────┴──────┴──────┘
+
+  Numerator → top number (shaded parts)
+  Denominator → bottom number (total parts)
+          `,
+          altText: 'Fraction diagram showing shaded rectangle parts',
+          caption: 'Fractions: shaded parts out of total equal parts',
+          subject: 'mathematics',
+          concept: 'fractions'
+        },
+        number_line: {
+          type: 'simple',
+          content: `
+  📏 NUMBER LINE
+
+  0    1    2    3    4    5    6    7    8    9   10
+  |----|----|----|----|----|----|----|----|----|----|
+  ↑              ↑                        ↑
+  Start          3                        8
+
+  Counting forward (+): move RIGHT  →
+  Counting back   (-): move LEFT   ←
+
+  Example: 3 + 5 = ?
+  Start at 3, jump 5 steps right → land on 8  ✓
+          `,
+          altText: 'Number line from 0 to 10 with arrows showing addition',
+          caption: 'Number line — addition moves right, subtraction moves left',
+          subject: 'mathematics',
+          concept: 'number_line'
+        },
+        shapes: {
+          type: 'simple',
+          content: `
+  📐 2D SHAPES
+
+  Triangle (3 sides):     Square (4 equal sides):
+       /\\                  ┌────┐
+      /  \\                 │    │
+     /____\\                └────┘
+
+  Rectangle (4 sides):    Circle:
+  ┌────────┐                 ○
+  │        │              (no corners)
+  └────────┘
+
+  Pentagon (5 sides):
+      /‾‾‾\\
+     /     \\
+    |       |
+     \\_____/
+          `,
+          altText: 'Common 2D shapes: triangle, square, rectangle, circle, pentagon',
+          caption: '2D shapes and their number of sides',
+          subject: 'mathematics',
+          concept: 'shapes'
+        },
+        multiplication: {
+          type: 'simple',
+          content: `
+  ✖️  MULTIPLICATION — rows of equal groups
+
+  3 × 4 = 12  (3 rows of 4):
+  🔵 🔵 🔵 🔵
+  🔵 🔵 🔵 🔵
+  🔵 🔵 🔵 🔵
+  Count all: 12 ✓
+
+  2 × 5 = 10  (2 rows of 5):
+  ⭐ ⭐ ⭐ ⭐ ⭐
+  ⭐ ⭐ ⭐ ⭐ ⭐
+  Count all: 10 ✓
+
+  Tip: 3 × 4 is the same as 4 × 3 = 12
+          `,
+          altText: 'Multiplication as equal groups shown with dots',
+          caption: 'Multiplication = equal groups added together',
+          subject: 'mathematics',
+          concept: 'multiplication'
+        },
+      },
       biology: {
         plant_cell: {
           type: 'simple',
@@ -1101,7 +1379,7 @@ CAREER CONTEXT: This student is targeting "${state.careerContext}". Connect expl
 ` : ''
 
     return `
-You are the Learning Compass creating a PERFECT task for a Kenyan student.
+You are the Learning Compass creating a PERFECT task for a student.
 
 SUBJECT: ${subject}
 DIFFICULTY LEVEL: ${difficulty} - ${difficultyDescriptions[difficulty]}
@@ -1124,33 +1402,37 @@ ${curriculumType === 'igcse' ? `🌍 CONTEXT GUIDELINES (Cambridge IGCSE student
 - Frame progress in Cambridge grade terms (targeting Grade C and above, pushing for A/A*)
 - Phrases: "Well done!", "Excellent effort!", "Keep pushing for that A*!", "Good thinking!"
 - Mention real-world global applications (e.g., multinational companies, international research)
-- For exam questions: use command words (Describe, Explain, Analyse, Evaluate, Calculate)` : `🇰🇪 KENYAN CONTEXT (MUST USE THESE):
-- Places: Nairobi, Mombasa, Kisumu, Eldoret, local market, shamba, duka
-- Transport: matatu, boda boda, tuk-tuk, train
-- Food: ugali, sukuma, nyama choma, chai, mandazi, mangoes
-- Money: KES (coins: 1,5,10,20 | notes: 50,100,200,500,1000)
-- Names: Wanjiku, Otieno, Achieng, Kamau, Njeri, Juma
-- Phrases: "Sawa!", "Vizuri sana!", "Hongera!", "Jaribu tena!"`}
+- For exam questions: use command words (Describe, Explain, Analyse, Evaluate, Calculate)` : `📚 CONTEXT GUIDELINES:
+Rotate NATURALLY between example types — do NOT force the same type every time:
+- Universal: sharing objects, dividing groups, counting, patterns
+- Visual: diagrams, pictures, shapes, number lines
+- Classroom: books, pencils, desks, school groups, tests
+- Real-world: money, food, sport, transport, nature
+- Kenyan: KES, matatu, shamba, Nairobi — ONLY when it genuinely improves understanding
+
+Never insert Kenyan references into every example. Variety makes explanations clearer.`}
 
 ${visualInstruction}
 
 CREATE A TASK WITH:
 
 1. INSTRUCTION: Clear, step-by-step what to do
-2. EXAMPLE: Real Kenyan situation showing how
+2. EXAMPLE: A clear real-world situation (rotate — universal, classroom, Kenyan as appropriate)
 3. QUESTION: What to solve/practice (if applicable)
-4. VISUAL AID: ${needsVisuals ? 'INCLUDE a simple ASCII diagram using box characters' : 'Description of helpful image (optional)'}
-5. REAL-WORLD CONTEXT: Explain why this matters in Kenya
+4. VISUAL AID: ${needsVisuals ? 'Draw a REAL ASCII diagram using box-drawing characters (┌─┐│└┘) and emojis. REQUIRED.' : 'Leave visualAid as empty string'}
+5. REAL-WORLD CONTEXT: Explain why this matters in real life
 
 RESPOND WITH JSON:
 {
   "instruction": "...",
   "example": "...",
   "question": "...",
-  "visualAid": "${needsVisuals ? 'ASCII diagram here' : ''}",
+  "visualAid": "${needsVisuals ? '← REPLACE THIS ENTIRE VALUE with a real ASCII diagram' : ''}",
   "realWorldContext": "...",
   "successCriteria": "..."
 }
+
+${needsVisuals ? 'CRITICAL: The visualAid value MUST be a real diagram drawn with ┌─┐│└┘ characters. Do NOT leave placeholder text.' : ''}
 
 CRITICAL TEACHING RULES — ALWAYS FOLLOW:
 - NEVER give the answer directly on first ask
@@ -1288,16 +1570,40 @@ CRITICAL TEACHING RULES — ALWAYS FOLLOW:
    * GET appropriate encouragement
    */
   private getEncouragement(state: LearnerState): string {
+    const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)]
+
     if (state.cognitiveLoad === 'overwhelmed') {
-      return "Pole pole ndio mwendo! Slow and steady wins the race. You can do this! 💪"
+      return pick([
+        "Take it one step at a time — you're doing well.",
+        "No rush. Understanding takes time.",
+        "You're working through something tricky — that's real learning.",
+        "Slow and steady. You'll get there.",
+      ])
     }
     if (state.confidenceLevel === 'high') {
-      return "Vizuri sana! You're on fire today! 🔥 Hongera!"
+      return pick([
+        "You're really getting this.",
+        "Nice thinking.",
+        "Excellent observation.",
+        "That's strong work — keep it up.",
+        "You're making solid progress.",
+      ])
     }
     if (state.attemptsOnConcept > 2) {
-      return "Jaribu tena! Every attempt makes you stronger. I believe in you! 🌟"
+      return pick([
+        "Every attempt is progress — keep going.",
+        "You almost have it.",
+        "That's closer than you think.",
+        "Don't stop now — you're building understanding.",
+      ])
     }
-    return "Sawa sawa! Keep going - you're doing great! 🚀"
+    return pick([
+      "Keep going — you're making progress.",
+      "Good effort.",
+      "You're improving.",
+      "That step was correct.",
+      "Solid work.",
+    ])
   }
   
   /**
@@ -1547,7 +1853,7 @@ CRITICAL TEACHING RULES — ALWAYS FOLLOW:
           instruction: parsed.instruction || 'Let\'s learn something new!',
           example: parsed.example,
           question: parsed.question,
-          realWorldContext: parsed.realWorldContext || 'This is useful in Kenya!'
+          realWorldContext: parsed.realWorldContext || 'This is useful in the real world.'
         },
         estimatedMinutes: difficulty === 1 ? 3 : difficulty === 2 ? 4 : difficulty === 3 ? 5 : 6,
         successCriteria: parsed.successCriteria || 'Can you explain this?',
@@ -1555,18 +1861,28 @@ CRITICAL TEACHING RULES — ALWAYS FOLLOW:
       }
       
       // Add visual aid if provided or needed
-      if (parsed.visualAid && parsed.visualAid.length > 10) {
+      // Reject placeholder echoes the AI sometimes returns verbatim
+      const PLACEHOLDER_PATTERNS = [
+        'ascii diagram here', '← replace this', 'replace this entire',
+        'put your diagram', 'diagram goes here', 'insert diagram',
+      ]
+      const rawAid = (parsed.visualAid || '').trim()
+      const isPlaceholder = !rawAid ||
+        rawAid.length < 20 ||
+        PLACEHOLDER_PATTERNS.some(p => rawAid.toLowerCase().includes(p))
+
+      if (!isPlaceholder) {
         task.content.visualAid = {
           type: 'simple',
-          content: parsed.visualAid,
+          content: rawAid,
           altText: `Diagram for ${subject}`,
           caption: `${subject} diagram`,
           subject,
           concept: 'current'
         }
-      } else if (needsVisuals && !task.content.visualAid) {
-        // Add fallback diagram for visual subjects
-        task.content.visualAid = this.getFallbackDiagram(subject, 'general', difficulty as 1|2|3|4|5)
+      } else if (needsVisuals) {
+        // Placeholder or empty — use rich fallback from the diagram library
+        task.content.visualAid = this.getFallbackDiagram(subject, task.concept, difficulty as 1|2|3|4|5)
       }
       
       return task

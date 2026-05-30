@@ -260,7 +260,7 @@ function MessageBubble({
 
 // ─── Main chat content ────────────────────────────────────────────────────────
 function ChatContent() {
-  const supabase     = createClient()
+  const [supabase]   = useState(() => createClient())
   const router       = useRouter()
   const searchParams = useSearchParams()
 
@@ -283,12 +283,17 @@ function ChatContent() {
   const [showUpgrade,     setShowUpgrade]     = useState(false)
   const [initDone,        setInitDone]        = useState(false)
 
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef       = useRef<HTMLTextAreaElement>(null)
-  const recognitionRef = useRef<any>(null)
+  const messagesEndRef  = useRef<HTMLDivElement>(null)
+  const inputRef        = useRef<HTMLTextAreaElement>(null)
+  const recognitionRef  = useRef<any>(null)
+  const initCalledRef   = useRef(false)
 
   // ── Init ────────────────────────────────────────────────────────────────────
-  useEffect(() => { initSession() }, [])
+  useEffect(() => {
+    if (initCalledRef.current) return
+    initCalledRef.current = true
+    initSession()
+  }, [])
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isLoading])
@@ -296,8 +301,10 @@ function ChatContent() {
   const ADMIN_EMAIL = 'kariukidennis092@gmail.com'
 
   const initSession = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
+    // Use getSession() — reads localStorage, no network lock contention
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) { router.push('/login'); return }
+    const user = session.user
 
     // Load student profile (first student belonging to this user)
     const { data: studentData } = await supabase
@@ -306,7 +313,7 @@ function ChatContent() {
       .eq('user_id', user.id)
       .order('created_at', { ascending: true })
       .limit(1)
-      .single()
+      .maybeSingle()
 
     if (studentData) {
       setStudent(studentData)
@@ -322,7 +329,7 @@ function ChatContent() {
       .from('student_learning_context')
       .select('first_subject, session_goal, guided_topics, overall_tier, recommended_pathway')
       .eq('student_id', effectiveLearnerId)
-      .single()
+      .maybeSingle()
 
     if (ctx) setLearningContext(ctx)
 
@@ -330,8 +337,8 @@ function ChatContent() {
 
     // Check access
     const [{ data: tokenData }, { data: subscription }] = await Promise.all([
-      supabase.from('token_balances').select('balance').eq('user_id', user.id).single(),
-      supabase.from('subscriptions').select('plan').eq('user_id', user.id).eq('status', 'active').gt('expires_at', new Date().toISOString()).single(),
+      supabase.from('token_balances').select('balance').eq('user_id', user.id).maybeSingle(),
+      supabase.from('subscriptions').select('plan').eq('user_id', user.id).eq('status', 'active').gt('expires_at', new Date().toISOString()).maybeSingle(),
     ])
 
     const tokens          = tokenData?.balance || 0
@@ -353,7 +360,7 @@ function ChatContent() {
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()
 
     if (existing) {
       setSessionId(existing.id)
@@ -397,14 +404,11 @@ function ChatContent() {
       .from('compass_sessions')
       .insert({
         learner_id:    userId,
-        title:         'Learning Session',
-        grade:         student?.grade ?? 7,
-        subject_id:    learningContext?.first_subject || 'mathematics',
         status:        'active',
         session_state: {},
       })
-      .select()
-      .single()
+      .select('id, learner_id, status, session_state')
+      .maybeSingle()
 
     if (data) {
       setSessionId(data.id)

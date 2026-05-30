@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 
     const { data: activeSows, error } = await db
       .from('schemes_of_work')
-      .select('id, teacher_id, learning_area, grade_name, term, year')
+      .select('id, teacher_id, learning_area, grade, term, year')
       .eq('year', currentYear)
       .eq('term', currentTerm)
       .eq('status', 'saved')

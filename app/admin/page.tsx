@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/utils/supabase/client'
 
 interface Stats {
   users: number
@@ -53,30 +53,9 @@ export default function AdminPage() {
   }
 
   const fetchRecentUsers = async () => {
-    const supabase = createClient()
-    const { data } = await supabase
-      .from('profiles')
-      .select(`
-        id,
-        email,
-        created_at,
-        subscriptions ( plan ),
-        token_balances ( balance )
-      `)
-      .order('created_at', { ascending: false })
-      .limit(10)
-
-    if (data) {
-      setRecentUsers(
-        data.map((u: any) => ({
-          id: u.id,
-          email: u.email ?? '—',
-          created_at: u.created_at,
-          plan: u.subscriptions?.[0]?.plan ?? 'free',
-          balance: u.token_balances?.[0]?.balance ?? 0,
-        }))
-      )
-    }
+    const res = await fetch('/api/admin/recent-users')
+    const json = await res.json()
+    if (json.success) setRecentUsers(json.data.users)
   }
 
   const handleGrantAccess = async () => {
@@ -98,16 +77,10 @@ export default function AdminPage() {
     if (json.success) setGrantEmail('')
   }
 
-  const handleExportCSV = async () => {
-    const supabase = createClient()
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, email, created_at')
-      .order('created_at', { ascending: false })
-
-    if (!data) return
-    const header = 'id,email,created_at'
-    const rows = data.map((u: any) => `${u.id},${u.email},${u.created_at}`)
+  const handleExportCSV = () => {
+    if (!recentUsers.length) return
+    const header = 'id,email,created_at,plan,tokens'
+    const rows = recentUsers.map((u) => `${u.id},${u.email},${u.created_at},${u.plan},${u.balance}`)
     const csv = [header, ...rows].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)

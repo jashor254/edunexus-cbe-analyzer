@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
+import { notifyAlertCreated } from '@/lib/notifications/notify'
 
 export async function GET() {
   try {
@@ -66,6 +67,32 @@ export async function POST(req: Request) {
 
     const body = await req.json()
     const { alertId, action } = body
+
+    if (action === 'create') {
+      const { studentId, alertType, message } = body
+      if (!studentId || !alertType || !message) {
+        return apiError('studentId, alertType, and message are required', 400)
+      }
+
+      const { data: alert, error } = await db
+        .from('student_alerts')
+        .insert({
+          student_id: studentId,
+          teacher_id: teacher.id,
+          alert_type: alertType,
+          message,
+          is_resolved: false,
+        })
+        .select('id')
+        .single()
+
+      if (error || !alert) return apiError('Failed to create alert')
+
+      notifyAlertCreated(alert.id)
+        .catch(err => console.error('[notify] alert:', err))
+
+      return apiSuccess({ alert })
+    }
 
     if (!alertId) return apiError('alertId is required', 400)
 
