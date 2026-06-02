@@ -723,8 +723,13 @@ export function generateReport(
       reasons,
       subjectsToStrengthen: pr.development_areas.slice(0, 3).map(pathwayFormatSubjectName),
       futureMessage,
-      stem_viable:       pr.stem_viable,
-      stem_gap_subjects: pr.stem_gap_subjects,
+      stem_viable:             pr.stem_viable,
+      stem_gap_subjects:       pr.stem_gap_subjects,
+      pathway_readiness:       pr.pathway_readiness,
+      to_unlock_stem:          pr.to_unlock_stem,
+      to_unlock_social:        pr.to_unlock_social,
+      to_maintain_recommended: pr.to_maintain_recommended,
+      alternative_pathway:     pr.alternative_pathway,
     }
   }
   const holidayPlan      = generateHolidayPlan(subjects)

@@ -116,18 +116,19 @@ const S = StyleSheet.create({
   subjectTrend:{ fontSize: 11, width: 16, textAlign: 'center' },
   subjectObs:  { fontSize: 7.5, color: C.muted, marginTop: 3, marginLeft: 22, width: 390 },
 
-  // ── Pathway bars
-  pathwayRow:    { marginBottom: 14 },
-  pathwayHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  pathwayName:   { fontSize: 10, fontWeight: 700, color: C.text },
-  pathwayPct:    { fontSize: 10, fontWeight: 700 },
-  pathwayTrack:  { height: 14, backgroundColor: C.border, borderRadius: 7, overflow: 'hidden' },
-  pathwayFill:   { height: 14, borderRadius: 7 },
+  // ── Pathway readiness bars
+  readinessTrack: { height: 8, backgroundColor: '#E2E8F0', borderRadius: 4, overflow: 'hidden' },
+  readinessFill:  { height: 8, borderRadius: 4 },
   // ── STEM potential box
-  stemPotentialBox:   { backgroundColor: '#FEF3C7', borderLeftWidth: 3, borderLeftColor: '#D97706', borderRadius: 4, padding: 10, marginTop: 12 },
+  stemPotentialBox:   { backgroundColor: '#FEF3C7', borderLeftWidth: 3, borderLeftColor: '#D97706', borderRadius: 4, padding: 10, marginTop: 10, marginBottom: 0 },
   stemPotentialTitle: { fontSize: 9, fontWeight: 700, color: '#92400E', marginBottom: 4, letterSpacing: 0.5 },
   stemPotentialBody:  { fontSize: 8, color: '#78350F', marginBottom: 6 },
   stemGapItem:        { fontSize: 8, color: '#92400E', marginBottom: 2 },
+  // ── Unlock / maintain boxes
+  unlockBox:    { borderLeftWidth: 2, borderLeftColor: '#1D9E75', backgroundColor: '#F0FDF4', borderRadius: 4, padding: 8 },
+  unlockTitle:  { fontSize: 8, fontWeight: 700, color: '#065F46', letterSpacing: 0.5, marginBottom: 5 },
+  maintainBox:  { borderLeftWidth: 2, borderLeftColor: '#378ADD', backgroundColor: '#EFF6FF', borderRadius: 4, padding: 8 },
+  maintainTitle:{ fontSize: 8, fontWeight: 700, color: '#1E40AF', letterSpacing: 0.5, marginBottom: 5 },
   recommendedBg: { backgroundColor: C.navyLight, borderRadius: 6, padding: 14, marginTop: 12 },
 
   // ── Career cards
@@ -456,12 +457,33 @@ function SubjectMatrixPage({ report }: { report: AcademicClinicReport }) {
 
 // ─── PAGE 4A: PATHWAY ANALYSIS (JUNIOR) ──────────────────────────────────────
 
+const REC_COLOR  = '#1D9E75'
+const ALT_COLOR  = '#378ADD'
+const GREY_COLOR = '#CBD5E1'
+
 function PathwayPage({ report }: { report: AcademicClinicReport }) {
   const sp = report.studentProfile
   const pa = report.pathwayAnalysis!
+  const pr = pa.pathway_readiness
 
   const confColor = pa.confidenceLevel === 'HIGH' ? C.l3 : pa.confidenceLevel === 'MEDIUM' ? C.l2 : C.l1
   const confBg    = pa.confidenceLevel === 'HIGH' ? C.l3bg : pa.confidenceLevel === 'MEDIUM' ? C.l2bg : C.l1bg
+
+  const READINESS_BARS = [
+    { label: 'STEM',                  score: pr?.stem            ?? 0 },
+    { label: 'Social Sciences',       score: pr?.social_sciences ?? 0 },
+    { label: 'Arts & Sports Science', score: pr?.arts            ?? 0 },
+  ]
+
+  function barColor(label: string): string {
+    if (label === pa.recommendedPathway)  return REC_COLOR
+    if (label === pa.alternative_pathway) return ALT_COLOR
+    return GREY_COLOR
+  }
+
+  const unlockItems = pa.alternative_pathway === 'STEM'
+    ? (pa.to_unlock_stem   ?? [])
+    : (pa.to_unlock_social ?? [])
 
   return (
     <Page size="A4" style={S.page}>
@@ -471,39 +493,54 @@ function PathwayPage({ report }: { report: AcademicClinicReport }) {
         <Text style={S.sectionTitle}>Senior School Pathway Recommendation</Text>
         <View style={S.divider} />
 
-        {/* Pathway bars */}
-        <Text style={{ fontSize: 9, color: C.muted, letterSpacing: 1, marginBottom: 12 }}>PATHWAY ALIGNMENT SCORES</Text>
-        {pa.pathwayScores.map((p, i) => {
-          const isRec = p.name === pa.recommendedPathway
+        {/* ── Pathway Readiness bars ── */}
+        <Text style={{ fontSize: 9, color: C.muted, letterSpacing: 1, marginBottom: 10 }}>PATHWAY READINESS</Text>
+        {READINESS_BARS.map((bar, i) => {
+          const color = barColor(bar.label)
+          const isRec = bar.label === pa.recommendedPathway
           return (
-            <View key={i} style={[S.pathwayRow, isRec ? { backgroundColor: '#f0f7ff', borderRadius: 6, padding: 10 } : {}]}>
-              <View style={S.pathwayHeader}>
+            <View key={i} style={{ marginBottom: 10 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   {isRec && (
-                    <View style={[S.badge, { backgroundColor: C.navy, marginRight: 8, paddingVertical: 2 }]}>
-                      <Text style={[S.badgeText, { color: C.gold, fontSize: 7 }]}>RECOMMENDED</Text>
+                    <View style={[S.badge, { backgroundColor: color, marginRight: 8, paddingVertical: 2 }]}>
+                      <Text style={[S.badgeText, { color: C.white, fontSize: 7 }]}>RECOMMENDED</Text>
                     </View>
                   )}
-                  <Text style={[S.pathwayName, isRec ? { color: C.navy } : {}]}>{p.name}</Text>
+                  <Text style={{ fontSize: 10, fontWeight: 700, color: isRec ? color : C.text }}>{bar.label}</Text>
                 </View>
-                <Text style={[S.pathwayPct, { color: p.color }]}>{p.score}%</Text>
+                <Text style={{ fontSize: 10, fontWeight: 700, color }}>{bar.score}%</Text>
               </View>
-              <View style={[S.pathwayTrack, { height: isRec ? 18 : 12 }]}>
-                <View style={[S.pathwayFill, { width: `${p.score}%`, backgroundColor: p.color, height: isRec ? 18 : 12 }]} />
+              <View style={S.readinessTrack}>
+                <View style={[S.readinessFill, { width: `${bar.score}%`, backgroundColor: color }]} />
               </View>
             </View>
           )
         })}
 
-        {/* Confidence */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, marginBottom: pa.stem_viable && pa.stem_gap_subjects?.length ? 0 : 16 }}>
-          <Text style={{ fontSize: 9, color: C.muted, marginRight: 8 }}>Recommendation confidence:</Text>
-          <View style={[S.badge, { backgroundColor: confBg }]}>
-            <Text style={[S.badgeText, { color: confColor }]}>{pa.confidenceLevel}</Text>
+        {/* ── Recommended / Alternative / Confidence ── */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, marginBottom: 12 }}>
+          <View style={{ marginRight: 24 }}>
+            <Text style={{ fontSize: 8, color: C.muted, letterSpacing: 1 }}>RECOMMENDED</Text>
+            <Text style={{ fontSize: 11, fontWeight: 700, color: REC_COLOR, marginTop: 2 }}>{pa.recommendedPathway}</Text>
+          </View>
+          {pa.alternative_pathway && (
+            <View style={{ marginRight: 24 }}>
+              <Text style={{ fontSize: 8, color: C.muted, letterSpacing: 1 }}>ALTERNATIVE</Text>
+              <Text style={{ fontSize: 11, fontWeight: 700, color: ALT_COLOR, marginTop: 2 }}>{pa.alternative_pathway}</Text>
+            </View>
+          )}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 'auto' }}>
+            <Text style={{ fontSize: 8, color: C.muted, marginRight: 6 }}>Confidence:</Text>
+            <View style={[S.badge, { backgroundColor: confBg }]}>
+              <Text style={[S.badgeText, { color: confColor }]}>{pa.confidenceLevel}</Text>
+            </View>
           </View>
         </View>
 
-        {/* STEM potential box */}
+        <View style={S.dividerThin} />
+
+        {/* ── STEM potential gold box ── */}
         {pa.stem_viable && pa.stem_gap_subjects && pa.stem_gap_subjects.length > 0 && (
           <View style={S.stemPotentialBox}>
             <Text style={S.stemPotentialTitle}>STEM PATHWAY POTENTIAL</Text>
@@ -512,31 +549,32 @@ function PathwayPage({ report }: { report: AcademicClinicReport }) {
             </Text>
             {pa.stem_gap_subjects.map((subject, i) => (
               <Text key={i} style={S.stemGapItem}>
-                {'• '}{subject.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}{' — currently Level 2 → needs Level 3'}
+                {'• '}{subject.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}{' — currently Level 2, needs Level 3'}
               </Text>
             ))}
           </View>
         )}
 
-        <View style={[S.dividerThin, { marginTop: 16 }]} />
-
-        {/* Reasons */}
-        <View style={{ flexDirection: 'row', marginBottom: 14 }}>
-          <View style={{ flex: 1, marginRight: 20 }}>
-            <Text style={{ fontSize: 9, fontWeight: 700, color: C.text, letterSpacing: 1, marginBottom: 8 }}>WHY THIS PATHWAY FITS</Text>
-            {pa.reasons.map((r, i) => (
-              <View key={i} style={[S.listRow, { marginBottom: 6 }]}>
-                <View style={[S.listDot, { backgroundColor: C.navy }]} />
-                <Text style={[S.listText, { fontSize: 9 }]}>{r}</Text>
-              </View>
-            ))}
+        {/* ── TO UNLOCK / TO MAINTAIN ── */}
+        <View style={{ flexDirection: 'row', marginTop: 12, marginBottom: 12 }}>
+          <View style={[S.unlockBox, { flex: 1, marginRight: 10 }]}>
+            <Text style={S.unlockTitle}>TO UNLOCK {(pa.alternative_pathway ?? 'STEM').toUpperCase()}</Text>
+            {unlockItems.length > 0
+              ? unlockItems.map((item, i) => (
+                  <View key={i} style={{ flexDirection: 'row', marginBottom: 3 }}>
+                    <Text style={{ fontSize: 7.5, color: '#475569', width: 10 }}>•</Text>
+                    <Text style={{ fontSize: 7.5, color: '#475569', flex: 1 }}>{item}</Text>
+                  </View>
+                ))
+              : <Text style={{ fontSize: 7.5, color: C.muted }}>No additional requirements</Text>
+            }
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 9, fontWeight: 700, color: C.text, letterSpacing: 1, marginBottom: 8 }}>SUBJECTS TO STRENGTHEN BEFORE GRADE 10</Text>
-            {pa.subjectsToStrengthen.map((s, i) => (
-              <View key={i} style={[S.listRow, { marginBottom: 6 }]}>
-                <View style={[S.listDot, { backgroundColor: C.gold }]} />
-                <Text style={[S.listText, { fontSize: 9 }]}>{s}</Text>
+          <View style={[S.maintainBox, { flex: 1 }]}>
+            <Text style={S.maintainTitle}>TO MAINTAIN {pa.recommendedPathway.toUpperCase()}</Text>
+            {(pa.to_maintain_recommended ?? []).map((item, i) => (
+              <View key={i} style={{ flexDirection: 'row', marginBottom: 3 }}>
+                <Text style={{ fontSize: 7.5, color: '#475569', width: 10 }}>•</Text>
+                <Text style={{ fontSize: 7.5, color: '#475569', flex: 1 }}>{item}</Text>
               </View>
             ))}
           </View>
@@ -544,10 +582,34 @@ function PathwayPage({ report }: { report: AcademicClinicReport }) {
 
         <View style={S.dividerThin} />
 
-        {/* Future message */}
-        <View style={{ backgroundColor: C.navyLight, borderRadius: 6, padding: 16 }}>
-          <Text style={{ fontSize: 8, color: C.gold, letterSpacing: 1, marginBottom: 8 }}>WHAT THIS MEANS FOR YOUR CHILD'S FUTURE</Text>
-          <Text style={{ fontSize: 10, color: C.white, lineHeight: 1.6 }}>{pa.futureMessage}</Text>
+        {/* ── Why this pathway / Subjects to strengthen ── */}
+        <View style={{ flexDirection: 'row', marginBottom: 12 }}>
+          <View style={{ flex: 1, marginRight: 20 }}>
+            <Text style={{ fontSize: 9, fontWeight: 700, color: C.text, letterSpacing: 1, marginBottom: 8 }}>WHY THIS PATHWAY FITS</Text>
+            {pa.reasons.map((r, i) => (
+              <View key={i} style={[S.listRow, { marginBottom: 5 }]}>
+                <View style={[S.listDot, { backgroundColor: C.navy }]} />
+                <Text style={[S.listText, { fontSize: 8.5 }]}>{r}</Text>
+              </View>
+            ))}
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 9, fontWeight: 700, color: C.text, letterSpacing: 1, marginBottom: 8 }}>SUBJECTS TO STRENGTHEN BEFORE GRADE 10</Text>
+            {pa.subjectsToStrengthen.map((s, i) => (
+              <View key={i} style={[S.listRow, { marginBottom: 5 }]}>
+                <View style={[S.listDot, { backgroundColor: C.gold }]} />
+                <Text style={[S.listText, { fontSize: 8.5 }]}>{s}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={S.dividerThin} />
+
+        {/* ── Future message ── */}
+        <View style={{ backgroundColor: C.navyLight, borderRadius: 6, padding: 14 }}>
+          <Text style={{ fontSize: 8, color: C.gold, letterSpacing: 1, marginBottom: 6 }}>WHAT THIS MEANS FOR YOUR CHILD'S FUTURE</Text>
+          <Text style={{ fontSize: 9.5, color: C.white, lineHeight: 1.6 }}>{pa.futureMessage}</Text>
         </View>
       </View>
       <PageFooter reportId={report.reportId} />

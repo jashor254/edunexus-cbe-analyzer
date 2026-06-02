@@ -2,6 +2,46 @@
 
 export type SubjectScores = Record<string, number>
 
+// ─── Pathway Rules & Weights ──────────────────────────────────────────────────
+
+export const PATHWAY_RULES = {
+  STEM: {
+    mathematics:        3,
+    integrated_science: 3,
+    language_avg:       3,
+  },
+  SOCIAL_SCIENCES: {
+    minimum_avg: 2.0,
+  },
+  ARTS: {
+    // fallback — no hard requirements
+  },
+} as const
+
+export const PATHWAY_WEIGHTS = {
+  STEM: {
+    mathematics:           0.35,
+    integrated_science:    0.35,
+    english:               0.15,
+    kiswahili:             0.05,
+    pre_technical_studies: 0.10,
+  },
+  SOCIAL_SCIENCES: {
+    english:               0.25,
+    kiswahili:             0.20,
+    social_studies:        0.30,
+    cre:                   0.15,
+    agriculture_nutrition: 0.10,
+  },
+  ARTS: {
+    creative_arts_sports:  0.40,
+    agriculture_nutrition: 0.20,
+    english:               0.15,
+    kiswahili:             0.10,
+    social_studies:        0.15,
+  },
+} as const
+
 // ─── IGCSE types ──────────────────────────────────────────────────────────────
 
 export type IGCSEGradeString = 'A*' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'U'
@@ -184,6 +224,40 @@ export function calculateIGCSESubjectRecommendation(
   }
 }
 
+// ─── Pathway helpers ──────────────────────────────────────────────────────────
+
+function cbcToPercent(level: number): number {
+  return Math.round(((level - 1) / 3) * 100)
+}
+
+function calculateWeightedScore(
+  scores:  SubjectScores,
+  weights: Record<string, number>,
+): number {
+  let total     = 0
+  let weightSum = 0
+  for (const [subject, weight] of Object.entries(weights)) {
+    const level = scores[subject]
+    if (level !== undefined && level > 0) {
+      total     += cbcToPercent(level) * weight
+      weightSum += weight
+    }
+  }
+  return weightSum > 0 ? Math.round(total / weightSum) : 0
+}
+
+function calculateConfidence(
+  topScore:    number,
+  secondScore: number,
+): 'high' | 'medium' | 'low' {
+  const gap = topScore - secondScore
+  if (gap >= 20) return 'high'
+  if (gap >= 10) return 'medium'
+  return 'low'
+}
+
+// ─── PathwayRecommendation type ───────────────────────────────────────────────
+
 export type PathwayRecommendation = {
   stem_score:            number
   arts_sports_score:     number
@@ -194,10 +268,20 @@ export type PathwayRecommendation = {
   development_areas:     string[]
   guidance_message:      string
   calculated_at:         string
-  // Performance context
   performance_tier:      'high' | 'mid' | 'low'
   stem_viable:           boolean
   stem_gap_subjects?:    string[]
+  // Pathway Readiness display (0–100 weighted scores)
+  pathway_readiness: {
+    stem:            number
+    social_sciences: number
+    arts:            number
+  }
+  // Actionable guidance
+  to_unlock_stem:           string[]
+  to_unlock_social:         string[]
+  to_maintain_recommended:  string[]
+  alternative_pathway:      string
 }
 
 /**
@@ -212,18 +296,23 @@ export type PathwayRecommendation = {
  */
 export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRecommendation {
 
-  // ── Gate subjects (DB snake_case keys) ──────────────────────────────────────
+  // ── Gate subject levels ───────────────────────────────────────────────────────
   const mathLevel = scores.mathematics        ?? 0
   const sciLevel  = scores.integrated_science ?? 0
   const engLevel  = scores.english            ?? 0
   const kisLevel  = scores.kiswahili          ?? 0
   const langAvg   = (engLevel + kisLevel) / 2
 
-  // ── Overall average (1–4 scale) ─────────────────────────────────────────────
+  // ── Weighted readiness scores (0–100) ────────────────────────────────────────
+  const stemWeighted   = calculateWeightedScore(scores, PATHWAY_WEIGHTS.STEM as unknown as Record<string, number>)
+  const socialWeighted = calculateWeightedScore(scores, PATHWAY_WEIGHTS.SOCIAL_SCIENCES as unknown as Record<string, number>)
+  const artsWeighted   = calculateWeightedScore(scores, PATHWAY_WEIGHTS.ARTS as unknown as Record<string, number>)
+
+  // ── Overall average (1–4 scale) ──────────────────────────────────────────────
   const allLevels = Object.values(scores).filter(v => v > 0)
   const cbcAvg    = allLevels.reduce((a, b) => a + b, 0) / allLevels.length
 
-  // ── Strengths and development areas ─────────────────────────────────────────
+  // ── Strengths and development areas ──────────────────────────────────────────
   const strengths = Object.entries(scores)
     .filter(([, s]) => s >= 3)
     .sort(([, a], [, b]) => b - a)
@@ -234,96 +323,127 @@ export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRe
     .sort(([, a], [, b]) => a - b)
     .map(([k]) => k)
 
-  // ══════════════════════════════════════════════════════════════════════════
+  // ── Unlock messages ───────────────────────────────────────────────────────────
+  const toUnlockSTEM: string[] = []
+  if (mathLevel < PATHWAY_RULES.STEM.mathematics)
+    toUnlockSTEM.push(`Mathematics — currently Level ${mathLevel}, needs Level ${PATHWAY_RULES.STEM.mathematics}`)
+  if (sciLevel < PATHWAY_RULES.STEM.integrated_science)
+    toUnlockSTEM.push(`Integrated Science — currently Level ${sciLevel}, needs Level ${PATHWAY_RULES.STEM.integrated_science}`)
+  if (langAvg < PATHWAY_RULES.STEM.language_avg)
+    toUnlockSTEM.push(`Languages — average currently ${langAvg.toFixed(1)}, needs Level ${PATHWAY_RULES.STEM.language_avg}`)
+
+  const toUnlockSocial: string[] =
+    cbcAvg >= PATHWAY_RULES.SOCIAL_SCIENCES.minimum_avg
+      ? []
+      : ['Improve overall performance to Level 2 average']
+
+  // ── STEM gate ─────────────────────────────────────────────────────────────────
+  const stemGateMet =
+    mathLevel >= PATHWAY_RULES.STEM.mathematics &&
+    sciLevel  >= PATHWAY_RULES.STEM.integrated_science &&
+    langAvg   >= PATHWAY_RULES.STEM.language_avg
+
+  // ── Arts gate ─────────────────────────────────────────────────────────────────
+  const level1Count    = allLevels.filter(l => l <= 1).length
+  const majorityLevel1 = level1Count / allLevels.length > 0.5
+
+  // ══════════════════════════════════════════════════════════════════════════════
   // GATE 1 — STEM
-  // Hard requirement: Math ≥ 3 AND Integrated Science ≥ 3 AND lang avg ≥ 3
-  // ══════════════════════════════════════════════════════════════════════════
-  const stemGateMet = mathLevel >= 3 && sciLevel >= 3 && langAvg >= 3
-
+  // ══════════════════════════════════════════════════════════════════════════════
   if (stemGateMet) {
-    const conf: 'high' | 'medium' | 'low' =
-      mathLevel === 4 && sciLevel === 4 ? 'high'
-      : cbcAvg >= 3.5                   ? 'high'
-      :                                   'medium'
-
+    const pathway_readiness = { stem: stemWeighted, social_sciences: socialWeighted, arts: artsWeighted }
     return {
-      stem_score:            95,
-      social_sciences_score: 70,
-      arts_sports_score:     40,
+      stem_score:            stemWeighted,
+      social_sciences_score: socialWeighted,
+      arts_sports_score:     artsWeighted,
       top_pathway:           'STEM',
-      confidence:            conf,
+      confidence:            calculateConfidence(stemWeighted, socialWeighted),
       strengths,
       development_areas:     developmentAreas,
       guidance_message:      buildGuidanceMessage('STEM', 'high', true, developmentAreas),
       calculated_at:         new Date().toISOString(),
       performance_tier:      'high',
       stem_viable:           true,
+      pathway_readiness,
+      to_unlock_stem:        [],
+      to_unlock_social:      toUnlockSocial,
+      to_maintain_recommended: [
+        `Keep Mathematics at Level ${PATHWAY_RULES.STEM.mathematics}+`,
+        `Keep Integrated Science at Level ${PATHWAY_RULES.STEM.integrated_science}+`,
+      ],
+      alternative_pathway: 'Social Sciences',
     }
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════════════════════
   // GATE 2 — SOCIAL SCIENCES
-  // STEM gate not met but not majority at Level 1
-  // ══════════════════════════════════════════════════════════════════════════
-  const level1Count    = allLevels.filter(l => l <= 1).length
-  const majorityLevel1 = level1Count / allLevels.length > 0.5
-
+  // ══════════════════════════════════════════════════════════════════════════════
   if (!majorityLevel1) {
     const stemBlockers: string[] = []
-    if (mathLevel < 3) stemBlockers.push('mathematics')
-    if (sciLevel  < 3) stemBlockers.push('integrated_science')
-    if (langAvg   < 3) stemBlockers.push('english')
+    if (mathLevel < PATHWAY_RULES.STEM.mathematics)        stemBlockers.push('mathematics')
+    if (sciLevel  < PATHWAY_RULES.STEM.integrated_science) stemBlockers.push('integrated_science')
+    if (langAvg   < PATHWAY_RULES.STEM.language_avg)       stemBlockers.push('english')
 
-    // STEM potential: exactly 1 gate blocker, that subject is Level 2, overall avg ≥ 2.8
     const stemPotential =
       stemBlockers.length === 1 &&
       (mathLevel === 2 || sciLevel === 2) &&
       cbcAvg >= 2.8
 
-    const gateAvg       = (mathLevel + sciLevel) / 2
-    const stemAlignScore = Math.min(Math.round((gateAvg / 3) * 95), 94)
-
-    const conf: 'high' | 'medium' | 'low' = cbcAvg >= 3.0 ? 'high' : 'medium'
-
-    const guidanceMsg = buildGuidanceMessage(
-      'Social Sciences', 'mid', false, developmentAreas,
-      stemPotential ? stemBlockers : undefined,
-    )
+    // Cap STEM score when gate is unmet so Social Sciences always renders higher
+    const stemDisplay = Math.min(stemWeighted, 89)
+    const pathway_readiness = { stem: stemDisplay, social_sciences: socialWeighted, arts: artsWeighted }
 
     return {
-      stem_score:            stemAlignScore,
-      social_sciences_score: 95,
-      arts_sports_score:     35,
+      stem_score:            stemDisplay,
+      social_sciences_score: socialWeighted,
+      arts_sports_score:     artsWeighted,
       top_pathway:           'Social Sciences',
-      confidence:            conf,
+      confidence:            calculateConfidence(socialWeighted, stemDisplay),
       strengths,
       development_areas:     developmentAreas,
-      guidance_message:      guidanceMsg,
-      calculated_at:         new Date().toISOString(),
-      performance_tier:      cbcAvg >= 3.0 ? 'high' : 'mid',
-      stem_viable:           stemPotential,
-      stem_gap_subjects:     stemPotential ? stemBlockers : undefined,
+      guidance_message:      buildGuidanceMessage(
+        'Social Sciences', 'mid', false, developmentAreas,
+        stemPotential ? stemBlockers : undefined,
+      ),
+      calculated_at:     new Date().toISOString(),
+      performance_tier:  cbcAvg >= 3.0 ? 'high' : 'mid',
+      stem_viable:       stemPotential,
+      stem_gap_subjects: stemPotential ? stemBlockers : undefined,
+      pathway_readiness,
+      to_unlock_stem:    toUnlockSTEM,
+      to_unlock_social:  [],
+      to_maintain_recommended: [
+        `Keep English at Level ${Math.round(PATHWAY_RULES.SOCIAL_SCIENCES.minimum_avg * 1.5)}+`,
+        `Keep Kiswahili at Level ${Math.round(PATHWAY_RULES.SOCIAL_SCIENCES.minimum_avg * 1.5)}+`,
+      ],
+      alternative_pathway: stemPotential ? 'STEM' : 'Arts & Sports Science',
     }
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════════════════════
   // GATE 3 — ARTS & SPORTS SCIENCE
-  // Majority at Level 1 — practical pathway
-  // ══════════════════════════════════════════════════════════════════════════
-  const socialScore = Math.round(cbcAvg * 15)
-
+  // ══════════════════════════════════════════════════════════════════════════════
+  const pathway_readiness = { stem: stemWeighted, social_sciences: socialWeighted, arts: artsWeighted }
   return {
-    stem_score:            10,
-    social_sciences_score: socialScore,
-    arts_sports_score:     95,
+    stem_score:            stemWeighted,
+    social_sciences_score: socialWeighted,
+    arts_sports_score:     artsWeighted,
     top_pathway:           'Arts & Sports Science',
-    confidence:            cbcAvg < 1.5 ? 'high' : 'medium',
+    confidence:            calculateConfidence(artsWeighted, socialWeighted),
     strengths,
     development_areas:     developmentAreas,
     guidance_message:      buildGuidanceMessage('Arts & Sports Science', 'low', false, developmentAreas),
     calculated_at:         new Date().toISOString(),
     performance_tier:      'low',
     stem_viable:           false,
+    pathway_readiness,
+    to_unlock_stem:        toUnlockSTEM,
+    to_unlock_social:      toUnlockSocial,
+    to_maintain_recommended: [
+      'Continue developing Creative Arts and Sports skills',
+      'Build confidence through practical subjects',
+    ],
+    alternative_pathway: 'Social Sciences',
   }
 }
 

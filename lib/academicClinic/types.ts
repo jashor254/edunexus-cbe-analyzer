@@ -59,8 +59,17 @@ export interface PathwayAnalysis {
   reasons: string[]
   subjectsToStrengthen: string[]
   futureMessage: string
-  stem_viable?:      boolean
-  stem_gap_subjects?: string[]
+  stem_viable?:           boolean
+  stem_gap_subjects?:     string[]
+  pathway_readiness?: {
+    stem:            number
+    social_sciences: number
+    arts:            number
+  }
+  to_unlock_stem?:          string[]
+  to_unlock_social?:        string[]
+  to_maintain_recommended?: string[]
+  alternative_pathway?:     string
 }
 
 // ─── Career Match (Senior — Page 4B) ─────────────────────────────────────────
