@@ -123,6 +123,11 @@ const S = StyleSheet.create({
   pathwayPct:    { fontSize: 10, fontWeight: 700 },
   pathwayTrack:  { height: 14, backgroundColor: C.border, borderRadius: 7, overflow: 'hidden' },
   pathwayFill:   { height: 14, borderRadius: 7 },
+  // ── STEM potential box
+  stemPotentialBox:   { backgroundColor: '#FEF3C7', borderLeftWidth: 3, borderLeftColor: '#D97706', borderRadius: 4, padding: 10, marginTop: 12 },
+  stemPotentialTitle: { fontSize: 9, fontWeight: 700, color: '#92400E', marginBottom: 4, letterSpacing: 0.5 },
+  stemPotentialBody:  { fontSize: 8, color: '#78350F', marginBottom: 6 },
+  stemGapItem:        { fontSize: 8, color: '#92400E', marginBottom: 2 },
   recommendedBg: { backgroundColor: C.navyLight, borderRadius: 6, padding: 14, marginTop: 12 },
 
   // ── Career cards
@@ -490,14 +495,29 @@ function PathwayPage({ report }: { report: AcademicClinicReport }) {
         })}
 
         {/* Confidence */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, marginBottom: 16 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, marginBottom: pa.stem_viable && pa.stem_gap_subjects?.length ? 0 : 16 }}>
           <Text style={{ fontSize: 9, color: C.muted, marginRight: 8 }}>Recommendation confidence:</Text>
           <View style={[S.badge, { backgroundColor: confBg }]}>
             <Text style={[S.badgeText, { color: confColor }]}>{pa.confidenceLevel}</Text>
           </View>
         </View>
 
-        <View style={S.dividerThin} />
+        {/* STEM potential box */}
+        {pa.stem_viable && pa.stem_gap_subjects && pa.stem_gap_subjects.length > 0 && (
+          <View style={S.stemPotentialBox}>
+            <Text style={S.stemPotentialTitle}>STEM PATHWAY POTENTIAL</Text>
+            <Text style={S.stemPotentialBody}>
+              This learner is one step away from STEM. Improve the following before Grade 10:
+            </Text>
+            {pa.stem_gap_subjects.map((subject, i) => (
+              <Text key={i} style={S.stemGapItem}>
+                {'• '}{subject.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}{' — currently Level 2 → needs Level 3'}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        <View style={[S.dividerThin, { marginTop: 16 }]} />
 
         {/* Reasons */}
         <View style={{ flexDirection: 'row', marginBottom: 14 }}>

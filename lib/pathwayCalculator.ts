@@ -197,6 +197,7 @@ export type PathwayRecommendation = {
   // Performance context
   performance_tier:      'high' | 'mid' | 'low'
   stem_viable:           boolean
+  stem_gap_subjects?:    string[]
 }
 
 /**
@@ -210,116 +211,128 @@ export type PathwayRecommendation = {
  * Scores arrive as CBC 1–4 from the assessment pipeline.
  */
 export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRecommendation {
-  // Step 1 — Convert CBC 1–4 to 0–100 percentage for precision
-  // ((score - 1) / 3) × 100  →  1→0, 2→33.3, 3→66.7, 4→100
-  const pct: Record<string, number> = {}
-  for (const [subject, score] of Object.entries(scores)) {
-    pct[subject] = ((score - 1) / 3) * 100
-  }
 
-  // Step 2 — Raw pathway averages
-  // STEM: Maths carries double weight (primary STEM indicator)
-  const stemRaw = (
-    (pct.mathematics             ?? 0) * 2 +
-    (pct.integrated_science      ?? 0) +
-    (pct.pre_technical_studies   ?? 0)
-  ) / 4
+  // ── Gate subjects (DB snake_case keys) ──────────────────────────────────────
+  const mathLevel = scores.mathematics        ?? 0
+  const sciLevel  = scores.integrated_science ?? 0
+  const engLevel  = scores.english            ?? 0
+  const kisLevel  = scores.kiswahili          ?? 0
+  const langAvg   = (engLevel + kisLevel) / 2
 
-  // Social Sciences: languages + humanities
-  const socialRaw = (
-    (pct.english        ?? 0) +
-    (pct.kiswahili      ?? 0) +
-    (pct.social_studies ?? 0) +
-    (pct.cre            ?? 0)
-  ) / 4
+  // ── Overall average (1–4 scale) ─────────────────────────────────────────────
+  const allLevels = Object.values(scores).filter(v => v > 0)
+  const cbcAvg    = allLevels.reduce((a, b) => a + b, 0) / allLevels.length
 
-  // Arts & Sports Science: creative + practical
-  const artsRaw = (
-    (pct.creative_arts_sports  ?? 0) +
-    (pct.agriculture_nutrition ?? 0)
-  ) / 2
-
-  // Step 3 — CBC average for tier detection (uses original 1–4 scale)
-  const allCBC         = Object.values(scores)
-  const cbcAvg         = allCBC.reduce((a, b) => a + b, 0) / allCBC.length
-  const performanceTier: 'high' | 'mid' | 'low' =
-    cbcAvg >= 3.0 ? 'high' : cbcAvg >= 2.0 ? 'mid' : 'low'
-
-  // Step 4 — Apply performance-tier bias
-  let stemFinal:   number
-  let socialFinal: number
-  let artsFinal:   number
-
-  if (performanceTier === 'high') {
-    // Capable students should aim for high-demand pathways
-    stemFinal   = stemRaw   + 15
-    socialFinal = socialRaw + 5
-    artsFinal   = artsRaw   - 10
-  } else if (performanceTier === 'mid') {
-    // Balanced with slight STEM preference
-    stemFinal   = stemRaw   + 5
-    socialFinal = socialRaw
-    artsFinal   = artsRaw
-  } else {
-    // Low performers: practical pathway builds confidence
-    // Never boost STEM for a struggling student — sets them up to fail
-    stemFinal   = stemRaw
-    socialFinal = socialRaw
-    artsFinal   = artsRaw   + 15
-  }
-
-  // Step 5 — Top pathway and confidence
-  const pathways = [
-    { name: 'STEM',                  score: stemFinal,   raw: stemRaw   },
-    { name: 'Social Sciences',       score: socialFinal, raw: socialRaw },
-    { name: 'Arts & Sports Science', score: artsFinal,   raw: artsRaw   },
-  ].sort((a, b) => b.score - a.score)
-
-  const topPathway = pathways[0].name
-  const gap        = pathways[0].score - pathways[1].score
-  // >= 15 (not >) so that all-Level-1 students hit HIGH confidence for Arts
-  const confidence: 'high' | 'medium' | 'low' =
-    gap >= 15 ? 'high' : gap >= 8 ? 'medium' : 'low'
-
-  // Step 6 — STEM viability (Maths + Sci both ≥ 55% on CBC scale)
-  const mathsPct   = (scores.mathematics        ?? 0) / 4 * 100
-  const sciPct     = (scores.integrated_science ?? 0) / 4 * 100
-  const stemViable = mathsPct >= 55 && sciPct >= 55
-
-  // Strengths / development areas
+  // ── Strengths and development areas ─────────────────────────────────────────
   const strengths = Object.entries(scores)
     .filter(([, s]) => s >= 3)
+    .sort(([, a], [, b]) => b - a)
     .map(([k]) => k)
-    .sort((a, b) => (scores[b] ?? 0) - (scores[a] ?? 0))
 
   const developmentAreas = Object.entries(scores)
     .filter(([, s]) => s <= 2)
+    .sort(([, a], [, b]) => a - b)
     .map(([k]) => k)
-    .sort((a, b) => (scores[a] ?? 0) - (scores[b] ?? 0))
 
-  // Step 7 — Guidance message
-  const guidanceMessage = buildGuidanceMessage(topPathway, performanceTier, stemViable, developmentAreas)
+  // ══════════════════════════════════════════════════════════════════════════
+  // GATE 1 — STEM
+  // Hard requirement: Math ≥ 3 AND Integrated Science ≥ 3 AND lang avg ≥ 3
+  // ══════════════════════════════════════════════════════════════════════════
+  const stemGateMet = mathLevel >= 3 && sciLevel >= 3 && langAvg >= 3
+
+  if (stemGateMet) {
+    const conf: 'high' | 'medium' | 'low' =
+      mathLevel === 4 && sciLevel === 4 ? 'high'
+      : cbcAvg >= 3.5                   ? 'high'
+      :                                   'medium'
+
+    return {
+      stem_score:            95,
+      social_sciences_score: 70,
+      arts_sports_score:     40,
+      top_pathway:           'STEM',
+      confidence:            conf,
+      strengths,
+      development_areas:     developmentAreas,
+      guidance_message:      buildGuidanceMessage('STEM', 'high', true, developmentAreas),
+      calculated_at:         new Date().toISOString(),
+      performance_tier:      'high',
+      stem_viable:           true,
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // GATE 2 — SOCIAL SCIENCES
+  // STEM gate not met but not majority at Level 1
+  // ══════════════════════════════════════════════════════════════════════════
+  const level1Count    = allLevels.filter(l => l <= 1).length
+  const majorityLevel1 = level1Count / allLevels.length > 0.5
+
+  if (!majorityLevel1) {
+    const stemBlockers: string[] = []
+    if (mathLevel < 3) stemBlockers.push('mathematics')
+    if (sciLevel  < 3) stemBlockers.push('integrated_science')
+    if (langAvg   < 3) stemBlockers.push('english')
+
+    // STEM potential: exactly 1 gate blocker, that subject is Level 2, overall avg ≥ 2.8
+    const stemPotential =
+      stemBlockers.length === 1 &&
+      (mathLevel === 2 || sciLevel === 2) &&
+      cbcAvg >= 2.8
+
+    const gateAvg       = (mathLevel + sciLevel) / 2
+    const stemAlignScore = Math.min(Math.round((gateAvg / 3) * 95), 94)
+
+    const conf: 'high' | 'medium' | 'low' = cbcAvg >= 3.0 ? 'high' : 'medium'
+
+    const guidanceMsg = buildGuidanceMessage(
+      'Social Sciences', 'mid', false, developmentAreas,
+      stemPotential ? stemBlockers : undefined,
+    )
+
+    return {
+      stem_score:            stemAlignScore,
+      social_sciences_score: 95,
+      arts_sports_score:     35,
+      top_pathway:           'Social Sciences',
+      confidence:            conf,
+      strengths,
+      development_areas:     developmentAreas,
+      guidance_message:      guidanceMsg,
+      calculated_at:         new Date().toISOString(),
+      performance_tier:      cbcAvg >= 3.0 ? 'high' : 'mid',
+      stem_viable:           stemPotential,
+      stem_gap_subjects:     stemPotential ? stemBlockers : undefined,
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // GATE 3 — ARTS & SPORTS SCIENCE
+  // Majority at Level 1 — practical pathway
+  // ══════════════════════════════════════════════════════════════════════════
+  const socialScore = Math.round(cbcAvg * 15)
 
   return {
-    stem_score:            Math.round(stemRaw),
-    arts_sports_score:     Math.round(artsRaw),
-    social_sciences_score: Math.round(socialRaw),
-    top_pathway:           topPathway,
-    confidence,
+    stem_score:            10,
+    social_sciences_score: socialScore,
+    arts_sports_score:     95,
+    top_pathway:           'Arts & Sports Science',
+    confidence:            cbcAvg < 1.5 ? 'high' : 'medium',
     strengths,
     development_areas:     developmentAreas,
-    guidance_message:      guidanceMessage,
+    guidance_message:      buildGuidanceMessage('Arts & Sports Science', 'low', false, developmentAreas),
     calculated_at:         new Date().toISOString(),
-    performance_tier:      performanceTier,
-    stem_viable:           stemViable,
+    performance_tier:      'low',
+    stem_viable:           false,
   }
 }
 
 function buildGuidanceMessage(
-  pathway:         string,
-  tier:            'high' | 'mid' | 'low',
-  stemViable:      boolean,
+  pathway:          string,
+  tier:             'high' | 'mid' | 'low',
+  stemViable:       boolean,
   developmentAreas: string[],
+  stemBlockers?:    string[],
 ): string {
   let message: string
 
@@ -356,6 +369,12 @@ function buildGuidanceMessage(
         'This student shows solid language and humanities ability. The Social Sciences pathway is a strong fit, ' +
         'leading to Law, Teaching, Business, and Public Service careers.\n\n' +
         '💡 Next steps: Reading habit, writing practice, debate and discussion activities.'
+      if (stemBlockers && stemBlockers.length > 0) {
+        message +=
+          `\n\n🎯 STEM is within reach: improve ${
+            stemBlockers.map(b => formatSubjectName(b)).join(' and ')
+          } from Level 2 to Level 3.`
+      }
     } else {
       message =
         'This student performs best in creative and practical subjects. The Arts & Sports Science pathway ' +

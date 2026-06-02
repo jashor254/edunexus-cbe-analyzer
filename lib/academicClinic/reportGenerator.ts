@@ -1,6 +1,7 @@
 // lib/academicClinic/reportGenerator.ts
 
 import { CareerEngine } from './careerEngine'
+import { calculateJuniorPathwayAffinity, formatSubjectName as pathwayFormatSubjectName } from '@/lib/pathwayCalculator'
 import {
   StudentProfile,
   SubjectProgress,
@@ -339,11 +340,12 @@ export function generateClinicalOverview(
 }
 
 // ─── Pathway Analysis (Junior — Page 4A) ──────────────────────────────────────
+// PATHWAY_MAP is used by generateReport to build pathway-specific reasons text.
 
 const PATHWAY_MAP: Record<string, 'STEM' | 'Social Sciences' | 'Arts & Sports Science'> = {
   mathematics: 'STEM', core_mathematics: 'STEM', essential_mathematics: 'STEM',
   integrated_science: 'STEM', biology: 'STEM', chemistry: 'STEM', physics: 'STEM',
-  computer_studies: 'STEM', pre_technical: 'STEM',
+  computer_studies: 'STEM', pre_technical_studies: 'STEM', pre_technical: 'STEM',
   social_studies: 'Social Sciences', history_citizenship: 'Social Sciences',
   history: 'Social Sciences', geography: 'Social Sciences',
   business_studies: 'Social Sciences', agriculture_nutrition: 'Social Sciences',
@@ -353,72 +355,6 @@ const PATHWAY_MAP: Record<string, 'STEM' | 'Social Sciences' | 'Arts & Sports Sc
   creative_arts_sports: 'Arts & Sports Science', physical_education: 'Arts & Sports Science',
   sports_recreation: 'Arts & Sports Science', music_dance: 'Arts & Sports Science',
   theatre_film: 'Arts & Sports Science', fine_arts: 'Arts & Sports Science',
-}
-
-export function generatePathwayAnalysis(subjects: SubjectProgress[], firstName: string): PathwayAnalysis {
-  const buckets: Record<'STEM' | 'Social Sciences' | 'Arts & Sports Science', number[]> = {
-    'STEM': [], 'Social Sciences': [], 'Arts & Sports Science': [],
-  }
-
-  for (const s of subjects) {
-    const p = PATHWAY_MAP[s.subject]
-    if (p) buckets[p].push(s.level)
-  }
-
-  const overallAvg = subjects.reduce((s, x) => s + x.level, 0) / subjects.length
-  const toScore = (levels: number[]) =>
-    levels.length ? Math.round(((levels.reduce((a, b) => a + b, 0) / levels.length) - 1) / 3 * 100)
-                  : Math.round(((overallAvg - 1) / 3) * 55)
-
-  const pathwayScores: PathwayScore[] = ([
-    { name: 'STEM'                  as const, score: toScore(buckets['STEM']),                  color: '#3b82f6' },
-    { name: 'Social Sciences'       as const, score: toScore(buckets['Social Sciences']),       color: '#10b981' },
-    { name: 'Arts & Sports Science' as const, score: toScore(buckets['Arts & Sports Science']), color: '#f59e0b' },
-  ] as PathwayScore[]).sort((a, b) => b.score - a.score)
-
-  const best      = pathwayScores[0]
-  const recommended = best.name as 'STEM' | 'Social Sciences' | 'Arts & Sports Science'
-  const confidence: 'HIGH' | 'MEDIUM' | 'DEVELOPING' = best.score >= 70 ? 'HIGH' : best.score >= 50 ? 'MEDIUM' : 'DEVELOPING'
-
-  const pathSubjects = subjects.filter(s => PATHWAY_MAP[s.subject] === recommended).sort((a, b) => b.level - a.level)
-  const strong = pathSubjects.filter(s => s.level >= 3).slice(0, 2)
-
-  const reasons: string[] = []
-  if (strong.length > 0) {
-    reasons.push(
-      `Demonstrates ${getLevelLabel(strong[0].level)} competency in ${strong.map(s => s.displayName).join(' and ')}, which are core subjects of the ${recommended} pathway.`
-    )
-  } else if (pathSubjects.length > 0) {
-    reasons.push(`Shows developing aptitude aligned with ${recommended} subjects based on current assessment data.`)
-  } else {
-    reasons.push(`Overall performance profile suggests alignment with ${recommended} pathway characteristics.`)
-  }
-
-  if (recommended === 'STEM') {
-    reasons.push('Analytical and quantitative reasoning skills observed in assessment data support STEM pathway engagement.')
-    reasons.push('Strong STEM foundations at this stage are critical access points for engineering, medicine, and technology degree programmes.')
-  } else if (recommended === 'Social Sciences') {
-    reasons.push('Communication, civic reasoning, and analytical skills align well with Social Sciences pathway requirements and outcomes.')
-    reasons.push('Social Sciences opens access to law, business, education, and public service — high-demand career pathways in Kenya.')
-  } else {
-    reasons.push('Creative expression and physical aptitude observed in assessment data align naturally with Arts & Sports Science pathway.')
-    reasons.push('Arts & Sports Science leads to design, performance, sports science, media, and creative industries — a rapidly growing sector in Kenya.')
-  }
-
-  const toStrengthen = [...subjects]
-    .filter(s => PATHWAY_MAP[s.subject] === recommended || !PATHWAY_MAP[s.subject])
-    .sort((a, b) => a.level - b.level)
-    .slice(0, 3)
-    .map(s => s.displayName)
-
-  const futureMessage =
-    recommended === 'STEM'
-      ? `A strong STEM pathway in Grade 10–12 opens doors to Medicine, Engineering, Technology, and Data Science — some of the highest-demand careers in Kenya and globally. With continued investment in ${firstName}'s foundational sciences now, these pathways become increasingly accessible.`
-      : recommended === 'Social Sciences'
-      ? `The Social Sciences pathway in Grade 10–12 leads to Law, Business, Education, Public Policy, and Finance — careers at the heart of Kenya's growth story. ${firstName}'s current trajectory suggests a strong fit for these intellectually stimulating and socially impactful pathways.`
-      : `The Arts & Sports Science pathway in Grade 10–12 leads to careers in design, performing arts, sports science, media, and creative industries — a rapidly growing sector in Kenya. ${firstName}'s creative and physical aptitudes represent a genuine and valuable talent worth developing fully.`
-
-  return { pathwayScores, recommendedPathway: recommended, confidenceLevel: confidence, reasons, subjectsToStrengthen: toStrengthen, futureMessage }
 }
 
 // ─── Junior Guidance (web UI backward compat) ─────────────────────────────────
@@ -713,7 +649,56 @@ export function generateReport(
   const reportId         = `EC-${studentProfile.year}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
   const graphData        = generateGraphData(subjects)
   const clinicalOverview = generateClinicalOverview(firstName, subjects, assessments)
-  const pathwayAnalysis  = isJunior ? generatePathwayAnalysis(subjects, firstName) : undefined
+  let pathwayAnalysis: PathwayAnalysis | undefined = undefined
+  if (isJunior) {
+    const scores = Object.fromEntries(subjects.map(s => [s.subject, s.level]))
+    const pr     = calculateJuniorPathwayAffinity(scores)
+    const recommended = pr.top_pathway as 'STEM' | 'Social Sciences' | 'Arts & Sports Science'
+    const confMap = { high: 'HIGH', medium: 'MEDIUM', low: 'DEVELOPING' } as const
+
+    const strongInPath = subjects
+      .filter(s => PATHWAY_MAP[s.subject] === recommended && s.level >= 3)
+      .sort((a, b) => b.level - a.level)
+      .slice(0, 2)
+
+    const reasons: string[] = [
+      strongInPath.length > 0
+        ? `Demonstrates ${getLevelLabel(strongInPath[0].level)} competency in ${strongInPath.map(s => s.displayName).join(' and ')}, which are core subjects of the ${recommended} pathway.`
+        : `Assessment profile shows developing aptitude aligned with ${recommended} subjects.`,
+      recommended === 'STEM'
+        ? 'Analytical and quantitative reasoning skills support STEM pathway engagement.'
+        : recommended === 'Social Sciences'
+        ? 'Communication, civic reasoning, and analytical skills align well with Social Sciences requirements.'
+        : 'Creative expression and practical aptitude align naturally with Arts & Sports Science.',
+      recommended === 'STEM'
+        ? 'Strong STEM foundations at this stage open access to engineering, medicine, and technology degree programmes.'
+        : recommended === 'Social Sciences'
+        ? 'Social Sciences opens access to law, business, education, and public service — high-demand careers in Kenya.'
+        : 'Arts & Sports Science leads to design, sports science, media, and creative industries in Kenya.',
+    ]
+
+    const futureMessage =
+      recommended === 'STEM'
+        ? `A strong STEM pathway in Grade 10–12 opens doors to Medicine, Engineering, Technology, and Data Science — some of the highest-demand careers in Kenya and globally. With continued investment in ${firstName}'s foundational sciences now, these pathways become increasingly accessible.`
+        : recommended === 'Social Sciences'
+        ? `The Social Sciences pathway in Grade 10–12 leads to Law, Business, Education, Public Policy, and Finance — careers at the heart of Kenya's growth story. ${firstName}'s current trajectory suggests a strong fit for these intellectually stimulating and socially impactful pathways.`
+        : `The Arts & Sports Science pathway in Grade 10–12 leads to careers in design, performing arts, sports science, media, and creative industries — a rapidly growing sector in Kenya. ${firstName}'s creative and physical aptitudes represent a genuine and valuable talent worth developing fully.`
+
+    pathwayAnalysis = {
+      pathwayScores: ([
+        { name: 'STEM'                  as const, score: pr.stem_score,            color: '#3b82f6' },
+        { name: 'Social Sciences'       as const, score: pr.social_sciences_score, color: '#10b981' },
+        { name: 'Arts & Sports Science' as const, score: pr.arts_sports_score,     color: '#f59e0b' },
+      ] as PathwayScore[]).sort((a, b) => b.score - a.score),
+      recommendedPathway: recommended,
+      confidenceLevel:    confMap[pr.confidence],
+      reasons,
+      subjectsToStrengthen: pr.development_areas.slice(0, 3).map(pathwayFormatSubjectName),
+      futureMessage,
+      stem_viable:       pr.stem_viable,
+      stem_gap_subjects: pr.stem_gap_subjects,
+    }
+  }
   const holidayPlan      = generateHolidayPlan(subjects)
   const learningCompassRec = generateLearningCompassRec(subjects)
 
