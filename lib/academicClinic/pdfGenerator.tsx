@@ -124,6 +124,7 @@ const S = StyleSheet.create({
   stemPotentialTitle: { fontSize: 9, fontWeight: 700, color: '#92400E', marginBottom: 4, letterSpacing: 0.5 },
   stemPotentialBody:  { fontSize: 8, color: '#78350F', marginBottom: 6 },
   stemGapItem:        { fontSize: 8, color: '#92400E', marginBottom: 2 },
+  confidenceSubtitle: { fontSize: 7.5, color: '#64748B', fontStyle: 'italic', marginTop: 3 },
   // ── Unlock / maintain boxes
   unlockBox:    { borderLeftWidth: 2, borderLeftColor: '#1D9E75', backgroundColor: '#F0FDF4', borderRadius: 4, padding: 8 },
   unlockTitle:  { fontSize: 8, fontWeight: 700, color: '#065F46', letterSpacing: 0.5, marginBottom: 5 },
@@ -530,11 +531,24 @@ function PathwayPage({ report }: { report: AcademicClinicReport }) {
               <Text style={{ fontSize: 11, fontWeight: 700, color: ALT_COLOR, marginTop: 2 }}>{pa.alternative_pathway}</Text>
             </View>
           )}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 'auto' }}>
-            <Text style={{ fontSize: 8, color: C.muted, marginRight: 6 }}>Confidence:</Text>
-            <View style={[S.badge, { backgroundColor: confBg }]}>
-              <Text style={[S.badgeText, { color: confColor }]}>{pa.confidenceLevel}</Text>
+          <View style={{ alignItems: 'flex-end', marginLeft: 'auto' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={{ fontSize: 8, color: C.muted, marginRight: 6 }}>Confidence:</Text>
+              <View style={[S.badge, { backgroundColor: confBg }]}>
+                <Text style={[S.badgeText, { color: confColor }]}>
+                  {pa.confidenceLevel === 'HIGH'
+                    ? 'HIGH'
+                    : pa.confidenceLevel === 'MEDIUM'
+                    ? 'GOOD FIT'
+                    : 'MULTIPLE PATHWAYS'}
+                </Text>
+              </View>
             </View>
+            {pa.confidenceLevel === 'DEVELOPING' && (
+              <Text style={S.confidenceSubtitle}>
+                This learner has the ability to succeed in more than one pathway.
+              </Text>
+            )}
           </View>
         </View>
 

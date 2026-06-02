@@ -256,6 +256,29 @@ function calculateConfidence(
   return 'low'
 }
 
+// Ensure the recommended pathway bar is always visually longest.
+// Does NOT affect gate logic — display only.
+function normalizeReadinessDisplay(
+  readiness: { stem: number; social_sciences: number; arts: number },
+  topPathway: string,
+): { stem: number; social_sciences: number; arts: number } {
+  const key =
+    topPathway === 'STEM'              ? 'stem'
+    : topPathway === 'Social Sciences' ? 'social_sciences'
+    : 'arts'
+
+  const recScore = readiness[key]
+  const result   = { ...readiness }
+
+  for (const k of Object.keys(result) as (keyof typeof result)[]) {
+    if (k !== key && result[k] >= recScore) {
+      result[k] = recScore - 4
+    }
+  }
+
+  return result
+}
+
 // ─── PathwayRecommendation type ───────────────────────────────────────────────
 
 export type PathwayRecommendation = {
@@ -351,7 +374,10 @@ export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRe
   // GATE 1 — STEM
   // ══════════════════════════════════════════════════════════════════════════════
   if (stemGateMet) {
-    const pathway_readiness = { stem: stemWeighted, social_sciences: socialWeighted, arts: artsWeighted }
+    const pathway_readiness = normalizeReadinessDisplay(
+      { stem: stemWeighted, social_sciences: socialWeighted, arts: artsWeighted },
+      'STEM',
+    )
     return {
       stem_score:            stemWeighted,
       social_sciences_score: socialWeighted,
@@ -391,7 +417,10 @@ export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRe
 
     // Cap STEM score when gate is unmet so Social Sciences always renders higher
     const stemDisplay = Math.min(stemWeighted, 89)
-    const pathway_readiness = { stem: stemDisplay, social_sciences: socialWeighted, arts: artsWeighted }
+    const pathway_readiness = normalizeReadinessDisplay(
+      { stem: stemDisplay, social_sciences: socialWeighted, arts: artsWeighted },
+      'Social Sciences',
+    )
 
     return {
       stem_score:            stemDisplay,
@@ -423,7 +452,10 @@ export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRe
   // ══════════════════════════════════════════════════════════════════════════════
   // GATE 3 — ARTS & SPORTS SCIENCE
   // ══════════════════════════════════════════════════════════════════════════════
-  const pathway_readiness = { stem: stemWeighted, social_sciences: socialWeighted, arts: artsWeighted }
+  const pathway_readiness = normalizeReadinessDisplay(
+    { stem: stemWeighted, social_sciences: socialWeighted, arts: artsWeighted },
+    'Arts & Sports Science',
+  )
   return {
     stem_score:            stemWeighted,
     social_sciences_score: socialWeighted,
