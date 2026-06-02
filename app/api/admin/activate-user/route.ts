@@ -2,7 +2,7 @@
 // Manually activates a user after M-PESA payment confirmation
 
 import { NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiForbidden, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
 import { ADMIN_CONFIG } from '@/lib/config/api'

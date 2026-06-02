@@ -1,6 +1,6 @@
 // app/api/admin/grant-access/route.ts
 import { NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiForbidden, apiUnauthorized } from '@/lib/api/response'
 import { ADMIN_CONFIG } from '@/lib/config/api'

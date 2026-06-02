@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/utils/supabase/client'
+
+const supabase = createClient()
 import { useSimpleSync } from '@/lib/sync/multi-device-sync'
 import { analyzePerformance, getTierConfig } from '@/lib/adaptiveLearning'
 import { careerEngine } from '@/lib/academicClinic/careerEngine'

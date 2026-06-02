@@ -408,7 +408,7 @@ export default function DashboardPage() {
 
   // ── Fetch user identity (from Supabase client) ────────────────────────────
   useEffect(() => {
-    import('@/lib/supabase/client').then(({ createClient }) => {
+    import('@/utils/supabase/client').then(({ createClient }) => {
       const sb = createClient()
       sb.auth.getUser().then(({ data: { user } }) => {
         if (!user) return

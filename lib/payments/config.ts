@@ -1,5 +1,17 @@
 // lib/payments/config.ts
 
+// ===== TOKEN COSTS (per action) =====
+export const TOKEN_COSTS = {
+  add_assessment_basic:    1,
+  add_assessment_detailed: 2,
+  generate_pdf:            3,
+  ai_career_analysis:      5,
+  ai_chat_session:         2,
+  download_clinic:         3,
+} as const
+
+export type TokenFeature = keyof typeof TOKEN_COSTS
+
 // ===== PLAN TYPES =====
 export type PlanType = 'termly' | 'annual' | 'none';
 export type TokenBundleType = 'starter' | 'popular' | 'pro';
