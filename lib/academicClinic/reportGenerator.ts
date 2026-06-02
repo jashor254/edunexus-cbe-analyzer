@@ -512,54 +512,82 @@ const SUBJECT_TOPICS: Record<string, { low: string[]; mid: string[]; high: strin
   },
 }
 
-function getSubjectActivities(subject: string, level: number): string[] {
-  const tier = level <= 1 ? 'low' : level === 2 ? 'mid' : level === 3 ? 'mid' : 'high'
-  return SUBJECT_TOPICS[subject]?.[tier] || [
-    level <= 2 ? `Complete 20 minutes of ${formatSubjectName(subject)} past paper practice daily` : `Explore advanced ${formatSubjectName(subject)} topics beyond the syllabus`,
-    level <= 2 ? `Focus on the fundamental concepts identified as weak in your last assessment` : `Teach one core concept to someone at home to deepen mastery`,
-    level <= 2 ? `Create a mind-map of the main topics in ${formatSubjectName(subject)} from this term` : `Research how ${formatSubjectName(subject)} connects to a career you find interesting`,
-  ]
+// Week-type activity pools — each week gets a DIFFERENT set regardless of subject
+const FOUNDATION_ACTIVITIES = [
+  'Identify and review key concepts from your teacher notes and textbook',
+  'Complete 10 practice questions per session — focus on accuracy, not speed',
+  'Create a summary mind-map of the core topics covered this term',
+]
+
+const BUILDING_ACTIVITIES = [
+  'Apply concepts to past exam questions — aim for 15 questions per session',
+  'Teach the concept back: explain it to a family member in simple terms',
+  'Identify 3 mistakes from previous work, understand why, and correct them',
+]
+
+const EXCELLENCE_ACTIVITIES = [
+  'Explore one advanced topic beyond the current syllabus',
+  'Write a one-page essay or analysis on a key theme from this subject',
+  'Research a real-world application of this subject in Kenya or globally',
+]
+
+// Forced-tier lookup: week type overrides the subject's actual level
+// so the same subject in Week 1 and Week 2 always has DIFFERENT activities
+function getActivitiesForWeek(
+  subject: string,
+  weekType: 'foundation' | 'building' | 'excellence',
+): string[] {
+  const tierMap = { foundation: 'low', building: 'mid', excellence: 'high' } as const
+  const tier = tierMap[weekType]
+  return SUBJECT_TOPICS[subject]?.[tier] ?? (
+    weekType === 'foundation' ? FOUNDATION_ACTIVITIES
+    : weekType === 'building'   ? BUILDING_ACTIVITIES
+    :                             EXCELLENCE_ACTIVITIES
+  )
 }
 
 export function generateHolidayPlan(subjects: SubjectProgress[]): HolidayActionPlan {
-  const byAsc   = [...subjects].sort((a, b) => a.level - b.level)
-  const level12 = byAsc.filter(s => s.level <= 2).slice(0, 2)
-  const level23 = byAsc.filter(s => s.level >= 2 && s.level <= 3).slice(0, 2)
-  const level34 = byAsc.filter(s => s.level >= 3).slice(0, 2)
+  const byAsc  = [...subjects].sort((a, b) => a.level - b.level)
+  const byDesc = [...subjects].sort((a, b) => b.level - a.level)
 
-  // Fallbacks
-  const w1focus = level12.length > 0 ? level12 : byAsc.slice(0, 2)
-  const w2focus = level23.length > 0 ? level23 : byAsc.slice(1, 3)
-  const w3focus = level34.length > 0 ? level34 : [...subjects].sort((a, b) => b.level - a.level).slice(0, 2)
+  // Week 1: weakest subject(s) — FOUNDATION activities
+  const w1focus = byAsc.slice(0, 2)
+
+  // Week 2: second weakest (different from week 1 when possible) — BUILDING activities
+  // If only one weak subject exists, use the same subject but a different tier guarantees different content
+  const w2focus = byAsc.length > 1 ? byAsc.slice(1, 3) : byAsc.slice(0, 1)
+
+  // Week 3: strongest subject(s) — EXCELLENCE activities (guaranteed different subject from week 1)
+  const w3focus = byDesc.slice(0, 2)
 
   const week1: WeekPlan = {
-    weekNumber: 1,
-    title: 'FOUNDATION WEEK',
-    theme: 'Close the Critical Gaps',
+    weekNumber:    1,
+    title:         'FOUNDATION WEEK',
+    theme:         'Close the Critical Gaps',
     focusSubjects: w1focus.map(s => s.displayName),
-    dailyMinutes: 45,
-    goal: 'Move from Emerging to Developing — build foundational competency in priority areas before the next term',
-    activities: w1focus.flatMap(s => getSubjectActivities(s.subject, s.level)),
+    dailyMinutes:  45,
+    goal:          'Build solid foundational understanding in priority areas before the next term begins',
+    activities:    w1focus.flatMap(s => getActivitiesForWeek(s.subject, 'foundation')).slice(0, 3),
   }
 
   const week2: WeekPlan = {
-    weekNumber: 2,
-    title: 'BUILDING WEEK',
-    theme: 'Consolidate and Close Gaps',
+    weekNumber:    2,
+    title:         'BUILDING WEEK',
+    theme:         'Apply and Consolidate',
     focusSubjects: w2focus.map(s => s.displayName),
-    dailyMinutes: 30,
-    goal: 'Push Developing subjects toward Proficient — consolidate understanding and reduce revision gaps',
-    activities: w2focus.flatMap(s => getSubjectActivities(s.subject, s.level)),
+    dailyMinutes:  30,
+    goal:          'Apply foundational knowledge to exam-style questions and consolidate understanding',
+    activities:    w2focus.flatMap(s => getActivitiesForWeek(s.subject, 'building')).slice(0, 3),
   }
 
   const week3: WeekPlan = {
-    weekNumber: 3,
-    title: 'EXCELLENCE WEEK',
-    theme: 'Reach and Sustain Level 4',
+    weekNumber:    3,
+    title:         'EXCELLENCE WEEK',
+    theme:         'Reach for Level 4',
     focusSubjects: w3focus.map(s => s.displayName),
-    dailyMinutes: 20,
-    goal: 'Advance strong subjects toward Exemplary level — explore extension opportunities and enrich learning',
-    activities: w3focus.flatMap(s => getSubjectActivities(s.subject, s.level)),
+    dailyMinutes:  20,
+    goal:          'Push strong subjects toward Exemplary level through extension and enrichment',
+    activities:    w3focus.flatMap(s => getActivitiesForWeek(s.subject, 'excellence')).slice(0, 3),
   }
 
   return {

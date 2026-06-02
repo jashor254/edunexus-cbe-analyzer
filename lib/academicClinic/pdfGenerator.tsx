@@ -6,7 +6,7 @@ import {
   Document, Page, Text, View, StyleSheet, Font,
 } from '@react-pdf/renderer'
 import type { AcademicClinicReport, SubjectProgress } from './reportGenerator'
-import { getLevelLabel, getClinicalObservation, getSubjectEmoji } from './reportGenerator'
+import { getLevelLabel, getClinicalObservation } from './reportGenerator'
 
 // ─── Color Palette ────────────────────────────────────────────────────────────
 
@@ -38,7 +38,7 @@ const C = {
 
 function levelColor(l: number)   { return [C.l1, C.l2, C.l3, C.l4][l - 1] ?? C.muted }
 function levelBg(l: number)      { return [C.l1bg, C.l2bg, C.l3bg, C.l4bg][l - 1] ?? C.offWhite }
-function trendArrow(t: string)   { return t === 'improving' ? '↑' : t === 'declining' ? '↓' : '→' }
+function trendArrow(t: string)   { return t === 'improving' ? '+' : t === 'declining' ? '-' : '=' }
 function trendColor(t: string)   { return t === 'improving' ? C.l3 : t === 'declining' ? C.l1 : C.muted }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -160,7 +160,7 @@ const S = StyleSheet.create({
   // ── Teacher page
   teacherBox:    { borderWidth: 1, borderColor: C.border, borderRadius: 6, padding: 14, marginBottom: 14 },
   teacherLabel:  { fontSize: 8, color: C.muted, letterSpacing: 1, marginBottom: 6 },
-  teacherLine:   { borderBottomWidth: 1, borderBottomColor: C.border, marginBottom: 14, height: 22 },
+  teacherLine:   { borderBottomWidth: 1, borderBottomColor: C.border, marginBottom: 10, height: 18 },
   sigRow:        { flexDirection: 'row', marginTop: 8 },
   sigBlock:      { flex: 1, marginRight: 16 },
   sigLine:       { borderBottomWidth: 1, borderBottomColor: C.text, marginBottom: 4, height: 24 },
@@ -424,11 +424,12 @@ function SubjectMatrixPage({ report }: { report: AcademicClinicReport }) {
           const pct   = (s.level / 4) * 100
           const color = levelColor(s.level)
           const obs   = getClinicalObservation(s.subject, s.level)
-          const emoji = getSubjectEmoji(s.subject)
           return (
             <View key={i}>
               <View style={S.subjectRow}>
-                <Text style={S.subjectEmoji}>{emoji}</Text>
+                <View style={{ width: 22, justifyContent: 'center', alignItems: 'center' }}>
+                  <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: levelColor(s.level) }} />
+                </View>
                 <Text style={S.subjectName}>{s.displayName}</Text>
                 <View style={{ width: 62 }}>
                   <View style={[S.badge, { backgroundColor: levelBg(s.level), paddingVertical: 2, paddingHorizontal: 5 }]}>
@@ -834,21 +835,22 @@ function TeacherPage({ report }: { report: AcademicClinicReport }) {
         {/* Teacher observations */}
         <View style={S.teacherBox}>
           <Text style={S.teacherLabel}>TEACHER'S OBSERVATIONS</Text>
-          {[1, 2, 3, 4, 5].map(i => (
-            <View key={i} style={S.teacherLine} />
-          ))}
-        </View>
-
-        {/* Action agreed */}
-        <View style={[S.teacherBox, { marginBottom: 16 }]}>
-          <Text style={S.teacherLabel}>ACTION AGREED WITH PARENT</Text>
           {[1, 2, 3].map(i => (
             <View key={i} style={S.teacherLine} />
           ))}
         </View>
 
-        {/* Signature row */}
-        <View style={S.sigRow}>
+        {/* Action agreed */}
+        <View style={[S.teacherBox, { marginBottom: 0 }]}>
+          <Text style={S.teacherLabel}>ACTION AGREED WITH PARENT</Text>
+          {[1, 2].map(i => (
+            <View key={i} style={S.teacherLine} />
+          ))}
+        </View>
+
+        {/* Signature row — fixed to bottom of this page */}
+        <View style={{ marginTop: 40 }} />
+        <View style={S.sigRow} wrap={false}>
           <View style={S.sigBlock}>
             <View style={S.sigLine} />
             <Text style={S.sigLabel}>Teacher's Signature</Text>
