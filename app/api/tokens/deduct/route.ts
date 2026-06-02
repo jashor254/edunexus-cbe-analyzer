@@ -1,132 +1,49 @@
 // app/api/tokens/deduct/route.ts
+// Thin route — all logic lives in lib/payments/access.ts
+// Call this AFTER the AI response succeeds — never before.
+
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { isAdmin } from '@/lib/auth/isAdmin'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-const TOKEN_COSTS = {
-  add_assessment_basic:    1,
-  add_assessment_detailed: 2,
-  generate_pdf:            3,
-  ai_career_analysis:      5,
-  ai_chat_session:         2,
-  download_clinic:         3,
-} as const
+import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
+import { type FeatureKey, FEATURE_ACCESS } from '@/lib/payments/config'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { userId, feature } = body
+    const feature = body?.feature as FeatureKey | undefined
 
-    if (!userId || !feature) {
+    if (!feature || !(feature in FEATURE_ACCESS)) {
       return NextResponse.json(
-        { success: false, error: 'Missing userId or feature' },
+        { success: false, error: 'Invalid or missing feature' },
         { status: 400 }
       )
     }
 
-    const tokenCost = TOKEN_COSTS[feature as keyof typeof TOKEN_COSTS]
-    if (!tokenCost) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid feature' },
-        { status: 400 }
-      )
+    // Re-verify access server-side — never trust a client-side check result
+    const result = await checkFeatureAccess(feature)
+
+    if (result.allowed === false) {
+      const status = result.reason === 'unauthenticated' ? 401 : 403
+      return NextResponse.json({ success: false, error: result.reason }, { status })
     }
 
-    // Admin bypass — unlimited access, no deduction
-    const { data: { user } } = await supabase.auth.admin.getUserById(userId)
-    if (await isAdmin(userId, user?.email)) {
-      return NextResponse.json({
-        success: true,
-        method: 'admin',
-        tokensRemaining: 'unlimited',
-        message: 'Access granted — admin account',
-      })
+    // Subscribers and teachers: no deduction needed
+    if (!result.deductTokens) {
+      return NextResponse.json({ success: true, deducted: false, tier: result.tier })
     }
 
-    // ✅ Check active subscription — use expires_at (NOT end_date)
-    const { data: subscriptions } = await supabase
-      .from('subscriptions')
-      .select('plan, expires_at')
-      .eq('user_id', userId)
-      .eq('status', 'active')
-      .gt('expires_at', new Date().toISOString())
-      .limit(1)
-
-    if (subscriptions && subscriptions.length > 0) {
-      return NextResponse.json({
-        success: true,
-        method: 'subscription',
-        tokensRemaining: 'unlimited',
-        message: 'Access granted via subscription',
-      })
-    }
-
-    // ✅ Call RPC — deducts from token_balances atomically
-    const { data, error } = await supabase.rpc('deduct_tokens', {
-      p_user_id: userId,
-      p_action:  feature,
-      p_tokens:  tokenCost,
-      p_metadata: { feature, timestamp: new Date().toISOString() },
-    })
-
-    if (error) {
-      console.error('Token deduction error:', error)
-      return NextResponse.json(
-        { success: false, error: 'Failed to deduct tokens', details: error.message },
-        { status: 500 }
-      )
-    }
-
-    if (!data) {
-      // ✅ Read remaining balance from token_balances (not user_tokens)
-      const { data: balanceRow } = await supabase
-        .from('token_balances')
-        .select('balance')
-        .eq('user_id', userId)
-        .single()
-
-      const availableTokens = balanceRow?.balance || 0
-
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'insufficient_tokens',
-          tokensRequired:  tokenCost,
-          tokensAvailable: availableTokens,
-          message: `You need ${tokenCost} tokens but only have ${availableTokens}`,
-        },
-        { status: 402 }
-      )
-    }
-
-    // ✅ Get updated balance from token_balances
-    const { data: updatedBalance } = await supabase
-      .from('token_balances')
-      .select('balance')
-      .eq('user_id', userId)
-      .single()
-
-    const remainingTokens = updatedBalance?.balance || 0
+    // Token users: deduct atomically via RPC
+    await deductFeatureTokens(result.userId, feature, result.cost)
 
     return NextResponse.json({
-      success: true,
-      method: 'tokens',
-      tokensDeducted: tokenCost,
-      tokensRemaining: remainingTokens,
-      message: `Successfully deducted ${tokenCost} tokens`,
+      success:  true,
+      deducted: true,
+      cost:     result.cost,
+      tier:     'token',
     })
-
-  } catch (error: any) {
-    console.error('Token deduction error:', error)
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Token deduction failed'
+    console.error('[tokens/deduct]', msg)
+    return NextResponse.json({ success: false, error: msg }, { status: 500 })
   }
 }
 

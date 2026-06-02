@@ -1,13 +1,57 @@
 // lib/payments/config.ts
 
+// ===== USER ACCESS TIERS =====
+export type UserTier = 'teacher' | 'subscriber' | 'token' | 'none'
+
+// ===== TERMLY SUBSCRIPTION PLANS =====
+export const SUBSCRIPTION_PLANS = {
+  TERMLY_SINGLE: {
+    id: 'termly_single',
+    name: 'Termly — Single Child',
+    priceKes: 2500,
+    childLimit: 1,
+    termDurationDays: 120,
+  },
+  TERMLY_FAMILY: {
+    id: 'termly_family',
+    name: 'Termly — Family',
+    priceKes: 4000,
+    childLimit: 3,
+    termDurationDays: 120,
+  },
+} as const
+
+// ===== FEATURE ACCESS MATRIX =====
+// 'free' = no cost, 'full' = unlimited (subscriber perk), 'token' = costs tokens
+export const FEATURE_ACCESS = {
+  sow_generate:         { teacher: 'free',  subscriber: 'full', token: 'token' },
+  lesson_plan_generate: { teacher: 'free',  subscriber: 'full', token: 'token' },
+  row_generate:         { teacher: 'free',  subscriber: 'full', token: 'token' },
+  clinic_report:        { teacher: 'token', subscriber: 'full', token: 'token' },
+  learning_compass:     { teacher: 'token', subscriber: 'full', token: 'token' },
+  career_guidance:      { teacher: 'token', subscriber: 'full', token: 'token' },
+} as const
+
+export type FeatureKey = keyof typeof FEATURE_ACCESS
+
 // ===== TOKEN COSTS (per action) =====
+// Legacy keys: used by existing per-action routes
+// Feature keys: used by checkFeatureAccess — must cover every FeatureKey
 export const TOKEN_COSTS = {
+  // Legacy per-action costs
   add_assessment_basic:    1,
   add_assessment_detailed: 2,
   generate_pdf:            3,
   ai_career_analysis:      5,
   ai_chat_session:         2,
   download_clinic:         3,
+  // Feature gate costs (aligned with FEATURE_ACCESS keys)
+  sow_generate:            5,
+  lesson_plan_generate:    3,
+  row_generate:            2,
+  clinic_report:           3,
+  learning_compass:        2,
+  career_guidance:         5,
 } as const
 
 export type TokenFeature = keyof typeof TOKEN_COSTS

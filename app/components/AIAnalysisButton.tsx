@@ -11,7 +11,7 @@ interface AIAnalysisButtonProps {
 }
 
 export function AIAnalysisButton({ userId, studentId }: AIAnalysisButtonProps) {
-  const { withTokens, tokensRemaining, isChecking } = useTokens(userId)
+  const { withTokens, tokensRemaining, isChecking } = useTokens()
   
   // 3. Tangaza hizi states hapa ndani
   const [loading, setLoading] = useState(false)
@@ -21,7 +21,7 @@ export function AIAnalysisButton({ userId, studentId }: AIAnalysisButtonProps) {
     setLoading(true)
 
     try {
-      const result = await withTokens('ai_career_analysis', async () => {
+      const result = await withTokens('career_guidance', async () => {
         // Call AI API
         const response = await fetch('/api/ai/career-analysis', {
           method: 'POST',
