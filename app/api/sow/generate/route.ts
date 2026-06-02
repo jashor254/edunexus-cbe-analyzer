@@ -1,15 +1,17 @@
 // app/api/sow/generate/route.ts
 // POST: Generate a full Scheme of Work via DeepSeek AI
 
-import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
+import { checkFeatureAccess } from '@/lib/payments/access'
+import { type FeatureKey } from '@/lib/payments/config'
 import {
   apiSuccess,
   apiError,
-  apiUnauthorized,
   apiForbidden,
   apiBadRequest,
 } from '@/lib/api/response'
+
+const FEATURE: FeatureKey = 'sow_generate'
 import { buildTermSchedule } from '@/lib/sow/termSchedule'
 import { applyBreaksToSchedule } from '@/lib/sow/breakEngine'
 import { generateSchemePipeline } from '@/lib/sow/lessonPipeline'
@@ -25,20 +27,19 @@ import { weekLessonToSlot } from '@/lib/sow/termSchedule'
 
 export async function POST(req: Request) {
   try {
-    // ── Auth ──────────────────────────────────────────────────────────────────
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    // ── Access check ──────────────────────────────────────────────────────────
+    const access = await checkFeatureAccess(FEATURE)
+    if (access.allowed === false) {
+      const status = access.reason === 'unauthenticated' ? 401 : 403
+      return apiError(access.reason, status)
+    }
 
-    if (!user) return apiUnauthorized()
-
-    // ── Verify teacher record ─────────────────────────────────────────────────
+    // ── Verify teacher record (needed for teacher_id FK in downstream queries) ─
     const db = createServiceClient()
     const { data: teacher } = await db
       .from('teachers')
       .select('id')
-      .eq('user_id', user.id)
+      .eq('user_id', access.userId)
       .single()
 
     if (!teacher) return apiForbidden()
@@ -100,8 +101,11 @@ export async function POST(req: Request) {
     })
 
     return apiSuccess({ result })
-  } catch (err: any) {
-    console.error('[sow/generate]', err)
-    return apiError(err.message || 'Generation failed')
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    const stack   = err instanceof Error ? err.stack   : undefined
+    console.error('[SOW Generate Error]:', message)
+    if (stack) console.error(stack)
+    return apiError(message || 'Generation failed')
   }
 }

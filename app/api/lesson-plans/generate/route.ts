@@ -2,16 +2,19 @@
 // Canonical endpoint: SOW-aware generation with auto week detection.
 // Body: { sow_id: string, week_number?: number }
 import { z } from 'zod'
-import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
+import { checkFeatureAccess } from '@/lib/payments/access'
+import { type FeatureKey } from '@/lib/payments/config'
 import {
   apiSuccess,
-  apiUnauthorized,
+  apiError,
   apiForbidden,
   apiBadRequest,
   apiFallback,
 } from '@/lib/api/response'
 import { generateSpecificWeekPlans } from '@/lib/lessonPlan/weeklyGenerator'
+
+const FEATURE: FeatureKey = 'lesson_plan_generate'
 
 const GenerateLessonSchema = z.object({
   sow_id:      z.uuid({ error: 'sow_id must be a valid UUID' }),
@@ -20,15 +23,17 @@ const GenerateLessonSchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    const access = await checkFeatureAccess(FEATURE)
+    if (access.allowed === false) {
+      const status = access.reason === 'unauthenticated' ? 401 : 403
+      return apiError(access.reason, status)
+    }
 
     const db = createServiceClient()
     const { data: teacher } = await db
       .from('teachers')
       .select('id')
-      .eq('user_id', user.id)
+      .eq('user_id', access.userId)
       .single()
     if (!teacher) return apiForbidden()
 
@@ -84,7 +89,7 @@ export async function POST(req: Request) {
       })
     }
 
-    const result = await generateSpecificWeekPlans(sowId, user.id, weekNumber)
+    const result = await generateSpecificWeekPlans(sowId, access.userId, weekNumber)
 
     const { data: plans } = await db
       .from('lesson_plans')

@@ -1,26 +1,30 @@
 // POST: Manually trigger lesson plan generation for a specific week
-import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
+import { checkFeatureAccess } from '@/lib/payments/access'
+import { type FeatureKey } from '@/lib/payments/config'
 import {
   apiSuccess,
   apiError,
-  apiUnauthorized,
   apiForbidden,
   apiBadRequest,
 } from '@/lib/api/response'
 import { generateSpecificWeekPlans } from '@/lib/lessonPlan/weeklyGenerator'
 
+const FEATURE: FeatureKey = 'lesson_plan_generate'
+
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    const access = await checkFeatureAccess(FEATURE)
+    if (access.allowed === false) {
+      const status = access.reason === 'unauthenticated' ? 401 : 403
+      return apiError(access.reason, status)
+    }
 
     const db = createServiceClient()
     const { data: teacher } = await db
       .from('teachers')
       .select('id')
-      .eq('user_id', user.id)
+      .eq('user_id', access.userId)
       .single()
     if (!teacher) return apiForbidden()
 
@@ -38,13 +42,13 @@ export async function POST(req: Request) {
 
     // Log job start
     const { data: job } = await db.from('generation_jobs').insert({
-      teacher_id: user.id,
+      teacher_id: access.userId,
       sow_id: sowId,
       week_number: weekNumber,
       status: 'processing',
     }).select('id').single()
 
-    const result = await generateSpecificWeekPlans(sowId, user.id, weekNumber)
+    const result = await generateSpecificWeekPlans(sowId, access.userId, weekNumber)
 
     if (job) {
       await db.from('generation_jobs').update({

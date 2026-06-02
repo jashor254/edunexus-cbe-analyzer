@@ -50,7 +50,7 @@ export const TOKEN_COSTS = {
   lesson_plan_generate:    3,
   row_generate:            2,
   clinic_report:           3,
-  learning_compass:        2,
+  learning_compass:        1,  // 1 token per compass chat message
   career_guidance:         5,
 } as const
 

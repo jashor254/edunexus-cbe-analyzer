@@ -1,10 +1,13 @@
-// app/api/chat/route.ts - COMPLETE FIXED VERSION
+// app/api/chat/route.ts
 import { learningCompass } from '@/lib/ai/learningCompass'
 import { callDeepSeek } from '@/lib/ai/deepseek'
 import { buildStudentRAGContext, buildRAGSystemPrompt } from '@/lib/ai/ragContext'
-import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
-import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
+import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
+import { type FeatureKey } from '@/lib/payments/config'
+import { apiSuccess, apiError, apiForbidden } from '@/lib/api/response'
+
+const FEATURE: FeatureKey = 'learning_compass'
 
 export async function POST(req: Request) {
   try {
@@ -17,38 +20,27 @@ export async function POST(req: Request) {
       previousMessages = [],
     } = await req.json()
 
-    // ── Auth ──
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    // ── Access check — auth + tier resolution via server session ──────────────
+    const access = await checkFeatureAccess(FEATURE)
+    if (access.allowed === false) {
+      const status = access.reason === 'unauthenticated' ? 401 : 403
+      return apiError(access.reason, status)
+    }
 
     const db = createServiceClient()
 
-    // ── Verify learner access ──
-    if (learnerId && learnerId !== user.id) {
+    // ── Verify learner access ──────────────────────────────────────────────────
+    if (learnerId && learnerId !== access.userId) {
       const { data: student } = await db
         .from('students')
         .select('id')
         .eq('id', learnerId)
-        .eq('user_id', user.id)
+        .eq('user_id', access.userId)
         .maybeSingle()
       if (!student) return apiForbidden()
     }
 
-    // ── Check subscription/tokens ──
-    const [{ data: subscription }, { data: tokenData }] = await Promise.all([
-      db.from('subscriptions').select('plan, expires_at').eq('user_id', user.id).eq('status', 'active').gt('expires_at', new Date().toISOString()).maybeSingle(),
-      db.from('token_balances').select('balance').eq('user_id', user.id).maybeSingle(),
-    ])
-
-    const hasSubscription = !!subscription
-    const tokenBalance = tokenData?.balance || 0
-
-    if (!hasSubscription && tokenBalance < 1) {
-      return apiError('Insufficient tokens', 403)
-    }
-
-    // ── Load or initialize compass state ──
+    // ── Load or initialize compass state ──────────────────────────────────────
     const [
       { data: savedState },
       { data: learningContext },
@@ -58,17 +50,17 @@ export async function POST(req: Request) {
         ? db.from('compass_sessions')
             .select('session_state')
             .eq('id', sessionId)
-            .eq('learner_id', user.id)
+            .eq('learner_id', access.userId)
             .eq('status', 'active')
             .maybeSingle()
         : Promise.resolve({ data: null }),
       db.from('student_learning_context')
         .select('overall_tier, subject_tiers, subject_action_steps, subject_velocities, recommended_pathway, pathway_confidence, top_careers, career_gaps, first_subject, session_goal, guided_topics, overall_level, curriculum_type, grade, compass_bridge')
-        .eq('student_id', learnerId || user.id)
+        .eq('student_id', learnerId || access.userId)
         .maybeSingle(),
       db.from('students')
         .select('name, grade, curriculum_type, current_pathway')
-        .eq('id', learnerId || user.id)
+        .eq('id', learnerId || access.userId)
         .maybeSingle(),
     ])
 
@@ -78,44 +70,44 @@ export async function POST(req: Request) {
       const [{ data: assessments }, { data: interests }] = await Promise.all([
         db.from('assessments')
           .select('*, students(name, grade, curriculum_type)')
-          .eq('student_id', learnerId || user.id)
+          .eq('student_id', learnerId || access.userId)
           .order('created_at', { ascending: false })
           .limit(5),
         db.from('student_interests')
           .select('*')
-          .eq('student_id', learnerId || user.id)
+          .eq('student_id', learnerId || access.userId)
           .maybeSingle(),
       ])
 
       await learningCompass.initializeFromAssessments(
-        learnerId || user.id,
+        learnerId || access.userId,
         assessments || [],
         interests,
         learningContext ?? null,
         studentProfile ?? null
       )
     } else if (savedState?.session_state) {
-      learningCompass.restoreState(learnerId || user.id, savedState.session_state)
+      learningCompass.restoreState(learnerId || access.userId, savedState.session_state)
     }
 
-    // ── RAG context ──
+    // ── RAG context ───────────────────────────────────────────────────────────
     let ragSystemPrompt = ''
     let ragCurriculumType: 'cbc' | 'igcse' | 'ib' | 'other' = 'cbc'
     try {
-      const ragContext = await buildStudentRAGContext(learnerId || user.id, sessionId)
+      const ragContext = await buildStudentRAGContext(learnerId || access.userId, sessionId)
       ragSystemPrompt = buildRAGSystemPrompt(ragContext)
       ragCurriculumType = ragContext.curriculumType
     } catch (ragError) {
       console.error('[chat] RAG failed:', ragError)
     }
 
-    // ── Detect struggle/confidence from message ──
+    // ── Detect struggle/confidence from message ───────────────────────────────
     const msgLower = message.toLowerCase()
     const struggled = /don't understand|confused|help|sijaelewa|hard|sijui|ngumu|explain again|i don't get|not clear|repeat|tell me again/i.test(msgLower)
     const confident = /got it|understand|easy|nimeelewa|sawa|i see|makes sense|i get it|aha|clear now|now i understand/i.test(msgLower)
     const confidence: 'low' | 'medium' | 'high' = confident ? 'high' : struggled ? 'low' : 'medium'
 
-    // ── Detect subject from message ──
+    // ── Detect subject from message ───────────────────────────────────────────
     const subjectKeywords: Record<string, string[]> = {
       mathematics: ['math', 'algebra', 'fraction', 'percentage', 'geometry', 'equation', 'hesabu', 'numbers', 'calculate', 'sum', 'times', 'divide', 'multiplication', 'addition', 'subtraction'],
       english: ['english', 'grammar', 'reading', 'writing', 'essay', 'spelling', 'vocabulary', 'noun', 'verb', 'adjective'],
@@ -128,7 +120,7 @@ export async function POST(req: Request) {
       history: ['history', 'colonialism', 'independence', 'war', 'king', 'empire', 'ancient', 'mau mau', 'kenyatta'],
       integrated_science: ['science', 'experiment', 'solar', 'ecosystem', 'environment', 'energy'],
     }
-    
+
     let subject = subjectId || 'mathematics'
     for (const [subj, keywords] of Object.entries(subjectKeywords)) {
       if (keywords.some(k => msgLower.includes(k))) {
@@ -137,17 +129,17 @@ export async function POST(req: Request) {
       }
     }
 
-    // ── BUILD previousTaskResult from conversation history ──
-    const lastAssistantMsg = [...previousMessages].reverse().find((m: any) => m.role === 'assistant')
+    // ── BUILD previousTaskResult from conversation history ────────────────────
+    const lastAssistantMsg = [...previousMessages].reverse().find((m: { role: string }) => m.role === 'assistant') as { role: string; metadata?: { questionProvided?: boolean; questionText?: string } } | undefined
     const lastTaskHadQuestion = lastAssistantMsg?.metadata?.questionProvided === true
     const lastTaskQuestion = lastAssistantMsg?.metadata?.questionText || ''
-    
+
     let completed = true
     if (lastTaskHadQuestion && lastTaskQuestion) {
       const userAnswered = message.length > 10 && !msgLower.includes('?') && !struggled && !msgLower.includes('help')
       completed = userAnswered
     }
-    
+
     const previousTaskResult = {
       completed,
       timeSpent: sessionState?.timeOnTask || 5,
@@ -155,9 +147,9 @@ export async function POST(req: Request) {
       confidence,
     }
 
-    // ── GET COMPASS DECISION ──
+    // ── GET COMPASS DECISION ──────────────────────────────────────────────────
     const compassResponse = await learningCompass.getNextTask(
-      learnerId || user.id,
+      learnerId || access.userId,
       subject,
       previousTaskResult,
       ragSystemPrompt,
@@ -168,7 +160,7 @@ export async function POST(req: Request) {
     const hasQuestion = !!task.content.question
     const hasVisual = !!task.content.visualAid
 
-    // ── Compass Bridge career context ──
+    // ── Compass Bridge career context ─────────────────────────────────────────
     type CompassBridgeShape = {
       summary?: { recommendedPathway?: string }
       sessionGoal?: string
@@ -180,7 +172,7 @@ export async function POST(req: Request) {
       ? `\n## CAREER CONTEXT FOR THIS SESSION:\nCareer Target: ${cb.summary?.recommendedPathway ?? ''}\nSession Goal: ${cb.sessionGoal ?? ''}\nPriority Subject: ${cb.subjectPriorities?.[0]?.displayName ?? ''}\nCareer Reason: ${cb.subjectPriorities?.[0]?.careerReason ?? ''}\nThis Week's Milestone: ${cb.weeklyMilestones?.[0]?.goal ?? ''}\n\nWhen teaching, connect every concept back to this career. If student asks why they need to learn this, use the career reason above.\n`
       : ''
 
-    // ── 🔥 GENERATE ACTUAL RESPONSE USING DEEPSEEK 🔥 ──
+    // ── 🔥 GENERATE ACTUAL RESPONSE USING DEEPSEEK 🔥 ────────────────────────
     const responsePrompt = `
 You are the Learning Compass tutor for a Kenyan student.
 ${compassBridgeContext}
@@ -219,8 +211,8 @@ Return ONLY the response text, no JSON, no markdown, no quotes around the respon
 
     const assistantResponse = await callDeepSeek(responsePrompt, ragSystemPrompt)
 
-    // ── SAVE COMPASS STATE ──
-    const updatedState = learningCompass.exportState(learnerId || user.id)
+    // ── SAVE COMPASS STATE ────────────────────────────────────────────────────
+    const updatedState = learningCompass.exportState(learnerId || access.userId)
     await db
       .from('compass_sessions')
       .update({
@@ -230,20 +222,25 @@ Return ONLY the response text, no JSON, no markdown, no quotes around the respon
       })
       .eq('id', sessionId)
 
-    // ── DEDUCT TOKEN ──
-    let newTokenBalance = tokenBalance
-    if (!hasSubscription && tokenBalance > 0) {
-      newTokenBalance = tokenBalance - 1
-      await db.from('token_balances').update({ balance: newTokenBalance }).eq('user_id', user.id)
+    // ── DEDUCT TOKEN — only after AI succeeds, only for token users ───────────
+    let tokensRemaining = -1
+    if (access.deductTokens) {
+      await deductFeatureTokens(access.userId, FEATURE, access.cost)
       await db.from('token_usage').insert({
-        user_id: user.id,
-        action: 'compass_session',
-        tokens_used: 1,
-        metadata: { session_id: sessionId, subject, difficulty: task.difficulty }
+        user_id:     access.userId,
+        action:      'compass_session',
+        tokens_used: access.cost,
+        metadata: { session_id: sessionId, subject, difficulty: task.difficulty },
       })
+      const { data: updatedBalance } = await db
+        .from('token_balances')
+        .select('balance')
+        .eq('user_id', access.userId)
+        .maybeSingle()
+      tokensRemaining = updatedBalance?.balance ?? 0
     }
 
-    // ── LOG MESSAGES WITH FULL METADATA ──
+    // ── LOG MESSAGES WITH FULL METADATA ──────────────────────────────────────
     await db.from('compass_messages').insert([
       {
         session_id: sessionId,
@@ -256,39 +253,39 @@ Return ONLY the response text, no JSON, no markdown, no quotes around the respon
         role: 'assistant',
         content: assistantResponse,
         metadata: {
-          difficulty: task.difficulty,
-          subject: subject,
-          type: task.type,
+          difficulty:       task.difficulty,
+          subject:          subject,
+          type:             task.type,
           questionProvided: hasQuestion,
-          questionText: task.content.question,
-          visualProvided: hasVisual,
+          questionText:     task.content.question,
+          visualProvided:   hasVisual,
           adaptationReason: compassResponse.adaptationReason,
-          parentInsight: compassResponse.parentInsight,
-          struggled: struggled,
-          confidence: confidence,
+          parentInsight:    compassResponse.parentInsight,
+          struggled:        struggled,
+          confidence:       confidence,
         },
         created_at: new Date(Date.now() + 1).toISOString(),
       }
     ])
 
-    // ── RETURN FULL RESPONSE TO FRONTEND ──
+    // ── RETURN FULL RESPONSE TO FRONTEND ─────────────────────────────────────
     return apiSuccess({
-      text: assistantResponse,
-      audioText: assistantResponse.substring(0, 400),
-      difficulty: task.difficulty,
-      type: task.type,
+      text:             assistantResponse,
+      audioText:        assistantResponse.substring(0, 400),
+      difficulty:       task.difficulty,
+      type:             task.type,
       adaptationReason: compassResponse.adaptationReason,
-      encouragement: compassResponse.encouragement,
-      parentInsight: compassResponse.parentInsight,
-      visualAid: task.content.visualAid || null,
+      encouragement:    compassResponse.encouragement,
+      parentInsight:    compassResponse.parentInsight,
+      visualAid:        task.content.visualAid || null,
       sessionUpdate: {
-        timeOnTask: (sessionState?.timeOnTask || 0) + 5,
+        timeOnTask:     (sessionState?.timeOnTask || 0) + 5,
         currentSubject: subject,
         currentConcept: task.concept || 'current',
-        needsBreak: compassResponse.needsBreak,
-        breakDuration: compassResponse.breakDuration,
+        needsBreak:     compassResponse.needsBreak,
+        breakDuration:  compassResponse.breakDuration,
       },
-      tokensRemaining: hasSubscription ? -1 : newTokenBalance,
+      tokensRemaining,
     })
   } catch (error) {
     console.error('[chat] Error:', error)
