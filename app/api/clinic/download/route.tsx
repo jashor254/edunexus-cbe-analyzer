@@ -168,7 +168,7 @@ export async function POST(req: Request) {
 
     const firstName      = student.name.split(' ')[0]
     const juniorGuidance = isJunior  ? generateJuniorGuidance(subjectProgress)                  : undefined
-    const seniorGuidance = !isJunior ? generateSeniorGuidance(subjectProgress, firstName)       : undefined
+    const seniorGuidance = !isJunior ? generateSeniorGuidance(subjectProgress, firstName, student.grade) : undefined
 
     const report = generateReport(
       studentProfile,

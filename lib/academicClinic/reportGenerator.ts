@@ -373,7 +373,7 @@ export function generateJuniorGuidance(subjects: SubjectProgress[]): JuniorGuida
 
 // ─── Career Intelligence (Senior — Page 4B) ───────────────────────────────────
 
-export function generateSeniorGuidance(subjects: SubjectProgress[], firstName = 'This student'): SeniorGuidance {
+export function generateSeniorGuidance(subjects: SubjectProgress[], firstName = 'This student', grade = 10): SeniorGuidance {
   const engine = new CareerEngine()
   const scores = Object.fromEntries(subjects.map(s => [s.subject, s.level]))
   const subjectAvg = subjects.reduce((s, x) => s + x.level, 0) / subjects.length
@@ -396,7 +396,7 @@ export function generateSeniorGuidance(subjects: SubjectProgress[], firstName = 
     }
   })
 
-  const topCareers: CareerMatch[] = scored.map(({ career, matchStrength, keyHits, gapSubjects }) => {
+  const topCareers: CareerMatch[] = scored.map(({ career, matchStrength, keyHits, gapSubjects, score }) => {
     const strong = keyHits.filter(s => s.level >= 3).map(s => s.displayName)
     const whyItFits = strong.length > 0
       ? `${firstName} demonstrates ${getLevelLabel(keyHits[0]?.level || 3)} competency in ${strong.slice(0, 2).join(' and ')}, core requirements for ${career.name}.`
@@ -407,7 +407,7 @@ export function generateSeniorGuidance(subjects: SubjectProgress[], firstName = 
     return {
       name: career.name,
       description: career.name,
-      matchPercentage: Math.round((scored[0].score / 4) * 100),
+      matchPercentage: Math.round((score / 4) * 100),
       matchStrength,
       whyItFits,
       keyGap,
@@ -426,7 +426,9 @@ export function generateSeniorGuidance(subjects: SubjectProgress[], firstName = 
     nextSteps: [
       `Prioritise strengthening ${subjects.sort((a, b) => a.level - b.level)[0]?.displayName || 'priority subjects'} before the next term`,
       'Research KCSE minimum grade requirements for target university programmes',
-      'Speak with your school career counsellor about pathway choices before Grade 10',
+      grade <= 10
+        ? 'Speak with your career counsellor about pathway choices before Grade 10 selections'
+        : 'Speak with your career counsellor about university pathway and subject choices',
     ],
     honestAssessment,
   }

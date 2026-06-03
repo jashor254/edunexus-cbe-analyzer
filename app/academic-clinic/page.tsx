@@ -208,7 +208,7 @@ export default function AcademicClinicPage() {
       const actionPlan = generateActionPlan(subjects)
       const guidance = isJunior
         ? generateJuniorGuidance(subjects)
-        : generateSeniorGuidance(subjects, firstName)
+        : generateSeniorGuidance(subjects, firstName, currentGrade)
 
       const generated = generateReport(
         studentProfile,

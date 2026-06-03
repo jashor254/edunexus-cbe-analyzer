@@ -16,6 +16,7 @@ import {
   calculateVitals,
   generateActionPlan,
   generateJuniorGuidance,
+  generateSeniorGuidance,
   formatSubjectName,
 } from '@/lib/academicClinic/reportGenerator'
 import { CareerEngine } from '@/lib/academicClinic/careerEngine'
@@ -171,10 +172,12 @@ async function processOne(
       school: student.school ?? undefined,
     }
 
-    const vitals     = calculateVitals(subjects)
-    const actionPlan = generateActionPlan(subjects)
-    const jGuidance  = isJunior ? generateJuniorGuidance(subjects) : undefined
-    const report     = generateReport(studentProfile, subjects, vitals, actionPlan, [], jGuidance)
+    const vitals      = calculateVitals(subjects)
+    const actionPlan  = generateActionPlan(subjects)
+    const firstName   = student.name.split(' ')[0]
+    const jGuidance   = isJunior  ? generateJuniorGuidance(subjects)           : undefined
+    const sGuidance   = !isJunior ? generateSeniorGuidance(subjects, firstName, student.grade) : undefined
+    const report      = generateReport(studentProfile, subjects, vitals, actionPlan, [], jGuidance, sGuidance)
 
     const pdfBlob   = await generateAcademicClinicPDF(report)
     const pdfBuffer = Buffer.from(await pdfBlob.arrayBuffer())
