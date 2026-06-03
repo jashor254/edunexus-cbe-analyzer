@@ -20,26 +20,30 @@ export async function GET(req: Request) {
   try {
     const db = createServiceClient()
 
-    // Get current term week from a simple date calculation
-    const now = new Date()
-    // Use a rough week number based on the current date within the year
-    // In production you'd derive this from the actual term start date stored in the SOW
-    const currentWeek = Math.ceil(
-      (now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) /
-        (7 * 24 * 60 * 60 * 1000)
-    )
+    const now          = new Date()
+    const currentYear  = now.getFullYear()
+    const month        = now.getMonth() + 1
+    const currentTerm  = month <= 4 ? 1 : month <= 8 ? 2 : 3
 
-    // Get all active SOWs for this term
-    const currentYear = now.getFullYear()
-    const currentMonth = now.getMonth() + 1
-    const currentTerm = currentMonth <= 4 ? 1 : currentMonth <= 8 ? 2 : 3
+    // Term-aware week number: count weeks from the first day of the term's start month
+    const termStartMonth = currentTerm === 1 ? 1 : currentTerm === 2 ? 5 : 9
+    const termStart      = new Date(currentYear, termStartMonth - 1, 1)
+    const currentWeek    = Math.min(
+      Math.max(
+        Math.floor(
+          (now.getTime() - termStart.getTime()) / (7 * 24 * 60 * 60 * 1000)
+        ) + 1,
+        1
+      ),
+      14
+    )
 
     const { data: activeSows, error } = await db
       .from('schemes_of_work')
       .select('id, teacher_id, learning_area, grade, term, year, status')
       .eq('year', currentYear)
       .eq('term', String(currentTerm))
-      .eq('status', 'saved')
+      .in('status', ['active', 'saved'])
 
     if (error) return apiError('Failed to fetch active SOWs')
 
