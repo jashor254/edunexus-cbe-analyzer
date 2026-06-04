@@ -1310,7 +1310,7 @@ ${needsVisuals ? 'Visual aid is REQUIRED for this subject.' : ''}
 - Use ONLY basic vocabulary
 - Every sentence max 8 words
 - Include a picture or emoji for each step
-- Example MUST be from daily Kenyan life
+- Example MUST be simple and universal (sharing, counting, dividing)
 - Celebrate each micro-step
 - Success = they can do one tiny piece`,
 
@@ -1408,9 +1408,20 @@ Rotate NATURALLY between example types — do NOT force the same type every time
 - Visual: diagrams, pictures, shapes, number lines
 - Classroom: books, pencils, desks, school groups, tests
 - Real-world: money, food, sport, transport, nature
-- Kenyan: KES, matatu, shamba, Nairobi — ONLY when it genuinely improves understanding
+- Kenyan: KES, matatu, shamba, Nairobi — only when it genuinely improves understanding
 
-Never insert Kenyan references into every example. Variety makes explanations clearer.`}
+CONTEXT ROTATION — STRICT:
+Turn 1: Universal (sharing, dividing, counting, patterns)
+Turn 2: Classroom (books, pencils, groups, tests)
+Turn 3: Real world — any country (money, sport, food, transport)
+Turn 4+: Kenyan ONLY if genuinely clearer (matatu, KES, shamba, chapati)
+
+HARD RULES:
+- NEVER two Kenyan references in one response
+- NEVER force Kenya into every example
+- DEFAULT to universal
+- If response has chapati, it cannot also have matatu, sukuma, or KES
+- One local reference maximum per response`}
 
 ${visualInstruction}
 

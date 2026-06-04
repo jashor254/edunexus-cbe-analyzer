@@ -627,6 +627,150 @@ const LEVEL_LABELS_T: Record<string, { label: string; color: string; bg: string 
   below:       { label: 'Below Expectations',        color: 'text-red-700',    bg: 'bg-red-100'    },
 }
 
+type TopicPickerState = {
+  open:     boolean
+  loading:  boolean
+  topics:   Array<{ strandId: string; strandTitle: string; displayTitle: string; substrands: Array<{ id: string; title: string; displayName: string; slug: string }> }>
+  selected: { subject: string; concept: string; strandName: string; displayName: string } | null
+  saving:   boolean
+  saved:    boolean
+}
+
+function CompassTopicPicker({
+  studentId,
+  weakSubjects,
+  grade,
+  curriculumType,
+}: {
+  studentId:      string
+  weakSubjects:   string[]
+  grade:          number
+  curriculumType: string
+}) {
+  const [state, setState] = useState<TopicPickerState>({
+    open: false, loading: false, topics: [], selected: null, saving: false, saved: false,
+  })
+
+  const openForSubject = async (subject: string) => {
+    setState(s => ({ ...s, open: true, loading: true, topics: [], selected: null, saved: false }))
+    try {
+      const params = new URLSearchParams({ subject, grade: String(grade), curriculumType })
+      const res  = await fetch(`/api/compass/topics?${params}`)
+      const data = await res.json()
+      setState(s => ({ ...s, loading: false, topics: data?.data?.topics ?? [] }))
+    } catch {
+      setState(s => ({ ...s, loading: false }))
+    }
+  }
+
+  const save = async () => {
+    if (!state.selected) return
+    setState(s => ({ ...s, saving: true }))
+    try {
+      await fetch(`/api/teacher/students/${studentId}/compass-topic`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          subject:    state.selected.subject,
+          concept:    state.selected.concept,
+          strandName: state.selected.strandName,
+        }),
+      })
+      setState(s => ({ ...s, saving: false, saved: true, open: false }))
+    } catch {
+      setState(s => ({ ...s, saving: false }))
+    }
+  }
+
+  if (state.saved) {
+    return (
+      <div className="flex items-center gap-1 text-xs text-teal-600 font-semibold mt-1">
+        <CheckCircle2 className="w-3.5 h-3.5" />
+        Compass topic set
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-2">
+      {!state.open ? (
+        <div className="flex flex-wrap gap-1">
+          {weakSubjects.slice(0, 3).map(subj => (
+            <button
+              key={subj}
+              onClick={() => openForSubject(subj)}
+              className="text-xs px-2.5 py-1 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors font-medium capitalize"
+            >
+              📌 {subj.replace(/_/g, ' ')}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-2 border border-amber-200 rounded-xl bg-white p-3 space-y-2">
+          {state.loading ? (
+            <div className="flex items-center gap-2 text-xs text-gray-400">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading topics…
+            </div>
+          ) : state.topics.length === 0 ? (
+            <p className="text-xs text-gray-400">No topics found for this subject.</p>
+          ) : (
+            <div className="max-h-48 overflow-y-auto space-y-2">
+              {state.topics.map(group => (
+                <div key={group.strandId}>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">{group.displayTitle}</p>
+                  <div className="flex flex-wrap gap-1">
+                    {group.substrands.map(sub => (
+                      <button
+                        key={sub.id}
+                        onClick={() => setState(s => ({
+                          ...s,
+                          selected: {
+                            subject:     weakSubjects.find(w => state.topics.some(g => g.substrands.some(ss => ss.id === sub.id))) ?? weakSubjects[0] ?? '',
+                            concept:     sub.slug,
+                            strandName:  group.strandTitle,
+                            displayName: sub.displayName,
+                          },
+                        }))}
+                        className={`text-xs px-2 py-1 rounded-lg border transition-colors font-medium ${
+                          state.selected?.concept === sub.slug
+                            ? 'bg-teal-100 border-teal-400 text-teal-800'
+                            : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-teal-50 hover:border-teal-300'
+                        }`}
+                      >
+                        {sub.displayName}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              onClick={save}
+              disabled={!state.selected || state.saving}
+              className="text-xs px-3 py-1.5 bg-teal-600 text-white rounded-lg font-bold hover:bg-teal-500 disabled:opacity-40 transition-colors"
+            >
+              {state.saving ? 'Saving…' : 'Set Topic'}
+            </button>
+            <button
+              onClick={() => setState(s => ({ ...s, open: false }))}
+              className="text-xs px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Cancel
+            </button>
+            {state.selected && (
+              <span className="text-xs text-teal-700 font-medium">
+                → {state.selected.displayName}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ClassAnalyticsTab({
   students,
   className,
@@ -646,7 +790,14 @@ function ClassAnalyticsTab({
   const levelCounts: Record<LevelKey, number> = { exceeds: 0, meets: 0, approaching: 0, below: 0 }
   const pathwayCounts: Record<string, number> = {}
   const subjectTotals: Record<string, { sum: number; count: number }> = {}
-  const needsAttention: Array<{ name: string; weakSubjects: string[] }> = []
+  const needsAttention: Array<{
+    id:             string
+    name:           string
+    grade:          number
+    curriculumType: string
+    weakSubjects:   string[]   // display labels
+    rawWeakSubjects: string[]  // original keys for API
+  }> = []
 
   for (const s of withAssessment) {
     const scores: Record<string, number> = s.assessment?.subject_scores ?? {}
@@ -668,11 +819,18 @@ function ClassAnalyticsTab({
     }
 
     // Needs attention: 2+ subjects below expectations (< 1.5)
-    const weakSubjects = Object.entries(scores)
+    const rawWeak = Object.entries(scores)
       .filter(([, v]) => (v as number) < 1.5)
-      .map(([k]) => k.replace(/_/g, ' '))
-    if (weakSubjects.length >= 2) {
-      needsAttention.push({ name: s.name, weakSubjects })
+      .map(([k]) => k)
+    if (rawWeak.length >= 2) {
+      needsAttention.push({
+        id:              s.id as string,
+        name:            s.name as string,
+        grade:           (s.grade as number) ?? grade,
+        curriculumType:  (s.curriculum_type as string) ?? 'cbc',
+        weakSubjects:    rawWeak.map(k => k.replace(/_/g, ' ')),
+        rawWeakSubjects: rawWeak,
+      })
     }
   }
 
@@ -798,17 +956,25 @@ function ClassAnalyticsTab({
             <Target className="w-5 h-5" /> Students Who May Need Extra Support
           </h3>
           <p className="text-xs text-amber-600 mb-4">
-            These students have 2+ subjects below expectations. This is a support list, not a shame list.
+            These students have 2+ subjects below expectations. Click a subject to suggest a specific Compass topic for them.
           </p>
           <div className="space-y-3">
-            {needsAttention.map(({ name, weakSubjects }) => (
-              <div key={name} className="flex items-start justify-between gap-3 bg-white rounded-xl p-3 border border-amber-100">
-                <div className="font-semibold text-gray-800">{name}</div>
-                <div className="flex flex-wrap gap-1 justify-end">
-                  {weakSubjects.map(s => (
-                    <span key={s} className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-lg capitalize">{s}</span>
-                  ))}
+            {needsAttention.map(({ id, name, grade: sGrade, curriculumType, weakSubjects, rawWeakSubjects }) => (
+              <div key={id} className="bg-white rounded-xl p-3 border border-amber-100">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="font-semibold text-gray-800">{name}</div>
+                  <div className="flex flex-wrap gap-1 justify-end">
+                    {weakSubjects.map(s => (
+                      <span key={s} className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-lg capitalize">{s}</span>
+                    ))}
+                  </div>
                 </div>
+                <CompassTopicPicker
+                  studentId={id}
+                  weakSubjects={rawWeakSubjects}
+                  grade={sGrade}
+                  curriculumType={curriculumType}
+                />
               </div>
             ))}
           </div>

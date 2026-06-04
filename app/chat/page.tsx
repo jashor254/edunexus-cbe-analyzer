@@ -12,6 +12,7 @@ import {
   RotateCcw, Clock
 } from 'lucide-react'
 import type { VisualAid } from '@/lib/ai/learningCompass'
+import TopicSelector from '@/components/compass/TopicSelector'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Message {
@@ -271,7 +272,15 @@ function ChatContent() {
   const [sessionId,       setSessionId]       = useState<string | null>(null)
   const [learnerId,       setLearnerId]       = useState<string | null>(null)
   const [student,         setStudent]         = useState<{ id: string; name: string; grade: number; curriculum_type: string } | null>(null)
-  const [learningContext, setLearningContext] = useState<{ first_subject: string; session_goal: string; guided_topics: string[]; overall_tier: string; recommended_pathway: string | null } | null>(null)
+  const [learningContext, setLearningContext] = useState<{
+    first_subject: string
+    session_goal: string
+    guided_topics: string[]
+    overall_tier: string
+    recommended_pathway: string | null
+    compass_bridge?: { firstConcept?: string; firstSubject?: string; sessionGoal?: string; teacherSuggested?: boolean } | null
+  } | null>(null)
+  const [topicSelected,   setTopicSelected]   = useState(false)
   const [stats,           setStats]           = useState<Stats | null>(null)
   const [sessionState,    setSessionState]    = useState<SessionState>({ timeOnTask: 0, currentSubject: 'mathematics', currentConcept: '' })
   const [expandedDiagram, setExpandedDiagram] = useState<VisualAid | null>(null)
@@ -328,7 +337,7 @@ function ChatContent() {
     // Load learning context saved by guidance/career pages
     const { data: ctx } = await supabase
       .from('student_learning_context')
-      .select('first_subject, session_goal, guided_topics, overall_tier, recommended_pathway')
+      .select('first_subject, session_goal, guided_topics, overall_tier, recommended_pathway, compass_bridge')
       .eq('student_id', effectiveLearnerId)
       .maybeSingle()
 
@@ -766,35 +775,85 @@ function ChatContent() {
 
               {learningContext ? (
                 // ── PERSONALISED WELCOME ──────────────────────────────────
-                <>
-                  <h2 className="text-2xl font-black text-white mb-1">Karibu! 🇰🇪</h2>
-                  <p className="text-white/50 mb-1 text-sm">Today we start with</p>
-                  <p className="text-xl font-black text-violet-300 mb-2 capitalize">
-                    {learningContext.first_subject}
-                  </p>
-                  {learningContext.session_goal && (
-                    <p className="text-white/40 text-xs max-w-sm mb-6 leading-relaxed">
-                      {learningContext.session_goal}
-                    </p>
-                  )}
-                  {/* Guided topic chips */}
-                  <div className="flex flex-wrap gap-2 justify-center max-w-lg mb-6">
-                    {(learningContext.guided_topics || []).map((topic: string) => (
-                      <button
-                        key={topic}
-                        onClick={() => { struggleTopicRef.current = topic; sendMessage(topic) }}
-                        className="px-4 py-2 bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/30 hover:border-violet-400/50 rounded-full text-sm text-violet-200 hover:text-white font-medium transition-all"
-                      >
-                        {topic}
-                      </button>
-                    ))}
-                  </div>
-                  {/* Tier badge */}
-                  <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-xs text-white/40 font-bold capitalize mb-4">
-                    Learning level: {learningContext.overall_tier?.replace(/_/g, ' ')}
-                    {learningContext.recommended_pathway && ` · ${learningContext.recommended_pathway} pathway`}
-                  </div>
-                </>
+                (() => {
+                  const cb = learningContext.compass_bridge
+                  const hasSpecificConcept = !!(cb?.firstConcept && cb.firstConcept !== 'null')
+                  const showTopicSelector  = !hasSpecificConcept && !topicSelected
+
+                  return (
+                    <>
+                      <h2 className="text-2xl font-black text-white mb-1">Karibu! 🇰🇪</h2>
+
+                      {hasSpecificConcept ? (
+                        // compass_bridge has a specific concept — skip selector
+                        <>
+                          <p className="text-white/50 mb-1 text-sm">Today we start with</p>
+                          <p className="text-xl font-black text-violet-300 mb-2 capitalize">
+                            {(cb?.firstConcept ?? '').replace(/_/g, ' ')}
+                          </p>
+                          {cb?.teacherSuggested && (
+                            <div className="flex items-center gap-1.5 text-xs text-amber-400/70 mb-2">
+                              <span>📌</span>
+                              <span>Your teacher suggested starting with this</span>
+                            </div>
+                          )}
+                          {learningContext.session_goal && (
+                            <p className="text-white/40 text-xs max-w-sm mb-6 leading-relaxed">
+                              {learningContext.session_goal}
+                            </p>
+                          )}
+                          <button
+                            onClick={() => {
+                              const concept = (cb?.firstConcept ?? '').replace(/_/g, ' ')
+                              const subject = cb?.firstSubject ?? learningContext.first_subject
+                              struggleTopicRef.current = cb?.firstConcept ?? null
+                              sendMessage(`I want to work on ${concept} in ${subject}`)
+                            }}
+                            className="px-6 py-3 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-2xl text-sm transition-colors mb-4"
+                          >
+                            Start →
+                          </button>
+                        </>
+                      ) : showTopicSelector ? (
+                        // No concept set — show DB-driven topic selector
+                        <>
+                          <p className="text-white/50 mb-1 text-sm">Today we start with</p>
+                          <p className="text-xl font-black text-violet-300 mb-4 capitalize">
+                            {learningContext.first_subject}
+                          </p>
+                          <TopicSelector
+                            subject={learningContext.first_subject}
+                            grade={student?.grade ?? 8}
+                            curriculumType={student?.curriculum_type ?? 'cbc'}
+                            selectedSlug={undefined}
+                            onSelect={(_strand, _substrand, displayName, slug) => {
+                              setTopicSelected(true)
+                              struggleTopicRef.current = slug
+                              const msg = slug === 'help_me_decide'
+                                ? `I need help deciding where to start in ${learningContext.first_subject}`
+                                : `I want to work on ${displayName} in ${learningContext.first_subject}`
+                              sendMessage(msg)
+                            }}
+                          />
+                        </>
+                      ) : (
+                        // topicSelected — already sent, show minimal state
+                        <>
+                          <p className="text-white/50 mb-1 text-sm">Learning</p>
+                          <p className="text-xl font-black text-violet-300 mb-2 capitalize">
+                            {learningContext.first_subject}
+                          </p>
+                        </>
+                      )}
+
+                      {/* Tier badge */}
+                      <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-xs text-white/40 font-bold capitalize mt-2">
+                        Level: {learningContext.overall_tier?.replace(/_/g, ' ')}
+                        {learningContext.recommended_pathway && ` · ${learningContext.recommended_pathway} pathway`}
+                      </div>
+                    </>
+                  )
+                })()
               ) : (
                 // ── GENERIC WELCOME FALLBACK ──────────────────────────────
                 <>
