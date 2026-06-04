@@ -315,6 +315,35 @@ function PathwayCareerPage({ report }: { report: ClinicReport }) {
               </Text>
             </View>
 
+            {/* STEM within reach — shown when Social Sciences but composite + science signal exists */}
+            {report.recommended_pathway === 'Social Sciences' && report.stem_viable && (() => {
+              const sciSubject = [...report.top_subjects, ...report.weak_subjects]
+                .find(s => s.subject === 'integrated_science' || s.subject === 'mathematics')
+              const strongSci = report.top_subjects.find(s => s.subject === 'integrated_science')
+              const weakMath  = report.weak_subjects.find(s => s.subject === 'mathematics')
+              if (!sciSubject) return null
+              return (
+                <View style={{ backgroundColor: '#f0fdf4', borderRadius: 6, padding: 14, borderLeftWidth: 3, borderLeftColor: '#16a34a', marginTop: 10 }}>
+                  <Text style={{ fontSize: 10, fontWeight: 700, color: '#15803d', marginBottom: 6 }}>
+                    STEM Pathway: Within Reach
+                  </Text>
+                  {weakMath && (
+                    <Text style={{ fontSize: 9, color: C.text, lineHeight: 1.6, marginBottom: 4 }}>
+                      {`Mathematics needs to reach Level 3 (currently Level ${weakMath.score.toFixed(0)}). One level of improvement unlocks the full STEM pathway.`}
+                    </Text>
+                  )}
+                  {strongSci && (
+                    <Text style={{ fontSize: 9, color: C.text, lineHeight: 1.6, marginBottom: 4 }}>
+                      {`Integrated Science is already strong at Level ${strongSci.score.toFixed(0)} — this is a real STEM signal.`}
+                    </Text>
+                  )}
+                  <Text style={{ fontSize: 9, color: C.muted, lineHeight: 1.5 }}>
+                    {`KJSEA composite: ${report.kjsea_composite ?? '—'}/72 (threshold: 20). Social Sciences remains a strong pathway now.`}
+                  </Text>
+                </View>
+              )
+            })()}
+
             {/* KJSEA composite + disclaimer */}
             <View style={{ backgroundColor: '#f8f9fa', borderLeftWidth: 3, borderLeftColor: '#6b7280', paddingHorizontal: 12, paddingVertical: 8, marginTop: 12 }}>
               {report.kjsea_composite !== undefined && (
@@ -323,7 +352,7 @@ function PathwayCareerPage({ report }: { report: ClinicReport }) {
                 </Text>
               )}
               <Text style={{ fontSize: 9, color: '#6b7280', fontStyle: 'italic', marginBottom: 2 }}>
-                {`📋 ${PATHWAY_DISCLAIMER.short}`}
+                {PATHWAY_DISCLAIMER.short}
               </Text>
               <Text style={{ fontSize: 9, color: '#6b7280', fontStyle: 'italic' }}>
                 {PATHWAY_DISCLAIMER.source}

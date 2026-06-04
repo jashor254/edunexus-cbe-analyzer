@@ -446,6 +446,18 @@ export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRe
     langAvg   >= PATHWAY_RULES.STEM.language_avg &&
     stemCompositeOk
 
+  // "Within reach" — composite is strong + at most ONE core STEM subject blocking.
+  // No langAvg check here: composite >= 20 already reflects holistic performance.
+  const stemBlockerCount = [
+    mathLevel < PATHWAY_RULES.STEM.mathematics,
+    sciLevel  < PATHWAY_RULES.STEM.integrated_science,
+  ].filter(Boolean).length
+
+  const stemViableNotGated =
+    stemCompositeOk &&
+    stemBlockerCount <= 1 &&
+    (mathLevel >= 2 || sciLevel >= 3)
+
   // ── Arts gate ─────────────────────────────────────────────────────────────────
   const level1Count    = allLevels.filter(l => l <= 1).length
   const majorityLevel1 = level1Count / allLevels.length > 0.5
@@ -494,11 +506,6 @@ export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRe
     if (sciLevel  < PATHWAY_RULES.STEM.integrated_science) stemBlockers.push('integrated_science')
     if (langAvg   < PATHWAY_RULES.STEM.language_avg)       stemBlockers.push('english')
 
-    const stemPotential =
-      stemBlockers.length === 1 &&
-      (mathLevel === 2 || sciLevel === 2) &&
-      cbcAvg >= 2.8
-
     // Cap STEM score when gate is unmet so Social Sciences always renders higher
     const stemDisplay = Math.min(stemWeighted, 89)
     const pathway_readiness = normalizeReadinessDisplay(
@@ -516,12 +523,14 @@ export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRe
       development_areas:     developmentAreas,
       guidance_message:      buildGuidanceMessage(
         'Social Sciences', 'mid', false, developmentAreas,
-        stemPotential ? stemBlockers : undefined,
+        stemViableNotGated ? stemBlockers : undefined,
       ),
       calculated_at:     new Date().toISOString(),
       performance_tier:  cbcAvg >= 3.0 ? 'high' : 'mid',
-      stem_viable:       stemPotential,
-      stem_gap_subjects: stemPotential ? stemBlockers : undefined,
+      stem_viable:       stemViableNotGated,
+      stem_gap_subjects: stemViableNotGated
+        ? stemBlockers.map(b => `${formatSubjectName(b)} needs Level 3`)
+        : undefined,
       pathway_readiness,
       to_unlock_stem:    toUnlockSTEM,
       to_unlock_social:  [],
@@ -529,7 +538,7 @@ export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRe
         `Keep English at Level ${Math.round(PATHWAY_RULES.SOCIAL_SCIENCES.minimum_avg * 1.5)}+`,
         `Keep Kiswahili at Level ${Math.round(PATHWAY_RULES.SOCIAL_SCIENCES.minimum_avg * 1.5)}+`,
       ],
-      alternative_pathway:    stemPotential ? 'STEM' : 'Arts & Sports Science',
+      alternative_pathway:    stemViableNotGated ? 'STEM' : 'Arts & Sports Science',
       kjsea_composite:        kjseaComposite,
       kjsea_stem_threshold:   20,
       kjsea_qualifies_stem:   stemCompositeOk,
@@ -586,7 +595,7 @@ function buildGuidanceMessage(
         'This student shows strong capability across all subjects. Their science and mathematics ' +
         'foundation qualifies them for the STEM pathway — the most in-demand career route in Kenya. ' +
         'With focused work on Mathematics, they can excel in Engineering, Medicine, or Technology.\n\n' +
-        '💡 Next steps: Science competitions, coding clubs, maths enrichment.'
+        'Next steps: Science competitions, coding clubs, maths enrichment.'
     } else if (pathway === 'Social Sciences') {
       message =
         'This is a high-achieving student with strong language and humanities performance. ' +
@@ -594,28 +603,28 @@ function buildGuidanceMessage(
         (stemViable
           ? ' Their science scores also keep the STEM pathway as a viable alternative.'
           : '') +
-        '\n\n💡 Next steps: Debate club, essay writing, reading widely across subjects.'
+        '\n\nNext steps: Debate club, essay writing, reading widely across subjects.'
     } else {
       // High performer going Arts — language/creative scores dominate
       message =
         'This student excels across the board with a clear strength in creative and expressive subjects. ' +
         'The Arts & Sports Science pathway leads to Design, Media, Journalism, Sports Management, and the Creative Industries.\n\n' +
-        '💡 Next steps: Competitions in arts, drama, or sports. Explore digital design and media production.'
+        'Next steps: Competitions in arts, drama, or sports. Explore digital design and media production.'
     }
   } else if (tier === 'mid') {
     if (pathway === 'STEM') {
       message =
         'This student has developing STEM ability with room to grow. With consistent effort in Mathematics ' +
         'and Science, the STEM pathway is achievable and worth pursuing.\n\n' +
-        '💡 Next steps: Khan Academy for Maths, BBC Bitesize for Science, regular practice problems.'
+        'Next steps: Khan Academy for Maths, BBC Bitesize for Science, regular practice problems.'
     } else if (pathway === 'Social Sciences') {
       message =
         'This student shows solid language and humanities ability. The Social Sciences pathway is a strong fit, ' +
         'leading to Law, Teaching, Business, and Public Service careers.\n\n' +
-        '💡 Next steps: Reading habit, writing practice, debate and discussion activities.'
+        'Next steps: Reading habit, writing practice, debate and discussion activities.'
       if (stemBlockers && stemBlockers.length > 0) {
         message +=
-          `\n\n🎯 STEM is within reach: improve ${
+          `\n\nSTEM is within reach: improve ${
             stemBlockers.map(b => formatSubjectName(b)).join(' and ')
           } from Level 2 to Level 3.`
       }
@@ -623,7 +632,7 @@ function buildGuidanceMessage(
       message =
         'This student performs best in creative and practical subjects. The Arts & Sports Science pathway ' +
         'offers hands-on, project-based learning that suits their strengths.\n\n' +
-        '💡 Next steps: School arts club, agriculture projects, sports teams, and creative hobbies.'
+        'Next steps: School arts club, agriculture projects, sports teams, and creative hobbies.'
     }
   } else {
     // Low performer — always Arts regardless of pathway (Arts always wins with +15 boost for low)
@@ -631,11 +640,11 @@ function buildGuidanceMessage(
       'This student is still developing foundational skills. The Arts & Sports Science pathway offers ' +
       'practical, hands-on learning that builds confidence. Focus on Agriculture, Creative Arts, and ' +
       'Physical Education this term. With consistent effort, other pathways open up.\n\n' +
-      '💡 Priority: Attend every class, complete assignments, ask the teacher for help on missed work.'
+      'Priority: Attend every class, complete assignments, ask the teacher for help on missed work.'
   }
 
   message +=
-    '\n\n📋 Placement note: This recommendation ' +
+    '\n\nPlacement note: This recommendation ' +
     'follows KNEC KJSEA 2025 criteria ' +
     '(STEM: 20+ composite points). ' +
     PATHWAY_DISCLAIMER.short
@@ -643,11 +652,11 @@ function buildGuidanceMessage(
   // Development areas
   if (developmentAreas.length > 0) {
     const top3 = developmentAreas.slice(0, 3).map(a => formatSubjectName(a)).join(', ')
-    message += `\n\n⚠️ Needs attention: ${top3}.`
+    message += `\n\nNeeds attention: ${top3}.`
   }
 
   message +=
-    '\n\n📌 All subjects remain essential in Junior School. This recommendation helps with planning — ' +
+    '\n\nNote: All subjects remain essential in Junior School. This recommendation helps with planning — ' +
     'final pathway decisions should consider the student\'s own interests and teacher guidance.'
 
   return message

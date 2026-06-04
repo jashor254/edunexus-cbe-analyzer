@@ -5,7 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getCareerBySlug, getMatchesForStudent, getCurrentSkillsForAge, getNextSkillsForAge, getAgeRangeLabel } from './careerEngine'
 import { STANDARD_DISCLAIMER } from './types'
 import type { ClinicReport, SubjectScoreRow, Career, SkillTimelineItem } from './types'
-import { calculateKJSEAComposite } from '@/lib/pathwayCalculator'
+import { calculateKJSEAComposite, calculateJuniorPathwayAffinity, PATHWAY_DISCLAIMER } from '@/lib/pathwayCalculator'
 
 // ─── Subject display names (Fix 3) ────────────────────────────────────────────
 
@@ -325,6 +325,9 @@ export async function buildClinicReport(
 
   const recommended_pathway = ctx?.recommended_pathway as string | null
   const kjsea_composite     = section === 'junior' ? calculateKJSEAComposite(subjectMap) : undefined
+  const stem_viable         = section === 'junior'
+    ? calculateJuniorPathwayAffinity(subjectMap).stem_viable
+    : undefined
 
   // 4. Dream career (from student_career_interests)
   const { data: interests } = await db
@@ -435,6 +438,7 @@ export async function buildClinicReport(
     summary_sentence,
     recommended_pathway,
     kjsea_composite,
+    stem_viable,
     top_career,
     top_career_detail,
     dream_career,
@@ -443,6 +447,8 @@ export async function buildClinicReport(
     current_phase,
     next_phase,
     parent_actions,
-    disclaimer:        STANDARD_DISCLAIMER,
+    disclaimer: section === 'junior'
+      ? PATHWAY_DISCLAIMER.short + ' ' + PATHWAY_DISCLAIMER.source
+      : STANDARD_DISCLAIMER,
   }
 }
