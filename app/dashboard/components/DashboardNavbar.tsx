@@ -7,8 +7,7 @@ import { RoleSwitcher } from '@/components/layout/RoleSwitcher'
 
 const NAV_LINKS = [
   { href: '/chat',                       label: 'Compass',     color: 'hover:text-violet-600'  },
-  { href: '/dashboard/pathway',          label: 'Pathway',     color: 'hover:text-green-600'   },
-  { href: '/dashboard/career-explorer',  label: 'Careers',     color: 'hover:text-purple-600'  },
+  { href: '/career',                     label: 'Careers',     color: 'hover:text-purple-600'  },
   { href: '/dashboard/clinic',           label: 'Clinic',      color: 'hover:text-cyan-600'    },
   { href: '/dashboard/assignments',      label: 'Assignments',  color: 'hover:text-pink-600'    },
   { href: '/pricing',                    label: 'Upgrade',     color: 'hover:text-amber-600'   },
@@ -19,7 +18,7 @@ const BOTTOM_NAV = [
   { href: '/chat',                       label: 'Compass',     icon: '🧭' },
   { href: '/dashboard/clinic',           label: 'Clinic',      icon: '🏥' },
   { href: '/dashboard/assignments',      label: 'Assignments', icon: '📋' },
-  { href: '/dashboard/career-explorer', label: 'Careers',     icon: '💼' },
+  { href: '/career',                     label: 'Careers',     icon: '💼' },
 ]
 
 export default function DashboardNavbar() {

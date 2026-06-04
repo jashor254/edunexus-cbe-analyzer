@@ -5,7 +5,6 @@ import {
   TrendingUp, BookOpen, UserCheck, 
   ArrowRight, ShieldCheck, Zap, Sparkles
 } from 'lucide-react'
-import { CareerCard } from '@/components/careers/CareerCard'
 import type { MatchReport } from '@/lib/academicClinic/careerEngine'
 
 interface MatchResultsViewProps {
@@ -59,7 +58,10 @@ export function MatchResultsView({
           </div>
         </div>
         
-        <CareerCard career={transformedTopCareer} showFullDetails={true} />
+        <div className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-sm space-y-4">
+          <h2 className="text-2xl font-black text-slate-900">{transformedTopCareer?.name}</h2>
+          <p className="text-slate-600 font-medium">{transformedTopCareer?.marketReality?.kenyanContext}</p>
+        </div>
       </section>
 
       {/* ── SECTION 2: THE BREAKDOWN ── */}
