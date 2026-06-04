@@ -55,9 +55,35 @@ function subjectStatus(score: number): SubjectScoreRow['status'] {
   return 'critical'
 }
 
-function calcAge(dob?: string | null): number {
-  if (!dob) return 14
+function calcAge(dob: string | null | undefined, grade: number): number {
+  if (!dob) return grade + 5   // CBC: Grade 7→12, Age 12→17
   return Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 3600 * 1000))
+}
+
+// ─── Subject cluster detection ────────────────────────────────────────────────
+
+const SCIENCE_SUBJECTS   = ['biology', 'chemistry', 'physics', 'mathematics', 'core_mathematics', 'integrated_science']
+const HUMANITIES_SUBJECTS = ['history', 'geography', 'social_studies', 'cre', 'christian_religious_education', 'islamic_religious_education']
+const BUSINESS_SUBJECTS  = ['business_studies', 'economics', 'accounting', 'commerce']
+const ARTS_SUBJECTS      = ['creative_arts', 'music', 'art_design', 'creative_arts_sports']
+
+function detectSubjectCluster(
+  scores: Record<string, number>
+): 'science' | 'humanities' | 'business' | 'arts' | 'general' {
+  const keys = Object.keys(scores)
+  if (keys.filter(s => SCIENCE_SUBJECTS.includes(s)).length >= 2)   return 'science'
+  if (keys.filter(s => HUMANITIES_SUBJECTS.includes(s)).length >= 2) return 'humanities'
+  if (keys.filter(s => BUSINESS_SUBJECTS.includes(s)).length >= 1)  return 'business'
+  if (keys.filter(s => ARTS_SUBJECTS.includes(s)).length >= 1)      return 'arts'
+  return 'general'
+}
+
+const CLUSTER_CAREER_CANDIDATES: Record<string, string[]> = {
+  science:    ['medical-doctor', 'environmental-scientist', 'agricultural-scientist', 'civil-engineer', 'software-engineer'],
+  humanities: ['journalist-content-creator', 'teacher-education-technologist', 'accountant-financial-analyst', 'entrepreneur-business'],
+  business:   ['accountant-financial-analyst', 'entrepreneur-business', 'journalist-content-creator'],
+  arts:       ['graphic-designer-creative-technologist', 'journalist-content-creator', 'teacher-education-technologist'],
+  general:    ['teacher-education-technologist', 'entrepreneur-business', 'journalist-content-creator'],
 }
 
 // ─── Fix 1: Pathway-based skill timeline defaults ──────────────────────────────
@@ -271,7 +297,7 @@ export async function buildClinicReport(
 
   const grade = student.grade as number
   const curriculum = (student.curriculum_type as string) ?? 'cbc'
-  const age = calcAge(student.date_of_birth as string | null)
+  const age = calcAge(student.date_of_birth as string | null, grade)
   const ageRange = getAgeRangeLabel(age)
 
   // Junior: Grade 7-9 CBC; Senior: Grade 10+, IGCSE, Form 1-4
@@ -351,14 +377,18 @@ export async function buildClinicReport(
       // No match on file — generate one now via AI
       console.log('  No career matches found — generating via AI...')
       try {
+        const cluster = detectSubjectCluster(subjectMap)
+        const candidateSlugs = CLUSTER_CAREER_CANDIDATES[cluster]
+        console.log(`  Subject cluster: ${cluster} → candidates: ${candidateSlugs.join(', ')}`)
         await generateCareerMatches({
-          student_id:     studentId,
-          student_name:   student.name as string,
+          student_id:      studentId,
+          student_name:    student.name as string,
           grade,
           age,
-          subject_scores: subjectMap,
-          interests:      [],
-          dream_career:   dream_career ?? undefined,
+          subject_scores:  subjectMap,
+          interests:       [],
+          dream_career:    dream_career ?? undefined,
+          candidate_slugs: candidateSlugs,
         })
         matches = await getMatchesForStudent(studentId)
         console.log(`  ✓ Generated ${matches.length} career matches`)
@@ -387,6 +417,29 @@ export async function buildClinicReport(
       }
     }
   }
+
+  // Build career-relevant gap table (career required subjects × student scores)
+  const career_gap_rows: typeof subjectRows = top_career_detail
+    ? (top_career_detail.required_subjects ?? []).map(subject => {
+        const imp      = (top_career_detail.subject_importance ?? {})[subject]
+        const required = imp === 'critical' ? 3 : 2
+        const score    = subjectMap[subject] ?? 0
+        const gap      = Math.max(0, required - score)
+        const status: 'strong' | 'meets' | 'needs_work' | 'critical' =
+          score >= required + 1 ? 'strong'
+          : score >= required   ? 'meets'
+          : gap >= 2            ? 'critical'
+          : 'needs_work'
+        return {
+          subject,
+          display_name: displayName(subject),
+          score,
+          required,
+          gap,
+          status,
+        }
+      }).sort((a, b) => (b.gap ?? 0) - (a.gap ?? 0))
+    : []
 
   // 6. Fix 1 — Skill timeline: use career data if available, else pathway defaults
   const careerTimeline = top_career_detail?.skill_timeline ?? []
@@ -462,6 +515,7 @@ export async function buildClinicReport(
     kjsea_composite,
     stem_viable,
     top_career,
+    career_gap_rows: career_gap_rows.length > 0 ? career_gap_rows : undefined,
     top_career_detail,
     dream_career,
     skill_timeline:    careerTimeline,
@@ -469,8 +523,8 @@ export async function buildClinicReport(
     current_phase,
     next_phase,
     parent_actions,
-    disclaimer: section === 'junior'
-      ? PATHWAY_DISCLAIMER.short + ' ' + PATHWAY_DISCLAIMER.source
-      : STANDARD_DISCLAIMER,
+    // Short disclaimer for both sections — STANDARD_DISCLAIMER is career-market text
+    // that overflows Page 3 when parent actions are long. Keep it concise.
+    disclaimer: PATHWAY_DISCLAIMER.short + ' ' + PATHWAY_DISCLAIMER.source,
   }
 }

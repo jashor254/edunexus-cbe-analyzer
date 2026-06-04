@@ -156,6 +156,7 @@ export type MatchEngineInput = {
   subject_scores: Record<string, number>
   interests: string[]
   dream_career?: string
+  candidate_slugs?: string[]  // restrict match pool to these careers (cluster-based)
 }
 
 export type MatchEngineResult = {
@@ -215,6 +216,7 @@ export type ClinicReport = {
   kjsea_composite?: number                  // Junior: KJSEA 2025 composite score
   stem_viable?: boolean                     // Junior: STEM within reach (one blocker)
   top_career: CareerMatchWithDetail | null  // Senior only
+  career_gap_rows?: SubjectScoreRow[]       // Senior: career-required subjects with gap data
   top_career_detail: Career | null          // Senior only (for subject gaps)
   dream_career: string | null
 

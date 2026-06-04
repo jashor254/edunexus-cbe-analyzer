@@ -371,31 +371,45 @@ function PathwayCareerPage({ report }: { report: ClinicReport }) {
 
             {report.top_career ? (
               <>
+                {/* Truncated description — full description causes Page 2 overflow */}
                 <View style={[S.summaryBox]}>
                   <Text style={S.summaryText}>
-                    {report.top_career.career.description ?? 'A strong career match based on current performance and interests.'}
+                    {(() => {
+                      const desc = report.top_career.career.description ?? ''
+                      return desc.length > 200 ? desc.slice(0, 200) + '…' : desc
+                    })()}
                   </Text>
                 </View>
+
+                {/* Career-relevant gap table — only required subjects */}
                 <Text style={{ fontSize: 11, fontWeight: 700, color: C.text, marginBottom: 8 }}>
                   Subject Gap Analysis
                 </Text>
-                {[...report.top_subjects, ...report.weak_subjects].map(s => (
-                  <View key={s.subject} style={S.subjectRow}>
-                    <Text style={S.subjectName}>{s.display_name}</Text>
-                    <Text style={{ fontSize: 9, color: C.muted, marginRight: 8 }}>
-                      Score: {s.score.toFixed(1)}{s.required ? ` / Required: ${s.required}` : ''}
-                    </Text>
-                    {s.gap && s.gap > 0 ? (
-                      <View style={{ backgroundColor: C.l1bg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 3 }}>
-                        <Text style={{ fontSize: 8, color: C.l1, fontWeight: 700 }}>Gap: {s.gap}</Text>
+                {(report.career_gap_rows ?? [...report.top_subjects, ...report.weak_subjects]).map(s => {
+                  const badgeBg  = s.status === 'strong'     ? C.l3bg
+                                 : s.status === 'meets'      ? '#dbeafe'
+                                 : s.status === 'critical'   ? C.l1bg
+                                 : C.l2bg
+                  const badgeFg  = s.status === 'strong'     ? C.l3
+                                 : s.status === 'meets'      ? '#1d4ed8'
+                                 : s.status === 'critical'   ? C.l1
+                                 : C.l2
+                  const badgeTxt = s.status === 'strong'     ? 'Strong'
+                                 : s.status === 'meets'      ? 'Meets'
+                                 : s.gap                     ? `Needs +${s.gap}`
+                                 : 'Review'
+                  return (
+                    <View key={s.subject} style={S.subjectRow}>
+                      <Text style={S.subjectName}>{s.display_name}</Text>
+                      <Text style={{ fontSize: 9, color: C.muted, marginRight: 8 }}>
+                        {s.score > 0 ? `Level ${s.score.toFixed(0)}` : 'Not studied'}{s.required ? ` / Need ${s.required}` : ''}
+                      </Text>
+                      <View style={{ backgroundColor: badgeBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 3 }}>
+                        <Text style={{ fontSize: 8, color: badgeFg, fontWeight: 700 }}>{badgeTxt}</Text>
                       </View>
-                    ) : (
-                      <View style={{ backgroundColor: C.l3bg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 3 }}>
-                        <Text style={{ fontSize: 8, color: C.l3, fontWeight: 700 }}>✓ On track</Text>
-                      </View>
-                    )}
-                  </View>
-                ))}
+                    </View>
+                  )
+                })}
               </>
             ) : (
               <View style={S.summaryBox}>

@@ -13,7 +13,12 @@ export async function generateCareerMatches(input: MatchEngineInput): Promise<Ma
     throw new Error('No careers in database. Run the seed first.')
   }
 
-  const careerList = careers.map((c) => ({
+  // Narrow to cluster candidates when provided — prevents cross-cluster mismatches
+  const filteredCareers = input.candidate_slugs?.length
+    ? careers.filter(c => input.candidate_slugs!.includes(c.slug))
+    : careers
+
+  const careerList = filteredCareers.map((c) => ({
     slug: c.slug,
     title: c.title,
     category: c.category,
