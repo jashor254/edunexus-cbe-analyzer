@@ -169,16 +169,48 @@ export async function POST(req: Request) {
     const hasQuestion = !!task.content.question
     const hasVisual = !!task.content.visualAid
 
-    // ── Compass Bridge career context ─────────────────────────────────────────
+    // ── Compass Bridge — specific AI briefing per student ────────────────────
     type CompassBridgeShape = {
-      summary?: { recommendedPathway?: string }
+      // New specific shape from autoReportGenerator
       sessionGoal?: string
-      subjectPriorities?: Array<{ displayName?: string; careerReason?: string }>
-      weeklyMilestones?: Array<{ goal?: string }>
+      firstSubject?: string
+      firstConcept?: string
+      startDifficulty?: 1 | 2 | 3
+      subjectPriorities?: Array<{
+        subject?: string
+        displayName?: string
+        currentTier?: string
+        requiredTier?: string
+        gap?: number
+        careerReason?: string
+        actionSteps?: string[]
+      }>
+      weeklyMilestones?: Array<{ week?: number; goal?: string; subject?: string; checkConcept?: string }>
+      parentWhatsAppMessage?: string
+      // Legacy shape fallback
+      summary?: { recommendedPathway?: string }
     }
     const cb = (learningContext as { compass_bridge?: CompassBridgeShape } | null)?.compass_bridge
+    const top = cb?.subjectPriorities?.[0]
     const compassBridgeContext = cb
-      ? `\n## CAREER CONTEXT FOR THIS SESSION:\nCareer Target: ${cb.summary?.recommendedPathway ?? ''}\nSession Goal: ${cb.sessionGoal ?? ''}\nPriority Subject: ${cb.subjectPriorities?.[0]?.displayName ?? ''}\nCareer Reason: ${cb.subjectPriorities?.[0]?.careerReason ?? ''}\nThis Week's Milestone: ${cb.weeklyMilestones?.[0]?.goal ?? ''}\n\nWhen teaching, connect every concept back to this career. If student asks why they need to learn this, use the career reason above.\n`
+      ? `\n## PERSONALIZED COMPASS BRIEFING:
+Session Goal: ${cb.sessionGoal ?? ''}
+Start Subject: ${cb.firstSubject ?? top?.subject ?? ''}
+Start Concept: ${cb.firstConcept ?? ''}
+Start Difficulty: ${cb.startDifficulty ?? 2}/5
+
+Subject Priorities:
+${(cb.subjectPriorities ?? []).slice(0, 3).map(s =>
+  `${s.displayName ?? s.subject ?? ''}: ${s.currentTier ?? ''} → needs ${s.requiredTier ?? ''}
+   Why: ${s.careerReason ?? ''}
+   Steps: ${(s.actionSteps ?? []).join(', ')}`
+).join('\n')}
+
+Week 1 Goal: ${cb.weeklyMilestones?.[0]?.goal ?? ''}
+
+IMPORTANT: When student opens Compass for the FIRST time, greet them by name and say ONE specific sentence about their goal. Example: "Hi Wanjiku! Today we're working on fractions — this is key for your STEM pathway. Let's start simple."
+Then begin teaching ${cb.firstConcept ?? 'their priority concept'} at difficulty ${cb.startDifficulty ?? 2}/5.
+When student asks WHY they need to learn this, use the career reason above.\n`
       : ''
 
     // ── 🔥 GENERATE ACTUAL RESPONSE USING DEEPSEEK 🔥 ────────────────────────

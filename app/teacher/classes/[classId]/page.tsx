@@ -8,6 +8,7 @@ import {
   TrendingUp, Compass, Brain,
   Loader2, X, UserPlus, Mail, Phone, FileText, CheckCircle2,
   FlaskConical, ChevronDown, ChevronRight,
+  Upload, Sparkles, Target,
 } from 'lucide-react'
 import {
   SENIOR_PATHWAYS,
@@ -17,7 +18,7 @@ import {
   type SeniorPathway,
 } from '@/lib/curriculum/subjects'
 
-type Tab = 'students' | 'gaps' | 'assignments' | 'holiday' | 'compass' | 'clinic'
+type Tab = 'students' | 'gaps' | 'assignments' | 'holiday' | 'compass' | 'clinic' | 'upload' | 'analytics'
 
 // ─── Add Student Modal ────────────────────────────────────────────────────────
 
@@ -386,6 +387,442 @@ type ClinicProgress = {
   emailSent?:  boolean
   whatsappSent?: boolean
   error?:      string
+}
+
+// ─── Upload Assessment Tab ────────────────────────────────────────────────────
+
+const CBC_SUBJECTS = [
+  'mathematics', 'english', 'kiswahili', 'science',
+  'social_studies', 'cre', 'creative_arts', 'physical_education',
+]
+
+function UploadAssessmentTab({
+  classId,
+  students,
+  className,
+}: {
+  classId:   string
+  students:  Array<{ id: string; name: string }>
+  className: string
+}) {
+  const [term,   setTerm]   = useState(1)
+  const [year,   setYear]   = useState(new Date().getFullYear())
+  const [atype,  setAtype]  = useState('midterm')
+  const [scores, setScores] = useState<Record<string, Record<string, string>>>({})
+  const [phase,  setPhase]  = useState<'entry' | 'saving' | 'generating' | 'done' | 'error'>('entry')
+  const [progress, setProgress] = useState({ done: 0, total: 0 })
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  function setScore(studentId: string, subject: string, val: string) {
+    setScores(prev => ({
+      ...prev,
+      [studentId]: { ...(prev[studentId] ?? {}), [subject]: val },
+    }))
+  }
+
+  async function handleSaveAndGenerate() {
+    if (students.length === 0) return
+    setPhase('saving')
+    setErrorMsg(null)
+
+    try {
+      // 1. Create assessment
+      const createRes = await fetch('/api/teacher/assessments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          classId, title: `${atype} Term ${term} ${year}`,
+          assessmentType: atype, term: String(term), year,
+          maxScore: 4, subjects: CBC_SUBJECTS, curriculumType: 'cbc',
+        }),
+      })
+      const createData = await createRes.json()
+      if (!createRes.ok || !createData.success) {
+        throw new Error(createData.error ?? 'Failed to create assessment')
+      }
+      const assessmentId: string = createData.data.assessment.id
+
+      // 2. Save marks
+      const marks = students.map(s => ({
+        studentName: s.name,
+        subjectScores: Object.fromEntries(
+          CBC_SUBJECTS.map(subj => [subj, parseFloat(scores[s.id]?.[subj] ?? '2') || 2])
+        ),
+      }))
+
+      const marksRes = await fetch(`/api/teacher/assessments/${assessmentId}/marks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ marks }),
+      })
+      const marksData = await marksRes.json()
+      if (!marksRes.ok || !marksData.success) {
+        throw new Error(marksData.error ?? 'Failed to save marks')
+      }
+
+      // 3. Generate reports with compass_bridge
+      setPhase('generating')
+      setProgress({ done: 0, total: students.length })
+
+      const genRes = await fetch(`/api/teacher/classes/${classId}/generate-reports`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assessmentIds: [assessmentId] }),
+      })
+      const genData = await genRes.json()
+      if (!genRes.ok || !genData.success) {
+        throw new Error(genData.error ?? 'Failed to generate reports')
+      }
+
+      setProgress({ done: genData.data?.success ?? students.length, total: students.length })
+      setPhase('done')
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'An error occurred')
+      setPhase('error')
+    }
+  }
+
+  if (phase === 'done') return (
+    <div className="bg-green-50 border border-green-200 rounded-2xl p-8 text-center space-y-3">
+      <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto" />
+      <h3 className="font-black text-green-800 text-xl">Reports Generated!</h3>
+      <p className="text-green-700 text-sm">
+        {progress.done}/{progress.total} student reports created with personalized Compass briefings.
+        Parents will be notified automatically.
+      </p>
+      <button onClick={() => { setPhase('entry'); setScores({}) }}
+        className="mt-2 px-5 py-2.5 bg-green-600 text-white font-bold rounded-xl text-sm hover:bg-green-700">
+        Upload Another Assessment
+      </button>
+    </div>
+  )
+
+  if (phase === 'generating') return (
+    <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center space-y-4">
+      <Loader2 className="w-10 h-10 text-violet-500 mx-auto animate-spin" />
+      <h3 className="font-black text-gray-800">Generating Reports & Compass Briefings…</h3>
+      <p className="text-gray-500 text-sm">
+        Building personalised learning plans for each student. This takes ~30 seconds.
+      </p>
+      <div className="bg-gray-100 rounded-full h-3 overflow-hidden max-w-sm mx-auto">
+        <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: '60%' }} />
+      </div>
+    </div>
+  )
+
+  if (phase === 'saving') return (
+    <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center space-y-3">
+      <Loader2 className="w-8 h-8 text-blue-500 mx-auto animate-spin" />
+      <p className="text-gray-600">Saving scores…</p>
+    </div>
+  )
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-5">
+        <h3 className="font-black text-blue-800 mb-1 flex items-center gap-2">
+          <Upload className="w-5 h-5" /> Upload Assessment — {className}
+        </h3>
+        <p className="text-sm text-blue-700">
+          Enter student scores below. Reports and personalized Compass briefings will generate automatically.
+        </p>
+      </div>
+
+      {phase === 'error' && errorMsg && (
+        <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          {errorMsg}
+        </div>
+      )}
+
+      {/* Assessment metadata */}
+      <div className="flex flex-wrap gap-3">
+        <div>
+          <label className="block text-xs font-bold text-gray-500 mb-1">Term</label>
+          <select value={term} onChange={e => setTerm(Number(e.target.value))}
+            className="border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium bg-white">
+            <option value={1}>Term 1</option>
+            <option value={2}>Term 2</option>
+            <option value={3}>Term 3</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-gray-500 mb-1">Year</label>
+          <select value={year} onChange={e => setYear(Number(e.target.value))}
+            className="border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium bg-white">
+            {[2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-gray-500 mb-1">Type</label>
+          <select value={atype} onChange={e => setAtype(e.target.value)}
+            className="border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium bg-white">
+            <option value="midterm">Mid-term</option>
+            <option value="endterm">End-term</option>
+            <option value="opener">Opener</option>
+            <option value="cat">CAT</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Score entry table */}
+      <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="text-left px-4 py-3 font-black text-gray-700 sticky left-0 bg-gray-50">Student</th>
+                {CBC_SUBJECTS.map(subj => (
+                  <th key={subj} className="px-2 py-3 font-bold text-gray-600 text-center min-w-[70px] capitalize">
+                    {subj.replace('_', ' ')}
+                    <div className="text-xs font-normal text-gray-400">1–4</div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {students.map(s => (
+                <tr key={s.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-2 font-semibold text-gray-900 sticky left-0 bg-white">{s.name}</td>
+                  {CBC_SUBJECTS.map(subj => (
+                    <td key={subj} className="px-2 py-2 text-center">
+                      <input
+                        type="number"
+                        min={1} max={4} step={0.5}
+                        value={scores[s.id]?.[subj] ?? ''}
+                        onChange={e => setScore(s.id, subj, e.target.value)}
+                        placeholder="–"
+                        className="w-14 text-center border border-gray-200 rounded-lg px-1 py-1 text-sm focus:outline-none focus:border-teal-400"
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-gray-400">CBC scale 1–4. Leave blank to default to 2 (Approaching).</p>
+        <button
+          onClick={handleSaveAndGenerate}
+          disabled={students.length === 0}
+          className="flex items-center gap-2 bg-violet-600 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-violet-700 transition disabled:opacity-50"
+        >
+          <Sparkles className="w-4 h-4" />
+          Save Scores & Generate Reports
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Class Analytics Tab ──────────────────────────────────────────────────────
+
+const LEVEL_LABELS_T: Record<string, { label: string; color: string; bg: string }> = {
+  exceeds:     { label: 'Exceeds Expectations',     color: 'text-purple-700', bg: 'bg-purple-100' },
+  meets:       { label: 'Meets Expectations',        color: 'text-green-700',  bg: 'bg-green-100'  },
+  approaching: { label: 'Approaching Expectations',  color: 'text-amber-700',  bg: 'bg-amber-100'  },
+  below:       { label: 'Below Expectations',        color: 'text-red-700',    bg: 'bg-red-100'    },
+}
+
+function ClassAnalyticsTab({
+  students,
+  className,
+  grade,
+}: {
+  students:  any[]
+  className: string
+  grade:     number
+}) {
+  const isJunior = grade <= 9
+
+  // Compute stats from students' latest assessment
+  const withAssessment = students.filter(s => s.assessment)
+  const withoutAssessment = students.filter(s => !s.assessment)
+
+  type LevelKey = 'exceeds' | 'meets' | 'approaching' | 'below'
+  const levelCounts: Record<LevelKey, number> = { exceeds: 0, meets: 0, approaching: 0, below: 0 }
+  const pathwayCounts: Record<string, number> = {}
+  const subjectTotals: Record<string, { sum: number; count: number }> = {}
+  const needsAttention: Array<{ name: string; weakSubjects: string[] }> = []
+
+  for (const s of withAssessment) {
+    const scores: Record<string, number> = s.assessment?.subject_scores ?? {}
+    const vals = Object.values(scores).filter(v => typeof v === 'number') as number[]
+    if (!vals.length) continue
+
+    const avg = vals.reduce((a, b) => a + b, 0) / vals.length
+    const lvl: LevelKey = avg >= 3.5 ? 'exceeds' : avg >= 2.5 ? 'meets' : avg >= 1.5 ? 'approaching' : 'below'
+    levelCounts[lvl]++
+
+    if (s.current_pathway) {
+      pathwayCounts[s.current_pathway] = (pathwayCounts[s.current_pathway] ?? 0) + 1
+    }
+
+    for (const [subj, score] of Object.entries(scores)) {
+      if (!subjectTotals[subj]) subjectTotals[subj] = { sum: 0, count: 0 }
+      subjectTotals[subj].sum   += score as number
+      subjectTotals[subj].count += 1
+    }
+
+    // Needs attention: 2+ subjects below expectations (< 1.5)
+    const weakSubjects = Object.entries(scores)
+      .filter(([, v]) => (v as number) < 1.5)
+      .map(([k]) => k.replace(/_/g, ' '))
+    if (weakSubjects.length >= 2) {
+      needsAttention.push({ name: s.name, weakSubjects })
+    }
+  }
+
+  const subjectAverages = Object.entries(subjectTotals)
+    .map(([subj, { sum, count }]) => ({ subj, avg: sum / count }))
+    .sort((a, b) => a.avg - b.avg)
+
+  const weakestSubject = subjectAverages[0]
+  const total = students.length
+
+  return (
+    <div className="space-y-6">
+      {/* CLASS OVERVIEW */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-6">
+        <h3 className="font-black text-gray-900 mb-4 flex items-center gap-2">
+          <BarChart3 className="w-5 h-5 text-teal-600" /> {className} — Overview
+        </h3>
+        <div className="grid grid-cols-3 gap-4 text-center">
+          <div className="bg-gray-50 rounded-xl p-4">
+            <div className="text-3xl font-black text-gray-800">{total}</div>
+            <div className="text-xs text-gray-500 mt-1">Total Students</div>
+          </div>
+          <div className="bg-teal-50 rounded-xl p-4">
+            <div className="text-3xl font-black text-teal-700">{withAssessment.length}</div>
+            <div className="text-xs text-gray-500 mt-1">Have Assessment</div>
+          </div>
+          <div className="bg-amber-50 rounded-xl p-4">
+            <div className="text-3xl font-black text-amber-700">{withoutAssessment.length}</div>
+            <div className="text-xs text-gray-500 mt-1">Missing Assessment</div>
+          </div>
+        </div>
+      </div>
+
+      {/* PATHWAY DISTRIBUTION (junior) */}
+      {isJunior && Object.keys(pathwayCounts).length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-6">
+          <h3 className="font-black text-gray-900 mb-4">Pathway Distribution</h3>
+          <div className="space-y-3">
+            {Object.entries(pathwayCounts)
+              .sort(([, a], [, b]) => b - a)
+              .map(([pathway, count]) => (
+                <div key={pathway} className="flex items-center gap-3">
+                  <div className="w-28 text-sm font-semibold text-gray-700">{pathway}</div>
+                  <div className="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-teal-500 rounded-full"
+                      style={{ width: `${Math.round((count / total) * 100)}%` }}
+                    />
+                  </div>
+                  <div className="text-sm font-bold text-gray-600 w-16 text-right">
+                    {count} ({Math.round((count / total) * 100)}%)
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* PERFORMANCE DISTRIBUTION */}
+      {withAssessment.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-6">
+          <h3 className="font-black text-gray-900 mb-4">Performance Distribution</h3>
+          <div className="space-y-3">
+            {(Object.entries(levelCounts) as [LevelKey, number][])
+              .sort(([, a], [, b]) => b - a)
+              .map(([lvl, count]) => {
+                const cfg = LEVEL_LABELS_T[lvl]
+                return (
+                  <div key={lvl} className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${cfg.bg} ${cfg.color}`}>
+                      {count}
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-sm font-semibold text-gray-700">{cfg.label}</div>
+                      <div className="h-2 bg-gray-100 rounded-full mt-1 overflow-hidden">
+                        <div
+                          className="h-full bg-teal-500 rounded-full"
+                          style={{ width: `${total ? Math.round((count / total) * 100) : 0}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="text-sm text-gray-500 w-12 text-right">
+                      {total ? Math.round((count / total) * 100) : 0}%
+                    </div>
+                  </div>
+                )
+              })}
+          </div>
+        </div>
+      )}
+
+      {/* SUBJECT AVERAGES */}
+      {subjectAverages.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-6">
+          <h3 className="font-black text-gray-900 mb-4">Subject Averages</h3>
+          {weakestSubject && (
+            <div className="mb-3 flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              Weakest: <strong className="capitalize">{weakestSubject.subj.replace(/_/g, ' ')}</strong> — class average {weakestSubject.avg.toFixed(1)}/4
+            </div>
+          )}
+          <div className="space-y-2">
+            {subjectAverages.map(({ subj, avg }) => (
+              <div key={subj} className="flex items-center gap-3">
+                <div className="w-32 text-xs text-gray-600 capitalize">{subj.replace(/_/g, ' ')}</div>
+                <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${avg >= 3 ? 'bg-green-500' : avg >= 2 ? 'bg-amber-500' : 'bg-red-500'}`}
+                    style={{ width: `${(avg / 4) * 100}%` }}
+                  />
+                </div>
+                <div className="text-xs font-bold text-gray-600 w-8">{avg.toFixed(1)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* NEEDS ATTENTION */}
+      {needsAttention.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6">
+          <h3 className="font-black text-amber-800 mb-1 flex items-center gap-2">
+            <Target className="w-5 h-5" /> Students Who May Need Extra Support
+          </h3>
+          <p className="text-xs text-amber-600 mb-4">
+            These students have 2+ subjects below expectations. This is a support list, not a shame list.
+          </p>
+          <div className="space-y-3">
+            {needsAttention.map(({ name, weakSubjects }) => (
+              <div key={name} className="flex items-start justify-between gap-3 bg-white rounded-xl p-3 border border-amber-100">
+                <div className="font-semibold text-gray-800">{name}</div>
+                <div className="flex flex-wrap gap-1 justify-end">
+                  {weakSubjects.map(s => (
+                    <span key={s} className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-lg capitalize">{s}</span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {withAssessment.length === 0 && (
+        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-8 text-center">
+          <BarChart3 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500">Upload an assessment to see class analytics.</p>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ─── Clinic: Generate Reports component ───────────────────────────────────────
@@ -931,6 +1368,8 @@ na kuwasaidia vizuri zaidi darasani.
     { key: 'holiday',     label: 'Holiday Bridge',  icon: Sun           },
     { key: 'compass',     label: 'Compass',         icon: Compass       },
     { key: 'clinic',      label: 'Clinic Reports',  icon: FlaskConical  },
+    { key: 'upload',      label: 'Upload Scores',   icon: Upload        },
+    { key: 'analytics',   label: 'Analytics',       icon: BarChart3     },
   ]
 
   return (
@@ -1614,6 +2053,24 @@ Asante! 🙏`
             </div>
           )}
         </div>
+      )}
+
+      {/* TAB: Upload Assessment */}
+      {tab === 'upload' && (
+        <UploadAssessmentTab
+          classId={classId}
+          students={students.map((s: any) => ({ id: s.id, name: s.name }))}
+          className={cls.name}
+        />
+      )}
+
+      {/* TAB: Analytics */}
+      {tab === 'analytics' && (
+        <ClassAnalyticsTab
+          students={students}
+          className={cls.name}
+          grade={cls.grade}
+        />
       )}
     </div>
   )

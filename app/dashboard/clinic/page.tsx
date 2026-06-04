@@ -366,10 +366,22 @@ function ClinicReportView({ studentId, studentName, onClose }: {
   studentName: string
   onClose: () => void
 }) {
+  type CompassBridgeData = {
+    sessionGoal?: string
+    firstSubject?: string
+    firstConcept?: string
+    startDifficulty?: number
+    parentWhatsAppMessage?: string
+    subjectPriorities?: Array<{ displayName?: string; currentTier?: string; careerReason?: string }>
+    weeklyMilestones?: Array<{ week?: number; goal?: string; checkConcept?: string }>
+  }
+
   const [report, setReport] = useState<CareerClinicReport | null>(null)
+  const [compassBridge, setCompassBridge] = useState<CompassBridgeData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTimelineIdx, setActiveTimelineIdx] = useState(0)
+  const [copiedMsg, setCopiedMsg] = useState(false)
 
   const loadReport = useCallback(async () => {
     setLoading(true)
@@ -380,6 +392,7 @@ function ClinicReportView({ studentId, studentName, onClose }: {
       if (!res.ok) throw new Error(data?.error ?? 'Failed to build report')
       const r: CareerClinicReport = data?.data?.report
       setReport(r)
+      setCompassBridge(data?.data?.compass_bridge ?? null)
       // Set timeline to current age
       if (r.skill_timeline.length > 0) {
         const idx = r.skill_timeline.findIndex(t => t.age_range === r.current_age_range)
@@ -786,6 +799,68 @@ function ClinicReportView({ studentId, studentName, onClose }: {
             ))}
           </div>
         </section>
+
+        {/* ── Compass Focus (from compass_bridge) ──────────────────────── */}
+        {compassBridge?.sessionGoal && (
+          <section className="space-y-4">
+            <div className="bg-violet-900/30 border border-violet-500/30 rounded-2xl p-5">
+              <h3 className="text-white font-bold mb-3 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-violet-400" />
+                This Week&apos;s Compass Focus
+              </h3>
+              <div className="space-y-2">
+                {compassBridge.firstSubject && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-white/40 w-20 shrink-0">Subject:</span>
+                    <span className="text-white/80 font-semibold capitalize">
+                      {compassBridge.firstSubject.replace(/_/g, ' ')}
+                      {compassBridge.firstConcept && ` — ${compassBridge.firstConcept.replace(/_/g, ' ')}`}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-start gap-2 text-sm">
+                  <span className="text-white/40 w-20 shrink-0 mt-0.5">Goal:</span>
+                  <span className="text-white/70">{compassBridge.sessionGoal}</span>
+                </div>
+                {typeof compassBridge.startDifficulty === 'number' && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-white/40 w-20 shrink-0">Level:</span>
+                    <span className="text-white/60">{compassBridge.startDifficulty}/5 — starts at the right level for {report.student_name}</span>
+                  </div>
+                )}
+              </div>
+              <Link
+                href="/chat"
+                className="mt-4 flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-colors"
+              >
+                <Sparkles className="w-4 h-4" />
+                Start Compass Session →
+              </Link>
+            </div>
+
+            {/* Parent WhatsApp message */}
+            {compassBridge.parentWhatsAppMessage && (
+              <div className="bg-green-900/20 border border-green-500/20 rounded-2xl p-5">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-white/70 text-xs font-bold uppercase tracking-wide">
+                    Share with Your Child&apos;s Parent
+                  </h4>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(compassBridge.parentWhatsAppMessage ?? '')
+                      setCopiedMsg(true)
+                      setTimeout(() => setCopiedMsg(false), 2000)
+                    }}
+                    className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 font-semibold transition-colors"
+                  >
+                    {copiedMsg ? <><CheckCircle2 className="w-3.5 h-3.5" /> Copied!</> : <><Share2 className="w-3.5 h-3.5" /> Copy</>}
+                  </button>
+                </div>
+                <p className="text-white/60 text-sm leading-relaxed">{compassBridge.parentWhatsAppMessage}</p>
+              </div>
+            )}
+          </section>
+        )}
 
         {/* ── Disclaimer ─────────────────────────────────────────────────── */}
         <div className="flex items-start gap-2 bg-white/3 border border-white/8 rounded-xl px-4 py-3">

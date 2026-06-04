@@ -28,9 +28,17 @@ export async function GET(req: NextRequest) {
     if (!student) return apiForbidden()
 
     const db = createServiceClient()
-    const report = await buildClinicReport(studentId, db)
+    const [report, contextResult] = await Promise.all([
+      buildClinicReport(studentId, db),
+      db.from('student_learning_context')
+        .select('compass_bridge')
+        .eq('student_id', studentId)
+        .maybeSingle(),
+    ])
 
-    return apiSuccess({ report })
+    const compass_bridge = contextResult.data?.compass_bridge ?? null
+
+    return apiSuccess({ report, compass_bridge })
   } catch (err) {
     console.error('[career/clinic-report]', err)
     return apiError('Failed to build clinic report')

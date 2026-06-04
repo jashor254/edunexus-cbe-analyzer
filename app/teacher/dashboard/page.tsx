@@ -116,6 +116,16 @@ export default async function TeacherDashboardPage() {
     ;(links || []).forEach((l: any) => allStudentIds.add(l.student_id))
   }
 
+  // Reports generated count (from student_learning_context — updated when report runs)
+  let reportsGeneratedCount = 0
+  if (allStudentIds.size > 0) {
+    const { count } = await db
+      .from('student_learning_context')
+      .select('student_id', { count: 'exact', head: true })
+      .in('student_id', Array.from(allStudentIds))
+    reportsGeneratedCount = count ?? 0
+  }
+
   let pendingCount = 0
   for (const a of activeAssignments) {
     const { count } = await db.from('assignment_submissions')
@@ -129,9 +139,13 @@ export default async function TeacherDashboardPage() {
     { icon: BookOpen,      value: classes.length,     label: 'Active Classes',   gradient: 'from-teal-500 to-cyan-500',      glow: 'shadow-teal-500/20'   },
     { icon: FileText,      value: pendingCount,       label: 'Pending Marking',  gradient: 'from-violet-500 to-purple-500',  glow: 'shadow-violet-500/20' },
     { icon: AlertTriangle, value: alerts.length,      label: 'Needs Attention',  gradient: alerts.length > 0 ? 'from-red-500 to-rose-500' : 'from-emerald-500 to-teal-500', glow: alerts.length > 0 ? 'shadow-red-500/20' : 'shadow-emerald-500/20' },
+    { icon: FlaskConical,  value: `${reportsGeneratedCount}/${allStudentIds.size}`, label: 'Reports Generated', gradient: reportsGeneratedCount > 0 ? 'from-violet-500 to-purple-500' : 'from-slate-500 to-gray-500', glow: 'shadow-violet-500/20' },
   ]
 
+  const mostRecentClassId = classesWithStats[0]?.id ?? ''
+
   const quickActions = [
+    { href: mostRecentClassId ? `/teacher/classes/${mostRecentClassId}?tab=upload` : '/teacher/classes', icon: ArrowUpRight, label: 'Upload Assessment', sub: 'Scores → Reports', gradient: 'from-violet-600 to-indigo-500' },
     { href: '/teacher/classes',          icon: PlusCircle,  label: 'New Class',       sub: 'Add students',     gradient: 'from-teal-600 to-cyan-500'    },
     { href: '/teacher/assignments/new',  icon: FileText,    label: 'New Assignment',  sub: 'Create & publish', gradient: 'from-blue-600 to-indigo-500'  },
     { href: '/teacher/scheme-of-work',   icon: Scroll,      label: 'Scheme of Work',  sub: 'AI-powered',       gradient: 'from-violet-600 to-purple-500'},
