@@ -2,19 +2,51 @@
 
 export type SubjectScores = Record<string, number>
 
+// ─── KJSEA 2025 Disclaimer ────────────────────────────────────────────────────
+
+export const PATHWAY_DISCLAIMER = {
+  short:
+    'Based on KNEC KJSEA 2025 criteria. ' +
+    'Subject to change as CBC evolves.',
+
+  full:
+    'This pathway recommendation is based on ' +
+    'the official KNEC Kenya Junior Secondary ' +
+    'Education Assessment (KJSEA) 2025 placement ' +
+    'criteria released December 2025. ' +
+    'STEM requires a composite score of 20+ points; ' +
+    'Social Sciences and Arts & Sports Science ' +
+    'require 25+ points (out of 72 total). ' +
+    'As Kenya\'s CBC system continues to evolve, ' +
+    'these criteria may be updated. EduNexus will ' +
+    'reflect any official changes from KNEC. ' +
+    'This is a guide to support planning — final ' +
+    'pathway decisions should consider the ' +
+    'learner\'s own interests and teacher guidance.',
+
+  source:
+    'Source: KNEC KJSEA 2025 Results & Placement ' +
+    'Criteria, Ministry of Education Kenya, ' +
+    'December 2025.',
+}
+
 // ─── Pathway Rules & Weights ──────────────────────────────────────────────────
 
 export const PATHWAY_RULES = {
   STEM: {
-    mathematics:        3,
-    integrated_science: 3,
-    language_avg:       3,
+    mathematics:        3,   // Level 3+ preferred
+    integrated_science: 3,   // Level 3+ preferred
+    language_avg:       2.5, // KJSEA 2025: inclusive threshold (59% qualified for STEM)
+    // KJSEA 2025: composite minimum
+    kjsea_composite_min: 20,
   },
   SOCIAL_SCIENCES: {
     minimum_avg: 2.0,
+    kjsea_composite_min: 25,
   },
   ARTS: {
-    // fallback — no hard requirements
+    kjsea_composite_min: 25,
+    // fallback — no hard subject requirements
   },
 } as const
 
@@ -305,6 +337,46 @@ export type PathwayRecommendation = {
   to_unlock_social:         string[]
   to_maintain_recommended:  string[]
   alternative_pathway:      string
+  // KJSEA 2025 composite data
+  kjsea_composite?:         number
+  kjsea_stem_threshold?:    number
+  kjsea_qualifies_stem?:    boolean
+  kjsea_qualifies_social?:  boolean
+}
+
+/**
+ * Convert CBC 1-4 scores to KJSEA-equivalent points
+ * Official mapping from KNEC KJSEA 2025
+ * EE = Exceeding Expectations, ME = Meeting, etc.
+ */
+export function cbcToKJSEAPoints(level: number): number {
+  switch (Math.round(level)) {
+    case 4: return 7  // EE  (Exceeding Expectations)
+    case 3: return 5  // ME2 (Meeting Expectations)
+    case 2: return 3  // AE  (Approaching Expectations)
+    case 1: return 1  // BE  (Below Expectations)
+    default: return 0
+  }
+}
+
+export function calculateKJSEAComposite(
+  scores: SubjectScores
+): number {
+  // Sum KJSEA points across all subjects
+  return Object.values(scores)
+    .filter(v => v > 0)
+    .reduce((sum, level) => sum + cbcToKJSEAPoints(level), 0)
+}
+
+export function getPathwayCompositeMinimum(
+  pathway: 'STEM' | 'Social Sciences' | 'Arts'
+): number {
+  // Official KNEC KJSEA 2025 thresholds
+  switch (pathway) {
+    case 'STEM':            return 20
+    case 'Social Sciences': return 25
+    case 'Arts':            return 25
+  }
 }
 
 /**
@@ -325,6 +397,11 @@ export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRe
   const engLevel  = scores.english            ?? 0
   const kisLevel  = scores.kiswahili          ?? 0
   const langAvg   = (engLevel + kisLevel) / 2
+
+  // ── KJSEA composite score ─────────────────────────────────────────────────────
+  const kjseaComposite   = calculateKJSEAComposite(scores)
+  const stemCompositeOk  = kjseaComposite >= 20
+  const socialCompositeOk = kjseaComposite >= 25
 
   // ── Weighted readiness scores (0–100) ────────────────────────────────────────
   const stemWeighted   = calculateWeightedScore(scores, PATHWAY_WEIGHTS.STEM as unknown as Record<string, number>)
@@ -361,10 +438,13 @@ export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRe
       : ['Improve overall performance to Level 2 average']
 
   // ── STEM gate ─────────────────────────────────────────────────────────────────
+  // OR for math/science: KNEC looks at composite, not both subjects in isolation.
+  // A student strong in Math but weak in Science (or vice versa) can still qualify.
   const stemGateMet =
-    mathLevel >= PATHWAY_RULES.STEM.mathematics &&
-    sciLevel  >= PATHWAY_RULES.STEM.integrated_science &&
-    langAvg   >= PATHWAY_RULES.STEM.language_avg
+    (mathLevel >= PATHWAY_RULES.STEM.mathematics ||
+     sciLevel  >= PATHWAY_RULES.STEM.integrated_science) &&
+    langAvg   >= PATHWAY_RULES.STEM.language_avg &&
+    stemCompositeOk
 
   // ── Arts gate ─────────────────────────────────────────────────────────────────
   const level1Count    = allLevels.filter(l => l <= 1).length
@@ -397,7 +477,11 @@ export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRe
         `Keep Mathematics at Level ${PATHWAY_RULES.STEM.mathematics}+`,
         `Keep Integrated Science at Level ${PATHWAY_RULES.STEM.integrated_science}+`,
       ],
-      alternative_pathway: 'Social Sciences',
+      alternative_pathway:    'Social Sciences',
+      kjsea_composite:        kjseaComposite,
+      kjsea_stem_threshold:   20,
+      kjsea_qualifies_stem:   stemCompositeOk,
+      kjsea_qualifies_social: socialCompositeOk,
     }
   }
 
@@ -445,7 +529,11 @@ export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRe
         `Keep English at Level ${Math.round(PATHWAY_RULES.SOCIAL_SCIENCES.minimum_avg * 1.5)}+`,
         `Keep Kiswahili at Level ${Math.round(PATHWAY_RULES.SOCIAL_SCIENCES.minimum_avg * 1.5)}+`,
       ],
-      alternative_pathway: stemPotential ? 'STEM' : 'Arts & Sports Science',
+      alternative_pathway:    stemPotential ? 'STEM' : 'Arts & Sports Science',
+      kjsea_composite:        kjseaComposite,
+      kjsea_stem_threshold:   20,
+      kjsea_qualifies_stem:   stemCompositeOk,
+      kjsea_qualifies_social: socialCompositeOk,
     }
   }
 
@@ -475,7 +563,11 @@ export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRe
       'Continue developing Creative Arts and Sports skills',
       'Build confidence through practical subjects',
     ],
-    alternative_pathway: 'Social Sciences',
+    alternative_pathway:    'Social Sciences',
+    kjsea_composite:        kjseaComposite,
+    kjsea_stem_threshold:   20,
+    kjsea_qualifies_stem:   stemCompositeOk,
+    kjsea_qualifies_social: socialCompositeOk,
   }
 }
 
@@ -541,6 +633,12 @@ function buildGuidanceMessage(
       'Physical Education this term. With consistent effort, other pathways open up.\n\n' +
       '💡 Priority: Attend every class, complete assignments, ask the teacher for help on missed work.'
   }
+
+  message +=
+    '\n\n📋 Placement note: This recommendation ' +
+    'follows KNEC KJSEA 2025 criteria ' +
+    '(STEM: 20+ composite points). ' +
+    PATHWAY_DISCLAIMER.short
 
   // Development areas
   if (developmentAreas.length > 0) {

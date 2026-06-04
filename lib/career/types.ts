@@ -212,6 +212,7 @@ export type ClinicReport = {
 
   // Section 2 — Career / Pathway
   recommended_pathway: string | null        // Junior: STEM/Social/Arts etc
+  kjsea_composite?: number                  // Junior: KJSEA 2025 composite score
   top_career: CareerMatchWithDetail | null  // Senior only
   top_career_detail: Career | null          // Senior only (for subject gaps)
   dream_career: string | null
