@@ -80,6 +80,12 @@ export async function generateCompassBridge(
       .map(([subj, steps]) => `${subj}: ${(steps as string[]).slice(0, 2).join('; ')}`)
       .join('\n')
 
+    // Students averaging Level 2 or below → start at difficulty 1 to build confidence
+    const allScores = Object.values(scores).filter(v => v > 0)
+    const avgScore = allScores.length > 0 ? allScores.reduce((a, b) => a + b, 0) / allScores.length : 0
+    const uniformlyLow = avgScore > 0 && avgScore <= 2.2
+    const recommendedDifficulty = uniformlyLow ? 1 : tierToDifficulty(overallTier)
+
     const prompt = `You are generating a personalized Learning Compass briefing for a Kenyan student.
 
 Student: ${student.name as string}, Grade ${student.grade as number}
@@ -95,11 +101,44 @@ ${stepsTable}
 
 Generate a compass_bridge JSON. Be SPECIFIC. Never say "improve Mathematics" — say "master fractions and percentages" or "practice linear equations". Use the student's actual weak subjects.
 
+CRITICAL: firstConcept MUST be a specific substrand name from the Kenya CBC curriculum.
+
+Grade 7-9 Mathematics examples:
+  'fractions', 'integers', 'algebra_expressions', 'linear_equations',
+  'angles', 'area_perimeter', 'data_and_statistics', 'percentages'
+
+Grade 7-9 Science examples:
+  'cell_structure', 'photosynthesis', 'human_digestive_system',
+  'ecosystems', 'forces_and_motion', 'simple_machines'
+
+Grade 7-9 English examples:
+  'essay_writing', 'grammar_tenses', 'reading_comprehension',
+  'oral_skills', 'letter_writing', 'vocabulary'
+
+Grade 10-12 Biology examples:
+  'cell_biology', 'cell_division', 'genetics', 'ecology',
+  'human_physiology', 'photosynthesis_senior', 'classification'
+
+Grade 10-12 Chemistry examples:
+  'atomic_structure', 'chemical_bonding', 'stoichiometry',
+  'acids_bases', 'periodic_table', 'organic_chemistry_intro'
+
+Grade 10-12 Physics examples:
+  'mechanics', 'waves', 'electricity', 'magnetism',
+  'optics', 'thermodynamics', 'nuclear_physics'
+
+If scores alone cannot determine the specific substrand, set firstConcept to null.
+
+IMPORTANT: Set startDifficulty to ${recommendedDifficulty}.${uniformlyLow ? ' This student has uniform Level 2 scores — start at 1 to build confidence first before progressing.' : ''}
+The UI will then show a curriculum-aligned topic selector pulled from the DB.
+
+NEVER set firstConcept to just a subject name. 'mathematics' is WRONG. 'fractions' is CORRECT.
+
 Return ONLY valid JSON in this exact shape:
 {
   "sessionGoal": "One specific sentence naming the subject and concept — e.g. 'Close the gap in fractions and basic algebra — these are blocking Wanjiku's STEM pathway progress'",
   "firstSubject": "the single most urgent subject name (lowercase, e.g. mathematics)",
-  "firstConcept": "specific concept e.g. fractions, cell_structure, essay_writing — NOT just the subject name",
+  "firstConcept": "specific substrand slug e.g. fractions, cell_structure, essay_writing — NOT just the subject name. null if unclear.",
   "startDifficulty": 1 or 2 or 3 based on tier (below=1, approaching=2, meets=3),
   "subjectPriorities": [
     {
@@ -135,9 +174,12 @@ Include top 3 subjects in subjectPriorities. Keep parentWhatsAppMessage under 50
     const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
     const bridge = JSON.parse(cleaned) as CompassBridge
 
-    // Validate start difficulty is 1-3
+    // Validate start difficulty is 1-3; enforce 1 for uniformly-low students
     if (![1, 2, 3].includes(bridge.startDifficulty)) {
-      bridge.startDifficulty = tierToDifficulty(overallTier)
+      bridge.startDifficulty = recommendedDifficulty
+    }
+    if (uniformlyLow && bridge.startDifficulty > 1) {
+      bridge.startDifficulty = 1
     }
 
     return bridge

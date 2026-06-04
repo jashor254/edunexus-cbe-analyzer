@@ -3,6 +3,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getCareerBySlug, getMatchesForStudent, getCurrentSkillsForAge, getNextSkillsForAge, getAgeRangeLabel } from './careerEngine'
+import { generateCareerMatches } from './matchEngine'
 import { STANDARD_DISCLAIMER } from './types'
 import type { ClinicReport, SubjectScoreRow, Career, SkillTimelineItem } from './types'
 import { calculateKJSEAComposite, calculateJuniorPathwayAffinity, PATHWAY_DISCLAIMER } from '@/lib/pathwayCalculator'
@@ -339,12 +340,33 @@ export async function buildClinicReport(
 
   const dream_career = interests?.[0]?.career_slug as string | null ?? null
 
-  // 5. Top career match (senior only)
+  // 5. Top career match (senior only) — generate fresh if missing
   let top_career = null
   let top_career_detail: Career | null = null
 
   if (section === 'senior') {
-    const matches = await getMatchesForStudent(studentId)
+    let matches = await getMatchesForStudent(studentId)
+
+    if (matches.length === 0 && Object.keys(subjectMap).length > 0) {
+      // No match on file — generate one now via AI
+      console.log('  No career matches found — generating via AI...')
+      try {
+        await generateCareerMatches({
+          student_id:     studentId,
+          student_name:   student.name as string,
+          grade,
+          age,
+          subject_scores: subjectMap,
+          interests:      [],
+          dream_career:   dream_career ?? undefined,
+        })
+        matches = await getMatchesForStudent(studentId)
+        console.log(`  ✓ Generated ${matches.length} career matches`)
+      } catch (err) {
+        console.warn('  ⚠ Career match generation failed:', (err as Error).message)
+      }
+    }
+
     if (matches.length > 0) {
       top_career = matches[0]
       top_career_detail = await getCareerBySlug(top_career.career.slug)

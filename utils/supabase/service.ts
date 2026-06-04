@@ -10,10 +10,13 @@ export function createServiceClient() {
     )
   }
 
+  // Node.js < 22 has no native WebSocket — inject ws so scripts work
+  // Next.js server runtime polyfills WebSocket, so this branch is skipped in prod
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const transport = typeof WebSocket === 'undefined' ? require('ws') : undefined
+
   return createClient(supabaseUrl, serviceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession:   false,
-    }
+    auth: { autoRefreshToken: false, persistSession: false },
+    ...(transport ? { realtime: { transport } } : {}),
   })
 }
