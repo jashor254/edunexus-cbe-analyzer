@@ -14,12 +14,27 @@ export type CareerCategory =
 
 export type DoorType = 'employment' | 'self_employment' | 'entrepreneurship' | 'ai_era'
 
+export type SalaryTier = {
+  min: number
+  max: number
+  label: string
+}
+
+export type SalaryTiers = {
+  entry: SalaryTier
+  mid: SalaryTier
+  senior: SalaryTier
+  note: string
+  kenya_context?: string
+  salary_growth_note?: string
+}
+
 export type CareerDoor = {
   type: DoorType
   title: string
   description: string
   // Employment
-  salary_range?: { min: number; max: number; currency: 'KES' }
+  salary_tiers?: SalaryTiers
   employers?: string[]
   time_to_first_job?: string
   // Self-employment
@@ -28,6 +43,7 @@ export type CareerDoor = {
   // Entrepreneurship
   kenya_examples?: string[]
   market_size?: string
+  earnings_note?: string    // replaces salary for entrepreneur door
   // AI era
   ai_opportunity?: string
   skills_needed?: string[]
@@ -52,12 +68,8 @@ export type SkillTimelineItem = {
   activities?: string[]
 }
 
-export type SalaryRangeKES = {
-  min: number
-  max: number
-  note: string
-  senior_max?: number
-}
+// Kept as alias for backward compat with any legacy reads; new code uses SalaryTiers
+export type SalaryRangeKES = SalaryTiers
 
 export type KenyaExample = {
   name: string
@@ -75,7 +87,7 @@ export type Career = {
   doors: CareerDoor[]
   ai_impact: AIImpact
   kenya_market_outlook: string
-  salary_range_kes: SalaryRangeKES | null        // kept for search cards
+  salary_range_kes: SalaryTiers | null
   required_subjects: string[]
   subject_importance: Record<string, 'critical' | 'important' | 'helpful'>
   skill_timeline: SkillTimelineItem[]

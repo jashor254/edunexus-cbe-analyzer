@@ -8,6 +8,11 @@ type SeedCareer = Omit<Career, 'id' | 'created_at' | 'updated_at'>
 
 const D = STANDARD_DISCLAIMER
 
+const KC = 'Kenya median salary for a degree holder is KES 60K–85K/month. Above KES 150K = top 15% of earners. This career can reach that level by year 3-5 with the right path.'
+const SGN_TECH   = 'Kenya tech salaries growing 15-20% per year (2026 data). General professional salaries: 8-12%.'
+const SGN_PROF   = 'Kenya professional salaries growing 8-12% per year (2026 data). Tech roles growing at 15-20%.'
+const ENTREP_NOTE = 'Highly variable. Year 1-2 typically reinvested. Established business: KES 200K–unlimited/month.'
+
 export const SEED_CAREERS: SeedCareer[] = [
 
   // ── 1. SOFTWARE ENGINEER ─────────────────────────────────────────────────────
@@ -22,7 +27,13 @@ export const SEED_CAREERS: SeedCareer[] = [
         type: 'employment',
         title: 'Software Developer at a Company',
         description: 'Build products for tech companies, banks, telcos, and NGOs. Kenya\'s Silicon Savannah employs thousands of developers across 400+ startups and established corporations.',
-        salary_range: { min: 80000, max: 350000, currency: 'KES' },
+        salary_tiers: {
+          entry:  { min: 80000,  max: 150000, label: 'Entry level (0-2 years)' },
+          mid:    { min: 150000, max: 400000, label: 'Mid level (3-5 years)' },
+          senior: { min: 400000, max: 700000, label: 'Senior (5+ years)' },
+          note: 'Nairobi rates. Remote USD roles can be 30-80% higher.',
+          kenya_context: KC, salary_growth_note: SGN_TECH,
+        },
         employers: ['Safaricom', 'Equity Bank', 'Andela', 'Microsoft Africa', 'iHub startups', 'Cellulant', 'Twiga Foods Tech'],
         time_to_first_job: '3–4 years (degree) or 1 year (bootcamp + strong portfolio)',
       },
@@ -39,6 +50,7 @@ export const SEED_CAREERS: SeedCareer[] = [
         description: 'Build software that solves a Kenyan or African problem and scale it. The market is massive and underserved.',
         kenya_examples: ['Safaricom M-Pesa (started as a small team)', 'Sendy (logistics)', 'Twiga Foods', 'MarketForce', 'Apollo Agriculture'],
         market_size: 'KES 200B+ digital economy growing 30% per year across East Africa',
+        earnings_note: ENTREP_NOTE,
       },
       {
         type: 'ai_era',
@@ -58,7 +70,13 @@ export const SEED_CAREERS: SeedCareer[] = [
       honest_summary: 'AI is changing software development faster than any other field. Basic coding is becoming a commodity — AI can write most CRUD apps in minutes. But developers who understand systems, can work with AI tools, and solve real business problems are MORE valuable than ever. The opportunity is to be the person who knows how to use AI — not the person AI replaces.',
     },
     kenya_market_outlook: 'Kenya is East Africa\'s tech hub. Nairobi\'s "Silicon Savannah" has 400+ startups and growing demand. M-Pesa, Safaricom, Andela, and hundreds of fintechs are hiring. Remote work opens global salaries. Entry is competitive but Kenya-trained engineers are now respected globally.',
-    salary_range_kes: { min: 80000, max: 350000, note: 'Entry to mid-level; senior engineers earn 500k–1.2M', senior_max: 1200000 },
+    salary_range_kes: {
+      entry:  { min: 80000,  max: 150000, label: 'Entry level (0-2 years)' },
+      mid:    { min: 150000, max: 400000, label: 'Mid level (3-5 years)' },
+      senior: { min: 400000, max: 700000, label: 'Senior (5+ years)' },
+      note: 'Nairobi rates. Remote USD roles can be 30-80% higher.',
+      kenya_context: KC, salary_growth_note: SGN_TECH,
+    },
     required_subjects: ['mathematics', 'physics', 'english', 'computer_studies'],
     subject_importance: { mathematics: 'critical', physics: 'important', english: 'important', computer_studies: 'helpful' },
     skill_timeline: [
@@ -87,7 +105,13 @@ export const SEED_CAREERS: SeedCareer[] = [
         type: 'employment',
         title: 'Government or Private Hospital Doctor',
         description: 'Work at county hospitals, national referral hospitals, or private facilities. Kenya has massive government recruitment and private sector demand.',
-        salary_range: { min: 150000, max: 500000, currency: 'KES' },
+        salary_tiers: {
+          entry:  { min: 80000,  max: 150000, label: 'Entry level (intern/house officer)' },
+          mid:    { min: 150000, max: 400000, label: 'Medical Officer / Registrar (3-5 years)' },
+          senior: { min: 400000, max: 800000, label: 'Specialist / Consultant (5+ years)' },
+          note: 'Government rates. Private sector and specialists earn 800K–2M+.',
+          kenya_context: KC, salary_growth_note: SGN_PROF,
+        },
         employers: ['Ministry of Health Kenya', 'Aga Khan Hospital', 'Nairobi Hospital', 'MP Shah', 'County governments', 'Mission hospitals'],
         time_to_first_job: '7 years (MBChB + 1-year internship) or 3 years (KMTC Clinical Officer)',
       },
@@ -104,6 +128,7 @@ export const SEED_CAREERS: SeedCareer[] = [
         description: 'Build a health business solving access, cost, or quality problems in Kenya\'s fragmented healthcare system.',
         kenya_examples: ['Daktari Online (telemedicine)', 'Ilara Health (diagnostic devices)', 'Maisha Meds (pharmacy)', 'mPharma Kenya'],
         market_size: 'Kenya healthcare market KES 300B+ growing at 8% annually',
+        earnings_note: ENTREP_NOTE,
       },
       {
         type: 'ai_era',
@@ -123,7 +148,13 @@ export const SEED_CAREERS: SeedCareer[] = [
       honest_summary: 'AI is excellent at reading X-rays and detecting patterns in lab results. But a doctor\'s core work — listening to a patient in a rural clinic with limited equipment, making ethical decisions, comforting families — cannot be automated. AI will make doctors more accurate, not unemployed. The best doctors of 2030 will use AI tools fluently.',
     },
     kenya_market_outlook: 'Kenya has 0.2 doctors per 1,000 people (WHO recommends 1 per 1,000). Massive shortage everywhere outside Nairobi. Government actively recruiting. KMA reports high demand. Specialization (surgery, oncology, psychiatry) commands premium pay. Private practice in Nairobi, Mombasa, and Kisumu is highly lucrative.',
-    salary_range_kes: { min: 150000, max: 500000, note: 'Government intern to experienced consultant; specialists earn 800k–2M', senior_max: 2000000 },
+    salary_range_kes: {
+      entry:  { min: 80000,  max: 150000, label: 'Intern / House Officer (0-2 years)' },
+      mid:    { min: 150000, max: 400000, label: 'Medical Officer / Registrar (3-5 years)' },
+      senior: { min: 400000, max: 800000, label: 'Specialist / Consultant (5+ years)' },
+      note: 'Government rates. Private sector specialists earn 800K–2M+.',
+      kenya_context: KC, salary_growth_note: SGN_PROF,
+    },
     required_subjects: ['biology', 'chemistry', 'physics', 'mathematics', 'english'],
     subject_importance: { biology: 'critical', chemistry: 'critical', physics: 'important', mathematics: 'important', english: 'important' },
     skill_timeline: [
@@ -152,7 +183,13 @@ export const SEED_CAREERS: SeedCareer[] = [
         type: 'employment',
         title: 'Agricultural Officer / Researcher',
         description: 'Work for government bodies, research institutions, or agribusiness companies driving Kenya\'s food system.',
-        salary_range: { min: 60000, max: 250000, currency: 'KES' },
+        salary_tiers: {
+          entry:  { min: 40000, max: 85000,  label: 'Entry level (0-2 years)' },
+          mid:    { min: 85000, max: 200000, label: 'Mid level (3-5 years)' },
+          senior: { min: 200000, max: 450000, label: 'Senior / Head of Department (5+ years)' },
+          note: 'KALRO/government rates. Private agribusiness and NGOs pay 20-40% higher.',
+          kenya_context: KC, salary_growth_note: SGN_PROF,
+        },
         employers: ['KALRO (Kenya Agricultural Research)', 'Ministry of Agriculture', 'Twiga Foods', 'Apollo Agriculture', 'East Africa Breweries', 'Del Monte Kenya'],
         time_to_first_job: '4 years (degree) or 2 years (TVET diploma)',
       },
@@ -169,6 +206,7 @@ export const SEED_CAREERS: SeedCareer[] = [
         description: 'Build technology that solves farming problems at scale. Kenya is Africa\'s agritech leader with a booming startup ecosystem.',
         kenya_examples: ['Twiga Foods (B2B distribution)', 'Apollo Agriculture (AI + credit for farmers)', 'FarmDrive', 'Tulaa', 'Hello Tractor'],
         market_size: 'Kenya agriculture is 26% of GDP — KES 3.5 trillion market with massive tech opportunity',
+        earnings_note: ENTREP_NOTE,
       },
       {
         type: 'ai_era',
@@ -188,7 +226,13 @@ export const SEED_CAREERS: SeedCareer[] = [
       honest_summary: 'AI is being used for crop disease detection, soil analysis, and weather prediction in Kenya right now. But someone needs to design these systems, train farmers, and apply local knowledge. Agricultural scientists who understand both agronomy and technology have a massive advantage and career security.',
     },
     kenya_market_outlook: 'Agriculture is 26% of Kenya\'s GDP. The government\'s Big 4 agenda prioritizes food security. Agritech startups are raising millions in funding. Export markets (flowers, tea, avocado, macadamia) are growing rapidly. Enormous unmet demand for people who understand both science and farming.',
-    salary_range_kes: { min: 60000, max: 250000, note: 'Government officer to agritech company; entrepreneurs can earn much more', senior_max: 600000 },
+    salary_range_kes: {
+      entry:  { min: 40000,  max: 85000,  label: 'Entry level (0-2 years)' },
+      mid:    { min: 85000,  max: 200000, label: 'Mid level (3-5 years)' },
+      senior: { min: 200000, max: 450000, label: 'Senior / Management (5+ years)' },
+      note: 'KALRO/government rates. Private agribusiness and NGOs pay 20-40% higher.',
+      kenya_context: KC, salary_growth_note: SGN_PROF,
+    },
     required_subjects: ['biology', 'chemistry', 'mathematics', 'geography'],
     subject_importance: { biology: 'critical', chemistry: 'important', mathematics: 'important', geography: 'helpful' },
     skill_timeline: [
@@ -217,7 +261,13 @@ export const SEED_CAREERS: SeedCareer[] = [
         type: 'employment',
         title: 'Infrastructure Engineer',
         description: 'Design and oversee construction of roads, bridges, water systems, and buildings for government or private contractors.',
-        salary_range: { min: 100000, max: 400000, currency: 'KES' },
+        salary_tiers: {
+          entry:  { min: 70000,  max: 130000, label: 'Graduate Engineer (0-2 years)' },
+          mid:    { min: 130000, max: 300000, label: 'Project Engineer (3-5 years)' },
+          senior: { min: 300000, max: 600000, label: 'Senior / Principal Engineer (5+ years)' },
+          note: 'Nairobi construction market rates. Consultants and directors earn 600K–1.5M.',
+          kenya_context: KC, salary_growth_note: SGN_PROF,
+        },
         employers: ['Kenya National Highways Authority (KeNHA)', 'County Governments', 'China Wu Yi', 'NCC Group', 'Spencon', 'Knight Frank Kenya'],
         time_to_first_job: '5 years (BSc Civil Engineering) or 3 years (Diploma)',
       },
@@ -234,6 +284,7 @@ export const SEED_CAREERS: SeedCareer[] = [
         description: 'Start a construction firm or develop affordable housing. Kenya\'s housing deficit of 2 million units creates massive opportunity.',
         kenya_examples: ['Karibu Homes (affordable housing)', 'Mi Vida Homes', 'Centum Real Estate', 'Small-scale local contractors across all 47 counties'],
         market_size: 'Kenya construction sector KES 550B+ — housing deficit of 2M units growing each year',
+        earnings_note: ENTREP_NOTE,
       },
       {
         type: 'ai_era',
@@ -253,7 +304,13 @@ export const SEED_CAREERS: SeedCareer[] = [
       honest_summary: 'AI is automating structural calculations and replacing manual drafting. But civil engineering requires physical site supervision, stakeholder management, government approvals, and on-the-ground problem solving that AI cannot handle. The role is evolving, not disappearing.',
     },
     kenya_market_outlook: 'The Kenya National Highways Authority, county governments, and major contractors are all hiring. Infrastructure projects worth hundreds of billions are underway. The housing deficit of 2 million units means construction engineers will be needed for decades.',
-    salary_range_kes: { min: 100000, max: 400000, note: 'Graduate to senior project engineer; consultants and directors earn 600k–1.5M', senior_max: 1500000 },
+    salary_range_kes: {
+      entry:  { min: 70000,  max: 130000, label: 'Graduate Engineer (0-2 years)' },
+      mid:    { min: 130000, max: 300000, label: 'Project Engineer (3-5 years)' },
+      senior: { min: 300000, max: 600000, label: 'Senior / Principal Engineer (5+ years)' },
+      note: 'Nairobi construction market rates. Consultants and directors earn 600K–1.5M.',
+      kenya_context: KC, salary_growth_note: SGN_PROF,
+    },
     required_subjects: ['mathematics', 'physics', 'english', 'geography'],
     subject_importance: { mathematics: 'critical', physics: 'critical', english: 'important', geography: 'helpful' },
     skill_timeline: [
@@ -282,7 +339,13 @@ export const SEED_CAREERS: SeedCareer[] = [
         type: 'employment',
         title: 'School Teacher / University Lecturer',
         description: 'Teach in government or private schools, or at university level. Kenya has 360,000+ teachers and needs more, especially in STEM.',
-        salary_range: { min: 40000, max: 200000, currency: 'KES' },
+        salary_tiers: {
+          entry:  { min: 35000, max: 65000,  label: 'P1 / Graduate Teacher (0-2 years)' },
+          mid:    { min: 65000, max: 150000, label: 'Senior Teacher / HOD (3-5 years)' },
+          senior: { min: 150000, max: 350000, label: 'Deputy Principal / Lecturer (5+ years)' },
+          note: 'Government TSC rates on lower end. Private international school rates significantly higher.',
+          kenya_context: KC, salary_growth_note: SGN_PROF,
+        },
         employers: ['Teachers Service Commission (TSC)', 'Private schools (Brookhouse, Alliance, Riara)', 'Universities (UoN, Strathmore)', 'NGOs (Teach For Kenya, Bridge)'],
         time_to_first_job: '4 years (BEd degree) or 2 years (P1 PTEC certificate)',
       },
@@ -299,6 +362,7 @@ export const SEED_CAREERS: SeedCareer[] = [
         description: 'Build an educational institution or a technology product that improves learning. The EdTech market in Africa is booming.',
         kenya_examples: ['Zeraki (school management analytics)', 'Eneza Education (SMS learning)', 'Viusasa (Swahili content)', 'Ubongo Kids (animated learning)'],
         market_size: 'Kenya EdTech market KES 50B+ growing at 15% annually; East Africa education market much larger',
+        earnings_note: ENTREP_NOTE,
       },
       {
         type: 'ai_era',
@@ -318,7 +382,13 @@ export const SEED_CAREERS: SeedCareer[] = [
       honest_summary: 'AI can generate lesson content and grade multiple-choice tests. But teaching is fundamentally human: building relationships, motivating reluctant learners, reading a classroom\'s energy, mentoring a struggling student. Teachers who embrace AI tools to reduce admin and focus more on students will thrive.',
     },
     kenya_market_outlook: 'Kenya has 360,000+ teachers and still needs more, especially in STEM and special needs. TSC has ongoing recruitment. Private schools pay much better. EdTech companies (Zeraki, Eneza, Ubongo) are hiring education technologists. CBC implementation creates demand for curriculum designers and teacher trainers.',
-    salary_range_kes: { min: 40000, max: 200000, note: 'Government P1 teacher to senior private school teacher; EdTech pays 80k–300k', senior_max: 400000 },
+    salary_range_kes: {
+      entry:  { min: 35000, max: 65000,  label: 'P1 / Graduate Teacher (0-2 years)' },
+      mid:    { min: 65000, max: 150000, label: 'Senior Teacher / HOD (3-5 years)' },
+      senior: { min: 150000, max: 350000, label: 'Deputy Principal / Lecturer (5+ years)' },
+      note: 'Government TSC rates on lower end. Private international school rates significantly higher.',
+      kenya_context: KC, salary_growth_note: SGN_PROF,
+    },
     required_subjects: ['english', 'mathematics', 'kiswahili'],
     subject_importance: { english: 'critical', mathematics: 'important', kiswahili: 'important' },
     skill_timeline: [
@@ -347,7 +417,13 @@ export const SEED_CAREERS: SeedCareer[] = [
         type: 'employment',
         title: 'Corporate / SME Business Role',
         description: 'Work in business development, sales, operations, or strategy at a company before launching your own. The best entrepreneurs often learn fundamentals at a corporate job first.',
-        salary_range: { min: 60000, max: 300000, currency: 'KES' },
+        salary_tiers: {
+          entry:  { min: 60000,  max: 120000, label: 'Junior Executive / Sales Rep (0-2 years)' },
+          mid:    { min: 120000, max: 300000, label: 'Manager / Business Developer (3-5 years)' },
+          senior: { min: 300000, max: 600000, label: 'Director / C-Suite (5+ years)' },
+          note: 'Corporate Nairobi rates. Bonuses and commissions can double base salary.',
+          kenya_context: KC, salary_growth_note: SGN_PROF,
+        },
         employers: ['Safaricom', 'Equity Bank', 'KCB', 'Unilever Kenya', 'Coca-Cola East Africa', 'Jumia Kenya'],
         time_to_first_job: '4 years (business degree) or immediately with strong hustle skills',
       },
@@ -364,6 +440,7 @@ export const SEED_CAREERS: SeedCareer[] = [
         description: 'Build a company that solves a problem at scale — technology, consumer products, logistics, healthcare. The Nairobi startup ecosystem is East Africa\'s most advanced.',
         kenya_examples: ['Equity Bank (started as a small SACCO)', 'Bidco Africa', 'Java House', 'Naivas Supermarkets'],
         market_size: 'Kenya GDP KES 15 trillion — opportunities in every sector, domestic market of 55M people',
+        earnings_note: ENTREP_NOTE,
       },
       {
         type: 'ai_era',
@@ -383,7 +460,7 @@ export const SEED_CAREERS: SeedCareer[] = [
       honest_summary: 'AI is giving small businesses superpowers they previously couldn\'t afford: 24/7 customer service, automated accounting, market analysis, content creation, and demand forecasting. The entrepreneur who learns to use these tools can compete with much larger companies. The opportunity is enormous for those who act early.',
     },
     kenya_market_outlook: 'Kenya ranks among Africa\'s top 5 startup ecosystems. M-Pesa enables instant payments. iHub, Nairobi Garage, and GrowthAfrica support startups. Youth unemployment (35%+) is pushing young Kenyans into self-employment. Government programs like Kazi Njenga and Youth Enterprise Fund provide capital.',
-    salary_range_kes: { min: 30000, max: 10000000, note: 'Ranges from micro-business to tech unicorn; median successful SME owner earns 150k–500k/month', senior_max: 10000000 },
+    salary_range_kes: null,
     required_subjects: ['mathematics', 'english', 'business_studies', 'economics'],
     subject_importance: { mathematics: 'important', english: 'critical', business_studies: 'important', economics: 'helpful' },
     skill_timeline: [
@@ -412,7 +489,13 @@ export const SEED_CAREERS: SeedCareer[] = [
         type: 'employment',
         title: 'Journalist at Media House',
         description: 'Report for newspapers, TV stations, online publications, or international outlets. Kenya has a vibrant professional journalism ecosystem.',
-        salary_range: { min: 35000, max: 200000, currency: 'KES' },
+        salary_tiers: {
+          entry:  { min: 35000, max: 65000,  label: 'Junior Reporter (0-2 years)' },
+          mid:    { min: 65000, max: 150000, label: 'Senior Reporter / Correspondent (3-5 years)' },
+          senior: { min: 150000, max: 400000, label: 'Editor / Bureau Chief (5+ years)' },
+          note: 'Media house rates. Top content creators earn 500K–2M+/month through multiple income streams.',
+          kenya_context: KC, salary_growth_note: SGN_PROF,
+        },
         employers: ['Nation Media Group', 'Standard Group', 'NTV', 'Citizen TV', 'BBC Africa', 'Reuters Africa', 'The Continent'],
         time_to_first_job: '4 years (journalism degree) or immediately with a strong portfolio',
       },
@@ -429,6 +512,7 @@ export const SEED_CAREERS: SeedCareer[] = [
         description: 'Build a media company, podcast network, YouTube channel network, or digital publication. The barrier to entry has never been lower.',
         kenya_examples: ['Shujaaz Inc (youth media)', 'Kuza Biashara (business content)', 'Churchill Show (talent network)', 'PowerFM Kenya (radio startup)'],
         market_size: 'Kenya digital media advertising KES 15B+ and growing; Africa creator economy worth $4.2B',
+        earnings_note: ENTREP_NOTE,
       },
       {
         type: 'ai_era',
@@ -448,7 +532,13 @@ export const SEED_CAREERS: SeedCareer[] = [
       honest_summary: 'AI writes press releases and basic news summaries. But investigative journalism, source relationships, editorial judgment, and storytelling that moves audiences are deeply human. The threat is to low-skill content churning. The opportunity is for journalists who use AI to produce better, faster, more data-driven stories.',
     },
     kenya_market_outlook: 'Kenya has a vibrant media ecosystem. YouTube monetization works in Kenya. Podcasting is growing. Brands pay Kenyan content creators for sponsorships. Journalism as a social justice tool is growing via organizations like InformAction and Code for Kenya.',
-    salary_range_kes: { min: 35000, max: 200000, note: 'Entry journalist to senior editor; top content creators earn 200k–1M+/month through multiple streams', senior_max: 1000000 },
+    salary_range_kes: {
+      entry:  { min: 35000, max: 65000,  label: 'Junior Reporter (0-2 years)' },
+      mid:    { min: 65000, max: 150000, label: 'Senior Reporter / Correspondent (3-5 years)' },
+      senior: { min: 150000, max: 400000, label: 'Editor / Bureau Chief (5+ years)' },
+      note: 'Media house rates. Top content creators earn 500K–2M+/month through multiple income streams.',
+      kenya_context: KC, salary_growth_note: SGN_PROF,
+    },
     required_subjects: ['english', 'kiswahili', 'history', 'computer_studies'],
     subject_importance: { english: 'critical', kiswahili: 'important', history: 'helpful', computer_studies: 'helpful' },
     skill_timeline: [
@@ -477,7 +567,13 @@ export const SEED_CAREERS: SeedCareer[] = [
         type: 'employment',
         title: 'Government or NGO Environmental Officer',
         description: 'Work for NEMA, county governments, or international NGOs managing environmental compliance, conservation, and policy.',
-        salary_range: { min: 60000, max: 250000, currency: 'KES' },
+        salary_tiers: {
+          entry:  { min: 50000,  max: 90000,  label: 'Field Officer / Graduate (0-2 years)' },
+          mid:    { min: 90000,  max: 200000, label: 'Environmental Officer (3-5 years)' },
+          senior: { min: 200000, max: 450000, label: 'Senior / Programme Manager (5+ years)' },
+          note: 'NGO and UN rates are notably higher than government. Carbon credit consultants earn significantly more.',
+          kenya_context: KC, salary_growth_note: SGN_PROF,
+        },
         employers: ['NEMA (National Environment Management Authority)', 'KWS (Kenya Wildlife Service)', 'UNEP (HQ in Nairobi)', 'WWF Kenya', 'WCS Kenya', 'Nature Kenya'],
         time_to_first_job: '4 years (BSc) or 2 years (diploma)',
       },
@@ -494,6 +590,7 @@ export const SEED_CAREERS: SeedCareer[] = [
         description: 'Build a business around sustainability: recycling, clean energy, carbon credits, eco-tourism, or organic farming certification.',
         kenya_examples: ['Sanergy (waste management)', 'M-KOPA Solar', 'BURN Manufacturing (clean cookstoves)', 'Africa Eco Travel', 'PureLiving Kenya'],
         market_size: 'Global carbon market KES 5 trillion by 2030 — Kenya is positioned as a key supplier through forests and clean energy',
+        earnings_note: ENTREP_NOTE,
       },
       {
         type: 'ai_era',
@@ -513,7 +610,13 @@ export const SEED_CAREERS: SeedCareer[] = [
       honest_summary: 'AI is used for satellite monitoring of deforestation, climate modelling, wildlife tracking, and water quality analysis. Environmental scientists who can work with these tools will be far more effective. The fieldwork, community engagement, policy advocacy, and ethical dimensions of environmental work remain entirely human.',
     },
     kenya_market_outlook: 'Kenya is a global leader in environmental conservation. UNEP is headquartered in Nairobi. NGOs, government, and the private sector (carbon credits, eco-tourism) all employ environmental scientists. Climate finance is growing rapidly and Kenya is well-positioned to access it.',
-    salary_range_kes: { min: 60000, max: 250000, note: 'NGO field officer to UN Environment consultant; carbon consultants earn significantly more', senior_max: 600000 },
+    salary_range_kes: {
+      entry:  { min: 50000,  max: 90000,  label: 'Field Officer / Graduate (0-2 years)' },
+      mid:    { min: 90000,  max: 200000, label: 'Environmental Officer (3-5 years)' },
+      senior: { min: 200000, max: 450000, label: 'Senior / Programme Manager (5+ years)' },
+      note: 'NGO and UN rates notably higher than government. Carbon credit consultants earn significantly more.',
+      kenya_context: KC, salary_growth_note: SGN_PROF,
+    },
     required_subjects: ['biology', 'chemistry', 'geography', 'mathematics'],
     subject_importance: { biology: 'critical', chemistry: 'important', geography: 'critical', mathematics: 'helpful' },
     skill_timeline: [
@@ -542,7 +645,13 @@ export const SEED_CAREERS: SeedCareer[] = [
         type: 'employment',
         title: 'Designer at Agency or Tech Company',
         description: 'Join an advertising agency, design studio, tech startup, or brand as an in-house designer.',
-        salary_range: { min: 45000, max: 250000, currency: 'KES' },
+        salary_tiers: {
+          entry:  { min: 40000,  max: 80000,  label: 'Junior Designer (0-2 years)' },
+          mid:    { min: 80000,  max: 200000, label: 'Mid-Weight Designer (3-5 years)' },
+          senior: { min: 200000, max: 450000, label: 'Senior / Creative Director (5+ years)' },
+          note: 'Nairobi agency rates. Top freelancers earn 400K–1M+/month.',
+          kenya_context: KC, salary_growth_note: SGN_TECH,
+        },
         employers: ['Ogilvy Nairobi', 'Scanad Kenya', 'McCann Nairobi', 'Safaricom design team', 'Equity Bank UX team', 'Nairobi-based startups'],
         time_to_first_job: '4 years (BA design) or 1 year (portfolio-driven self-taught path)',
       },
@@ -559,6 +668,7 @@ export const SEED_CAREERS: SeedCareer[] = [
         description: 'Build a design agency, branded merchandise business, or creative studio. Kenya\'s growing middle class and expanding startup ecosystem are hungry for quality design.',
         kenya_examples: ['Bold Design Studio Nairobi', 'Shujaaz Inc (creative agency)', 'Studio Ang (African print fashion)', 'Pixel8 Creative'],
         market_size: 'Africa creative economy KES 550B+ growing at 12% annually',
+        earnings_note: ENTREP_NOTE,
       },
       {
         type: 'ai_era',
@@ -578,7 +688,13 @@ export const SEED_CAREERS: SeedCareer[] = [
       honest_summary: 'AI image generation (Midjourney, Adobe Firefly) is changing graphic design. Basic logo creation and stock illustration are automating. But brand strategy, UI/UX design, motion graphics, and creative direction require human judgment and cultural understanding. Designers who use AI tools will produce work faster and charge more.',
     },
     kenya_market_outlook: 'Kenya\'s advertising industry, film sector (growing Nollywood-adjacent), and startup ecosystem all employ designers. Freelance design on Upwork and Fiverr is accessible from Nairobi. The African creative economy is worth $4.2B and growing.',
-    salary_range_kes: { min: 45000, max: 250000, note: 'Junior designer to creative director; top freelancers earn 300k–800k+/month', senior_max: 800000 },
+    salary_range_kes: {
+      entry:  { min: 40000,  max: 80000,  label: 'Junior Designer (0-2 years)' },
+      mid:    { min: 80000,  max: 200000, label: 'Mid-Weight Designer (3-5 years)' },
+      senior: { min: 200000, max: 450000, label: 'Senior / Creative Director (5+ years)' },
+      note: 'Nairobi agency rates. Top freelancers earn 400K–1M+/month.',
+      kenya_context: KC, salary_growth_note: SGN_TECH,
+    },
     required_subjects: ['art_and_design', 'computer_studies', 'english', 'mathematics'],
     subject_importance: { art_and_design: 'critical', computer_studies: 'important', english: 'important', mathematics: 'helpful' },
     skill_timeline: [
@@ -607,7 +723,13 @@ export const SEED_CAREERS: SeedCareer[] = [
         type: 'employment',
         title: 'Accountant / Finance Manager',
         description: 'Work in finance departments across industries — banking, manufacturing, NGOs, government, tech. Every organization needs financial management.',
-        salary_range: { min: 60000, max: 350000, currency: 'KES' },
+        salary_tiers: {
+          entry:  { min: 60000,  max: 120000, label: 'Graduate Accountant (0-2 years)' },
+          mid:    { min: 120000, max: 300000, label: 'Senior Accountant / Finance Officer (3-5 years)' },
+          senior: { min: 300000, max: 600000, label: 'Finance Manager / CFO (5+ years)' },
+          note: 'Big 4 and banking sector rates. CFOs at major companies earn 800K–2M.',
+          kenya_context: KC, salary_growth_note: SGN_PROF,
+        },
         employers: ['KPMG', 'Deloitte', 'EY', 'PwC', 'KCB', 'Equity Bank', 'Safaricom Finance', 'NGOs (USAID, UN)', 'Manufacturing companies'],
         time_to_first_job: '3 years (CPA Foundation through Final) or 4 years (BCom Accounting)',
       },
@@ -624,6 +746,7 @@ export const SEED_CAREERS: SeedCareer[] = [
         description: 'Build a financial technology or advisory business. The gap between where Kenya\'s financial sector is and where it needs to be is enormous.',
         kenya_examples: ['M-KOPA (asset finance)', 'Pezesha (SME lending)', 'Kopo Kopo (merchant payments)', 'Chumz (savings app)'],
         market_size: 'Kenya fintech sector KES 200B+ — one of Africa\'s most active fintech ecosystems',
+        earnings_note: ENTREP_NOTE,
       },
       {
         type: 'ai_era',
@@ -643,7 +766,13 @@ export const SEED_CAREERS: SeedCareer[] = [
       honest_summary: 'AI and accounting software are automating data entry, bank reconciliation, and basic tax filing. This eliminates low-skill bookkeeping. But financial analysis, strategic advisory, audit work, and forensic accounting require judgment, ethics, and communication that AI cannot replace. The bar has risen, not fallen.',
     },
     kenya_market_outlook: 'Kenya has one of Africa\'s most developed financial sectors: NSE, major commercial banks, Big 4 audit firms, and a growing fintech ecosystem. CPA Kenya qualification is valued across East Africa. Treasury and county government finance departments need thousands of qualified accountants.',
-    salary_range_kes: { min: 60000, max: 350000, note: 'Graduate accountant to Finance Manager; CFOs earn 800k–2M', senior_max: 2000000 },
+    salary_range_kes: {
+      entry:  { min: 60000,  max: 120000, label: 'Graduate Accountant (0-2 years)' },
+      mid:    { min: 120000, max: 300000, label: 'Senior Accountant / Finance Officer (3-5 years)' },
+      senior: { min: 300000, max: 600000, label: 'Finance Manager / CFO (5+ years)' },
+      note: 'Big 4 and banking sector rates. CFOs at major companies earn 800K–2M.',
+      kenya_context: KC, salary_growth_note: SGN_PROF,
+    },
     required_subjects: ['mathematics', 'english', 'business_studies', 'economics'],
     subject_importance: { mathematics: 'critical', english: 'important', business_studies: 'critical', economics: 'important' },
     skill_timeline: [

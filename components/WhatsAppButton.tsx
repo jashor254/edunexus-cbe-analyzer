@@ -5,7 +5,7 @@ import { useState } from 'react';
 
 export default function WhatsAppButton() {
   const [showTooltip, setShowTooltip] = useState(false);
-  const whatsappUrl = "https://wa.me/254710798030?text=Hello%20EduNexus%2C%20I%20have%20a%20question%20about%20the%20Academic%20Clinic.";
+  const whatsappUrl = "https://wa.me/254141799322?text=Hello%20EduNexus%2C%20I%20have%20a%20question%20about%20the%20Academic%20Clinic.";
 
   return (
     <div className="fixed bottom-6 right-6 z-50">

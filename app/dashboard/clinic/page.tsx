@@ -619,8 +619,8 @@ function ClinicReportView({ studentId, studentName, onClose }: {
                         <div key={door.type} className="bg-white/5 rounded-xl px-3 py-2 text-xs">
                           <span className="text-white/40 capitalize">{door.type.replace(/_/g, ' ')}: </span>
                           <span className="text-white/70">
-                            {door.type === 'employment' && door.salary_range
-                              ? `KES ${Math.round(door.salary_range.min / 1000)}k–${Math.round(door.salary_range.max / 1000)}k/mo`
+                            {door.type === 'employment' && door.salary_tiers
+                              ? `KES ${Math.round(door.salary_tiers.entry.min / 1000)}k–${Math.round(door.salary_tiers.senior.max / 1000)}k/mo`
                               : door.type === 'self_employment' && door.startup_cost_kes
                               ? `from KES ${Math.round(door.startup_cost_kes.min / 1000)}k`
                               : door.type === 'entrepreneurship'

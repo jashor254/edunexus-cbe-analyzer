@@ -83,12 +83,15 @@ function DoorCard({ door }: { door: CareerDoor }) {
       {/* Door-type specific details */}
       {door.type === 'employment' && (
         <div className="space-y-2">
-          {door.salary_range && (
-            <div className="flex items-center gap-2 text-sm">
-              <TrendingUp className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-              <span className="text-white/70">
-                KES {formatKES(door.salary_range.min)} – {formatKES(door.salary_range.max)}/mo
-              </span>
+          {door.salary_tiers && (
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-sm">
+                <TrendingUp className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <span className="text-white/50 text-xs">
+                  Entry: KES {formatKES(door.salary_tiers.entry.min)}–{formatKES(door.salary_tiers.entry.max)} →
+                  Senior: KES {formatKES(door.salary_tiers.senior.min)}–{formatKES(door.salary_tiers.senior.max)}/mo
+                </span>
+              </div>
             </div>
           )}
           {door.time_to_first_job && (
@@ -144,6 +147,9 @@ function DoorCard({ door }: { door: CareerDoor }) {
                 <span key={e} className="text-xs bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-lg text-amber-400/80">{e}</span>
               ))}
             </div>
+          )}
+          {door.earnings_note && (
+            <p className="text-amber-400/60 text-xs italic pt-1">{door.earnings_note}</p>
           )}
         </div>
       )}
@@ -291,21 +297,35 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
           <p className="text-white/60 text-base leading-relaxed">{career.description}</p>
 
           {career.salary_range_kes && (
-            <div className="mt-5 flex flex-wrap gap-3">
-              <div className="bg-white/5 rounded-xl px-4 py-3">
-                <div className="text-xs text-white/40 mb-1">Starting</div>
-                <div className="text-white font-bold">KES {formatKES(career.salary_range_kes.min)}/mo</div>
+            <div className="mt-5 space-y-3">
+              <div className="text-xs text-white/40 uppercase tracking-wide font-semibold">Salary Journey</div>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { tier: career.salary_range_kes.entry,  accent: 'bg-white/5 border-white/10',              textColor: 'text-white' },
+                  { tier: career.salary_range_kes.mid,    accent: 'bg-blue-500/10 border-blue-500/20',       textColor: 'text-blue-300' },
+                  { tier: career.salary_range_kes.senior, accent: 'bg-violet-500/10 border-violet-500/20',   textColor: 'text-violet-300' },
+                ] as Array<{ tier: typeof career.salary_range_kes.entry; accent: string; textColor: string }>).map(({ tier, accent, textColor }) => (
+                  <div key={tier.label} className={`${accent} border rounded-xl px-3 py-3 text-center`}>
+                    <div className="text-xs text-white/30 mb-1 leading-tight">{tier.label}</div>
+                    <div className={`font-black text-sm ${textColor}`}>
+                      KES {formatKES(tier.min)}–{formatKES(tier.max)}
+                    </div>
+                    <div className="text-white/25 text-xs mt-0.5">/month</div>
+                  </div>
+                ))}
               </div>
-              <div className="bg-white/5 rounded-xl px-4 py-3">
-                <div className="text-xs text-white/40 mb-1">Experienced</div>
-                <div className="text-white font-bold">KES {formatKES(career.salary_range_kes.max)}/mo</div>
-              </div>
-              {career.salary_range_kes.senior_max && (
-                <div className="bg-violet-500/10 border border-violet-500/20 rounded-xl px-4 py-3">
-                  <div className="text-xs text-violet-400/70 mb-1">Senior specialist</div>
-                  <div className="text-violet-300 font-bold">KES {formatKES(career.salary_range_kes.senior_max)}/mo</div>
-                </div>
+              {career.salary_range_kes.note && (
+                <p className="text-white/40 text-xs">{career.salary_range_kes.note}</p>
               )}
+              {career.salary_range_kes.kenya_context && (
+                <p className="text-white/30 text-xs italic">{career.salary_range_kes.kenya_context}</p>
+              )}
+              {career.salary_range_kes.salary_growth_note && (
+                <p className="text-green-400/50 text-xs">{career.salary_range_kes.salary_growth_note}</p>
+              )}
+              <p className="text-white/20 text-xs">
+                Source: Zaajira, MaxisHR, BrighterMonday Kenya 2026. Updated quarterly.
+              </p>
             </div>
           )}
         </div>

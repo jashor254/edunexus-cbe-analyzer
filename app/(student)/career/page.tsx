@@ -44,8 +44,8 @@ function ScoreBadge({ score }: { score: number }) {
 
 function CareerCard({ career, matchScore }: { career: CareerSummary; matchScore?: number }) {
   const badge = AI_IMPACT_BADGE[career.ai_impact.level] ?? AI_IMPACT_BADGE.medium
-  const salaryMin = career.salary_range_kes
-    ? `KES ${(career.salary_range_kes.min / 1000).toFixed(0)}k`
+  const salaryMin = career.salary_range_kes?.entry
+    ? `KES ${(career.salary_range_kes.entry.min / 1000).toFixed(0)}k`
     : null
 
   return (
