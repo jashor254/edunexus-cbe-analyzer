@@ -43,7 +43,7 @@ function ScoreBadge({ score }: { score: number }) {
 }
 
 function CareerCard({ career, matchScore }: { career: CareerSummary; matchScore?: number }) {
-  const badge = AI_IMPACT_BADGE[career.ai_impact_level] ?? AI_IMPACT_BADGE.medium
+  const badge = AI_IMPACT_BADGE[career.ai_impact.level] ?? AI_IMPACT_BADGE.medium
   const salaryMin = career.salary_range_kes
     ? `KES ${(career.salary_range_kes.min / 1000).toFixed(0)}k`
     : null
@@ -83,7 +83,7 @@ function CareerCard({ career, matchScore }: { career: CareerSummary; matchScore?
 }
 
 function MatchCard({ match }: { match: CareerMatchWithDetail }) {
-  const badge = AI_IMPACT_BADGE[match.career.ai_impact_level] ?? AI_IMPACT_BADGE.medium
+  const badge = AI_IMPACT_BADGE[match.career.ai_impact.level] ?? AI_IMPACT_BADGE.medium
   return (
     <Link
       href={`/career/${match.career.slug}`}

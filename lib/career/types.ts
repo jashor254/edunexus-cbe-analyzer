@@ -12,23 +12,43 @@ export type CareerCategory =
   | 'media'
   | 'finance'
 
-export type AIImpactLevel = 'low' | 'medium' | 'high' | 'transforming'
+export type DoorType = 'employment' | 'self_employment' | 'entrepreneurship' | 'ai_era'
 
-export type PathwayType = 'university' | 'college' | 'tvet' | 'self_taught' | 'entrepreneurial' | 'apprenticeship'
-
-export type CareerPathway = {
-  type: PathwayType
+export type CareerDoor = {
+  type: DoorType
+  title: string
   description: string
-  cost_kes: { min: number; max: number; note: string }
-  duration_years: number
-  institutions: string[]
-  entry_requirements?: string
+  // Employment
+  salary_range?: { min: number; max: number; currency: 'KES' }
+  employers?: string[]
+  time_to_first_job?: string
+  // Self-employment
+  startup_cost_kes?: { min: number; max: number }
+  platforms?: string[]
+  // Entrepreneurship
+  kenya_examples?: string[]
+  market_size?: string
+  // AI era
+  ai_opportunity?: string
+  skills_needed?: string[]
+  early_mover_advantage?: boolean
+}
+
+export type AIImpact = {
+  level: 'low' | 'medium' | 'high' | 'transforming'
+  replacing: string[]
+  creating: string[]
+  human_advantage: string[]
+  timeline: string
+  honest_summary: string
 }
 
 export type SkillTimelineItem = {
   age_range: string
+  phase: string
   skills: string[]
   why: string
+  parent_action: string
   activities?: string[]
 }
 
@@ -43,6 +63,7 @@ export type KenyaExample = {
   name: string
   what_they_did: string
   started_from: string
+  door?: DoorType
 }
 
 export type Career = {
@@ -51,25 +72,27 @@ export type Career = {
   title: string
   category: CareerCategory
   description: string
-  ai_impact: string
-  ai_impact_level: AIImpactLevel
+  doors: CareerDoor[]
+  ai_impact: AIImpact
   kenya_market_outlook: string
-  salary_range_kes: SalaryRangeKES | null
-  pathways: CareerPathway[]
+  salary_range_kes: SalaryRangeKES | null        // kept for search cards
   required_subjects: string[]
+  subject_importance: Record<string, 'critical' | 'important' | 'helpful'>
   skill_timeline: SkillTimelineItem[]
   future_skills: string[]
-  obsolete_skills: string[] | null
   kenya_examples: KenyaExample[] | null
+  pathway: 'STEM' | 'Social' | 'Arts' | 'Creative' | 'Trades'
+  disclaimer: string
   created_at: string
   updated_at: string
 }
 
 export type CareerSummary = Pick<
   Career,
-  'id' | 'slug' | 'title' | 'category' | 'ai_impact_level' | 'kenya_market_outlook' | 'salary_range_kes' | 'required_subjects'
+  'id' | 'slug' | 'title' | 'category' | 'kenya_market_outlook' | 'salary_range_kes' | 'required_subjects' | 'pathway'
 > & {
   description: string
+  ai_impact: { level: AIImpact['level'] }
 }
 
 export type StudentCareerInterest = {
@@ -109,7 +132,7 @@ export type CareerMatchWithDetail = StudentCareerMatch & {
 export type CareerSearchFilters = {
   q?: string
   category?: CareerCategory
-  ai_impact_level?: AIImpactLevel
+  ai_impact_level?: AIImpact['level']
   student_id?: string
 }
 
@@ -144,3 +167,59 @@ export type ParentCareerSummary = {
   overall_readiness: string
   parent_actions: string[]
 }
+
+// ── Clinic Report Types ───────────────────────────────────────────────────────
+
+export type ClinicReportSection = 'junior' | 'senior'
+
+export type SubjectScoreRow = {
+  subject: string
+  display_name: string
+  score: number
+  required?: number
+  gap?: number
+  status: 'strong' | 'meets' | 'needs_work' | 'critical'
+}
+
+export type ClinicReport = {
+  student_id: string
+  student_name: string
+  grade: number
+  age: number
+  curriculum_type: string
+  section: ClinicReportSection
+  generated_at: string
+
+  // Section 1 — Learner Snapshot
+  overall_score: number
+  overall_level: 1 | 2 | 3 | 4
+  overall_label: string
+  top_subjects: SubjectScoreRow[]
+  weak_subjects: SubjectScoreRow[]
+  summary_sentence: string
+
+  // Section 2 — Career / Pathway
+  recommended_pathway: string | null        // Junior: STEM/Social/Arts etc
+  top_career: CareerMatchWithDetail | null  // Senior only
+  top_career_detail: Career | null          // Senior only (for subject gaps)
+  dream_career: string | null
+
+  // Section 3 — Skill Timeline
+  skill_timeline: SkillTimelineItem[]
+  current_age_range: string
+  current_phase: SkillTimelineItem | null
+  next_phase: SkillTimelineItem | null
+
+  // Section 4 — Parent Actions
+  parent_actions: Array<{
+    title: string
+    why: string
+    action: string
+    link?: string
+  }>
+
+  disclaimer: string
+}
+
+export const STANDARD_DISCLAIMER =
+  'These are informed estimates based on current Kenya market data and global trends. Technology is changing fast — especially AI. We update this information regularly and will always be honest with you about what\'s shifting. The goal is not to predict the future perfectly, but to help your child build skills that remain valuable no matter what changes.'

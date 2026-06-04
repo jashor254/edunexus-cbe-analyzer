@@ -18,7 +18,7 @@ export async function generateCareerMatches(input: MatchEngineInput): Promise<Ma
     title: c.title,
     category: c.category,
     required_subjects: c.required_subjects,
-    ai_impact_level: c.ai_impact_level,
+    ai_impact_level: c.ai_impact.level,
   }))
 
   const subjectSummary = Object.entries(input.subject_scores)
