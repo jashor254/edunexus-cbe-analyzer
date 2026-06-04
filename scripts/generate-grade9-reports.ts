@@ -118,7 +118,7 @@ async function main() {
     const actionPlan = generateActionPlan(subjects)
     const firstName  = student.name.split(' ')[0]
     const jGuidance  = isJunior  ? generateJuniorGuidance(subjects)            : undefined
-    const sGuidance  = !isJunior ? generateSeniorGuidance(subjects, firstName, student.grade) : undefined
+    const sGuidance  = !isJunior ? generateSeniorGuidance(subjects, firstName, student.grade, (student as { current_pathway?: string | null }).current_pathway ?? undefined) : undefined
     const report     = generateReport(
       { id: student.id, name: student.name, grade: student.grade, level: isJunior ? 'Junior School' : 'Senior School', term: assessment.term, year: assessment.year, school: student.school ?? undefined },
       subjects, vitals, actionPlan, [], jGuidance, sGuidance

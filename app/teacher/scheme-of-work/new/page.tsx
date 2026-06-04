@@ -309,6 +309,7 @@ export default function SchemeOfWorkPage() {
         school, grade, learningArea: learningAreaName, term: String(term), year, textbook,
         totalLessons: result.summary.generated,
         totalWeeks: lessonStructure.lastWeek - lessonStructure.firstWeek + 1,
+        lessonsPerWeek: lessonStructure.lessonsPerWeek,
         generatedDate: new Date().toLocaleDateString('en-KE'),
         curriculumMode,
         averageConfidence: Math.round(avgConf * 100) / 100,

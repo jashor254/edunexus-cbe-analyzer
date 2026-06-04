@@ -20,6 +20,8 @@ export async function POST(request: Request) {
       mathematics_type,
       pathway_electives,
       pathway_recommendations,
+      source,
+      raw_marks,
     } = body
 
     if (!student_id) return apiBadRequest('student_id is required')
@@ -45,15 +47,17 @@ export async function POST(request: Request) {
       .from('assessments')
       .insert({
         student_id,
-        user_id:                user.id,
-        grade:                  grade ?? student.grade,
+        user_id:                 user.id,
+        grade:                   grade ?? student.grade,
         term,
         year,
-        grade_level:            grade_level ?? (student.grade <= 9 ? 'junior' : 'senior'),
-        subject_scores:         subject_scores,
-        mathematics_type:       mathematics_type ?? null,
-        pathway_electives:      pathway_electives ?? null,
+        grade_level:             grade_level ?? (student.grade <= 9 ? 'junior' : 'senior'),
+        subject_scores:          subject_scores,
+        mathematics_type:        mathematics_type ?? null,
+        pathway_electives:       pathway_electives ?? null,
         pathway_recommendations: pathway_recommendations ?? null,
+        source:                  source === 'teacher' ? 'teacher' : 'parent',
+        raw_marks:               raw_marks ?? {},
       })
       .select()
       .single()

@@ -15,6 +15,8 @@ import type {
   SubjectProgress,
   StudentProfile,
 } from '@/lib/academicClinic/types'
+import { resolveLevel } from '@/lib/assessments/gradeCalculator'
+import type { CBCLevel } from '@/lib/assessments/gradeCalculator'
 import {
   FileText,
   Download,
@@ -45,6 +47,22 @@ interface Assessment {
   created_at: string
   term?: number
   year?: number
+  source?: 'teacher' | 'parent'
+}
+
+function resolveEffectiveScores(assessments: Assessment[]): Record<string, number> {
+  if (assessments.length === 0) return {}
+  const latest      = assessments[0]
+  const teacherAss  = assessments.find(a => a.source === 'teacher' && a.term === latest.term && a.year === latest.year)
+  const parentAss   = assessments.find(a => a.source !== 'teacher' && a.term === latest.term && a.year === latest.year) ?? latest
+  if (!teacherAss) return latest.subject_scores
+
+  const merged: Record<string, number> = { ...parentAss.subject_scores }
+  for (const [subj, teacherLevel] of Object.entries(teacherAss.subject_scores)) {
+    const resolved = resolveLevel(teacherLevel as CBCLevel, merged[subj] as CBCLevel ?? null)
+    if (resolved) merged[subj] = resolved.level
+  }
+  return merged
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -65,7 +83,7 @@ function calculateTrend(
 }
 
 function buildSubjects(assessments: Assessment[]): SubjectProgress[] {
-  const latestScores = assessments[0]?.subject_scores || {}
+  const latestScores = resolveEffectiveScores(assessments)
   return Object.entries(latestScores).map(([subject, score]) => ({
     subject,
     displayName: formatSubjectName(subject),
@@ -170,7 +188,7 @@ export default function AcademicClinicPage() {
     try {
       const { data: assessments, error: fetchErr } = await supabase
         .from('assessments')
-        .select('subject_scores, grade, created_at, term, year')
+        .select('subject_scores, grade, created_at, term, year, source')
         .eq('student_id', selectedStudentId)
         .order('created_at', { ascending: false })
         .limit(5)
@@ -208,7 +226,7 @@ export default function AcademicClinicPage() {
       const actionPlan = generateActionPlan(subjects)
       const guidance = isJunior
         ? generateJuniorGuidance(subjects)
-        : generateSeniorGuidance(subjects, firstName, currentGrade)
+        : generateSeniorGuidance(subjects, firstName, currentGrade, selectedStudent.current_pathway ?? undefined)
 
       const generated = generateReport(
         studentProfile,
@@ -250,8 +268,10 @@ export default function AcademicClinicPage() {
       const a = document.createElement('a')
       a.href = url
       a.download = `Academic_Clinic_${report.studentProfile.name.replace(/\s+/g, '_')}_Term${report.studentProfile.term}_${report.studentProfile.year}.pdf`
+      document.body.appendChild(a)
       a.click()
-      URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 10000)
     } catch (err) {
       setError('Failed to download PDF.')
       console.error(err)

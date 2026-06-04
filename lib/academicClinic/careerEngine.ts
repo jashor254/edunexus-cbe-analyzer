@@ -2642,6 +2642,22 @@ export function searchCareers(keyword: string): CareerData[] {
 // SECTION 8 — CAREER ENGINE CLASS (new)
 // ============================================================
 
+// ─── Pathway name normalizer ─────────────────────────────────────────────────
+// career.pathway uses 'Arts & Sports'
+// student.current_pathway uses 'Arts & Sports Science'
+// This map normalizes both to the same key
+
+export const PATHWAY_NORMALIZE: Record<string, string> = {
+  'STEM':                  'STEM',
+  'Social Sciences':       'Social Sciences',
+  'Arts & Sports':         'Arts & Sports Science',
+  'Arts & Sports Science': 'Arts & Sports Science',
+}
+
+export function normalizePathway(raw: string): string {
+  return PATHWAY_NORMALIZE[raw] ?? raw
+}
+
 export class CareerEngine {
   private _db: ReturnType<typeof createServiceClient> | null = null
   private get db() {
@@ -2654,25 +2670,35 @@ export class CareerEngine {
   matchCareers(
     cbcScores: Record<string, number>,
     performanceTier: 'high' | 'mid' | 'low',
-    _curriculumType: 'cbc' | 'igcse' = 'cbc'
+    _curriculumType: 'cbc' | 'igcse' = 'cbc',
+    currentPathway?: string
   ): CareerMatch[] {
-    const scored = CAREER_DATABASE.map(career => ({
-      career,
-      matchScore: this.scoreCareer(career, cbcScores, performanceTier),
-      matchReasons: this.buildMatchReasons(career, cbcScores),
-      gapSubjects: this.buildGapSubjects(career, cbcScores),
-    }))
+    const studentPathway = currentPathway ? normalizePathway(currentPathway) : null
+
+    const scored = CAREER_DATABASE
+      .filter(career => {
+        if (!studentPathway) return true
+        return normalizePathway(career.pathway) === studentPathway
+      })
+      .map(career => ({
+        career,
+        matchScore: this.scoreCareer(career, cbcScores, performanceTier, studentPathway),
+        matchReasons: this.buildMatchReasons(career, cbcScores),
+        gapSubjects: this.buildGapSubjects(career, cbcScores),
+      }))
     return scored.sort((a, b) => b.matchScore - a.matchScore)
   }
 
   private scoreCareer(
     career: CareerData,
     cbcScores: Record<string, number>,
-    tier: 'high' | 'mid' | 'low'
+    tier: 'high' | 'mid' | 'low',
+    studentPathway: string | null
   ): number {
     const { primarySubjects, minimumLevels } = career.matchRequirements
     if (primarySubjects.length === 0) return 50
 
+    // 1. Subject performance score
     let total = 0
     for (const subject of primarySubjects) {
       const student = cbcScores[subject] ?? 0
@@ -2680,26 +2706,29 @@ export class CareerEngine {
     }
     const subjectScore = total / primarySubjects.length
 
-    // Kenya shortage bonus: high-shortage careers get up to 15 extra points
+    // 2. Kenya shortage bonus
     const shortageBonus = (career.kenyaShortageScore / 100) * 15
 
-    // Tier bias mirrors pathwayCalculator.ts logic
-    let tierBias = 0
-    if (tier === 'high') {
-      tierBias = career.pathway === 'STEM' ? 12 : career.pathway === 'Social Sciences' ? 4 : -5
-    } else if (tier === 'mid') {
-      tierBias = career.pathway === 'STEM' ? 4 : 0
-    } else {
-      tierBias = career.pathway === 'Arts & Sports' ? 12 : career.pathway === 'STEM' ? -5 : 0
-    }
+    // 3. Pathway alignment bonus (replaces tier bias)
+    // Careers are already filtered to the student's pathway above, but we still
+    // reward alignment and penalise mismatches when no pathway is known (junior school)
+    const pathwayAligned = studentPathway
+      ? normalizePathway(career.pathway) === studentPathway
+      : true
+    const pathwayBonus = pathwayAligned ? 20 : -30
 
-    // Penalty for not meeting minimum levels in primary subjects
+    // 4. Tier bonus — within pathway, higher performers see more demanding careers first
+    const tierBonus = tier === 'high' ? 8 : tier === 'mid' ? 3 : 0
+
+    // 5. Minimum level penalty
     const meetsMinimum = Object.entries(minimumLevels).every(
       ([subj, min]) => (cbcScores[subj] ?? 0) >= min
     )
     const minPenalty = meetsMinimum ? 0 : -15
 
-    return Math.max(0, Math.min(100, subjectScore + shortageBonus + tierBias + minPenalty))
+    return Math.max(0, Math.min(100,
+      subjectScore + shortageBonus + pathwayBonus + tierBonus + minPenalty
+    ))
   }
 
   private buildMatchReasons(career: CareerData, cbcScores: Record<string, number>): string[] {
@@ -2904,10 +2933,11 @@ export class CareerEngine {
     curriculumType: 'cbc' | 'igcse'
     performanceTier: 'high' | 'mid' | 'low'
     enrichWithRealTime?: boolean
+    currentPathway?: string
   }): Promise<CareerAnalysisResult> {
-    const { studentName, grade, cbcScores, curriculumType, performanceTier, enrichWithRealTime = true } = params
+    const { studentName, grade, cbcScores, curriculumType, performanceTier, enrichWithRealTime = true, currentPathway } = params
 
-    const allMatches = this.matchCareers(cbcScores, performanceTier, curriculumType)
+    const allMatches = this.matchCareers(cbcScores, performanceTier, curriculumType, currentPathway)
     const top5 = allMatches.slice(0, 5)
     const enriched = await this.enrichWithMarket(top5, enrichWithRealTime)
 
@@ -2938,6 +2968,129 @@ export class CareerEngine {
           'Early stage — focus on foundational subjects first',
       },
     }
+  }
+}
+
+// ============================================================
+// DREAM CAREER ANALYSIS
+// ============================================================
+
+export interface DreamCareerAnalysis {
+  dreamCareer:      string
+  found:            boolean
+  readinessScore:   number
+  readinessLabel:   string
+  gapSubjects: Array<{
+    subject:        string
+    displayName:    string
+    currentLevel:   number
+    requiredLevel:  number
+    gapSize:        number
+  }>
+  allGapsClosed:    boolean
+  estimatedTerms:   number
+  alternativeCareers: Array<{
+    name:           string
+    matchScore:     number
+    whyRelevant:    string
+  }>
+  encouragement:    string
+}
+
+export function analyzeDreamCareer(
+  dreamCareerInput: string,
+  cbcScores:        Record<string, number>,
+  _currentPathway?: string
+): DreamCareerAnalysis {
+  const career = findCareerByName(dreamCareerInput)
+
+  if (!career) {
+    return {
+      dreamCareer:        dreamCareerInput,
+      found:              false,
+      readinessScore:     0,
+      readinessLabel:     'Career not yet in our database',
+      gapSubjects:        [],
+      allGapsClosed:      false,
+      estimatedTerms:     0,
+      alternativeCareers: [],
+      encouragement:      `We don't have specific data for "${dreamCareerInput}" yet, but your Learning Compass can guide you toward it.`,
+    }
+  }
+
+  const { primarySubjects, minimumLevels } = career.matchRequirements
+
+  const gapSubjects = primarySubjects
+    .map(subject => {
+      const current  = cbcScores[subject] ?? 0
+      const required = minimumLevels[subject] ?? 3
+      return {
+        subject,
+        displayName:  formatSubjectName(subject),
+        currentLevel: current,
+        requiredLevel: required,
+        gapSize:      Math.max(0, required - current),
+      }
+    })
+    .filter(s => s.gapSize > 0)
+    .sort((a, b) => b.gapSize - a.gapSize)
+
+  const subjectReadiness = primarySubjects.map(subject => {
+    const current  = cbcScores[subject] ?? 0
+    const required = minimumLevels[subject] ?? 3
+    return Math.min(current / required, 1) * 100
+  })
+  const readinessScore = subjectReadiness.length > 0
+    ? Math.round(subjectReadiness.reduce((a, b) => a + b, 0) / subjectReadiness.length)
+    : 50
+
+  const readinessLabel =
+    readinessScore >= 90 ? 'Ready — qualifications met!' :
+    readinessScore >= 70 ? 'Very close — minor gaps to close' :
+    readinessScore >= 50 ? 'On track — keep building' :
+    readinessScore >= 30 ? 'Gap to close — focused effort needed' :
+    'Early stage — strong foundation first'
+
+  const maxGap = gapSubjects.length > 0
+    ? Math.max(...gapSubjects.map(s => s.gapSize))
+    : 0
+  const estimatedTerms = maxGap * 2
+
+  const pathwayKey = normalizePathway(career.pathway)
+  const alternatives = CAREER_DATABASE
+    .filter(c => normalizePathway(c.pathway) === pathwayKey && c.name !== career.name)
+    .map(c => {
+      const altScores = c.matchRequirements.primarySubjects
+        .map(s => (cbcScores[s] ?? 0) / 4 * 100)
+      const altScore = altScores.length > 0
+        ? Math.round(altScores.reduce((a, b) => a + b, 0) / altScores.length)
+        : 50
+      return {
+        name: c.name,
+        matchScore: altScore,
+        whyRelevant: `Also in ${pathwayKey} pathway — ${c.marketReality.kenyanContext.slice(0, 80)}...`,
+      }
+    })
+    .sort((a, b) => b.matchScore - a.matchScore)
+    .slice(0, 2)
+
+  const allGapsClosed = gapSubjects.length === 0
+  const encouragement = allGapsClosed
+    ? `${career.name} is within reach! This career is in high demand in Kenya — keep this trajectory.`
+    : gapSubjects.length === 1
+    ? `Just ONE subject stands between this child and ${career.name}: ${gapSubjects[0].displayName}. With ${estimatedTerms} term(s) of focused Learning Compass sessions, this gap can close.`
+    : `${career.name} requires improvement in ${gapSubjects.length} areas. With consistent EduNexus support, this goal is achievable. Start with ${gapSubjects[0].displayName} first.`
+
+  return {
+    dreamCareer: career.name,
+    found:       true,
+    readinessScore,
+    readinessLabel,
+    gapSubjects,
+    allGapsClosed,
+    estimatedTerms,
+    alternativeCareers: alternatives,
+    encouragement,
   }
 }
 

@@ -9,18 +9,27 @@ import {
   Loader2, X, UserPlus, Mail, Phone, FileText, CheckCircle2,
   FlaskConical, ChevronDown, ChevronRight,
 } from 'lucide-react'
+import {
+  SENIOR_PATHWAYS,
+  SENIOR_PATHWAY_ELECTIVES,
+  getSeniorCompulsorySubjects,
+  validateSeniorSubjects,
+  type SeniorPathway,
+} from '@/lib/curriculum/subjects'
 
 type Tab = 'students' | 'gaps' | 'assignments' | 'holiday' | 'compass' | 'clinic'
 
 // ─── Add Student Modal ────────────────────────────────────────────────────────
 
 type StudentRow = {
-  name:           string
-  grade:          number
+  name:            string
+  grade:           number
   curriculum_type: string
-  parent_name:    string
-  parent_phone:   string
-  parent_email:   string
+  parent_name:     string
+  parent_phone:    string
+  parent_email:    string
+  pathway:         SeniorPathway | ''
+  electives:       string[]
 }
 
 function AddStudentModal({
@@ -34,19 +43,42 @@ function AddStudentModal({
   onClose:      () => void
   onSuccess:    (count: number) => void
 }) {
-  const [rows, setRows]       = useState<StudentRow[]>([
-    { name: '', grade: defaultGrade, curriculum_type: 'cbc', parent_name: '', parent_phone: '', parent_email: '' },
-  ])
+  const emptyRow = (): StudentRow => ({
+    name: '', grade: defaultGrade, curriculum_type: 'cbc',
+    parent_name: '', parent_phone: '', parent_email: '',
+    pathway: '' as SeniorPathway | '', electives: [],
+  })
+  const [rows, setRows] = useState<StudentRow[]>([emptyRow()])
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState<string | null>(null)
   const fileRef               = useRef<HTMLInputElement>(null)
 
-  function updateRow(i: number, field: keyof StudentRow, value: string | number) {
-    setRows(prev => prev.map((r, idx) => idx === i ? { ...r, [field]: value } : r))
+  function updateRow(i: number, field: keyof StudentRow, value: string | number | string[]) {
+    setRows(prev => prev.map((r, idx) => {
+      if (idx !== i) return r
+      const updated = { ...r, [field]: value }
+      // reset pathway/electives when grade drops below 10
+      if (field === 'grade' && Number(value) < 10) {
+        updated.pathway  = ''
+        updated.electives = []
+      }
+      // reset electives when pathway changes
+      if (field === 'pathway') updated.electives = []
+      return updated
+    }))
+  }
+
+  function toggleRowElective(i: number, subject: string) {
+    setRows(prev => prev.map((r, idx) => {
+      if (idx !== i) return r
+      const has = r.electives.includes(subject)
+      if (!has && r.electives.length >= 3) return r
+      return { ...r, electives: has ? r.electives.filter(e => e !== subject) : [...r.electives, subject] }
+    }))
   }
 
   function addRow() {
-    setRows(prev => [...prev, { name: '', grade: defaultGrade, curriculum_type: 'cbc', parent_name: '', parent_phone: '', parent_email: '' }])
+    setRows(prev => [...prev, emptyRow()])
   }
 
   function removeRow(i: number) {
@@ -63,12 +95,14 @@ function AddStudentModal({
       const parsed: StudentRow[] = lines.map(line => {
         const [name, grade, curriculum_type, parent_name, parent_phone, parent_email] = line.split(',').map(s => s.trim().replace(/^"|"$/g, ''))
         return {
-          name:           name || '',
-          grade:          Number(grade) || defaultGrade,
+          name:            name || '',
+          grade:           Number(grade) || defaultGrade,
           curriculum_type: curriculum_type || 'cbc',
-          parent_name:    parent_name || '',
-          parent_phone:   parent_phone || '',
-          parent_email:   parent_email || '',
+          parent_name:     parent_name || '',
+          parent_phone:    parent_phone || '',
+          parent_email:    parent_email || '',
+          pathway:   '' as SeniorPathway | '',
+          electives: [] as string[],
         }
       }).filter(r => r.name)
       if (parsed.length > 0) setRows(parsed)
@@ -81,6 +115,19 @@ function AddStudentModal({
     e.preventDefault()
     const valid = rows.filter(r => r.name.trim())
     if (!valid.length) { setError('Add at least one student name'); return }
+
+    // Validate senior rows
+    for (const r of valid) {
+      if (r.grade >= 10 && r.curriculum_type === 'cbc') {
+        if (!r.pathway) {
+          setError(`${r.name.trim()}: Please select a pathway (Grade 10–12)`)
+          return
+        }
+        const v = validateSeniorSubjects(r.pathway as SeniorPathway, r.electives)
+        if (!v.valid) { setError(`${r.name.trim()}: ${v.error}`); return }
+      }
+    }
+
     setLoading(true)
     setError(null)
     try {
@@ -88,14 +135,24 @@ function AddStudentModal({
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
-          students: valid.map(r => ({
-            name:           r.name.trim(),
-            grade:          Number(r.grade),
-            curriculum_type: r.curriculum_type,
-            parent_name:    r.parent_name.trim() || undefined,
-            parent_phone:   r.parent_phone.trim() || undefined,
-            parent_email:   r.parent_email.trim() || undefined,
-          })),
+          students: valid.map(r => {
+            const isSenior = r.grade >= 10 && r.curriculum_type === 'cbc'
+            return {
+              name:            r.name.trim(),
+              grade:           Number(r.grade),
+              curriculum_type: r.curriculum_type,
+              parent_name:     r.parent_name.trim() || undefined,
+              parent_phone:    r.parent_phone.trim() || undefined,
+              parent_email:    r.parent_email.trim() || undefined,
+              ...(isSenior && r.pathway ? {
+                current_pathway:   r.pathway,
+                selected_subjects: [
+                  ...getSeniorCompulsorySubjects(r.pathway as SeniorPathway),
+                  ...r.electives,
+                ],
+              } : {}),
+            }
+          }),
         }),
       })
       const json = await res.json()
@@ -127,7 +184,7 @@ function AddStudentModal({
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+          <div className="p-6 space-y-4 max-h-[85vh] overflow-y-auto">
             {/* CSV Import */}
             <div className="flex items-center justify-between">
               <p className="text-xs text-gray-500">
@@ -154,65 +211,127 @@ function AddStudentModal({
             </div>
 
             {/* Student rows */}
-            {rows.map((row, i) => (
-              <div key={i} className="grid grid-cols-12 gap-2 items-center">
-                <input
-                  className="col-span-3 px-3 py-2 rounded-xl border border-gray-200 text-sm font-medium focus:border-teal-400 focus:outline-none"
-                  placeholder="e.g. Grace Wanjiku"
-                  value={row.name}
-                  onChange={e => updateRow(i, 'name', e.target.value)}
-                />
-                <select
-                  className="col-span-1 px-2 py-2 rounded-xl border border-gray-200 text-sm focus:border-teal-400 focus:outline-none bg-white"
-                  value={row.grade}
-                  onChange={e => updateRow(i, 'grade', Number(e.target.value))}
-                >
-                  {[7,8,9,10,11,12].map(g => <option key={g} value={g}>{g}</option>)}
-                </select>
-                <select
-                  className="col-span-2 px-2 py-2 rounded-xl border border-gray-200 text-sm focus:border-teal-400 focus:outline-none bg-white"
-                  value={row.curriculum_type}
-                  onChange={e => updateRow(i, 'curriculum_type', e.target.value)}
-                >
-                  <option value="cbc">CBC</option>
-                  <option value="igcse">IGCSE</option>
-                  <option value="844">8-4-4</option>
-                  <option value="other">Other</option>
-                </select>
-                <input
-                  className="col-span-2 px-3 py-2 rounded-xl border border-gray-200 text-sm focus:border-teal-400 focus:outline-none"
-                  placeholder="Parent name"
-                  value={row.parent_name}
-                  onChange={e => updateRow(i, 'parent_name', e.target.value)}
-                />
-                <div className="col-span-2 relative">
-                  <Phone className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" />
-                  <input
-                    className="w-full pl-8 pr-3 py-2 rounded-xl border border-gray-200 text-sm focus:border-teal-400 focus:outline-none"
-                    placeholder="+254..."
-                    value={row.parent_phone}
-                    onChange={e => updateRow(i, 'parent_phone', e.target.value)}
-                  />
-                </div>
-                <div className="col-span-1 relative flex items-center gap-1">
-                  <div className="flex-1 relative">
-                    <Mail className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" />
+            {rows.map((row, i) => {
+              const isSeniorRow = row.grade >= 10 && row.curriculum_type === 'cbc'
+              return (
+                <div key={i} className="space-y-2">
+                  <div className="grid grid-cols-12 gap-2 items-center">
                     <input
-                      className="w-full pl-7 pr-2 py-2 rounded-xl border border-gray-200 text-xs focus:border-teal-400 focus:outline-none"
-                      placeholder="email"
-                      type="email"
-                      value={row.parent_email}
-                      onChange={e => updateRow(i, 'parent_email', e.target.value)}
+                      className="col-span-3 px-3 py-2 rounded-xl border border-gray-200 text-sm font-medium focus:border-teal-400 focus:outline-none"
+                      placeholder="e.g. Grace Wanjiku"
+                      value={row.name}
+                      onChange={e => updateRow(i, 'name', e.target.value)}
                     />
+                    <select
+                      className="col-span-1 px-2 py-2 rounded-xl border border-gray-200 text-sm focus:border-teal-400 focus:outline-none bg-white"
+                      value={row.grade}
+                      onChange={e => updateRow(i, 'grade', Number(e.target.value))}
+                    >
+                      {[7,8,9,10,11,12].map(g => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                    <select
+                      className="col-span-2 px-2 py-2 rounded-xl border border-gray-200 text-sm focus:border-teal-400 focus:outline-none bg-white"
+                      value={row.curriculum_type}
+                      onChange={e => updateRow(i, 'curriculum_type', e.target.value)}
+                    >
+                      <option value="cbc">CBC</option>
+                      <option value="igcse">IGCSE</option>
+                      <option value="844">8-4-4</option>
+                      <option value="other">Other</option>
+                    </select>
+                    <input
+                      className="col-span-2 px-3 py-2 rounded-xl border border-gray-200 text-sm focus:border-teal-400 focus:outline-none"
+                      placeholder="Parent name"
+                      value={row.parent_name}
+                      onChange={e => updateRow(i, 'parent_name', e.target.value)}
+                    />
+                    <div className="col-span-2 relative">
+                      <Phone className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" />
+                      <input
+                        className="w-full pl-8 pr-3 py-2 rounded-xl border border-gray-200 text-sm focus:border-teal-400 focus:outline-none"
+                        placeholder="+254..."
+                        value={row.parent_phone}
+                        onChange={e => updateRow(i, 'parent_phone', e.target.value)}
+                      />
+                    </div>
+                    <div className="col-span-1 relative flex items-center gap-1">
+                      <div className="flex-1 relative">
+                        <Mail className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" />
+                        <input
+                          className="w-full pl-7 pr-2 py-2 rounded-xl border border-gray-200 text-xs focus:border-teal-400 focus:outline-none"
+                          placeholder="email"
+                          type="email"
+                          value={row.parent_email}
+                          onChange={e => updateRow(i, 'parent_email', e.target.value)}
+                        />
+                      </div>
+                      {rows.length > 1 && (
+                        <button type="button" onClick={() => removeRow(i)} className="text-gray-300 hover:text-red-400 p-1">
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  {rows.length > 1 && (
-                    <button type="button" onClick={() => removeRow(i)} className="text-gray-300 hover:text-red-400 p-1">
-                      <X className="w-4 h-4" />
-                    </button>
+
+                  {/* Senior pathway section — appears below row when Grade 10+ CBC */}
+                  {isSeniorRow && (
+                    <div className="ml-2 pl-3 border-l-2 border-teal-200 space-y-2 pb-1">
+                      <p className="text-xs font-black text-teal-600 uppercase tracking-wide">Senior Pathway Required</p>
+                      {/* Pathway dropdown */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <select
+                          className="px-2 py-1.5 rounded-lg border border-gray-200 text-xs focus:border-teal-400 focus:outline-none bg-white"
+                          value={row.pathway}
+                          onChange={e => updateRow(i, 'pathway', e.target.value)}
+                        >
+                          <option value="">Select pathway…</option>
+                          {SENIOR_PATHWAYS.map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                        {row.pathway && (
+                          <span className="text-xs text-gray-500">
+                            Compulsory: {getSeniorCompulsorySubjects(row.pathway as SeniorPathway).join(', ')}
+                          </span>
+                        )}
+                      </div>
+                      {/* Elective chips */}
+                      {row.pathway && (
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">
+                            Electives <span className={row.electives.length === 3 ? 'text-teal-600 font-bold' : ''}>
+                              ({row.electives.length}/3)
+                            </span>
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {SENIOR_PATHWAY_ELECTIVES[row.pathway as SeniorPathway].map(subject => {
+                              const selected = row.electives.includes(subject)
+                              const maxed    = !selected && row.electives.length >= 3
+                              return (
+                                <button
+                                  key={subject}
+                                  type="button"
+                                  onClick={() => toggleRowElective(i, subject)}
+                                  disabled={maxed}
+                                  className={[
+                                    'text-xs px-2 py-0.5 rounded-full border transition-all',
+                                    selected
+                                      ? 'bg-teal-600 border-teal-600 text-white'
+                                      : maxed
+                                      ? 'bg-gray-50 border-gray-200 text-gray-300 cursor-not-allowed'
+                                      : 'bg-white border-gray-200 text-gray-600 hover:border-teal-400',
+                                  ].join(' ')}
+                                >
+                                  {subject}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
 
             <button
               type="button"

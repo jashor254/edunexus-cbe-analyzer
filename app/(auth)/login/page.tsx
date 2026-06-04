@@ -26,32 +26,60 @@ function LoginContent() {
   const returnTo = searchParams?.get('returnTo') || '/dashboard'
   const product  = searchParams?.get('product')
 
-  const resolveDestination = async (base: string) => {
-    if (base !== '/dashboard') return product ? `${base}?product=${product}` : base
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      // profiles.id = auth user UUID (NOT user_id)
+  const resolveDestination = async (_returnTo: string | null): Promise<string> => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return '/login'
+
+      // Honor saved role preference first
+      const savedPreference =
+        typeof window !== 'undefined'
+          ? localStorage.getItem('preferred_role')
+          : null
+
+      if (savedPreference === 'parent')  return '/dashboard'
+      if (savedPreference === 'teacher') return '/teacher/dashboard'
+
       const { data: profile } = await supabase
-        .from('profiles').select('role').eq('id', user.id).maybeSingle()
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
 
-      if (profile?.role === 'teacher') return '/teacher/dashboard'
+      const role = profile?.role
 
-      // Fallback for accounts where profiles.role hasn't been set yet
-      if (!profile?.role) {
-        const { data: teacherRow } = await supabase
-          .from('teachers').select('id').eq('user_id', user.id).maybeSingle()
-        if (teacherRow?.id) return '/teacher/dashboard'
+      if (!role) {
+        const { data: teacher } = await supabase
+          .from('teachers')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle()
+        if (teacher) return '/teacher/dashboard'
+        return '/dashboard'
       }
+
+      if (role === 'teacher') return '/teacher/dashboard'
+      return '/dashboard'
+    } catch {
+      return '/dashboard'
     }
-    return product ? `/dashboard?product=${product}` : '/dashboard'
   }
 
   useEffect(() => {
+    let isMounted = true
     const check = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) router.push(await resolveDestination(returnTo))
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (isMounted && user) router.push(await resolveDestination(returnTo))
+      } catch (err) {
+        // Supabase auth lock stolen by Strict Mode double-invoke — safe to ignore
+        if (isMounted && err instanceof Error && !err.message.includes('released because another request stole it')) {
+          throw err
+        }
+      }
     }
     check()
+    return () => { isMounted = false }
   }, [])
 
   const handleGoogleLogin = async () => {

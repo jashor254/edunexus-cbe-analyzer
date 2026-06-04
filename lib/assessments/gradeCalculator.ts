@@ -109,6 +109,109 @@ export function calculateMeanScore(subjectScores: Record<string, number>): numbe
   return Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 100) / 100
 }
 
+// ─── Marks → CBC Level ────────────────────────────────────────────────────────
+
+// marksToLevel(74) → 3  Meeting ✓
+// marksToLevel(75) → 4  Exceeding ✓
+// marksToLevel(49) → 2  Approaching ✓
+// marksToLevel(50) → 3  Meeting ✓
+// marksToLevel(29) → 1  Below ✓
+// marksToLevel(30) → 2  Approaching ✓
+
+export const DEFAULT_MARKS_THRESHOLDS = {
+  level4: 75,   // 75-100 → Exceeding Expectations
+  level3: 50,   // 50-74  → Meeting Expectations
+  level2: 30,   // 30-49  → Approaching Expectations
+  level1: 0,    // 0-29   → Below Expectations
+} as const
+
+export type MarksThresholds = {
+  level4: number
+  level3: number
+  level2: number
+}
+
+export type CBCLevel = 1 | 2 | 3 | 4
+
+export function marksToLevel(
+  marks:      number,
+  thresholds: MarksThresholds = DEFAULT_MARKS_THRESHOLDS,
+): CBCLevel {
+  if (marks < 0 || marks > 100) {
+    throw new Error(`Marks must be 0-100, got ${marks}`)
+  }
+  if (marks >= thresholds.level4) return 4
+  if (marks >= thresholds.level3) return 3
+  if (marks >= thresholds.level2) return 2
+  return 1
+}
+
+export function levelToLabel(level: CBCLevel): string {
+  const labels: Record<CBCLevel, string> = {
+    4: 'Exceeding Expectations',
+    3: 'Meeting Expectations',
+    2: 'Approaching Expectations',
+    1: 'Below Expectations',
+  }
+  return labels[level]
+}
+
+export function levelToShortLabel(level: CBCLevel): string {
+  const labels: Record<CBCLevel, string> = {
+    4: 'Exceeding',
+    3: 'Meeting',
+    2: 'Approaching',
+    1: 'Below',
+  }
+  return labels[level]
+}
+
+export function levelToColor(level: CBCLevel): string {
+  const colors: Record<CBCLevel, string> = {
+    4: '#1D9E75',
+    3: '#378ADD',
+    2: '#EF9F27',
+    1: '#E24B4A',
+  }
+  return colors[level]
+}
+
+// ─── Source of truth ──────────────────────────────────────────────────────────
+
+export type AssessmentSource = 'teacher' | 'parent'
+
+export function resolveLevel(
+  teacherLevel: CBCLevel | null,
+  parentLevel:  CBCLevel | null,
+): { level: CBCLevel; source: AssessmentSource } | null {
+  if (teacherLevel !== null) return { level: teacherLevel, source: 'teacher' }
+  if (parentLevel  !== null) return { level: parentLevel,  source: 'parent'  }
+  return null
+}
+
+// ─── School-level threshold config ───────────────────────────────────────────
+// Stored in school settings (future feature).
+// Default used when school has no custom config.
+
+export interface SchoolGradeConfig {
+  schoolId:   string
+  thresholds: MarksThresholds
+  updatedAt:  string
+}
+
+export function getSchoolThresholds(
+  schoolConfig?: SchoolGradeConfig | null,
+): MarksThresholds {
+  return schoolConfig?.thresholds ?? DEFAULT_MARKS_THRESHOLDS
+}
+
+export function marksToLevelForSchool(
+  marks:        number,
+  schoolConfig?: SchoolGradeConfig | null,
+): CBCLevel {
+  return marksToLevel(marks, getSchoolThresholds(schoolConfig))
+}
+
 export function gradeBandKey(grade: string): 'EE' | 'ME' | 'AE' | 'BE' {
   if (grade === 'EE') return 'EE'
   if (grade === 'ME') return 'ME'

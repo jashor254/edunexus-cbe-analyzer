@@ -23,17 +23,13 @@ export function allocateLessons({
 
   for (const substrand of selectedSubstrands) {
     const { strandTitle, substrandTitle, lessonsRequired } = substrand
+    const count = Math.max(1, lessonsRequired || 1)
 
-    if (!lessonsRequired || lessonsRequired < 1) {
-      throw new Error(`Invalid lessonsRequired for ${substrandTitle}`)
-    }
-
-    for (let lessonIndex = 1; lessonIndex <= lessonsRequired; lessonIndex++) {
+    for (let lessonIndex = 1; lessonIndex <= count; lessonIndex++) {
       const currentSlot = teachingSlots[slotPointer]
 
-      if (!currentSlot) {
-        throw new Error('Not enough teaching slots to allocate all lessons')
-      }
+      // Ran out of teaching slots — stop gracefully instead of throwing
+      if (!currentSlot) break
 
       allocatedLessons.push({
         slotIndex: currentSlot.slotIndex,

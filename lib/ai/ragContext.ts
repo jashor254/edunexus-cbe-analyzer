@@ -6,9 +6,9 @@ import { createServiceClient } from '@/utils/supabase/service'
 import {
   getCurriculumConfig,
   getCurriculumPhase,
-  getGradeLabel,
   type CurriculumType,
 } from '@/lib/curriculum'
+import { getCompassTopicContext } from '@/lib/compass/topicContext'
 
 export interface StudentRAGContext {
   // Student profile
@@ -52,11 +52,19 @@ export interface StudentRAGContext {
     year: number
     overallLevel: string
   }[]
+
+  // Topic context (Tier 1: SOW / Tier 2: KICD / Tier 3: generic)
+  topicContextSummary: string
+  topicContextTier:    1 | 2 | 3
 }
 
 export async function buildStudentRAGContext(
   learnerId: string,
-  sessionId: string
+  sessionId: string,
+  options?: {
+    subjectFilter?: string
+    struggleTopic?: string
+  }
 ): Promise<StudentRAGContext> {
   const db = createServiceClient()
 
@@ -65,6 +73,7 @@ export async function buildStudentRAGContext(
     assessmentsResult,
     sessionStateResult,
     recentMessagesResult,
+    topicCtx,
   ] = await Promise.all([
 
     // 1. Student profile — now includes curriculum fields
@@ -94,12 +103,20 @@ export async function buildStudentRAGContext(
       .eq('session_id', sessionId)
       .order('created_at', { ascending: false })
       .limit(10),
+
+    // 5. Topic context — SOW → KICD → generic fallback
+    getCompassTopicContext(learnerId, options),
   ])
 
   const student      = studentResult.data
   const assessments  = assessmentsResult.data || []
-  const sessionState = sessionStateResult.data?.session_state as Record<string, any> | null
+  const sessionState = sessionStateResult.data?.session_state as Record<string, unknown> | null
   const recentMessages = (recentMessagesResult.data || []).reverse()
+
+  console.info(
+    `[Compass] Student ${learnerId} — Tier ${topicCtx.tier} context ` +
+    `(${topicCtx.topics.length} topics)`
+  )
 
   // ── Curriculum resolution ─────────────────────────────────────────────────
   const curriculumType: CurriculumType =
@@ -184,10 +201,10 @@ export async function buildStudentRAGContext(
   }
 
   // ── Session state ─────────────────────────────────────────────────────────
-  const masteredConcepts: string[]  = sessionState?.masteredConcepts || []
-  const strugglingConcepts: string[] = sessionState?.strugglingConcepts || []
-  const preferredExampleType: string = sessionState?.preferredExampleType || 'general'
-  const consecutiveSuccesses: number = sessionState?.consecutiveSuccesses || 0
+  const masteredConcepts: string[]   = (sessionState?.masteredConcepts as string[])   || []
+  const strugglingConcepts: string[] = (sessionState?.strugglingConcepts as string[]) || []
+  const preferredExampleType: string = (sessionState?.preferredExampleType as string) || 'general'
+  const consecutiveSuccesses: number = (sessionState?.consecutiveSuccesses as number) || 0
 
   // ── Previous assessments summary ──────────────────────────────────────────
   const gradeToNum: Record<string, number> = {
@@ -238,6 +255,8 @@ export async function buildStudentRAGContext(
       content: m.content,
     })),
     previousAssessments,
+    topicContextSummary: topicCtx.contextSummary,
+    topicContextTier:    topicCtx.tier,
   }
 }
 
@@ -421,6 +440,10 @@ CBC-SPECIFIC TEACHING RULES:
    Never force the same example type every response.
 `
 
+  const topicBlock = context.topicContextSummary
+    ? `\n═══════════════════════════════\nCURRICULUM TOPIC CONTEXT\n═══════════════════════════════\n${context.topicContextSummary}\n`
+    : ''
+
   return `
 You are the Learning Compass — a personal AI tutor for EduNexus.
 Always respond with valid JSON only — no markdown, no explanation, just raw JSON.
@@ -476,6 +499,7 @@ ${encouragementBlock}
 8. If student seems frustrated:
    Switch example type immediately, offer a brain break, reduce difficulty one level
 
+${topicBlock}
 ═══════════════════════════════
 RESPONSE FORMAT
 ═══════════════════════════════

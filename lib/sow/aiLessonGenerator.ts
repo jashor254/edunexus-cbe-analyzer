@@ -1,15 +1,79 @@
 // lib/sow/aiLessonGenerator.ts
-// Adapted from jashor-app aiLessonGenerator.js
-// Replaces aiClient with direct DeepSeek API calls.
-// Supports both CBC and 8-4-4 curricula.
+// Generates and validates one lesson at a time via DeepSeek AI.
+// Diversity at 5 levels is enforced by injecting DiversitySeed per call.
 
 import { validateLesson } from './validators'
 import type { CurriculumMode } from './types'
+import type { DiversitySeed } from './diversityEngine'
 
-const MAX_RETRIES = 5
+const MAX_RETRIES   = 5
 const MAX_CONFIDENCE = 0.92
+const TEMPERATURE   = 0.65  // raised from 0.2 — low temp was the primary driver of repetition
 
-// ─── DeepSeek API call ──────────────────────────────────────────────────────
+// ─── Diversity system instruction ─────────────────────────────────────────────
+// Injected into the SYSTEM role so it primes the model's full behavior.
+
+const DIVERSITY_SYSTEM_RULES = `You are a Kenya curriculum expert producing ONE lesson for a Scheme of Work.
+Return ONLY valid JSON. No markdown. No explanation. No code blocks. Pure JSON only.
+
+DIVERSITY RULES — NON-NEGOTIABLE:
+
+RULE 1 — VERB DIVERSITY
+Never use the same opening verb in consecutive lessons.
+Level 1 alternatives: classify, locate, select, match, recall, name, label, record,
+  collect, observe, count, trace, outline, give, read, sort, copy, mark, find, show,
+  detect, measure, sketch, note, draw, examine, list, describe, identify, state
+Level 2 alternatives: analyze, compare, contrast, apply, calculate, construct, convert,
+  deduce, determine, differentiate, discuss, estimate, experiment, formulate, illustrate,
+  infer, interpret, investigate, justify, measure, model, predict, relate, research,
+  review, sequence, simulate, solve, summarize, test, verify, explain, demonstrate
+Level 3 alternatives: advocate, assess, collaborate, compose, create, critique, design,
+  develop, evaluate, generalize, implement, integrate, organize, plan, produce, promote,
+  propose, protect, reflect, synthesize, validate, value, defend, generate, appreciate
+
+RULE 2 — OUTCOME STRUCTURE DIVERSITY
+Use a DIFFERENT sentence structure for each learning outcome.
+Never write all three outcomes with the same shape.
+Rotate through: Action+Object, Action+How, Action+Comparison, Action+Purpose,
+  Action+Condition, Action+Audience, Action+Standard, Value/Attitude
+
+RULE 3 — INQUIRY QUESTION DIVERSITY
+Use DIFFERENT question starters each lesson.
+Never use "What would happen if..." or "Why is..." in more than 1 of every 4 lessons.
+Rotate: Causal, Comparative, Evaluative, Hypothetical, Personal, Predictive,
+  Investigative, Critical, Connective, Application, Open
+
+RULE 4 — LEARNING EXPERIENCE DIVERSITY
+Never start more than 1 in 3 consecutive experiences with "Learners work in groups to observe and..."
+ALL activities MUST happen INSIDE the classroom. No field trips, no external visitors,
+  no going to other locations. No inviting community members to class.
+Rotate activity structures: Demonstration, Problem-solving, Case study, Simulation,
+  Gallery walk, Debate, Jigsaw, Role play, Think-Pair-Share, Question and Answer,
+  Discussion, Brainstorming, Sorting, Peer teaching
+
+RULE 5 — ASSESSMENT DIVERSITY
+Never use the same 3 assessments in consecutive lessons.
+Use: observation checklist, oral questioning, written exercise, practical demonstration,
+  peer assessment, self-assessment, exit ticket, product assessment, portfolio entry,
+  quiz, reflection journal, debate assessment.
+
+KENYAN CONTEXT RULE:
+Every learning experience MUST reference at least one specific Kenyan location, crop,
+community, or practice — but as classroom DISCUSSION EXAMPLES only, never as physical visits.
+Correct: "Learners discuss how maize farmers in the Rift Valley manage soil erosion"
+Correct: "Learners analyse trade practices at Gikomba market using case study cards"
+WRONG:   "Learners visit Gikomba market" / "Invite a local elder to class"
+
+RESOURCE VARIETY RULE:
+Always lead with the class textbook and teacher's guide as the first two resources.
+Add classroom-realistic resources only: charts (hand-drawn or printed), real objects from
+  the school compound (stones, leaves, soil), newspaper clippings, blackboard diagrams,
+  flash cards, locally made models, digital devices if the school has them.
+NEVER generate: community resource persons, farm visits, audio recordings from specific
+  radio stations, maps from government offices, materials requiring purchase or ordering,
+  or internet resources unless digital devices are confirmed available.`
+
+// ─── DeepSeek API call ───────────────────────────────────────────────────────
 
 async function callDeepSeek(prompt: string): Promise<string> {
   const response = await fetch('https://api.deepseek.com/chat/completions', {
@@ -21,17 +85,10 @@ async function callDeepSeek(prompt: string): Promise<string> {
     body: JSON.stringify({
       model: 'deepseek-chat',
       messages: [
-        {
-          role: 'system',
-          content:
-            'You are a Kenya curriculum expert. ' +
-            'Return ONLY valid JSON. ' +
-            'No markdown. No explanation. ' +
-            'No code blocks. Pure JSON only.',
-        },
-        { role: 'user', content: prompt },
+        { role: 'system', content: DIVERSITY_SYSTEM_RULES },
+        { role: 'user',   content: prompt },
       ],
-      temperature: 0.2,
+      temperature: TEMPERATURE,
       max_tokens: 2000,
     }),
   })
@@ -55,132 +112,167 @@ function buildLessonPrompt({
   totalLessons,
   curriculumMode,
   subjectType = 'default',
+  previousVerbs,
+  diversitySeed,
   kicdContext,
+  textbook,
 }: {
-  learningArea: string
-  grade: string
-  strand: string
-  substrand: string
-  lessonNumber: number
-  totalLessons: number
+  learningArea:   string
+  grade:          string
+  strand:         string
+  substrand:      string
+  lessonNumber:   number
+  totalLessons:   number
   curriculumMode: CurriculumMode
-  subjectType?: string
-  kicdContext?: { subjectData: Record<string, any>; strandData: Array<{ title: string; kicd_data: any[] }>; subtopicMap?: Record<string, string[]> }
+  subjectType?:   string
+  previousVerbs?: string[]
+  diversitySeed?: DiversitySeed
+  textbook?:      string
+  kicdContext?: {
+    subjectData:  Record<string, any>
+    strandData:   Array<{ title: string; kicd_data: any[] }>
+    subtopicMap?: Record<string, string[]>
+  }
 }, retryNote = ''): string {
-  const isCBC = curriculumMode.startsWith('cbc')
-  const isMaths = subjectType === 'mathematics'
 
-  const skillWords = substrand
-    .split(/[\s\-:,\/()]+/)
-    .filter(w => w.length >= 4)
-    .slice(0, 3)
-    .join(', ')
+  const isCBC   = curriculumMode.startsWith('cbc')
+  const isMaths = subjectType === 'mathematics' || subjectType === 'cbc_senior_mathematics' || subjectType === 'kcse_mathematics'
 
-  // Estimate page range based on lesson position (early topics = p.1-50, later = p.50-150+)
-  const topicFraction = totalLessons > 1 ? (lessonNumber - 1) / (totalLessons - 1) : 0
-  const estimatedPage = Math.round(1 + topicFraction * 149)
-  const estimatedPageEnd = estimatedPage + 3
 
+  // KICD context sections
   const subtopics = kicdContext?.subtopicMap?.[strand]
   const subtopicsSection = subtopics?.length
-    ? `\nSYLLABUS CONTENT for this topic (distribute across ${totalLessons} lessons):\n${subtopics.join(' | ')}\n\nCover these points progressively across lessons. Lesson ${lessonNumber} should focus on points ${lessonNumber}–${Math.min(lessonNumber + 1, subtopics.length)}.\n`
+    ? `\nSYLLABUS CONTENT (distribute across ${totalLessons} lessons):\n${subtopics.join(' | ')}\nLesson ${lessonNumber} covers points ${lessonNumber}–${Math.min(lessonNumber + 1, subtopics.length)}.\n`
     : ''
 
   const kicdStrand = kicdContext?.strandData
     ?.find(s => s.title.toLowerCase().includes(strand.toLowerCase().slice(0, 10)))
-
   const kicdSection = kicdStrand?.kicd_data?.length
-    ? `
-OFFICIAL KICD CONTENT FOR THIS STRAND (use as your base):
-${JSON.stringify(kicdStrand.kicd_data[0], null, 2)}
-
-Instructions:
-- Use these official outcomes as your BASE for lesson ${lessonNumber} of ${totalLessons}
-- Adapt the language for this specific lesson focus
-- Maintain CBC competency-based approach
-- Do not copy verbatim — generate lesson-specific content
-`
+    ? `\nOFFICIAL KICD CONTENT (use as base, adapt language):\n${JSON.stringify(kicdStrand.kicd_data[0], null, 2)}\n`
     : ''
 
+  // Curriculum-mode descriptors
   const curriculumContext = isCBC
-    ? `Kenya CBC Competency-Based Curriculum
-       Assessment: Continuous formative (Levels 1-4)
-       Approach: Learner-centered, inquiry-based
-       Context: Kenyan classroom, local examples`
-    : `Kenya 8-4-4 KCSE Curriculum
-       Assessment: Summative exams (marks-based)
-       Approach: Content mastery, exam preparation
-       Context: Kenyan secondary school`
+    ? 'Kenya CBC — Competency-Based, learner-centered, inquiry-driven, no marks/exams, real Kenyan examples'
+    : 'Kenya 8-4-4 KCSE — Content mastery, exam-oriented, past-paper style questions, KCSE marking awareness'
 
-  const outcomeBlock = !isCBC ? '' : isMaths ? `
-MANDATORY MATHS OUTCOME STRUCTURE:
-Write EXACTLY 3 learning outcomes in THIS progression:
+  // ── Outcome instructions ────────────────────────────────────────────────────
+  // Use seed verbs when available; fall back to broad verb groups.
+  const seed = diversitySeed
 
-Outcome a) MUST start with: identify / state / define / describe / list / name / recognize / recall
-Example: 'identify the steps in solving ${substrand}'
+  const verbAvoidLine = previousVerbs && previousVerbs.length > 0
+    ? `VERBS ALREADY USED — do NOT start any outcome with: ${previousVerbs.slice(-15).join(', ')}`
+    : 'First lesson — choose freely, but avoid starting all outcomes with the same verb.'
 
-Outcome b) MUST start with: solve / calculate / apply / compute / determine / evaluate / find / work out / construct / draw / plot / measure
-Example: 'solve problems involving ${substrand}'
+  let outcomeBlock: string
 
-Outcome c) MUST start with: appreciate / value / recognize the importance of / develop interest / show confidence
-Example: 'appreciate the application of ${substrand} in real life situations'
+  if (isMaths) {
+    const l1 = seed?.outcomePattern.l1 ?? 'identify'
+    const l2 = seed?.outcomePattern.l2 ?? 'calculate'
+    const l3 = seed?.outcomePattern.l3 ?? 'appreciate'
+    outcomeBlock = `
+LEARNING OUTCOMES — MATHEMATICS:
+Write EXACTLY 3 outcomes in this cognitive progression:
+a) LEVEL 1 (knowledge/recall) — start with: "${l1}" or any equivalent Level 1 maths verb
+   e.g. "${l1} the properties of ${substrand}"
+b) LEVEL 2 (computation/application) — start with: "${l2}" or any equivalent Level 2 maths verb
+   e.g. "${l2} problems involving ${substrand}"
+c) LEVEL 3 (real-life value) — start with: "${l3}" or any equivalent Level 3 verb
+   e.g. "${l3} the use of ${substrand} in everyday Kenyan contexts"
 
-WRONG — will be REJECTED:
-❌ a) explain ${substrand}     (explain is level 2, not level 1)
-❌ b) appreciate ${substrand}  (appreciate is level 3, not level 2)
-❌ c) solve ${substrand}       (solve belongs at level 1 or 2, not level 3)
-` : `
-CRITICAL — TSC INSPECTION REQUIREMENT:
-Write EXACTLY 3 learning outcomes in THIS progression:
-
-Outcome a) MUST start with ONE of these LEVEL 1 words:
-identify, describe, define, list, name, state,
-outline, locate, observe, collect, note, read,
-record, recognize, select, match, label
-
-Outcome b) MUST start with ONE of these LEVEL 2 words:
-explain, discuss, analyze, compare, examine,
-classify, interpret, differentiate, investigate,
-express, predict, relate, demonstrate, apply
-
-Outcome c) MUST start with ONE of these LEVEL 3 words:
-appreciate, value, evaluate, reflect, advocate,
-promote, create, develop, recognize the importance of
-
-CORRECT EXAMPLE for "${substrand}":
-a) identify the key features of ${substrand} in context,
-b) explain how ${substrand} is applied in communication,
-c) appreciate the role of ${substrand} in effective language use.
-
-WRONG — will be REJECTED:
-❌ a) understand ${substrand}  ('understand' not allowed)
-❌ a) explain ${substrand}     (explain is level 2, not level 1)
-❌ b) appreciate ${substrand}  (appreciate is level 3, not level 2)
+Sentence structure for this lesson: ${seed?.outcomePattern.structure ?? 'A'} — use structure variety across the three outcomes.
+${verbAvoidLine}
 `
+  } else if (isCBC) {
+    const l1 = seed?.outcomePattern.l1 ?? 'describe'
+    const l2 = seed?.outcomePattern.l2 ?? 'analyze'
+    const l3 = seed?.outcomePattern.l3 ?? 'reflect on'
+    outcomeBlock = `
+LEARNING OUTCOMES — CBC:
+Write EXACTLY 3 outcomes in this cognitive progression:
+a) LEVEL 1 (knowledge/observation) — start with: "${l1}" or any equivalent Level 1 verb
+   e.g. "${l1} the [key aspect] of ${substrand} in a Kenyan context"
+b) LEVEL 2 (understanding/application) — start with: "${l2}" or any equivalent Level 2 verb
+   e.g. "${l2} how ${substrand} is applied in [real Kenyan situation]"
+c) LEVEL 3 (values/advocacy) — start with: "${l3}" or any equivalent Level 3 verb
+   e.g. "${l3} the importance of ${substrand} in [community or national context]"
 
-  return `
-You are a Kenyan curriculum expert preparing ONE lesson only.
-
-CURRICULUM: ${curriculumContext}
-
-STRICT RULES:
-${
-  isCBC
-    ? `
-- Follow KICD CBC curriculum design
-- NO exams, NO tests, NO marks
-- Learner-centered activities
-- Real Kenyan context examples
-- Competency-based outcomes
+Sentence structure for this lesson: ${seed?.outcomePattern.structure ?? 'A'} — vary structure across the three outcomes.
+${verbAvoidLine}
 `
-    : `
-- Follow 8-4-4 KCSE syllabus
-- Exam-oriented objectives
-- Content mastery focus
-- Past paper style questions
-- KCSE marking scheme awareness
+  } else {
+    // 8-4-4
+    const l1 = seed?.outcomePattern.l1 ?? 'state'
+    const l2 = seed?.outcomePattern.l2 ?? 'explain'
+    const l3 = seed?.outcomePattern.l3 ?? 'evaluate'
+    outcomeBlock = `
+LEARNING OUTCOMES — 8-4-4 KCSE:
+Write EXACTLY 3 specific objectives in this progression:
+a) KNOWLEDGE — start with: "${l1}" or any equivalent recall verb
+   e.g. "${l1} the [key fact] about ${substrand}"
+b) COMPREHENSION/APPLICATION — start with: "${l2}" or any equivalent application verb
+   e.g. "${l2} how ${substrand} applies to [KCSE exam context]"
+c) EVALUATION/ATTITUDE — start with: "${l3}" or any equivalent higher-order verb
+   e.g. "${l3} the significance of ${substrand} in [Kenyan context]"
+
+${verbAvoidLine}
 `
-}
+  }
+
+  // ── Experience instruction ──────────────────────────────────────────────────
+  const classroomRule = `IMPORTANT: All activities happen INSIDE the classroom only.
+No field trips, no external visitors, no going to other locations.
+Use only: discussion, role play, think-pair-share, gallery walk, case study, group work, Q&A, debate, demonstration.
+Each activity: 1–2 sentences max. Total time: 35–40 minutes for 30–45 students.
+Kenyan contexts appear as discussion examples only — not as places the class physically visits.`
+
+  const experienceInstruction = seed
+    ? `LEARNING EXPERIENCE FRAMEWORK — ${seed.framework.label}: ${seed.framework.name}
+${seed.framework.template}
+Replace [topic], [location], [context] with specifics from: ${substrand}, ${strand}, ${learningArea}
+${classroomRule}`
+    : `Design 3 varied classroom activities.
+${classroomRule}`
+
+  // ── Inquiry question instruction ────────────────────────────────────────────
+  const questionInstruction = seed
+    ? `INQUIRY QUESTIONS — ${seed.questionFrame.name} frame:
+Use THESE specific starters (adapt to topic):
+  Q1 starter: "${seed.questionFrame.starters[0]}"
+  Q2 starter: "${seed.questionFrame.starters[1]}"
+  Q3 starter: "${seed.questionFrame.starters[2]}"`
+    : `Write 3 inquiry questions using DIFFERENT starters. Rotate: Why / How / What if / In what ways / Which / How might / Where / Can you...`
+
+  // ── Assessment instruction ──────────────────────────────────────────────────
+  const assessmentInstruction = seed
+    ? `ASSESSMENT — use EXACTLY these three methods (no substitution):
+  "${seed.assessmentMethods[0]}"
+  "${seed.assessmentMethods[1]}"
+  "${seed.assessmentMethods[2]}"`
+    : `Choose 3 DIFFERENT assessment methods. Rotate from: observation checklist, oral questions, written exercise, practical demo, peer assessment, self-assessment, exit ticket, portfolio entry, quiz, reflection.`
+
+  // ── Values and competencies ─────────────────────────────────────────────────
+  const valuesStr       = seed?.values           ?? 'Respect, Responsibility, Unity'
+  const competenciesStr = seed?.coreCompetencies ?? (isCBC ? 'Communication, Critical thinking, Collaboration' : 'Problem solving, Critical thinking')
+
+  // ── Dynamic JSON example — NEVER hardcode identify/explain/appreciate ───────
+  const l1ex = seed?.outcomePattern.l1 ?? 'describe'
+  const l2ex = seed?.outcomePattern.l2 ?? 'investigate'
+  const l3ex = seed?.outcomePattern.l3 ?? 'reflect on'
+
+  const experienceEx = seed
+    ? [
+        `${seed.framework.name}: [specific activity referencing ${substrand} in Kenyan context]`,
+        '[second distinct activity — different structure from first]',
+        '[third activity — individual, pair, or group work]',
+      ]
+    : [
+        'Learners [activity 1 referencing specific local context]',
+        'Learners [activity 2 — different mode from activity 1]',
+        'Learners [activity 3 — individual task to consolidate]',
+      ]
+
+  return `CURRICULUM: ${curriculumContext}
 
 LESSON DETAILS:
 Subject: ${learningArea}
@@ -188,113 +280,118 @@ ${isCBC ? 'Grade' : 'Form'}: ${grade}
 Strand/Topic: ${strand}
 Substrand/Subtopic: ${substrand}
 Lesson: ${lessonNumber} of ${totalLessons}
-${outcomeBlock}
-MANDATORY JSON FORMAT:
-{
-  "learning_outcomes": [
-    "identify [specific knowledge from this substrand]",
-    "explain [understanding of concept]",
-    "appreciate [value or relevance to learner's life]"
-  ],
-  "learning_experiences": [
-    "Learners work in groups to...",
-    "Learners discuss and explain...",
-    "Learners demonstrate..."
-  ],
-  "key_inquiry_questions": [
-    "Why does...?",
-    "How can...?",
-    "What would happen if...?"
-  ],
-  "assessment_methods": [
-    "Observation",
-    "Oral questions",
-    "Written exercise"
-  ],
-  "learning_resources": [
-    "KLB ${learningArea} ${grade} pg. ${estimatedPage}-${estimatedPageEnd}",
-    "Charts showing [specific aspect of topic]",
-    "Real objects: [relevant specimen or material]",
-    "Digital: YouTube — [topic] explanation"
-  ],
-  "core_competencies": "${
-    isCBC
-      ? 'Communication, Critical thinking, Collaboration'
-      : 'Problem solving, Critical thinking'
-  }",
-  "values": "Respect, Responsibility, Unity",
-  "pci_links": "${
-    isCBC
-      ? 'Health Education, Citizenship, Life Skills'
-      : 'Guidance and Counselling, Life Skills'
-  }"
-}
 
-RESOURCES REQUIREMENT:
-"learning_resources" MUST include exactly 4 items in this order:
-1. The specific textbook with page range — Format: '[Publisher] [Subject] Grade [N] pg. [X]-[Y]'
-   For this lesson (${lessonNumber} of ${totalLessons}): use pages around ${estimatedPage}–${estimatedPageEnd}
-   Example: 'KLB ${learningArea} ${grade} pg. ${estimatedPage}–${estimatedPageEnd}'
-   (Substitute correct publisher if not KLB. Use realistic consecutive page numbers.)
-2. A specific chart or diagram relevant to ${substrand}
-3. Real objects, specimens, or materials specific to this lesson
-4. A digital resource (YouTube video, educational website) about ${substrand}
+${outcomeBlock}
+
+${experienceInstruction}
+
+${questionInstruction}
+
+${assessmentInstruction}
+
+RESOURCES — REALISTIC FOR A KENYAN PUBLIC SCHOOL CLASSROOM:
+First two are MANDATORY in every lesson:
+1. "${textbook || `${learningArea} ${isCBC ? 'Grade' : 'Form'} ${grade} Textbook`}" — relevant pages on ${substrand}
+2. Teacher's Guide for ${learningArea} ${isCBC ? 'Grade' : 'Form'} ${grade}
+Then add 1–2 of these ONLY (classroom-available):
+- Charts (hand-drawn or printed)
+- Locally available real objects (stones, leaves, soil — found in any Kenyan classroom or compound)
+- Newspaper or magazine cutouts
+- Blackboard and chalk diagrams
+- Digital devices only if explicitly available at the school
+NEVER: community resource persons, farm visits, radio recordings, government maps, purchased materials.
 
 KEYWORD REQUIREMENT:
 Your lesson is about: ${substrand}
-You MUST use at least ONE of these exact words or their direct forms in your outcomes/experiences:
-${skillWords}
-
-Example — for 'Previewing and Predicting':
-MUST include 'preview' or 'predict' somewhere ✅
+Use at least ONE word from this set somewhere in outcomes or experiences:
+${substrand.split(/[\s\-:,\/()]+/).filter(w => w.length >= 4).slice(0, 3).join(', ')}
 
 ${kicdSection}${subtopicsSection}
-IMPORTANT:
-- Exactly 3 learning outcomes: Level 1 verb → Level 2 verb → Level 3 verb
-- Use ${isCBC ? 'Kenyan CBC' : 'KCSE'} terminology
-- Outcomes must progress from knowledge → understanding → values
-- Output VALID JSON ONLY
-${retryNote}  `
+${seed?.contextBlock ? `\nPER-LESSON DIVERSITY CONTEXT:\n${seed.contextBlock}` : ''}
+
+OUTPUT — Return ONLY this JSON structure:
+{
+  "learning_outcomes": [
+    "${l1ex} [specific knowledge about ${substrand} using Kenyan context]",
+    "${l2ex} how ${substrand} [applies or functions in real situation]",
+    "${l3ex} the significance of ${substrand} in [Kenyan community or national context]"
+  ],
+  "learning_experiences": [
+    "${experienceEx[0]}",
+    "${experienceEx[1]}",
+    "${experienceEx[2]}"
+  ],
+  "key_inquiry_questions": [
+    "[question using first starter from the frame above]",
+    "[question using second starter from the frame above]",
+    "[question using third starter from the frame above]"
+  ],
+  "assessment_methods": [
+    "${seed?.assessmentMethods[0] ?? 'Observation checklist for [skill]'}",
+    "${seed?.assessmentMethods[1] ?? 'Oral questioning using higher-order prompts'}",
+    "${seed?.assessmentMethods[2] ?? 'Written exercise: [specific task]'}"
+  ],
+  "learning_resources": [
+    "${textbook || `${learningArea} ${isCBC ? 'Grade' : 'Form'} ${grade} Textbook`} — pages on ${substrand}",
+    "Teacher's Guide for ${learningArea} ${isCBC ? 'Grade' : 'Form'} ${grade}",
+    "[One classroom resource: chart / real object / newspaper cutout / blackboard diagram]"
+  ],
+  "core_competencies": "${competenciesStr}",
+  "values": "${valuesStr}",
+  "pci_links": "${isCBC ? 'Health Education, Citizenship, Life Skills' : 'Guidance and Counselling, Life Skills'}"
 }
 
-// ─── Main export ─────────────────────────────────────────────────────────────
+IMPORTANT:
+- 3 learning outcomes: Level 1 → Level 2 → Level 3 cognitive order
+- Use ${isCBC ? 'CBC Kenya' : 'KCSE 8-4-4 Kenya'} terminology throughout
+- All examples must reference real Kenyan places, crops, practices, or communities
+- Output VALID JSON ONLY — no extra text
+${retryNote}`
+}
+
+// ─── Context interface ────────────────────────────────────────────────────────
 
 export interface LessonGenerationContext {
-  learningArea: string
-  grade: string
-  strand: string
-  substrand: string
-  lessonNumber: number
-  totalLessons: number
+  learningArea:   string
+  grade:          string
+  strand:         string
+  substrand:      string
+  lessonNumber:   number
+  totalLessons:   number
   curriculumMode: CurriculumMode
-  subjectType?: string
+  subjectType?:   string
+  previousVerbs?: string[]
+  diversitySeed?: DiversitySeed
+  textbook?:      string
   kicdContext?: {
-    subjectData: Record<string, any>
-    strandData: Array<{ title: string; kicd_data: any[] }>
+    subjectData:  Record<string, any>
+    strandData:   Array<{ title: string; kicd_data: any[] }>
     subtopicMap?: Record<string, string[]>
   }
 }
 
 export interface ValidatedLessonResult {
-  learning_outcomes?: string[]
-  learning_experiences?: string[]
-  key_inquiry_questions?: string[]
-  assessment_methods?: string[]
-  learning_resources?: string[]
-  core_competencies?: string
-  values?: string
-  pci_links?: string
-  _validated: boolean
+  learning_outcomes?:      string[]
+  learning_experiences?:   string[]
+  key_inquiry_questions?:  string[]
+  assessment_methods?:     string[]
+  learning_resources?:     string[]
+  core_competencies?:      string
+  values?:                 string
+  pci_links?:              string
+  _validated:  boolean
   _confidence: number
-  _source: string
-  error?: string
-  details?: string
+  _source:     string
+  error?:      string
+  details?:    string
 }
+
+// ─── Main export ─────────────────────────────────────────────────────────────
 
 export async function generateValidatedLesson(
   context: LessonGenerationContext
 ): Promise<ValidatedLessonResult> {
-  let attempt = 0
+  let attempt   = 0
   let lastError: string | null = null
 
   const skillWords = context.substrand
@@ -308,31 +405,28 @@ export async function generateValidatedLesson(
 
     let retryNote = ''
     if (attempt > 1 && lastError) {
-      const isMathsRetry = (context.subjectType ?? 'default') === 'mathematics'
-      const progressReminder = isMathsRetry
-        ? 'REMINDER: Maths outcomes — a)=identify/state/define/solve, b)=calculate/apply/compute, c)=appreciate/value'
-        : 'REMINDER: outcome a)=identify/describe, b)=explain/discuss, c)=appreciate/value'
+      const isMathsRetry = (context.subjectType ?? '').includes('mathematics')
       retryNote = `
-PREVIOUS ATTEMPT FAILED BECAUSE: ${lastError}
+PREVIOUS ATTEMPT FAILED: ${lastError}
 Fix this specific issue in your next response.
-${lastError.includes('progress') ? progressReminder : ''}
-${lastError.includes('aligned') ? `REMINDER: Must include at least one word from: ${skillWords}` : ''}
+${lastError.includes('progress') ? `REMINDER: outcomes must go Level 1 → Level 2 → Level 3 cognitive order` : ''}
+${lastError.includes('aligned')  ? `REMINDER: must include at least one word from: ${skillWords}` : ''}
+${isMathsRetry && lastError.includes('progress') ? 'MATHS REMINDER: a)=recall/identify, b)=calculate/apply, c)=appreciate/value' : ''}
 `
     }
 
-    const prompt = buildLessonPrompt(context, retryNote)
+    const prompt = buildLessonPrompt({ ...context }, retryNote)
 
     let aiResponse: string
     try {
       aiResponse = await callDeepSeek(prompt)
-    } catch (err: any) {
-      lastError = `AI request failed: ${err.message}`
+    } catch (err: unknown) {
+      lastError = `AI request failed: ${err instanceof Error ? err.message : String(err)}`
       continue
     }
 
     let lesson: Record<string, any>
     try {
-      // Strip any accidental markdown fences before parsing
       const cleaned = aiResponse
         .replace(/^```json\s*/i, '')
         .replace(/^```\s*/i, '')
@@ -349,9 +443,9 @@ ${lastError.includes('aligned') ? `REMINDER: Must include at least one word from
     if (validation.isValid) {
       return {
         ...lesson,
-        _validated: true,
+        _validated:  true,
         _confidence: Math.min(0.85 + attempt * 0.03, MAX_CONFIDENCE),
-        _source: 'deepseek_sow_generator',
+        _source:     'deepseek_sow_generator',
       }
     }
 
@@ -359,10 +453,10 @@ ${lastError.includes('aligned') ? `REMINDER: Must include at least one word from
   }
 
   return {
-    error: 'Lesson failed validation',
-    details: lastError || 'Unknown error',
-    _validated: false,
+    error:       'Lesson failed validation',
+    details:     lastError || 'Unknown error',
+    _validated:  false,
     _confidence: 0,
-    _source: 'deepseek_sow_generator',
+    _source:     'deepseek_sow_generator',
   }
 }

@@ -159,6 +159,23 @@ const S = StyleSheet.create({
   topicNum:         { fontSize: 9, fontWeight: 700, color: C.gold, width: 20 },
   topicText:        { fontSize: 9.5, color: C.text, flex: 1, lineHeight: 1.5 },
 
+  // ── Dream career section
+  dreamSection:    { backgroundColor: '#E6F1FB', borderLeftWidth: 3, borderLeftColor: '#185FA5', borderRadius: 4, padding: 10, marginBottom: 12 },
+  dreamLabel:      { fontSize: 8, fontWeight: 700, color: '#185FA5', letterSpacing: 0.5, marginBottom: 2 },
+  dreamTitle:      { fontSize: 14, fontWeight: 700, color: '#0C447C', marginBottom: 6 },
+  dreamMeterRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 3 },
+  dreamMeterTrack: { flex: 1, height: 10, backgroundColor: '#B5D4F4', borderRadius: 5, marginRight: 8, overflow: 'hidden' },
+  dreamMeterFill:  { height: 10, backgroundColor: '#185FA5', borderRadius: 5 },
+  dreamScore:      { fontSize: 16, fontWeight: 700, color: '#0C447C', width: 40 },
+  dreamReadiness:  { fontSize: 9, color: '#185FA5', marginBottom: 6 },
+  dreamGapsBox:    { backgroundColor: '#FAEEDA', borderLeftWidth: 2, borderLeftColor: '#EF9F27', padding: 6, borderRadius: 3, marginBottom: 6 },
+  dreamGapsTitle:  { fontSize: 8, fontWeight: 700, color: '#854F0B', marginBottom: 3 },
+  dreamGapItem:    { fontSize: 8, color: '#633806', marginBottom: 2 },
+  dreamEstimate:   { fontSize: 8, color: '#854F0B', fontStyle: 'italic', marginTop: 4 },
+  dreamEncourage:  { fontSize: 8, color: '#0C447C', lineHeight: 1.5, marginBottom: 6 },
+  dreamAltTitle:   { fontSize: 8, fontWeight: 700, color: '#185FA5', marginBottom: 2 },
+  dreamAltItem:    { fontSize: 8, color: '#185FA5', marginBottom: 1 },
+
   // ── Teacher page
   teacherBox:    { borderWidth: 1, borderColor: C.border, borderRadius: 6, padding: 14, marginBottom: 14 },
   teacherLabel:  { fontSize: 8, color: C.muted, letterSpacing: 1, marginBottom: 6 },
@@ -649,6 +666,50 @@ function CareerPage({ report }: { report: AcademicClinicReport }) {
         <Text style={S.sectionLabel}>CAREER ANALYSIS · GRADES 10–12</Text>
         <Text style={S.sectionTitle}>Career Intelligence Report</Text>
         <View style={S.divider} />
+
+        {report.dreamCareerAnalysis?.found && (
+          <View style={S.dreamSection}>
+            <Text style={S.dreamLabel}>DREAM CAREER ANALYSIS</Text>
+            <Text style={S.dreamTitle}>{report.dreamCareerAnalysis.dreamCareer}</Text>
+
+            <View style={S.dreamMeterRow}>
+              <View style={S.dreamMeterTrack}>
+                <View style={[S.dreamMeterFill, { width: `${report.dreamCareerAnalysis.readinessScore}%` }]} />
+              </View>
+              <Text style={S.dreamScore}>{report.dreamCareerAnalysis.readinessScore}%</Text>
+            </View>
+            <Text style={S.dreamReadiness}>{report.dreamCareerAnalysis.readinessLabel}</Text>
+
+            {report.dreamCareerAnalysis.gapSubjects.length > 0 && (
+              <View style={S.dreamGapsBox}>
+                <Text style={S.dreamGapsTitle}>TO QUALIFY:</Text>
+                {report.dreamCareerAnalysis.gapSubjects.map(g => (
+                  <Text key={g.subject} style={S.dreamGapItem}>
+                    {'•'} {g.displayName}: Level {g.currentLevel} {'→'} Level {g.requiredLevel} ({g.gapSize === 1 ? 'one step away' : 'two steps'})
+                  </Text>
+                ))}
+                {report.dreamCareerAnalysis.estimatedTerms > 0 && (
+                  <Text style={S.dreamEstimate}>
+                    Estimated: {report.dreamCareerAnalysis.estimatedTerms} term(s) with EduNexus Learning Compass
+                  </Text>
+                )}
+              </View>
+            )}
+
+            <Text style={S.dreamEncourage}>{report.dreamCareerAnalysis.encouragement}</Text>
+
+            {report.dreamCareerAnalysis.alternativeCareers.length > 0 && (
+              <View>
+                <Text style={S.dreamAltTitle}>RELATED CAREERS IN SAME PATHWAY:</Text>
+                {report.dreamCareerAnalysis.alternativeCareers.map(alt => (
+                  <Text key={alt.name} style={S.dreamAltItem}>
+                    {alt.name} — {alt.matchScore}% match
+                  </Text>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
 
         {sg.topCareers.map((c, i) => (
           <View key={i} style={S.careerCard}>

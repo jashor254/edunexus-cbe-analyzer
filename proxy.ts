@@ -1,7 +1,28 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+const PUBLIC_PREFIXES = [
+  '/login',
+  '/signup',
+  '/pricing',
+  '/legal',
+  '/auth',
+  '/join',
+  '/shared',
+  '/payment',
+  '/_next',
+  '/favicon',
+]
+
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // Root and explicitly public paths bypass auth entirely
+  if (pathname === '/') return NextResponse.next()
+  if (PUBLIC_PREFIXES.some(prefix => pathname.startsWith(prefix))) {
+    return NextResponse.next()
+  }
+
   let response = NextResponse.next({
     request: { headers: request.headers },
   })
@@ -15,18 +36,19 @@ export async function proxy(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
+          cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
-            response = NextResponse.next({ request: { headers: request.headers } })
+          )
+          response = NextResponse.next({ request: { headers: request.headers } })
+          cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
-          })
+          )
         },
       },
     }
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-  const { pathname } = request.nextUrl
 
   // ── Admin routes: only kariukidennis092@gmail.com ─────────────────────────
   if (pathname.startsWith('/admin')) {
@@ -36,34 +58,56 @@ export async function proxy(request: NextRequest) {
     return response
   }
 
-  // ── Dashboard routes: must be logged in ──────────────────────────────────
-  if (pathname.startsWith('/dashboard')) {
-    if (!user) {
-      return NextResponse.redirect(new URL('/login', request.url))
-    }
-    return response
+  // ── All other protected routes: must be logged in ─────────────────────────
+  if (!user) {
+    return NextResponse.redirect(
+      new URL(`/login?returnTo=${encodeURIComponent(pathname)}`, request.url)
+    )
   }
 
-  // ── Teacher routes: must be logged in + have teacher record ──────────────
+  // ── Teacher routes ────────────────────────────────────────────────────────
   if (pathname.startsWith('/teacher')) {
-    if (!user) {
-      return NextResponse.redirect(new URL('/login', request.url))
+    // /teacher/setup is open to any logged-in user (completes onboarding)
+    if (pathname === '/teacher/setup') return response
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, secondary_role')
+      .eq('id', user.id)
+      .single()
+
+    const canAccessTeacher =
+      profile?.role === 'teacher' || profile?.secondary_role === 'teacher'
+
+    if (!canAccessTeacher) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
-    // /teacher/setup is allowed for logged-in users without a teacher record
-    if (pathname === '/teacher/setup') {
-      return response
-    }
-
-    // All other /teacher/* routes need a teacher record
+    // Verify teacher record exists (role may be set but setup incomplete)
     const { data: teacher } = await supabase
       .from('teachers')
       .select('id')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
 
     if (!teacher) {
       return NextResponse.redirect(new URL('/teacher/setup', request.url))
+    }
+
+    return response
+  }
+
+  // ── Dashboard routes ──────────────────────────────────────────────────────
+  if (pathname.startsWith('/dashboard')) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, secondary_role')
+      .eq('id', user.id)
+      .single()
+
+    // Pure teachers (no parent secondary role) belong in teacher dashboard
+    if (profile?.role === 'teacher' && profile?.secondary_role !== 'parent') {
+      return NextResponse.redirect(new URL('/teacher/dashboard', request.url))
     }
 
     return response

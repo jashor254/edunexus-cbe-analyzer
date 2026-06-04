@@ -235,6 +235,12 @@ export default function AdminPage() {
               <p className="font-semibold text-white">Other Actions</p>
               <div className="space-y-2">
                 <a
+                  href="/admin/pilot"
+                  className="flex items-center gap-2 w-full px-4 py-2 bg-violet-900/40 hover:bg-violet-900/60 text-violet-300 text-sm font-medium rounded-lg transition-colors border border-violet-700/30"
+                >
+                  Pilot Students →
+                </a>
+                <a
                   href="/admin/payments"
                   className="flex items-center gap-2 w-full px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm font-medium rounded-lg transition-colors"
                 >

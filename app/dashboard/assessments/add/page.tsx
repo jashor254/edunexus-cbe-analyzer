@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 import { getCurriculumConfig, getGradeColor, getGradeLabel } from '@/lib/curriculum'
+import { marksToLevel, levelToLabel, levelToColor, type CBCLevel } from '@/lib/assessments/gradeCalculator'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Student {
@@ -155,6 +156,67 @@ function ScoreButtons({
   )
 }
 
+// ─── Marks input component (0-100 → auto level) ──────────────────────────────
+function MarksScoreInput({
+  subjectKey,
+  label,
+  emoji,
+  rawMarks,
+  scores,
+  onMark,
+}: {
+  subjectKey: string
+  label:      string
+  emoji?:     string
+  rawMarks:   Record<string, number | ''>
+  scores:     Record<string, number>
+  onMark:     (key: string, raw: number | '') => void
+}) {
+  const raw   = rawMarks[subjectKey] ?? ''
+  const level = scores[subjectKey] as CBCLevel | undefined
+
+  return (
+    <div className={`p-4 rounded-2xl border-2 transition-all ${level ? 'bg-white border-black' : 'bg-white border-slate-100'}`}>
+      <div className="flex items-center gap-2 mb-3">
+        {emoji && <span className="text-xl">{emoji}</span>}
+        <div className="flex-1 min-w-0">
+          <div className="text-xs font-black text-slate-500 uppercase truncate">{label}</div>
+          {level && (
+            <div className="text-xs font-bold" style={{ color: levelToColor(level) }}>
+              L{level} — {levelToLabel(level)} ✓
+            </div>
+          )}
+        </div>
+        {level && (
+          <span
+            className="text-xs font-black px-2 py-0.5 rounded-full text-white"
+            style={{ backgroundColor: levelToColor(level) }}
+          >
+            L{level}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          min={0}
+          max={100}
+          value={raw}
+          onChange={e => {
+            const v = e.target.value === '' ? '' : Number(e.target.value)
+            onMark(subjectKey, v)
+          }}
+          placeholder="0–100"
+          className="w-20 px-3 py-2 border-2 border-slate-200 rounded-xl text-sm font-black text-center focus:border-black focus:outline-none"
+        />
+        <span className="text-xs text-slate-400 font-medium">
+          75+ L4 · 50-74 L3 · 30-49 L2 · 0-29 L1
+        </span>
+      </div>
+    </div>
+  )
+}
+
 // ─── IGCSE Score button component ─────────────────────────────────────────────
 function IGCSEScoreButtons({
   subjectId,
@@ -229,10 +291,24 @@ function AddAssessmentContent() {
   const [loading,            setLoading]            = useState(false)
   const [error,              setError]              = useState<string | null>(null)
 
+  // Marks mode (CBC only)
+  const [inputMode, setInputMode] = useState<'marks' | 'levels'>('marks')
+  const [rawMarks,  setRawMarks]  = useState<Record<string, number | ''>>({})
+
+  function setRawMark(key: string, raw: number | '') {
+    setRawMarks(prev => ({ ...prev, [key]: raw }))
+    if (raw !== '' && raw >= 0 && raw <= 100) {
+      setScores(prev => ({ ...prev, [key]: marksToLevel(raw) }))
+    } else {
+      setScores(prev => { const next = { ...prev }; delete next[key]; return next })
+    }
+  }
+
   // IGCSE state
   const [igcseSelectedSubjects, setIgcseSelectedSubjects] = useState<string[]>([])
   const [igcseScores,           setIgcseScores]           = useState<Record<string, string>>({})
   const [assessmentStyle,       setAssessmentStyle]       = useState<string>('end_of_term')
+  const [dreamCareer,           setDreamCareer]           = useState<string>('')
 
   // ── Load students ───────────────────────────────────────────────────────────
   const loadStudents = useCallback(async () => {
@@ -433,6 +509,9 @@ function AddAssessmentContent() {
         assessment_style:  'formative',
         mathematics_type:  isSenior ? mathType : null,
         pathway_electives: isSenior ? selectedElectives : null,
+        source:            'parent',
+        raw_marks:         inputMode === 'marks' ? rawMarks : {},
+        dream_career:      dreamCareer.trim() || null,
       }
 
       const { error: insertError } = await supabase
@@ -715,8 +794,34 @@ function AddAssessmentContent() {
           </div>
         )}
 
+        {/* ── Input mode toggle (CBC only) ────────────────────────────────── */}
+        {!isIGCSE && currentStudent && (
+          <div className="flex items-center gap-3 mb-6 p-4 bg-slate-50 rounded-2xl border-2 border-slate-200">
+            <span className="text-xs font-black text-slate-500 uppercase tracking-wider">Enter scores as:</span>
+            <div className="flex gap-1 bg-slate-200 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setInputMode('marks')}
+                className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${inputMode === 'marks' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                Marks (0–100)
+              </button>
+              <button
+                type="button"
+                onClick={() => setInputMode('levels')}
+                className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${inputMode === 'levels' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                Levels (1–4)
+              </button>
+            </div>
+            {inputMode === 'marks' && (
+              <span className="text-xs text-slate-400 font-medium hidden sm:inline">75+ → L4 · 50-74 → L3 · 30-49 → L2 · 0-29 → L1</span>
+            )}
+          </div>
+        )}
+
         {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* ── CBC FLOW (unchanged) ────────────────────────────────────────── */}
+        {/* ── CBC FLOW ────────────────────────────────────────────────────── */}
         {/* ═══════════════════════════════════════════════════════════════════ */}
 
         {/* ── CBC JUNIOR SCHOOL ───────────────────────────────────────────── */}
@@ -750,14 +855,11 @@ function AddAssessmentContent() {
               <p className="text-xs text-blue-500 font-bold mb-6">All 8 required</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {JUNIOR_CORE.map(subject => (
-                  <ScoreButtons
-                    key={subject.key}
-                    subjectKey={subject.key}
-                    label={subject.label}
-                    emoji={subject.emoji}
-                    scores={scores}
-                    onScore={setScore}
-                  />
+                  inputMode === 'marks' ? (
+                    <MarksScoreInput key={subject.key} subjectKey={subject.key} label={subject.label} emoji={subject.emoji} rawMarks={rawMarks} scores={scores} onMark={setRawMark} />
+                  ) : (
+                    <ScoreButtons key={subject.key} subjectKey={subject.key} label={subject.label} emoji={subject.emoji} scores={scores} onScore={setScore} />
+                  )
                 ))}
               </div>
             </section>
@@ -798,13 +900,11 @@ function AddAssessmentContent() {
 
               {selectedReligion && (
                 <div className="max-w-sm">
-                  <ScoreButtons
-                    subjectKey={selectedReligion}
-                    label={JUNIOR_RELIGIOUS.find(r => r.key === selectedReligion)?.label || ''}
-                    emoji={JUNIOR_RELIGIOUS.find(r => r.key === selectedReligion)?.emoji}
-                    scores={scores}
-                    onScore={setScore}
-                  />
+                  {inputMode === 'marks' ? (
+                    <MarksScoreInput subjectKey={selectedReligion} label={JUNIOR_RELIGIOUS.find(r => r.key === selectedReligion)?.label || ''} emoji={JUNIOR_RELIGIOUS.find(r => r.key === selectedReligion)?.emoji} rawMarks={rawMarks} scores={scores} onMark={setRawMark} />
+                  ) : (
+                    <ScoreButtons subjectKey={selectedReligion} label={JUNIOR_RELIGIOUS.find(r => r.key === selectedReligion)?.label || ''} emoji={JUNIOR_RELIGIOUS.find(r => r.key === selectedReligion)?.emoji} scores={scores} onScore={setScore} />
+                  )}
                 </div>
               )}
             </section>
@@ -872,14 +972,11 @@ function AddAssessmentContent() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {SENIOR_COMPULSORY.map(subject => (
-                      <ScoreButtons
-                        key={subject.key}
-                        subjectKey={subject.key}
-                        label={subject.label}
-                        emoji={subject.emoji}
-                        scores={scores}
-                        onScore={setScore}
-                      />
+                      inputMode === 'marks' ? (
+                        <MarksScoreInput key={subject.key} subjectKey={subject.key} label={subject.label} emoji={subject.emoji} rawMarks={rawMarks} scores={scores} onMark={setRawMark} />
+                      ) : (
+                        <ScoreButtons key={subject.key} subjectKey={subject.key} label={subject.label} emoji={subject.emoji} scores={scores} onScore={setScore} />
+                      )
                     ))}
 
                     <div className="md:col-span-2">
@@ -899,13 +996,11 @@ function AddAssessmentContent() {
                         </span>
                       </div>
                       <div className="max-w-sm">
-                        <ScoreButtons
-                          subjectKey={mathType === 'core' ? 'core_mathematics' : 'essential_mathematics'}
-                          label={mathType === 'core' ? 'Core Mathematics' : 'Essential Mathematics'}
-                          emoji={mathType === 'core' ? '📐' : '📊'}
-                          scores={scores}
-                          onScore={setScore}
-                        />
+                        {inputMode === 'marks' ? (
+                          <MarksScoreInput subjectKey={mathType === 'core' ? 'core_mathematics' : 'essential_mathematics'} label={mathType === 'core' ? 'Core Mathematics' : 'Essential Mathematics'} emoji={mathType === 'core' ? '📐' : '📊'} rawMarks={rawMarks} scores={scores} onMark={setRawMark} />
+                        ) : (
+                          <ScoreButtons subjectKey={mathType === 'core' ? 'core_mathematics' : 'essential_mathematics'} label={mathType === 'core' ? 'Core Mathematics' : 'Essential Mathematics'} emoji={mathType === 'core' ? '📐' : '📊'} scores={scores} onScore={setScore} />
+                        )}
                       </div>
                     </div>
                   </div>
@@ -920,7 +1015,7 @@ function AddAssessmentContent() {
                     Choose exactly 3 • Selected: {selectedElectives.length}/3
                   </p>
 
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
+                  <div className="grid grid-cols-2 gap-2 mt-2">
                     {getPathwayElectives(currentStudent.current_pathway).map(elective => (
                       <button
                         key={elective.key}
@@ -953,15 +1048,10 @@ function AddAssessmentContent() {
                         {selectedElectives.map(key => {
                           const elective = getPathwayElectives(currentStudent.current_pathway!).find(e => e.key === key)
                           if (!elective) return null
-                          return (
-                            <ScoreButtons
-                              key={key}
-                              subjectKey={key}
-                              label={elective.label}
-                              emoji={elective.emoji}
-                              scores={scores}
-                              onScore={setScore}
-                            />
+                          return inputMode === 'marks' ? (
+                            <MarksScoreInput key={key} subjectKey={key} label={elective.label} emoji={elective.emoji} rawMarks={rawMarks} scores={scores} onMark={setRawMark} />
+                          ) : (
+                            <ScoreButtons key={key} subjectKey={key} label={elective.label} emoji={elective.emoji} scores={scores} onScore={setScore} />
                           )
                         })}
                       </div>
@@ -1007,6 +1097,28 @@ function AddAssessmentContent() {
                   <div>{label}</div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Dream Career (optional) ────────────────────────────────────────── */}
+        {currentStudent && isSenior && (
+          <div className="mt-8 border-t-2 border-dashed border-slate-200 pt-8">
+            <div className="mb-2">
+              <label className="block text-sm font-black uppercase tracking-wider text-slate-700 mb-1">
+                Dream Career <span className="text-slate-400 font-normal normal-case tracking-normal">(optional)</span>
+              </label>
+              <p className="text-xs text-slate-500 mb-3">
+                What career does your child dream of? We'll show their current readiness and the exact steps to get there.
+              </p>
+              <input
+                type="text"
+                value={dreamCareer}
+                onChange={e => setDreamCareer(e.target.value)}
+                placeholder="e.g. Doctor, Engineer, Lawyer..."
+                maxLength={100}
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl font-medium text-sm focus:outline-none focus:border-black transition-colors"
+              />
             </div>
           </div>
         )}

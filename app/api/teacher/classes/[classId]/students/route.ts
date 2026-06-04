@@ -12,13 +12,17 @@ import { sendWelcomeMessage } from '@/lib/whatsapp/sender'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://edunexus.co.ke'
 
+const SENIOR_PATHWAY_VALUES = ['STEM', 'Social Sciences', 'Arts & Sports Science'] as const
+
 const StudentSchema = z.object({
-  name:          z.string().min(1).max(100),
-  grade:         z.number().int().min(7).max(12),
-  curriculum_type: z.enum(['cbc', 'igcse', 'ib', '844', 'other']).default('cbc'),
-  parent_name:   z.string().min(1).max(100).optional(),
-  parent_phone:  z.string().max(20).optional(),
-  parent_email:  z.string().email().optional(),
+  name:              z.string().min(1).max(100),
+  grade:             z.number().int().min(7).max(12),
+  curriculum_type:   z.enum(['cbc', 'igcse', 'ib', '844', 'other']).default('cbc'),
+  parent_name:       z.string().min(1).max(100).optional(),
+  parent_phone:      z.string().max(20).optional(),
+  parent_email:      z.string().email().optional(),
+  current_pathway:   z.enum(SENIOR_PATHWAY_VALUES).optional(),
+  selected_subjects: z.array(z.string()).optional(),
 })
 
 const BodySchema = z.object({
@@ -77,6 +81,10 @@ export async function POST(
             parent_email:    s.parent_email?.trim().toLowerCase() ?? null,
             notification_email:    !!s.parent_email,
             notification_whatsapp: !!s.parent_phone,
+            ...(s.current_pathway ? {
+              current_pathway:   s.current_pathway,
+              selected_subjects: s.selected_subjects ?? [],
+            } : {}),
           })
           .select('id, name')
           .single()

@@ -9,6 +9,7 @@ const PLAN_LIMITS: Record<string, number> = {
   term:    3,
   premium: 3,
   admin:   3,
+  school:  9999,
 }
 
 export async function POST(request: Request) {
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
     if (authError || !user) return apiUnauthorized()
 
     const body = await request.json()
-    const { name, grade, school, curriculum_type } = body
+    const { name, grade, school, curriculum_type, current_pathway, selected_subjects } = body
 
     if (!name?.trim()) return apiBadRequest('Name is required')
     const gradeNum = Number(grade)
@@ -58,6 +59,13 @@ export async function POST(request: Request) {
       )
     }
 
+    const VALID_PATHWAYS = ['STEM', 'Social Sciences', 'Arts & Sports Science'] as const
+    type ValidPathway = typeof VALID_PATHWAYS[number]
+    const pathwayValue: ValidPathway | null =
+      current_pathway && VALID_PATHWAYS.includes(current_pathway as ValidPathway)
+        ? (current_pathway as ValidPathway)
+        : null
+
     // Create student
     const { data: student, error: insertError } = await service
       .from('students')
@@ -67,6 +75,10 @@ export async function POST(request: Request) {
         grade:           gradeNum,
         school:          school?.trim() || null,
         curriculum_type: curriculumType,
+        ...(pathwayValue ? {
+          current_pathway:   pathwayValue,
+          selected_subjects: Array.isArray(selected_subjects) ? selected_subjects : [],
+        } : {}),
       })
       .select()
       .single()

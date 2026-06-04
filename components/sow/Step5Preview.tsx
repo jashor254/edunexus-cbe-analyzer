@@ -312,22 +312,39 @@ export default function Step5Preview({
   // Build a lookup by week+lesson for O(1) access during table rendering
   const lessonByKey = new Map(result!.lessons.map(l => [`${l.week}_${l.lesson}`, l]))
   let lessonRowIdx = 0
+  let lastBreakId: string | null = null
   const tableRows = timeline.map(slot => {
     if (slot.isBreak) {
       const matchBreak = breaks.find(b => slotInBreak(slot.week, slot.lesson, b))
+      // Show one row per break period — skip duplicate slots of the same break
+      if (!matchBreak || matchBreak.id === lastBreakId) return null
+      lastBreakId = matchBreak.id
+      const wkRange = matchBreak.startWeek === matchBreak.endWeek
+        ? `Wk ${matchBreak.startWeek}`
+        : `Wk ${matchBreak.startWeek}–${matchBreak.endWeek}`
+      const lessonsLost = timeline.filter(s => s.isBreak && slotInBreak(s.week, s.lesson, matchBreak)).length
       return (
-        <tr key={`s${slot.slotIndex}`} className="bg-amber-50">
-          <td className="px-3 py-2 text-center font-bold text-amber-800 text-xs">{slot.week}</td>
-          <td className="px-3 py-2 text-center text-amber-600 text-xs">{slot.lesson}</td>
+        <tr key={`brk-${matchBreak.id}`} className="bg-amber-50 border-b border-amber-200">
+          <td className="px-3 py-2.5 text-center font-bold text-amber-800 text-xs">{matchBreak.startWeek}</td>
+          <td className="px-3 py-2.5 text-center text-amber-500 text-xs">—</td>
           <td
             colSpan={colConfig.hasInquiryQuestions ? 8 : 7}
-            className="px-3 py-2 text-center font-bold text-amber-800 text-xs italic"
+            className="px-3 py-2.5"
           >
-            {(matchBreak?.title ?? 'BREAK').toUpperCase()}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900">
+                BREAK
+              </span>
+              <span className="text-xs font-bold text-amber-900">{matchBreak.title}</span>
+              <span className="text-[11px] text-amber-700">
+                {wkRange} · {lessonsLost} lesson{lessonsLost !== 1 ? 's' : ''}
+              </span>
+            </div>
           </td>
         </tr>
       )
     }
+    lastBreakId = null
     const lesson = lessonByKey.get(`${slot.week}_${slot.lesson}`)
     if (!lesson) return null
     const myIdx = lessonRowIdx++

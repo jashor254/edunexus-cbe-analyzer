@@ -268,22 +268,22 @@ export default function Step4Breaks({
 
               <button
                 onClick={addBreak}
-                className="flex items-center gap-1.5 text-sm font-bold bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition"
+                className="flex items-center gap-1.5 text-sm font-bold bg-teal-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-teal-700 transition"
               >
                 + Add break
               </button>
             </div>
 
             {/* C. Breaks table — always visible */}
-            <div className="border border-gray-200 rounded-xl overflow-hidden mb-4">
-              <table className="w-full text-sm">
+            <div className="w-full border border-gray-200 rounded-lg overflow-hidden mb-4">
+              <table className="w-full">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase tracking-wide">
-                    <th className="text-left px-4 py-2.5">Break name</th>
-                    <th className="text-left px-4 py-2.5">Start</th>
-                    <th className="text-left px-4 py-2.5">End</th>
-                    <th className="text-left px-4 py-2.5">Lessons lost</th>
-                    <th className="px-4 py-2.5" />
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="text-left px-3 py-2 text-gray-600 font-medium text-sm">Break name</th>
+                    <th className="text-left px-3 py-2 text-gray-600 font-medium text-sm">Start</th>
+                    <th className="text-left px-3 py-2 text-gray-600 font-medium text-sm">End</th>
+                    <th className="text-left px-3 py-2 text-gray-600 font-medium text-sm">Lessons lost</th>
+                    <th className="px-3 py-2" />
                   </tr>
                 </thead>
                 <tbody>
@@ -291,28 +291,26 @@ export default function Step4Breaks({
                     <tr>
                       <td
                         colSpan={5}
-                        className="px-4 py-6 text-center text-sm text-gray-400 italic"
+                        className="text-center py-4 text-gray-500 text-sm border border-dashed border-gray-300 rounded-lg"
                       >
-                        No breaks added yet — add one above
+                        No breaks added yet
                       </td>
                     </tr>
                   ) : (
-                    breaks.map((b, i) => (
+                    breaks.map(b => (
                       <tr
                         key={b.id}
-                        className={`border-b border-gray-100 last:border-0 ${
-                          i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'
-                        }`}
+                        className="border-b border-gray-200 text-gray-800 text-sm"
                       >
-                        <td className="px-4 py-3 font-medium text-gray-900">{b.name}</td>
-                        <td className="px-4 py-3 text-gray-600">
+                        <td className="py-2 px-3 text-gray-700">{b.name}</td>
+                        <td className="py-2 px-3 text-gray-700">
                           Wk {b.startWeek}, L {b.startLesson}
                         </td>
-                        <td className="px-4 py-3 text-gray-600">
+                        <td className="py-2 px-3 text-gray-700">
                           Wk {b.endWeek}, L {b.endLesson}
                         </td>
-                        <td className="px-4 py-3 text-gray-400">{b.lessonsLost}</td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="py-2 px-3 text-gray-700">{b.lessonsLost}</td>
+                        <td className="py-2 px-3 text-right">
                           <button
                             onClick={() => removeBreak(b.id)}
                             className="text-xs font-bold text-red-500 hover:text-red-700 transition"
@@ -428,7 +426,7 @@ export default function Step4Breaks({
         <button
           onClick={handleNext}
           disabled={(noBreaks ? totalSlots : lessonsToGenerate) < 1}
-          className="flex items-center gap-2 bg-teal-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-teal-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 bg-teal-600 text-gray-800 px-6 py-3 rounded-xl font-bold hover:bg-teal-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Next — Generate Preview <ChevronRight className="w-4 h-4" />
         </button>

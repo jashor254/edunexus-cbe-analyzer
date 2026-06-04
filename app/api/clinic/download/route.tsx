@@ -16,6 +16,8 @@ import type {
   SubjectProgress,
   StudentProfile,
 } from '@/lib/academicClinic/reportGenerator'
+import { resolveLevel } from '@/lib/assessments/gradeCalculator'
+import type { CBCLevel } from '@/lib/assessments/gradeCalculator'
 
 export async function POST(req: Request) {
   try {
@@ -114,7 +116,21 @@ export async function POST(req: Request) {
 
     // ── 6. Build subject progress from assessments ───────────────────────────
     const latestAssessment  = assessments[assessments.length - 1]
-    const currentScores     = latestAssessment?.subject_scores || {}
+
+    // Resolve teacher-wins per subject for the latest term/year
+    const teacherAss = assessments.find((a: any) =>
+      a.source === 'teacher' && a.term === latestAssessment?.term && a.year === latestAssessment?.year
+    )
+    const baseScores: Record<string, number> = latestAssessment?.subject_scores || {}
+    const currentScores: Record<string, number> = teacherAss
+      ? Object.fromEntries(
+          Object.entries(baseScores).map(([subj, parentLevel]) => {
+            const teacherLevel = (teacherAss.subject_scores as Record<string, number>)?.[subj] ?? null
+            const resolved = resolveLevel(teacherLevel as CBCLevel | null, parentLevel as CBCLevel | null)
+            return [subj, resolved?.level ?? parentLevel]
+          })
+        )
+      : baseScores
 
     const subjectProgress: SubjectProgress[] = Object.keys(currentScores).map(subject => {
       const scores = assessments
@@ -168,7 +184,7 @@ export async function POST(req: Request) {
 
     const firstName      = student.name.split(' ')[0]
     const juniorGuidance = isJunior  ? generateJuniorGuidance(subjectProgress)                  : undefined
-    const seniorGuidance = !isJunior ? generateSeniorGuidance(subjectProgress, firstName, student.grade) : undefined
+    const seniorGuidance = !isJunior ? generateSeniorGuidance(subjectProgress, firstName, student.grade, student.current_pathway ?? undefined) : undefined
 
     const report = generateReport(
       studentProfile,

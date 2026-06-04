@@ -146,6 +146,8 @@ export interface GraphData {
 
 // ─── Main Report ─────────────────────────────────────────────────────────────
 
+import type { DreamCareerAnalysis } from './careerEngine'
+
 export interface AcademicClinicReport {
   studentProfile: StudentProfile
   subjectBreakdown: SubjectProgress[]
@@ -157,6 +159,7 @@ export interface AcademicClinicReport {
   learningCompassRec: LearningCompassRec       // NEW — Page 6
   juniorGuidance?: JuniorGuidance              // kept for web UI
   seniorGuidance?: SeniorGuidance              // kept for web UI (enriched)
+  dreamCareerAnalysis?: DreamCareerAnalysis | null
   graphData: GraphData
   reportId: string
   generatedAt: string

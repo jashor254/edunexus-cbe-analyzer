@@ -55,10 +55,11 @@ function bullets(items: string[]): string {
   return `<ul>${items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>`
 }
 
-function breakRowsInWeek(week: number, breaks: BreakItem[]): string[] {
-  return breaks
-    .filter(b => b.startWeek <= week && week <= b.endWeek)
-    .map(b => b.title.toUpperCase())
+function breakDetail(b: BreakItem): string {
+  const wk = b.startWeek === b.endWeek
+    ? `Wk ${b.startWeek}`
+    : `Wk ${b.startWeek}–${b.endWeek}`
+  return `${wk} · L${b.startLesson}–L${b.endLesson}`
 }
 
 function buildCoverPage(meta: SOWPreviewData['meta']): string {
@@ -101,33 +102,31 @@ function buildTablePage(
 ): string {
   const isCBC = colConfig.hasInquiryQuestions
 
-  // Collect unique weeks that are fully break weeks
-  const breakWeeks = new Set<number>()
-  breaks.forEach(b => {
-    for (let w = b.startWeek; w <= b.endWeek; w++) breakWeeks.add(w)
-  })
-
-  // Build a merged timeline: lessons interleaved with break rows
+  // Build a merged timeline: lessons interleaved with one row per BreakItem
   type TableRow =
     | { kind: 'lesson'; lesson: GeneratedLesson }
-    | { kind: 'break'; week: number; title: string }
+    | { kind: 'break'; week: number; title: string; detail: string }
 
   const rows: TableRow[] = []
-  let lastWeek = -1
+
+  const sortedBreaks = [...breaks].sort((a, b) =>
+    a.startWeek !== b.startWeek ? a.startWeek - b.startWeek : a.startLesson - b.startLesson
+  )
+  let bi = 0
 
   for (const lesson of lessons) {
-    // Insert break rows before this lesson's week if needed
-    if (lesson.week !== lastWeek) {
-      // Check weeks between last and current for full break weeks
-      for (let w = lastWeek + 1; w < lesson.week; w++) {
-        if (breakWeeks.has(w)) {
-          const titles = breakRowsInWeek(w, breaks)
-          rows.push({ kind: 'break', week: w, title: titles.join(' / ') || 'BREAK' })
-        }
-      }
+    // Inject any breaks whose end week falls before this lesson's week
+    while (bi < sortedBreaks.length && sortedBreaks[bi].endWeek < lesson.week) {
+      const b = sortedBreaks[bi++]
+      rows.push({ kind: 'break', week: b.startWeek, title: b.title, detail: breakDetail(b) })
     }
     rows.push({ kind: 'lesson', lesson })
-    lastWeek = lesson.week
+  }
+
+  // Inject any breaks that come after the last lesson
+  while (bi < sortedBreaks.length) {
+    const b = sortedBreaks[bi++]
+    rows.push({ kind: 'break', week: b.startWeek, title: b.title, detail: breakDetail(b) })
   }
 
   const headerCols = isCBC
@@ -191,10 +190,12 @@ function buildTablePage(
   const bodyRows = rows.map((row, ri) => {
     if (row.kind === 'break') {
       return `<tr class="break-row">
-        <td class="center">${row.week}</td>
+        <td class="center" style="white-space:nowrap;">${row.week}</td>
         <td class="center">—</td>
-        <td colspan="${numCols - 2}" style="text-align:center;font-style:italic;font-weight:bold;">
-          ${esc(row.title)}
+        <td colspan="${numCols - 2}" style="padding:5px 8px;">
+          <span class="break-badge">BREAK</span>
+          <strong style="color:#633806;margin-left:5px;">${esc(row.title)}</strong>
+          <span style="color:#854F0B;font-size:6.5pt;margin-left:6px;">${esc(row.detail)}</span>
         </td>
       </tr>`
     }
@@ -341,7 +342,16 @@ export function generateSOWHTML(
     }
 
     /* ── Break rows ─────────────────────────────────────────── */
-    .break-row td { background: #fef3c7 !important; color: #92400e; }
+    .break-row td { background: #FAEEDA !important; color: #92400e; border-color: #EF9F2766 !important; }
+    .break-badge {
+      font-size: 6.5pt;
+      padding: 1px 5px;
+      border-radius: 8px;
+      background: #FAC775;
+      color: #633806;
+      font-weight: bold;
+      white-space: nowrap;
+    }
 
     /* ── Footer ─────────────────────────────────────────────── */
     .sow-footer {

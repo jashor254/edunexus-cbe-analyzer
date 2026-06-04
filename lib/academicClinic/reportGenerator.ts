@@ -1,6 +1,6 @@
 // lib/academicClinic/reportGenerator.ts
 
-import { CareerEngine } from './careerEngine'
+import { CareerEngine, analyzeDreamCareer } from './careerEngine'
 import { calculateJuniorPathwayAffinity, formatSubjectName as pathwayFormatSubjectName } from '@/lib/pathwayCalculator'
 import {
   StudentProfile,
@@ -258,41 +258,46 @@ export function calculateVitals(subjects: SubjectProgress[]): Vitals {
 // ─── Clinical Overview (Page 2) ───────────────────────────────────────────────
 
 function buildClinicalParagraph(firstName: string, subjects: SubjectProgress[], avg: number): string {
-  const byDesc = [...subjects].sort((a, b) => b.level - a.level)
-  const byAsc  = [...subjects].sort((a, b) => a.level - b.level)
-  const top2   = byDesc.slice(0, 2).map(s => s.displayName)
-  const bot2   = byAsc.slice(0, 2).map(s => s.displayName)
-  const topLvl = byDesc[0] ? getLevelLabel(byDesc[0].level) : ''
+  const byDesc    = [...subjects].sort((a, b) => b.level - a.level)
+  const byAsc     = [...subjects].sort((a, b) => a.level - b.level)
+  const top2      = byDesc.slice(0, 2).map(s => s.displayName)
+  // FIX 4: only mention subjects as challenges if level <= 2
+  const weak2     = byAsc.filter(s => s.level <= 2).slice(0, 2).map(s => s.displayName)
+  const topLvl    = byDesc[0] ? getLevelLabel(byDesc[0].level) : ''
 
   if (avg >= 3.5) {
     return `${firstName} demonstrates exceptional overall academic competency, with outstanding performance across the majority of assessed subjects. ` +
       `Highest-performing areas include ${top2.join(' and ')}, where ${firstName} operates at ${topLvl} level — placing this student among the upper tier of the academic cohort. ` +
-      (byAsc[0]?.level <= 2
-        ? `${byAsc[0].displayName} represents an emerging challenge that warrants targeted attention to maintain the overall trajectory. `
+      (weak2.length > 0
+        ? `${weak2[0]} represents an emerging challenge that warrants targeted attention to maintain the overall trajectory. `
         : '') +
       `Clinical recommendation: sustain high performance through advanced enrichment and competition exposure while proactively closing any emerging gaps.`
   }
   if (avg >= 3.0) {
     return `${firstName} demonstrates strong and consistent academic competency, with a well-rounded performance profile across assessed subjects. ` +
       `Areas of particular strength include ${top2.join(' and ')}, which reflect ${firstName}'s core academic aptitudes and should be actively nurtured. ` +
-      (byAsc[0]?.level <= 2
-        ? `${firstName} demonstrates an emerging challenge in ${bot2.join(' and ')}, representing a priority intervention area to prevent further progression gaps. `
+      (weak2.length > 0
+        ? `${firstName} demonstrates an emerging challenge in ${weak2.join(' and ')}, representing a priority intervention area to prevent further progression gaps. `
         : '') +
       `The overall trajectory indicates a highly capable learner well-positioned for continued academic advancement with targeted support in identified areas.`
   }
   if (avg >= 2.5) {
     return `${firstName} demonstrates developing competency with clear academic strengths emerging in ${top2.join(' and ')}. ` +
-      `The assessment identifies ${bot2.join(' and ')} as priority intervention areas requiring structured and consistent support to close identified foundational gaps. ` +
+      (weak2.length > 0
+        ? `The assessment identifies ${weak2.join(' and ')} as priority intervention areas requiring structured and consistent support to close identified foundational gaps. `
+        : '') +
       `${firstName}'s performance trajectory indicates a learner with real potential — with targeted intervention, meaningful improvement is achievable within one academic term. ` +
       `Clinical recommendation: implement the 3-week holiday action plan with particular focus on identified priority areas to build a stronger foundation for the coming term.`
   }
   if (avg >= 2.0) {
     return `${firstName}'s current assessment reveals developing competency across the curriculum, with relative strengths observed in ${top2.join(' and ')}. ` +
-      `Priority intervention areas include ${bot2.join(' and ')}, where foundational gaps have been clearly identified and require immediate structured support. ` +
+      (weak2.length > 0
+        ? `Priority intervention areas include ${weak2.join(' and ')}, where foundational gaps have been clearly identified and require immediate structured support. `
+        : '') +
       `The trajectory indicates that consistent, structured support is essential at this stage to unlock ${firstName}'s academic potential. ` +
       `Clinical recommendation: an intensive holiday study programme combined with regular EduNexus Learning Compass sessions will be critical in reversing this trajectory.`
   }
-  return `${firstName}'s current assessment reveals emerging competency across multiple curriculum areas, with ${bot2.join(' and ')} identified as critical priority intervention areas. ` +
+  return `${firstName}'s current assessment reveals emerging competency across multiple curriculum areas, with ${weak2.join(' and ')} identified as critical priority intervention areas. ` +
     `Foundational gaps across several subjects indicate that intensive, structured support is urgently required. ` +
     `Early and consistent intervention at this developmental stage yields significantly positive outcomes — the holiday period represents a critical intervention window. ` +
     `Clinical recommendation: implement the daily holiday study plan immediately, engage the EduNexus Learning Compass three times per week, and share this report with ${firstName}'s class teacher.`
@@ -373,19 +378,27 @@ export function generateJuniorGuidance(subjects: SubjectProgress[]): JuniorGuida
 
 // ─── Career Intelligence (Senior — Page 4B) ───────────────────────────────────
 
-export function generateSeniorGuidance(subjects: SubjectProgress[], firstName = 'This student', grade = 10): SeniorGuidance {
+export function generateSeniorGuidance(subjects: SubjectProgress[], firstName = 'This student', grade = 10, currentPathway?: string): SeniorGuidance {
   const engine = new CareerEngine()
   const scores = Object.fromEntries(subjects.map(s => [s.subject, s.level]))
   const subjectAvg = subjects.reduce((s, x) => s + x.level, 0) / subjects.length
   const tier: 'high' | 'mid' | 'low' = subjectAvg >= 3.0 ? 'high' : subjectAvg >= 2.0 ? 'mid' : 'low'
 
-  const engineResults = engine.matchCareers(scores, tier).slice(0, 3)
+  const engineResults = engine.matchCareers(scores, tier, 'cbc', currentPathway).slice(0, 3)
+
+  const assessedSubjectKeys = subjects.map(s => s.subject)
 
   const scored = engineResults.map(match => {
     const keyHits = subjects.filter(s => match.career.matchRequirements.primarySubjects.includes(s.subject))
-    const gapSubjects = match.gapSubjects.map(s => formatSubjectName(s))
+    const strongSubjectKeys = keyHits.filter(s => s.level >= 3).map(s => s.subject)
+    // FIX 1: only gap subjects the student was actually assessed on
+    // FIX 3: exclude subjects already listed in whyItFits (level >= 3) to avoid contradiction
+    const gapSubjects = match.gapSubjects
+      .filter(s => assessedSubjectKeys.includes(s) && !strongSubjectKeys.includes(s))
+      .map(s => formatSubjectName(s))
     const score = match.matchScore / 25
-    const matchStrength: 'STRONG' | 'GOOD' | 'POSSIBLE' = match.matchScore >= 75 ? 'STRONG' : match.matchScore >= 55 ? 'GOOD' : 'POSSIBLE'
+    // FIX 2: thresholds aligned to score >= 3.5 / 2.5 (matchScore >= 87.5 / 62.5)
+    const matchStrength: 'STRONG' | 'GOOD' | 'POSSIBLE' = score >= 3.5 ? 'STRONG' : score >= 2.5 ? 'GOOD' : 'POSSIBLE'
     return {
       career: {
         name: match.career.name,
@@ -669,7 +682,7 @@ export function generateReport(
   subjects:        SubjectProgress[],
   vitals:          Vitals,
   actionPlan:      ActionPlan,
-  assessments:     any[],
+  assessments:     Array<{ created_at?: string; dream_career?: string | null; [key: string]: unknown }>,
   juniorGuidance?: JuniorGuidance,
   seniorGuidance?: SeniorGuidance
 ): AcademicClinicReport {
@@ -734,8 +747,18 @@ export function generateReport(
       alternative_pathway:     pr.alternative_pathway,
     }
   }
-  const holidayPlan      = generateHolidayPlan(subjects)
+  const holidayPlan        = generateHolidayPlan(subjects)
   const learningCompassRec = generateLearningCompassRec(subjects)
+
+  const dreamCareerInput = assessments
+    .sort((a, b) =>
+      new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
+    )[0]?.dream_career ?? null
+
+  const cbcScores = Object.fromEntries(subjects.map(s => [s.subject, s.level]))
+  const dreamCareerAnalysis = dreamCareerInput
+    ? analyzeDreamCareer(dreamCareerInput, cbcScores, studentProfile.pathway ?? undefined)
+    : null
 
   return {
     studentProfile,
@@ -748,6 +771,7 @@ export function generateReport(
     learningCompassRec,
     juniorGuidance,
     seniorGuidance,
+    dreamCareerAnalysis,
     graphData,
     reportId,
     generatedAt: new Date().toISOString(),

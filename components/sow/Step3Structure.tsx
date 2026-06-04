@@ -1,13 +1,13 @@
 'use client'
 
-import { useState } from 'react'
 import { ChevronRight, ChevronLeft } from 'lucide-react'
+import { useState } from 'react'
 import { buildTermSchedule } from '@/lib/sow/termSchedule'
 import type { TermScheduleResult } from '@/lib/sow/termSchedule'
 import type { LessonStructure } from '@/lib/sow/types'
 
-const LP_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-const WEEK_OPTIONS = Array.from({ length: 15 }, (_, i) => i + 1)
+const TERM_WEEKS     = [8, 9, 10, 11, 12, 13, 14]
+const LESSONS_PER_WK = [2, 3, 4, 5, 6]
 
 export default function Step3Structure({
   onComplete,
@@ -16,63 +16,28 @@ export default function Step3Structure({
   onComplete: (ls: LessonStructure, ts: TermScheduleResult) => void
   onBack: () => void
 }) {
-  const [lessonsPerWeek, setLessonsPerWeek] = useState(5)
-  const [firstWeek, setFirstWeek] = useState(1)
-  const [firstLesson, setFirstLesson] = useState(1)
-  const [lastWeek, setLastWeek] = useState(13)
-  const [lastLesson, setLastLesson] = useState(5)
-  const [doubleLessonOption, setDoubleLessonOption] = useState<'single' | 'double'>('single')
-  const [doubleLessonCombination, setDoubleLessonCombination] = useState('')
-  const [error, setError] = useState('')
+  const [termWeeks,      setTermWeeks]      = useState(13)
+  const [lessonsPerWeek, setLessonsPerWeek] = useState(4)
 
-  const lessonOptions = Array.from({ length: lessonsPerWeek }, (_, i) => i + 1)
-
-  // Live summary
-  let totalWeeks = 0
-  let totalSlots = 0
-  let summaryError = ''
-  try {
-    const ts = buildTermSchedule({
-      lessonsPerWeek,
-      firstWeek,
-      firstLesson,
-      lastWeek,
-      lastLesson,
-      doubleLessonOption,
-      doubleLessonCombination: doubleLessonCombination || null,
-    })
-    totalSlots = ts.totalSlots
-    totalWeeks = ts.lastWeek - ts.firstWeek + 1
-  } catch (e: any) {
-    summaryError = e.message
-  }
+  const totalSlots = termWeeks * lessonsPerWeek
 
   function handleNext() {
-    setError('')
-    try {
-      const termSchedule = buildTermSchedule({
-        lessonsPerWeek,
-        firstWeek,
-        firstLesson,
-        lastWeek,
-        lastLesson,
-        doubleLessonOption,
-        doubleLessonCombination: doubleLessonCombination || null,
-      })
-      const ls: LessonStructure = {
-        lessonsPerWeek,
-        firstWeek,
-        firstLesson,
-        lastWeek,
-        lastLesson,
-        doubleLessonOption,
-        doubleLessonCombination: doubleLessonCombination || undefined,
-      }
-      console.log('[Step3] passing termSchedule, lessonsPerWeek:', termSchedule.lessonsPerWeek)
-      onComplete(ls, termSchedule)
-    } catch (e: any) {
-      setError(e.message)
+    const ls: LessonStructure = {
+      lessonsPerWeek,
+      firstWeek:   1,
+      firstLesson: 1,
+      lastWeek:    termWeeks,
+      lastLesson:  lessonsPerWeek,
+      doubleLessonOption: 'single',
     }
+    const ts = buildTermSchedule({
+      lessonsPerWeek,
+      firstWeek:   1,
+      firstLesson: 1,
+      lastWeek:    termWeeks,
+      lastLesson:  lessonsPerWeek,
+    })
+    onComplete(ls, ts)
   }
 
   return (
@@ -81,135 +46,59 @@ export default function Step3Structure({
         <h2 className="text-lg font-black text-gray-900 mb-5">Lesson Schedule</h2>
 
         <div className="grid sm:grid-cols-2 gap-5">
-          {/* Lessons per week */}
+          {/* Term length */}
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1.5">
-              Lessons per week
+              Term length (weeks)
             </label>
             <select
-              value={lessonsPerWeek}
-              onChange={e => {
-                const v = Number(e.target.value)
-                setLessonsPerWeek(v)
-                if (firstLesson > v) setFirstLesson(v)
-                if (lastLesson > v) setLastLesson(v)
-              }}
+              value={termWeeks}
+              onChange={e => setTermWeeks(Number(e.target.value))}
               className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-teal-500 outline-none text-gray-900 bg-white"
             >
-              {LP_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </div>
-
-          {/* Double lesson */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5">
-              Double lessons
-            </label>
-            <select
-              value={doubleLessonOption}
-              onChange={e => setDoubleLessonOption(e.target.value as 'single' | 'double')}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-teal-500 outline-none text-gray-900 bg-white"
-            >
-              <option value="single">Single lessons only</option>
-              <option value="double">Double lessons enabled</option>
-            </select>
-          </div>
-
-          {doubleLessonOption === 'double' && (
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-bold text-gray-700 mb-1.5">
-                Double lesson combination{' '}
-                <span className="text-gray-400 font-normal">(e.g. Lessons 3 &amp; 4)</span>
-              </label>
-              <input
-                value={doubleLessonCombination}
-                onChange={e => setDoubleLessonCombination(e.target.value)}
-                placeholder="e.g. Lessons 3 & 4"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-teal-500 outline-none text-gray-900"
-              />
-            </div>
-          )}
-
-          {/* First week */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5">
-              First week of teaching
-            </label>
-            <select
-              value={firstWeek}
-              onChange={e => setFirstWeek(Number(e.target.value))}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-teal-500 outline-none text-gray-900 bg-white"
-            >
-              {WEEK_OPTIONS.map(w => <option key={w} value={w}>Week {w}</option>)}
-            </select>
-          </div>
-
-          {/* First lesson */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5">
-              First lesson number
-            </label>
-            <select
-              value={firstLesson}
-              onChange={e => setFirstLesson(Number(e.target.value))}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-teal-500 outline-none text-gray-900 bg-white"
-            >
-              {lessonOptions.map(l => <option key={l} value={l}>Lesson {l}</option>)}
-            </select>
-          </div>
-
-          {/* Last week */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5">
-              Last week of teaching
-            </label>
-            <select
-              value={lastWeek}
-              onChange={e => setLastWeek(Number(e.target.value))}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-teal-500 outline-none text-gray-900 bg-white"
-            >
-              {WEEK_OPTIONS.filter(w => w >= firstWeek).map(w => (
-                <option key={w} value={w}>Week {w}</option>
+              {TERM_WEEKS.map(w => (
+                <option key={w} value={w}>
+                  {w} weeks{w === 13 ? ' (standard)' : ''}
+                </option>
               ))}
             </select>
           </div>
 
-          {/* Last lesson */}
+          {/* Lessons per week */}
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1.5">
-              Last lesson number
+              Lessons per week <span className="text-gray-400 font-normal">(this subject)</span>
             </label>
             <select
-              value={lastLesson}
-              onChange={e => setLastLesson(Number(e.target.value))}
+              value={lessonsPerWeek}
+              onChange={e => setLessonsPerWeek(Number(e.target.value))}
               className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-teal-500 outline-none text-gray-900 bg-white"
             >
-              {lessonOptions.map(l => <option key={l} value={l}>Lesson {l}</option>)}
+              {LESSONS_PER_WK.map(n => (
+                <option key={n} value={n}>{n} lessons/week</option>
+              ))}
             </select>
           </div>
         </div>
 
         {/* Live summary */}
-        <div className="mt-6 bg-gray-50 border border-gray-200 rounded-xl px-5 py-4 space-y-2">
-          {summaryError ? (
-            <p className="text-red-600 text-sm font-bold">{summaryError}</p>
-          ) : (
-            <>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Teaching weeks:</span>
-                <span className="font-bold text-gray-900">{totalWeeks}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Total lesson slots:</span>
-                <span className="font-bold text-teal-700">{totalSlots}</span>
-              </div>
-            </>
-          )}
+        <div className="mt-6 bg-teal-50 border border-teal-200 rounded-xl px-5 py-4">
+          <div className="flex justify-between text-sm mb-1">
+            <span className="text-gray-600">Teaching weeks</span>
+            <span className="font-bold text-gray-900">{termWeeks}</span>
+          </div>
+          <div className="flex justify-between text-sm mb-1">
+            <span className="text-gray-600">Lessons per week</span>
+            <span className="font-bold text-gray-900">{lessonsPerWeek}</span>
+          </div>
+          <div className="flex justify-between text-sm pt-2 border-t border-teal-200 mt-2">
+            <span className="font-bold text-teal-800">Slots before breaks</span>
+            <span className="font-black text-teal-700 text-base">{totalSlots}</span>
+          </div>
+          <p className="text-[11px] text-teal-600 mt-1">
+            You'll select break weeks in the next step. Available lessons = {totalSlots} minus break weeks.
+          </p>
         </div>
-
-        {error && (
-          <p className="mt-3 text-red-600 text-sm font-bold">{error}</p>
-        )}
       </div>
 
       <div className="flex justify-between">
@@ -221,8 +110,7 @@ export default function Step3Structure({
         </button>
         <button
           onClick={handleNext}
-          disabled={!!summaryError}
-          className="flex items-center gap-2 bg-teal-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-teal-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 bg-teal-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-teal-700 transition"
         >
           Next — Add Breaks <ChevronRight className="w-4 h-4" />
         </button>

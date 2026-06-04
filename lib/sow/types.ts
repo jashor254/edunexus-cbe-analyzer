@@ -87,6 +87,9 @@ export interface GeneratedLesson {
   reflection: string
   _validated: boolean
   _confidence: number
+  isBreak?:      boolean
+  breakName?:    string
+  breakDetails?: string
 }
 
 export interface SOWGenerationResult {
@@ -118,6 +121,7 @@ export interface SOWPreviewData {
     textbook: string
     totalLessons: number
     totalWeeks: number
+    lessonsPerWeek?: number
     generatedDate: string
     curriculumMode: CurriculumMode
     averageConfidence: number

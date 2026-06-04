@@ -22,6 +22,13 @@ import {
   Shield,
 } from 'lucide-react'
 import { NoStudentsEmpty } from '@/components/ui/empty-states'
+import {
+  SENIOR_PATHWAYS,
+  SENIOR_PATHWAY_ELECTIVES,
+  getSeniorCompulsorySubjects,
+  validateSeniorSubjects,
+  type SeniorPathway,
+} from '@/lib/curriculum/subjects'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -169,26 +176,64 @@ function AddStudentModal({ onClose, onSuccess }: { onClose: () => void; onSucces
   const [curriculum, setCurriculum] = useState<'cbc' | 'igcse'>('cbc')
   const [grade, setGrade] = useState(7)
   const [school, setSchool] = useState('')
+  const [pathway, setPathway] = useState<SeniorPathway | ''>('')
+  const [electives, setElectives] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   const gradeOptions = curriculum === 'igcse' ? IGCSE_YEARS : CBC_GRADES
+  const isSenior = grade >= 10 && curriculum === 'cbc'
 
   // Reset grade when curriculum changes
   useEffect(() => {
     setGrade(curriculum === 'igcse' ? 7 : 7)
   }, [curriculum])
 
+  function handleGradeChange(g: number) {
+    setGrade(g)
+    if (g < 10) { setPathway(''); setElectives([]) }
+  }
+
+  function handlePathwayChange(p: SeniorPathway | '') {
+    setPathway(p)
+    setElectives([])
+  }
+
+  function toggleElective(subject: string) {
+    setElectives(prev => {
+      if (prev.includes(subject)) return prev.filter(e => e !== subject)
+      if (prev.length >= 3) return prev
+      return [...prev, subject]
+    })
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) { setError('Student name is required'); return }
+    if (isSenior) {
+      if (!pathway) { setError('Please select a pathway for Grade 10–12 students'); return }
+      const v = validateSeniorSubjects(pathway as SeniorPathway, electives)
+      if (!v.valid) { setError(v.error ?? 'Invalid subject selection'); return }
+    }
     setLoading(true)
     setError('')
     try {
       const res = await fetch('/api/students/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), grade, school: school.trim() || null, curriculum_type: curriculum }),
+        body: JSON.stringify({
+          name: name.trim(),
+          grade,
+          school: school.trim() || null,
+          curriculum_type: curriculum,
+          ...(isSenior && pathway ? {
+            current_pathway:   pathway,
+            selected_subjects: [
+              ...getSeniorCompulsorySubjects(pathway as SeniorPathway),
+              ...electives,
+            ],
+          } : {}),
+        }),
       })
       const json = await res.json()
       if (!json.success) { setError(json.error || 'Failed to add student'); setLoading(false); return }
@@ -202,7 +247,7 @@ function AddStudentModal({ onClose, onSuccess }: { onClose: () => void; onSucces
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-y-auto max-h-[85vh]">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-100">
           <h2 className="text-xl font-black text-slate-900">Add Student</h2>
@@ -264,7 +309,7 @@ function AddStudentModal({ onClose, onSuccess }: { onClose: () => void; onSucces
             </label>
             <select
               value={grade}
-              onChange={e => setGrade(Number(e.target.value))}
+              onChange={e => handleGradeChange(Number(e.target.value))}
               className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
             >
               {gradeOptions.map(g => (
@@ -274,6 +319,86 @@ function AddStudentModal({ onClose, onSuccess }: { onClose: () => void; onSucces
               ))}
             </select>
           </div>
+
+          {/* Senior School Pathway — Grade 10-12 CBC only */}
+          {isSenior && (
+            <div className="border-t border-slate-100 pt-4 space-y-4">
+              <p className="text-xs font-black text-slate-500 uppercase tracking-wide">Senior School Pathway</p>
+
+              {/* Pathway selector */}
+              <div>
+                <label className="block text-sm font-black text-slate-700 mb-1.5">
+                  Pathway <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={pathway}
+                  onChange={e => handlePathwayChange(e.target.value as SeniorPathway | '')}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                >
+                  <option value="">Select pathway…</option>
+                  {SENIOR_PATHWAYS.map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Compulsory subjects — read-only */}
+              {pathway && (
+                <div>
+                  <label className="block text-sm font-black text-slate-700 mb-1.5">
+                    Compulsory Subjects
+                    <span className="ml-2 text-xs font-normal text-slate-400">automatic</span>
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {getSeniorCompulsorySubjects(pathway as SeniorPathway).map(s => (
+                      <span key={s} className="text-xs px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 font-medium">
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Elective selection */}
+              {pathway && (
+                <div>
+                  <label className="block text-sm font-black text-slate-700 mb-1.5">
+                    Elective Subjects
+                    <span className={`ml-2 text-xs font-${electives.length === 3 ? 'black' : 'normal'} ${electives.length === 3 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                      {electives.length} / 3 selected{electives.length === 3 ? ' ✓' : ''}
+                    </span>
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SENIOR_PATHWAY_ELECTIVES[pathway as SeniorPathway].map(subject => {
+                      const selected = electives.includes(subject)
+                      const maxed    = !selected && electives.length >= 3
+                      return (
+                        <button
+                          key={subject}
+                          type="button"
+                          onClick={() => toggleElective(subject)}
+                          disabled={maxed}
+                          className={[
+                            'text-xs px-2.5 py-1 rounded-full border font-medium transition-all',
+                            selected
+                              ? 'bg-violet-600 border-violet-600 text-white'
+                              : maxed
+                              ? 'bg-slate-50 border-slate-200 text-slate-300 cursor-not-allowed'
+                              : 'bg-white border-slate-200 text-slate-700 hover:border-violet-400 hover:text-violet-700',
+                          ].join(' ')}
+                        >
+                          {subject}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {electives.length < 3 && (
+                    <p className="text-xs text-slate-400 mt-2">Choose exactly 3 electives from the {pathway} pathway</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* School */}
           <div>

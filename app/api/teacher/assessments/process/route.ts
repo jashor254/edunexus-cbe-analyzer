@@ -60,7 +60,7 @@ async function processOne(
     // Load student + assessment
     const [studentRes, assessmentRes] = await Promise.all([
       db.from('students')
-        .select('id, name, grade, curriculum_type, school, parent_email, parent_phone, parent_first_name, parent_user_id, notification_email, notification_whatsapp, whatsapp_opted_in')
+        .select('id, name, grade, curriculum_type, school, current_pathway, parent_email, parent_phone, parent_first_name, parent_user_id, notification_email, notification_whatsapp, whatsapp_opted_in')
         .eq('id', studentId)
         .single(),
       db.from('assessments')
@@ -176,7 +176,7 @@ async function processOne(
     const actionPlan  = generateActionPlan(subjects)
     const firstName   = student.name.split(' ')[0]
     const jGuidance   = isJunior  ? generateJuniorGuidance(subjects)           : undefined
-    const sGuidance   = !isJunior ? generateSeniorGuidance(subjects, firstName, student.grade) : undefined
+    const sGuidance   = !isJunior ? generateSeniorGuidance(subjects, firstName, student.grade, (student as { current_pathway?: string | null }).current_pathway ?? undefined) : undefined
     const report      = generateReport(studentProfile, subjects, vitals, actionPlan, [], jGuidance, sGuidance)
 
     const pdfBlob   = await generateAcademicClinicPDF(report)

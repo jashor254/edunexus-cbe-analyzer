@@ -150,7 +150,7 @@ export default async function StudentReportPage({
   // Generate guidance based on grade level
   const isJunior = student.grade <= 9
   const juniorGuidance: JuniorGuidance | undefined = isJunior ? generateJuniorGuidance(subjectProgress) : undefined
-  const seniorGuidance: SeniorGuidance | undefined = !isJunior ? generateSeniorGuidance(subjectProgress, undefined, student.grade) : undefined
+  const seniorGuidance: SeniorGuidance | undefined = !isJunior ? generateSeniorGuidance(subjectProgress, undefined, student.grade, student.current_pathway ?? undefined) : undefined
 
   // Generate final report
   const report = generateReport(

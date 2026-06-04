@@ -67,13 +67,14 @@ export async function POST(req: Request) {
         curriculum_mode: meta.curriculumMode,
         total_lessons: meta.totalLessons,
         total_weeks: meta.totalWeeks,
+        lessons_per_week: meta.lessonsPerWeek ?? 4,
         average_confidence: meta.averageConfidence,
         breaks,
         lessons,
         timeline,
         teacher_name: meta.teacherName || null,
         tsc_number: meta.tscNumber || null,
-        status: 'saved',
+        status: 'active',
         created_at: new Date().toISOString(),
       })
       .select('id')
@@ -101,9 +102,8 @@ export async function POST(req: Request) {
         assessment_methods: l.assessmentMethods,
         core_competencies: l.coreCompetencies,
         values: l.values,
-        pci_links: l.pciLinks,
         reflection: l.reflection || '',
-        confidence: l._confidence,
+        // pci_links and confidence are preserved in schemes_of_work.lessons JSONB
       }))
 
       const { error: lessonsErr } = await db
@@ -111,14 +111,14 @@ export async function POST(req: Request) {
         .insert(lessonRows)
 
       if (lessonsErr) {
-        console.error('[sow/save] lessons insert error:', lessonsErr)
-        // Don't fail the whole request — scheme was saved
+        console.error('[sow/save] scheme_lessons insert error:', lessonsErr.message)
       }
     }
 
     return apiSuccess({ schemeId })
-  } catch (err: any) {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Save failed'
     console.error('[sow/save]', err)
-    return apiError(err.message || 'Save failed')
+    return apiError(message)
   }
 }

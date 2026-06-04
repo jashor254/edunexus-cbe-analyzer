@@ -1,7 +1,36 @@
 import { createServerClient } from '@supabase/ssr'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+
+// ─── Role-aware path resolver ─────────────────────────────────────────────────
+
+const PUBLIC_PATHS = ['/pricing', '/legal', '/join', '/shared', '/payment']
+
+async function resolveRoleDestination(
+  db: SupabaseClient,
+  userId: string,
+  requestedPath: string
+): Promise<string> {
+  const isPublic = PUBLIC_PATHS.some(p => requestedPath.startsWith(p))
+  if (isPublic) return requestedPath
+
+  const { data: profile } = await db
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .single()
+
+  const role = profile?.role
+
+  if (requestedPath.startsWith('/teacher')) {
+    if (role === 'teacher') return requestedPath
+    return '/dashboard'
+  }
+
+  if (role === 'teacher') return '/teacher/dashboard'
+  return '/dashboard'
+}
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
@@ -83,35 +112,12 @@ export async function GET(request: Request) {
       }
     }
 
-  } else if (user && (resolvedPath === '/dashboard' || resolvedPath === '/')) {
-    // Returning user — no role param: detect from profiles then teachers table
-    const { data: profile } = await db
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)   // profiles.id, not user_id
-      .maybeSingle()
-
-    if (profile?.role === 'teacher') {
-      resolvedPath = '/teacher/dashboard'
-    } else {
-      // Fallback: check teachers table for legacy / stale-role accounts
-      const { data: teacher } = await db
-        .from('teachers')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle()
-
-      if (teacher) {
-        resolvedPath = '/teacher/dashboard'
-        // Self-heal: write correct role so future logins skip this check
-        await db.from('profiles').upsert(
-          { id: user.id, role: 'teacher', updated_at: new Date().toISOString() },
-          { onConflict: 'id' }
-        )
-      }
-    }
   }
 
-  if (product) resolvedPath += `?product=${product}`
-  return NextResponse.redirect(new URL(resolvedPath, requestUrl.origin))
+  const safePath = user
+    ? await resolveRoleDestination(db, user.id, resolvedPath)
+    : resolvedPath
+
+  const finalPath = product ? `${safePath}?product=${product}` : safePath
+  return NextResponse.redirect(new URL(finalPath, requestUrl.origin))
 }

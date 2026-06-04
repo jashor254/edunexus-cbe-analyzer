@@ -18,6 +18,8 @@ export async function POST(req: Request) {
       subjectId,
       sessionState,
       previousMessages = [],
+      struggleTopic,
+      subjectFilter,
     } = await req.json()
 
     // ── Access check — auth + tier resolution via server session ──────────────
@@ -94,7 +96,14 @@ export async function POST(req: Request) {
     let ragSystemPrompt = ''
     let ragCurriculumType: 'cbc' | 'igcse' | 'ib' | 'other' = 'cbc'
     try {
-      const ragContext = await buildStudentRAGContext(learnerId || access.userId, sessionId)
+      const ragContext = await buildStudentRAGContext(
+        learnerId || access.userId,
+        sessionId,
+        {
+          struggleTopic: struggleTopic ?? undefined,
+          subjectFilter: subjectFilter ?? undefined,
+        }
+      )
       ragSystemPrompt = buildRAGSystemPrompt(ragContext)
       ragCurriculumType = ragContext.curriculumType
     } catch (ragError) {

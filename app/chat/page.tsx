@@ -263,6 +263,7 @@ function ChatContent() {
   const [supabase]   = useState(() => createClient())
   const router       = useRouter()
   const searchParams = useSearchParams()
+  const struggleTopicRef = useRef<string | null>(null)
 
   const [messages,        setMessages]        = useState<Message[]>([])
   const [input,           setInput]           = useState('')
@@ -485,6 +486,8 @@ function ChatContent() {
           previousMessages: messages
             .slice(-6)
             .map(m => ({ role: m.role, content: m.content, metadata: m.metadata })),
+          struggleTopic: struggleTopicRef.current ?? undefined,
+          subjectFilter: sessionState.currentSubject || undefined,
         }),
       })
 
@@ -563,6 +566,7 @@ function ChatContent() {
       }])
     } finally {
       setIsLoading(false)
+      struggleTopicRef.current = null
       inputRef.current?.focus()
     }
   }, [input, isLoading, sessionId, learnerId, sessionState, freeLeft, stats])
@@ -778,7 +782,7 @@ function ChatContent() {
                     {(learningContext.guided_topics || []).map((topic: string) => (
                       <button
                         key={topic}
-                        onClick={() => sendMessage(topic)}
+                        onClick={() => { struggleTopicRef.current = topic; sendMessage(topic) }}
                         className="px-4 py-2 bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/30 hover:border-violet-400/50 rounded-full text-sm text-violet-200 hover:text-white font-medium transition-all"
                       >
                         {topic}
