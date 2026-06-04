@@ -142,20 +142,26 @@ export default function MarketingFooter() {
 
         {/* Bottom Bar */}
         <div className="pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-slate-500">
-            © {currentYear} EduNexus. All rights reserved. Nairobi, Kenya 🇰🇪
-          </p>
+          <div className="text-center md:text-left">
+            <p className="text-sm text-slate-500">
+              © {currentYear} EduNexus. All rights reserved. Nairobi, Kenya 🇰🇪
+            </p>
+            <p className="text-xs text-slate-600 mt-1">
+              Developed by{' '}
+              <span className="text-slate-400 font-semibold">Jashor Technologies</span>
+            </p>
+          </div>
           <div className="flex items-center gap-4">
             <Link href="/legal/privacy" className="text-xs text-slate-600 hover:text-slate-400 transition">
-              Privacy
+              Privacy Policy
             </Link>
             <span className="text-slate-700">•</span>
             <Link href="/legal/terms" className="text-xs text-slate-600 hover:text-slate-400 transition">
-              Terms
+              Terms of Use
             </Link>
             <span className="text-slate-700">•</span>
             <Link href="/legal/refund" className="text-xs text-slate-600 hover:text-slate-400 transition">
-              Refund
+              Refund Policy
             </Link>
           </div>
         </div>

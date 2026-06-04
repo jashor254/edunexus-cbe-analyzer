@@ -161,6 +161,19 @@ export default function RootLayout({
           {children}
         </main>
 
+        <footer className="bg-slate-950 border-t border-white/5 py-4 text-center">
+          <p className="text-xs text-white/30">
+            © 2026 EduNexus &middot; Developed by{' '}
+            <span className="text-white/50 font-medium">Jashor Technologies</span>
+            {' '}&middot; Kenya
+          </p>
+          <div className="flex justify-center gap-4 mt-2">
+            <a href="/legal/privacy" className="text-xs text-white/30 hover:text-white/60 transition-colors">Privacy Policy</a>
+            <a href="/legal/terms" className="text-xs text-white/30 hover:text-white/60 transition-colors">Terms of Use</a>
+            <a href="/legal/refund" className="text-xs text-white/30 hover:text-white/60 transition-colors">Refund Policy</a>
+          </div>
+        </footer>
+
         <WhatsAppButton />
         <ToastProvider />
         <Analytics />

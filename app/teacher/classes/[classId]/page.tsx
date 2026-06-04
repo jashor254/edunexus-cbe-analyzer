@@ -1372,6 +1372,22 @@ function ClinicReportsTab({
   )
 }
 
+function getParentStatus(student: {
+  parent_phone?: string | null
+  parent_user_id?: string | null
+  parent_id?: string | null
+  whatsapp_verified?: boolean | null
+}): { label: string; color: string } {
+  const hasPhone    = !!student.parent_phone
+  const hasAccount  = !!(student.parent_user_id ?? student.parent_id)
+  const hasWhatsapp = !!student.whatsapp_verified
+
+  if (hasWhatsapp) return { label: 'WhatsApp Connected', color: 'text-green-600 bg-green-50 border-green-200' }
+  if (hasAccount)  return { label: 'Account Linked',     color: 'text-blue-600 bg-blue-50 border-blue-200'   }
+  if (hasPhone)    return { label: 'Phone Added',        color: 'text-amber-600 bg-amber-50 border-amber-200' }
+  return                  { label: 'Not Connected',      color: 'text-gray-400 bg-gray-50 border-gray-200'   }
+}
+
 function compassTierBadge(tier: string | null) {
   switch (tier) {
     case 'exceeds_expectations':     return { label: 'Exceeds',     cls: 'bg-purple-100 text-purple-700 border border-purple-200' }
@@ -1706,22 +1722,29 @@ na kuwasaidia vizuri zaidi darasani.
                             )}
                           </td>
                           <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
-                            {s.parent_id ? (
-                              <span className="flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 px-2 py-1 rounded-full font-bold">
-                                <Check className="w-3 h-3" /> Connected
-                              </span>
-                            ) : (
-                              <button
-                                onClick={() => {
-                                  setSelectedStudentName(s.name)
-                                  setShowInviteModal(true)
-                                  generateInvite()
-                                }}
-                                className="text-xs text-teal-600 font-bold border border-teal-300 bg-teal-50 hover:bg-teal-100 px-2.5 py-1 rounded-full transition-colors"
-                              >
-                                Invite parent
-                              </button>
-                            )}
+                            {(() => {
+                              const status = getParentStatus(s)
+                              const isConnected = status.label !== 'Not Connected'
+                              if (isConnected) {
+                                return (
+                                  <span className={`flex items-center gap-1 text-xs border px-2 py-1 rounded-full font-bold ${status.color}`}>
+                                    <Check className="w-3 h-3" /> {status.label}
+                                  </span>
+                                )
+                              }
+                              return (
+                                <button
+                                  onClick={() => {
+                                    setSelectedStudentName(s.name)
+                                    setShowInviteModal(true)
+                                    generateInvite()
+                                  }}
+                                  className="text-xs text-gray-400 font-bold border border-gray-200 bg-gray-50 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-600 px-2.5 py-1 rounded-full transition-colors"
+                                >
+                                  Not Connected
+                                </button>
+                              )
+                            })()}
                           </td>
                           <td className="px-5 py-4">
                             {isDone ? (
