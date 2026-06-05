@@ -366,6 +366,7 @@ Return ONLY the response text. No JSON. No markdown. No preamble.`
     let newOutcomeStep  = currentOutcomeStep
     let outcomeAchieved = false
 
+    let outcomeUpdatePromise: Promise<unknown> = Promise.resolve(null)
     if (currentOutcomeData && confident && consecutiveSuccesses >= 2) {
       const nextUnachieved = outcomeMilestones.find(m => !m.achieved)
       if (nextUnachieved) {
@@ -375,84 +376,91 @@ Return ONLY the response text. No JSON. No markdown. No preamble.`
             : m
         )
         const allAchieved = updatedMilestones.every(m => m.achieved)
-        await db
-          .from('compass_outcomes')
-          .update({
-            milestones:     updatedMilestones,
-            status:         allAchieved ? 'achieved' : 'in_progress',
-            achieved_at:    allAchieved ? new Date().toISOString() : null,
-            sessions_spent: ((currentOutcomeData.sessions_spent as number | null) ?? 0) + 1,
-            last_attempted: new Date().toISOString(),
-            updated_at:     new Date().toISOString(),
-          })
-          .eq('id', currentOutcomeData.id)
+        outcomeUpdatePromise = Promise.resolve(
+          db.from('compass_outcomes')
+            .update({
+              milestones:     updatedMilestones,
+              status:         allAchieved ? 'achieved' : 'in_progress',
+              achieved_at:    allAchieved ? new Date().toISOString() : null,
+              sessions_spent: ((currentOutcomeData.sessions_spent as number | null) ?? 0) + 1,
+              last_attempted: new Date().toISOString(),
+              updated_at:     new Date().toISOString(),
+            })
+            .eq('id', currentOutcomeData.id)
+        )
         outcomeAdvanced = true
         newOutcomeStep  = updatedMilestones.filter(m => m.achieved).length + 1
         outcomeAchieved = allAchieved
       }
     }
 
-    // ── SAVE COMPASS STATE — persist subject lock across messages ─────────────
+    // ── SAVE STATE + DEDUCT TOKENS + LOG MESSAGES — all in parallel ──────────
     const updatedState = learningCompass.exportState(learnerId || access.userId)
-    await db
-      .from('compass_sessions')
-      .update({
-        session_state: {
-          ...updatedState,
-          initialized:      true,
-          lockedSubject:    effectiveLockedSubject   || savedLockedSubject,
-          lockedSubstrand:  effectiveLockedSubstrand || savedLockedSubstrand,
-        },
-        last_subject: subject,
-        updated_at:   new Date().toISOString(),
-      })
-      .eq('id', sessionId)
 
-    // ── DEDUCT TOKEN — only after AI succeeds, only for token users ───────────
-    let tokensRemaining = -1
-    if (access.deductTokens) {
-      await deductFeatureTokens(access.userId, FEATURE, access.cost)
-      await db.from('token_usage').insert({
-        user_id:     access.userId,
-        action:      'compass_session',
-        tokens_used: access.cost,
-        metadata: { session_id: sessionId, subject, difficulty: task.difficulty },
-      })
-      const { data: updatedBalance } = await db
-        .from('token_balances')
-        .select('balance')
-        .eq('user_id', access.userId)
-        .maybeSingle()
-      tokensRemaining = updatedBalance?.balance ?? 0
-    }
+    const tokenWritePromise: Promise<number> = access.deductTokens
+      ? (async () => {
+          await deductFeatureTokens(access.userId, FEATURE, access.cost)
+          await db.from('token_usage').insert({
+            user_id:     access.userId,
+            action:      'compass_session',
+            tokens_used: access.cost,
+            metadata: { session_id: sessionId, subject, difficulty: task.difficulty },
+          })
+          const { data: bal } = await db
+            .from('token_balances')
+            .select('balance')
+            .eq('user_id', access.userId)
+            .maybeSingle()
+          return bal?.balance ?? 0
+        })()
+      : Promise.resolve(-1)
 
-    // ── LOG MESSAGES WITH FULL METADATA ──────────────────────────────────────
-    await db.from('compass_messages').insert([
-      {
-        session_id: sessionId,
-        role: 'user',
-        content: message,
-        created_at: new Date().toISOString(),
-      },
-      {
-        session_id: sessionId,
-        role: 'assistant',
-        content: assistantResponse,
-        metadata: {
-          difficulty:       task.difficulty,
-          subject:          subject,
-          activeConcept:    activeConcept,
-          type:             task.type,
-          questionProvided: hasQuestion,
-          questionText:     task.content.question,
-          visualProvided:   hasVisual,
-          adaptationReason: compassResponse.adaptationReason,
-          parentInsight:    compassResponse.parentInsight,
-          struggled,
-          confidence,
-        },
-        created_at: new Date(Date.now() + 1).toISOString(),
-      }
+    const [, tokensRemaining] = await Promise.all([
+      // 1. Session state + subject lock + outcome + message log — all together
+      Promise.all([
+        db.from('compass_sessions')
+          .update({
+            session_state: {
+              ...updatedState,
+              initialized:      true,
+              lockedSubject:    effectiveLockedSubject   || savedLockedSubject,
+              lockedSubstrand:  effectiveLockedSubstrand || savedLockedSubstrand,
+            },
+            last_subject: subject,
+            updated_at:   new Date().toISOString(),
+          })
+          .eq('id', sessionId),
+        outcomeUpdatePromise,
+        db.from('compass_messages').insert([
+          {
+            session_id: sessionId,
+            role: 'user',
+            content: message,
+            created_at: new Date().toISOString(),
+          },
+          {
+            session_id: sessionId,
+            role: 'assistant',
+            content: assistantResponse,
+            metadata: {
+              difficulty:       task.difficulty,
+              subject:          subject,
+              activeConcept:    activeConcept,
+              type:             task.type,
+              questionProvided: hasQuestion,
+              questionText:     task.content.question,
+              visualProvided:   hasVisual,
+              adaptationReason: compassResponse.adaptationReason,
+              parentInsight:    compassResponse.parentInsight,
+              struggled,
+              confidence,
+            },
+            created_at: new Date(Date.now() + 1).toISOString(),
+          },
+        ]),
+      ]),
+      // 2. Token deduction + balance fetch (chained internally)
+      tokenWritePromise,
     ])
 
     // ── RETURN FULL RESPONSE TO FRONTEND ─────────────────────────────────────

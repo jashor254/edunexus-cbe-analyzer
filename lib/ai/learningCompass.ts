@@ -465,7 +465,7 @@ export class LearningCompass {
     }
 
     // Generate fresh task based on difficulty
-    const task = await this.createTaskForDifficulty(subject, difficulty, state, needsVisuals, ragSystemPrompt)
+    const task = this.createTaskForDifficulty(subject, difficulty, state, needsVisuals, ragSystemPrompt)
 
     return task
   }
@@ -473,125 +473,21 @@ export class LearningCompass {
   /**
    * CREATE task at specific difficulty level
    */
-  private async createTaskForDifficulty(
+  private createTaskForDifficulty(
     subject: string,
     difficulty: 1 | 2 | 3 | 4 | 5,
     state: LearnerState,
     needsVisuals: boolean = false,
-    ragSystemPrompt?: string
-  ): Promise<Task> {
-    // Level 1 learners get a fully scaffolded, multiple-choice path
+    _ragSystemPrompt?: string
+  ): Task {
+    // Skip the internal AI call entirely — the route's single DeepSeek call
+    // already has subject, locked topic, difficulty, and student level to
+    // generate the actual response. Task metadata guides difficulty only.
     if (difficulty === 1) {
-      return this.createStrugglingLearnerTask(subject, state, needsVisuals)
-    }
-
-    const prompt = this.buildTaskPrompt(subject, difficulty, state, needsVisuals, state.curriculumType || 'cbc')
-
-    try {
-      const response = await callDeepSeek(prompt, ragSystemPrompt)
-      const task = this.parseTaskResponse(response, subject, difficulty, state)
-
-      if (needsVisuals && !task.content.visualAid) {
-        task.content.visualAid = await this.generateDiagram(subject, task.concept, difficulty)
-      }
-
-      return task
-    } catch (error) {
-      console.error('Task generation failed, using fallback:', error)
-      return this.getFallbackTask(subject, difficulty, state, needsVisuals)
-    }
-  }
-
-  /**
-   * Specialized task generator for level 1 (struggling) learners.
-   * Ultra-short, high scaffolding, multiple-choice questions, zero overwhelm.
-   */
-  private async createStrugglingLearnerTask(
-    subject: string,
-    state: LearnerState,
-    needsVisuals: boolean
-  ): Promise<Task> {
-    const concept = state.currentConcept || this.getDefaultConceptForSubject(subject)
-
-    const prompt = `
-You are helping a struggling student understand ${subject}.
-
-STUDENT:
-- Level 1 out of 4 (Below Expectations — maximum support needed)
-- Grade: ${state.learner.grade}
-- Concept: ${concept}
-- They lose confidence easily — small wins matter
-
-═══════════════════════════════════════
-CRITICAL RULES — FOLLOW ALL OF THEM
-═══════════════════════════════════════
-
-1. MAX 3 SENTENCES before asking a question. Short sentences. Max 8 words each.
-2. ONE example only. Never give multiple examples.
-3. Question MUST be multiple choice (2-3 options). No open-ended questions.
-4. Start with encouragement, then teach one thing, then ask.
-5. Include a simple visual diagram for any math or science concept.
-6. Context examples: universal first (sharing, counting); local only if it genuinely helps.
-
-RESPONSE STRUCTURE:
-[ENCOURAGEMENT]: One short sentence.
-[TEACHING]: One sentence. Max 8 words.
-[EXAMPLE]: One sentence with one simple example.
-[VISUAL]: Simple ASCII diagram (or empty).
-[QUESTION]: The question they must answer.
-[CHOICES]: A) option1  B) option2  C) option3
-[INSTRUCTION]: "Type A, B, or C."
-
-Return ONLY JSON:
-{
-  "instruction": "One sentence — the one thing to learn. Max 15 words.",
-  "example": "One sentence example. Max 15 words.",
-  "question": "The question they answer.",
-  "choices": "A) option1  B) option2  C) option3",
-  "visualAid": "ASCII diagram using ┌─┐│└┘ and emojis, or empty string.",
-  "realWorldContext": "One sentence connecting to daily life. Max 15 words.",
-  "successCriteria": "They answer the multiple choice correctly."
-}
-
-Subject: ${subject}
-Concept: ${concept}
-${needsVisuals ? 'Visual aid is REQUIRED for this subject.' : ''}
-`
-
-    try {
-      const response = await callDeepSeek(prompt)
-      const parsed = JSON.parse(response)
-
-      const questionWithChoices = parsed.choices
-        ? `${parsed.question}\n\n${parsed.choices}\n\nType A, B, or C.`
-        : parsed.question
-
-      const rawAid = (parsed.visualAid || '').trim()
-      const visualAid: VisualAid | undefined = rawAid.length > 10
-        ? { type: 'simple', content: rawAid, altText: `${concept} diagram`, caption: `${subject} — ${concept}`, subject, concept }
-        : needsVisuals ? this.getFallbackDiagram(subject, concept, 1) : undefined
-
-      return {
-        id: `struggling-${Date.now()}`,
-        type: 'concept_intro',
-        subject,
-        concept,
-        difficulty: 1,
-        content: {
-          instruction: parsed.instruction,
-          example: parsed.example,
-          question: questionWithChoices,
-          visualAid,
-          realWorldContext: parsed.realWorldContext || `This helps you understand ${subject} better.`,
-        },
-        estimatedMinutes: 3,
-        successCriteria: parsed.successCriteria || 'Answer the multiple choice question correctly.',
-        nextTaskRecommended: 'practice_same_concept',
-      }
-    } catch (error) {
-      console.error('Struggling learner task generation failed:', error)
+      const concept = state.currentConcept || this.getDefaultConceptForSubject(subject)
       return this.getStrugglingLearnerFallback(subject, concept, state)
     }
+    return this.getFallbackTask(subject, difficulty, state, needsVisuals)
   }
 
   /** Guaranteed simple fallback when AI fails for level 1 learners */
@@ -675,81 +571,6 @@ ${needsVisuals ? 'Visual aid is REQUIRED for this subject.' : ''}
       integrated_science: 'scientific_method',
     }
     return defaults[subject.toLowerCase()] ?? 'basic_concepts'
-  }
-  
-  /**
-   * GENERATE diagram for visual subjects
-   * This is where the magic happens for Biology, Geography, Agriculture, etc!
-   */
-  private async generateDiagram(
-    subject: string, 
-    concept: string, 
-    difficulty: 1 | 2 | 3 | 4 | 5
-  ): Promise<VisualAid> {
-    
-    const diagramPrompt = `
-      Create a simple ASCII/Unicode diagram for a Kenyan student learning:
-      
-      Subject: ${subject}
-      Concept: ${concept}
-      Difficulty Level: ${difficulty} (1=simplest, 5=most detailed)
-      
-      The diagram should be:
-      - Clear and easy to understand
-      - Use simple ASCII characters (+, -, |, /, \, ┌, ┐, └, ┘, ├, ┤, ─, │, etc.)
-      - Include labels where helpful
-      - Max 15 lines
-      
-      IMPORTANT: Return ONLY the diagram text, no explanations.
-      
-      Examples of good diagrams:
-      
-      For Plant Cell (Biology):
-      ┌─────────────────────┐
-      │  ┌───────────────┐  │
-      │  │    Nucleus    │  │
-      │  │      ☢️       │  │
-      │  └───────────────┘  │
-      │    🌿 Chloroplast   │
-      │    💧 Vacuole       │
-      └─────────────────────┘
-      Cell Wall (outside)
-      
-      For Water Cycle (Geography):
-          ☁️ Clouds
-           ↑  ↓
-      💧 Lake → Rain
-           ↓
-      🌊 River
-      
-      For Simple Circuit (Physics):
-      [Battery]───[Bulb]───[Switch]
-          ↑                    ↓
-          └──────────┘
-      
-      For Row Planting (Agriculture):
-      🌱──30cm──🌱──30cm──🌱
-       │        │        │
-      60cm      60cm      60cm
-       │        │        │
-      🌱──30cm──🌱──30cm──🌱
-    `
-    
-    try {
-      const diagramText = await callDeepSeek(diagramPrompt)  // Changed to DeepSeek
-      
-      return {
-        type: 'simple',
-        content: diagramText.trim(),
-        altText: `${concept} diagram for ${subject}`,
-        caption: `${subject} - ${concept}`,
-        subject,
-        concept
-      }
-    } catch (error) {
-      console.error('Diagram generation failed, using fallback:', error)
-      return this.getFallbackDiagram(subject, concept, difficulty)
-    }
   }
   
   /**
@@ -1264,206 +1085,6 @@ ${needsVisuals ? 'Visual aid is REQUIRED for this subject.' : ''}
       concept
     }
   }
-  
-  /**
-   * BUILD task prompt with specific difficulty instructions
-   */
-  private buildTaskPrompt(
-    subject: string,
-    difficulty: 1 | 2 | 3 | 4 | 5,
-    state: LearnerState,
-    needsVisuals: boolean = false,
-    curriculumType: CurriculumType = 'cbc'
-  ): string {
-    
-    // DIFFICULTY LEVEL DEFINITIONS
-    const difficultyDescriptions = curriculumType === 'igcse' ? {
-      1: `FOUNDATION - Grade E-G level (needs support)
-- Break into small steps using Cambridge foundation style
-- Use simple vocabulary; every sentence max 10 words
-- Focus on one key fact or skill at a time
-- Cambridge command word: "State" or "Identify"
-- Success = they can recall a key fact`,
-      2: `DEVELOPING - Grade C-D level (approaching target)
-- Clear step-by-step approach
-- One worked example in Cambridge exam style
-- Connect to something already known
-- Cambridge command words: "Describe" or "Outline"
-- Success = they can follow and apply the example`,
-      3: `ACHIEVING - Grade B-C level (meeting expectations)
-- Standard Cambridge IGCSE difficulty
-- Require application of knowledge to a scenario
-- Cambridge command words: "Explain" or "Calculate"
-- Success = they can apply to similar exam questions`,
-      4: `EXCEEDING - Grade A level (above expectations)
-- Push analytical and evaluative thinking
-- Require connecting multiple ideas or concepts
-- Cambridge command words: "Analyse" or "Compare"
-- Success = they can justify and explain their reasoning`,
-      5: `DISTINCTION - Grade A* level (outstanding)
-- Complex multi-step problems requiring synthesis
-- Evaluation, judgement, and extended writing
-- Cambridge command word: "Evaluate" or "To what extent..."
-- Success = they can construct a well-argued response`
-    } : {
-      1: `EXTREMELY SIMPLE - For learners BELOW expectations
-- Break into TINY steps (max 2-3 steps)
-- Use ONLY basic vocabulary
-- Every sentence max 8 words
-- Include a picture or emoji for each step
-- Example MUST be simple and universal (sharing, counting, dividing)
-- Celebrate each micro-step
-- Success = they can do one tiny piece`,
-
-      2: `SIMPLE - For learners APPROACHING expectations
-- Clear, straightforward steps
-- Simple vocabulary
-- One clear example
-- Connect to things they already know
-- Success = they can follow the example`,
-
-      3: `GRADE LEVEL - For learners MEETING expectations
-- Standard difficulty for Grade ${state.learner.grade}
-- Mix of simple and slightly challenging
-- Require some thinking but not too much
-- Success = they can apply to similar problems`,
-
-      4: `CHALLENGING - For learners EXCEEDING expectations
-- Push them to think deeper
-- Require connecting multiple ideas
-- Ask "what if" questions
-- Success = they can explain their reasoning
-- NOT TOO HARD - keep them engaged, not frustrated`,
-
-      5: `ADVANCED - Only for learners who've MASTERED level 4
-- Complex problems requiring synthesis
-- Multiple steps with reasoning
-- Success = they can teach someone else
-- Use sparingly! Only when truly ready`
-    }
-    
-    const visualInstruction = needsVisuals ? `
-IMPORTANT: This subject NEEDS VISUAL DIAGRAMS!
-After your explanation, include a SIMPLE ASCII DIAGRAM using:
-- Box drawing characters: ┌ ┐ └ ┘ ├ ┤ ─ │
-- Emojis for objects: 🌱 🌿 ☀️ 💧 🔧 ⚡
-- Labels showing parts
-
-Example format:
-EXPLANATION: [your text]
-
-DIAGRAM:
-┌─────────────────┐
-│  ☢️ Nucleus     │
-│  💧 Vacuole     │
-│  🌿 Chloroplast │
-└─────────────────┘
-` : ''
-    
-    const actionStepsForSubject = state.subjectActionSteps?.[subject]
-    const actionStepsBlock = actionStepsForSubject?.length ? `
-PERSONALIZED ACTION STEPS FOR THIS LEARNER IN ${subject.toUpperCase()}:
-${actionStepsForSubject.slice(0, 3).map((step, i) => `${i + 1}. ${step}`).join('\n')}
-
-Build your task around these specific steps.
-Learner's tier for this subject: ${state.subjectTiers?.[subject] || 'standard'}
-` : ''
-
-    const sessionGoalBlock = state.sessionGoal ? `
-SESSION GOAL: ${state.sessionGoal}
-GUIDED TOPICS FOR THIS SESSION:
-${(state.guidedTopics || []).map((t, i) => `${i + 1}. ${t}`).join('\n')}
-` : ''
-
-    const careerBlock = state.careerContext ? `
-CAREER CONTEXT: This student is targeting "${state.careerContext}". Connect explanations to this career whenever natural.
-` : ''
-
-    return `
-You are the Learning Compass creating a PERFECT task for a student.
-
-SUBJECT: ${subject}
-DIFFICULTY LEVEL: ${difficulty} - ${difficultyDescriptions[difficulty]}
-
-STUDENT CONTEXT:
-- Name: ${state.learner.name}
-- Grade: ${state.learner.grade}
-- Current Tier: ${state.currentTier}
-- Struggling with: ${state.strugglingConcepts.join(', ') || 'nothing specific'}
-- Good at: ${state.masteredConcepts.join(', ') || 'willing to learn'}
-- Interests: ${state.learner.interests.join(', ') || 'learning through stories'}
-- Dream Career: ${state.learner.dreamCareer || 'not sure yet'}
-- Recommended Pathway: ${state.learner.recommendedPathway || 'not set yet'}
-${actionStepsBlock}${sessionGoalBlock}${careerBlock}
-
-${curriculumType === 'igcse' ? `CONTEXT GUIDELINES (Cambridge IGCSE):
-- Use international examples (London, Tokyo, global data)
-- Reference Cambridge exam style: structured questions, mark schemes
-- Frame progress in Cambridge grade terms (targeting C and above, pushing for A/A*)
-- For exam questions: use command words (Describe, Explain, Analyse, Evaluate, Calculate)` : `CONTEXT GUIDELINES — STRICT:
-
-Use ABSTRACT examples by default:
-- "a set of 8 objects" / "a rectangle divided into parts" / "a number line from 0 to 10" / "a container that holds liquid"
-
-Use REAL WORLD only when the concept IS about real world:
-- Speed → distance and time are fine
-- Area → a room or field is fine
-- Fractions → NOT food, NOT people
-- Cell structure → NOT food analogies
-
-NEVER use:
-- Named characters (Wanjiku, Otieno, Kamau, Mama, Baba, Farmer X)
-- Food as a fraction or division analogy
-- Transport as a physics analogy
-- Local references as the default
-- "chapati" / "ugali" / "matatu" / "shamba" / "sukuma" / "boda boda"
-
-IF a real-world connection is needed: make it universal, not Kenyan-specific.`}
-
-${visualInstruction}
-
-CREATE A TASK WITH:
-
-1. INSTRUCTION: Clear, step-by-step what to do
-2. EXAMPLE: A clear real-world situation (rotate — universal, classroom, Kenyan as appropriate)
-3. QUESTION: What to solve/practice (if applicable)
-4. VISUAL AID: ${needsVisuals ? 'Draw a REAL ASCII diagram using box-drawing characters (┌─┐│└┘) and emojis. REQUIRED.' : 'Leave visualAid as empty string'}
-5. REAL-WORLD CONTEXT: Explain why this matters in real life
-
-RESPOND WITH JSON:
-{
-  "instruction": "...",
-  "example": "...",
-  "question": "...",
-  "visualAid": "${needsVisuals ? '← REPLACE THIS ENTIRE VALUE with a real ASCII diagram' : ''}",
-  "realWorldContext": "...",
-  "successCriteria": "..."
-}
-
-${needsVisuals ? 'CRITICAL: The visualAid value MUST be a real diagram drawn with ┌─┐│└┘ characters. Do NOT leave placeholder text.' : ''}
-
-CRITICAL TEACHING RULES — ALWAYS FOLLOW:
-- NEVER give the answer directly on first ask
-- ALWAYS respond with a guiding question first
-- After student attempts: give a HINT not the answer
-- After 3 failed attempts: show worked example + give a similar NEW problem to try
-- Response format must be:
-  "What do you think would happen if...?"
-  "Close. What about the second step?"
-  "Interesting approach — why did you choose that?"
-- When right: confirm briefly then advance ("Right. Now:")
-- When wrong: name specifically what's wrong — never just "try again"
-- NEVER say "Wrong" — name the issue: "The denominator stays the same here."
-- For struggling students (difficulty 1-2):
-  Break into ONE tiny step at a time
-  Ask ONE question only per response
-- For excelling students (difficulty 4-5):
-  Ask multi-step reasoning questions
-  "Can you explain WHY that works?"
-  "How would you teach this to a classmate?"
-`
-  }
-  
   /**
    * UPDATE learner state based on task result
    * This is how compass LEARNS and ADAPTS
@@ -1839,66 +1460,6 @@ CRITICAL TEACHING RULES — ALWAYS FOLLOW:
     })
     return tiers
   }
-  
-  private parseTaskResponse(
-    response: string, 
-    subject: string, 
-    difficulty: number,
-    state: LearnerState
-  ): Task {
-    try {
-      const parsed = JSON.parse(response)
-      const needsVisuals = this.visualSubjects.includes(subject.toLowerCase())
-      
-      const task: Task = {
-        id: `task-${Date.now()}`,
-        type: difficulty <= 2 ? 'concept_intro' : difficulty >= 4 ? 'challenge' : 'practice',
-        subject,
-        concept: 'current',
-        difficulty: difficulty as 1 | 2 | 3 | 4 | 5,
-        content: {
-          instruction: parsed.instruction || 'Let\'s learn something new!',
-          example: parsed.example,
-          question: parsed.question,
-          realWorldContext: parsed.realWorldContext || 'This is useful in the real world.'
-        },
-        estimatedMinutes: difficulty === 1 ? 3 : difficulty === 2 ? 4 : difficulty === 3 ? 5 : 6,
-        successCriteria: parsed.successCriteria || 'Can you explain this?',
-        nextTaskRecommended: 'continue'
-      }
-      
-      // Add visual aid if provided or needed
-      // Reject placeholder echoes the AI sometimes returns verbatim
-      const PLACEHOLDER_PATTERNS = [
-        'ascii diagram here', '← replace this', 'replace this entire',
-        'put your diagram', 'diagram goes here', 'insert diagram',
-      ]
-      const rawAid = (parsed.visualAid || '').trim()
-      const isPlaceholder = !rawAid ||
-        rawAid.length < 20 ||
-        PLACEHOLDER_PATTERNS.some(p => rawAid.toLowerCase().includes(p))
-
-      if (!isPlaceholder) {
-        task.content.visualAid = {
-          type: 'simple',
-          content: rawAid,
-          altText: `Diagram for ${subject}`,
-          caption: `${subject} diagram`,
-          subject,
-          concept: 'current'
-        }
-      } else if (needsVisuals) {
-        // Placeholder or empty — use rich fallback from the diagram library
-        task.content.visualAid = this.getFallbackDiagram(subject, task.concept, difficulty as 1|2|3|4|5)
-      }
-      
-      return task
-    } catch (error) {
-      console.error('Failed to parse task response:', error)
-      return this.getFallbackTask(subject, difficulty as 1|2|3|4|5, state, 
-        this.visualSubjects.includes(subject.toLowerCase()))
-    }
-  }// ─────────────────────────────────────────────────────────────────────────────
 // ADD THESE TWO METHODS to the LearningCompass class in lib/ai/learningCompass.ts
 // Place them just before the closing brace of the class (before the singleton export)
 // ─────────────────────────────────────────────────────────────────────────────
