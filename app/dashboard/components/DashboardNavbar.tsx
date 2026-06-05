@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { GraduationCap, LogOut, Menu, X } from 'lucide-react'
+import { LogOut, Menu, X } from 'lucide-react'
 import { RoleSwitcher } from '@/components/layout/RoleSwitcher'
+import { Logo } from '@/components/ui/Logo'
 
 const NAV_LINKS = [
   { href: '/chat',                       label: 'Compass',     color: 'hover:text-violet-600'  },
@@ -32,11 +33,8 @@ export default function DashboardNavbar() {
           <div className="flex items-center justify-between">
 
             {/* Logo */}
-            <Link href="/dashboard" className="flex items-center gap-3 group">
-              <div className="w-10 h-10 bg-linear-to-br from-violet-500 to-cyan-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg">
-                <GraduationCap className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-xl sm:text-2xl font-black text-slate-900">EduNexus</span>
+            <Link href="/dashboard">
+              <Logo variant="light" size="md" />
             </Link>
 
             {/* Desktop links */}

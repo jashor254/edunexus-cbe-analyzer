@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { MessageCircle, Facebook, Music2, Phone, Mail } from 'lucide-react'
+import { Logo } from '@/components/ui/Logo'
 
 export default function MarketingFooter() {
   const currentYear = new Date().getFullYear();
@@ -13,7 +14,7 @@ export default function MarketingFooter() {
           
           {/* Brand Column */}
           <div className="md:col-span-1">
-            <h3 className="text-white font-black text-2xl mb-4">EduNexus</h3>
+            <div className="mb-4"><Logo variant="dark" size="sm" /></div>
             <p className="text-slate-400 text-sm mb-6">
               Complete CBE guidance from Junior to Senior School. 🇰🇪
             </p>

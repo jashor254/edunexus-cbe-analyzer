@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Mail, Lock, ArrowRight, Loader2, Chrome, ArrowLeft } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
+import { Logo } from '@/components/ui/Logo'
 
 export default function LoginContent() {
   const [email, setEmail] = useState('')
@@ -80,7 +81,7 @@ export default function LoginContent() {
   return (
     <div className="min-h-screen bg-[#020617] text-white">
       <nav className="p-6 border-b border-white/5 flex justify-between items-center">
-        <Link href="/" className="text-2xl font-black italic">EduNexus<span className="text-purple-500">.</span></Link>
+        <Link href="/"><Logo variant="dark" size="sm" /></Link>
         <Link href="/pricing" className="text-sm font-bold text-slate-400 flex items-center gap-2">
           <ArrowLeft className="w-4 h-4" /> Back to Pricing
         </Link>

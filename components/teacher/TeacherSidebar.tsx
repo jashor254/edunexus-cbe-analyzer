@@ -4,10 +4,11 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, BookOpen, FileText, BarChart3,
-  AlertTriangle, ClipboardList, Settings, GraduationCap,
+  AlertTriangle, ClipboardList, Settings,
   LogOut, Scroll, NotebookPen, Sparkles, ChevronRight,
 } from 'lucide-react'
 import { RoleSwitcher } from '@/components/layout/RoleSwitcher'
+import { Logo } from '@/components/ui/Logo'
 
 const NAV = [
   { href: '/teacher/dashboard',      icon: LayoutDashboard, label: 'Dashboard'      },
@@ -56,14 +57,8 @@ export default function TeacherSidebar({ teacherName, school, subject }: Props) 
 
         {/* Logo */}
         <div className="px-5 py-5">
-          <Link href="/teacher/dashboard" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 bg-gradient-to-br from-teal-400 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg shadow-teal-900/40 group-hover:scale-105 transition-transform">
-              <GraduationCap className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <div className="font-black text-white text-[15px] leading-tight tracking-tight">EduNexus</div>
-              <div className="text-[11px] text-teal-400 font-semibold tracking-wide uppercase">Teacher Portal</div>
-            </div>
+          <Link href="/teacher/dashboard">
+            <Logo variant="dark" size="sm" />
           </Link>
         </div>
 
@@ -142,14 +137,8 @@ export default function TeacherSidebar({ teacherName, school, subject }: Props) 
 
       {/* ── Mobile Header ─────────────────────────────────────────────────────── */}
       <header className="lg:hidden sticky top-0 z-20 bg-[#0c1929] border-b border-white/10 px-4 py-3 flex items-center justify-between">
-        <Link href="/teacher/dashboard" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-gradient-to-br from-teal-400 to-cyan-500 rounded-xl flex items-center justify-center shadow">
-            <GraduationCap className="w-4 h-4 text-white" />
-          </div>
-          <div>
-            <span className="font-black text-white text-sm">EduNexus</span>
-            <span className="text-teal-400 text-xs font-semibold ml-1.5">Teacher</span>
-          </div>
+        <Link href="/teacher/dashboard">
+          <Logo variant="dark" size="sm" />
         </Link>
         <div className="flex items-center gap-2">
           <RoleSwitcher />
