@@ -52,6 +52,8 @@ type Props = {
   weakAreas:      SubjectPriority[]
   onSelect:       (params: TopicSelectParams) => void
   onContinue:     () => void
+  defaultSubject?: string   // pre-select this subject dbName on mount
+  compact?:        boolean  // hide greeting + continue card, just show picker
 }
 
 // ── Subject catalogue — keyed by exact DB learning_area name ─────────────────
@@ -137,11 +139,17 @@ export default function TopicChoice({
   weakAreas,
   onSelect,
   onContinue,
+  defaultSubject,
+  compact = false,
 }: Props) {
   const firstName = studentName.split(' ')[0]
 
+  const defaultSubjectDef = defaultSubject
+    ? (getSubjectsForGrade(studentGrade).find(s => s.dbName === defaultSubject) ?? null)
+    : null
+
   // ── UI state ──────────────────────────────────────────────────────────────
-  const [selectedSubject,  setSelectedSubject]  = useState<SubjectDef | null>(null)
+  const [selectedSubject,  setSelectedSubject]  = useState<SubjectDef | null>(defaultSubjectDef)
   const [selectedGrade,    setSelectedGrade]    = useState<number>(studentGrade)
   const [showGradePicker,  setShowGradePicker]  = useState(false)
   const [strandTree,       setStrandTree]       = useState<StrandGroup[]>([])
@@ -231,14 +239,16 @@ export default function TopicChoice({
   return (
     <div className="w-full max-w-lg mx-auto space-y-5 text-left">
 
-      {/* Greeting */}
-      <div className="text-center">
-        <h2 className="text-xl font-black text-white">Hey {firstName}.</h2>
-        <p className="text-white/50 text-sm mt-1">What would you like to work on?</p>
-      </div>
+      {/* Greeting — hidden in compact mode */}
+      {!compact && (
+        <div className="text-center">
+          <h2 className="text-xl font-black text-white">Hey {firstName}.</h2>
+          <p className="text-white/50 text-sm mt-1">What would you like to work on?</p>
+        </div>
+      )}
 
-      {/* ── Continue card ──────────────────────────────────────────────────── */}
-      {currentOutcome && (
+      {/* ── Continue card — hidden in compact mode ─────────────────────────── */}
+      {!compact && currentOutcome && (
         <div>
           <p className="text-[10px] font-black text-white/30 uppercase tracking-wider mb-2">
             Continue where you left off
@@ -274,14 +284,16 @@ export default function TopicChoice({
         </div>
       )}
 
-      {/* Divider */}
-      <div className="flex items-center gap-3">
-        <div className="flex-1 h-px bg-white/8" />
-        <span className="text-[10px] font-black text-white/20 uppercase tracking-wider">
-          {currentOutcome ? 'Or pick something new' : 'Choose a subject'}
-        </span>
-        <div className="flex-1 h-px bg-white/8" />
-      </div>
+      {/* Divider — hidden in compact mode */}
+      {!compact && (
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-px bg-white/8" />
+          <span className="text-[10px] font-black text-white/20 uppercase tracking-wider">
+            {currentOutcome ? 'Or pick something new' : 'Choose a subject'}
+          </span>
+          <div className="flex-1 h-px bg-white/8" />
+        </div>
+      )}
 
       {/* ── Grade selector ─────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2">

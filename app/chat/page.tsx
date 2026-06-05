@@ -283,8 +283,10 @@ function ChatContent() {
   const [freeLeft,        setFreeLeft]        = useState(1)
   const [showUpgrade,     setShowUpgrade]     = useState(false)
   const [initDone,        setInitDone]        = useState(false)
-  const [currentOutcome,  setCurrentOutcome]  = useState<LessonOutcome | null>(null)
-  const [outcomeStep,     setOutcomeStep]     = useState<number>(1)
+  const [currentOutcome,       setCurrentOutcome]       = useState<LessonOutcome | null>(null)
+  const [outcomeStep,          setOutcomeStep]          = useState<number>(1)
+  const [showNextSubject,      setShowNextSubject]      = useState(false)
+  const [nextSubjectPicker,    setNextSubjectPicker]    = useState<string | null>(null)
 
   const messagesEndRef  = useRef<HTMLDivElement>(null)
   const inputRef        = useRef<HTMLTextAreaElement>(null)
@@ -479,6 +481,21 @@ function ChatContent() {
     recognitionRef.current = rec
   }
 
+  // ── Next-subject suggestions (shown after session completes) ────────────────
+  // Takes the 2nd and 3rd priorities from compass_bridge, excluding the subject just done
+  const nextSubjectSuggestions: Array<{ dbName: string; label: string }> = (() => {
+    type CB = { subjectPriorities?: Array<{ subject?: string; displayName?: string }> }
+    const cb = (learningContext?.compass_bridge as CB | null | undefined)
+    const currentSub = sessionState.currentSubject?.toLowerCase()
+    return (cb?.subjectPriorities ?? [])
+      .filter(sp => (sp.subject ?? '').toLowerCase() !== currentSub)
+      .slice(0, 2)
+      .map(sp => ({
+        dbName: sp.displayName ?? (sp.subject ?? ''),
+        label:  sp.displayName ?? (sp.subject ?? ''),
+      }))
+  })()
+
   // ── Compute weak topics from compass_bridge priorities ──────────────────────
   const availableTopicsForChoice: WeakTopic[] = (() => {
     type Priority = { subject?: string; currentTier?: string; careerReason?: string; actionSteps?: string[] }
@@ -654,6 +671,9 @@ function ChatContent() {
                 : `Step ${step - 1} done. Moving up.`,
               timestamp: new Date(),
             }])
+            if (data.outcomeAchieved) {
+              setTimeout(() => setShowNextSubject(true), 800)
+            }
           }, 400)
         }
 
@@ -1089,6 +1109,71 @@ function ChatContent() {
                   ))}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ── What next? panel — appears after session completes ─────────── */}
+          {showNextSubject && (
+            <div className="px-4 pb-4 max-w-2xl mx-auto w-full">
+              {nextSubjectPicker ? (
+                // Full topic picker for the chosen next subject
+                <div className="bg-white/3 border border-white/8 rounded-3xl p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-black text-white/40 uppercase tracking-wider">
+                      Pick a topic in {nextSubjectPicker}
+                    </p>
+                    <button
+                      onClick={() => setNextSubjectPicker(null)}
+                      className="text-xs text-white/30 hover:text-white/60 transition-colors"
+                    >
+                      ← back
+                    </button>
+                  </div>
+                  <TopicChoice
+                    studentName={student?.name ?? ''}
+                    studentGrade={student?.grade ?? 9}
+                    curriculumType={student?.curriculum_type ?? 'cbc'}
+                    currentOutcome={null}
+                    weakAreas={[]}
+                    defaultSubject={nextSubjectPicker}
+                    compact
+                    onSelect={params => {
+                      setShowNextSubject(false)
+                      setNextSubjectPicker(null)
+                      setTopicSelected(true)
+                      generateOutcomeAndStart(params)
+                    }}
+                    onContinue={() => {}}
+                  />
+                </div>
+              ) : (
+                // Quick suggestion chips
+                <div className="bg-white/3 border border-white/8 rounded-2xl p-4">
+                  <p className="text-sm font-black text-white/60 mb-3">
+                    Session done. What next?
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {nextSubjectSuggestions.map(s => (
+                      <button
+                        key={s.dbName}
+                        onClick={() => setNextSubjectPicker(s.dbName)}
+                        className="px-4 py-2 bg-violet-500/15 border border-violet-500/30 hover:bg-violet-500/25 text-violet-300 text-sm font-bold rounded-xl transition-all"
+                      >
+                        Try {s.label} →
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => {
+                        setShowNextSubject(false)
+                        setNextSubjectPicker(null)
+                      }}
+                      className="px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/8 text-white/40 text-sm font-bold rounded-xl transition-all"
+                    >
+                      Keep chatting
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

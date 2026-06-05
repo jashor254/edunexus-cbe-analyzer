@@ -103,38 +103,40 @@ ${stepsTable}
 
 Generate a compass_bridge JSON. Be SPECIFIC. Never say "improve Mathematics" — say "master fractions and percentages" or "practice linear equations". Use the student's actual weak subjects.
 
-CRITICAL: firstConcept MUST be a specific substrand name from the Kenya CBC curriculum.
+CRITICAL: firstConcept MUST be a topic from the student's ACTUAL grade curriculum — NEVER a lower-grade topic.
 
-Grade 7-9 Mathematics examples:
-  'fractions', 'integers', 'algebra_expressions', 'linear_equations',
-  'angles', 'area_perimeter', 'data_and_statistics', 'percentages'
+Grade 7 Mathematics (pick from):
+  'fractions', 'decimals', 'percentages', 'integers', 'algebra_expressions',
+  'angles', 'area_perimeter', 'data_and_statistics'
 
-Grade 7-9 Science examples:
-  'cell_structure', 'photosynthesis', 'human_digestive_system',
-  'ecosystems', 'forces_and_motion', 'simple_machines'
+Grade 8 Mathematics (pick from):
+  'integers', 'algebra_linear_equations', 'commercial_arithmetic',
+  'area_and_perimeter', 'data_handling', 'matrices_intro'
 
-Grade 7-9 English examples:
-  'essay_writing', 'grammar_tenses', 'reading_comprehension',
-  'oral_skills', 'letter_writing', 'vocabulary'
+Grade 9 Mathematics (pick from — DO NOT use 'fractions' or 'percentages', those are Grade 7):
+  'integers', 'cubes_and_cube_roots', 'indices_and_logarithms',
+  'compound_proportions', 'linear_equations', 'matrices',
+  'area_perimeter_volume', 'coordinates_and_graphs', 'data_handling_probability'
 
-Grade 10-12 Biology examples:
-  'cell_biology', 'cell_division', 'genetics', 'ecology',
-  'human_physiology', 'photosynthesis_senior', 'classification'
+Grade 7 Science: 'cell_structure', 'photosynthesis', 'ecosystems', 'forces_and_motion', 'simple_machines'
+Grade 8 Science: 'nutrition', 'reproduction', 'electricity', 'waves'
+Grade 9 Science: 'genetics', 'evolution', 'acids_bases', 'organic_chemistry_intro', 'energy_transformations'
 
-Grade 10-12 Chemistry examples:
-  'atomic_structure', 'chemical_bonding', 'stoichiometry',
-  'acids_bases', 'periodic_table', 'organic_chemistry_intro'
+Grade 7-9 English: 'essay_writing', 'grammar_tenses', 'reading_comprehension', 'oral_skills', 'letter_writing'
+Grade 7-9 Social Studies: 'map_skills', 'population', 'governance', 'economic_activities', 'history_kenya'
 
-Grade 10-12 Physics examples:
-  'mechanics', 'waves', 'electricity', 'magnetism',
-  'optics', 'thermodynamics', 'nuclear_physics'
+Grade 10-12 Biology: 'cell_biology', 'cell_division', 'genetics', 'ecology', 'human_physiology', 'classification'
+Grade 10-12 Chemistry: 'atomic_structure', 'chemical_bonding', 'stoichiometry', 'acids_bases', 'organic_chemistry_intro'
+Grade 10-12 Physics: 'mechanics', 'waves', 'electricity', 'magnetism', 'optics', 'thermodynamics'
+Grade 10-12 Core Mathematics: 'matrices', 'linear_programming', 'differentiation', 'integration', 'statistics'
 
 If scores alone cannot determine the specific substrand, set firstConcept to null.
 
 IMPORTANT: Set startDifficulty to ${recommendedDifficulty}.${uniformlyLow ? ' This student has uniform Level 2 scores — start at 1 to build confidence first before progressing.' : ''}
-The UI will then show a curriculum-aligned topic selector pulled from the DB.
+The UI shows a curriculum-aligned topic selector from the DB after this.
 
-NEVER set firstConcept to just a subject name. 'mathematics' is WRONG. 'fractions' is CORRECT.
+NEVER set firstConcept to just a subject name ('mathematics' is WRONG).
+NEVER assign a lower-grade topic to an older student — fractions belong to Grade 7, NOT Grade 9.
 
 Return ONLY valid JSON in this exact shape:
 {
