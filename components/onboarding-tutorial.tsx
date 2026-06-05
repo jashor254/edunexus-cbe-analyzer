@@ -40,7 +40,7 @@ const steps: Step[] = [
   {
     title: 'Learning Compass 🧭',
     description:
-      'Chat with the Learning Compass — trained on CBC and IGCSE curriculum. Uses Kenyan examples — unga, matatus, KES. Available at midnight during school holidays.',
+      'Chat with the Learning Compass — trained on CBC and IGCSE curriculum. Personalised to your child\'s exact level with topic selection straight from the curriculum.',
     icon: '🧭',
     gradient: 'from-amber-500 to-orange-500',
     highlight: '✨ First session is on us — no card needed',

@@ -136,7 +136,7 @@ NEVER set firstConcept to just a subject name. 'mathematics' is WRONG. 'fraction
 
 Return ONLY valid JSON in this exact shape:
 {
-  "sessionGoal": "One specific sentence naming the subject and concept — e.g. 'Close the gap in fractions and basic algebra — these are blocking Wanjiku's STEM pathway progress'",
+  "sessionGoal": "One specific sentence naming the subject and concept — e.g. 'Close the gap in fractions and basic algebra — these are blocking the STEM pathway progress'",
   "firstSubject": "the single most urgent subject name (lowercase, e.g. mathematics)",
   "firstConcept": "specific substrand slug e.g. fractions, cell_structure, essay_writing — NOT just the subject name. null if unclear.",
   "startDifficulty": 1 or 2 or 3 based on tier (below=1, approaching=2, meets=3),
