@@ -290,6 +290,8 @@ function ChatContent() {
   const [lockedSubject,        setLockedSubject]        = useState<string | null>(null)
   const [lockedSubstrand,      setLockedSubstrand]      = useState<string | null>(null)
   const [lockedGrade,          setLockedGrade]          = useState<number | null>(null)
+  const [isRevision,           setIsRevision]           = useState(false)
+  const [topicDisplayName,     setTopicDisplayName]     = useState<string | null>(null)
 
   const messagesEndRef  = useRef<HTMLDivElement>(null)
   const inputRef        = useRef<HTMLTextAreaElement>(null)
@@ -417,6 +419,20 @@ function ChatContent() {
     if (existing) {
       setSessionId(existing.id)
       await loadMessages(existing.id)
+
+      // Restore topic lock if session is recent (< 1 hour)
+      // Otherwise show TopicChoice so student picks a fresh focus
+      const lastUpdate  = new Date(existing.updated_at || existing.created_at)
+      const hoursSince  = (Date.now() - lastUpdate.getTime()) / 3600000
+      type SavedState   = { lockedSubject?: string; lockedSubstrand?: string; initialized?: boolean }
+      const saved       = (existing.session_state ?? {}) as SavedState
+
+      if (hoursSince <= 1 && saved.lockedSubject) {
+        setLockedSubject(saved.lockedSubject)
+        setLockedSubstrand(saved.lockedSubstrand ?? null)
+        setTopicSelected(true)
+      }
+      // > 1 hour away: topicSelected stays false → TopicChoice shown at top
     } else {
       await createNewSession(user.id)
     }
@@ -465,7 +481,23 @@ function ChatContent() {
     if (data) {
       setSessionId(data.id)
       setMessages([])
+      setLockedSubject(null)
+      setLockedSubstrand(null)
+      setLockedGrade(null)
+      setTopicDisplayName(null)
+      setIsRevision(false)
+      setTopicSelected(false)
+      setCurrentOutcome(null)
     }
+  }
+
+  const resetTopic = () => {
+    setLockedSubject(null)
+    setLockedSubstrand(null)
+    setLockedGrade(null)
+    setTopicDisplayName(null)
+    setIsRevision(false)
+    setTopicSelected(false)
   }
 
   const initSpeech = () => {
@@ -527,6 +559,8 @@ function ChatContent() {
     setLockedSubject(subject)
     setLockedSubstrand(substrand)
     setLockedGrade(grade)
+    setIsRevision(isRevision)
+    setTopicDisplayName(displayName)
 
     if (learnerId) {
       try {
@@ -744,7 +778,8 @@ function ChatContent() {
       struggleTopicRef.current = null
       inputRef.current?.focus()
     }
-  }, [input, isLoading, sessionId, learnerId, sessionState, freeLeft, stats])
+  }, [input, isLoading, sessionId, learnerId, sessionState, freeLeft, stats,
+      lockedSubject, lockedSubstrand, lockedGrade, isRevision])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -846,13 +881,18 @@ function ChatContent() {
                 <div className="font-black text-white/80 capitalize text-sm">
                   {lockedSubject || sessionState.currentSubject}
                 </div>
-                {lockedSubstrand && (
+                {(topicDisplayName || lockedSubstrand) && (
                   <p className="text-xs text-white/40 mt-0.5 leading-tight capitalize">
-                    {lockedSubstrand.replace(/_/g, ' ')}
+                    {topicDisplayName || lockedSubstrand!.replace(/_/g, ' ')}
                   </p>
                 )}
-                {!lockedSubstrand && sessionState.currentConcept && (
+                {!topicDisplayName && !lockedSubstrand && sessionState.currentConcept && (
                   <div className="text-[10px] text-white/30 mt-0.5">{sessionState.currentConcept}</div>
+                )}
+                {isRevision && lockedGrade && (
+                  <div className="text-[10px] text-amber-400/60 mt-1">
+                    Revising Grade {lockedGrade} content
+                  </div>
                 )}
               </div>
             )}
@@ -898,8 +938,13 @@ function ChatContent() {
             </Link>
             <div>
               <h1 className="font-black text-white text-sm capitalize">
-                {sessionState.currentSubject || 'Learning Compass'}
+                {lockedSubject || sessionState.currentSubject || 'Learning Compass'}
               </h1>
+              {topicDisplayName && (
+                <p className="text-[10px] text-white/40 font-medium capitalize leading-tight">
+                  {topicDisplayName}
+                </p>
+              )}
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
                 <span className="text-[10px] text-green-400 font-bold">
@@ -910,6 +955,16 @@ function ChatContent() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Change Topic button — visible when a topic is locked */}
+            {topicSelected && (
+              <button
+                onClick={resetTopic}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 rounded-xl text-xs font-bold text-white/40 hover:bg-white/10 hover:text-white/60 transition-all"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span className="hidden sm:inline">Change Topic</span>
+              </button>
+            )}
             {/* Mobile new session */}
             <button
               onClick={async () => { if (learnerId) await createNewSession(learnerId) }}
