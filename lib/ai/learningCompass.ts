@@ -383,27 +383,27 @@ export class LearningCompass {
     const breakIdeas = [
       {
         type: 'movement',
-        task: "Stand up and touch your toes 5 times! 🏃",
+        task: "Stand up and touch your toes 5 times.",
         duration: 2
       },
       {
         type: 'fun_fact',
-        task: "Did you know? A hippo's yawn means 'go away'! 😮",
+        task: "Did you know? A hippo's yawn is actually a threat display.",
         duration: 1
       },
       {
         type: 'quick_game',
-        task: "How many blue things can you see around you? Count them! 🔵",
+        task: "How many blue things can you see around you? Count them.",
         duration: 2
       },
       {
         type: 'stretch',
-        task: "Stretch your arms high like a giraffe eating leaves! 🦒",
+        task: "Stretch your arms above your head and hold for 10 seconds.",
         duration: 2
       },
       {
-        type: 'joke',
-        task: "Why did the matatu cross the road? To get to the other side! 🚌😂",
+        type: 'breathe',
+        task: "Breathe in slowly for 4 counts, hold for 4, out for 4. Twice.",
         duration: 1
       }
     ]
@@ -433,7 +433,7 @@ export class LearningCompass {
       },
       adaptationReason: "Your brain needs a rest! Let's take a short break.",
       nextCheckpoint: breakIdea.duration,
-      encouragement: "Pumzika kidogo! Rest a bit then come back stronger! 💪",
+      encouragement: "Take a short break. Your brain will work better when you return.",
       parentInsight: `${state.currentSubject} was getting tough. A ${breakIdea.duration}-minute brain break will help.`,
       needsBreak: true,
       breakDuration: breakIdea.duration
@@ -595,8 +595,8 @@ ${needsVisuals ? 'Visual aid is REQUIRED for this subject.' : ''}
   private getStrugglingLearnerFallback(subject: string, concept: string, _state: LearnerState): Task {
     const fallbacks: Record<string, { instruction: string; example: string; question: string; visualAid?: VisualAid; realWorldContext: string }> = {
       mathematics: {
-        instruction: '1/2 means one piece out of two equal pieces.',
-        example: 'Share 1 bread between 2 people — each gets 1/2.',
+        instruction: '1/2 means one part out of two equal parts.',
+        example: 'Split a rectangle into 2 equal parts — each part is 1/2.',
         question: 'What is 1/2 as a decimal?\n\nA) 0.2\nB) 0.5\nC) 2.0\n\nType A, B, or C.',
         visualAid: {
           type: 'simple',
@@ -608,7 +608,7 @@ ${needsVisuals ? 'Visual aid is REQUIRED for this subject.' : ''}
       },
       biology: {
         instruction: 'A plant cell has a strong outer wall.',
-        example: 'Like a fence around a field — it protects what is inside.',
+        example: 'It works like a firm container — it holds everything inside and keeps the shape.',
         question: 'What surrounds a plant cell?\n\nA) Cell wall\nB) Nucleus\nC) Vacuole\n\nType A, B, or C.',
         visualAid: {
           type: 'simple',
@@ -694,9 +694,8 @@ ${needsVisuals ? 'Visual aid is REQUIRED for this subject.' : ''}
       The diagram should be:
       - Clear and easy to understand
       - Use simple ASCII characters (+, -, |, /, \, ┌, ┐, └, ┘, ├, ┤, ─, │, etc.)
-      - Include labels with emojis where helpful
+      - Include labels where helpful
       - Max 15 lines
-      - Use Kenyan context where possible
       
       IMPORTANT: Return ONLY the diagram text, no explanations.
       
@@ -725,7 +724,7 @@ ${needsVisuals ? 'Visual aid is REQUIRED for this subject.' : ''}
           ↑                    ↓
           └──────────┘
       
-      For Maize Planting (Agriculture):
+      For Row Planting (Agriculture):
       🌱──30cm──🌱──30cm──🌱
        │        │        │
       60cm      60cm      60cm
@@ -766,7 +765,7 @@ ${needsVisuals ? 'Visual aid is REQUIRED for this subject.' : ''}
         fractions: {
           type: 'simple',
           content: `
-  🍕 FRACTIONS — Dividing into EQUAL parts
+  FRACTIONS — Dividing into EQUAL parts
 
   1/2 (one half):
   ┌──────┬──────┐
@@ -931,18 +930,18 @@ ${needsVisuals ? 'Visual aid is REQUIRED for this subject.' : ''}
         water_cycle: {
           type: 'simple',
           content: `
-            💧 WATER CYCLE IN KENYA 💧
-            
+            THE WATER CYCLE
+
                  ☁️ CLOUDS
                   ↑  ↓
-            LAKE VICTORIA → RAIN
+            OCEAN/LAKE → RAIN
             (Evaporation)  ↓
                       RIVERS flow
                         ↓
-                    INDIAN OCEAN
-                        
-            Process: Sun heats water → Evaporation → 
-            Condensation → Clouds → Rain → Rivers → Back to ocean
+                    OCEAN/LAKE (returns)
+
+            Sun heats water → Evaporation → Condensation
+            → Clouds → Precipitation → Rivers → Ocean
           `,
           altText: 'Water cycle showing evaporation, condensation, precipitation',
           caption: 'Water keeps moving in a circle - like magic!'
@@ -970,18 +969,17 @@ ${needsVisuals ? 'Visual aid is REQUIRED for this subject.' : ''}
         weather: {
           type: 'simple',
           content: `
-            🌤️ WEATHER SYMBOLS:
-            
-            ☀️ Sunny      (Jua kali)
-            ⛅ Partly     (Mawingu kidogo)
-            ☁️ Cloudy     (Mawingu mengi)
-            🌧️ Rain       (Mvua)
-            ⚡ Thunder    (Ngurumo)
-            🌈 Rainbow    (Upindi)
-            
-            Nairobi today: ⛅ 24°C
-            Mombasa:       ☀️ 30°C
-            Kisumu:        🌧️ 26°C
+            WEATHER SYMBOLS:
+
+            ☀️ Sunny
+            ⛅ Partly cloudy
+            ☁️ Overcast
+            🌧️ Rain
+            ⚡ Thunder
+            🌈 Rainbow
+
+            Temperature rises with more sunshine.
+            Humidity increases before rain.
           `,
           altText: 'Weather symbols and Kenya forecast',
           caption: 'Check the weather before going out!'
@@ -1015,23 +1013,23 @@ ${needsVisuals ? 'Visual aid is REQUIRED for this subject.' : ''}
         compost: {
           type: 'simple',
           content: `
-            ♻️ MAKING COMPOST:
-            
+            MAKING COMPOST:
+
             LAYERS IN THE PIT:
             ┌─────────────────┐
-            │ 🌿 Dry leaves   │ ← Top
+            │ Dry leaves      │ ← Top
             ├─────────────────┤
-            │ 🥬 Kitchen waste│
+            │ Organic waste   │
             ├─────────────────┤
-            │ 🌱 Fresh grass  │
+            │ Fresh plant matter│
             ├─────────────────┤
-            │   Soil + Ash    │
+            │ Soil + Ash      │
             ├─────────────────┤
-            │ 💧 Water (moist)│
+            │ Water (moist)   │
             └─────────────────┘
-            
-            Mix every 2 weeks!
-            After 3 months: 🪴 Rich soil for shamba
+
+            Mix every 2 weeks.
+            After 3 months: rich organic soil ready to use.
           `,
           altText: 'Compost pit layers diagram',
           caption: 'Turn kitchen waste into garden gold!'
@@ -1121,7 +1119,7 @@ ${needsVisuals ? 'Visual aid is REQUIRED for this subject.' : ''}
             • Other side lifts load
             • Makes work easier!
             
-            Examples: Jembe, crowbar, see-saw
+            Examples: crowbar, see-saw, scissors
           `,
           altText: 'Lever diagram showing load, fulcrum, and effort',
           caption: 'Levers make heavy things feel light!'
@@ -1395,33 +1393,29 @@ STUDENT CONTEXT:
 - Recommended Pathway: ${state.learner.recommendedPathway || 'not set yet'}
 ${actionStepsBlock}${sessionGoalBlock}${careerBlock}
 
-${curriculumType === 'igcse' ? `🌍 CONTEXT GUIDELINES (Cambridge IGCSE student):
-- Use international examples primarily (London, New York, Tokyo, Nairobi)
+${curriculumType === 'igcse' ? `CONTEXT GUIDELINES (Cambridge IGCSE):
+- Use international examples (London, Tokyo, global data)
 - Reference Cambridge exam style: structured questions, mark schemes
-- Connect concepts to global contexts and international data
-- Frame progress in Cambridge grade terms (targeting Grade C and above, pushing for A/A*)
-- Phrases: "Well done!", "Excellent effort!", "Keep pushing for that A*!", "Good thinking!"
-- Mention real-world global applications (e.g., multinational companies, international research)
-- For exam questions: use command words (Describe, Explain, Analyse, Evaluate, Calculate)` : `📚 CONTEXT GUIDELINES:
-Rotate NATURALLY between example types — do NOT force the same type every time:
-- Universal: sharing objects, dividing groups, counting, patterns
-- Visual: diagrams, pictures, shapes, number lines
-- Classroom: books, pencils, desks, school groups, tests
-- Real-world: money, food, sport, transport, nature
-- Kenyan: KES, matatu, shamba, Nairobi — only when it genuinely improves understanding
+- Frame progress in Cambridge grade terms (targeting C and above, pushing for A/A*)
+- For exam questions: use command words (Describe, Explain, Analyse, Evaluate, Calculate)` : `CONTEXT GUIDELINES — STRICT:
 
-CONTEXT ROTATION — STRICT:
-Turn 1: Universal (sharing, dividing, counting, patterns)
-Turn 2: Classroom (books, pencils, groups, tests)
-Turn 3: Real world — any country (money, sport, food, transport)
-Turn 4+: Kenyan ONLY if genuinely clearer (matatu, KES, shamba, chapati)
+Use ABSTRACT examples by default:
+- "a set of 8 objects" / "a rectangle divided into parts" / "a number line from 0 to 10" / "a container that holds liquid"
 
-HARD RULES:
-- NEVER two Kenyan references in one response
-- NEVER force Kenya into every example
-- DEFAULT to universal
-- If response has chapati, it cannot also have matatu, sukuma, or KES
-- One local reference maximum per response`}
+Use REAL WORLD only when the concept IS about real world:
+- Speed → distance and time are fine
+- Area → a room or field is fine
+- Fractions → NOT food, NOT people
+- Cell structure → NOT food analogies
+
+NEVER use:
+- Named characters (Wanjiku, Otieno, Kamau, Mama, Baba, Farmer X)
+- Food as a fraction or division analogy
+- Transport as a physics analogy
+- Local references as the default
+- "chapati" / "ugali" / "matatu" / "shamba" / "sukuma" / "boda boda"
+
+IF a real-world connection is needed: make it universal, not Kenyan-specific.`}
 
 ${visualInstruction}
 
@@ -1452,19 +1446,18 @@ CRITICAL TEACHING RULES — ALWAYS FOLLOW:
 - After 3 failed attempts: show worked example + give a similar NEW problem to try
 - Response format must be:
   "What do you think would happen if...?"
-  "You're very close! What about the second step?"
+  "Close. What about the second step?"
   "Interesting approach — why did you choose that?"
-- Celebrate effort always:
-  "Vizuri! Your thinking is right, let's refine it"
-  "Jaribu tena! Every attempt makes you stronger"
-- NEVER say "Wrong" — say "Almost!" or "Good try!"
+- When right: confirm briefly then advance ("Right. Now:")
+- When wrong: name specifically what's wrong — never just "try again"
+- NEVER say "Wrong" — name the issue: "The denominator stays the same here."
 - For struggling students (difficulty 1-2):
   Break into ONE tiny step at a time
   Ask ONE question only per response
 - For excelling students (difficulty 4-5):
   Ask multi-step reasoning questions
   "Can you explain WHY that works?"
-  "How would you teach this to a friend?"
+  "How would you teach this to a classmate?"
 `
   }
   
@@ -1652,58 +1645,58 @@ CRITICAL TEACHING RULES — ALWAYS FOLLOW:
     const fallbackExamples: Record<string, any> = {
       mathematics: {
         1: {
-          instruction: "Let's count mangoes! 🥭",
-          example: "Mama has 3 mangoes. Baba gives her 2 more. Let's count together: 1,2,3... + 1,2 = 5!",
-          question: "If you have 2 mangoes and your friend gives you 3, how many do you have?",
-          context: "Counting happens every day at the market!"
+          instruction: "Let's count items in a group.",
+          example: "There are 3 items in one group and 2 in another. Together: 1,2,3 + 1,2 = 5.",
+          question: "If you have a group of 2 and someone adds 3 more, how many total?",
+          context: "Counting and adding are the foundation of all arithmetic."
         },
         3: {
-          instruction: "Let's practice multiplication with matatu fares!",
-          example: "A matatu ride costs KES 50. If you take 4 rides in a week, how much do you spend? 50 × 4 = 200",
-          question: "If a boda boda ride costs KES 100 and you take it 3 times, how much do you pay?",
-          context: "Knowing multiplication helps you budget for transport!"
+          instruction: "Let's practice multiplication.",
+          example: "A box holds 50 items. If you have 4 boxes, how many items total? 50 × 4 = 200.",
+          question: "A shelf holds 100 items. You have 3 shelves. How many items can you store?",
+          context: "Multiplication lets you scale up any repeated quantity quickly."
         }
       },
       biology: {
         1: {
-          instruction: "Let's learn about plant cells!",
-          example: "A plant cell has a strong outer wall, like a fence around a shamba.",
-          question: "Can you point to where the nucleus might be?",
-          context: "Plants are all around us in Kenya - in our farms, gardens, and forests!",
+          instruction: "Let's learn about plant cells.",
+          example: "A plant cell has a strong outer wall — it acts like a firm container that holds everything inside.",
+          question: "Can you name one part of a plant cell?",
+          context: "Cells are the building blocks of every living organism.",
           visualAid: this.getFallbackDiagram('biology', 'plant_cell', difficulty)
         },
         3: {
-          instruction: "Let's understand photosynthesis - how plants make their own food!",
-          example: "Just like how you need ugali to get energy, plants need sunlight, water, and air.",
+          instruction: "Let's understand photosynthesis — how plants produce their own food.",
+          example: "Plants capture light energy and use it to convert water and carbon dioxide into glucose.",
           question: "What three things does a plant need to make food?",
-          context: "This happens in every plant around us - from the maize in the farm to the trees in the park!",
+          context: "Photosynthesis is how nearly all energy enters the food chain.",
           visualAid: this.getFallbackDiagram('biology', 'photosynthesis', difficulty)
         }
       },
       geography: {
         2: {
-          instruction: "Let's explore the water cycle!",
-          example: "The sun heats water in Lake Victoria, it rises as vapor, forms clouds, then rains in the mountains.",
-          question: "What happens after water evaporates?",
-          context: "This is why it rains in different parts of Kenya throughout the year!",
+          instruction: "Let's explore the water cycle.",
+          example: "The sun heats surface water, which rises as vapor, condenses into clouds, then falls as rain.",
+          question: "What happens to water after it evaporates?",
+          context: "The water cycle drives weather patterns across the planet.",
           visualAid: this.getFallbackDiagram('geography', 'water_cycle', difficulty)
         }
       },
       agriculture: {
         2: {
-          instruction: "Let's learn about proper planting!",
-          example: "Farmer Kamau plants maize in rows. He leaves 30cm between each plant so they have room to grow.",
-          question: "Why is it important to space plants properly?",
-          context: "Good spacing means bigger harvest and healthier plants!",
+          instruction: "Let's learn about proper crop spacing.",
+          example: "Plants in rows with 30cm between each one have enough room to grow and access nutrients.",
+          question: "Why is spacing plants properly important?",
+          context: "Good spacing means better yields and healthier plants.",
           visualAid: this.getFallbackDiagram('agriculture', 'row_planting', difficulty)
         }
       },
       physics: {
         2: {
-          instruction: "Let's learn about simple circuits!",
-          example: "When you connect a battery, wire, and bulb in a circle, the bulb lights up!",
-          question: "What happens if you break the circle?",
-          context: "Electricity needs a complete path, like water in a pipe!",
+          instruction: "Let's learn about simple circuits.",
+          example: "When a battery, wire, and bulb form a complete loop, current flows and the bulb lights up.",
+          question: "What happens if you break the loop?",
+          context: "Electricity needs a complete path — like water in a closed pipe.",
           visualAid: this.getFallbackDiagram('physics', 'simple_circuit', difficulty)
         }
       }
@@ -1745,9 +1738,9 @@ CRITICAL TEACHING RULES — ALWAYS FOLLOW:
       difficulty,
       content: {
         instruction: `Let's practice ${subject}!`,
-        example: `Think about ${subject} in your daily life.`,
+        example: `Think about how ${subject} concepts appear in everyday situations.`,
         question: "What did you learn today?",
-        realWorldContext: `${subject} is all around us in Kenya!`,
+        realWorldContext: `${subject} connects to many real situations.`,
         visualAid: isVisualSubject ? this.getFallbackDiagram(subject, 'general', difficulty) : undefined
       },
       estimatedMinutes: 5,

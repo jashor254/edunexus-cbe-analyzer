@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import type { VisualAid } from '@/lib/ai/learningCompass'
 import type { LessonOutcome, WeakTopic } from '@/lib/compass/lessonOutcomes'
-import TopicChoice from '@/components/compass/TopicChoice'
+import TopicChoice, { type TopicSelectParams } from '@/components/compass/TopicChoice'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Message {
@@ -60,16 +60,6 @@ const STRATEGY_LABEL: Record<string, string> = {
   review:        'Review',
   break:         'Brain Break',
 }
-
-// ─── Suggestion chips ─────────────────────────────────────────────────────────
-const SUGGESTIONS = [
-  'Help me with fractions 🍕',
-  'Explain photosynthesis 🌱',
-  'I don\'t understand algebra',
-  'What is the water cycle? 💧',
-  'Help with essay writing ✍️',
-  'Teach me about circuits ⚡',
-]
 
 // ─── Visual Aid renderer ──────────────────────────────────────────────────────
 function VisualAidBlock({
@@ -272,7 +262,7 @@ function ChatContent() {
   const [isLoading,       setIsLoading]       = useState(false)
   const [sessionId,       setSessionId]       = useState<string | null>(null)
   const [learnerId,       setLearnerId]       = useState<string | null>(null)
-  const [student,         setStudent]         = useState<{ id: string; name: string; grade: number; curriculum_type: string } | null>(null)
+  const [student,         setStudent]         = useState<{ id: string; name: string; grade: number; curriculum_type: string; current_pathway?: string | null } | null>(null)
   const [learningContext, setLearningContext] = useState<{
     first_subject: string
     session_goal: string
@@ -322,7 +312,7 @@ function ChatContent() {
     // Load student profile (first student belonging to this user)
     const { data: studentData } = await supabase
       .from('students')
-      .select('id, name, grade, curriculum_type')
+      .select('id, name, grade, curriculum_type, current_pathway')
       .eq('user_id', user.id)
       .order('created_at', { ascending: true })
       .limit(1)
@@ -331,6 +321,16 @@ function ChatContent() {
     if (studentData) {
       setStudent(studentData)
       setLearnerId(studentData.id)
+
+      // Resolve the correct math learning area name for Grade 10+
+      if (studentData.grade >= 10) {
+        const isStem = studentData.current_pathway === 'STEM'
+        const mathSubject = isStem ? 'Core Mathematics' : 'Essential Mathematics'
+        setSessionState(prev => ({
+          ...prev,
+          currentSubject: prev.currentSubject === 'mathematics' ? mathSubject : prev.currentSubject,
+        }))
+      }
     } else {
       setLearnerId(user.id)
     }
@@ -496,18 +496,22 @@ function ChatContent() {
   })()
 
   // ── Generate outcome then start session ──────────────────────────────────────
-  const generateOutcomeAndStart = async (
-    concept: string,
-    substrand: string,
-    displayName: string,
-    subject: string,
-  ) => {
+  const generateOutcomeAndStart = async (params: TopicSelectParams) => {
+    const { subject, substrand, displayName, grade, substrandId } = params
+    const isRevision  = grade < (student?.grade ?? 7)
+    const revisionGrade = isRevision ? grade : undefined
+
     if (learnerId) {
       try {
         const res = await fetch('/api/compass/outcome/generate', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ concept, substrand, subject, studentId: learnerId }),
+          body: JSON.stringify({
+            concept:   substrandId || substrand,
+            substrand: substrand,
+            subject,
+            studentId: learnerId,
+          }),
         })
         if (res.ok) {
           const json = await res.json() as { data?: { outcome?: LessonOutcome } }
@@ -520,7 +524,13 @@ function ChatContent() {
         // non-critical — session continues without outcome
       }
     }
-    sendMessage(`I want to work on ${displayName} in ${subject}`)
+
+    struggleTopicRef.current = substrand
+    // Send the kickoff message; revision context is carried via extra body fields
+    sendMessage(
+      `I want to work on ${displayName} in ${subject}`,
+      isRevision ? revisionGrade : undefined
+    )
   }
 
   const toggleListening = () => {
@@ -546,7 +556,7 @@ function ChatContent() {
   }
 
   // ── Send message ─────────────────────────────────────────────────────────────
-  const sendMessage = useCallback(async (text?: string) => {
+  const sendMessage = useCallback(async (text?: string, revisionGrade?: number) => {
     const userMessage = (text || input).trim()
     if (!userMessage || isLoading || !sessionId || !learnerId) return
 
@@ -578,6 +588,13 @@ function ChatContent() {
             .map(m => ({ role: m.role, content: m.content, metadata: m.metadata })),
           struggleTopic: struggleTopicRef.current ?? undefined,
           subjectFilter: sessionState.currentSubject || undefined,
+          isRevision: revisionGrade !== undefined,
+          revisionGrade: revisionGrade ?? undefined,
+          mathType: student?.current_pathway === 'STEM' && (student?.grade ?? 0) >= 10
+            ? 'core'
+            : (student?.grade ?? 0) >= 10
+              ? 'essential'
+              : undefined,
         }),
       })
 
@@ -666,7 +683,7 @@ function ChatContent() {
             setMessages(prev => [...prev, {
               id:      `break-${Date.now()}`,
               role:    'assistant',
-              content: `⏰ Pumzika kidogo! Take a ${data.sessionUpdate.breakDuration || 2}-minute break then come back stronger. Your brain is working hard! 💪`,
+              content: `Take a ${data.sessionUpdate.breakDuration || 2}-minute break. Your brain processes information better after rest.`,
               timestamp: new Date(),
             }])
           }, 600)
@@ -677,7 +694,7 @@ function ChatContent() {
       setMessages(prev => [...prev, {
         id:      `err-${Date.now()}`,
         role:    'assistant',
-        content: 'Pole! Kuna tatizo la mtandao. Jaribu tena.',
+        content: 'Something went wrong. Please try again.',
         timestamp: new Date(),
       }])
     } finally {
@@ -920,7 +937,7 @@ function ChatContent() {
 
                   return (
                     <>
-                      <h2 className="text-2xl font-black text-white mb-1">Karibu! 🇰🇪</h2>
+                      <h2 className="text-2xl font-black text-white mb-1">Learning Compass</h2>
 
                       {hasSpecificConcept ? (
                         // compass_bridge has a specific concept — skip selector
@@ -956,12 +973,17 @@ function ChatContent() {
                         // No concept set — show personalised topic choice
                         <TopicChoice
                           studentName={student?.name ?? 'there'}
+                          studentGrade={student?.grade ?? 9}
+                          curriculumType={student?.curriculum_type ?? 'cbc'}
                           currentOutcome={currentOutcome}
-                          availableTopics={availableTopicsForChoice}
-                          teacherAssigned={null}
-                          onSelect={(concept, substrand, displayName, subject) => {
+                          weakAreas={availableTopicsForChoice.map(t => ({
+                            subject:     t.subject,
+                            displayName: t.displayName,
+                            actionSteps: [t.substrand],
+                          }))}
+                          onSelect={params => {
                             setTopicSelected(true)
-                            generateOutcomeAndStart(concept, substrand, displayName, subject)
+                            generateOutcomeAndStart(params)
                           }}
                           onContinue={() => {
                             if (currentOutcome) {
@@ -969,11 +991,6 @@ function ChatContent() {
                               struggleTopicRef.current = currentOutcome.substrand || currentOutcome.concept
                               sendMessage(`Let's continue with ${currentOutcome.concept.replace(/_/g, ' ')}`)
                             }
-                          }}
-                          onHelpDecide={() => {
-                            setTopicSelected(true)
-                            struggleTopicRef.current = 'help_me_decide'
-                            sendMessage(`I need help deciding what to work on in ${learningContext.first_subject}`)
                           }}
                         />
                       ) : (
@@ -996,23 +1013,24 @@ function ChatContent() {
                 })()
               ) : (
                 // ── GENERIC WELCOME FALLBACK ──────────────────────────────
-                <>
-                  <h2 className="text-2xl font-black text-white mb-2">Karibu! 🇰🇪</h2>
-                  <p className="text-white/50 mb-8 max-w-sm leading-relaxed text-sm">
-                    Mimi ni mwalimu wako wa kibinafsi. Niulize chochote — nitakusaidia kuelewa vizuri.
-                  </p>
-                  <div className="flex flex-wrap gap-2 justify-center max-w-lg">
-                    {SUGGESTIONS.map(s => (
-                      <button
-                        key={s}
-                        onClick={() => sendMessage(s)}
-                        className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-violet-500/40 rounded-full text-sm text-white/60 hover:text-white/90 font-medium transition-all"
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                </>
+                <TopicChoice
+                  studentName={student?.name ?? 'there'}
+                  studentGrade={student?.grade ?? 9}
+                  curriculumType={student?.curriculum_type ?? 'cbc'}
+                  currentOutcome={currentOutcome}
+                  weakAreas={[]}
+                  onSelect={params => {
+                    setTopicSelected(true)
+                    generateOutcomeAndStart(params)
+                  }}
+                  onContinue={() => {
+                    if (currentOutcome) {
+                      setTopicSelected(true)
+                      struggleTopicRef.current = currentOutcome.substrand || currentOutcome.concept
+                      sendMessage(`Let's continue with ${currentOutcome.concept.replace(/_/g, ' ')}`)
+                    }
+                  }}
+                />
               )}
 
               <div className="mt-6 bg-white/5 border border-white/10 rounded-xl px-5 py-3 max-w-md mx-auto">
@@ -1194,7 +1212,7 @@ function ChatContent() {
                 'Adapts to your child\'s exact CBC level',
                 'Visual diagrams for Science & Geography',
                 'Parent insights after every session',
-                'Kenyan context — chapati, matatu & more',
+                'Grade-aware topic selection from the curriculum',
               ].map((f, i) => (
                 <div key={i} className="flex items-center gap-3">
                   <div className="w-5 h-5 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0">

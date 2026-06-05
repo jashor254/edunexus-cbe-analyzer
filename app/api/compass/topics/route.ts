@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
     if (isNaN(grade)) return apiBadRequest('grade must be a number')
 
     const topics = await getTopicsForSubject(subject, grade, curriculum)
+    // Return as { topics } so TopicChoice reads json.data.topics
     return apiSuccess({ topics })
   } catch (err) {
     console.error('[compass/topics]', err)

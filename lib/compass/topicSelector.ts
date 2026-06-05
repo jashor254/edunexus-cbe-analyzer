@@ -68,11 +68,13 @@ export async function getTopicsForSubject(
   const gradeIds = gradeRows.map((g: { id: string }) => g.id)
 
   // 2. Find learning area matching subject name
+  // 'Core Mathematics' / 'Essential Mathematics' must match exactly to avoid mixing both types
+  const isExactMathName = subject === 'Core Mathematics' || subject === 'Essential Mathematics'
   const { data: learningAreas } = await db
     .from('sow_learning_areas')
     .select('id, name')
     .in('grade_id', gradeIds)
-    .ilike('name', `%${subject}%`)
+    .ilike('name', isExactMathName ? subject : `%${subject}%`)
     .order('name')
     .limit(5)
 
@@ -130,6 +132,32 @@ export async function getTopicsForSubject(
   }
 
   return tree
+}
+
+export async function getAvailableGrades(
+  subject: string,
+  _curriculumType: string
+): Promise<number[]> {
+  const db = createServiceClient()
+
+  const { data: learningAreas } = await db
+    .from('sow_learning_areas')
+    .select('grade_id')
+    .ilike('name', `%${subject}%`)
+
+  if (!learningAreas?.length) return []
+
+  const gradeIds = [...new Set(learningAreas.map((la: { grade_id: string }) => la.grade_id))]
+
+  const { data: grades } = await db
+    .from('sow_grades')
+    .select('numeric_grade')
+    .in('id', gradeIds)
+    .order('numeric_grade')
+
+  if (!grades?.length) return []
+
+  return grades.map((g: { numeric_grade: number }) => g.numeric_grade)
 }
 
 export async function resolveConceptToDisplayName(

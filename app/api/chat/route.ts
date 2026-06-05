@@ -20,6 +20,8 @@ export async function POST(req: Request) {
       previousMessages = [],
       struggleTopic,
       subjectFilter,
+      isRevision = false,
+      revisionGrade,
     } = await req.json()
 
     // ── Access check — auth + tier resolution via server session ──────────────
@@ -47,6 +49,7 @@ export async function POST(req: Request) {
       { data: savedState },
       { data: learningContext },
       { data: studentProfile },
+      { data: currentOutcomeData },
     ] = await Promise.all([
       sessionId
         ? db.from('compass_sessions')
@@ -63,6 +66,13 @@ export async function POST(req: Request) {
       db.from('students')
         .select('name, grade, curriculum_type, current_pathway')
         .eq('id', learnerId || access.userId)
+        .maybeSingle(),
+      db.from('compass_outcomes')
+        .select('id, concept, substrand, mastery_statement, milestones, status, sessions_spent')
+        .eq('student_id', learnerId || access.userId)
+        .eq('status', 'in_progress')
+        .order('updated_at', { ascending: false })
+        .limit(1)
         .maybeSingle(),
     ])
 
@@ -171,7 +181,6 @@ export async function POST(req: Request) {
 
     // ── Compass Bridge — specific AI briefing per student ────────────────────
     type CompassBridgeShape = {
-      // New specific shape from autoReportGenerator
       sessionGoal?: string
       firstSubject?: string
       firstConcept?: string
@@ -187,7 +196,6 @@ export async function POST(req: Request) {
       }>
       weeklyMilestones?: Array<{ week?: number; goal?: string; subject?: string; checkConcept?: string }>
       parentWhatsAppMessage?: string
-      // Legacy shape fallback
       summary?: { recommendedPathway?: string }
     }
     const cb = (learningContext as { compass_bridge?: CompassBridgeShape } | null)?.compass_bridge
@@ -207,10 +215,55 @@ ${(cb.subjectPriorities ?? []).slice(0, 3).map(s =>
 ).join('\n')}
 
 Week 1 Goal: ${cb.weeklyMilestones?.[0]?.goal ?? ''}
-
-IMPORTANT: When student opens Compass for the FIRST time, greet them by name and say ONE specific sentence about their goal. Example: "Hi Wanjiku! Today we're working on fractions — this is key for your STEM pathway. Let's start simple."
-Then begin teaching ${cb.firstConcept ?? 'their priority concept'} at difficulty ${cb.startDifficulty ?? 2}/5.
 When student asks WHY they need to learn this, use the career reason above.\n`
+      : ''
+
+    // ── Session context for response prompt ──────────────────────────────────
+    type StoredSessionState = {
+      consecutiveSuccesses?: number
+      initialized?: boolean
+      [key: string]: unknown
+    }
+    const storedState = (savedState?.session_state ?? {}) as StoredSessionState
+    const consecutiveSuccesses   = (storedState.consecutiveSuccesses as number | undefined) ?? 0
+
+    type MilestoneRecord = {
+      step: number
+      description: string
+      checkQuestion: string
+      achieved: boolean
+      achievedAt?: string
+    }
+    const outcomeMilestones  = (currentOutcomeData?.milestones ?? []) as MilestoneRecord[]
+    const currentOutcomeStep = outcomeMilestones.filter(m => m.achieved).length + 1
+
+    const overallLevel = (learningContext?.overall_level as number | null) ?? 2
+    const tier         = (learningContext?.overall_tier   as string | null) ?? 'developing'
+    const isLevel1     = overallLevel <= 1 || tier === 'below_expectation'
+    const isLevel4     = overallLevel >= 4 || tier === 'above_expectation'
+    const profile = {
+      toneKey:          isLevel1 ? 'patient and simple' : isLevel4 ? 'direct and challenging' : 'warm and focused',
+      skipBasics:       isLevel4,
+      openEndedAllowed: overallLevel >= 3,
+      askToTeachBack:   overallLevel >= 3,
+    }
+
+    const firstName    = (studentProfile?.name as string | null)?.split(' ')[0] ?? 'there'
+    const sessionStateTyped = sessionState as { currentConcept?: string } | null
+    const currentConcept    = sessionStateTyped?.currentConcept || cb?.firstConcept || subject
+
+    // ── Revision mode context ────────────────────────────────────────────────
+    const studentGrade = (studentProfile?.grade as number | null) ?? 7
+    const revisionContext = isRevision && revisionGrade && (revisionGrade as number) < studentGrade
+      ? `\n## REVISION MODE:
+Student is Grade ${studentGrade} revising Grade ${revisionGrade as number} content.
+This means:
+- They have seen this before — do not treat it as brand new
+- Move faster than normal intro pace
+- If they remember it: confirm and move to application quickly
+- If they do not remember: rebuild efficiently, no judgment
+- Do NOT say "this is Grade ${revisionGrade as number} work" — just teach it
+Opening question for revision: "What do you remember about [concept]?" — NOT "Today we will learn about..."\n`
       : ''
 
     // ── Substrand-specific CBC context ───────────────────────────────────────
@@ -226,52 +279,95 @@ Start at the identify/explain level, then progress as confidence increases.\n`
       : ''
 
     // ── 🔥 GENERATE ACTUAL RESPONSE USING DEEPSEEK 🔥 ────────────────────────
-    const responsePrompt = `
-You are the Learning Compass tutor for a Kenyan student.
-${compassBridgeContext}${substrandContext}
+    const responsePrompt = `You are the EduNexus Learning Compass — a knowledgeable, calm tutor. Like a smart older sibling who knows their subject well.
+${compassBridgeContext}${revisionContext}${substrandContext}
+VOICE — FOLLOW EXACTLY:
+What you sound like: "What do you know about [concept] already?" / "Look at just the top number first." / "Right. Now the bottom number — what does that tell you?" / "Not quite. Think about what [specific thing] means." / "Got it. Here's a harder one."
 
-## WHAT TO TEACH:
-- Instruction: ${task.content.instruction}
-- Example: ${task.content.example || 'No example provided'}
-- Question: ${task.content.question || 'Help them understand the concept'}
-- Difficulty: ${task.difficulty}/5
-- Type: ${task.type}
+What you NEVER say:
+- "Sawa sawa!" / "That's awesome!" / "Keep going, you're doing great!" / "Excellent effort!"
+- "Like sharing chapati..." / "Imagine Otieno/Wanjiku/Kamau..." / "Mama sells sukuma..."
+- "Step 1... Step 2... Step 3..." (no numbered lists)
+- Any food analogy / Any transport analogy / Any named character
+- Any emoji in the response text
 
-## CONTEXT:
-- Student said: "${message}"
-- Subject: ${subject}
-- They ${struggled ? 'are struggling' : 'seem to understand'}
-- Confidence: ${confidence}
-- Encouragement to give: ${compassResponse.encouragement}
+FORMAT:
+Short. Max 3 sentences + 1 question. ONE question per response — always.
+No numbered lists. No bullet points. Direct prose + question.
+${isLevel1 ? 'Level 1 student: one sentence max, then multiple choice (A/B/C options).' : ''}${isLevel4 ? 'Level 4 student: lead with the question; explain only if they struggle.' : ''}
 
-## REAL-WORLD CONTEXT TO USE:
-${task.content.realWorldContext}
+EXAMPLES:
+If an example genuinely helps: use abstract objects — "a rectangle", "a number line", "a set of 8 items" — NOT food, NOT transport, NOT people.
+If a diagram helps: describe it simply — "Think of a rectangle split into 4 equal parts" — NOT "like a chapati cut into pieces".
 
-## YOUR RESPONSE MUST:
-1. Start with encouragement: "${compassResponse.encouragement}"
-2. Acknowledge what they said
-3. Teach the concept using the instruction
-4. Show the example clearly
-5. ${hasQuestion ? `Ask EXACTLY: "${task.content.question}"` : 'Ask if they understand'}
-6. ${hasVisual ? 'Say: "I have a diagram to help visualize this. Click the Diagram button below!"' : ''}
-7. Keep under 200 words
-8. CONTEXT ROTATION — STRICT: Turn 1=universal (sharing/counting/patterns), Turn 2=classroom (books/pencils/groups), Turn 3=real world any country (money/sport/food), Turn 4+=Kenyan ONLY if clearer. HARD RULE: max ONE local reference per response. If response has chapati it cannot also have matatu, sukuma, or KES.
-9. ${struggled ? 'Be extra patient and break it down more simply' : 'Keep going at good pace'}
-10. NEVER give the answer directly — guide with questions
+NEVER: Start with name + praise ("Great job ${firstName}!") / filler ("That's a great question!") / narrate ("Now let's look at...") / give the answer then ask "Do you understand?"
 
-Return ONLY the response text, no JSON, no markdown, no quotes around the response.
-`
+ALWAYS: End with a question or clear next instruction — never just a statement. Name what was wrong specifically. When right: confirm briefly then advance ("Right. Now:"). When stuck 3+ attempts: show worked example then a DIFFERENT problem.
+
+CURRENT SESSION:
+Student: ${firstName} | Subject: ${subject} | Concept: ${currentConcept} | Difficulty: ${task.difficulty}/5
+${currentOutcomeData ? `Goal: "${currentOutcomeData.mastery_statement as string}"
+Milestone: Step ${currentOutcomeStep}/4 — ${outcomeMilestones[Math.min(currentOutcomeStep - 1, 3)]?.description ?? ''}` : ''}
+Student said: "${message}"
+${struggled ? 'STRUGGLING — be patient, try a completely different angle' : confident ? 'CONFIDENT — advance to harder problem' : 'WORKING THROUGH IT — steady pace'}
+Consecutive successes: ${consecutiveSuccesses}
+${lastTaskQuestion ? `Last question you asked: "${lastTaskQuestion}"` : ''}
+
+WHAT TO TEACH:
+${task.content.instruction}
+${task.content.example ? `Example: ${task.content.example}` : ''}
+${hasQuestion ? `Ask: ${task.content.question}` : 'Guide without giving the answer'}
+${hasVisual ? 'Say: "I have a diagram for this — click the Diagram button below."' : ''}
+
+RESPOND in ${profile.toneKey} tone. Max 3 sentences + 1 question.
+${profile.skipBasics ? 'Skip recall — go straight to application.' : ''}${profile.openEndedAllowed ? ' Open-ended questions allowed.' : ' Multiple choice only (A/B/C options).'}${profile.askToTeachBack && consecutiveSuccesses >= 2 ? ' Ask them to explain their reasoning.' : ''}
+
+Return ONLY the response text. No JSON. No markdown. No preamble.`
 
     const assistantResponse = await callDeepSeek(responsePrompt, ragSystemPrompt)
+
+    // ── Advance outcome milestone if mastery threshold reached ───────────────
+    let outcomeAdvanced = false
+    let newOutcomeStep  = currentOutcomeStep
+    let outcomeAchieved = false
+
+    if (currentOutcomeData && confident && consecutiveSuccesses >= 2) {
+      const nextUnachieved = outcomeMilestones.find(m => !m.achieved)
+      if (nextUnachieved) {
+        const updatedMilestones: MilestoneRecord[] = outcomeMilestones.map(m =>
+          m.step === nextUnachieved.step
+            ? { ...m, achieved: true, achievedAt: new Date().toISOString() }
+            : m
+        )
+        const allAchieved = updatedMilestones.every(m => m.achieved)
+        await db
+          .from('compass_outcomes')
+          .update({
+            milestones:     updatedMilestones,
+            status:         allAchieved ? 'achieved' : 'in_progress',
+            achieved_at:    allAchieved ? new Date().toISOString() : null,
+            sessions_spent: ((currentOutcomeData.sessions_spent as number | null) ?? 0) + 1,
+            last_attempted: new Date().toISOString(),
+            updated_at:     new Date().toISOString(),
+          })
+          .eq('id', currentOutcomeData.id)
+        outcomeAdvanced = true
+        newOutcomeStep  = updatedMilestones.filter(m => m.achieved).length + 1
+        outcomeAchieved = allAchieved
+      }
+    }
 
     // ── SAVE COMPASS STATE ────────────────────────────────────────────────────
     const updatedState = learningCompass.exportState(learnerId || access.userId)
     await db
       .from('compass_sessions')
       .update({
-        session_state: { ...updatedState, initialized: true },
+        session_state: {
+          ...updatedState,
+          initialized:  true,
+        },
         last_subject: subject,
-        updated_at: new Date().toISOString(),
+        updated_at:   new Date().toISOString(),
       })
       .eq('id', sessionId)
 
@@ -331,6 +427,9 @@ Return ONLY the response text, no JSON, no markdown, no quotes around the respon
       encouragement:    compassResponse.encouragement,
       parentInsight:    compassResponse.parentInsight,
       visualAid:        task.content.visualAid || null,
+      outcomeAdvanced,
+      newOutcomeStep,
+      outcomeAchieved,
       sessionUpdate: {
         timeOnTask:     (sessionState?.timeOnTask || 0) + 5,
         currentSubject: subject,
