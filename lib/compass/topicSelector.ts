@@ -103,31 +103,61 @@ export async function getTopicsForSubject(
 
   if (!substrands?.length) return []
 
-  // 5. Build tree — deduplicate strand titles
-  const seenStrandTitles = new Set<string>()
-  const tree: TopicTree = []
+  // 5. Build tree — group by normalised strand title, merging substrands
+  //    when the same strand title appears under duplicate learning area rows.
+  const strandsByTitle = new Map<
+    string,
+    { strandId: string; strandTitle: string; substrandIds: Set<string>; substrands: SubstrandOption[] }
+  >()
 
-  for (const strand of strands as Array<{ id: string; title: string; learning_area_id: string }>) {
+  const ssMap = new Map<string, Array<{ id: string; title: string; strand_id: string }>>()
+  for (const ss of substrands as Array<{ id: string; title: string; strand_id: string }>) {
+    const list = ssMap.get(ss.strand_id) ?? []
+    list.push(ss)
+    ssMap.set(ss.strand_id, list)
+  }
+
+  for (const strand of strands as Array<{ id: string; title: string; learning_area_id: string; order_index: number }>) {
     const titleKey = strand.title.trim().toUpperCase()
-    if (seenStrandTitles.has(titleKey)) continue
-    seenStrandTitles.add(titleKey)
+    const children = ssMap.get(strand.id) ?? []
 
-    const children = (substrands as Array<{ id: string; title: string; strand_id: string }>)
-      .filter(ss => ss.strand_id === strand.id)
-      .map(ss => ({
-        id: ss.id,
-        title: ss.title,
-        displayName: toChipLabel(ss.title),
-        slug: toSlug(ss.title),
-      }))
+    if (!strandsByTitle.has(titleKey)) {
+      strandsByTitle.set(titleKey, {
+        strandId: strand.id,
+        strandTitle: strand.title,
+        substrandIds: new Set(children.map(ss => ss.id)),
+        substrands: children.map(ss => ({
+          id: ss.id,
+          title: ss.title,
+          displayName: toChipLabel(ss.title),
+          slug: toSlug(ss.title),
+        })),
+      })
+    } else {
+      // Merge substrands from duplicate strand row, skipping duplicates
+      const existing = strandsByTitle.get(titleKey)!
+      for (const ss of children) {
+        if (!existing.substrandIds.has(ss.id)) {
+          existing.substrandIds.add(ss.id)
+          existing.substrands.push({
+            id: ss.id,
+            title: ss.title,
+            displayName: toChipLabel(ss.title),
+            slug: toSlug(ss.title),
+          })
+        }
+      }
+    }
+  }
 
-    if (children.length === 0) continue
-
+  const tree: TopicTree = []
+  for (const entry of strandsByTitle.values()) {
+    if (entry.substrands.length === 0) continue
     tree.push({
-      strandId: strand.id,
-      strandTitle: strand.title,
-      displayTitle: toDisplayTitle(strand.title),
-      substrands: children,
+      strandId: entry.strandId,
+      strandTitle: entry.strandTitle,
+      displayTitle: toDisplayTitle(entry.strandTitle),
+      substrands: entry.substrands,
     })
   }
 

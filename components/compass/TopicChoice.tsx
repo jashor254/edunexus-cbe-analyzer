@@ -6,11 +6,24 @@ import type { LessonOutcome } from '@/lib/compass/lessonOutcomes'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+type SubstrandOption = {
+  id: string
+  title: string       // full raw title e.g. "Fractions - Adding fractions"
+  displayName: string // formatted for display
+  slug: string
+}
+
+type SubGroup = {
+  groupName: string         // e.g. "Fractions" (prefix before " - ")
+  substrands: SubstrandOption[]
+}
+
 type StrandGroup = {
   strandId:    string
   strandTitle: string
   displayTitle: string
-  substrands: { id: string; title: string; displayName: string; slug: string }[]
+  substrands:  SubstrandOption[]
+  subGroups:   SubGroup[]   // parsed from substrands
 }
 
 type SubjectPriority = {
@@ -41,20 +54,78 @@ type Props = {
   onContinue:     () => void
 }
 
-// ── Subject list ──────────────────────────────────────────────────────────────
+// ── Subject catalogue — keyed by exact DB learning_area name ─────────────────
 
-const SUBJECTS = [
-  { key: 'mathematics',        label: 'Mathematics'  },
-  { key: 'english',            label: 'English'      },
-  { key: 'kiswahili',          label: 'Kiswahili'    },
-  { key: 'biology',            label: 'Biology'      },
-  { key: 'chemistry',          label: 'Chemistry'    },
-  { key: 'physics',            label: 'Physics'      },
-  { key: 'geography',          label: 'Geography'    },
-  { key: 'history',            label: 'History'      },
-  { key: 'agriculture',        label: 'Agriculture'  },
-  { key: 'integrated_science', label: 'Science'      },
+type SubjectDef = { dbName: string; label: string }
+
+const SUBJECTS_JUNIOR: SubjectDef[] = [
+  { dbName: 'Mathematics',              label: 'Mathematics'       },
+  { dbName: 'English',                  label: 'English'           },
+  { dbName: 'Kiswahili',               label: 'Kiswahili'         },
+  { dbName: 'Integrated Science',       label: 'Integrated Science'},
+  { dbName: 'Social Studies',           label: 'Social Studies'    },
+  { dbName: 'Agriculture and Nutrition',label: 'Agriculture'       },
+  { dbName: 'Pre-Technical Studies',    label: 'Pre-Technical'     },
+  { dbName: 'Creative Arts and Sports', label: 'Creative Arts'     },
 ]
+
+const SUBJECTS_SENIOR: SubjectDef[] = [
+  { dbName: 'Core Mathematics',      label: 'Core Mathematics' },
+  { dbName: 'Essential Mathematics', label: 'Essential Maths'  },
+  { dbName: 'Biology',               label: 'Biology'          },
+  { dbName: 'Chemistry',             label: 'Chemistry'        },
+  { dbName: 'Physics',               label: 'Physics'          },
+  { dbName: 'Geography',             label: 'Geography'        },
+  { dbName: 'English',               label: 'English'          },
+  { dbName: 'Business Studies',      label: 'Business Studies' },
+  { dbName: 'Agriculture',           label: 'Agriculture'      },
+  { dbName: 'Computer Studies',      label: 'Computer Studies' },
+  { dbName: 'History and Citizenship', label: 'History'        },
+  { dbName: 'Kiswahili Lugha',       label: 'Kiswahili'        },
+]
+
+function getSubjectsForGrade(grade: number): SubjectDef[] {
+  return grade >= 10 ? SUBJECTS_SENIOR : SUBJECTS_JUNIOR
+}
+
+// ── Parse "Group - Topic" or "Group — Topic" substrand titles ────────────────
+// DB uses " - " (hyphen) for gr7-9, " — " (em dash) for gr10+
+
+function splitGroupName(rawTitle: string): string {
+  let idx = rawTitle.indexOf(' — ')
+  if (idx !== -1) return rawTitle.slice(0, idx).trim()
+  idx = rawTitle.indexOf(' - ')
+  if (idx !== -1) return rawTitle.slice(0, idx).trim()
+  return ''
+}
+
+function buildSubGroups(substrands: SubstrandOption[]): SubGroup[] {
+  const map = new Map<string, SubstrandOption[]>()
+
+  for (const ss of substrands) {
+    const groupName = splitGroupName(ss.title)
+    const existing = map.get(groupName) ?? []
+    map.set(groupName, [...existing, ss])
+  }
+
+  // Groups with no prefix ('') go first as direct items; named groups after
+  const result: SubGroup[] = []
+  const noGroup = map.get('')
+  if (noGroup?.length) result.push({ groupName: '', substrands: noGroup })
+  for (const [name, items] of map) {
+    if (name !== '') result.push({ groupName: name, substrands: items })
+  }
+  return result
+}
+
+function topicLabel(ss: SubstrandOption, groupName: string): string {
+  // Strip "GroupName — " prefix (toChipLabel normalises all separators to em dash)
+  if (!groupName) return ss.displayName
+  const prefix = groupName + ' — '
+  return ss.displayName.startsWith(prefix)
+    ? ss.displayName.slice(prefix.length)
+    : ss.displayName
+}
 
 // ── TopicChoice ───────────────────────────────────────────────────────────────
 
@@ -70,41 +141,68 @@ export default function TopicChoice({
   const firstName = studentName.split(' ')[0]
 
   // ── UI state ──────────────────────────────────────────────────────────────
-  const [selectedSubject,  setSelectedSubject]  = useState<string | null>(null)
+  const [selectedSubject,  setSelectedSubject]  = useState<SubjectDef | null>(null)
   const [selectedGrade,    setSelectedGrade]    = useState<number>(studentGrade)
   const [showGradePicker,  setShowGradePicker]  = useState(false)
   const [strandTree,       setStrandTree]       = useState<StrandGroup[]>([])
   const [loadingTopics,    setLoadingTopics]    = useState(false)
-  const [expanded,         setExpanded]         = useState<Record<string, boolean>>({})
+  // expandedStrands: strandId → bool
+  // expandedGroups:  `${strandId}::${groupName}` → bool
+  const [expandedStrands,  setExpandedStrands]  = useState<Record<string, boolean>>({})
+  const [expandedGroups,   setExpandedGroups]   = useState<Record<string, boolean>>({})
   const [showWeakAreas,    setShowWeakAreas]    = useState(false)
 
-  const earlierGrades = Array.from({ length: studentGrade - 7 }, (_, i) => 7 + i)
-    .filter(g => g < studentGrade)
+  const subjects       = getSubjectsForGrade(selectedGrade)
+  const earlierGrades  = Array.from(
+    { length: Math.max(0, studentGrade - 7) },
+    (_, i) => 7 + i
+  )
 
-  // ── Fetch topics when subject or grade changes ───────────────────────────
+  // Reset subject selection when grade changes (different subject set)
+  useEffect(() => {
+    setSelectedSubject(null)
+    setStrandTree([])
+    setExpandedStrands({})
+    setExpandedGroups({})
+  }, [selectedGrade])
+
+  // Fetch strand tree when subject or grade changes
   useEffect(() => {
     if (!selectedSubject) return
     setLoadingTopics(true)
-    setExpanded({})
     setStrandTree([])
+    setExpandedStrands({})
+    setExpandedGroups({})
 
     fetch(
-      `/api/compass/topics?subject=${encodeURIComponent(selectedSubject)}&grade=${selectedGrade}&curriculumType=${curriculumType}`
+      `/api/compass/topics?subject=${encodeURIComponent(selectedSubject.dbName)}&grade=${selectedGrade}&curriculumType=${curriculumType}`
     )
       .then(r => r.json())
-      .then((json: { data?: { topics?: StrandGroup[] } }) => {
-        setStrandTree(json.data?.topics ?? [])
+      .then((json: { data?: { topics?: Omit<StrandGroup, 'subGroups'>[] } }) => {
+        const raw = json.data?.topics ?? []
+        const enriched: StrandGroup[] = raw.map(s => ({
+          ...s,
+          subGroups: buildSubGroups(s.substrands),
+        }))
+        setStrandTree(enriched)
       })
       .catch(() => {})
       .finally(() => setLoadingTopics(false))
   }, [selectedSubject, selectedGrade, curriculumType])
 
   const toggleStrand = (strandId: string) =>
-    setExpanded(prev => ({ ...prev, [strandId]: !prev[strandId] }))
+    setExpandedStrands(prev => ({ ...prev, [strandId]: !prev[strandId] }))
 
-  const handleSubjectClick = (key: string) => {
-    setSelectedSubject(key)
-    setSelectedGrade(studentGrade)
+  const toggleGroup = (strandId: string, groupName: string) => {
+    const key = `${strandId}::${groupName}`
+    setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const isGroupExpanded = (strandId: string, groupName: string) =>
+    !!expandedGroups[`${strandId}::${groupName}`]
+
+  const handleSubjectClick = (subj: SubjectDef) => {
+    setSelectedSubject(subj)
     setShowGradePicker(false)
   }
 
@@ -113,13 +211,10 @@ export default function TopicChoice({
     setShowGradePicker(false)
   }
 
-  const handleSubstrandSelect = (
-    strand: StrandGroup,
-    ss: StrandGroup['substrands'][number]
-  ) => {
+  const handleSubstrandSelect = (strand: StrandGroup, ss: SubstrandOption) => {
     if (!selectedSubject) return
     onSelect({
-      subject:     selectedSubject,
+      subject:     selectedSubject.dbName,
       strand:      strand.strandTitle,
       substrand:   ss.title,
       substrandId: ss.id,
@@ -142,7 +237,7 @@ export default function TopicChoice({
         <p className="text-white/50 text-sm mt-1">What would you like to work on?</p>
       </div>
 
-      {/* Continue card */}
+      {/* ── Continue card ──────────────────────────────────────────────────── */}
       {currentOutcome && (
         <div>
           <p className="text-[10px] font-black text-white/30 uppercase tracking-wider mb-2">
@@ -188,14 +283,65 @@ export default function TopicChoice({
         <div className="flex-1 h-px bg-white/8" />
       </div>
 
-      {/* Subject grid */}
+      {/* ── Grade selector ─────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => handleGradeSelect(studentGrade)}
+          className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+            selectedGrade === studentGrade
+              ? 'bg-violet-500/20 border border-violet-500/40 text-violet-300'
+              : 'bg-white/3 border border-white/8 text-white/50 hover:bg-white/6'
+          }`}
+        >
+          My Grade ({studentGrade})
+        </button>
+
+        {earlierGrades.length > 0 && (
+          <div className="flex-1 relative">
+            <button
+              onClick={() => setShowGradePicker(p => !p)}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                selectedGrade !== studentGrade
+                  ? 'bg-amber-500/20 border border-amber-500/40 text-amber-300'
+                  : 'bg-white/3 border border-white/8 text-white/50 hover:bg-white/6'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <RotateCcw className="w-3 h-3" />
+                {selectedGrade !== studentGrade
+                  ? `Revising Grade ${selectedGrade}`
+                  : 'Earlier Grade'}
+              </span>
+              {showGradePicker
+                ? <ChevronUp className="w-3 h-3" />
+                : <ChevronDown className="w-3 h-3" />
+              }
+            </button>
+            {showGradePicker && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-slate-900 border border-white/10 rounded-xl overflow-hidden z-10 shadow-xl">
+                {earlierGrades.map(g => (
+                  <button
+                    key={g}
+                    onClick={() => handleGradeSelect(g)}
+                    className="w-full px-4 py-2.5 text-left text-xs font-bold text-white/60 hover:bg-white/8 hover:text-white/90 transition-colors"
+                  >
+                    Grade {g}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Subject grid — grade-aware ──────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-2">
-        {SUBJECTS.map(s => (
+        {subjects.map(s => (
           <button
-            key={s.key}
-            onClick={() => handleSubjectClick(s.key)}
+            key={s.dbName}
+            onClick={() => handleSubjectClick(s)}
             className={`px-3 py-2.5 rounded-xl text-sm font-bold text-left transition-all ${
-              selectedSubject === s.key
+              selectedSubject?.dbName === s.dbName
                 ? 'bg-violet-500/20 border border-violet-500/50 text-violet-300'
                 : 'bg-white/3 border border-white/8 text-white/60 hover:bg-white/6 hover:text-white/80'
             }`}
@@ -205,110 +351,117 @@ export default function TopicChoice({
         ))}
       </div>
 
-      {/* Topic browser — shown after subject is selected */}
+      {/* ── Strand → Sub-group → Substrand tree ───────────────────────────── */}
       {selectedSubject && (
-        <div className="space-y-3">
-
-          {/* Grade selector */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => { setSelectedGrade(studentGrade); setShowGradePicker(false) }}
-              className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
-                selectedGrade === studentGrade
-                  ? 'bg-violet-500/20 border border-violet-500/40 text-violet-300'
-                  : 'bg-white/3 border border-white/8 text-white/50 hover:bg-white/6'
-              }`}
-            >
-              My Grade ({studentGrade})
-            </button>
-
-            {earlierGrades.length > 0 && (
-              <div className="flex-1 relative">
-                <button
-                  onClick={() => setShowGradePicker(p => !p)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
-                    selectedGrade !== studentGrade
-                      ? 'bg-amber-500/20 border border-amber-500/40 text-amber-300'
-                      : 'bg-white/3 border border-white/8 text-white/50 hover:bg-white/6'
-                  }`}
-                >
-                  <span className="flex items-center gap-1.5">
-                    <RotateCcw className="w-3 h-3" />
-                    {selectedGrade !== studentGrade ? `Grade ${selectedGrade} (revision)` : 'Earlier Grade'}
-                  </span>
-                  {showGradePicker
-                    ? <ChevronUp className="w-3 h-3" />
-                    : <ChevronDown className="w-3 h-3" />
-                  }
-                </button>
-                {showGradePicker && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-slate-900 border border-white/10 rounded-xl overflow-hidden z-10 shadow-xl">
-                    {earlierGrades.map(g => (
-                      <button
-                        key={g}
-                        onClick={() => handleGradeSelect(g)}
-                        className="w-full px-4 py-2.5 text-left text-xs font-bold text-white/60 hover:bg-white/8 hover:text-white/90 transition-colors"
-                      >
-                        Grade {g}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+        <div>
+          {/* Header showing selected subject + grade */}
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] font-black text-white/30 uppercase tracking-wider">
+              {selectedSubject.label} · Grade {selectedGrade}
+            </p>
+            {selectedGrade !== studentGrade && (
+              <span className="text-[10px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-full px-2 py-0.5">
+                Revision
+              </span>
             )}
           </div>
 
-          {/* Strand tree */}
           {loadingTopics ? (
             <div className="flex items-center justify-center gap-2 py-8 text-white/30 text-sm">
               <Loader2 className="w-4 h-4 animate-spin" />
               Loading topics…
             </div>
           ) : strandTree.length > 0 ? (
-            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
               {strandTree.map(strand => (
                 <div key={strand.strandId} className="bg-white/3 border border-white/8 rounded-2xl overflow-hidden">
+
+                  {/* Strand header */}
                   <button
                     onClick={() => toggleStrand(strand.strandId)}
                     className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-white/3 transition-colors"
                   >
                     <span className="font-bold text-white/80 text-sm">{strand.displayTitle}</span>
-                    {expanded[strand.strandId]
-                      ? <ChevronUp   className="w-3.5 h-3.5 text-white/30 shrink-0" />
-                      : <ChevronDown className="w-3.5 h-3.5 text-white/30 shrink-0" />
-                    }
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[10px] text-white/20 font-medium">
+                        {strand.substrands.length}
+                      </span>
+                      {expandedStrands[strand.strandId]
+                        ? <ChevronUp   className="w-3.5 h-3.5 text-white/30" />
+                        : <ChevronDown className="w-3.5 h-3.5 text-white/30" />
+                      }
+                    </div>
                   </button>
-                  {expanded[strand.strandId] && (
-                    <div className="px-4 pb-3 space-y-1 border-t border-white/5 pt-3">
-                      {strand.substrands.slice(0, 12).map(ss => (
-                        <button
-                          key={ss.id}
-                          onClick={() => handleSubstrandSelect(strand, ss)}
-                          className="w-full text-left flex items-center justify-between px-3 py-2 bg-white/3 hover:bg-violet-500/10 border border-transparent hover:border-violet-500/20 rounded-xl transition-all group"
-                        >
-                          <span className="text-xs text-white/60 font-medium leading-snug">{ss.displayName}</span>
-                          <ArrowRight className="w-3 h-3 shrink-0 text-white/20 group-hover:text-violet-400 transition-colors ml-2" />
-                        </button>
-                      ))}
-                      {strand.substrands.length > 12 && (
-                        <p className="text-[10px] text-white/20 text-center pt-1">
-                          +{strand.substrands.length - 12} more
-                        </p>
-                      )}
+
+                  {expandedStrands[strand.strandId] && (
+                    <div className="border-t border-white/5">
+
+                      {strand.subGroups.map(group => {
+                        // No-group substrands render directly (no sub-group wrapper)
+                        if (group.groupName === '') {
+                          return (
+                            <div key="__direct__" className="px-4 py-2 space-y-1">
+                              {group.substrands.map(ss => (
+                                <SubstrandButton
+                                  key={ss.id}
+                                  label={topicLabel(ss, group.groupName)}
+                                  onClick={() => handleSubstrandSelect(strand, ss)}
+                                />
+                              ))}
+                            </div>
+                          )
+                        }
+
+                        // Named sub-group — collapsible
+                        return (
+                          <div key={group.groupName} className="border-t border-white/5 first:border-t-0">
+                            <button
+                              onClick={() => toggleGroup(strand.strandId, group.groupName)}
+                              className="w-full flex items-center justify-between px-5 py-2.5 text-left hover:bg-white/3 transition-colors"
+                            >
+                              <span className="text-xs font-bold text-violet-300/80">
+                                {group.groupName}
+                              </span>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-[10px] text-white/20">
+                                  {group.substrands.length}
+                                </span>
+                                {isGroupExpanded(strand.strandId, group.groupName)
+                                  ? <ChevronUp   className="w-3 h-3 text-white/30" />
+                                  : <ChevronDown className="w-3 h-3 text-white/30" />
+                                }
+                              </div>
+                            </button>
+
+                            {isGroupExpanded(strand.strandId, group.groupName) && (
+                              <div className="px-5 pb-2 space-y-1 border-t border-white/5">
+                                {group.substrands.map(ss => (
+                                  <SubstrandButton
+                                    key={ss.id}
+                                    label={topicLabel(ss, group.groupName)}
+                                    onClick={() => handleSubstrandSelect(strand, ss)}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+
                     </div>
                   )}
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-xs text-white/30 text-center py-4">
-              No topics found for this grade and subject.
+            <p className="text-xs text-white/30 text-center py-6">
+              No topics found for {selectedSubject.label}, Grade {selectedGrade}.
             </p>
           )}
         </div>
       )}
 
-      {/* Weak areas — show when compass_bridge has priorities */}
+      {/* ── Weak areas (compass_bridge priorities) ─────────────────────────── */}
       {weakAreas.length > 0 && (
         <div>
           <button
@@ -360,5 +513,19 @@ export default function TopicChoice({
         </div>
       )}
     </div>
+  )
+}
+
+// ── Reusable substrand row button ─────────────────────────────────────────────
+
+function SubstrandButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left flex items-center justify-between px-3 py-2 bg-white/3 hover:bg-violet-500/10 border border-transparent hover:border-violet-500/20 rounded-xl transition-all group"
+    >
+      <span className="text-xs text-white/60 font-medium leading-snug">{label}</span>
+      <ArrowRight className="w-3 h-3 shrink-0 text-white/20 group-hover:text-violet-400 transition-colors ml-2" />
+    </button>
   )
 }

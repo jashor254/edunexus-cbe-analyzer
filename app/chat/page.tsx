@@ -309,14 +309,16 @@ function ChatContent() {
     if (!session?.user) { router.push('/login'); return }
     const user = session.user
 
-    // Load student profile (first student belonging to this user)
-    const { data: studentData } = await supabase
+    // Load student profile — ?student=ID selects a specific child, else first by created_at
+    const studentIdParam = searchParams.get('student')
+    const studentQuery = supabase
       .from('students')
       .select('id, name, grade, curriculum_type, current_pathway')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle()
+
+    const { data: studentData } = studentIdParam
+      ? await studentQuery.eq('id', studentIdParam).maybeSingle()
+      : await studentQuery.order('created_at', { ascending: true }).limit(1).maybeSingle()
 
     if (studentData) {
       setStudent(studentData)
