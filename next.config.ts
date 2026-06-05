@@ -9,6 +9,15 @@ const nextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: '/dashboard/career-explorer',
+        destination: '/career',
+        permanent: true,
+      },
+    ]
+  },
 }
 
 export default nextConfig

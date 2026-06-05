@@ -511,7 +511,6 @@ function AddAssessmentContent() {
         pathway_electives: isSenior ? selectedElectives : null,
         source:            'parent',
         raw_marks:         inputMode === 'marks' ? rawMarks : {},
-        dream_career:      dreamCareer.trim() || null,
       }
 
       const { error: insertError } = await supabase
@@ -519,6 +518,16 @@ function AddAssessmentContent() {
         .insert(assessmentData)
 
       if (insertError) throw insertError
+
+      // Save dream career separately — assessments table has no dream_career column
+      if (dreamCareer.trim()) {
+        await supabase
+          .from('student_interests')
+          .upsert(
+            { student_id: selectedStudent, interests: { dream_career: dreamCareer.trim() } },
+            { onConflict: 'student_id' }
+          )
+      }
 
       if (isJunior) {
         router.push(`/dashboard/assessments/guidance?student=${selectedStudent}`)
@@ -1102,20 +1111,20 @@ function AddAssessmentContent() {
         )}
 
         {/* ── Dream Career (optional) ────────────────────────────────────────── */}
-        {currentStudent && isSenior && (
+        {currentStudent && (
           <div className="mt-8 border-t-2 border-dashed border-slate-200 pt-8">
             <div className="mb-2">
               <label className="block text-sm font-black uppercase tracking-wider text-slate-700 mb-1">
                 Dream Career <span className="text-slate-400 font-normal normal-case tracking-normal">(optional)</span>
               </label>
               <p className="text-xs text-slate-500 mb-3">
-                What career does your child dream of? We'll show their current readiness and the exact steps to get there.
+                What career does your child dream of? We&apos;ll connect their learning to this goal.
               </p>
               <input
                 type="text"
                 value={dreamCareer}
                 onChange={e => setDreamCareer(e.target.value)}
-                placeholder="e.g. Doctor, Engineer, Lawyer..."
+                placeholder="e.g. Doctor, Engineer, Teacher..."
                 maxLength={100}
                 className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl font-medium text-sm focus:outline-none focus:border-black transition-colors"
               />

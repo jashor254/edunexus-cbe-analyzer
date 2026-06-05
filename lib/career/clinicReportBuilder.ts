@@ -356,15 +356,23 @@ export async function buildClinicReport(
     ? calculateJuniorPathwayAffinity(subjectMap).stem_viable
     : undefined
 
-  // 4. Dream career (from student_career_interests)
-  const { data: interests } = await db
+  // 4. Dream career — check student_interests first (from assessment form), then career_interests
+  const { data: studentInterests } = await db
+    .from('student_interests')
+    .select('interests')
+    .eq('student_id', studentId)
+    .maybeSingle()
+
+  const dreamCareerFreeText = (studentInterests?.interests as Record<string, string> | null)?.dream_career ?? null
+
+  const { data: careerInterests } = await db
     .from('student_career_interests')
     .select('career_slug, notes')
     .eq('student_id', studentId)
     .order('interest_level', { ascending: false })
     .limit(1)
 
-  const dream_career = interests?.[0]?.career_slug as string | null ?? null
+  const dream_career = dreamCareerFreeText ?? careerInterests?.[0]?.career_slug ?? null
 
   // 5. Top career match (senior only) — generate fresh if missing
   let top_career = null

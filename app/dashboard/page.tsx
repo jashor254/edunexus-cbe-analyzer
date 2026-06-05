@@ -875,7 +875,7 @@ export default function DashboardPage() {
                 sub: 'Explore careers',
                 gradient: 'from-cyan-500 to-blue-500',
                 shadow: 'shadow-cyan-500/20',
-                href: '/dashboard/career-explorer',
+                href: '/career',
                 badge: null,
               },
               {
