@@ -12,6 +12,10 @@ const PUBLIC_PREFIXES = [
   '/payment',
   '/_next',
   '/favicon',
+  '/site.webmanifest',
+  '/manifest.json',
+  '/robots.txt',
+  '/sitemap.xml',
 ]
 
 export async function proxy(request: NextRequest) {
@@ -117,5 +121,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon|site.webmanifest|manifest.json|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'],
 }
