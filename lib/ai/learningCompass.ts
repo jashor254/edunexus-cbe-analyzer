@@ -161,12 +161,15 @@ export class LearningCompass {
     if (learningContext && Object.keys(learningContext.subject_tiers || {}).length > 0) {
       // Use pre-calculated context saved by guidance/career pages
       overallTier = this.mapOverallTier(learningContext.overall_tier)
-      subjectTiers = learningContext.subject_tiers || {}
+      // Map raw DB tiers (reinforcement/standard/challenge) to canonical form
+      subjectTiers = Object.fromEntries(
+        Object.entries(learningContext.subject_tiers || {}).map(([k, v]) => [k, this.mapOverallTier(v as string)])
+      )
       subjectActionSteps = learningContext.subject_action_steps || {}
       subjectVelocities = learningContext.subject_velocities || {}
       Object.entries(subjectTiers).forEach(([subj, tier]) => {
-        if (tier === 'remedial' || tier === 'reinforcement') strugglingSubs.push(subj)
-        else if (tier === 'challenge') masteredSubs.push(subj)
+        if (tier === 'below_expectations' || tier === 'approaching_expectations') strugglingSubs.push(subj)
+        else if (tier === 'exceeds_expectations') masteredSubs.push(subj)
       })
     } else if (latestAssessment?.subject_scores && Object.keys(latestAssessment.subject_scores).length > 0) {
       // Fall back: calculate fresh using adaptiveLearning

@@ -961,10 +961,18 @@ function ChatContent() {
                           )}
                           <button
                             onClick={() => {
-                              const concept = (cb?.firstConcept ?? '').replace(/_/g, ' ')
-                              const subject = cb?.firstSubject ?? learningContext.first_subject
-                              struggleTopicRef.current = cb?.firstConcept ?? null
-                              sendMessage(`I want to work on ${concept} in ${subject}`)
+                              const firstConcept = cb?.firstConcept ?? ''
+                              const concept      = firstConcept.replace(/_/g, ' ')
+                              const subject      = cb?.firstSubject ?? learningContext.first_subject ?? 'mathematics'
+                              setTopicSelected(true)
+                              generateOutcomeAndStart({
+                                subject,
+                                strand:      '',
+                                substrand:   firstConcept || concept,
+                                substrandId: '',
+                                grade:       student?.grade ?? 9,
+                                displayName: concept,
+                              })
                             }}
                             className="px-6 py-3 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-2xl text-sm transition-colors mb-4"
                           >

@@ -33,8 +33,10 @@ export type CompassBridge = {
 // ── Tier → difficulty mapping ─────────────────────────────────────────────────
 
 function tierToDifficulty(tier: string): 1 | 2 | 3 {
-  if (tier === 'below_expectations') return 1
-  if (tier === 'approaching_expectations') return 2
+  // Handle both raw DB values (reinforcement/standard/challenge) and mapped form
+  if (tier === 'below_expectations' || tier === 'remedial') return 1
+  if (tier === 'approaching_expectations' || tier === 'reinforcement') return 2
+  if (tier === 'meets_expectations' || tier === 'standard') return 3
   return 3
 }
 
