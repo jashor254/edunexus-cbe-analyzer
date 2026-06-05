@@ -445,7 +445,7 @@ function ChatContent() {
     // Close existing active sessions
     await supabase
       .from('compass_sessions')
-      .update({ status: 'completed' })
+      .update({ status: 'ended' })
       .eq('learner_id', userId)
       .eq('status', 'active')
 
