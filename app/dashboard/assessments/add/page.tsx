@@ -450,11 +450,7 @@ function AddAssessmentContent() {
         const { error: insertError } = await supabase.from('assessments').insert(assessmentData)
         if (insertError) throw insertError
 
-        if (isJunior) {
-          router.push(`/dashboard/assessments/guidance?student=${selectedStudent}`)
-        } else {
-          router.push(`/dashboard/assessments/career-guidance?student=${selectedStudent}`)
-        }
+        router.push(`/dashboard/clinic/reports/${selectedStudent}`)
         return
       }
 
@@ -519,21 +515,18 @@ function AddAssessmentContent() {
 
       if (insertError) throw insertError
 
-      // Save dream career separately — assessments table has no dream_career column
+      // Save dream career separately — stored in interests JSONB as { dream_career: "..." }
       if (dreamCareer.trim()) {
-        await supabase
+        const { error: interestsError } = await supabase
           .from('student_interests')
           .upsert(
             { student_id: selectedStudent, interests: { dream_career: dreamCareer.trim() } },
             { onConflict: 'student_id' }
           )
+        if (interestsError) console.error('[assessments/add] dream career save failed:', interestsError.message)
       }
 
-      if (isJunior) {
-        router.push(`/dashboard/assessments/guidance?student=${selectedStudent}`)
-      } else {
-        router.push(`/dashboard/assessments/career-guidance?student=${selectedStudent}`)
-      }
+      router.push(`/dashboard/clinic/reports/${selectedStudent}`)
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save. Please try again.')

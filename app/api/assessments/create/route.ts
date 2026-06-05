@@ -10,6 +10,8 @@ export async function POST(request: Request) {
     if (authError || !user) return apiUnauthorized()
 
     const body = await request.json()
+    console.log('[assessments/create] payload:', JSON.stringify(body, null, 2))
+
     const {
       student_id,
       grade,
@@ -17,6 +19,8 @@ export async function POST(request: Request) {
       year,
       grade_level,
       subject_scores,
+      curriculum_type,
+      assessment_style,
       mathematics_type,
       pathway_electives,
       pathway_recommendations,
@@ -36,12 +40,15 @@ export async function POST(request: Request) {
     // Verify student belongs to this user
     const { data: student, error: studentError } = await service
       .from('students')
-      .select('id, grade')
+      .select('id, grade, curriculum_type')
       .eq('id', student_id)
       .eq('user_id', user.id)
       .single()
 
     if (studentError || !student) return apiBadRequest('Student not found or does not belong to you')
+
+    const resolvedCurriculumType = curriculum_type ?? student.curriculum_type ?? 'cbc'
+    const resolvedAssessmentStyle = assessment_style ?? 'formative'
 
     const { data: assessment, error: insertError } = await service
       .from('assessments')
@@ -52,7 +59,9 @@ export async function POST(request: Request) {
         term,
         year,
         grade_level:             grade_level ?? (student.grade <= 9 ? 'junior' : 'senior'),
-        subject_scores:          subject_scores,
+        subject_scores,
+        curriculum_type:         resolvedCurriculumType,
+        assessment_style:        resolvedAssessmentStyle,
         mathematics_type:        mathematics_type ?? null,
         pathway_electives:       pathway_electives ?? null,
         pathway_recommendations: pathway_recommendations ?? null,
@@ -62,7 +71,10 @@ export async function POST(request: Request) {
       .select()
       .single()
 
-    if (insertError) return apiError(insertError.message)
+    if (insertError) {
+      console.error('[assessments/create] insert error:', insertError)
+      return apiError(insertError.message)
+    }
 
     return apiSuccess({ assessment }, 201)
   } catch (err) {
