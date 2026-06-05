@@ -14,7 +14,7 @@ const SLIDES = [
   {
     id: 0,
     label: '🧭 Learning Compass',
-    sublabel: 'AI tutoring at midnight',
+    sublabel: 'Personalised tutoring at midnight',
     color: 'from-amber-500 to-orange-500',
     glowColor: 'from-amber-500/20 to-orange-500/20',
     activeText: 'text-amber-300',
@@ -136,7 +136,7 @@ export default function HeroSlideshow() {
       {/* Floating badge */}
       <div className="absolute -top-3 right-0 z-10 hidden md:block">
         <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-full px-3 py-1 text-[10px] font-black text-white/40">
-          🤖 AI-Powered · 🇰🇪 Made in Kenya
+          🧭 Personalised · 🇰🇪 Made in Kenya
         </div>
       </div>
 

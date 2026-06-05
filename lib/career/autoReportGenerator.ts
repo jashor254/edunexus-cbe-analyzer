@@ -165,7 +165,7 @@ Return ONLY valid JSON in this exact shape:
       "checkConcept": "concept"
     }
   ],
-  "parentWhatsAppMessage": "Hi! ${student.name as string}'s report is ready. This week the AI tutor will focus on [concept] in [subject] — their biggest gap toward [pathway/career]. Start their first free session here: edunexus.co.ke/chat"
+  "parentWhatsAppMessage": "Hi! ${student.name as string}'s report is ready. This week Learning Compass will focus on [concept] in [subject] — their biggest gap toward [pathway/career]. Start their first free session here: edunexus.co.ke/chat"
 }
 
 Include top 3 subjects in subjectPriorities. Keep parentWhatsAppMessage under 50 words. Be encouraging, not alarming.`

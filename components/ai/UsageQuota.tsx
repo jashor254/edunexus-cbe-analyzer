@@ -103,7 +103,7 @@ export default function UsageQuota({ userId, tier }: Props) {
       <div className="space-y-4">
         <div>
           <div className="flex justify-between text-sm mb-2">
-            <span className="font-medium text-gray-700">🤖 Career Analysis</span>
+            <span className="font-medium text-gray-700">💼 Career Analysis</span>
             <span className="font-bold text-gray-900">
               {quota.careerAnalysis.limit === -1 
                 ? 'Unlimited' 

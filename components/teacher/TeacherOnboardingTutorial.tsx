@@ -17,7 +17,7 @@ const steps: Step[] = [
   {
     title: 'Karibu, Mwalimu! 👩‍🏫',
     description:
-      "EduNexus Teacher Portal — Kenya's AI-powered teaching companion. Built for CBC and IGCSE teachers to save time and track every student.",
+      "EduNexus Teacher Portal — Kenya's teaching companion. Built for CBC and IGCSE teachers to save time and track every student.",
     icon: '👩‍🏫',
     gradient: 'from-teal-500 to-cyan-500',
     extra: 'showCurriculumBadges',
@@ -33,13 +33,13 @@ const steps: Step[] = [
   {
     title: 'Assignments & Marking ✅',
     description:
-      'Create assignments, set due dates, and receive student submissions in one place. Add AI-generated individualised feedback in a single click.',
+      'Create assignments, set due dates, and receive student submissions in one place. Add personalised feedback in a single click.',
     icon: '✅',
     gradient: 'from-violet-500 to-purple-600',
     highlight: '✨ AI marks and generates feedback for you',
   },
   {
-    title: 'AI Schemes of Work 📋',
+    title: 'Schemes of Work 📋',
     description:
       'Generate a complete term scheme of work in under 60 seconds. Fully aligned to CBC KICD syllabi and 8-4-4 Form 3–4. Export to PDF instantly.',
     icon: '📋',

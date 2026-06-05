@@ -3,7 +3,7 @@
 
 import React from 'react'
 import {
-  Document, Page, Text, View, StyleSheet, Font,
+  Document, Page, Text, View, StyleSheet, Font, Svg, Circle, Polygon,
 } from '@react-pdf/renderer'
 import type { AcademicClinicReport, SubjectProgress } from './reportGenerator'
 import { getLevelLabel, getClinicalObservation } from './reportGenerator'
@@ -268,10 +268,29 @@ function CoverPage({ report }: { report: AcademicClinicReport }) {
   return (
     <Page size="A4" style={S.coverPage}>
       {/* Header band */}
-      <View style={S.coverHeader}>
-        <Text style={S.coverBrand}>EDUNEXUS</Text>
-        <Text style={S.coverTitle}>Academic Clinic</Text>
-        <Text style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>Personalised Clinical Learning Report</Text>
+      <View style={[S.coverHeader, { flexDirection: 'row', alignItems: 'center', gap: 20 }]}>
+        {/* Compass icon */}
+        <Svg width={52} height={52} viewBox="0 0 64 64">
+          <Circle cx="32" cy="32" r="30" fill="#243358" stroke="#4f46e5" strokeWidth="1.5" />
+          <Circle cx="32" cy="32" r="20" fill="none" stroke="#312e81" strokeWidth="0.8" strokeDasharray="2 5" />
+          <Polygon points="32,4 36.5,28.5 32,30 27.5,28.5" fill="#f59e0b" />
+          <Polygon points="32,60 36.5,35.5 32,34 27.5,35.5" fill="#818cf8" />
+          <Polygon points="4,32 28.5,27.5 30,32 28.5,36.5" fill="#10b981" />
+          <Polygon points="60,32 35.5,27.5 34,32 35.5,36.5" fill="#f43f5e" />
+          <Circle cx="32" cy="32" r="4" fill="#0f0e2a" stroke="#f59e0b" strokeWidth="1.5" />
+          <Circle cx="32" cy="32" r="1.8" fill="#fde68a" />
+        </Svg>
+        {/* Wordmark */}
+        <View>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 4 }}>
+            <Text style={{ fontSize: 30, fontWeight: 700, color: C.white }}>Edu</Text>
+            <Text style={{ fontSize: 30, fontWeight: 700, color: C.gold }}>Nexus</Text>
+          </View>
+          <Text style={S.coverBrand}>Academic Clinic</Text>
+          <Text style={{ fontSize: 10, color: '#94a3b8', marginTop: 4, letterSpacing: 1.5 }}>
+            EVERY CHILD FINDS THEIR WAY
+          </Text>
+        </View>
       </View>
 
       {/* Body */}
@@ -843,7 +862,7 @@ function CompassPage({ report }: { report: AcademicClinicReport }) {
     <Page size="A4" style={S.page}>
       <PageHeader name={sp.name} grade={sp.grade} pageNum={6} totalPages={7} reportId={report.reportId} />
       <View style={S.content}>
-        <Text style={S.sectionLabel}>AI TUTORING GUIDANCE</Text>
+        <Text style={S.sectionLabel}>LEARNING COMPASS GUIDANCE</Text>
         <Text style={S.sectionTitle}>Learning Compass Recommendations</Text>
         <View style={S.divider} />
 

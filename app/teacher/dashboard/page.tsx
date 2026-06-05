@@ -148,7 +148,7 @@ export default async function TeacherDashboardPage() {
     { href: mostRecentClassId ? `/teacher/classes/${mostRecentClassId}?tab=upload` : '/teacher/classes', icon: ArrowUpRight, label: 'Upload Assessment', sub: 'Scores → Reports', gradient: 'from-violet-600 to-indigo-500' },
     { href: '/teacher/classes',          icon: PlusCircle,  label: 'New Class',       sub: 'Add students',     gradient: 'from-teal-600 to-cyan-500'    },
     { href: '/teacher/assignments/new',  icon: FileText,    label: 'New Assignment',  sub: 'Create & publish', gradient: 'from-blue-600 to-indigo-500'  },
-    { href: '/teacher/scheme-of-work',   icon: Scroll,      label: 'Scheme of Work',  sub: 'AI-powered',       gradient: 'from-violet-600 to-purple-500'},
+    { href: '/teacher/scheme-of-work',   icon: Scroll,      label: 'Scheme of Work',  sub: 'Full term in 5 min', gradient: 'from-violet-600 to-purple-500'},
     { href: '/teacher/lesson-plans',     icon: NotebookPen, label: 'Lesson Plans',    sub: 'Plan your lessons', gradient: 'from-pink-600 to-rose-500'   },
     { href: '/teacher/reports',          icon: TrendingUp,  label: 'Class Reports',   sub: 'CBC analytics',    gradient: 'from-amber-500 to-orange-500' },
   ]
@@ -500,7 +500,7 @@ export default async function TeacherDashboardPage() {
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <Sparkles className="w-4 h-4 text-teal-400" />
-                <span className="text-teal-400 text-xs font-bold uppercase tracking-wider">AI-Powered Teaching</span>
+                <span className="text-teal-400 text-xs font-bold uppercase tracking-wider">Your Teaching Tools</span>
               </div>
               <h3 className="text-white font-black text-lg leading-tight">Unlock Full EduNexus Premium</h3>
               <p className="text-slate-400 text-sm mt-1">Advanced analytics, unlimited AI schemes & lesson plans.</p>

@@ -12,7 +12,8 @@ import {
   RotateCcw, Clock
 } from 'lucide-react'
 import type { VisualAid } from '@/lib/ai/learningCompass'
-import TopicSelector from '@/components/compass/TopicSelector'
+import type { LessonOutcome, WeakTopic } from '@/lib/compass/lessonOutcomes'
+import TopicChoice from '@/components/compass/TopicChoice'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Message {
@@ -292,6 +293,8 @@ function ChatContent() {
   const [freeLeft,        setFreeLeft]        = useState(1)
   const [showUpgrade,     setShowUpgrade]     = useState(false)
   const [initDone,        setInitDone]        = useState(false)
+  const [currentOutcome,  setCurrentOutcome]  = useState<LessonOutcome | null>(null)
+  const [outcomeStep,     setOutcomeStep]     = useState<number>(1)
 
   const messagesEndRef  = useRef<HTMLDivElement>(null)
   const inputRef        = useRef<HTMLTextAreaElement>(null)
@@ -342,6 +345,38 @@ function ChatContent() {
       .maybeSingle()
 
     if (ctx) setLearningContext(ctx)
+
+    // Load in-progress outcome
+    const { data: outcomeData } = await supabase
+      .from('compass_outcomes')
+      .select('id, subject, concept, substrand, mastery_statement, mastery_evidence, milestones, status, sessions_spent, set_by, teacher_note')
+      .eq('student_id', effectiveLearnerId)
+      .eq('status', 'in_progress')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (outcomeData) {
+      type DBMilestone = { step: number; description: string; checkQuestion: string; achieved: boolean; achievedAt?: string }
+      const milestones = (outcomeData.milestones as DBMilestone[]).map(m => ({
+        ...m,
+        achievedAt: m.achievedAt ? new Date(m.achievedAt) : undefined,
+      }))
+      setCurrentOutcome({
+        id:               outcomeData.id,
+        subject:          outcomeData.subject as string,
+        concept:          outcomeData.concept as string,
+        substrand:        (outcomeData.substrand as string | null) ?? '',
+        masteryStatement: outcomeData.mastery_statement as string,
+        masteryEvidence:  (outcomeData.mastery_evidence as string[]) ?? [],
+        milestones,
+        status:   outcomeData.status as LessonOutcome['status'],
+        sessionsSpent: outcomeData.sessions_spent as number,
+        setBy:    (outcomeData.set_by as LessonOutcome['setBy']) ?? 'system',
+        teacherNote: (outcomeData.teacher_note as string | null) ?? undefined,
+      })
+      setOutcomeStep(milestones.filter(m => m.achieved).length + 1)
+    }
 
     const isAdmin = user.email === ADMIN_EMAIL
 
@@ -442,6 +477,52 @@ function ChatContent() {
     recognitionRef.current = rec
   }
 
+  // ── Compute weak topics from compass_bridge priorities ──────────────────────
+  const availableTopicsForChoice: WeakTopic[] = (() => {
+    type Priority = { subject?: string; currentTier?: string; careerReason?: string; actionSteps?: string[] }
+    const priorities = ((learningContext?.compass_bridge as { subjectPriorities?: Priority[] } | null | undefined)?.subjectPriorities) ?? []
+    const tierToLevel = (t: string | undefined): number =>
+      ({ below_expectation: 1, approaching_expectation: 2, meeting_expectation: 3, above_expectation: 4 }[t ?? ''] ?? 2)
+    return priorities.flatMap(sp =>
+      (sp.actionSteps ?? []).slice(0, 2).map(step => ({
+        subject:      sp.subject ?? '',
+        concept:      step,
+        substrand:    step,
+        displayName:  step.replace(/_/g, ' '),
+        currentLevel: tierToLevel(sp.currentTier),
+        whyItMatters: sp.careerReason ?? '',
+      }))
+    )
+  })()
+
+  // ── Generate outcome then start session ──────────────────────────────────────
+  const generateOutcomeAndStart = async (
+    concept: string,
+    substrand: string,
+    displayName: string,
+    subject: string,
+  ) => {
+    if (learnerId) {
+      try {
+        const res = await fetch('/api/compass/outcome/generate', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ concept, substrand, subject, studentId: learnerId }),
+        })
+        if (res.ok) {
+          const json = await res.json() as { data?: { outcome?: LessonOutcome } }
+          if (json.data?.outcome) {
+            setCurrentOutcome(json.data.outcome)
+            setOutcomeStep(1)
+          }
+        }
+      } catch {
+        // non-critical — session continues without outcome
+      }
+    }
+    sendMessage(`I want to work on ${displayName} in ${subject}`)
+  }
+
   const toggleListening = () => {
     if (!recognitionRef.current) return
     if (isListening) {
@@ -531,6 +612,32 @@ function ChatContent() {
 
         if (data.parentInsight) setParentInsight(data.parentInsight)
 
+        // Handle milestone advancement
+        if (data.outcomeAdvanced) {
+          const step = data.newOutcomeStep as number
+          setOutcomeStep(step)
+          setCurrentOutcome(prev => {
+            if (!prev) return null
+            return {
+              ...prev,
+              status: data.outcomeAchieved ? 'achieved' : 'in_progress',
+              milestones: prev.milestones.map((m, i) =>
+                i < step - 1 ? { ...m, achieved: true } : m
+              ),
+            }
+          })
+          setTimeout(() => {
+            setMessages(prev => [...prev, {
+              id:        `milestone-${Date.now()}`,
+              role:      'assistant' as const,
+              content:   data.outcomeAchieved
+                ? `You've got this one. ${currentOutcome?.concept?.replace(/_/g, ' ')} — done.`
+                : `Step ${step - 1} done. Moving up.`,
+              timestamp: new Date(),
+            }])
+          }, 400)
+        }
+
         if (data.sessionUpdate) {
           setSessionState({
             timeOnTask:     data.sessionUpdate.timeOnTask,
@@ -606,7 +713,7 @@ function ChatContent() {
           </div>
           <h2 className="text-2xl font-black text-white mb-3">Learning Compass</h2>
           <p className="text-white/50 mb-8 leading-relaxed">
-            Unlock your personal AI tutor — adapts to your child's exact level.
+            Unlock the Learning Compass — personalised to your child's exact level.
           </p>
           <Link href="/pricing" className="block w-full py-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-2xl font-black hover:scale-105 transition-all shadow-xl mb-3">
             Unlock Now — From KES 500
@@ -730,7 +837,7 @@ function ChatContent() {
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
                 <span className="text-[10px] text-green-400 font-bold">
-                  AI adapting to your level · Parent can see all sessions
+                  Personalised to your level · Parent can see all sessions
                 </span>
               </div>
             </div>
@@ -759,6 +866,37 @@ function ChatContent() {
             </button>
           </div>
         </header>
+
+        {/* Outcome progress bar */}
+        {currentOutcome && currentOutcome.status === 'in_progress' && (
+          <div className="px-5 py-3 border-b border-white/5 bg-white/2">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[10px] font-black text-white/30 uppercase tracking-wider">Working toward</p>
+              <span className="text-[10px] font-bold text-violet-400">Step {outcomeStep}/4</span>
+            </div>
+            <p className="text-xs font-bold text-white/70 mb-2 line-clamp-1">
+              &ldquo;{currentOutcome.masteryStatement}&rdquo;
+            </p>
+            <div className="flex gap-1.5">
+              {currentOutcome.milestones.map((m, i) => (
+                <div
+                  key={m.step}
+                  title={m.description}
+                  className={`flex-1 h-1.5 rounded-full transition-all ${
+                    m.achieved
+                      ? 'bg-violet-500'
+                      : i === outcomeStep - 1
+                        ? 'bg-violet-500/40'
+                        : 'bg-white/10'
+                  }`}
+                />
+              ))}
+            </div>
+            <p className="text-[10px] text-white/30 mt-1">
+              {currentOutcome.milestones[Math.min(outcomeStep - 1, 3)]?.description}
+            </p>
+          </div>
+        )}
 
         {/* Messages area */}
         <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6 space-y-5">
@@ -815,27 +953,29 @@ function ChatContent() {
                           </button>
                         </>
                       ) : showTopicSelector ? (
-                        // No concept set — show DB-driven topic selector
-                        <>
-                          <p className="text-white/50 mb-1 text-sm">Today we start with</p>
-                          <p className="text-xl font-black text-violet-300 mb-4 capitalize">
-                            {learningContext.first_subject}
-                          </p>
-                          <TopicSelector
-                            subject={learningContext.first_subject}
-                            grade={student?.grade ?? 8}
-                            curriculumType={student?.curriculum_type ?? 'cbc'}
-                            selectedSlug={undefined}
-                            onSelect={(_strand, _substrand, displayName, slug) => {
+                        // No concept set — show personalised topic choice
+                        <TopicChoice
+                          studentName={student?.name ?? 'there'}
+                          currentOutcome={currentOutcome}
+                          availableTopics={availableTopicsForChoice}
+                          teacherAssigned={null}
+                          onSelect={(concept, substrand, displayName, subject) => {
+                            setTopicSelected(true)
+                            generateOutcomeAndStart(concept, substrand, displayName, subject)
+                          }}
+                          onContinue={() => {
+                            if (currentOutcome) {
                               setTopicSelected(true)
-                              struggleTopicRef.current = slug
-                              const msg = slug === 'help_me_decide'
-                                ? `I need help deciding where to start in ${learningContext.first_subject}`
-                                : `I want to work on ${displayName} in ${learningContext.first_subject}`
-                              sendMessage(msg)
-                            }}
-                          />
-                        </>
+                              struggleTopicRef.current = currentOutcome.substrand || currentOutcome.concept
+                              sendMessage(`Let's continue with ${currentOutcome.concept.replace(/_/g, ' ')}`)
+                            }
+                          }}
+                          onHelpDecide={() => {
+                            setTopicSelected(true)
+                            struggleTopicRef.current = 'help_me_decide'
+                            sendMessage(`I need help deciding what to work on in ${learningContext.first_subject}`)
+                          }}
+                        />
                       ) : (
                         // topicSelected — already sent, show minimal state
                         <>
@@ -859,7 +999,7 @@ function ChatContent() {
                 <>
                   <h2 className="text-2xl font-black text-white mb-2">Karibu! 🇰🇪</h2>
                   <p className="text-white/50 mb-8 max-w-sm leading-relaxed text-sm">
-                    Mimi ni mwalimu wako wa kibinafsi wa AI. Niulize chochote — nitakusaidia kuelewa vizuri.
+                    Mimi ni mwalimu wako wa kibinafsi. Niulize chochote — nitakusaidia kuelewa vizuri.
                   </p>
                   <div className="flex flex-wrap gap-2 justify-center max-w-lg">
                     {SUGGESTIONS.map(s => (
@@ -877,7 +1017,7 @@ function ChatContent() {
 
               <div className="mt-6 bg-white/5 border border-white/10 rounded-xl px-5 py-3 max-w-md mx-auto">
                 <p className="text-xs text-white/40 text-center leading-relaxed">
-                  🤖 <strong className="text-white/60">Powered by AI</strong> · This tutor adapts to your child&apos;s level. Parents can view all sessions from their dashboard.
+                  Your progress is saved and visible to your parent.
                 </p>
               </div>
 
@@ -1043,7 +1183,7 @@ function ChatContent() {
               </div>
               <h3 className="text-xl font-black text-white mb-2">Loved the Experience?</h3>
               <p className="text-white/50 text-sm leading-relaxed">
-                Continue with personalized AI tutoring that adapts to your child's exact level.
+                Continue with personalised tutoring that adapts to your child's exact level.
               </p>
             </div>
 
@@ -1051,7 +1191,7 @@ function ChatContent() {
               {[
                 'Unlimited tutoring sessions',
                 'Adapts to your child\'s CBC level',
-                'AI tutoring that adapts in real time',
+                'Adapts to your child\'s exact CBC level',
                 'Visual diagrams for Science & Geography',
                 'Parent insights after every session',
                 'Kenyan context — chapati, matatu & more',

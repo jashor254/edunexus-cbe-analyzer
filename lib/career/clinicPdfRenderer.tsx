@@ -497,7 +497,6 @@ function SkillsParentPage({ report }: { report: ClinicReport }) {
 
         {/* Disclaimer */}
         <View style={S.disclaimerBox}>
-          <Text style={[S.disclaimerText, { fontWeight: 700, marginBottom: 4 }]}>DISCLAIMER</Text>
           <Text style={S.disclaimerText}>{report.disclaimer}</Text>
         </View>
       </View>

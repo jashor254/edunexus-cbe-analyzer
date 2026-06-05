@@ -45,7 +45,7 @@ export async function sendReportWhatsApp(params: ReportWhatsAppParams): Promise<
       `${params.studentName}'s Grade ${params.grade} Academic Clinic Report is ready. ` +
       `Your child's personalised 7-page report covers subject performance, pathway analysis, ` +
       `and a 3-week holiday action plan. Full report sent to your email. ` +
-      `${params.signupToken ? 'Create your EduNexus parent account to access AI tutoring for your child.' : 'View on your dashboard.'}`
+      `${params.signupToken ? 'Create your EduNexus parent account to access the Learning Compass for your child.' : 'View on your dashboard.'}`
 
     const result = await sendWhatsAppTemplate({
       to:           params.parentPhone,

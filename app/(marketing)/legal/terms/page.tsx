@@ -35,9 +35,9 @@ export default function TermsPage() {
           <h2>Services Provided</h2>
           <p>EduNexus provides:</p>
           <ol>
-            <li><strong>Pathway Analysis:</strong> AI-powered analysis of student strengths and recommended CBC pathways</li>
+            <li><strong>Pathway Analysis:</strong> Personalised analysis of student strengths and recommended CBC pathways</li>
             <li><strong>Career Recommendations:</strong> Suggested career paths based on student interests and performance</li>
-            <li><strong>Guardian AI Tutor:</strong> 24/7 AI-powered educational support</li>
+            <li><strong>Learning Compass:</strong> 24/7 personalised educational support</li>
             <li><strong>Progress Tracking:</strong> Monitor student development over time</li>
           </ol>
 
@@ -120,7 +120,7 @@ export default function TermsPage() {
                 <p className="font-bold text-green-700 mb-2">✅ What We Are:</p>
                 <ul className="text-sm text-yellow-900 space-y-1">
                   <li>• An educational guidance tool</li>
-                  <li>• AI-powered analysis platform</li>
+                  <li>• Personalised analysis platform</li>
                   <li>• Support for decision-making</li>
                 </ul>
               </div>

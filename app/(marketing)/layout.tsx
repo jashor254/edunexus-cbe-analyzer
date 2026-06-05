@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { X, Menu, Sparkles } from 'lucide-react'
+import { X, Menu } from 'lucide-react'
 import { Sora } from 'next/font/google'
+import { Logo } from '@/components/ui/Logo'
 
 const sora = Sora({ subsets: ['latin'], weight: ['400', '600', '700', '800'] })
 
@@ -29,10 +30,7 @@ function MarketingNav() {
       <div className="max-w-[1100px] mx-auto px-6 py-4 flex justify-between items-center">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-violet-600 rounded-xl flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-white" />
-          </div>
-          <span className="text-lg font-black text-white tracking-tight">EduNexus</span>
+          <Logo variant="dark" size="sm" />
           <span className="text-[11px] font-bold bg-violet-500/20 text-violet-300 px-2 py-0.5 rounded-full">Beta</span>
         </Link>
 
@@ -122,11 +120,8 @@ function MarketingFooter() {
         <div className="flex flex-col md:flex-row justify-between gap-10 mb-12">
           {/* Left — logo + tagline */}
           <div>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-7 h-7 bg-violet-600 rounded-lg flex items-center justify-center">
-                <Sparkles className="w-3.5 h-3.5 text-white" />
-              </div>
-              <span className="text-lg font-black text-white tracking-tight">EduNexus</span>
+            <div className="mb-3">
+              <Logo variant="dark" size="sm" showTagline />
             </div>
             <p className="text-sm text-white/40 max-w-[240px] leading-relaxed">
               Learn at your level. Grow at your pace.
@@ -162,8 +157,9 @@ function MarketingFooter() {
           </div>
         </div>
 
-        <div className="border-t border-white/10 pt-6 text-center">
+        <div className="border-t border-white/10 pt-6 text-center space-y-1">
           <p className="text-xs text-white/20">Developed by Jashor Technologies © 2026</p>
+          <p className="text-xs text-white/15">AI-assisted · edunexus.co.ke</p>
         </div>
       </div>
     </footer>

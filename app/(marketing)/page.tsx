@@ -32,15 +32,14 @@ export default function LandingPage() {
             className="font-extrabold leading-[1.05] tracking-[-0.02em] mb-6"
             style={{ fontSize: 'clamp(44px, 7vw, 72px)' }}
           >
-            <span className="block text-white">Learn at your level.</span>
+            <span className="block text-white">Every child learns differently.</span>
             <span className="block bg-gradient-to-r from-violet-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mt-1">
-              Grow at your pace.
+              EduNexus knows yours.
             </span>
           </h1>
 
           <p className="text-[18px] md:text-[20px] text-white/60 max-w-[560px] mx-auto mb-8 leading-relaxed">
-            EduNexus is Kenya&apos;s first adaptive learning platform — connecting parents,
-            learners, and teachers in one intelligent ecosystem.
+            Personalised to your child&apos;s actual scores. CBC-aligned. Built for Kenya.
           </p>
 
           <div className="flex flex-wrap justify-center gap-2 mb-10">
@@ -74,6 +73,21 @@ export default function LandingPage() {
             ✓ Free first report &nbsp;·&nbsp; ✓ M-PESA accepted &nbsp;·&nbsp; ✓ Works on any phone
           </p>
 
+          {/* Three benefit cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-14 max-w-[760px] mx-auto text-left">
+            {[
+              { icon: '👨‍🏫', who: 'For Teachers', body: 'Schemes, lesson plans, and class analytics — in minutes.' },
+              { icon: '👨‍👩‍👧', who: 'For Parents',  body: 'Know exactly where your child stands and what they need next.' },
+              { icon: '🎒',   who: 'For Students', body: 'A tutor that starts where you are and grows with you.' },
+            ].map((card) => (
+              <div key={card.who} className="bg-white/4 border border-white/10 rounded-2xl px-5 py-4">
+                <div className="text-2xl mb-2">{card.icon}</div>
+                <div className="text-xs font-bold text-white/40 uppercase tracking-widest mb-1">{card.who}</div>
+                <p className="text-sm text-white/65 leading-relaxed">{card.body}</p>
+              </div>
+            ))}
+          </div>
+
         </div>
       </section>
 
@@ -88,7 +102,7 @@ export default function LandingPage() {
                 Learning Compass
               </span>
               <h2 className="text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5">
-                Your child&apos;s personal AI tutor.
+                A tutor that starts where your child is.
               </h2>
               <p className="text-white/60 leading-relaxed mb-6">
                 Not a broadcast. Not one-size-fits-all. The Learning Compass learns your
@@ -399,7 +413,7 @@ export default function LandingPage() {
                 icon: '🚀',
                 color: '#fbbf24',
                 title: 'Follow the plan',
-                body: "3-week holiday study plan + AI Learning Compass. You'll know exactly what to do next.",
+                body: "3-week holiday study plan + Learning Compass. You'll know exactly what to do next.",
               },
             ].map((step) => (
               <div key={step.num} className="flex flex-col items-center">

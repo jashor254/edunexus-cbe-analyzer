@@ -42,7 +42,7 @@ const REPORT_TYPES = [
   { id: 'subject',     icon: FileText,      label: 'Subject Gap Report',  desc: 'Concept-by-concept breakdown per subject'     },
   { id: 'assignment',  icon: ClipboardList, label: 'Assignment Summary',  desc: 'Submission rates, scores and common mistakes' },
   { id: 'knec',        icon: GraduationCap, label: 'KNEC CBA Export',     desc: 'CSV ready to upload to KNEC CBA portal'       },
-  { id: 'sow',         icon: Scroll,        label: 'Scheme of Work',       desc: 'AI-generated KICD-aligned SOW · CBC & 8-4-4'  },
+  { id: 'sow',         icon: Scroll,        label: 'Scheme of Work',       desc: 'KICD-aligned SOW · CBC & 8-4-4'  },
 ]
 
 const TERMS = ['1', '2', '3']

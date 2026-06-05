@@ -82,7 +82,7 @@ export async function sendReportEmail(params: ReportEmailParams): Promise<SendRe
       </div>
       ${params.signupToken ? `
       <p style="color:#94a3b8;font-size:13px;text-align:center;margin:0">
-        New to EduNexus? Click above to create your account and access your child's personalised AI tutor.
+        New to EduNexus? Click above to create your account and access your child's personalised Learning Compass.
         This link expires in 7 days.
       </p>` : ''}
     </div>

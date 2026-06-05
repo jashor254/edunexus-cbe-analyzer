@@ -38,9 +38,9 @@ const steps: Step[] = [
     highlight: 'Based on the KICD competency framework',
   },
   {
-    title: 'Learning Compass AI 🧭',
+    title: 'Learning Compass 🧭',
     description:
-      'Chat with an AI tutor trained on CBC and IGCSE curriculum. Uses Kenyan examples — unga, matatus, KES. Available at midnight during school holidays.',
+      'Chat with the Learning Compass — trained on CBC and IGCSE curriculum. Uses Kenyan examples — unga, matatus, KES. Available at midnight during school holidays.',
     icon: '🧭',
     gradient: 'from-amber-500 to-orange-500',
     highlight: '✨ First session is on us — no card needed',
@@ -48,7 +48,7 @@ const steps: Step[] = [
   {
     title: 'Academic Clinic Reports 📊',
     description:
-      'AI-powered reports that pinpoint exactly which competency strands your child is struggling with. Share with their teacher in one click.',
+      'Personalised reports that pinpoint exactly which competency strands your child is struggling with. Share with their teacher in one click.',
     icon: '📊',
     gradient: 'from-rose-500 to-pink-600',
     highlight: '✨ First report is on us',
@@ -56,14 +56,14 @@ const steps: Step[] = [
   {
     title: 'Career Intelligence 🎯',
     description:
-      'Grade 10+ students get AI career matching. 200+ real Kenyan careers with actual KES salary ranges, matched to your child\'s competency profile.',
+      'Grade 10+ students get career matching. 200+ real Kenyan careers with actual KES salary ranges, matched to your child\'s competency profile.',
     icon: '🎯',
     gradient: 'from-purple-500 to-violet-600',
   },
   {
     title: "You're Ready! 🚀",
     description:
-      "Start by adding your child and their latest results. Your first AI session is free — no card needed.",
+      "Start by adding your child and their latest results. Your first session is free — no card needed.",
     icon: '🚀',
     gradient: 'from-green-500 to-emerald-500',
     highlight: 'Mtoto wako anastahili zaidi ya average. 🇰🇪',

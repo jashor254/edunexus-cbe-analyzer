@@ -455,7 +455,7 @@ export default function SchemeOfWorkPage() {
               </h1>
               <p className="text-slate-400 text-xs flex items-center gap-1.5 mt-0.5">
                 <Sparkles className="w-3 h-3 text-amber-400" />
-                AI-powered · KICD aligned · CBC &amp; 8-4-4
+                KICD aligned · CBC &amp; 8-4-4
               </p>
             </div>
           </div>

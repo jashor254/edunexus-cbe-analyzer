@@ -71,7 +71,7 @@ export const PAYMENT_PLANS = {
     period: 'term',
     features: [
       'Unlimited Academic Clinic reports',
-      'Unlimited AI tutoring sessions',
+      'Unlimited Learning Compass sessions',
       'All subjects (Junior & Senior)',
       'Parent insights dashboard',
       'Progress tracking over time',

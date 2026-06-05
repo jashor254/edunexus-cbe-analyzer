@@ -54,7 +54,7 @@ export default function PrivacyPage() {
           </div>
           <div className="space-y-3 text-slate-700 text-base leading-relaxed ml-11">
             <p>
-              <strong>EduNexus</strong> is an AI-powered education platform developed by{' '}
+              <strong>EduNexus</strong> is an education platform developed by{' '}
               <strong>Jashor Technologies</strong>, based in Kenya. We serve Kenyan students, parents, and teachers
               navigating the CBC, 8-4-4, and IGCSE curricula — from Grade 7 through Grade 12.
             </p>
@@ -127,7 +127,7 @@ export default function PrivacyPage() {
           <div className="ml-11 grid sm:grid-cols-2 gap-3">
             {[
               'Generate personalised Academic Clinic Reports',
-              'Power the AI Learning Compass for each student',
+              'Power the Learning Compass for each student',
               'Send academic reports to parents via WhatsApp & email',
               'Help teachers track class performance',
               'Improve our platform and fix bugs',
@@ -215,7 +215,7 @@ export default function PrivacyPage() {
               ))}
             </div>
             <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-green-800 space-y-1">
-              <p className="font-black text-green-900">AI-generated content is always:</p>
+              <p className="font-black text-green-900">Personalised content is always:</p>
               <p>• Reviewed against real KICD curriculum data</p>
               <p>• Labeled as AI-assisted</p>
               <p>• Subject to human oversight</p>

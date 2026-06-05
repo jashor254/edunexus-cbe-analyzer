@@ -492,8 +492,8 @@ export async function buildClinicReport(
   const firstSubject = ctx?.first_subject as string ?? topSubjects[0]?.display_name ?? 'their strongest subject'
   parent_actions.push({
     title:  'Start a Learning Compass Session',
-    why:    `The AI tutor already knows ${student.name}'s exact level and will start precisely where they are — no wasted time.`,
-    action: `Open the Learning Compass in ${firstSubject}. The AI will greet them by name, explain what they\'re working on, and adapt in real time. First session takes 10 minutes.`,
+    why:    `The Learning Compass already knows ${student.name as string}'s exact level and will start precisely where they are — no wasted time.`,
+    action: `Open the Learning Compass in ${firstSubject}. It will greet them by name, explain what they\'re working on, and adapt in real time. First session takes 10 minutes.`,
     link:   '/chat',
   })
 
@@ -523,8 +523,6 @@ export async function buildClinicReport(
     current_phase,
     next_phase,
     parent_actions,
-    // Short disclaimer for both sections — STANDARD_DISCLAIMER is career-market text
-    // that overflows Page 3 when parent actions are long. Keep it concise.
-    disclaimer: PATHWAY_DISCLAIMER.short + ' ' + PATHWAY_DISCLAIMER.source,
+    disclaimer: `This report reflects ${student.name as string}'s actual assessment scores. Sit with your child and read it together — they should know where they stand and where they're going.`,
   }
 }

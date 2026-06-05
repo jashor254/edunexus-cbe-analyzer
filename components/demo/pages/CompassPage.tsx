@@ -23,7 +23,7 @@ export default function CompassPage() {
       <div className="relative z-10 flex-1 overflow-y-auto px-4 pt-3 pb-3">
         {/* Section header */}
         <div className="text-amber-600 text-[10px] font-black tracking-[0.25em] uppercase mb-0.5">
-          AI Tutoring Guidance
+          Learning Compass Guidance
         </div>
         <h2 className="text-[#1a2744] text-xl font-black mb-1">Learning Compass Recommendations</h2>
         <div className="h-0.5 bg-[#1a2744]/15 mb-3" />

@@ -466,7 +466,7 @@ function ClinicReportView({ studentId, studentName, onClose }: {
           </div>
         </div>
         <p className="text-xs text-white/30 mt-3 italic">
-          Powered by AI — estimates only, updated regularly
+          Estimates only, updated regularly
         </p>
       </div>
 

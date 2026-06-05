@@ -63,7 +63,7 @@ export function LearningCompassMockup() {
               <span className="text-[10px] font-black text-green-300">live</span>
             </div>
             <div className="text-[9px] bg-white/5 border border-white/10 text-white/30 px-2 py-0.5 rounded-full font-black">
-              🤖 AI · 👨‍👩‍👧 Parent can see all
+              🧭 Personalised · 👨‍👩‍👧 Parent can see all
             </div>
           </div>
         </div>
@@ -179,7 +179,7 @@ export function AcademicClinicMockup() {
 
         {/* Footer */}
         <div className="px-4 py-3 border-t border-white/10 bg-white/3">
-          <p className="text-[10px] text-white/30 mb-2">AI-Generated Report · Parent Verified</p>
+          <p className="text-[10px] text-white/30 mb-2">Clinic Report · Parent Verified</p>
           <div className="flex gap-2">
             <button className="flex-1 flex items-center justify-center gap-1.5 bg-linear-to-r from-violet-500 to-purple-500 text-white py-2 rounded-xl text-[11px] font-black">
               <Download className="w-3 h-3" /> Download PDF
@@ -422,7 +422,7 @@ export function SchemeOfWorkMockup() {
           </div>
 
           <p className="text-[10px] text-white/30 text-center">
-            AI-generated · 13 weeks · 52 lessons
+            KICD-aligned · 13 weeks · 52 lessons
           </p>
 
           <div className="flex gap-2">

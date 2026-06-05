@@ -688,7 +688,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2 mt-2">
               <span className="inline-flex items-center gap-1.5 bg-violet-50 border border-violet-200 text-violet-600 px-3 py-1 rounded-full text-xs font-bold">
                 <Sparkles className="w-3 h-3" />
-                AI-Powered Learning
+                Personalised Learning
               </span>
               <span className="inline-flex items-center gap-1.5 bg-green-50 border border-green-200 text-green-600 px-3 py-1 rounded-full text-xs font-bold">
                 <Shield className="w-3 h-3" />
@@ -827,7 +827,7 @@ export default function DashboardPage() {
               {
                 icon: Compass,
                 title: 'Learning Compass',
-                sub: 'AI tutoring · adapts to your child',
+                sub: 'Adapts to your child\'s level',
                 gradient: 'from-amber-500 to-orange-500',
                 shadow: 'shadow-amber-500/20',
                 href: '/chat',
@@ -836,7 +836,7 @@ export default function DashboardPage() {
               {
                 icon: BarChart3,
                 title: 'Academic Clinic',
-                sub: 'AI-generated reports · parent verified',
+                sub: 'Clinic reports · parent verified',
                 gradient: 'from-violet-500 to-purple-500',
                 shadow: 'shadow-violet-500/20',
                 href: '/dashboard/clinic',

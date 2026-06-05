@@ -36,15 +36,15 @@ export function NoStudentsEmpty({ onAddStudent }: { onAddStudent?: () => void })
         </div>
 
         <div className="bg-white rounded-3xl p-8 border-2 border-blue-200 hover:scale-105 transition-all">
-          <div className="text-5xl mb-4">🤖</div>
-          <h3 className="font-black uppercase text-lg mb-2">Guardian Tutor AI</h3>
+          <div className="text-5xl mb-4">🧭</div>
+          <h3 className="font-black uppercase text-lg mb-2">Learning Compass</h3>
           <p className="text-sm text-slate-600">Get Kenyan CBC-specific learning recommendations</p>
         </div>
 
         <div className="bg-white rounded-3xl p-8 border-2 border-cyan-200 hover:scale-105 transition-all">
           <div className="text-5xl mb-4">💼</div>
           <h3 className="font-black uppercase text-lg mb-2">Career Pathways</h3>
-          <p className="text-sm text-slate-600">AI-powered career guidance based on competencies</p>
+          <p className="text-sm text-slate-600">Career guidance based on competencies</p>
         </div>
       </div>
     </div>
@@ -60,7 +60,7 @@ export function NoAssessmentsEmpty({ studentId, studentName }: { studentId: stri
       <div className="text-8xl mb-8">📋</div>
       <h2 className="text-5xl font-black uppercase mb-6">No Assessments Yet</h2>
       <p className="text-xl text-slate-600 mb-10 max-w-2xl mx-auto">
-        Start recording {studentName}'s CBC assessments to track academic progress and unlock AI-powered career insights.
+        Start recording {studentName}'s CBC assessments to track academic progress and unlock career insights.
       </p>
 
       <Link
@@ -113,7 +113,7 @@ export function NoCareerAnalysisEmpty({
       <h2 className="text-5xl font-black uppercase mb-6">Career Analysis Awaits</h2>
       <p className="text-xl text-slate-600 mb-10 max-w-2xl mx-auto">
         Discover {studentName}'s ideal career pathway based on their CBC competency profile. 
-        Our AI analyzes strengths and provides Kenyan-specific career recommendations.
+        We analyze {studentName}'s strengths and provide Kenyan-specific career recommendations.
       </p>
 
       <button
@@ -129,7 +129,7 @@ export function NoCareerAnalysisEmpty({
         <div className="bg-white rounded-3xl p-8 border-2 border-indigo-200">
           <div className="text-5xl mb-4">🎯</div>
           <h3 className="font-black uppercase text-lg mb-2">Pathway Match</h3>
-          <p className="text-sm text-slate-600">STEM, Arts & Sports, or Social Sciences - AI determines the best fit</p>
+          <p className="text-sm text-slate-600">STEM, Arts & Sports, or Social Sciences — matched to {studentName}'s strengths</p>
         </div>
 
         <div className="bg-white rounded-3xl p-8 border-2 border-purple-200">
@@ -139,9 +139,9 @@ export function NoCareerAnalysisEmpty({
         </div>
 
         <div className="bg-white rounded-3xl p-8 border-2 border-blue-200">
-          <div className="text-5xl mb-4">🤖</div>
-          <h3 className="font-black uppercase text-lg mb-2">AI Disruption</h3>
-          <p className="text-sm text-slate-600">Future-proof career advice with AI impact analysis</p>
+          <div className="text-5xl mb-4">🔮</div>
+          <h3 className="font-black uppercase text-lg mb-2">Future Outlook</h3>
+          <p className="text-sm text-slate-600">Future-proof career advice based on Kenya's job market</p>
         </div>
       </div>
     </div>
@@ -188,7 +188,7 @@ export function NoClinicReportEmpty({
             { icon: '⚠️', title: 'Critical Gaps', desc: 'Urgent interventions needed with costs' },
             { icon: '📅', title: '90-Day Plan', desc: 'Actionable steps with Kenyan resources' },
             { icon: '🇰🇪', title: 'Kenyan Context', desc: 'Universities, TVET, real salary expectations' },
-            { icon: '🤖', title: 'AI Impact', desc: 'Future-proof career survival strategies' },
+            { icon: '🔮', title: 'Future Impact', desc: 'Future-proof career survival strategies' },
           ].map((item, i) => (
             <div key={i} className="flex items-start gap-3 bg-emerald-50 p-4 rounded-2xl">
               <div className="text-3xl">{item.icon}</div>
@@ -292,7 +292,7 @@ export function NoSubscriptionState({ onSubscribe, onBuyTokens }: {
         <div className="text-7xl mb-4">🔒</div>
         <h3 className="text-4xl font-black uppercase mb-4">Premium Feature</h3>
         <p className="text-xl text-slate-700">
-          Unlock AI-powered career guidance and Academic Clinic reports
+          Unlock personalised career guidance and Academic Clinic reports
         </p>
       </div>
 

@@ -65,7 +65,7 @@ const PLANS = [
     color: 'from-blue-500 to-cyan-500',
     icon: Gift,
     features: [
-      '15 AI tutoring sessions',
+      '15 Learning Compass sessions',
       'Academic Clinic report',
       'Career guidance',
       'Tokens never expire',
@@ -84,13 +84,13 @@ const PLANS = [
     icon: Star,
     features: [
       'Unlimited tutoring sessions',
-      "🤖 AI tutoring that learns your child's pace",
+      "Learning Compass that adapts to your child's pace",
       'All CBC subjects',
       'Academic Clinic reports',
       'Holiday learning plan',
       'Share with teacher',
       'Track 1 student',
-      'AI-powered · parents in control',
+      'Parents always in control',
     ],
   },
   {

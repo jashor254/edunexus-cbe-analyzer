@@ -271,7 +271,7 @@ export default function Step2Topics({
                   No curriculum topics found for this subject yet.
                 </p>
                 <p className="text-amber-700 text-sm mt-1">
-                  You can still generate a scheme — AI will create content based on the subject name
+                  You can still generate a scheme — content will be created based on the subject name
                   and {context.gradeName} context.
                 </p>
               </div>
@@ -293,7 +293,7 @@ export default function Step2Topics({
               onClick={handleProceedWithPlaceholder}
               className="flex items-center gap-2 bg-amber-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-amber-700 transition text-sm"
             >
-              Proceed with AI-generated content <ChevronRight className="w-4 h-4" />
+              Proceed with generated content <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         )}

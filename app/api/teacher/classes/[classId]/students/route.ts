@@ -122,9 +122,9 @@ export async function POST(
           const welcomeMsg =
             `Habari ${parentName}! 👋\n\n` +
             `Mwalimu ${teacher.full_name ?? ''} ameweka ${student.name} kwenye EduNexus — ` +
-            `platform ya AI inayosaidia watoto kujifunza vizuri zaidi.\n\n` +
+            `platform inayosaidia watoto kujifunza vizuri zaidi.\n\n` +
             `Bonyeza hapa kuunda akaunti yako ya mzazi:\n${inviteLink}\n\n` +
-            `Mtoto wako atakuwa na AI tutor binafsi na ripoti za kina. Bure kabisa! 🇰🇪`
+            `Mtoto wako atakuwa na mwalimu wake wa kibinafsi na ripoti za kina. Bure kabisa! 🇰🇪`
 
           // Use freeform sender (within 24h opt-in window or skip silently)
           sendWelcomeMessage(s.parent_phone, student.name, student.id).catch(() => {

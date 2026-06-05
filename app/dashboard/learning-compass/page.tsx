@@ -34,7 +34,7 @@ export default function LearningCompassPage() {
         </h1>
         
         <p className="text-lg text-gray-600">
-          Preparing your personalized AI tutor...
+          Preparing your Learning Compass...
         </p>
 
         {/* Loading Spinner */}
