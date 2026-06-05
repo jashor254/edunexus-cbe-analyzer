@@ -287,6 +287,9 @@ function ChatContent() {
   const [outcomeStep,          setOutcomeStep]          = useState<number>(1)
   const [showNextSubject,      setShowNextSubject]      = useState(false)
   const [nextSubjectPicker,    setNextSubjectPicker]    = useState<string | null>(null)
+  const [lockedSubject,        setLockedSubject]        = useState<string | null>(null)
+  const [lockedSubstrand,      setLockedSubstrand]      = useState<string | null>(null)
+  const [lockedGrade,          setLockedGrade]          = useState<number | null>(null)
 
   const messagesEndRef  = useRef<HTMLDivElement>(null)
   const inputRef        = useRef<HTMLTextAreaElement>(null)
@@ -517,8 +520,13 @@ function ChatContent() {
   // ── Generate outcome then start session ──────────────────────────────────────
   const generateOutcomeAndStart = async (params: TopicSelectParams) => {
     const { subject, substrand, displayName, grade, substrandId } = params
-    const isRevision  = grade < (student?.grade ?? 7)
+    const isRevision    = grade < (student?.grade ?? 7)
     const revisionGrade = isRevision ? grade : undefined
+
+    // Lock the subject/substrand so every subsequent message stays on topic
+    setLockedSubject(subject)
+    setLockedSubstrand(substrand)
+    setLockedGrade(grade)
 
     if (learnerId) {
       try {
@@ -545,10 +553,10 @@ function ChatContent() {
     }
 
     struggleTopicRef.current = substrand
-    // Send the kickoff message; revision context is carried via extra body fields
     sendMessage(
       `I want to work on ${displayName} in ${subject}`,
-      isRevision ? revisionGrade : undefined
+      isRevision ? revisionGrade : undefined,
+      { lockedSubject: subject, lockedSubstrand: substrand, lockedGrade: grade }
     )
   }
 
@@ -575,12 +583,21 @@ function ChatContent() {
   }
 
   // ── Send message ─────────────────────────────────────────────────────────────
-  const sendMessage = useCallback(async (text?: string, revisionGrade?: number) => {
+  type LockedParams = { lockedSubject?: string; lockedSubstrand?: string; lockedGrade?: number }
+
+  const sendMessage = useCallback(async (text?: string, revisionGrade?: number, locked?: LockedParams) => {
     const userMessage = (text || input).trim()
     if (!userMessage || isLoading || !sessionId || !learnerId) return
 
     setInput('')
     setIsLoading(true)
+
+    // Resolve locked values: explicit param wins, then state fallback
+    const effectiveLocked = {
+      lockedSubject:   locked?.lockedSubject   ?? lockedSubject   ?? undefined,
+      lockedSubstrand: locked?.lockedSubstrand ?? lockedSubstrand ?? undefined,
+      lockedGrade:     locked?.lockedGrade     ?? lockedGrade     ?? undefined,
+    }
 
     // Optimistic
     const tempId = `temp-${Date.now()}`
@@ -596,18 +613,21 @@ function ChatContent() {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message:      userMessage,
+          message:         userMessage,
           sessionId,
           learnerId,
-          subjectId:    sessionState.currentSubject,
-          grade:        student?.grade ?? 7,
+          subjectId:       effectiveLocked.lockedSubject || sessionState.currentSubject,
+          lockedSubject:   effectiveLocked.lockedSubject,
+          lockedSubstrand: effectiveLocked.lockedSubstrand,
+          lockedGrade:     effectiveLocked.lockedGrade,
+          grade:           student?.grade ?? 7,
           sessionState,
           previousMessages: messages
             .slice(-6)
             .map(m => ({ role: m.role, content: m.content, metadata: m.metadata })),
-          struggleTopic: struggleTopicRef.current ?? undefined,
-          subjectFilter: sessionState.currentSubject || undefined,
-          isRevision: revisionGrade !== undefined,
+          struggleTopic: effectiveLocked.lockedSubstrand || struggleTopicRef.current || undefined,
+          subjectFilter: effectiveLocked.lockedSubject || sessionState.currentSubject || undefined,
+          isRevision:    revisionGrade !== undefined,
           revisionGrade: revisionGrade ?? undefined,
           mathType: student?.current_pathway === 'STEM' && (student?.grade ?? 0) >= 10
             ? 'core'
@@ -823,8 +843,15 @@ function ChatContent() {
                   <Star className="w-3.5 h-3.5 text-violet-400" />
                   <span className="text-[10px] font-bold text-white/40 uppercase tracking-wider">Now Learning</span>
                 </div>
-                <div className="font-black text-white/80 capitalize text-sm">{sessionState.currentSubject}</div>
-                {sessionState.currentConcept && (
+                <div className="font-black text-white/80 capitalize text-sm">
+                  {lockedSubject || sessionState.currentSubject}
+                </div>
+                {lockedSubstrand && (
+                  <p className="text-xs text-white/40 mt-0.5 leading-tight capitalize">
+                    {lockedSubstrand.replace(/_/g, ' ')}
+                  </p>
+                )}
+                {!lockedSubstrand && sessionState.currentConcept && (
                   <div className="text-[10px] text-white/30 mt-0.5">{sessionState.currentConcept}</div>
                 )}
               </div>

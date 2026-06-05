@@ -16,6 +16,9 @@ export async function POST(req: Request) {
       sessionId,
       learnerId,
       subjectId,
+      lockedSubject,      // explicitly chosen via TopicChoice — highest priority
+      lockedSubstrand,    // specific topic selected by student
+      lockedGrade,        // grade for the selected topic (may differ for revision)
       sessionState,
       previousMessages = [],
       struggleTopic,
@@ -110,8 +113,8 @@ export async function POST(req: Request) {
         learnerId || access.userId,
         sessionId,
         {
-          struggleTopic: struggleTopic ?? undefined,
-          subjectFilter: subjectFilter ?? undefined,
+          struggleTopic: lockedSubstrand || struggleTopic || undefined,
+          subjectFilter: lockedSubject   || subjectFilter  || undefined,
         }
       )
       ragSystemPrompt = buildRAGSystemPrompt(ragContext)
@@ -126,32 +129,58 @@ export async function POST(req: Request) {
     const confident = /got it|understand|easy|nimeelewa|sawa|i see|makes sense|i get it|aha|clear now|now i understand/i.test(msgLower)
     const confidence: 'low' | 'medium' | 'high' = confident ? 'high' : struggled ? 'low' : 'medium'
 
-    // ── Detect subject from message ───────────────────────────────────────────
-    const subjectKeywords: Record<string, string[]> = {
-      mathematics: ['math', 'algebra', 'fraction', 'percentage', 'geometry', 'equation', 'hesabu', 'numbers', 'calculate', 'sum', 'times', 'divide', 'multiplication', 'addition', 'subtraction'],
-      english: ['english', 'grammar', 'reading', 'writing', 'essay', 'spelling', 'vocabulary', 'noun', 'verb', 'adjective'],
-      kiswahili: ['kiswahili', 'sarufi', 'insha', 'kusoma', 'fasihi', 'ngeli', 'viambishi', 'vitendawili'],
-      biology: ['biology', 'cell', 'plant', 'animal', 'heart', 'photosynthesis', 'organism', 'living', 'human body', 'digestion', 'respiratory'],
-      chemistry: ['chemistry', 'atom', 'molecule', 'reaction', 'element', 'compound', 'chemical', 'periodic'],
-      physics: ['physics', 'force', 'energy', 'electricity', 'circuit', 'motion', 'light', 'gravity', 'speed', 'velocity', 'acceleration'],
-      geography: ['geography', 'map', 'weather', 'climate', 'river', 'mountain', 'population', 'volcano', 'earthquake', 'lake victoria'],
-      agriculture: ['agriculture', 'farm', 'crop', 'soil', 'planting', 'shamba', 'harvest', 'fertilizer', 'irrigation', 'maize', 'cow'],
-      history: ['history', 'colonialism', 'independence', 'war', 'king', 'empire', 'ancient', 'mau mau', 'kenyatta'],
-      integrated_science: ['science', 'experiment', 'solar', 'ecosystem', 'environment', 'energy'],
+    // ── Subject resolution — priority order ───────────────────────────────────
+    // 1. lockedSubject from TopicChoice (explicit student choice) — highest
+    // 2. Saved lockedSubject from session_state (persists across messages)
+    // 3. sessionState.currentSubject (from previous turns in this session)
+    // 4. Keyword detection from message — last resort only
+    type StoredSessionState = {
+      consecutiveSuccesses?: number
+      initialized?: boolean
+      lockedSubject?: string
+      lockedSubstrand?: string
+      [key: string]: unknown
     }
+    const storedState = (savedState?.session_state ?? {}) as StoredSessionState
 
-    let subject = subjectId || 'mathematics'
-    for (const [subj, keywords] of Object.entries(subjectKeywords)) {
-      if (keywords.some(k => msgLower.includes(k))) {
-        subject = subj
-        break
+    const savedLockedSubject   = storedState.lockedSubject   as string | undefined
+    const savedLockedSubstrand = storedState.lockedSubstrand as string | undefined
+
+    const effectiveLockedSubject   = lockedSubject   || savedLockedSubject
+    const effectiveLockedSubstrand = lockedSubstrand || savedLockedSubstrand
+
+    let subject: string
+    if (effectiveLockedSubject) {
+      subject = effectiveLockedSubject
+    } else if (sessionState?.currentSubject && sessionState.currentSubject !== '') {
+      subject = sessionState.currentSubject
+    } else {
+      // Last resort: keyword detection
+      const subjectKeywords: Record<string, string[]> = {
+        mathematics:        ['math', 'algebra', 'fraction', 'percentage', 'geometry', 'equation', 'hesabu', 'numbers', 'calculate', 'sum', 'divide', 'multiplication'],
+        english:            ['english', 'grammar', 'reading', 'writing', 'essay', 'spelling', 'vocabulary', 'noun', 'verb'],
+        kiswahili:          ['kiswahili', 'sarufi', 'insha', 'kusoma', 'fasihi', 'ngeli', 'viambishi'],
+        biology:            ['biology', 'cell', 'plant', 'animal', 'heart', 'photosynthesis', 'organism', 'digestion', 'respiratory'],
+        chemistry:          ['chemistry', 'atom', 'molecule', 'reaction', 'element', 'compound', 'chemical', 'periodic'],
+        physics:            ['physics', 'force', 'energy', 'electricity', 'circuit', 'motion', 'light', 'gravity', 'speed'],
+        geography:          ['geography', 'map', 'weather', 'climate', 'river', 'mountain', 'population', 'volcano'],
+        agriculture:        ['agriculture', 'farm', 'crop', 'soil', 'planting', 'harvest', 'fertilizer', 'irrigation', 'hay', 'silage'],
+        history:            ['history', 'colonialism', 'independence', 'war', 'king', 'empire', 'ancient'],
+        integrated_science: ['science', 'experiment', 'solar', 'ecosystem', 'environment'],
+      }
+      subject = subjectId || 'mathematics'
+      for (const [subj, keywords] of Object.entries(subjectKeywords)) {
+        if (keywords.some(k => msgLower.includes(k))) { subject = subj; break }
       }
     }
+
+    // Active concept — locked substrand takes priority over session state
+    const activeConcept = effectiveLockedSubstrand || (sessionState as { currentConcept?: string } | null)?.currentConcept || ''
 
     // ── BUILD previousTaskResult from conversation history ────────────────────
     const lastAssistantMsg = [...previousMessages].reverse().find((m: { role: string }) => m.role === 'assistant') as { role: string; metadata?: { questionProvided?: boolean; questionText?: string } } | undefined
     const lastTaskHadQuestion = lastAssistantMsg?.metadata?.questionProvided === true
-    const lastTaskQuestion = lastAssistantMsg?.metadata?.questionText || ''
+    const lastTaskQuestion    = lastAssistantMsg?.metadata?.questionText || ''
 
     let completed = true
     if (lastTaskHadQuestion && lastTaskQuestion) {
@@ -175,9 +204,9 @@ export async function POST(req: Request) {
       ragCurriculumType
     )
 
-    const task = compassResponse.task
+    const task       = compassResponse.task
     const hasQuestion = !!task.content.question
-    const hasVisual = !!task.content.visualAid
+    const hasVisual   = !!task.content.visualAid
 
     // ── Compass Bridge — specific AI briefing per student ────────────────────
     type CompassBridgeShape = {
@@ -218,14 +247,8 @@ Week 1 Goal: ${cb.weeklyMilestones?.[0]?.goal ?? ''}
 When student asks WHY they need to learn this, use the career reason above.\n`
       : ''
 
-    // ── Session context for response prompt ──────────────────────────────────
-    type StoredSessionState = {
-      consecutiveSuccesses?: number
-      initialized?: boolean
-      [key: string]: unknown
-    }
-    const storedState = (savedState?.session_state ?? {}) as StoredSessionState
-    const consecutiveSuccesses   = (storedState.consecutiveSuccesses as number | undefined) ?? 0
+    // ── Session context ───────────────────────────────────────────────────────
+    const consecutiveSuccesses = (storedState.consecutiveSuccesses as number | undefined) ?? 0
 
     type MilestoneRecord = {
       step: number
@@ -248,64 +271,76 @@ When student asks WHY they need to learn this, use the career reason above.\n`
       askToTeachBack:   overallLevel >= 3,
     }
 
-    const firstName    = (studentProfile?.name as string | null)?.split(' ')[0] ?? 'there'
-    const sessionStateTyped = sessionState as { currentConcept?: string } | null
-    const currentConcept    = sessionStateTyped?.currentConcept || cb?.firstConcept || subject
-
-    // ── Revision mode context ────────────────────────────────────────────────
+    const firstName   = (studentProfile?.name as string | null)?.split(' ')[0] ?? 'there'
     const studentGrade = (studentProfile?.grade as number | null) ?? 7
+    const topicGrade  = (lockedGrade as number | undefined) ?? studentGrade
+
+    // ── STEP 3: Topic context block (replaces substrandContext) ───────────────
+    // Built when a topic was explicitly selected — gives AI precise scope
+    const topicContext = effectiveLockedSubstrand
+      ? `\n## LOCKED TOPIC — TEACH ONLY THIS:
+Subject: ${subject}
+Specific Topic: ${effectiveLockedSubstrand.replace(/_/g, ' ')}
+${topicGrade !== studentGrade
+  ? `Revision Mode: Grade ${topicGrade} content (student is Grade ${studentGrade})`
+  : `Grade: ${studentGrade}`}
+
+FIRST MESSAGE RULE — if this is the first message about this topic:
+  Do NOT say "Today we will learn about..."
+  Ask ONE diagnostic question to find where they are:
+  Level 1-2 (below/approaching): give A/B/C multiple choice
+  Level 3-4 (meets/exceeds): ask open question — "What do you already know about [specific concept]?"
+
+TOPIC LOCK — CRITICAL:
+  Every single response must relate to this topic.
+  Do NOT drift to other subjects even if student mentions them.
+  If student asks about something else: "Let's finish [topic] first. We can cover that next."
+  Question AND answer choices MUST both be about this topic — never mix topics.\n`
+      : (struggleTopic && struggleTopic !== 'help_me_decide'
+          ? `\n## SPECIFIC TOPIC SELECTED BY STUDENT:
+Substrand: ${struggleTopic.replace(/_/g, ' ')}
+Subject: ${subjectFilter ?? ''}
+Stay focused on THIS specific substrand until the student shows mastery.
+Do not drift to other topics unless directly asked.\n`
+          : '')
+
+    // ── Revision mode context ─────────────────────────────────────────────────
     const revisionContext = isRevision && revisionGrade && (revisionGrade as number) < studentGrade
       ? `\n## REVISION MODE:
 Student is Grade ${studentGrade} revising Grade ${revisionGrade as number} content.
-This means:
 - They have seen this before — do not treat it as brand new
 - Move faster than normal intro pace
-- If they remember it: confirm and move to application quickly
-- If they do not remember: rebuild efficiently, no judgment
-- Do NOT say "this is Grade ${revisionGrade as number} work" — just teach it
-Opening question for revision: "What do you remember about [concept]?" — NOT "Today we will learn about..."\n`
+- Opening question: "What do you remember about [concept]?" — NOT "Today we will learn about..."\n`
       : ''
 
-    // ── Substrand-specific CBC context ───────────────────────────────────────
-    const substrandContext = struggleTopic && struggleTopic !== 'help_me_decide'
-      ? `\n## SPECIFIC TOPIC SELECTED BY STUDENT:
-Substrand: ${struggleTopic.replace(/_/g, ' ')}
-Subject: ${subjectFilter ?? ''}
-
-Stay focused on THIS specific substrand until the student shows mastery.
-Do not drift to other topics unless directly asked.
-Use the CBC verb progression: identify → explain → apply → analyse → evaluate → create
-Start at the identify/explain level, then progress as confidence increases.\n`
-      : ''
-
-    // ── 🔥 GENERATE ACTUAL RESPONSE USING DEEPSEEK 🔥 ────────────────────────
+    // ── Build response prompt ─────────────────────────────────────────────────
     const responsePrompt = `You are the EduNexus Learning Compass — a knowledgeable, calm tutor. Like a smart older sibling who knows their subject well.
-${compassBridgeContext}${revisionContext}${substrandContext}
+${compassBridgeContext}${topicContext}${revisionContext}
 VOICE — FOLLOW EXACTLY:
-What you sound like: "What do you know about [concept] already?" / "Look at just the top number first." / "Right. Now the bottom number — what does that tell you?" / "Not quite. Think about what [specific thing] means." / "Got it. Here's a harder one."
+What you sound like: "What do you know about [concept] already?" / "Look at just the top number first." / "Right. Now try this one." / "Not quite. Think about what [specific thing] means." / "Got it. Here's a harder one."
 
 What you NEVER say:
 - "Sawa sawa!" / "That's awesome!" / "Keep going, you're doing great!" / "Excellent effort!"
 - "Like sharing chapati..." / "Imagine Otieno/Wanjiku/Kamau..." / "Mama sells sukuma..."
 - "Step 1... Step 2... Step 3..." (no numbered lists)
-- Any food analogy / Any transport analogy / Any named character
-- Any emoji in the response text
+- Any food analogy / Any transport analogy / Any named character / Any emoji
+- "I have a diagram — click the button" — NEVER narrate the UI; just teach
 
-FORMAT:
-Short. Max 3 sentences + 1 question. ONE question per response — always.
+FORMAT: Short. Max 3 sentences + 1 question. ONE question per response — always.
 No numbered lists. No bullet points. Direct prose + question.
 ${isLevel1 ? 'Level 1 student: one sentence max, then multiple choice (A/B/C options).' : ''}${isLevel4 ? 'Level 4 student: lead with the question; explain only if they struggle.' : ''}
 
-EXAMPLES:
-If an example genuinely helps: use abstract objects — "a rectangle", "a number line", "a set of 8 items" — NOT food, NOT transport, NOT people.
-If a diagram helps: describe it simply — "Think of a rectangle split into 4 equal parts" — NOT "like a chapati cut into pieces".
+EXAMPLES: use abstract objects — "a rectangle", "a number line", "a set of 8 items" — NOT food, NOT transport, NOT people.
 
-NEVER: Start with name + praise ("Great job ${firstName}!") / filler ("That's a great question!") / narrate ("Now let's look at...") / give the answer then ask "Do you understand?"
+TOPIC INTEGRITY:
+Every question AND every answer choice must be about: ${subject} / ${activeConcept || subject}
+NEVER ask about topic A and give answer choices about topic B.
+If you catch yourself mixing topics — stop and redirect to the locked topic.
 
-ALWAYS: End with a question or clear next instruction — never just a statement. Name what was wrong specifically. When right: confirm briefly then advance ("Right. Now:"). When stuck 3+ attempts: show worked example then a DIFFERENT problem.
+ALWAYS: End with a question. Name what was wrong specifically. When right: confirm briefly then advance ("Right. Now:"). When stuck 3+ attempts: show a worked example then a DIFFERENT problem.
 
 CURRENT SESSION:
-Student: ${firstName} | Subject: ${subject} | Concept: ${currentConcept} | Difficulty: ${task.difficulty}/5
+Student: ${firstName} | Subject: ${subject} | Topic: ${activeConcept || 'current topic'} | Difficulty: ${task.difficulty}/5
 ${currentOutcomeData ? `Goal: "${currentOutcomeData.mastery_statement as string}"
 Milestone: Step ${currentOutcomeStep}/4 — ${outcomeMilestones[Math.min(currentOutcomeStep - 1, 3)]?.description ?? ''}` : ''}
 Student said: "${message}"
@@ -313,11 +348,11 @@ ${struggled ? 'STRUGGLING — be patient, try a completely different angle' : co
 Consecutive successes: ${consecutiveSuccesses}
 ${lastTaskQuestion ? `Last question you asked: "${lastTaskQuestion}"` : ''}
 
-WHAT TO TEACH:
+WHAT TO TEACH (about ${activeConcept || subject}):
 ${task.content.instruction}
 ${task.content.example ? `Example: ${task.content.example}` : ''}
 ${hasQuestion ? `Ask: ${task.content.question}` : 'Guide without giving the answer'}
-${hasVisual ? 'Say: "I have a diagram for this — click the Diagram button below."' : ''}
+${hasVisual ? '(A diagram is shown automatically in the UI — do not mention it in text)' : ''}
 
 RESPOND in ${profile.toneKey} tone. Max 3 sentences + 1 question.
 ${profile.skipBasics ? 'Skip recall — go straight to application.' : ''}${profile.openEndedAllowed ? ' Open-ended questions allowed.' : ' Multiple choice only (A/B/C options).'}${profile.askToTeachBack && consecutiveSuccesses >= 2 ? ' Ask them to explain their reasoning.' : ''}
@@ -357,14 +392,16 @@ Return ONLY the response text. No JSON. No markdown. No preamble.`
       }
     }
 
-    // ── SAVE COMPASS STATE ────────────────────────────────────────────────────
+    // ── SAVE COMPASS STATE — persist subject lock across messages ─────────────
     const updatedState = learningCompass.exportState(learnerId || access.userId)
     await db
       .from('compass_sessions')
       .update({
         session_state: {
           ...updatedState,
-          initialized:  true,
+          initialized:      true,
+          lockedSubject:    effectiveLockedSubject   || savedLockedSubject,
+          lockedSubstrand:  effectiveLockedSubstrand || savedLockedSubstrand,
         },
         last_subject: subject,
         updated_at:   new Date().toISOString(),
@@ -404,14 +441,15 @@ Return ONLY the response text. No JSON. No markdown. No preamble.`
         metadata: {
           difficulty:       task.difficulty,
           subject:          subject,
+          activeConcept:    activeConcept,
           type:             task.type,
           questionProvided: hasQuestion,
           questionText:     task.content.question,
           visualProvided:   hasVisual,
           adaptationReason: compassResponse.adaptationReason,
           parentInsight:    compassResponse.parentInsight,
-          struggled:        struggled,
-          confidence:       confidence,
+          struggled,
+          confidence,
         },
         created_at: new Date(Date.now() + 1).toISOString(),
       }
@@ -431,11 +469,13 @@ Return ONLY the response text. No JSON. No markdown. No preamble.`
       newOutcomeStep,
       outcomeAchieved,
       sessionUpdate: {
-        timeOnTask:     (sessionState?.timeOnTask || 0) + 5,
-        currentSubject: subject,
-        currentConcept: task.concept || 'current',
-        needsBreak:     compassResponse.needsBreak,
-        breakDuration:  compassResponse.breakDuration,
+        timeOnTask:      (sessionState?.timeOnTask || 0) + 5,
+        currentSubject:  subject,
+        currentConcept:  activeConcept || task.concept || 'current',
+        lockedSubject:   effectiveLockedSubject,
+        lockedSubstrand: effectiveLockedSubstrand,
+        needsBreak:      compassResponse.needsBreak,
+        breakDuration:   compassResponse.breakDuration,
       },
       tokensRemaining,
     })

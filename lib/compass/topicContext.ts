@@ -189,7 +189,13 @@ async function getTier2KicdContext(
     .order('name')
 
   if (subjectFilter) {
-    laQuery = laQuery.ilike('name', `%${subjectFilter}%`)
+    // 'Core Mathematics' / 'Essential Mathematics' must match exactly — ilike would catch both
+    const isExactMathName = subjectFilter === 'Core Mathematics' || subjectFilter === 'Essential Mathematics'
+    if (isExactMathName) {
+      laQuery = laQuery.ilike('name', subjectFilter)
+    } else {
+      laQuery = laQuery.ilike('name', `%${subjectFilter}%`)
+    }
   }
 
   const { data: learningAreas } = await laQuery as { data: SowLaRow[] | null }
