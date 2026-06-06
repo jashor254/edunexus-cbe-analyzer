@@ -714,8 +714,18 @@ function ChatContent() {
         {/* Messages area */}
         <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6 space-y-5">
 
-          {/* Empty state */}
-          {messages.length === 0 && initDone && (
+          {/* Starting state — topic picked, waiting for first response */}
+          {messages.length === 0 && topicSelected && isLoading && (
+            <div className="flex flex-col items-center justify-center h-full gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center">
+                <Brain className="w-5 h-5 text-white animate-pulse" />
+              </div>
+              <p className="text-sm text-white/40">Starting your session...</p>
+            </div>
+          )}
+
+          {/* Empty state — topic not yet selected */}
+          {messages.length === 0 && initDone && !isLoading && (
             <div className="flex flex-col items-center justify-center h-full text-center py-10 px-4">
               <div className="relative mb-8">
                 <div className="absolute inset-0 bg-violet-600/30 rounded-full blur-3xl animate-pulse" />
@@ -758,12 +768,14 @@ function ChatContent() {
                               setLockedSubstrand(firstConcept || concept)
                               setTopicDisplayName(concept)
                               setTopicSelected(true)
-                              sendMessage(`I want to work on ${concept}`, {
-                                lockedSubject:   subject,
-                                lockedSubstrand: firstConcept || concept,
-                                lockedGrade:     student?.grade ?? 9,
-                                isRevision:      false,
-                              })
+                              setTimeout(() => {
+                                sendMessage(`I want to work on ${concept}`, {
+                                  lockedSubject:   subject,
+                                  lockedSubstrand: firstConcept || concept,
+                                  lockedGrade:     student?.grade ?? 9,
+                                  isRevision:      false,
+                                })
+                              }, 100)
                             }}
                             className="px-6 py-3 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-2xl text-sm transition-colors mb-4"
                           >
@@ -789,12 +801,14 @@ function ChatContent() {
                             setIsRevision(rev)
                             setTopicDisplayName(params.displayName)
                             setTopicSelected(true)
-                            sendMessage(`I want to work on ${params.displayName}`, {
-                              lockedSubject:   params.subject,
-                              lockedSubstrand: params.substrand,
-                              lockedGrade:     params.grade,
-                              isRevision:      rev,
-                            })
+                            setTimeout(() => {
+                              sendMessage(`I want to work on ${params.displayName}`, {
+                                lockedSubject:   params.subject,
+                                lockedSubstrand: params.substrand,
+                                lockedGrade:     params.grade,
+                                isRevision:      rev,
+                              })
+                            }, 100)
                           }}
                           onContinue={() => {}}
                         />
@@ -827,12 +841,14 @@ function ChatContent() {
                     setIsRevision(rev)
                     setTopicDisplayName(params.displayName)
                     setTopicSelected(true)
-                    sendMessage(`I want to work on ${params.displayName}`, {
-                      lockedSubject:   params.subject,
-                      lockedSubstrand: params.substrand,
-                      lockedGrade:     params.grade,
-                      isRevision:      rev,
-                    })
+                    setTimeout(() => {
+                      sendMessage(`I want to work on ${params.displayName}`, {
+                        lockedSubject:   params.subject,
+                        lockedSubstrand: params.substrand,
+                        lockedGrade:     params.grade,
+                        isRevision:      rev,
+                      })
+                    }, 100)
                   }}
                   onContinue={() => {}}
                 />

@@ -66,18 +66,30 @@ export async function writeSession(
 
   const current = (data?.session_state ?? {}) as Record<string, unknown>
 
-  await db
+  const newState = {
+    ...current,
+    ...update,
+    initialized: true,
+  }
+
+  console.log('[writeSession] saving:', {
+    sessionId,
+    lockedSubject:   newState.lockedSubject,
+    lockedSubstrand: newState.lockedSubstrand,
+  })
+
+  const { error } = await db
     .from('compass_sessions')
     .update({
-      session_state: {
-        ...current,
-        ...update,
-        initialized: true,
-      },
-      last_subject: update.lockedSubject || current.lockedSubject,
-      updated_at:   new Date().toISOString(),
+      session_state: newState,
+      last_subject:  (update.lockedSubject as string | null) || (current.lockedSubject as string | null) || null,
+      updated_at:    new Date().toISOString(),
     })
     .eq('id', sessionId)
+
+  if (error) {
+    console.error('[writeSession] FAILED:', error)
+  }
 }
 
 export function resolveSubject(
