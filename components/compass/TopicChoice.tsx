@@ -2,7 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { ChevronDown, ChevronUp, ArrowRight, HelpCircle, Loader2, RotateCcw } from 'lucide-react'
-import type { LessonOutcome } from '@/lib/compass/lessonOutcomes'
+type LessonOutcome = {
+  concept: string
+  milestones: { step: number; description: string; checkQuestion: string; achieved: boolean; achievedAt?: Date }[]
+  [key: string]: unknown
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

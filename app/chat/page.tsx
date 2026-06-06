@@ -5,28 +5,32 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 import {
-  Send, Mic, MicOff, Volume2, VolumeX,
+  Send, Mic, MicOff, Volume2,
   Plus, ChevronLeft, Maximize2, X,
   Zap, Star, Flame, Brain,
   Image as ImageIcon, Heart, Sparkles,
   RotateCcw, Clock
 } from 'lucide-react'
-import type { VisualAid } from '@/lib/ai/learningCompass'
-import type { LessonOutcome, WeakTopic } from '@/lib/compass/lessonOutcomes'
 import TopicChoice, { type TopicSelectParams } from '@/components/compass/TopicChoice'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+type VisualAid = {
+  content:   string
+  caption?:  string
+  subject?:  string
+  concept?:  string
+}
+
 interface Message {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
+  id:       string
+  role:     'user' | 'assistant'
+  content:  string
   metadata?: {
-    pedagogy?:        { strategy: string; checkForUnderstanding?: string }
-    parentInsight?:   any
-    audioOptimized?:  string
-    difficulty?:      number
-    adaptationReason?: string
-    visualAid?:       VisualAid
+    parentInsight?: Record<string, string>
+    audioOptimized?: string
+    difficulty?:     number
+    visualAid?:      VisualAid
   }
   timestamp: Date
 }
@@ -38,10 +42,10 @@ interface SessionState {
 }
 
 interface Stats {
-  streakDays:       number
+  streakDays:      number
   conceptsMastered: number
-  tokens:           number
-  hasSubscription:  boolean
+  tokens:          number
+  hasSubscription: boolean
 }
 
 // ─── Difficulty label ─────────────────────────────────────────────────────────
@@ -53,71 +57,33 @@ const DIFF_LABEL: Record<number, { label: string; color: string }> = {
   5: { label: 'Advanced',     color: 'text-purple-400' },
 }
 
-const STRATEGY_LABEL: Record<string, string> = {
-  concept_intro: 'New Concept',
-  practice:      'Practice',
-  challenge:     'Challenge',
-  review:        'Review',
-  break:         'Brain Break',
-}
-
 // ─── Visual Aid renderer ──────────────────────────────────────────────────────
-function VisualAidBlock({
-  aid,
-  onExpand,
-}: {
-  aid: VisualAid
-  onExpand: (aid: VisualAid) => void
-}) {
+function VisualAidBlock({ aid, onExpand }: { aid: VisualAid; onExpand: (a: VisualAid) => void }) {
   return (
     <div className="mt-3 rounded-2xl overflow-hidden border border-white/10">
       <div className="flex items-center justify-between px-3 py-2 bg-white/5">
         <div className="flex items-center gap-2">
           <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
-          <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">
-            {aid.subject || 'Diagram'}
-          </span>
+          <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">{aid.subject || 'Diagram'}</span>
         </div>
-        <button
-          onClick={() => onExpand(aid)}
-          className="flex items-center gap-1 text-xs text-white/40 hover:text-white/80 transition-colors"
-        >
-          <Maximize2 className="w-3 h-3" />
-          Expand
+        <button onClick={() => onExpand(aid)} className="flex items-center gap-1 text-xs text-white/40 hover:text-white/80 transition-colors">
+          <Maximize2 className="w-3 h-3" />Expand
         </button>
       </div>
       <pre
         className="p-4 font-mono text-xs text-emerald-300 bg-slate-950/60 overflow-x-auto whitespace-pre leading-relaxed cursor-pointer hover:bg-slate-950/80 transition-colors"
         onClick={() => onExpand(aid)}
-      >
-        {aid.content}
-      </pre>
-      {aid.caption && (
-        <p className="px-3 py-1.5 text-xs text-white/40 italic bg-white/3">
-          {aid.caption}
-        </p>
-      )}
+      >{aid.content}</pre>
+      {aid.caption && <p className="px-3 py-1.5 text-xs text-white/40 italic bg-white/3">{aid.caption}</p>}
     </div>
   )
 }
 
-// ─── Expanded diagram modal ───────────────────────────────────────────────────
-function DiagramModal({
-  aid,
-  onClose,
-}: {
-  aid: VisualAid
-  onClose: () => void
-}) {
+// ─── Diagram modal ────────────────────────────────────────────────────────────
+function DiagramModal({ aid, onClose }: { aid: VisualAid; onClose: () => void }) {
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-6"
-      onClick={onClose}
-    >
-      <div
-        className="relative w-full max-w-2xl bg-slate-900 rounded-3xl border border-white/10 overflow-hidden shadow-2xl"
-        onClick={e => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-6" onClick={onClose}>
+      <div className="relative w-full max-w-2xl bg-slate-900 rounded-3xl border border-white/10 overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-amber-500/20 rounded-xl flex items-center justify-center">
@@ -128,21 +94,12 @@ function DiagramModal({
               <p className="text-xs text-white/40">{aid.concept}</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center transition-colors"
-          >
+          <button onClick={onClose} className="w-8 h-8 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center transition-colors">
             <X className="w-4 h-4 text-white/60" />
           </button>
         </div>
-        <pre className="p-8 font-mono text-sm text-emerald-300 overflow-x-auto whitespace-pre leading-relaxed">
-          {aid.content}
-        </pre>
-        {aid.caption && (
-          <p className="px-6 py-3 text-sm text-white/50 italic border-t border-white/10 text-center">
-            {aid.caption}
-          </p>
-        )}
+        <pre className="p-8 font-mono text-sm text-emerald-300 overflow-x-auto whitespace-pre leading-relaxed">{aid.content}</pre>
+        {aid.caption && <p className="px-6 py-3 text-sm text-white/50 italic border-t border-white/10 text-center">{aid.caption}</p>}
       </div>
     </div>
   )
@@ -150,85 +107,58 @@ function DiagramModal({
 
 // ─── Message bubble ───────────────────────────────────────────────────────────
 function MessageBubble({
-  msg,
-  onExpand,
-  onSpeak,
-  onParentInsight,
+  msg, onExpand, onSpeak, onParentInsight,
 }: {
-  msg: Message
-  onExpand:       (aid: VisualAid) => void
-  onSpeak:        (text: string) => void
-  onParentInsight:(insight: any) => void
+  msg:             Message
+  onExpand:        (a: VisualAid) => void
+  onSpeak:         (t: string) => void
+  onParentInsight: (i: Record<string, string>) => void
 }) {
   const isUser = msg.role === 'user'
   const diff   = msg.metadata?.difficulty
-  const strat  = msg.metadata?.pedagogy?.strategy
 
   return (
     <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'} items-end`}>
-
-      {/* Avatar */}
       <div className={`w-8 h-8 rounded-2xl flex-shrink-0 flex items-center justify-center text-xs font-black shadow-lg ${
-        isUser
-          ? 'bg-gradient-to-br from-blue-500 to-cyan-500'
-          : 'bg-gradient-to-br from-violet-600 to-indigo-600'
+        isUser ? 'bg-gradient-to-br from-blue-500 to-cyan-500' : 'bg-gradient-to-br from-violet-600 to-indigo-600'
       }`}>
         {isUser ? 'You' : <Brain className="w-4 h-4 text-white" />}
       </div>
 
       <div className={`flex flex-col gap-1 max-w-[80%] ${isUser ? 'items-end' : 'items-start'}`}>
-
-        {/* Metadata chips — assistant only */}
-        {!isUser && (diff || strat) && (
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            {strat && (
-              <span className="text-[10px] font-bold text-white/40 uppercase tracking-wider">
-                {STRATEGY_LABEL[strat] || strat}
-              </span>
-            )}
-            {diff && DIFF_LABEL[diff] && (
-              <span className={`text-[10px] font-bold uppercase tracking-wider ${DIFF_LABEL[diff].color}`}>
-                • {DIFF_LABEL[diff].label}
-              </span>
-            )}
-          </div>
+        {!isUser && diff && DIFF_LABEL[diff] && (
+          <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${DIFF_LABEL[diff].color}`}>
+            {DIFF_LABEL[diff].label}
+          </span>
         )}
 
-        {/* Bubble */}
         <div className={`px-4 py-3 rounded-2xl leading-relaxed text-sm ${
           isUser
             ? 'bg-gradient-to-br from-blue-600 to-cyan-600 text-white rounded-br-sm'
             : 'bg-white/8 border border-white/10 text-white/90 rounded-bl-sm'
         }`}>
-          {msg.content.split('\n').map((line, i) => (
-            line.trim()
-              ? <p key={i} className="mb-2 last:mb-0">{line}</p>
-              : <div key={i} className="h-1" />
-          ))}
-
-          {/* Visual aid */}
+          {msg.content.split('\n').map((line, i) =>
+            line.trim() ? <p key={i} className="mb-2 last:mb-0">{line}</p> : <div key={i} className="h-1" />
+          )}
           {!isUser && msg.metadata?.visualAid && (
             <VisualAidBlock aid={msg.metadata.visualAid} onExpand={onExpand} />
           )}
         </div>
 
-        {/* Action row — assistant only */}
         {!isUser && (
           <div className="flex items-center gap-3 px-1">
             <button
               onClick={() => onSpeak(msg.metadata?.audioOptimized || msg.content)}
               className="flex items-center gap-1 text-[10px] text-white/30 hover:text-white/60 transition-colors font-bold uppercase tracking-wider"
             >
-              <Volume2 className="w-3 h-3" />
-              Listen
+              <Volume2 className="w-3 h-3" />Listen
             </button>
             {msg.metadata?.parentInsight && (
               <button
-                onClick={() => onParentInsight(msg.metadata!.parentInsight)}
+                onClick={() => onParentInsight(msg.metadata!.parentInsight!)}
                 className="flex items-center gap-1 text-[10px] text-pink-400/50 hover:text-pink-400 transition-colors font-bold uppercase tracking-wider"
               >
-                <Heart className="w-3 h-3" />
-                Parent tip
+                <Heart className="w-3 h-3" />Parent tip
               </button>
             )}
             {msg.metadata?.visualAid && (
@@ -236,8 +166,7 @@ function MessageBubble({
                 onClick={() => onExpand(msg.metadata!.visualAid!)}
                 className="flex items-center gap-1 text-[10px] text-amber-400/50 hover:text-amber-400 transition-colors font-bold uppercase tracking-wider"
               >
-                <ImageIcon className="w-3 h-3" />
-                Diagram
+                <ImageIcon className="w-3 h-3" />Diagram
               </button>
             )}
             <span className="text-[10px] text-white/20 ml-auto">
@@ -255,7 +184,6 @@ function ChatContent() {
   const [supabase]   = useState(() => createClient())
   const router       = useRouter()
   const searchParams = useSearchParams()
-  const struggleTopicRef = useRef<string | null>(null)
 
   const [messages,        setMessages]        = useState<Message[]>([])
   const [input,           setInput]           = useState('')
@@ -264,10 +192,10 @@ function ChatContent() {
   const [learnerId,       setLearnerId]       = useState<string | null>(null)
   const [student,         setStudent]         = useState<{ id: string; name: string; grade: number; curriculum_type: string; current_pathway?: string | null } | null>(null)
   const [learningContext, setLearningContext] = useState<{
-    first_subject: string
-    session_goal: string
-    guided_topics: string[]
-    overall_tier: string
+    first_subject:       string
+    session_goal:        string
+    guided_topics:       string[]
+    overall_tier:        string
     recommended_pathway: string | null
     compass_bridge?: { firstConcept?: string; firstSubject?: string; sessionGoal?: string; teacherSuggested?: boolean } | null
   } | null>(null)
@@ -275,7 +203,7 @@ function ChatContent() {
   const [stats,           setStats]           = useState<Stats | null>(null)
   const [sessionState,    setSessionState]    = useState<SessionState>({ timeOnTask: 0, currentSubject: 'mathematics', currentConcept: '' })
   const [expandedDiagram, setExpandedDiagram] = useState<VisualAid | null>(null)
-  const [parentInsight,   setParentInsight]   = useState<any>(null)
+  const [parentInsight,   setParentInsight]   = useState<Record<string, string> | null>(null)
   const [showParent,      setShowParent]      = useState(false)
   const [isSpeaking,      setIsSpeaking]      = useState(false)
   const [isListening,     setIsListening]     = useState(false)
@@ -283,42 +211,38 @@ function ChatContent() {
   const [freeLeft,        setFreeLeft]        = useState(1)
   const [showUpgrade,     setShowUpgrade]     = useState(false)
   const [initDone,        setInitDone]        = useState(false)
-  const [currentOutcome,       setCurrentOutcome]       = useState<LessonOutcome | null>(null)
-  const [outcomeStep,          setOutcomeStep]          = useState<number>(1)
-  const [showNextSubject,      setShowNextSubject]      = useState(false)
-  const [nextSubjectPicker,    setNextSubjectPicker]    = useState<string | null>(null)
-  const [lockedSubject,        setLockedSubject]        = useState<string | null>(null)
-  const [lockedSubstrand,      setLockedSubstrand]      = useState<string | null>(null)
-  const [lockedGrade,          setLockedGrade]          = useState<number | null>(null)
-  const [isRevision,           setIsRevision]           = useState(false)
-  const [topicDisplayName,     setTopicDisplayName]     = useState<string | null>(null)
+  const [lockedSubject,   setLockedSubject]   = useState<string | null>(null)
+  const [lockedSubstrand, setLockedSubstrand] = useState<string | null>(null)
+  const [lockedGrade,     setLockedGrade]     = useState<number | null>(null)
+  const [isRevision,      setIsRevision]      = useState(false)
+  const [topicDisplayName,setTopicDisplayName]= useState<string | null>(null)
 
-  const messagesEndRef  = useRef<HTMLDivElement>(null)
-  const inputRef        = useRef<HTMLTextAreaElement>(null)
-  const recognitionRef  = useRef<any>(null)
-  const initCalledRef   = useRef(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef       = useRef<HTMLTextAreaElement>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null)
+  const initCalledRef  = useRef(false)
 
-  // ── Init ────────────────────────────────────────────────────────────────────
+  const ADMIN_EMAIL = 'kariukidennis092@gmail.com'
+
   useEffect(() => {
     if (initCalledRef.current) return
     initCalledRef.current = true
     initSession()
   }, [])
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isLoading])
 
-  const ADMIN_EMAIL = 'kariukidennis092@gmail.com'
-
+  // ── Init ───────────────────────────────────────────────────────────────────
   const initSession = async () => {
-    // Use getSession() — reads localStorage, no network lock contention
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) { router.push('/login'); return }
     const user = session.user
 
-    // Load student profile — ?student=ID selects a specific child, else first by created_at
     const studentIdParam = searchParams.get('student')
-    const studentQuery = supabase
+    const studentQuery   = supabase
       .from('students')
       .select('id, name, grade, curriculum_type, current_pathway')
       .eq('user_id', user.id)
@@ -330,23 +254,12 @@ function ChatContent() {
     if (studentData) {
       setStudent(studentData)
       setLearnerId(studentData.id)
-
-      // Resolve the correct math learning area name for Grade 10+
-      if (studentData.grade >= 10) {
-        const isStem = studentData.current_pathway === 'STEM'
-        const mathSubject = isStem ? 'Core Mathematics' : 'Essential Mathematics'
-        setSessionState(prev => ({
-          ...prev,
-          currentSubject: prev.currentSubject === 'mathematics' ? mathSubject : prev.currentSubject,
-        }))
-      }
     } else {
       setLearnerId(user.id)
     }
 
     const effectiveLearnerId = studentData?.id || user.id
 
-    // Load learning context saved by guidance/career pages
     const { data: ctx } = await supabase
       .from('student_learning_context')
       .select('first_subject, session_goal, guided_topics, overall_tier, recommended_pathway, compass_bridge')
@@ -355,47 +268,14 @@ function ChatContent() {
 
     if (ctx) setLearningContext(ctx)
 
-    // Load in-progress outcome
-    const { data: outcomeData } = await supabase
-      .from('compass_outcomes')
-      .select('id, subject, concept, substrand, mastery_statement, mastery_evidence, milestones, status, sessions_spent, set_by, teacher_note')
-      .eq('student_id', effectiveLearnerId)
-      .eq('status', 'in_progress')
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (outcomeData) {
-      type DBMilestone = { step: number; description: string; checkQuestion: string; achieved: boolean; achievedAt?: string }
-      const milestones = (outcomeData.milestones as DBMilestone[]).map(m => ({
-        ...m,
-        achievedAt: m.achievedAt ? new Date(m.achievedAt) : undefined,
-      }))
-      setCurrentOutcome({
-        id:               outcomeData.id,
-        subject:          outcomeData.subject as string,
-        concept:          outcomeData.concept as string,
-        substrand:        (outcomeData.substrand as string | null) ?? '',
-        masteryStatement: outcomeData.mastery_statement as string,
-        masteryEvidence:  (outcomeData.mastery_evidence as string[]) ?? [],
-        milestones,
-        status:   outcomeData.status as LessonOutcome['status'],
-        sessionsSpent: outcomeData.sessions_spent as number,
-        setBy:    (outcomeData.set_by as LessonOutcome['setBy']) ?? 'system',
-        teacherNote: (outcomeData.teacher_note as string | null) ?? undefined,
-      })
-      setOutcomeStep(milestones.filter(m => m.achieved).length + 1)
-    }
-
     const isAdmin = user.email === ADMIN_EMAIL
 
-    // Check access
     const [{ data: tokenData }, { data: subscription }] = await Promise.all([
       supabase.from('token_balances').select('balance').eq('user_id', user.id).maybeSingle(),
       supabase.from('subscriptions').select('plan').eq('user_id', user.id).eq('status', 'active').gt('expires_at', new Date().toISOString()).maybeSingle(),
     ])
 
-    const tokens          = tokenData?.balance || 0
+    const tokens          = (tokenData?.balance as number | null) || 0
     const hasSubscription = !!subscription
 
     setStats({
@@ -404,7 +284,7 @@ function ChatContent() {
       tokens,
       hasSubscription: hasSubscription || isAdmin,
     })
-    setHasAccess(true) // everyone gets free message (admin always gets access)
+    setHasAccess(true)
 
     // Load or create session
     const { data: existing } = await supabase
@@ -420,24 +300,24 @@ function ChatContent() {
       setSessionId(existing.id)
       await loadMessages(existing.id)
 
-      // Restore topic lock if session is recent (< 1 hour)
-      // Otherwise show TopicChoice so student picks a fresh focus
-      const lastUpdate  = new Date(existing.updated_at || existing.created_at)
-      const hoursSince  = (Date.now() - lastUpdate.getTime()) / 3600000
-      type SavedState   = { lockedSubject?: string; lockedSubstrand?: string; initialized?: boolean }
-      const saved       = (existing.session_state ?? {}) as SavedState
+      // Restore topic lock from DB session if session is recent (< 1 hour)
+      const lastUpdate = new Date(existing.updated_at || existing.created_at)
+      const hoursSince = (Date.now() - lastUpdate.getTime()) / 3600000
+      type SavedState  = { lockedSubject?: string; lockedSubstrand?: string; lockedGrade?: number }
+      const saved      = (existing.session_state ?? {}) as SavedState
 
       if (hoursSince <= 1 && saved.lockedSubject) {
         setLockedSubject(saved.lockedSubject)
         setLockedSubstrand(saved.lockedSubstrand ?? null)
+        setLockedGrade(saved.lockedGrade ?? null)
+        setTopicDisplayName(saved.lockedSubstrand || saved.lockedSubject)
         setTopicSelected(true)
       }
-      // > 1 hour away: topicSelected stays false → TopicChoice shown at top
+      // > 1 hour: topicSelected stays false → TopicChoice shown
     } else {
       await createNewSession(user.id)
     }
 
-    // Init speech recognition
     initSpeech()
     setInitDone(true)
   }
@@ -461,7 +341,6 @@ function ChatContent() {
   }
 
   const createNewSession = async (userId: string) => {
-    // Close existing active sessions
     await supabase
       .from('compass_sessions')
       .update({ status: 'ended' })
@@ -470,12 +349,8 @@ function ChatContent() {
 
     const { data } = await supabase
       .from('compass_sessions')
-      .insert({
-        learner_id:    userId,
-        status:        'active',
-        session_state: {},
-      })
-      .select('id, learner_id, status, session_state')
+      .insert({ learner_id: userId, status: 'active', session_state: {} })
+      .select('id')
       .maybeSingle()
 
     if (data) {
@@ -487,7 +362,6 @@ function ChatContent() {
       setTopicDisplayName(null)
       setIsRevision(false)
       setTopicSelected(false)
-      setCurrentOutcome(null)
     }
   }
 
@@ -502,96 +376,21 @@ function ChatContent() {
 
   const initSpeech = () => {
     if (typeof window === 'undefined') return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SR) return
-    const rec           = new SR()
-    rec.lang            = 'en-KE'
-    rec.continuous      = false
-    rec.interimResults  = false
-    rec.onresult        = (e: any) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rec: any     = new SR()
+    rec.lang           = 'en-KE'
+    rec.continuous     = false
+    rec.interimResults = false
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rec.onresult       = (e: any) => {
       setInput(e.results[0][0].transcript)
       setIsListening(false)
     }
     rec.onend = () => setIsListening(false)
     recognitionRef.current = rec
-  }
-
-  // ── Next-subject suggestions (shown after session completes) ────────────────
-  // Takes the 2nd and 3rd priorities from compass_bridge, excluding the subject just done
-  const nextSubjectSuggestions: Array<{ dbName: string; label: string }> = (() => {
-    type CB = { subjectPriorities?: Array<{ subject?: string; displayName?: string }> }
-    const cb = (learningContext?.compass_bridge as CB | null | undefined)
-    const currentSub = sessionState.currentSubject?.toLowerCase()
-    return (cb?.subjectPriorities ?? [])
-      .filter(sp => (sp.subject ?? '').toLowerCase() !== currentSub)
-      .slice(0, 2)
-      .map(sp => ({
-        dbName: sp.displayName ?? (sp.subject ?? ''),
-        label:  sp.displayName ?? (sp.subject ?? ''),
-      }))
-  })()
-
-  // ── Compute weak topics from compass_bridge priorities ──────────────────────
-  const availableTopicsForChoice: WeakTopic[] = (() => {
-    type Priority = { subject?: string; currentTier?: string; careerReason?: string; actionSteps?: string[] }
-    const priorities = ((learningContext?.compass_bridge as { subjectPriorities?: Priority[] } | null | undefined)?.subjectPriorities) ?? []
-    const tierToLevel = (t: string | undefined): number =>
-      ({ below_expectation: 1, approaching_expectation: 2, meeting_expectation: 3, above_expectation: 4 }[t ?? ''] ?? 2)
-    return priorities.flatMap(sp =>
-      (sp.actionSteps ?? []).slice(0, 2).map(step => ({
-        subject:      sp.subject ?? '',
-        concept:      step,
-        substrand:    step,
-        displayName:  step.replace(/_/g, ' '),
-        currentLevel: tierToLevel(sp.currentTier),
-        whyItMatters: sp.careerReason ?? '',
-      }))
-    )
-  })()
-
-  // ── Generate outcome then start session ──────────────────────────────────────
-  const generateOutcomeAndStart = async (params: TopicSelectParams) => {
-    const { subject, substrand, displayName, grade, substrandId } = params
-    const isRevision    = grade < (student?.grade ?? 7)
-    const revisionGrade = isRevision ? grade : undefined
-
-    // Lock the subject/substrand so every subsequent message stays on topic
-    setLockedSubject(subject)
-    setLockedSubstrand(substrand)
-    setLockedGrade(grade)
-    setIsRevision(isRevision)
-    setTopicDisplayName(displayName)
-
-    if (learnerId) {
-      try {
-        const res = await fetch('/api/compass/outcome/generate', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            concept:   substrandId || substrand,
-            substrand: substrand,
-            subject,
-            studentId: learnerId,
-          }),
-        })
-        if (res.ok) {
-          const json = await res.json() as { data?: { outcome?: LessonOutcome } }
-          if (json.data?.outcome) {
-            setCurrentOutcome(json.data.outcome)
-            setOutcomeStep(1)
-          }
-        }
-      } catch {
-        // non-critical — session continues without outcome
-      }
-    }
-
-    struggleTopicRef.current = substrand
-    sendMessage(
-      `I want to work on ${displayName} in ${subject}`,
-      isRevision ? revisionGrade : undefined,
-      { lockedSubject: subject, lockedSubstrand: substrand, lockedGrade: grade }
-    )
   }
 
   const toggleListening = () => {
@@ -616,58 +415,62 @@ function ChatContent() {
     window.speechSynthesis.speak(u)
   }
 
-  // ── Send message ─────────────────────────────────────────────────────────────
-  type LockedParams = { lockedSubject?: string; lockedSubstrand?: string; lockedGrade?: number }
+  // ── Topic priorities from compass_bridge (for TopicChoice weakAreas) ────────
+  const availableTopicsForChoice: Array<{ subject: string; substrand: string; displayName: string; currentLevel: number; whyItMatters: string }> = (() => {
+    type Priority = { subject?: string; currentTier?: string; careerReason?: string; actionSteps?: string[] }
+    const priorities = ((learningContext?.compass_bridge as { subjectPriorities?: Priority[] } | null | undefined)?.subjectPriorities) ?? []
+    const tierToLevel = (t: string | undefined): number =>
+      ({ below_expectation: 1, approaching_expectation: 2, meeting_expectation: 3, above_expectation: 4 }[t ?? ''] ?? 2)
+    return priorities.flatMap(sp =>
+      (sp.actionSteps ?? []).slice(0, 2).map(step => ({
+        subject:      sp.subject ?? '',
+        substrand:    step,
+        displayName:  step.replace(/_/g, ' '),
+        currentLevel: tierToLevel(sp.currentTier),
+        whyItMatters: sp.careerReason ?? '',
+      }))
+    )
+  })()
 
-  const sendMessage = useCallback(async (text?: string, revisionGrade?: number, locked?: LockedParams) => {
+  // ── Send message ──────────────────────────────────────────────────────────
+  type SendOverrides = {
+    lockedSubject?:   string
+    lockedSubstrand?: string
+    lockedGrade?:     number
+    isRevision?:      boolean
+  }
+
+  const sendMessage = useCallback(async (text?: string, overrides?: SendOverrides) => {
     const userMessage = (text || input).trim()
     if (!userMessage || isLoading || !sessionId || !learnerId) return
 
     setInput('')
     setIsLoading(true)
 
-    // Resolve locked values: explicit param wins, then state fallback
     const effectiveLocked = {
-      lockedSubject:   locked?.lockedSubject   ?? lockedSubject   ?? undefined,
-      lockedSubstrand: locked?.lockedSubstrand ?? lockedSubstrand ?? undefined,
-      lockedGrade:     locked?.lockedGrade     ?? lockedGrade     ?? undefined,
+      lockedSubject:   overrides?.lockedSubject   ?? lockedSubject   ?? undefined,
+      lockedSubstrand: overrides?.lockedSubstrand ?? lockedSubstrand ?? undefined,
+      lockedGrade:     overrides?.lockedGrade     ?? lockedGrade     ?? undefined,
+      isRevision:      overrides?.isRevision      ?? isRevision,
     }
 
-    // Optimistic
     const tempId = `temp-${Date.now()}`
-    setMessages(prev => [...prev, {
-      id:        tempId,
-      role:      'user',
-      content:   userMessage,
-      timestamp: new Date(),
-    }])
+    setMessages(prev => [...prev, { id: tempId, role: 'user', content: userMessage, timestamp: new Date() }])
 
     try {
       const res = await fetch('/api/chat', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message:         userMessage,
+          message:          userMessage,
           sessionId,
           learnerId,
-          subjectId:       effectiveLocked.lockedSubject || sessionState.currentSubject,
-          lockedSubject:   effectiveLocked.lockedSubject,
-          lockedSubstrand: effectiveLocked.lockedSubstrand,
-          lockedGrade:     effectiveLocked.lockedGrade,
-          grade:           student?.grade ?? 7,
+          lockedSubject:    effectiveLocked.lockedSubject,
+          lockedSubstrand:  effectiveLocked.lockedSubstrand,
+          lockedGrade:      effectiveLocked.lockedGrade,
+          isRevision:       effectiveLocked.isRevision,
           sessionState,
-          previousMessages: messages
-            .slice(-6)
-            .map(m => ({ role: m.role, content: m.content, metadata: m.metadata })),
-          struggleTopic: effectiveLocked.lockedSubstrand || struggleTopicRef.current || undefined,
-          subjectFilter: effectiveLocked.lockedSubject || sessionState.currentSubject || undefined,
-          isRevision:    revisionGrade !== undefined,
-          revisionGrade: revisionGrade ?? undefined,
-          mathType: student?.current_pathway === 'STEM' && (student?.grade ?? 0) >= 10
-            ? 'core'
-            : (student?.grade ?? 0) >= 10
-              ? 'essential'
-              : undefined,
+          previousMessages: messages.slice(-6).map(m => ({ role: m.role, content: m.content })),
         }),
       })
 
@@ -678,72 +481,38 @@ function ChatContent() {
         return
       }
 
-      if (!res.ok) {
-        throw new Error(`Server error ${res.status}`)
-      }
+      if (!res.ok) throw new Error(`Server error ${res.status}`)
 
-      const data = await res.json()
+      const data = await res.json() as {
+        text?:            string
+        sessionUpdate?:   { currentSubject?: string; currentConcept?: string }
+        tokensRemaining?: number
+        parentInsight?:   Record<string, string>
+      }
 
       if (data.text) {
         setMessages(prev => [...prev, {
-          id:      `msg-${Date.now()}`,
-          role:    'assistant',
-          content: data.text,
-          metadata: {
-            pedagogy:        data.pedagogy,
-            parentInsight:   data.parentInsight,
-            audioOptimized:  data.audioText,
-            difficulty:      data.difficulty,
-            adaptationReason: data.adaptationReason,
-            visualAid:       data.visualAid || undefined,
-          },
+          id:        `msg-${Date.now()}`,
+          role:      'assistant',
+          content:   data.text!,
+          metadata:  { parentInsight: data.parentInsight },
           timestamp: new Date(),
         }])
 
         if (data.parentInsight) setParentInsight(data.parentInsight)
 
-        // Handle milestone advancement
-        if (data.outcomeAdvanced) {
-          const step = data.newOutcomeStep as number
-          setOutcomeStep(step)
-          setCurrentOutcome(prev => {
-            if (!prev) return null
-            return {
-              ...prev,
-              status: data.outcomeAchieved ? 'achieved' : 'in_progress',
-              milestones: prev.milestones.map((m, i) =>
-                i < step - 1 ? { ...m, achieved: true } : m
-              ),
-            }
-          })
-          setTimeout(() => {
-            setMessages(prev => [...prev, {
-              id:        `milestone-${Date.now()}`,
-              role:      'assistant' as const,
-              content:   data.outcomeAchieved
-                ? `You've got this one. ${currentOutcome?.concept?.replace(/_/g, ' ')} — done.`
-                : `Step ${step - 1} done. Moving up.`,
-              timestamp: new Date(),
-            }])
-            if (data.outcomeAchieved) {
-              setTimeout(() => setShowNextSubject(true), 800)
-            }
-          }, 400)
-        }
-
         if (data.sessionUpdate) {
-          setSessionState({
-            timeOnTask:     data.sessionUpdate.timeOnTask,
-            currentSubject: data.sessionUpdate.currentSubject || sessionState.currentSubject,
-            currentConcept: data.sessionUpdate.currentConcept || '',
-          })
+          setSessionState(prev => ({
+            ...prev,
+            currentSubject: data.sessionUpdate?.currentSubject || prev.currentSubject,
+            currentConcept: data.sessionUpdate?.currentConcept || '',
+          }))
         }
 
-        if (data.tokensRemaining !== undefined) {
-          setStats(prev => prev ? { ...prev, tokens: data.tokensRemaining } : null)
+        if (typeof data.tokensRemaining === 'number') {
+          setStats(prev => prev ? { ...prev, tokens: data.tokensRemaining! } : null)
         }
 
-        // Handle free message gate
         if (freeLeft > 0) {
           const remaining = freeLeft - 1
           setFreeLeft(remaining)
@@ -752,43 +521,27 @@ function ChatContent() {
             setHasAccess(false)
           }
         }
-
-        // Break nudge
-        if (data.sessionUpdate?.needsBreak) {
-          setTimeout(() => {
-            setMessages(prev => [...prev, {
-              id:      `break-${Date.now()}`,
-              role:    'assistant',
-              content: `Take a ${data.sessionUpdate.breakDuration || 2}-minute break. Your brain processes information better after rest.`,
-              timestamp: new Date(),
-            }])
-          }, 600)
-        }
       }
     } catch {
       setMessages(prev => prev.filter(m => m.id !== tempId))
       setMessages(prev => [...prev, {
-        id:      `err-${Date.now()}`,
-        role:    'assistant',
-        content: 'Something went wrong. Please try again.',
+        id:        `err-${Date.now()}`,
+        role:      'assistant',
+        content:   'Something went wrong. Please try again.',
         timestamp: new Date(),
       }])
     } finally {
       setIsLoading(false)
-      struggleTopicRef.current = null
       inputRef.current?.focus()
     }
   }, [input, isLoading, sessionId, learnerId, sessionState, freeLeft, stats,
-      lockedSubject, lockedSubstrand, lockedGrade, isRevision])
+      lockedSubject, lockedSubstrand, lockedGrade, isRevision, messages])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage()
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
   }
 
-  // ── Loading screen (while initSession runs) ──────────────────────────────────
+  // ── Loading / locked screens ───────────────────────────────────────────────
   if (!initDone && !hasAccess) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
@@ -797,7 +550,6 @@ function ChatContent() {
     )
   }
 
-  // ── Locked screen ────────────────────────────────────────────────────────────
   if (!hasAccess && !showUpgrade) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
@@ -806,9 +558,7 @@ function ChatContent() {
             <Brain className="w-10 h-10 text-white" />
           </div>
           <h2 className="text-2xl font-black text-white mb-3">Learning Compass</h2>
-          <p className="text-white/50 mb-8 leading-relaxed">
-            Unlock the Learning Compass — personalised to your child's exact level.
-          </p>
+          <p className="text-white/50 mb-8 leading-relaxed">Unlock the Learning Compass — personalised to your child&apos;s exact level.</p>
           <Link href="/pricing" className="block w-full py-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-2xl font-black hover:scale-105 transition-all shadow-xl mb-3">
             Unlock Now — From KES 500
           </Link>
@@ -824,10 +574,9 @@ function ChatContent() {
   return (
     <div className="flex h-screen bg-[#0a0a14] overflow-hidden">
 
-      {/* ── LEFT SIDEBAR ───────────────────────────────────────────────────── */}
+      {/* ── LEFT SIDEBAR ─────────────────────────────────────────────────────── */}
       <aside className="hidden lg:flex flex-col w-72 border-r border-white/5 bg-[#0d0d1a]">
 
-        {/* Logo + back */}
         <div className="flex items-center justify-between px-5 py-5 border-b border-white/5">
           <Link href="/dashboard" className="flex items-center gap-2 group">
             <ChevronLeft className="w-4 h-4 text-white/30 group-hover:text-white/60 transition-colors" />
@@ -845,7 +594,6 @@ function ChatContent() {
           </button>
         </div>
 
-        {/* Stats */}
         {stats && (
           <div className="p-4 space-y-3">
             <div className="grid grid-cols-2 gap-2">
@@ -862,42 +610,29 @@ function ChatContent() {
                   <Zap className="w-3.5 h-3.5 text-amber-400" />
                   <span className="text-[10px] font-bold text-white/40 uppercase tracking-wider">Tokens</span>
                 </div>
-                <div className="text-2xl font-black text-amber-400">
-                  {stats.hasSubscription ? '∞' : stats.tokens}
-                </div>
-                <div className="text-[10px] text-white/30">
-                  {stats.hasSubscription ? 'unlimited' : 'left'}
-                </div>
+                <div className="text-2xl font-black text-amber-400">{stats.hasSubscription ? '∞' : stats.tokens}</div>
+                <div className="text-[10px] text-white/30">{stats.hasSubscription ? 'unlimited' : 'left'}</div>
               </div>
             </div>
 
-            {/* Current subject */}
             {sessionState.currentSubject && (
               <div className="bg-white/3 rounded-2xl p-3 border border-white/5">
                 <div className="flex items-center gap-1.5 mb-1">
                   <Star className="w-3.5 h-3.5 text-violet-400" />
                   <span className="text-[10px] font-bold text-white/40 uppercase tracking-wider">Now Learning</span>
                 </div>
-                <div className="font-black text-white/80 capitalize text-sm">
-                  {lockedSubject || sessionState.currentSubject}
-                </div>
+                <div className="font-black text-white/80 capitalize text-sm">{lockedSubject || sessionState.currentSubject}</div>
                 {(topicDisplayName || lockedSubstrand) && (
                   <p className="text-xs text-white/40 mt-0.5 leading-tight capitalize">
                     {topicDisplayName || lockedSubstrand!.replace(/_/g, ' ')}
                   </p>
                 )}
-                {!topicDisplayName && !lockedSubstrand && sessionState.currentConcept && (
-                  <div className="text-[10px] text-white/30 mt-0.5">{sessionState.currentConcept}</div>
-                )}
                 {isRevision && lockedGrade && (
-                  <div className="text-[10px] text-amber-400/60 mt-1">
-                    Revising Grade {lockedGrade} content
-                  </div>
+                  <div className="text-[10px] text-amber-400/60 mt-1">Revising Grade {lockedGrade} content</div>
                 )}
               </div>
             )}
 
-            {/* Session time */}
             {sessionState.timeOnTask > 0 && (
               <div className="bg-white/3 rounded-2xl p-3 border border-white/5">
                 <div className="flex items-center gap-1.5 mb-1">
@@ -910,7 +645,6 @@ function ChatContent() {
           </div>
         )}
 
-        {/* Parent insights toggle */}
         <div className="mt-auto p-4 border-t border-white/5">
           <button
             onClick={() => setShowParent(!showParent)}
@@ -926,13 +660,12 @@ function ChatContent() {
         </div>
       </aside>
 
-      {/* ── MAIN CHAT ──────────────────────────────────────────────────────── */}
+      {/* ── MAIN CHAT ────────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
 
         {/* Top bar */}
         <header className="flex items-center justify-between px-5 py-4 border-b border-white/5 bg-[#0a0a14]/80 backdrop-blur-xl">
           <div className="flex items-center gap-3">
-            {/* Mobile back */}
             <Link href="/dashboard" className="lg:hidden w-8 h-8 flex items-center justify-center">
               <ChevronLeft className="w-5 h-5 text-white/40" />
             </Link>
@@ -941,21 +674,16 @@ function ChatContent() {
                 {lockedSubject || sessionState.currentSubject || 'Learning Compass'}
               </h1>
               {topicDisplayName && (
-                <p className="text-[10px] text-white/40 font-medium capitalize leading-tight">
-                  {topicDisplayName}
-                </p>
+                <p className="text-[10px] text-white/40 font-medium capitalize leading-tight">{topicDisplayName}</p>
               )}
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-                <span className="text-[10px] text-green-400 font-bold">
-                  Personalised to your level · Parent can see all sessions
-                </span>
+                <span className="text-[10px] text-green-400 font-bold">Personalised to your level · Parent can see all sessions</span>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Change Topic button — visible when a topic is locked */}
             {topicSelected && (
               <button
                 onClick={resetTopic}
@@ -965,21 +693,16 @@ function ChatContent() {
                 <span className="hidden sm:inline">Change Topic</span>
               </button>
             )}
-            {/* Mobile new session */}
             <button
               onClick={async () => { if (learnerId) await createNewSession(learnerId) }}
               className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 bg-white/5 rounded-xl text-xs font-bold text-white/50 hover:bg-white/10 hover:text-white/70 transition-all"
             >
-              <Plus className="w-3.5 h-3.5" />
-              New
+              <Plus className="w-3.5 h-3.5" />New
             </button>
-            {/* Mobile parent toggle */}
             <button
               onClick={() => setShowParent(!showParent)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                showParent
-                  ? 'bg-pink-500/15 text-pink-400'
-                  : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/60'
+                showParent ? 'bg-pink-500/15 text-pink-400' : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/60'
               }`}
             >
               <Heart className="w-3.5 h-3.5" />
@@ -987,37 +710,6 @@ function ChatContent() {
             </button>
           </div>
         </header>
-
-        {/* Outcome progress bar */}
-        {currentOutcome && currentOutcome.status === 'in_progress' && (
-          <div className="px-5 py-3 border-b border-white/5 bg-white/2">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-[10px] font-black text-white/30 uppercase tracking-wider">Working toward</p>
-              <span className="text-[10px] font-bold text-violet-400">Step {outcomeStep}/4</span>
-            </div>
-            <p className="text-xs font-bold text-white/70 mb-2 line-clamp-1">
-              &ldquo;{currentOutcome.masteryStatement}&rdquo;
-            </p>
-            <div className="flex gap-1.5">
-              {currentOutcome.milestones.map((m, i) => (
-                <div
-                  key={m.step}
-                  title={m.description}
-                  className={`flex-1 h-1.5 rounded-full transition-all ${
-                    m.achieved
-                      ? 'bg-violet-500'
-                      : i === outcomeStep - 1
-                        ? 'bg-violet-500/40'
-                        : 'bg-white/10'
-                  }`}
-                />
-              ))}
-            </div>
-            <p className="text-[10px] text-white/30 mt-1">
-              {currentOutcome.milestones[Math.min(outcomeStep - 1, 3)]?.description}
-            </p>
-          </div>
-        )}
 
         {/* Messages area */}
         <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6 space-y-5">
@@ -1033,7 +725,6 @@ function ChatContent() {
               </div>
 
               {learningContext ? (
-                // ── PERSONALISED WELCOME ──────────────────────────────────
                 (() => {
                   const cb = learningContext.compass_bridge
                   const hasSpecificConcept = !!(cb?.firstConcept && cb.firstConcept !== 'null')
@@ -1044,7 +735,6 @@ function ChatContent() {
                       <h2 className="text-2xl font-black text-white mb-1">Learning Compass</h2>
 
                       {hasSpecificConcept ? (
-                        // compass_bridge has a specific concept — skip selector
                         <>
                           <p className="text-white/50 mb-1 text-sm">Today we start with</p>
                           <p className="text-xl font-black text-violet-300 mb-2 capitalize">
@@ -1057,23 +747,22 @@ function ChatContent() {
                             </div>
                           )}
                           {learningContext.session_goal && (
-                            <p className="text-white/40 text-xs max-w-sm mb-6 leading-relaxed">
-                              {learningContext.session_goal}
-                            </p>
+                            <p className="text-white/40 text-xs max-w-sm mb-6 leading-relaxed">{learningContext.session_goal}</p>
                           )}
                           <button
                             onClick={() => {
                               const firstConcept = cb?.firstConcept ?? ''
                               const concept      = firstConcept.replace(/_/g, ' ')
                               const subject      = cb?.firstSubject ?? learningContext.first_subject ?? 'mathematics'
+                              setLockedSubject(subject)
+                              setLockedSubstrand(firstConcept || concept)
+                              setTopicDisplayName(concept)
                               setTopicSelected(true)
-                              generateOutcomeAndStart({
-                                subject,
-                                strand:      '',
-                                substrand:   firstConcept || concept,
-                                substrandId: '',
-                                grade:       student?.grade ?? 9,
-                                displayName: concept,
+                              sendMessage(`I want to work on ${concept}`, {
+                                lockedSubject:   subject,
+                                lockedSubstrand: firstConcept || concept,
+                                lockedGrade:     student?.grade ?? 9,
+                                isRevision:      false,
                               })
                             }}
                             className="px-6 py-3 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-2xl text-sm transition-colors mb-4"
@@ -1082,40 +771,40 @@ function ChatContent() {
                           </button>
                         </>
                       ) : showTopicSelector ? (
-                        // No concept set — show personalised topic choice
                         <TopicChoice
                           studentName={student?.name ?? 'there'}
                           studentGrade={student?.grade ?? 9}
                           curriculumType={student?.curriculum_type ?? 'cbc'}
-                          currentOutcome={currentOutcome}
+                          currentOutcome={null}
                           weakAreas={availableTopicsForChoice.map(t => ({
                             subject:     t.subject,
                             displayName: t.displayName,
                             actionSteps: [t.substrand],
                           }))}
-                          onSelect={params => {
+                          onSelect={(params: TopicSelectParams) => {
+                            const rev = params.grade < (student?.grade ?? 9)
+                            setLockedSubject(params.subject)
+                            setLockedSubstrand(params.substrand)
+                            setLockedGrade(params.grade)
+                            setIsRevision(rev)
+                            setTopicDisplayName(params.displayName)
                             setTopicSelected(true)
-                            generateOutcomeAndStart(params)
+                            sendMessage(`I want to work on ${params.displayName}`, {
+                              lockedSubject:   params.subject,
+                              lockedSubstrand: params.substrand,
+                              lockedGrade:     params.grade,
+                              isRevision:      rev,
+                            })
                           }}
-                          onContinue={() => {
-                            if (currentOutcome) {
-                              setTopicSelected(true)
-                              struggleTopicRef.current = currentOutcome.substrand || currentOutcome.concept
-                              sendMessage(`Let's continue with ${currentOutcome.concept.replace(/_/g, ' ')}`)
-                            }
-                          }}
+                          onContinue={() => {}}
                         />
                       ) : (
-                        // topicSelected — already sent, show minimal state
                         <>
                           <p className="text-white/50 mb-1 text-sm">Learning</p>
-                          <p className="text-xl font-black text-violet-300 mb-2 capitalize">
-                            {learningContext.first_subject}
-                          </p>
+                          <p className="text-xl font-black text-violet-300 mb-2 capitalize">{learningContext.first_subject}</p>
                         </>
                       )}
 
-                      {/* Tier badge */}
                       <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-xs text-white/40 font-bold capitalize mt-2">
                         Level: {learningContext.overall_tier?.replace(/_/g, ' ')}
                         {learningContext.recommended_pathway && ` · ${learningContext.recommended_pathway} pathway`}
@@ -1124,24 +813,28 @@ function ChatContent() {
                   )
                 })()
               ) : (
-                // ── GENERIC WELCOME FALLBACK ──────────────────────────────
                 <TopicChoice
                   studentName={student?.name ?? 'there'}
                   studentGrade={student?.grade ?? 9}
                   curriculumType={student?.curriculum_type ?? 'cbc'}
-                  currentOutcome={currentOutcome}
+                  currentOutcome={null}
                   weakAreas={[]}
-                  onSelect={params => {
+                  onSelect={(params: TopicSelectParams) => {
+                    const rev = params.grade < (student?.grade ?? 9)
+                    setLockedSubject(params.subject)
+                    setLockedSubstrand(params.substrand)
+                    setLockedGrade(params.grade)
+                    setIsRevision(rev)
+                    setTopicDisplayName(params.displayName)
                     setTopicSelected(true)
-                    generateOutcomeAndStart(params)
+                    sendMessage(`I want to work on ${params.displayName}`, {
+                      lockedSubject:   params.subject,
+                      lockedSubstrand: params.substrand,
+                      lockedGrade:     params.grade,
+                      isRevision:      rev,
+                    })
                   }}
-                  onContinue={() => {
-                    if (currentOutcome) {
-                      setTopicSelected(true)
-                      struggleTopicRef.current = currentOutcome.substrand || currentOutcome.concept
-                      sendMessage(`Let's continue with ${currentOutcome.concept.replace(/_/g, ' ')}`)
-                    }
-                  }}
+                  onContinue={() => {}}
                 />
               )}
 
@@ -1151,13 +844,10 @@ function ChatContent() {
                 </p>
               </div>
 
-              {/* Free message banner */}
               {freeLeft > 0 && !stats?.hasSubscription && (stats?.tokens || 0) === 0 && (
                 <div className="mt-8 flex items-center gap-2 px-5 py-2.5 bg-green-500/10 border border-green-500/20 rounded-full">
                   <Sparkles className="w-4 h-4 text-green-400" />
-                  <span className="text-sm font-bold text-green-300">
-                    🎁 {freeLeft} free message — try it now!
-                  </span>
+                  <span className="text-sm font-bold text-green-300">🎁 {freeLeft} free message — try it now!</span>
                 </div>
               )}
             </div>
@@ -1183,89 +873,18 @@ function ChatContent() {
               <div className="px-4 py-3 bg-white/8 border border-white/10 rounded-2xl rounded-bl-sm">
                 <div className="flex gap-1.5">
                   {[0, 0.15, 0.3].map((d, i) => (
-                    <div
-                      key={i}
-                      className="w-2 h-2 bg-violet-400 rounded-full animate-bounce"
-                      style={{ animationDelay: `${d}s` }}
-                    />
+                    <div key={i} className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: `${d}s` }} />
                   ))}
                 </div>
               </div>
             </div>
           )}
 
-          {/* ── What next? panel — appears after session completes ─────────── */}
-          {showNextSubject && (
-            <div className="px-4 pb-4 max-w-2xl mx-auto w-full">
-              {nextSubjectPicker ? (
-                // Full topic picker for the chosen next subject
-                <div className="bg-white/3 border border-white/8 rounded-3xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-black text-white/40 uppercase tracking-wider">
-                      Pick a topic in {nextSubjectPicker}
-                    </p>
-                    <button
-                      onClick={() => setNextSubjectPicker(null)}
-                      className="text-xs text-white/30 hover:text-white/60 transition-colors"
-                    >
-                      ← back
-                    </button>
-                  </div>
-                  <TopicChoice
-                    studentName={student?.name ?? ''}
-                    studentGrade={student?.grade ?? 9}
-                    curriculumType={student?.curriculum_type ?? 'cbc'}
-                    currentOutcome={null}
-                    weakAreas={[]}
-                    defaultSubject={nextSubjectPicker}
-                    compact
-                    onSelect={params => {
-                      setShowNextSubject(false)
-                      setNextSubjectPicker(null)
-                      setTopicSelected(true)
-                      generateOutcomeAndStart(params)
-                    }}
-                    onContinue={() => {}}
-                  />
-                </div>
-              ) : (
-                // Quick suggestion chips
-                <div className="bg-white/3 border border-white/8 rounded-2xl p-4">
-                  <p className="text-sm font-black text-white/60 mb-3">
-                    Session done. What next?
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {nextSubjectSuggestions.map(s => (
-                      <button
-                        key={s.dbName}
-                        onClick={() => setNextSubjectPicker(s.dbName)}
-                        className="px-4 py-2 bg-violet-500/15 border border-violet-500/30 hover:bg-violet-500/25 text-violet-300 text-sm font-bold rounded-xl transition-all"
-                      >
-                        Try {s.label} →
-                      </button>
-                    ))}
-                    <button
-                      onClick={() => {
-                        setShowNextSubject(false)
-                        setNextSubjectPicker(null)
-                      }}
-                      className="px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/8 text-white/40 text-sm font-bold rounded-xl transition-all"
-                    >
-                      Keep chatting
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
           <div ref={messagesEndRef} />
         </div>
 
-        {/* ── Input area ────────────────────────────────────────────────────── */}
+        {/* ── Input area ──────────────────────────────────────────────────────── */}
         <div className="px-4 md:px-6 py-4 border-t border-white/5 bg-[#0a0a14]/90 backdrop-blur-xl">
-
-          {/* Free message indicator */}
           {freeLeft > 0 && messages.length > 0 && !stats?.hasSubscription && (stats?.tokens || 0) === 0 && (
             <div className="flex justify-center mb-3">
               <span className="text-xs font-bold text-green-400/70 bg-green-500/10 px-4 py-1.5 rounded-full border border-green-500/15">
@@ -1275,8 +894,6 @@ function ChatContent() {
           )}
 
           <div className="flex gap-3 items-end max-w-3xl mx-auto">
-
-            {/* Mic button */}
             <button
               type="button"
               onClick={toggleListening}
@@ -1289,14 +906,12 @@ function ChatContent() {
               {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
             </button>
 
-            {/* Text input */}
             <div className="flex-1 relative">
               <textarea
                 ref={inputRef}
                 value={input}
                 onChange={e => {
                   setInput(e.target.value)
-                  // Auto-resize
                   e.target.style.height = 'auto'
                   e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
                 }}
@@ -1308,7 +923,6 @@ function ChatContent() {
               />
             </div>
 
-            {/* Send button */}
             <button
               onClick={() => sendMessage()}
               disabled={isLoading || !input.trim()}
@@ -1319,12 +933,12 @@ function ChatContent() {
           </div>
 
           <p className="text-center text-[10px] text-white/15 mt-3 font-medium">
-            Shift+Enter for new line • Powered by DeepSeek AI • CBC Kenya aligned
+            Shift+Enter for new line · Powered by DeepSeek AI · CBC Kenya aligned
           </p>
         </div>
       </div>
 
-      {/* ── PARENT INSIGHTS PANEL ──────────────────────────────────────────── */}
+      {/* ── PARENT INSIGHTS PANEL ────────────────────────────────────────────── */}
       {showParent && (
         <aside className="fixed inset-0 z-30 lg:static lg:inset-auto lg:z-auto lg:w-80 border-l border-white/5 bg-[#0d0d1a] flex flex-col overflow-y-auto">
           <div className="flex items-center justify-between px-5 py-5 border-b border-white/5">
@@ -1332,23 +946,19 @@ function ChatContent() {
               <Heart className="w-4 h-4 text-pink-400" />
               <span className="font-black text-white/80 text-sm">Parent Insights</span>
             </div>
-            <button
-              onClick={() => setShowParent(false)}
-              className="w-6 h-6 flex items-center justify-center text-white/30 hover:text-white/60 transition-colors"
-            >
+            <button onClick={() => setShowParent(false)} className="w-6 h-6 flex items-center justify-center text-white/30 hover:text-white/60 transition-colors">
               <X className="w-4 h-4" />
             </button>
           </div>
-
           <div className="p-4 space-y-3 flex-1">
             {parentInsight ? (
               <>
                 {[
-                  { label: 'Learning Now',      value: parentInsight.conceptAttempted, color: 'text-violet-300' },
-                  { label: 'Their Approach',    value: parentInsight.childApproach,    color: 'text-cyan-300'   },
-                  { label: 'Celebrate! 🎉',     value: parentInsight.celebrationMoment,color: 'text-green-300' },
-                  { label: 'Practice at Home',  value: parentInsight.practiceIdea,     color: 'text-amber-300' },
-                  { label: 'Why This Task?',    value: parentInsight.whyThisTask,       color: 'text-white/60'  },
+                  { label: 'Learning Now',     value: parentInsight.conceptAttempted, color: 'text-violet-300' },
+                  { label: 'Their Approach',   value: parentInsight.childApproach,    color: 'text-cyan-300'   },
+                  { label: 'Celebrate! 🎉',    value: parentInsight.celebrationMoment,color: 'text-green-300' },
+                  { label: 'Practice at Home', value: parentInsight.practiceIdea,     color: 'text-amber-300' },
+                  { label: 'Why This Task?',   value: parentInsight.whyThisTask,      color: 'text-white/60'  },
                 ].map(({ label, value, color }) => value ? (
                   <div key={label} className="bg-white/3 border border-white/5 rounded-2xl p-4">
                     <p className="text-[10px] font-black text-white/30 uppercase tracking-wider mb-2">{label}</p>
@@ -1359,16 +969,14 @@ function ChatContent() {
             ) : (
               <div className="flex flex-col items-center justify-center h-48 text-center">
                 <Heart className="w-10 h-10 text-white/10 mb-3" />
-                <p className="text-sm text-white/30 font-medium">
-                  Insights appear after the first response
-                </p>
+                <p className="text-sm text-white/30 font-medium">Insights appear after the first response</p>
               </div>
             )}
           </div>
         </aside>
       )}
 
-      {/* ── UPGRADE MODAL ──────────────────────────────────────────────────── */}
+      {/* ── UPGRADE MODAL ────────────────────────────────────────────────────── */}
       {showUpgrade && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
           <div className="relative w-full max-w-md bg-[#0d0d1a] rounded-3xl border border-white/10 p-8 shadow-2xl">
@@ -1377,15 +985,11 @@ function ChatContent() {
                 <Sparkles className="w-8 h-8 text-white" />
               </div>
               <h3 className="text-xl font-black text-white mb-2">Loved the Experience?</h3>
-              <p className="text-white/50 text-sm leading-relaxed">
-                Continue with personalised tutoring that adapts to your child's exact level.
-              </p>
+              <p className="text-white/50 text-sm leading-relaxed">Continue with personalised tutoring that adapts to your child&apos;s exact level.</p>
             </div>
-
             <div className="space-y-2 mb-6">
               {[
                 'Unlimited tutoring sessions',
-                'Adapts to your child\'s CBC level',
                 'Adapts to your child\'s exact CBC level',
                 'Visual diagrams for Science & Geography',
                 'Parent insights after every session',
@@ -1399,18 +1003,11 @@ function ChatContent() {
                 </div>
               ))}
             </div>
-
             <div className="space-y-3">
-              <Link
-                href="/pricing"
-                className="block w-full py-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-2xl font-black text-center hover:scale-[1.02] transition-all shadow-xl shadow-violet-600/25"
-              >
+              <Link href="/pricing" className="block w-full py-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-2xl font-black text-center hover:scale-[1.02] transition-all shadow-xl shadow-violet-600/25">
                 Unlock Full Access — From KES 500
               </Link>
-              <button
-                onClick={() => setShowUpgrade(false)}
-                className="block w-full py-3 bg-white/5 text-white/50 rounded-2xl font-bold hover:bg-white/8 transition-all text-sm"
-              >
+              <button onClick={() => setShowUpgrade(false)} className="block w-full py-3 bg-white/5 text-white/50 rounded-2xl font-bold hover:bg-white/8 transition-all text-sm">
                 Maybe Later
               </button>
             </div>
@@ -1418,10 +1015,8 @@ function ChatContent() {
         </div>
       )}
 
-      {/* ── DIAGRAM MODAL ──────────────────────────────────────────────────── */}
-      {expandedDiagram && (
-        <DiagramModal aid={expandedDiagram} onClose={() => setExpandedDiagram(null)} />
-      )}
+      {/* ── DIAGRAM MODAL ────────────────────────────────────────────────────── */}
+      {expandedDiagram && <DiagramModal aid={expandedDiagram} onClose={() => setExpandedDiagram(null)} />}
     </div>
   )
 }
