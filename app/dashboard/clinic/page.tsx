@@ -830,11 +830,11 @@ function ClinicReportView({ studentId, studentName, onClose }: {
                 )}
               </div>
               <Link
-                href="/chat"
+                href={`/learn?student=${studentId}`}
                 className="mt-4 flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-colors"
               >
                 <Sparkles className="w-4 h-4" />
-                Start Compass Session →
+                Start Learning Session →
               </Link>
             </div>
 
@@ -873,6 +873,86 @@ function ClinicReportView({ studentId, studentName, onClose }: {
           EduNexus Academic Clinic © 2026 | Jashor Technologies
         </p>
 
+      </div>
+    </div>
+  )
+}
+
+// ─── Learning Progress Widget ─────────────────────────────────────────────────
+
+interface TopicProgress {
+  topic:         string
+  topicDisplay:  string
+  subject:       string
+  sessions:      { date: string; mastery: number; correct: number; attempted: number }[]
+  latestMastery: number
+  improvement:   number
+  mastered:      boolean
+  trend:         'improving' | 'steady' | 'needs_work'
+}
+
+function StudentProgressWidget({ studentId }: { studentId: string }) {
+  const [progress, setProgress] = useState<TopicProgress[] | null>(null)
+
+  useEffect(() => {
+    fetch(`/api/learn/progress?studentId=${studentId}`)
+      .then(r => r.json())
+      .then(d => { if (d.success) setProgress(d.data.progress) })
+      .catch(() => {})
+  }, [studentId])
+
+  if (!progress) return null
+
+  if (progress.length === 0) {
+    return (
+      <div className="mt-4 pt-4 border-t border-slate-100">
+        <p className="text-xs text-slate-400">No Compass sessions yet.</p>
+        <a
+          href={`/learn?student=${studentId}`}
+          className="text-xs text-violet-600 hover:text-violet-500 transition-colors mt-1 block font-medium"
+        >
+          Start first session →
+        </a>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-4 pt-4 border-t border-slate-100">
+      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+        Learning Progress
+      </p>
+      <div className="space-y-2">
+        {progress.map(p => (
+          <div key={p.topic} className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-slate-700 font-medium">{p.topicDisplay}</p>
+              <p className="text-[10px] text-slate-400">
+                {p.sessions.length} session{p.sessions.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex gap-0.5 items-end h-6">
+                {p.sessions.map((s, i) => (
+                  <div
+                    key={i}
+                    className={`w-2 rounded-sm ${
+                      s.mastery >= 80 ? 'bg-green-500'
+                      : s.mastery >= 60 ? 'bg-amber-400'
+                      : 'bg-violet-400'
+                    }`}
+                    style={{ height: `${Math.max(4, s.mastery * 0.22)}px` }}
+                  />
+                ))}
+              </div>
+              {p.mastered ? (
+                <span className="text-[10px] text-green-600 font-bold">✓ Mastered</span>
+              ) : (
+                <span className="text-[10px] text-slate-400">{p.latestMastery}%</span>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -1059,6 +1139,8 @@ function StudentCard({ student, onViewReport }: { student: Student; onViewReport
           </p>
         )}
       </div>
+
+      <StudentProgressWidget studentId={student.id} />
     </div>
   )
 }

@@ -49,15 +49,16 @@ export type TopicSelectParams = {
 }
 
 type Props = {
-  studentName:    string
-  studentGrade:   number
-  curriculumType: string
-  currentOutcome: LessonOutcome | null
-  weakAreas:      SubjectPriority[]
-  onSelect:       (params: TopicSelectParams) => void
-  onContinue:     () => void
-  defaultSubject?: string   // pre-select this subject dbName on mount
-  compact?:        boolean  // hide greeting + continue card, just show picker
+  studentName:     string
+  studentGrade:    number
+  curriculumType:  string
+  currentOutcome:  LessonOutcome | null
+  weakAreas:       SubjectPriority[]
+  onSelect:        (params: TopicSelectParams) => void
+  onContinue:      () => void
+  currentPathway?: string | null
+  defaultSubject?: string
+  compact?:        boolean
 }
 
 // ── Subject catalogue — keyed by exact DB learning_area name ─────────────────
@@ -75,23 +76,51 @@ const SUBJECTS_JUNIOR: SubjectDef[] = [
   { dbName: 'Creative Arts and Sports', label: 'Creative Arts'     },
 ]
 
-const SUBJECTS_SENIOR: SubjectDef[] = [
-  { dbName: 'Core Mathematics',      label: 'Core Mathematics' },
-  { dbName: 'Essential Mathematics', label: 'Essential Maths'  },
-  { dbName: 'Biology',               label: 'Biology'          },
-  { dbName: 'Chemistry',             label: 'Chemistry'        },
-  { dbName: 'Physics',               label: 'Physics'          },
-  { dbName: 'Geography',             label: 'Geography'        },
-  { dbName: 'English',               label: 'English'          },
-  { dbName: 'Business Studies',      label: 'Business Studies' },
-  { dbName: 'Agriculture',           label: 'Agriculture'      },
-  { dbName: 'Computer Studies',      label: 'Computer Studies' },
-  { dbName: 'History and Citizenship', label: 'History'        },
-  { dbName: 'Kiswahili Lugha',       label: 'Kiswahili'        },
+const SUBJECTS_SENIOR_ALL: SubjectDef[] = [
+  { dbName: 'Core Mathematics',        label: 'Core Mathematics'  },
+  { dbName: 'Essential Mathematics',   label: 'Essential Maths'   },
+  { dbName: 'Biology',                 label: 'Biology'           },
+  { dbName: 'Chemistry',               label: 'Chemistry'         },
+  { dbName: 'Physics',                 label: 'Physics'           },
+  { dbName: 'Geography',               label: 'Geography'         },
+  { dbName: 'English',                 label: 'English'           },
+  { dbName: 'Business Studies',        label: 'Business Studies'  },
+  { dbName: 'Agriculture',             label: 'Agriculture'       },
+  { dbName: 'Computer Studies',        label: 'Computer Studies'  },
+  { dbName: 'History and Citizenship', label: 'History'           },
+  { dbName: 'Kiswahili Lugha',         label: 'Kiswahili'         },
 ]
 
-function getSubjectsForGrade(grade: number): SubjectDef[] {
-  return grade >= 10 ? SUBJECTS_SENIOR : SUBJECTS_JUNIOR
+const SENIOR_PATHWAY_SUBJECTS: Record<string, SubjectDef[]> = {
+  'STEM': [
+    { dbName: 'Core Mathematics',      label: 'Mathematics' },
+    { dbName: 'Biology',               label: 'Biology'     },
+    { dbName: 'Chemistry',             label: 'Chemistry'   },
+    { dbName: 'Physics',               label: 'Physics'     },
+    { dbName: 'English',               label: 'English'     },
+    { dbName: 'Kiswahili Lugha',       label: 'Kiswahili'   },
+  ],
+  'Social Sciences': [
+    { dbName: 'History and Citizenship', label: 'History & Citizenship' },
+    { dbName: 'Geography',               label: 'Geography'             },
+    { dbName: 'CRE',                     label: 'CRE / IRE'             },
+    { dbName: 'English',                 label: 'English'               },
+    { dbName: 'Kiswahili Lugha',         label: 'Kiswahili'             },
+    { dbName: 'Core Mathematics',        label: 'Mathematics'           },
+  ],
+  'Arts': [
+    { dbName: 'Creative Arts and Sports', label: 'Creative Arts' },
+    { dbName: 'English',                  label: 'English'       },
+    { dbName: 'Kiswahili Lugha',          label: 'Kiswahili'     },
+    { dbName: 'History and Citizenship',  label: 'History'       },
+    { dbName: 'Core Mathematics',         label: 'Mathematics'   },
+  ],
+}
+
+function getSubjectsForGrade(grade: number, pathway?: string | null): SubjectDef[] {
+  if (grade < 10) return SUBJECTS_JUNIOR
+  if (pathway && SENIOR_PATHWAY_SUBJECTS[pathway]) return SENIOR_PATHWAY_SUBJECTS[pathway]
+  return SUBJECTS_SENIOR_ALL
 }
 
 // ── Parse "Group - Topic" or "Group — Topic" substrand titles ────────────────
@@ -143,13 +172,14 @@ export default function TopicChoice({
   weakAreas,
   onSelect,
   onContinue,
+  currentPathway,
   defaultSubject,
   compact = false,
 }: Props) {
   const firstName = studentName.split(' ')[0]
 
   const defaultSubjectDef = defaultSubject
-    ? (getSubjectsForGrade(studentGrade).find(s => s.dbName === defaultSubject) ?? null)
+    ? (getSubjectsForGrade(studentGrade, currentPathway).find(s => s.dbName === defaultSubject) ?? null)
     : null
 
   // ── UI state ──────────────────────────────────────────────────────────────
@@ -164,11 +194,27 @@ export default function TopicChoice({
   const [expandedGroups,   setExpandedGroups]   = useState<Record<string, boolean>>({})
   const [showWeakAreas,    setShowWeakAreas]    = useState(false)
 
-  const subjects       = getSubjectsForGrade(selectedGrade)
-  const earlierGrades  = Array.from(
-    { length: Math.max(0, studentGrade - 7) },
-    (_, i) => 7 + i
+  // For the selected grade, use pathway-filtered subjects only when at senior grade
+  const subjects = getSubjectsForGrade(
+    selectedGrade,
+    selectedGrade >= 10 ? currentPathway : null,
   )
+
+  const earlierGrades = (() => {
+    if (studentGrade <= 7) return []
+    if (studentGrade <= 9) {
+      // Junior: show all grades back to 7, descending
+      return Array.from(
+        { length: studentGrade - 7 },
+        (_, i) => studentGrade - 1 - i,
+      )
+    }
+    // Senior: show at most 2 earlier grades, descending
+    return Array.from(
+      { length: Math.min(studentGrade - 9, 2) },
+      (_, i) => studentGrade - 1 - i,
+    )
+  })()
 
   // Reset subject selection when grade changes (different subject set)
   useEffect(() => {
