@@ -3,7 +3,11 @@
 
 import { DEEPSEEK_CONFIG } from '@/lib/config/api'
 
-export async function callDeepSeek(prompt: string, systemPrompt?: string): Promise<string> {
+export async function callDeepSeek(
+  prompt: string,
+  systemPrompt?: string,
+  options?: { temperature?: number; maxTokens?: number }
+): Promise<string> {
   const response = await fetch(`${DEEPSEEK_CONFIG.baseURL}/v1/chat/completions`, {
     method: 'POST',
     headers: {
@@ -23,8 +27,8 @@ export async function callDeepSeek(prompt: string, systemPrompt?: string): Promi
           content: prompt,
         },
       ],
-      temperature: 0.7,
-      max_tokens: 2048,
+      temperature: options?.temperature ?? 0.7,
+      max_tokens:  options?.maxTokens  ?? 2048,
     }),
   })
 

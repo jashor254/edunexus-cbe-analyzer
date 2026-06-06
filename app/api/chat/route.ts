@@ -100,9 +100,12 @@ export async function POST(req: Request) {
     })
 
     // ── Call DeepSeek ─────────────────────────────────────────────────────────
+    // Low temperature = strict rule-following (no subject drift)
+    // Low maxTokens = forces concise 2-sentence + question responses
     const response = await callDeepSeek(
       prompt,
-      'You are a knowledgeable, calm tutor for Kenyan CBC students.'
+      'You are a knowledgeable, calm tutor for Kenyan CBC students.',
+      { temperature: 0.3, maxTokens: 400 }
     )
 
     // ── Save session state (ONE DB call) ──────────────────────────────────────
