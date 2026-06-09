@@ -1,13 +1,13 @@
 import type { LessonPlanContext, GeneratedLessonPlan } from './types'
 import { isKiswahiliSubject, isSocialStudies } from '@/lib/curriculum/subjectUtils'
 
-function parseDeepSeekJSON(raw: string): any {
+function parseDeepSeekJSON(raw: string): Record<string, unknown> {
   const cleaned = raw
     .replace(/^```json\s*/i, '')
     .replace(/^```\s*/i, '')
     .replace(/```\s*$/i, '')
     .trim()
-  return JSON.parse(cleaned)
+  return JSON.parse(cleaned) as Record<string, unknown>
 }
 
 async function callDeepSeek(prompt: string): Promise<string> {
@@ -140,12 +140,12 @@ export async function generateLessonPlan(
     let raw: string
     try {
       raw = await callDeepSeek(prompt)
-    } catch (err: any) {
-      lastError = err.message
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err.message : 'Unknown AI error'
       continue
     }
 
-    let parsed: any
+    let parsed: Record<string, unknown>
     try {
       parsed = parseDeepSeekJSON(raw)
     } catch {
@@ -169,13 +169,13 @@ export async function generateLessonPlan(
 
       return {
         context: ctx,
-        organisationOfLearning: parsed.organisationOfLearning,
-        introduction: parsed.introduction,
-        step1: parsed.step1,
-        step2: parsed.step2,
-        step3: parsed.step3,
-        conclusion: parsed.conclusion,
-        extendedActivities: parsed.extendedActivities,
+        organisationOfLearning: String(parsed.organisationOfLearning),
+        introduction: String(parsed.introduction),
+        step1: String(parsed.step1),
+        step2: String(parsed.step2),
+        step3: String(parsed.step3),
+        conclusion: String(parsed.conclusion),
+        extendedActivities: String(parsed.extendedActivities),
         reflection,
         generatedAt: new Date().toISOString(),
       }

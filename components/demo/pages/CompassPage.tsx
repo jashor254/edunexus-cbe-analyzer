@@ -9,9 +9,9 @@ const WM = () => (
 )
 
 const TOPICS = [
-  'Explain the key concepts in fractions and basic algebra I need to master this holiday.',
-  'Walk me through Integrated Science — help me understand where I\'m going wrong.',
-  'Help me build a 3-week revision plan based on my Academic Clinic report.',
+  'Help me master the design-and-draw and materials topics in Pre-Technical Studies — Grade 9 level.',
+  'Give me advanced Social Studies questions on Kenya\'s devolution and East Africa — I want to reach Level 4.',
+  'Create a 3-week holiday plan to close my Pre-Technical gap and push Kiswahili to Exemplary.',
 ]
 
 export default function CompassPage() {
@@ -33,9 +33,9 @@ export default function CompassPage() {
           <div className="text-slate-400 text-[9px] font-black tracking-widest uppercase mb-1">
             Start your first session with
           </div>
-          <div className="text-white text-2xl font-black mb-1">Mathematics</div>
+          <div className="text-white text-2xl font-black mb-1">Pre-Technical Studies</div>
           <p className="text-slate-300 text-xs leading-snug max-w-xs mx-auto">
-            Highest-priority intervention area based on this assessment.
+            Single priority intervention area — close this gap before Grade 10 subject choices.
           </p>
           {/* B2 hero statement */}
           <p className="text-base font-bold text-white mt-3 text-center leading-relaxed">
@@ -52,7 +52,7 @@ export default function CompassPage() {
         <div className="bg-white border-l-4 border-amber-500 px-3 py-2.5 rounded-r-xl shadow-sm mb-3">
           <div className="text-amber-600 text-[9px] font-black tracking-widest uppercase mb-1">Session Goal</div>
           <p className="text-slate-700 text-xs leading-snug">
-            Close gaps in <strong>Mathematics</strong> and <strong>Integrated Science</strong> — reach Level 3 in both before Term 2 begins.
+            Bring <strong>Pre-Technical Studies</strong> to Proficient — and push <strong>Social Studies &amp; Kiswahili</strong> toward Exemplary before Grade 10 pathway selection.
           </p>
         </div>
 

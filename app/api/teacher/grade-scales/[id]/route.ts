@@ -42,8 +42,8 @@ export async function PUT(
 
     const scale = await updateGradeScale(id, teacher.id, parsed.data)
     return apiSuccess({ scale })
-  } catch (e: any) {
-    console.error('[grade-scales PUT]', e.message)
+  } catch (e: unknown) {
+    console.error('[grade-scales PUT]', e instanceof Error ? e.message : String(e))
     return apiError('Failed to update grade scale')
   }
 }
@@ -63,8 +63,8 @@ export async function DELETE(
 
     await deleteGradeScale(id, teacher.id)
     return apiSuccess({ deleted: true })
-  } catch (e: any) {
-    console.error('[grade-scales DELETE]', e.message)
+  } catch (e: unknown) {
+    console.error('[grade-scales DELETE]', e instanceof Error ? e.message : String(e))
     return apiError('Failed to delete grade scale')
   }
 }

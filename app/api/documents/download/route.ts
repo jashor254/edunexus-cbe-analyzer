@@ -181,13 +181,14 @@ export async function POST(req: Request) {
         key_inquiry_questions: p.key_inquiry_questions ?? [],
         learning_resources:    p.learning_resources ?? [],
         activities_summary:    [p.step_1, p.step_2, p.step_3].filter(Boolean).join(' / '),
+        objectives:            p.learning_outcomes ?? [],
         status:                p.status === 'taught' ? 'completed' : 'not_completed',
         remarks:               '',
+        reflection:            '',
       }))
 
       const rowData: RecordOfWork = {
         teacher_name:  s.teacher_name || '',
-        tsc_number:    s.tsc_number || '',
         school:        s.school || '',
         grade:         s.grade,
         learning_area: s.learning_area,

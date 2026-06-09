@@ -24,8 +24,8 @@ export async function GET(
     if (!ctx) return apiNotFound('Assessment not found')
 
     return apiSuccess(ctx)
-  } catch (e: any) {
-    console.error('[assessments/:id GET]', e.message)
+  } catch (e: unknown) {
+    console.error('[assessments/:id GET]', e instanceof Error ? e.message : String(e))
     return apiError('Failed to fetch assessment')
   }
 }
@@ -72,8 +72,8 @@ export async function PATCH(
       updates as Parameters<typeof updateAssessment>[2]
     )
     return apiSuccess({ assessment })
-  } catch (e: any) {
-    console.error('[assessments/:id PATCH]', e.message)
+  } catch (e: unknown) {
+    console.error('[assessments/:id PATCH]', e instanceof Error ? e.message : String(e))
     return apiError('Failed to update assessment')
   }
 }

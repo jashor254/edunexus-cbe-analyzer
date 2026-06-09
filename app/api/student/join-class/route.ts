@@ -78,8 +78,8 @@ export async function POST(req: Request) {
         school: teacher?.school || '',
       }
     })
-  } catch (e: any) {
-    console.error('[student/join-class POST]', e.message)
+  } catch (e: unknown) {
+    console.error('[student/join-class POST]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')
   }
 }

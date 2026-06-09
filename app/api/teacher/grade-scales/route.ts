@@ -30,8 +30,8 @@ export async function GET() {
 
     const scales = await getTeacherGradeScales(teacher.id)
     return apiSuccess({ scales })
-  } catch (e: any) {
-    console.error('[grade-scales GET]', e.message)
+  } catch (e: unknown) {
+    console.error('[grade-scales GET]', e instanceof Error ? e.message : String(e))
     return apiError('Failed to fetch grade scales')
   }
 }
@@ -51,8 +51,8 @@ export async function POST(req: Request) {
 
     const scale = await createGradeScale(teacher.id, parsed.data)
     return apiSuccess({ scale }, 201)
-  } catch (e: any) {
-    console.error('[grade-scales POST]', e.message)
+  } catch (e: unknown) {
+    console.error('[grade-scales POST]', e instanceof Error ? e.message : String(e))
     return apiError('Failed to create grade scale')
   }
 }

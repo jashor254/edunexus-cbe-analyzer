@@ -184,7 +184,8 @@ export async function POST(req: Request) {
       ?? subject
 
     // Teacher recommendation — only when teacher explicitly set a compass topic
-    const teacherRecommendation: string | undefined = compassBridge.teacherSuggested
+    const teacherSuggested: boolean = !!(compassBridge.teacherSuggested)
+    const teacherRecommendation: string | undefined = teacherSuggested
       ? ((compassBridge.strandName as string | null) ?? undefined)
       : undefined
 
@@ -220,6 +221,7 @@ export async function POST(req: Request) {
       gradeTopics,
       lastSessionSummary:         (lastSessionRow?.one_line_summary as string | null) ?? undefined,
       teacherRecommendation,
+      teacherSuggested,
       sessionsWithoutImprovement: (ctx?.sessions_without_improvement as number | null) ?? 0,
       mode,
       holidayWeek,
@@ -276,6 +278,14 @@ export async function POST(req: Request) {
       } catch (parseErr) {
         console.error('[learn] eval parse failed:', parseErr)
       }
+    }
+
+    // ── Clear teacherSuggested flag after first message so greeting only fires once
+    if (teacherSuggested && session.isNew) {
+      const updatedBridge = { ...compassBridge, teacherSuggested: false }
+      await db.from('student_learning_context')
+        .update({ compass_bridge: updatedBridge })
+        .eq('student_id', studentId)
     }
 
     // ── Persist eval results ──────────────────────────────────────────────────

@@ -4,12 +4,9 @@
 // ✅ Logs NPS scores separately for tracking
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServiceClient } from '@/utils/supabase/service'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+const supabase = createServiceClient()
 
 export async function POST(request: NextRequest) {
   try {
@@ -75,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Feedback route error:', error)
     return NextResponse.json(
       { error: 'Failed to save feedback' },
@@ -96,7 +93,7 @@ export async function GET(request: NextRequest) {
     // Overall stats
     const { data: feedback } = await supabase
       .from('user_feedback')
-      .select('*')
+      .select('id, user_id, trigger, rating, nps_score, category, message, would_recommend, created_at')
       .order('created_at', { ascending: false })
 
     if (!feedback) {
@@ -139,7 +136,7 @@ export async function GET(request: NextRequest) {
       feedback: feedback.slice(0, 50), // Latest 50
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Feedback GET error:', error)
     return NextResponse.json({ error: 'Failed to fetch feedback' }, { status: 500 })
   }

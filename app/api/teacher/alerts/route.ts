@@ -43,8 +43,8 @@ export async function GET() {
     )
 
     return apiSuccess({ alerts: alerts || [], critical, warning, overdue })
-  } catch (e: any) {
-    console.error('[teacher/alerts GET]', e.message)
+  } catch (e: unknown) {
+    console.error('[teacher/alerts GET]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')
   }
 }
@@ -108,8 +108,8 @@ export async function POST(req: Request) {
     }
 
     return apiError('Unknown action', 400)
-  } catch (e: any) {
-    console.error('[teacher/alerts POST]', e.message)
+  } catch (e: unknown) {
+    console.error('[teacher/alerts POST]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')
   }
 }

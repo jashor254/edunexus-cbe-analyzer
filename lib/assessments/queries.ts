@@ -186,7 +186,8 @@ export async function getAssessmentContext(
 
   if (!assessmentRes.data || !teacherRes.data) return null
 
-  const raw = assessmentRes.data as ClassAssessment & { teacher_classes: any }
+  type TeacherClassJoin = { id: string; name: string; grade: number; subject: string; stream: string | null; grade_cohort: string | null }
+  const raw = assessmentRes.data as unknown as ClassAssessment & { teacher_classes: TeacherClassJoin }
   const cls = raw.teacher_classes
 
   const { data: marks } = await db

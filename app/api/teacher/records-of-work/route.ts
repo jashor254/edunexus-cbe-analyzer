@@ -29,8 +29,8 @@ export async function GET() {
     }))
 
     return apiSuccess({ records: withStats })
-  } catch (e: any) {
-    return apiError(e.message)
+  } catch (e: unknown) {
+    return apiError(e instanceof Error ? e.message : 'Internal error')
   }
 }
 
@@ -92,7 +92,7 @@ export async function POST(req: Request) {
     }
 
     return apiSuccess({ rowId: row.id })
-  } catch (e: any) {
-    return apiError(e.message)
+  } catch (e: unknown) {
+    return apiError(e instanceof Error ? e.message : 'Internal error')
   }
 }

@@ -50,11 +50,11 @@ export default function TeacherPage() {
         <div className="bg-white border border-slate-200 rounded-xl p-3 mb-3">
           <p className="text-slate-700 text-xs leading-relaxed">
             <strong>{STUDENT.name} (Grade {STUDENT.grade})</strong> has completed an EduNexus Academic Clinic assessment for Term {STUDENT.term}, {STUDENT.year}.
-            Overall competency is rated <strong>Approaching Expectations (Level {STUDENT.overallLevel})</strong>{' '}
+            Overall competency is rated <strong>{STUDENT.overallLabel} (Level {STUDENT.overallLevel})</strong>{' '}
             with a trajectory of <strong className="text-amber-600">{STUDENT.trajectory}</strong>.
           </p>
           <p className="text-slate-500 text-xs leading-relaxed mt-1.5">
-            {SUBJECTS.length} subjects assessed · {strengths.length} at Meeting Expectations · {priorities.length} require structured support
+            {SUBJECTS.length} subjects assessed · {strengths.length} at Proficient or above · {priorities.length} require structured support
           </p>
         </div>
 

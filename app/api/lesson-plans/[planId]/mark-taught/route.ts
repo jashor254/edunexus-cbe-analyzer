@@ -42,8 +42,8 @@ export async function POST(req: Request, { params }: RouteContext) {
     if (error || !plan) return apiForbidden()
 
     return apiSuccess({ plan })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[lesson-plans/mark-taught]', err)
-    return apiError(err.message || 'Update failed')
+    return apiError(err instanceof Error ? err.message : 'Update failed')
   }
 }

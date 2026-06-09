@@ -91,8 +91,8 @@ export async function GET(req: Request) {
           status: 'done',
           completed_at: new Date().toISOString(),
         })
-      } catch (err: any) {
-        errors.push({ sowId: sow.id, error: err.message })
+      } catch (err: unknown) {
+        errors.push({ sowId: sow.id, error: err instanceof Error ? err.message : String(err) })
         await db.from('generation_jobs').insert({
           teacher_id: sow.teacher_id,
           sow_id: sow.id,
@@ -112,8 +112,8 @@ export async function GET(req: Request) {
         ...r.result,
       })),
     })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[cron/friday-generation]', err)
-    return apiError(err.message || 'Cron job failed')
+    return apiError(err instanceof Error ? err.message : 'Cron job failed')
   }
 }

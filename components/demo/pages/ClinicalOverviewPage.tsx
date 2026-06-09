@@ -28,12 +28,12 @@ export default function ClinicalOverviewPage() {
 
         {/* Overall level row */}
         <div className="flex items-center gap-3 mb-4 flex-wrap">
-          <div className="w-10 h-10 bg-amber-100 border-2 border-amber-300 rounded-full flex items-center justify-center shrink-0">
-            <span className="text-amber-700 text-lg font-black">2</span>
+          <div className="w-10 h-10 bg-green-100 border-2 border-green-300 rounded-full flex items-center justify-center shrink-0">
+            <span className="text-green-700 text-lg font-black">3</span>
           </div>
           <div className="min-w-0">
-            <div className="bg-amber-100 text-amber-700 border border-amber-200 text-xs font-black px-3 py-0.5 rounded-full inline-block">
-              LEVEL 2 — APPROACHING EXPECTATIONS
+            <div className="bg-green-100 text-green-700 border border-green-200 text-xs font-black px-3 py-0.5 rounded-full inline-block">
+              LEVEL 3 — PROFICIENT
             </div>
             <div className="text-slate-400 text-[10px] mt-0.5">
               Average across 9 CBC subjects · Term {STUDENT.term}, {STUDENT.year}
@@ -64,15 +64,15 @@ export default function ClinicalOverviewPage() {
         </div>
 
         {/* Clinical paragraph */}
-        <div className="bg-white border-l-4 border-amber-500 px-4 py-3 rounded-r-xl shadow-sm mb-4">
+        <div className="bg-white border-l-4 border-green-500 px-4 py-3 rounded-r-xl shadow-sm mb-4">
           <p className="text-slate-700 text-xs leading-relaxed mb-2">
-            Brian demonstrates developing competency across the CBC curriculum, with relative strengths in English, Kiswahili, and Social Studies. Mathematics and Integrated Science are priority intervention areas.
+            Brian demonstrates strong and consistent academic competency across the CBC Grade 9 curriculum, with <strong>Exemplary performance in Kiswahili and Social Studies</strong> — the clearest indicators of genuine Social Sciences pathway aptitude.
           </p>
           <p className="text-slate-700 text-xs leading-relaxed mb-2">
-            Of particular concern is the <strong>declining trajectory in Integrated Science</strong> — Brian was at Level 3 last term and has dropped to Level 2. Immediate attention is required.
+            A notable positive trajectory: <strong>Mathematics has recovered from Developing to Proficient this term</strong>, reflecting Brian&apos;s improving work ethic and structured revision approach.
           </p>
           <p className="text-slate-600 text-xs leading-relaxed">
-            With targeted support and consistent Learning Compass sessions, improvement is achievable within one term.
+            Pre-Technical Studies (Level 2) is the single priority intervention area — targeted hands-on workshop practice this holiday will consolidate the design and drawing skills needed before Grade 10 subject choices.
           </p>
         </div>
 

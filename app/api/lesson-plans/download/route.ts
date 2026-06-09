@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
     const { data: plans, error } = await db
       .from('lesson_plans')
-      .select('*')
+      .select('id, sow_id, teacher_id, week_number, lesson_number, strand, sub_strand, learning_outcomes, key_inquiry_questions, learning_resources, organisation_of_learning, introduction, step_1, step_2, step_3, conclusion, extended_activities, reflection, status, taught_date, generated_at, created_at')
       .in('id', planIds)
       .eq('teacher_id', user.id)
       .order('week_number')
@@ -54,8 +54,8 @@ export async function POST(req: Request) {
 
     const html = generateLessonPlanHTML(plans as LessonPlanRecord[], meta)
     return apiSuccess({ html })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[lesson-plans/download]', err)
-    return apiError(err.message || 'PDF generation failed')
+    return apiError(err instanceof Error ? err.message : 'PDF generation failed')
   }
 }

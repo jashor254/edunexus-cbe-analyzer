@@ -103,8 +103,8 @@ export async function POST(req: Request) {
       reference:         data.data.reference,
     })
 
-  } catch (error: any) {
-    console.error('[initialize] Unhandled error:', error.message)
+  } catch (error: unknown) {
+    console.error('[initialize] Unhandled error:', error instanceof Error ? error.message : String(error))
     return apiError('Internal server error')
   }
 }

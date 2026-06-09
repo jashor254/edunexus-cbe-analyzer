@@ -60,14 +60,14 @@ export async function POST(req: Request) {
     // Fetch the newly created plans
     const { data: plans } = await db
       .from('lesson_plans')
-      .select('*')
+      .select('id, sow_id, teacher_id, week_number, lesson_number, strand, sub_strand, learning_outcomes, key_inquiry_questions, learning_resources, organisation_of_learning, introduction, step_1, step_2, step_3, conclusion, extended_activities, reflection, status, taught_date, generated_at, created_at')
       .eq('sow_id', sowId)
       .eq('week_number', weekNumber)
       .order('lesson_number')
 
     return apiSuccess({ ...result, plans: plans || [] })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[lesson-plans/generate-week]', err)
-    return apiError(err.message || 'Generation failed')
+    return apiError(err instanceof Error ? err.message : 'Generation failed')
   }
 }

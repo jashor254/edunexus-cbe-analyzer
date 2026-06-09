@@ -102,8 +102,8 @@ export async function POST(req: Request) {
     }
 
     return apiSuccess({ submission })
-  } catch (e: any) {
-    console.error('[student/submit POST]', e.message)
+  } catch (e: unknown) {
+    console.error('[student/submit POST]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')
   }
 }

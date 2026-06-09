@@ -1,11 +1,8 @@
 // app/api/users/create/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/utils/supabase/service';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabase = createServiceClient();
 
 export async function POST(request: NextRequest) {
   try {
@@ -63,10 +60,10 @@ export async function POST(request: NextRequest) {
         ? 'Account created! You and your referrer got bonus tokens!' 
         : 'Account created! You have 1 free analysis!',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('User creation API error:', error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error instanceof Error ? error.message : 'Internal error' },
       { status: 500 }
     );
   }

@@ -20,8 +20,8 @@ export interface SOWContext {
   curriculumMode: CurriculumMode
   textbook?: string
   kicdContext?: {
-    subjectData: Record<string, any>
-    strandData: Array<{ title: string; kicd_data: any[] }>
+    subjectData: Record<string, Record<string, unknown>>
+    strandData: Array<{ title: string; kicd_data: Record<string, unknown>[] }>
     subtopicMap?: Record<string, string[]>
   }
 }

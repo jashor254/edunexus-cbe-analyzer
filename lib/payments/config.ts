@@ -216,13 +216,12 @@ export function calculateTokensNeeded(reportCount: number): TokenBundleType | nu
   return null; // Recommend subscription instead
 }
 
-export function isSubscriptionActive(subscription: any): boolean {
+type SubscriptionRecord = { status: string; end_date: string }
+
+export function isSubscriptionActive(subscription: SubscriptionRecord | null | undefined): boolean {
   if (!subscription) return false;
   if (subscription.status !== 'active') return false;
-  
-  const now = new Date();
-  const endDate = new Date(subscription.end_date);
-  return endDate > now;
+  return new Date(subscription.end_date) > new Date();
 }
 
 export function getPaymentRecommendation(

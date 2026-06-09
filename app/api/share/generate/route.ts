@@ -53,8 +53,8 @@ export async function POST(req: Request) {
     const shareUrl = `https://www.edunexus.co.ke/shared/${token}`
 
     return apiSuccess({ token, shareUrl, expiresAt: expiresAt.toISOString() })
-  } catch (error: any) {
-    console.error('[share/generate] error:', error.message)
+  } catch (error: unknown) {
+    console.error('[share/generate] error:', error instanceof Error ? error.message : String(error))
     return apiError('Internal server error')
   }
 }

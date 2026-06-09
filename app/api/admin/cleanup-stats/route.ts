@@ -1,18 +1,15 @@
 // app/api/admin/cleanup-stats/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/utils/supabase/service';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabase = createServiceClient();
 
 export async function GET(request: NextRequest) {
   try {
     // Get cleanup statistics
     const { data: stats, error } = await supabase
       .from('user_cleanup_stats')
-      .select('*')
+      .select('id, run_at, deleted_count, idle_deleted, unverified_deleted, details, created_at, updated_at')
       .single();
 
     if (error) throw error;
@@ -40,10 +37,10 @@ export async function GET(request: NextRequest) {
       recent_deletions: recentDeletions || [],
       pending_deletion: pendingDeletion || [],
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Stats error:', error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error instanceof Error ? error.message : 'Internal error' },
       { status: 500 }
     );
   }

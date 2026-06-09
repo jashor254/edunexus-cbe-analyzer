@@ -33,7 +33,8 @@ const SELECT = `
     subject_tiers,
     recommended_pathway,
     sessions_without_improvement,
-    subject_rest_until
+    subject_rest_until,
+    compass_bridge
   )
 `
 
@@ -111,13 +112,21 @@ function shapeAndReturn(data: Record<string, unknown>) {
   const raw = data.student_learning_context
   const ctx = (Array.isArray(raw) ? raw[0] : raw) as Record<string, unknown> | null
 
-  const tiers      = (ctx?.subject_tiers      ?? {}) as Record<string, string>
+  const tiers         = (ctx?.subject_tiers  ?? {}) as Record<string, string>
+  const compassBridge = (ctx?.compass_bridge ?? {}) as Record<string, unknown>
   const pathwayRaw = (
     (ctx?.recommended_pathway as string | null) ??
     (data.current_pathway     as string | null)
   )
   const grade    = (data.grade as number | null) ?? 7
   const isJunior = grade <= 9
+
+  const teacherSuggestedSubject = compassBridge.teacherSuggested
+    ? (compassBridge.firstSubject as string | null)
+    : null
+  const teacherSuggestedConcept = compassBridge.teacherSuggested
+    ? (compassBridge.firstConcept as string | null)
+    : null
 
   console.log('[student-route] name:', data.name)
   console.log('[student-route] grade:', grade)
@@ -143,8 +152,11 @@ function shapeAndReturn(data: Record<string, unknown>) {
   const subjects = sorted.map(({ key, level }) => ({
     key,
     level,
-    recommended: key === recommendedKey,
-    subtopic:    null as string | null,
+    recommended:      key === recommendedKey,
+    teacherSuggested: key === teacherSuggestedSubject,
+    subtopic:         key === teacherSuggestedSubject
+      ? teacherSuggestedConcept
+      : null,
   }))
 
   const firstName = formatFirstName(data.name as string | null)

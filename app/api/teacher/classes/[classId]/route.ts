@@ -32,7 +32,7 @@ export async function GET(
     // Verify class belongs to this teacher
     const { data: cls } = await db
       .from('teacher_classes')
-      .select('*')
+      .select('id, teacher_id, name, grade, subject, class_code, created_at')
       .eq('id', classId)
       .eq('teacher_id', teacher.id)
       .single()
@@ -45,94 +45,97 @@ export async function GET(
       .select('student_id, parent_id, joined_at')
       .eq('class_id', classId)
 
-    const studentIds = (studentLinks || []).map((s: any) => s.student_id)
+    type StudentLink = { student_id: string; parent_id: string | null; joined_at: string }
+    const links = (studentLinks || []) as StudentLink[]
+    const studentIds = links.map(s => s.student_id)
 
-    let students: any[] = []
+    type StudentRow = { id: string; name: string; grade: number; school: string; parent_email: string | null; parent_phone: string | null }
+    type AssessmentRow = { id: string; student_id: string; subject_scores: Record<string, number>; term: number; year: number; created_at: string }
+    type SessionRow = { learner_id: string; updated_at: string }
+
+    let students: ReturnType<typeof buildStudentPayload>[] = []
     let subjectAggregates: Record<string, number[]> = {}
 
+    function buildStudentPayload(
+      student: StudentRow,
+      assessment: AssessmentRow | null,
+      lastActive: string | null,
+      link: StudentLink | undefined
+    ) {
+      let overallLevel: string | null = null
+      let avgScore: number | null = null
+      let subjectScores: Record<string, number> = {}
+
+      if (assessment?.subject_scores) {
+        subjectScores = assessment.subject_scores
+        const vals = Object.values(subjectScores)
+        avgScore = vals.reduce((s, v) => s + v, 0) / vals.length
+        overallLevel = levelLabel(avgScore)
+      }
+
+      const daysInactive = lastActive
+        ? Math.floor((Date.now() - new Date(lastActive).getTime()) / (1000 * 60 * 60 * 24))
+        : null
+
+      return {
+        ...student,
+        joined_at: link?.joined_at ?? null,
+        parent_id: link?.parent_id ?? null,
+        overallLevel,
+        avgScore: avgScore != null ? Math.round(avgScore * 10) / 10 : null,
+        subjectScores,
+        lastActive,
+        daysInactive,
+        assessment: assessment ? { id: assessment.id, term: assessment.term, year: assessment.year } : null,
+        latestAssessmentId: assessment?.id ?? null,
+      }
+    }
+
     if (studentIds.length > 0) {
-      const { data: studentData } = await db
-        .from('students')
-        .select('id, name, grade, school, parent_email, parent_phone')
-        .in('id', studentIds)
-
-      // Get latest assessment per student
-      const assessmentPromises = studentIds.map((sid: string) =>
+      // Batch all queries — 3 round trips instead of 2N
+      const [{ data: studentData }, { data: allAssessments }, { data: allSessions }] = await Promise.all([
+        db.from('students')
+          .select('id, name, grade, school, parent_email, parent_phone')
+          .in('id', studentIds),
         db.from('assessments')
-          .select('id, subject_scores, term, year, created_at')
-          .eq('student_id', sid)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single()
-      )
-
-      const assessmentResults = await Promise.allSettled(assessmentPromises)
-
-      // Get last activity (compass sessions)
-      const activityPromises = studentIds.map((sid: string) =>
+          .select('id, student_id, subject_scores, term, year, created_at')
+          .in('student_id', studentIds)
+          .order('created_at', { ascending: false }),
         db.from('compass_sessions')
-          .select('updated_at')
-          .eq('learner_id', sid)
-          .order('updated_at', { ascending: false })
-          .limit(1)
-          .single()
-      )
+          .select('learner_id, updated_at')
+          .in('learner_id', studentIds)
+          .order('updated_at', { ascending: false }),
+      ])
 
-      const activityResults = await Promise.allSettled(activityPromises)
+      // Pick the latest assessment and session per student (rows are desc-sorted)
+      const latestAssessmentByStudent = new Map<string, AssessmentRow>()
+      for (const a of (allAssessments || []) as AssessmentRow[]) {
+        if (!latestAssessmentByStudent.has(a.student_id)) {
+          latestAssessmentByStudent.set(a.student_id, a)
+        }
+      }
 
-      students = (studentData || []).map((student: any, idx: number) => {
-        const assessmentResult = assessmentResults[idx]
-        const activityResult = activityResults[idx]
+      const latestSessionByStudent = new Map<string, string>()
+      for (const s of (allSessions || []) as SessionRow[]) {
+        if (!latestSessionByStudent.has(s.learner_id)) {
+          latestSessionByStudent.set(s.learner_id, s.updated_at)
+        }
+      }
 
-        const assessment = assessmentResult.status === 'fulfilled'
-          ? assessmentResult.value.data
-          : null
+      students = (studentData || []).map((student: StudentRow) => {
+        const assessment = latestAssessmentByStudent.get(student.id) ?? null
+        const lastActive = latestSessionByStudent.get(student.id) ?? null
+        const link = links.find(l => l.student_id === student.id)
 
-        const lastActive = activityResult.status === 'fulfilled'
-          ? activityResult.value.data?.updated_at
-          : null
-
-        let overallLevel = null
-        let avgScore = null
-        let subjectScores: Record<string, number> = {}
-
+        // Build class-level aggregates
         if (assessment?.subject_scores) {
-          subjectScores = assessment.subject_scores as Record<string, number>
-          const vals = Object.values(subjectScores)
-          avgScore = vals.reduce((s, v) => s + v, 0) / vals.length
-          overallLevel = levelLabel(avgScore)
-
-          // Aggregate for class averages
-          Object.entries(subjectScores).forEach(([subj, score]) => {
+          Object.entries(assessment.subject_scores).forEach(([subj, score]) => {
             if (!subjectAggregates[subj]) subjectAggregates[subj] = []
             subjectAggregates[subj].push(score)
           })
         }
 
-        // Days inactive
-        let daysInactive = null
-        if (lastActive) {
-          daysInactive = Math.floor(
-            (Date.now() - new Date(lastActive).getTime()) / (1000 * 60 * 60 * 24)
-          )
-        }
-
-        const link = (studentLinks || []).find((sl: any) => sl.student_id === student.id)
-
-        return {
-          ...student,
-          joined_at: link?.joined_at,
-          parent_id: link?.parent_id ?? null,
-          overallLevel,
-          avgScore: avgScore ? Math.round(avgScore * 10) / 10 : null,
-          subjectScores,
-          lastActive,
-          daysInactive,
-          assessment: assessment
-            ? { id: assessment.id, term: assessment.term, year: assessment.year }
-            : null,
-          latestAssessmentId: assessment?.id ?? null,
-        }
+        return buildStudentPayload(student, assessment, lastActive, link)
       })
     }
 
@@ -172,8 +175,8 @@ export async function GET(
       topGaps,
       recommendations,
     })
-  } catch (e: any) {
-    console.error('[teacher/classes/[classId] GET]', e.message)
+  } catch (e: unknown) {
+    console.error('[teacher/classes/[classId] GET]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')
   }
 }

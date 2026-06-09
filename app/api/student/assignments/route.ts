@@ -45,49 +45,50 @@ export async function GET(req: Request) {
       return apiSuccess({ assignments: [] })
     }
 
-    const classIds = classLinks.map((c: any) => c.class_id)
+    const classIds = classLinks.map(c => c.class_id)
 
     // Get active assignments for those classes
     const { data: assignments, error } = await db
       .from('assignments')
-      .select(`
-        *,
-        teacher_classes(name, grade, subject),
-        teachers(full_name)
-      `)
+      .select('id, class_id, title, description, due_date, status, created_at, teacher_classes(name, grade, subject), teachers(full_name)')
       .in('class_id', classIds)
       .eq('status', 'active')
       .order('due_date', { ascending: true })
 
     if (error) return apiError('Failed to fetch assignments')
 
-    // Get submission status for each
-    const withStatus = await Promise.all(
-      (assignments || []).map(async (a: any) => {
-        const { data: submission } = await db
+    const assignmentList = assignments || []
+    const assignmentIds = assignmentList.map(a => a.id)
+
+    // Batch-fetch all submissions in one query instead of N queries
+    const { data: submissions } = assignmentIds.length > 0
+      ? await db
           .from('assignment_submissions')
-          .select('id, status, score, submitted_at, marked_at')
-          .eq('assignment_id', a.id)
+          .select('id, assignment_id, status, score, submitted_at, marked_at')
+          .in('assignment_id', assignmentIds)
           .eq('student_id', targetStudentId!)
-          .single()
+      : { data: [] }
 
-        const dueDate = new Date(a.due_date)
-        const now = new Date()
-        const daysLeft = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-
-        return {
-          ...a,
-          submission: submission || null,
-          submissionStatus: submission?.status || 'pending',
-          daysLeft,
-          isOverdue: daysLeft < 0 && (!submission || submission.status === 'pending'),
-        }
-      })
+    const submissionByAssignment = new Map(
+      (submissions || []).map(s => [s.assignment_id, s])
     )
 
+    const now = new Date()
+    const withStatus = assignmentList.map(a => {
+      const submission = submissionByAssignment.get(a.id) ?? null
+      const daysLeft = Math.ceil((new Date(a.due_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      return {
+        ...a,
+        submission,
+        submissionStatus: submission?.status || 'pending',
+        daysLeft,
+        isOverdue: daysLeft < 0 && (!submission || submission.status === 'pending'),
+      }
+    })
+
     return apiSuccess({ assignments: withStatus })
-  } catch (e: any) {
-    console.error('[student/assignments GET]', e.message)
+  } catch (e: unknown) {
+    console.error('[student/assignments GET]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')
   }
 }

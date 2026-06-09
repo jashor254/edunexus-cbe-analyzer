@@ -82,8 +82,8 @@ export async function GET(req: Request) {
     const response = apiSuccess({ strands })
     response.headers.set('Cache-Control', 'public, max-age=600, stale-while-revalidate=120')
     return response
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[sow/strands]', err)
-    return apiError(err.message || 'Failed to load strands')
+    return apiError(err instanceof Error ? err.message : 'Failed to load strands')
   }
 }

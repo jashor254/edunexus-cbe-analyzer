@@ -21,9 +21,9 @@ export async function POST(request: NextRequest) {
       message: 'Cleanup triggered manually',
       results: data,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error instanceof Error ? error.message : 'Internal error' },
       { status: 500 }
     );
   }

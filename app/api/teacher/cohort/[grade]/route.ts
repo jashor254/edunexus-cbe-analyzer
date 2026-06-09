@@ -31,8 +31,8 @@ export async function GET(
     if (!cohort) return apiNotFound('No cohort data found for this grade / term / year')
 
     return apiSuccess({ cohort })
-  } catch (e: any) {
-    console.error('[cohort GET]', e.message)
+  } catch (e: unknown) {
+    console.error('[cohort GET]', e instanceof Error ? e.message : String(e))
     return apiError('Failed to fetch cohort data')
   }
 }

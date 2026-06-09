@@ -82,8 +82,8 @@ export async function GET(req: Request) {
     const response = apiSuccess({ areas: areas || [] })
     response.headers.set('Cache-Control', 'public, max-age=600, stale-while-revalidate=120')
     return response
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[sow/learning-areas]', err)
-    return apiError(err.message || 'Failed to load learning areas')
+    return apiError(err instanceof Error ? err.message : 'Failed to load learning areas')
   }
 }

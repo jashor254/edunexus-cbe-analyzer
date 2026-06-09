@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     // Build assessments query
     let query = service
       .from('assessments')
-      .select('*')
+      .select('id, student_id, subject_scores, term, year, source, created_at')
       .in('student_id', studentIds)
       .order('created_at', { ascending: false })
 

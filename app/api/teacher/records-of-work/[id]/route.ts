@@ -14,8 +14,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     if (!teacher) return apiForbidden()
 
     const { data: row, error } = await db
-      .from('records_of_work').select('*')
-      .eq('id', id).eq('teacher_id', teacher.id).single()
+      .from('records_of_work')
+      .select('id, teacher_id, sow_id, school, grade, subject, term, year, created_at, updated_at')
+      .eq('id', id)
+      .eq('teacher_id', teacher.id)
+      .single()
 
     if (error || !row) return apiError('Record not found', 404)
 
@@ -26,8 +29,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       .order('week').order('lesson')
 
     return apiSuccess({ row, entries: entries || [] })
-  } catch (e: any) {
-    return apiError(e.message)
+  } catch (e: unknown) {
+    return apiError(e instanceof Error ? e.message : 'Internal error')
   }
 }
 
@@ -61,8 +64,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     await db.from('records_of_work').update({ updated_at: new Date().toISOString() }).eq('id', id)
     return apiSuccess({ ok: true })
-  } catch (e: any) {
-    return apiError(e.message)
+  } catch (e: unknown) {
+    return apiError(e instanceof Error ? e.message : 'Internal error')
   }
 }
 
@@ -79,7 +82,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
 
     await db.from('records_of_work').delete().eq('id', id).eq('teacher_id', teacher.id)
     return apiSuccess({ ok: true })
-  } catch (e: any) {
-    return apiError(e.message)
+  } catch (e: unknown) {
+    return apiError(e instanceof Error ? e.message : 'Internal error')
   }
 }

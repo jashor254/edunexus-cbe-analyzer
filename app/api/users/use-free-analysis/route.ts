@@ -1,11 +1,8 @@
 // app/api/users/use-free-analysis/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/utils/supabase/service';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabase = createServiceClient();
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,10 +42,10 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Free analysis used successfully',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Use free analysis API error:', error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error instanceof Error ? error.message : 'Internal error' },
       { status: 500 }
     );
   }

@@ -259,6 +259,7 @@ function PricingContent() {
   const [selected,      setSelected]      = useState<Product>(PLAN_PRODUCTS[0])
   const [phone,         setPhone]         = useState('')
   const [user,          setUser]          = useState<User | null>(null)
+  const [dashboardHref, setDashboardHref] = useState('/')
   const [loading,       setLoading]       = useState(false)
   const [autoTriggered, setAutoTriggered] = useState(false)
 
@@ -266,6 +267,15 @@ function PricingContent() {
     const init = async () => {
       const { data: { user: authUser } } = await supabase.auth.getUser()
       setUser(authUser)
+
+      if (authUser) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', authUser.id)
+          .single()
+        setDashboardHref(profile?.role === 'teacher' ? '/teacher/dashboard' : '/dashboard')
+      }
 
       const productId  = searchParams.get('product') ?? localStorage.getItem('pending_plan')
       const savedPhone = localStorage.getItem('pending_phone')
@@ -354,10 +364,10 @@ function PricingContent() {
             <span className="text-lg font-black tracking-tight">EduNexus</span>
           </Link>
           <Link
-            href="/dashboard"
+            href={dashboardHref}
             className="text-sm text-white/45 hover:text-white flex items-center gap-1.5 transition-colors font-bold"
           >
-            <ArrowLeft className="w-4 h-4" /> Dashboard
+            <ArrowLeft className="w-4 h-4" /> {user ? 'Dashboard' : 'Home'}
           </Link>
         </div>
       </nav>

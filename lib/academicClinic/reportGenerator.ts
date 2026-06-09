@@ -306,7 +306,7 @@ function buildClinicalParagraph(firstName: string, subjects: SubjectProgress[], 
 export function generateClinicalOverview(
   firstName: string,
   subjects: SubjectProgress[],
-  assessments: any[]
+  assessments: Array<Record<string, unknown>>
 ): ClinicalOverview {
   const avg        = subjects.reduce((s, x) => s + x.level, 0) / subjects.length
   const rounded    = Math.max(1, Math.min(4, Math.round(avg))) as 1 | 2 | 3 | 4
@@ -320,8 +320,8 @@ export function generateClinicalOverview(
   if (avg < 1.5) {
     trajectory = 'CRITICAL'
   } else if (assessments.length >= 2) {
-    const prev     = assessments[assessments.length - 2]?.subject_scores || {}
-    const prevVals = Object.values(prev) as number[]
+    const prev     = (assessments[assessments.length - 2]?.subject_scores as Record<string, number>) || {}
+    const prevVals = Object.values(prev)
     if (prevVals.length > 0) {
       const prevAvg = prevVals.reduce((s, v) => s + (v || 0), 0) / prevVals.length
       const diff    = avg - prevAvg

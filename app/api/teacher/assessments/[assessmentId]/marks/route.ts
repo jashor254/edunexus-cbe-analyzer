@@ -33,8 +33,8 @@ export async function GET(
 
     const marks = await getLearnerMarks(assessmentId, teacher.id)
     return apiSuccess({ marks })
-  } catch (e: any) {
-    console.error('[marks GET]', e.message)
+  } catch (e: unknown) {
+    console.error('[marks GET]', e instanceof Error ? e.message : String(e))
     return apiError('Failed to fetch marks')
   }
 }
@@ -120,8 +120,8 @@ export async function POST(
     }
 
     return apiSuccess({ marks, saved: marks.length })
-  } catch (e: any) {
-    console.error('[marks POST]', e.message)
+  } catch (e: unknown) {
+    console.error('[marks POST]', e instanceof Error ? e.message : String(e))
     return apiError('Failed to save marks')
   }
 }

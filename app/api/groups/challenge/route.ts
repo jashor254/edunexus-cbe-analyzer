@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     const today = new Date().toISOString().split('T')[0]
     const { data: challenge } = await db
       .from('study_group_challenges')
-      .select('*')
+      .select('id, group_id, question, options, correct_answer, explanation, date')
       .eq('group_id', groupId)
       .eq('date', today)
       .single()
@@ -92,8 +92,8 @@ export async function POST(req: Request) {
       pointsEarned,
       correctAnswer: isCorrect ? null : challenge.correct_answer,
     })
-  } catch (error: any) {
-    console.error('[groups/challenge] error:', error.message)
+  } catch (error: unknown) {
+    console.error('[groups/challenge] error:', error instanceof Error ? error.message : String(error))
     return apiError('Internal server error')
   }
 }

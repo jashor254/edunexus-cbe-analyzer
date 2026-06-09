@@ -1,13 +1,9 @@
 import { NextRequest } from 'next/server';
 import { apiSuccess, apiError, apiUnauthorized, apiBadRequest } from '@/lib/api/response';
-import { createClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/utils/supabase/service';
 import { paystackClient } from '@/lib/payments/paystack';
 
-// Service Role for bypassing RLS
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabase = createServiceClient();
 
 export async function POST(request: NextRequest) {
   try {
@@ -92,8 +88,8 @@ export async function POST(request: NextRequest) {
     console.log(`✅ Success! Payment processed for User: ${user_id}`);
     return apiSuccess({ status: 'success' });
 
-  } catch (error: any) {
-    console.error('❌ Webhook Critical Error:', error.message);
+  } catch (error: unknown) {
+    console.error('❌ Webhook Critical Error:', error instanceof Error ? error.message : String(error));
     return apiError('Internal Server Error');
   }
 }

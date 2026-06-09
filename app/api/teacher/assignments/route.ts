@@ -52,8 +52,8 @@ export async function GET() {
     )
 
     return apiSuccess({ assignments: withCounts })
-  } catch (e: any) {
-    console.error('[teacher/assignments GET]', e.message)
+  } catch (e: unknown) {
+    console.error('[teacher/assignments GET]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')
   }
 }
@@ -135,8 +135,8 @@ export async function POST(req: Request) {
     }
 
     return apiSuccess({ assignment }, 201)
-  } catch (e: any) {
-    console.error('[teacher/assignments POST]', e.message)
+  } catch (e: unknown) {
+    console.error('[teacher/assignments POST]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')
   }
 }

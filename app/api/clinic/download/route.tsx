@@ -44,7 +44,7 @@ export async function POST(req: Request) {
 
     const { data: student, error: studentError } = await db
       .from('students')
-      .select('*')
+      .select('id, user_id, name, grade, school, current_pathway')
       .eq('id', studentId)
       .eq('user_id', user.id)
       .single()
@@ -212,8 +212,8 @@ export async function POST(req: Request) {
       },
     })
 
-  } catch (error: any) {
-    console.error('[clinic/download] error:', error.message)
+  } catch (error: unknown) {
+    console.error('[clinic/download] error:', error instanceof Error ? error.message : String(error))
     return NextResponse.json(
       { error: 'Failed to generate report. Please try again.' },
       { status: 500 }

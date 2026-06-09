@@ -175,8 +175,8 @@ export async function GET(req: Request) {
         'Content-Disposition': `attachment; filename="${filename}"`,
       },
     })
-  } catch (e: any) {
-    console.error('[teacher/reports/knec-export GET]', e.message)
+  } catch (e: unknown) {
+    console.error('[teacher/reports/knec-export GET]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')
   }
 }

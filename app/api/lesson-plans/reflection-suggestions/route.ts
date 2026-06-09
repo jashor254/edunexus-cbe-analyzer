@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
     const { data: plan, error } = await db
       .from('lesson_plans')
-      .select('*')
+      .select('id, sow_id, teacher_id, week_number, lesson_number, strand, sub_strand, learning_outcomes, key_inquiry_questions, learning_resources, organisation_of_learning, introduction, step_1, step_2, step_3, conclusion, extended_activities, reflection, status, taught_date, generated_at, created_at')
       .eq('id', planId)
       .eq('teacher_id', user.id)
       .single()
@@ -62,8 +62,8 @@ export async function POST(req: Request) {
     const suggestions = await generateReflectionSuggestions(ctx, taughtDate)
 
     return apiSuccess({ suggestions })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[lesson-plans/reflection-suggestions]', err)
-    return apiError(err.message || 'Failed to generate suggestions')
+    return apiError(err instanceof Error ? err.message : 'Failed to generate suggestions')
   }
 }

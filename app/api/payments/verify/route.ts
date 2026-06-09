@@ -180,8 +180,8 @@ export async function POST(request: NextRequest) {
       }
     });
 
-  } catch (error: any) {
-    console.error('Verification System Error:', error.message);
+  } catch (error: unknown) {
+    console.error('Verification System Error:', error instanceof Error ? error.message : String(error));
     return NextResponse.json({ 
       success: false, 
       error: 'Internal server error during verification' 

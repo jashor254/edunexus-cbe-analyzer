@@ -133,8 +133,8 @@ export async function GET(
         riskLevels: riskCounts,
       }
     })
-  } catch (e: any) {
-    console.error('[teacher/classes/insights GET]', e.message)
+  } catch (e: unknown) {
+    console.error('[teacher/classes/insights GET]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')
   }
 }

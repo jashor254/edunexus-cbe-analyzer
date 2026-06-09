@@ -151,8 +151,8 @@ export async function GET(req: Request) {
 
     return NextResponse.redirect(`${SITE_URL}/pricing?error=not_found`)
 
-  } catch (error: any) {
-    console.error('[callback GET] error:', error.message)
+  } catch (error: unknown) {
+    console.error('[callback GET] error:', error instanceof Error ? error.message : String(error))
     return NextResponse.redirect(`${SITE_URL}/payment/failed`)
   }
 }
@@ -191,8 +191,8 @@ export async function POST(req: Request) {
     await processPayment(reference)
     return NextResponse.json({ received: true })
 
-  } catch (error: any) {
-    console.error('[webhook POST] error:', error.message)
+  } catch (error: unknown) {
+    console.error('[webhook POST] error:', error instanceof Error ? error.message : String(error))
     return NextResponse.json(
       { error: 'Webhook processing failed' },
       { status: 500 }

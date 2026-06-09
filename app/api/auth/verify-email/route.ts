@@ -1,11 +1,8 @@
 // app/api/auth/verify-email/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/utils/supabase/service';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabase = createServiceClient();
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,10 +36,10 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Email verified successfully',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Email verification error:', error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error instanceof Error ? error.message : 'Internal error' },
       { status: 500 }
     );
   }

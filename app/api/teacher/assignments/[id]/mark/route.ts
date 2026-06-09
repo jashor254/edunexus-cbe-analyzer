@@ -75,8 +75,8 @@ export async function POST(
       .catch(err => console.error('[notify] mark:', err))
 
     return apiSuccess({ submission })
-  } catch (e: any) {
-    console.error('[teacher/assignments/[id]/mark POST]', e.message)
+  } catch (e: unknown) {
+    console.error('[teacher/assignments/[id]/mark POST]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')
   }
 }

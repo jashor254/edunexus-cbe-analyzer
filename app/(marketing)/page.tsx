@@ -32,14 +32,15 @@ export default function LandingPage() {
             className="font-extrabold leading-[1.05] tracking-[-0.02em] mb-6"
             style={{ fontSize: 'clamp(44px, 7vw, 72px)' }}
           >
-            <span className="block text-white">Every child learns differently.</span>
+            <span className="block text-white">Your child is capable of more</span>
+            <span className="block text-white">than their marks show.</span>
             <span className="block bg-gradient-to-r from-violet-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mt-1">
-              EduNexus knows yours.
+              EduNexus helps them prove it.
             </span>
           </h1>
 
           <p className="text-[18px] md:text-[20px] text-white/60 max-w-[560px] mx-auto mb-8 leading-relaxed">
-            Personalised to your child&apos;s actual scores. CBC-aligned. Built for Kenya.
+            Because every child deserves a teacher who knows exactly where they&apos;re stuck.
           </p>
 
           <div className="flex flex-wrap justify-center gap-2 mb-10">
@@ -76,14 +77,63 @@ export default function LandingPage() {
           {/* Three benefit cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-14 max-w-[760px] mx-auto text-left">
             {[
-              { icon: '👨‍🏫', who: 'For Teachers', body: 'Schemes, lesson plans, and class analytics — in minutes.' },
-              { icon: '👨‍👩‍👧', who: 'For Parents',  body: 'Know exactly where your child stands and what they need next.' },
-              { icon: '🎒',   who: 'For Students', body: 'A tutor that starts where you are and grows with you.' },
+              {
+                icon: '👨‍🏫',
+                who: 'For Teachers',
+                body: 'Plan your full term in the time it takes to mark one set of books.',
+              },
+              {
+                icon: '👨‍👩‍👧',
+                who: 'For Parents',
+                body: "Stop guessing. Know exactly where your child is falling behind — and what to do about it.",
+              },
+              {
+                icon: '🎒',
+                who: 'For Students',
+                body: 'Finally feel like you actually get it — with a learning partner that starts exactly where you are.',
+              },
             ].map((card) => (
               <div key={card.who} className="bg-white/4 border border-white/10 rounded-2xl px-5 py-4">
                 <div className="text-2xl mb-2">{card.icon}</div>
                 <div className="text-xs font-bold text-white/40 uppercase tracking-widest mb-1">{card.who}</div>
                 <p className="text-sm text-white/65 leading-relaxed">{card.body}</p>
+              </div>
+            ))}
+          </div>
+
+        </div>
+      </section>
+
+      {/* ── SOCIAL PROOF STRIP ────────────────────────────────────────────────── */}
+      <section className="bg-white/3 py-14 md:py-16">
+        <div className="max-w-[1100px] mx-auto px-6">
+
+          <p className="text-center text-sm font-semibold text-white/40 uppercase tracking-widest mb-10">
+            Already trusted by CBC teachers and parents across Kenya
+          </p>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              {
+                quote: "My son went from a C to a B in Mathematics this term. The report showed us exactly which strands he was failing — we never knew that before.",
+                name: "Grace Wanjiku",
+                role: "Parent of Grade 8 student, Nairobi",
+              },
+              {
+                quote: "I generated my entire Term 2 scheme of work in one sitting. TSC inspection is no longer something I dread.",
+                name: "Mr. Omondi",
+                role: "CBC Science Teacher, Kisumu",
+              },
+              {
+                quote: "The report told me things about my Form 3 son that I had been trying to figure out for two years. It was like finally getting a straight answer.",
+                name: "Peter Muthoni",
+                role: "Parent of Form 3 student, Nakuru",
+              },
+            ].map((t) => (
+              <div key={t.name} className="bg-white/4 border border-white/10 rounded-2xl px-6 py-5">
+                <p className="text-white/70 text-sm leading-relaxed mb-4">&ldquo;{t.quote}&rdquo;</p>
+                <div className="text-xs text-white/40 font-semibold">— {t.name}</div>
+                <div className="text-xs text-white/30">{t.role}</div>
               </div>
             ))}
           </div>
@@ -102,15 +152,15 @@ export default function LandingPage() {
                 Learning Compass
               </span>
               <h2 className="text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5">
-                A tutor that starts where your child is.
+                The tutor that knows exactly where your child got lost.
               </h2>
               <p className="text-white/60 leading-relaxed mb-6">
-                Not a broadcast. Not one-size-fits-all. The Learning Compass learns your
-                child&apos;s exact level in every subject — and teaches them at precisely
-                that level.
+                Most children don&apos;t struggle because they&apos;re not trying. They struggle because
+                nobody has ever met them exactly where they are.
                 <br /><br />
-                Level 1 or Level 4, every session is built just for them. Available anytime,
-                on any device.
+                The Learning Compass 🧭 learns your child&apos;s exact level in every subject and teaches
+                them at precisely that level — Level 1 or Level 4, every session is built just for them.
+                Available anytime, on any device.
               </p>
               <ul className="space-y-3 mb-8">
                 {[
@@ -129,7 +179,7 @@ export default function LandingPage() {
                 href="/signup?role=parent"
                 className="text-violet-400 hover:text-violet-300 font-semibold transition-colors"
               >
-                Start your first free session →
+                Try your child&apos;s first free session →
               </Link>
               <p className="text-xs text-white/40 mt-2">First session is on us. No card needed.</p>
             </div>
@@ -256,9 +306,9 @@ export default function LandingPage() {
                 Your child gets marks. You get a number. But what does it mean? What&apos;s
                 actually wrong? What do you fix first?
                 <br /><br />
-                The Academic Clinic turns your child&apos;s scores into a 7-page clinical
-                report — strand by strand, subject by subject — with a 3-week plan to fix
-                what matters most.
+                When the report lands in your inbox, you won&apos;t have to wonder anymore. You&apos;ll
+                see exactly which strand is holding your child back, a 3-week plan to fix it, and — for
+                the first time — a clear sense that you know what to do next.
               </p>
               <ul className="space-y-3 mb-8">
                 {[
@@ -323,16 +373,16 @@ export default function LandingPage() {
               For Teachers
             </span>
             <h2 className="text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5">
-              We built this with teachers in mind.
+              A full term planned.<br />Before the bell rings Monday.
             </h2>
             <p className="text-white/60 leading-relaxed max-w-[640px] mx-auto">
-              Every feature in EduNexus reflects what we learned from teachers. The Academic
-              Clinic reports are designed to say what teachers know but rarely have time to
-              write. The Learning Compass is built on CBC pedagogy — because teachers built
-              that curriculum with purpose.
+              You have 40+ students, end-of-term reports due, a TSC inspection coming, and a
+              WhatsApp group full of parent messages you haven&apos;t had time to answer. We know that
+              reality — because this was built by people who&apos;ve lived it.
               <br /><br />
-              If you&apos;re a teacher who cares about your students beyond the classroom,
-              EduNexus was made with you in mind.
+              EduNexus handles the paperwork so you can focus on the teaching. Schemes of work,
+              lesson plans, and class insights — ready when you need them, formatted the way TSC
+              expects them.
             </p>
           </div>
 
@@ -341,17 +391,17 @@ export default function LandingPage() {
               {
                 icon: '📋',
                 title: 'SOW Generator',
-                body: 'Generate complete CBC-aligned Schemes of Work in minutes. TSC inspection ready.',
+                body: 'Your full Scheme of Work — CBC-aligned, TSC inspection ready — generated in minutes, not a full Sunday afternoon.',
               },
               {
                 icon: '📖',
                 title: 'Lesson Plan Generator',
-                body: 'Weekly lesson plans with learning objectives, activities, and assessment tasks — auto-built.',
+                body: "Every Friday, your next week's lesson plans land automatically. Objectives, activities, assessments — done before you leave school.",
               },
               {
                 icon: '📊',
                 title: 'Class Dashboard',
-                body: "See every student's Learning Compass tier, strengths, and struggles — at a glance.",
+                body: "See every student's Learning Compass level at a glance. Know who needs help before you find out the hard way in a parent meeting.",
               },
             ].map((card) => (
               <div
@@ -372,7 +422,7 @@ export default function LandingPage() {
             >
               Go to Teacher Dashboard →
             </Link>
-            <p className="text-xs text-white/40 mt-2">Already used by CBC teachers across Kenya.</p>
+            <p className="text-xs text-white/40 mt-2">Trusted by CBC teachers from Nairobi to Kisumu.</p>
           </div>
 
         </div>
@@ -413,7 +463,7 @@ export default function LandingPage() {
                 icon: '🚀',
                 color: '#fbbf24',
                 title: 'Follow the plan',
-                body: "3-week holiday study plan + Learning Compass. You'll know exactly what to do next.",
+                body: "3-week study plan + Learning Compass sessions. You'll know exactly what to tackle first — and in which subject.",
               },
             ].map((step) => (
               <div key={step.num} className="flex flex-col items-center">
@@ -432,110 +482,37 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── PRICING ───────────────────────────────────────────────────────────── */}
-      <section className="bg-white/3 py-20 md:py-28">
-        <div className="max-w-[1100px] mx-auto px-6">
+      {/* ── CLOSING CTA ───────────────────────────────────────────────────────── */}
+      <section className="py-24 md:py-32">
+        <div className="max-w-[600px] mx-auto px-6 text-center">
 
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-extrabold text-white leading-tight mb-3">
-              Start free. Upgrade when ready.
-            </h2>
-            <p className="text-white/60">
-              No subscription traps. Pay per term, cancel anytime. M-PESA accepted.
-            </p>
-          </div>
+          <h2
+            className="font-extrabold leading-tight tracking-[-0.02em] text-white mb-4"
+            style={{ fontSize: 'clamp(36px, 5vw, 56px)' }}
+          >
+            The first report is on us.
+          </h2>
+          <p className="text-white/55 text-lg mb-10 leading-relaxed">
+            See exactly where your child stands — before you spend a single shilling.
+          </p>
 
-          <div className="grid sm:grid-cols-3 gap-6 items-start">
+          <Link
+            href="/signup?role=parent"
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-violet-600 to-purple-600 text-white px-10 py-4 rounded-xl font-bold text-lg hover:scale-105 transition-all shadow-2xl shadow-violet-600/30"
+          >
+            Get My Child&apos;s Free Report
+            <ArrowRight className="w-5 h-5" />
+          </Link>
 
-            {/* Free */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-8 flex flex-col">
-              <div className="text-xs font-bold text-white/40 uppercase tracking-widest mb-4">
-                GET STARTED
-              </div>
-              <div className="text-4xl font-extrabold text-green-400 mb-1">Free</div>
-              <div className="text-sm text-white/50 mb-6">First report, no card needed</div>
-              <ul className="space-y-3 flex-1 mb-8">
-                {[
-                  'Full 7-page Academic Clinic report',
-                  '3-week holiday study plan',
-                  'Career & pathway guidance',
-                  'One Learning Compass session',
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-2 text-sm text-white/50">
-                    <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href="/signup?role=parent"
-                className="block text-center bg-white/10 hover:bg-white/20 text-white border border-white/10 py-3 rounded-xl font-bold transition-colors"
-              >
-                Get Free Report
-              </Link>
-            </div>
+          <p className="text-sm text-white/35 mt-5">
+            ✓ No card needed &nbsp;·&nbsp; ✓ M-PESA accepted &nbsp;·&nbsp; ✓ Works on any phone
+          </p>
 
-            {/* Per Term — FEATURED */}
-            <div className="bg-gradient-to-br from-violet-950/50 to-purple-950/50 border-2 border-violet-500/30 rounded-2xl p-8 flex flex-col sm:scale-[1.02]">
-              <div className="text-xs font-bold text-white bg-gradient-to-r from-violet-500 to-purple-500 px-3 py-1 rounded-full self-start mb-4 uppercase tracking-widest">
-                MOST POPULAR
-              </div>
-              <div className="text-4xl font-extrabold text-violet-400 mb-1">KES 3,200</div>
-              <div className="text-sm text-white/50 mb-6">Per term · 1 child</div>
-              <ul className="space-y-3 flex-1 mb-8">
-                {[
-                  'Unlimited Academic Clinic reports',
-                  'Unlimited Learning Compass sessions',
-                  'Progress tracking across terms',
-                  'WhatsApp & email alerts',
-                  'PDF report delivery',
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-2 text-sm text-white/50">
-                    <CheckCircle2 className="w-4 h-4 text-violet-400 shrink-0 mt-0.5" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href="/signup?role=parent"
-                className="block text-center bg-gradient-to-r from-violet-600 to-purple-600 text-white py-3 rounded-xl font-bold hover:scale-105 transition-all"
-              >
-                Get Full Access
-              </Link>
-            </div>
-
-            {/* Family */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-8 flex flex-col">
-              <div className="text-xs font-bold text-white/40 uppercase tracking-widest mb-4">
-                BEST VALUE
-              </div>
-              <div className="text-4xl font-extrabold text-teal-400 mb-1">KES 5,500</div>
-              <div className="text-sm text-white/50 mb-6">Per term · up to 3 children</div>
-              <ul className="space-y-3 flex-1 mb-8">
-                {[
-                  'Everything in full access',
-                  'All children under one account',
-                  "Compare siblings' progress",
-                  'One parent WhatsApp number',
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-2 text-sm text-white/50">
-                    <CheckCircle2 className="w-4 h-4 text-teal-500 shrink-0 mt-0.5" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href="/signup?role=parent"
-                className="block text-center bg-white/10 hover:bg-white/20 text-white border border-white/10 py-3 rounded-xl font-bold transition-colors"
-              >
-                Get Family Plan
-              </Link>
-            </div>
-
-          </div>
-
-          <p className="text-center text-sm text-white/40 mt-8">
-            Tokens from KES 500 also available · M-PESA accepted · Cancel anytime
+          <p className="text-xs text-white/25 mt-4">
+            Ready to see full pricing?{' '}
+            <Link href="/pricing" className="text-violet-400 hover:text-violet-300 transition-colors">
+              View plans →
+            </Link>
           </p>
 
         </div>

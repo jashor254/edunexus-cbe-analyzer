@@ -23,8 +23,8 @@ export async function callGemini(prompt: string): Promise<string> {
     const result = await model.generateContent(prompt)
     const response = result.response
     return response.text()
-  } catch (error: any) {
-    throw new Error(`Gemini API error: ${error.message}`)
+  } catch (error: unknown) {
+    throw new Error(`Gemini API error: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 

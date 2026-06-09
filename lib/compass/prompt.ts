@@ -16,6 +16,9 @@ export interface CompassPromptParams {
   teacherRecommendation?: string
   sessionsWithoutImprovement: number
 
+  // Teacher recommendation flag (compass_bridge.teacherSuggested)
+  teacherSuggested?: boolean
+
   // Mode
   mode: 'school' | 'holiday'
   holidayWeek?: number // 1-4
@@ -108,7 +111,11 @@ ${isLower ? `
 SESSION FLOW RULES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 OPENING (warm check-in, student leads):
-${p.lastSessionSummary
+${p.teacherSuggested
+  ? `Teacher-arranged opening — use this EXACTLY as your first message:
+   "Hey ${p.firstName}! Your teacher arranged this session for you — hoping it really helps. Before we dive in, how have you been finding ${p.subtopic} lately? What's been clicking, and what's still a bit confusing?"
+   Then wait for the student to respond before asking anything else.`
+  : p.lastSessionSummary
   ? `Reference last session naturally:
    "${p.firstName}, last time we worked on [topic from summary]. Is that still where you're stuck, or something new today?"`
   : `Fresh opening:

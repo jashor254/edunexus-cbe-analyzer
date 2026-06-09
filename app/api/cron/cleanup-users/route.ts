@@ -4,13 +4,10 @@
 // ✅ Proper error handling
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServiceClient } from '@/utils/supabase/service'
+import { getErrorMessage } from '@/lib/api/response'
 
-// ✅ Server-only Supabase client (uses service role key)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+const supabase = createServiceClient()
 
 export async function POST(request: NextRequest) {
   try {
@@ -73,12 +70,12 @@ export async function POST(request: NextRequest) {
       results: stats
     })
 
-  } catch (error: any) {
-    console.error('❌ Cleanup job failed:', error.message)
+  } catch (error: unknown) {
+    console.error('❌ Cleanup job failed:', getErrorMessage(error))
     return NextResponse.json(
       {
         success: false,
-        error: error.message,
+        error: getErrorMessage(error),
         timestamp: new Date().toISOString()
       },
       { status: 500 }

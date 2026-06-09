@@ -34,8 +34,8 @@ export async function GET(req: Request) {
       : await getTeacherAssessments(teacher.id)
 
     return apiSuccess({ assessments })
-  } catch (e: any) {
-    console.error('[teacher/assessments GET]', e.message)
+  } catch (e: unknown) {
+    console.error('[teacher/assessments GET]', e instanceof Error ? e.message : String(e))
     return apiError('Failed to fetch assessments')
   }
 }
@@ -69,8 +69,8 @@ export async function POST(req: Request) {
       title, assessmentType, term, year, maxScore, subjects, curriculumType, gradeScaleId,
     })
     return apiSuccess({ assessment }, 201)
-  } catch (e: any) {
-    console.error('[teacher/assessments POST]', e.message)
+  } catch (e: unknown) {
+    console.error('[teacher/assessments POST]', e instanceof Error ? e.message : String(e))
     return apiError('Failed to create assessment')
   }
 }

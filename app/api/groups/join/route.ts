@@ -60,8 +60,8 @@ export async function POST(req: Request) {
     })
 
     return apiSuccess({ groupId: group.id, groupName: group.name })
-  } catch (error: any) {
-    console.error('[groups/join] error:', error.message)
+  } catch (error: unknown) {
+    console.error('[groups/join] error:', error instanceof Error ? error.message : String(error))
     return apiError('Internal server error')
   }
 }

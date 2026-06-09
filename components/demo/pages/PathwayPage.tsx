@@ -10,9 +10,9 @@ const WM = () => (
 )
 
 const PATHWAYS = [
-  { name: 'STEM', sub: 'Mathematics & Sciences', pct: 38, recommended: false, barColor: 'bg-blue-400' },
-  { name: 'SOCIAL SCIENCES', sub: 'Humanities & Communication', pct: 67, recommended: true, barColor: 'bg-amber-400' },
-  { name: 'ARTS & SPORTS SCIENCE', sub: 'Creative & Physical Education', pct: 52, recommended: false, barColor: 'bg-amber-400' },
+  { name: 'STEM', sub: 'Mathematics & Sciences', pct: 52, recommended: false, barColor: 'bg-blue-400' },
+  { name: 'SOCIAL SCIENCES', sub: 'Humanities & Communication', pct: 84, recommended: true, barColor: 'bg-amber-400' },
+  { name: 'ARTS & SPORTS SCIENCE', sub: 'Creative & Physical Education', pct: 61, recommended: false, barColor: 'bg-amber-400' },
 ]
 
 export default function PathwayPage() {
@@ -67,9 +67,9 @@ export default function PathwayPage() {
             <div className="text-[10px] font-black text-slate-500 tracking-widest uppercase mb-2">Why it fits</div>
             <div className="space-y-2">
               {[
-                'Meeting Expectations in English and Kiswahili — core Social Sciences subjects',
-                'Strong Social Studies performance reflects genuine humanities aptitude',
-                'Communication skills across assessments align with pathway requirements',
+                'Exemplary Kiswahili and Social Studies — the two highest-weight Social Sciences subjects',
+                'Devolution, East Africa community units, and map work all at outstanding level',
+                'Proficient English and strong reflective reasoning across CRE align with pathway demands',
               ].map((item, i) => (
                 <div key={i} className="flex items-start gap-2">
                   <div className="w-4 h-4 bg-green-100 border border-green-200 rounded-full flex items-center justify-center shrink-0 mt-0.5">
@@ -84,9 +84,9 @@ export default function PathwayPage() {
             <div className="text-[10px] font-black text-slate-500 tracking-widest uppercase mb-2">Strengthen before Grade 10</div>
             <div className="space-y-2">
               {[
-                'Mathematics (Level 2 — all pathways require it)',
-                'Integrated Science (declining — needs recovery)',
-                'Agriculture & Nutrition (declining trend)',
+                'Pre-Technical Studies (Level 2 — consolidate design & draw before Grade 10)',
+                'Mathematics — maintain Proficient level, do not let it slip in Grade 10',
+                'Integrated Science — strong foundation needed for Biology/Chemistry/Physics split',
               ].map((item, i) => (
                 <div key={i} className="flex items-start gap-2">
                   <div className="w-4 h-4 bg-red-100 border border-red-200 rounded-full flex items-center justify-center shrink-0 mt-0.5">
@@ -103,10 +103,10 @@ export default function PathwayPage() {
         <div className="bg-[#1a2744] rounded-xl p-4">
           <div className="text-amber-500 text-[10px] font-black tracking-widest uppercase mb-2">What this means for Brian&apos;s future</div>
           <p className="text-slate-200 text-xs leading-relaxed mb-2">
-            Social Sciences leads to Law, Business, Education, Public Policy, and Finance — careers at the heart of Kenya&apos;s growth story. Brian&apos;s current trajectory suggests a strong fit.
+            Social Sciences leads to Law, Business, Education, Public Policy, and Finance — careers at the heart of Kenya&apos;s growth story. Brian&apos;s Exemplary Kiswahili and Social Studies already place him above average for this pathway.
           </p>
           <p className="text-amber-300 text-xs leading-relaxed font-medium">
-            Mathematics is critical regardless of pathway. Level 2 must be addressed this term — it affects ALL senior school options.
+            With HIGH CONFIDENCE in this recommendation, Brian should confirm Social Sciences as his Grade 10 pathway and focus the holiday on closing the Pre-Technical Studies gap.
           </p>
         </div>
 

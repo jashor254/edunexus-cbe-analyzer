@@ -10,17 +10,17 @@ export type SubjectData = {
 }
 
 export const LEVEL_LABEL: Record<Level, string> = {
-  1: 'Below Expectations',
-  2: 'Approaching',
-  3: 'Meeting',
-  4: 'Exceeding',
+  1: 'Emerging',
+  2: 'Developing',
+  3: 'Proficient',
+  4: 'Exemplary',
 }
 
 export const LEVEL_LONG: Record<Level, string> = {
-  1: 'Below Expectations',
-  2: 'Approaching Expectations',
-  3: 'Meeting Expectations',
-  4: 'Exceeding Expectations',
+  1: 'Emerging',
+  2: 'Developing',
+  3: 'Proficient',
+  4: 'Exemplary',
 }
 
 export const LEVEL_BADGE_CLASS: Record<Level, string> = {
@@ -48,42 +48,42 @@ export const SUBJECTS: SubjectData[] = [
   {
     name: 'Mathematics',
     emoji: '🔢',
-    level: 2,
-    trend: 'stable',
+    level: 3,
+    trend: 'improving',
     clinicalNote:
-      'Procedural gaps in algebraic reasoning. Structured daily practice targeting fractions and equations is clinically recommended.',
+      'Moved from Developing to Proficient this term — algebra and number patterns now solid. Consolidate linear equations and data handling before KCSE transition to Core Mathematics.',
   },
   {
     name: 'English',
     emoji: '📖',
     level: 3,
-    trend: 'improving',
+    trend: 'stable',
     clinicalNote:
-      'Demonstrates proficient language competency. Strong foundation for humanities and communication pathways.',
+      'Proficient across comprehension, grammar, and composition. Essay structure meets Grade 9 CBC benchmarks. Strong foundation for humanities and professional pathways.',
   },
   {
     name: 'Kiswahili',
     emoji: '🗣️',
-    level: 3,
+    level: 4,
     trend: 'stable',
     clinicalNote:
-      'Solid national language proficiency. Consistent performance supports Social Sciences pathway alignment.',
+      'Exemplary national language competency. Lugha na Fasihi both at outstanding standard. Significant career asset for law, diplomacy, public service, and any community-facing pathway in Kenya.',
   },
   {
     name: 'Integrated Science',
     emoji: '🔬',
-    level: 2,
-    trend: 'declining',
+    level: 3,
+    trend: 'stable',
     clinicalNote:
-      '⚠️ DECLINING from Level 3. Conceptual gaps emerging in scientific reasoning. Immediate structured intervention recommended.',
+      'Solid scientific reasoning across ecology, matter, and Newton\'s Laws units. Practical investigation skills developing well — on track for the Biology, Chemistry, Physics split at Grade 10.',
   },
   {
     name: 'Social Studies',
     emoji: '🌍',
-    level: 3,
+    level: 4,
     trend: 'improving',
     clinicalNote:
-      'Authentic engagement with civic and social content. Performance aligns strongly with Social Sciences pathway recommendation.',
+      'Exemplary civic and geographical understanding. Outstanding performance in Kenya\'s devolution structure, East Africa economic community units, and map interpretation — genuine Social Sciences pathway aptitude.',
   },
   {
     name: 'Pre-Technical Studies',
@@ -91,7 +91,7 @@ export const SUBJECTS: SubjectData[] = [
     level: 2,
     trend: 'stable',
     clinicalNote:
-      'Developing foundational technical competency. Requires hands-on practice to consolidate design and construction skills.',
+      'Developing technical competency. Design and draw exercises and materials classification need consolidation. Structured hands-on workshop practice this holiday is clinically recommended before Grade 10.',
   },
   {
     name: 'Creative Arts & Sports',
@@ -99,15 +99,15 @@ export const SUBJECTS: SubjectData[] = [
     level: 3,
     trend: 'stable',
     clinicalNote:
-      'Consistent creative performance and physical engagement. Balanced expression across both arts and athletics observed.',
+      'Consistent creative and physical engagement across Visual Arts and Athletics. Well-rounded practical expression is a notable co-curricular strength worth developing further.',
   },
   {
     name: 'Agriculture & Nutrition',
     emoji: '🌱',
-    level: 2,
-    trend: 'declining',
+    level: 3,
+    trend: 'improving',
     clinicalNote:
-      '⚠️ DECLINING. Practical application skills require reinforcement. Structured field engagement and nutritional case studies recommended.',
+      'Improved from Developing last term — soil science, crop production, and food groups now at Proficient level. Real-world farm context is clearly supporting retention. Maintain momentum.',
   },
   {
     name: 'CRE',
@@ -115,7 +115,7 @@ export const SUBJECTS: SubjectData[] = [
     level: 3,
     trend: 'stable',
     clinicalNote:
-      'Solid ethical and religious competency. Consistent performance supports well-rounded humanities profile.',
+      'Consistent applied ethics and values competency within the CBC religious education framework. Strong reflective reasoning aligned with Social Sciences pathway character profile.',
   },
 ]
 
@@ -127,12 +127,12 @@ export const STUDENT = {
   year: 2026,
   reportId: 'EC-2026-BT9K2M',
   generatedDate: '19 May 2026',
-  overallLevel: 2.4,
-  overallLabel: 'Approaching Expectations',
-  trajectory: 'NEEDS ATTENTION',
-  trajectoryNote: 'Integrated Science declining',
+  overallLevel: 3.2,
+  overallLabel: 'Proficient',
+  trajectory: 'IMPROVING',
+  trajectoryNote: 'Mathematics recovering well',
   pathwayRecommendation: 'Social Sciences',
-  pathwayConfidence: 'MEDIUM CONFIDENCE',
+  pathwayConfidence: 'HIGH CONFIDENCE',
 }
 
 export const PAGE_TITLES = [

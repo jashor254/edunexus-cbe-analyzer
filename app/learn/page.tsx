@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Compass, Send, Trophy, Star, Clock, ChevronRight } from 'lucide-react'
+import { Compass, Send, Trophy, Star, Clock, ChevronRight, BookOpen, AlertCircle } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -10,11 +10,23 @@ type PageState = 'student_select' | 'subject_select' | 'active_session' | 'sessi
 type Level = 1 | 2 | 3 | 4
 
 interface SubjectCard {
-  key:         string
-  label:       string
-  level:       Level
-  recommended: boolean
-  subtopic:    string | null
+  key:             string
+  label:           string
+  level:           Level
+  recommended:     boolean
+  teacherSuggested: boolean
+  subtopic:        string | null
+}
+
+interface Assignment {
+  id:               string
+  title:            string
+  description:      string | null
+  due_date:         string
+  daysLeft:         number
+  isOverdue:        boolean
+  submissionStatus: 'pending' | 'submitted' | 'marked'
+  score:            number | null
 }
 
 interface StudentData {
@@ -42,7 +54,7 @@ type StudentApiResponse = {
   grade:     number
   isJunior:  boolean
   pathway:   string | null
-  subjects:  Array<{ key: string; level: Level; recommended: boolean; subtopic: string | null }>
+  subjects:  Array<{ key: string; level: Level; recommended: boolean; teacherSuggested: boolean; subtopic: string | null }>
 }
 
 type StudentListApiResponse = {
@@ -130,6 +142,9 @@ function LearnContent() {
   const [students,    setStudents]    = useState<StudentSummaryCard[]>([])
   const [dataLoading, setDataLoading] = useState(true)
 
+  // Assignments
+  const [assignments, setAssignments] = useState<Assignment[]>([])
+
   // Session state
   const [activeSubject,        setActiveSubject]        = useState<SubjectCard | null>(null)
   const [sessionId,            setSessionId]            = useState<string | null>(null)
@@ -171,12 +186,21 @@ function LearnContent() {
         }
 
         const d = json.data as StudentApiResponse
+        const studentId = d.id
         setStudent({
-          id:        d.id,
+          id:        studentId,
           firstName: d.firstName,
           grade:     d.grade,
           subjects:  d.subjects.map(s => ({ ...s, label: toLabel(s.key) })),
         })
+
+        // Fetch assignments in parallel
+        fetch(`/api/student/assignments?studentId=${studentId}`, { credentials: 'include' })
+          .then(r => r.json())
+          .then((aj: { success: boolean; data: { assignments: Assignment[] } }) => {
+            if (aj.success) setAssignments(aj.data.assignments ?? [])
+          })
+          .catch(() => {})
       } catch (err) {
         console.error('[learn] student load failed:', err)
       } finally {
@@ -200,6 +224,12 @@ function LearnContent() {
         grade:     d.grade,
         subjects:  d.subjects.map(s => ({ ...s, label: toLabel(s.key) })),
       })
+      fetch(`/api/student/assignments?studentId=${d.id}`, { credentials: 'include' })
+        .then(r => r.json())
+        .then((aj: { success: boolean; data: { assignments: Assignment[] } }) => {
+          if (aj.success) setAssignments(aj.data.assignments ?? [])
+        })
+        .catch(() => {})
       setPageState('subject_select')
     } catch (err) {
       console.error('[learn] student select failed:', err)
@@ -378,6 +408,41 @@ function LearnContent() {
           </p>
         )}
 
+        {/* Pending assignments for the just-completed subject */}
+        {(() => {
+          const subjectAssignments = assignments.filter(
+            a => a.submissionStatus === 'pending'
+          )
+          if (subjectAssignments.length === 0) return null
+          return (
+            <div className="w-full max-w-xs mt-6 mb-2">
+              <p className="text-xs font-bold text-white/30 uppercase tracking-wider mb-3 text-left">
+                Your Assignments
+              </p>
+              <div className="grid gap-2">
+                {subjectAssignments.map(a => (
+                  <div
+                    key={a.id}
+                    className="px-4 py-3 bg-sky-500/10 border border-sky-500/20 rounded-xl text-left"
+                  >
+                    <p className="text-sm font-bold text-white">{a.title}</p>
+                    <p className={`text-xs mt-0.5 ${a.isOverdue ? 'text-red-400' : 'text-sky-300/70'}`}>
+                      {a.isOverdue
+                        ? `Overdue by ${Math.abs(a.daysLeft)} day${Math.abs(a.daysLeft) !== 1 ? 's' : ''}`
+                        : a.daysLeft === 0
+                        ? 'Due today'
+                        : `Due in ${a.daysLeft} day${a.daysLeft !== 1 ? 's' : ''}`}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-white/30 mt-3 text-center">
+                Submit your assignments through your student portal
+              </p>
+            </div>
+          )
+        })()}
+
         <div className="flex flex-col gap-3 w-full max-w-xs mt-4">
           <button
             onClick={() => {
@@ -464,7 +529,43 @@ function LearnContent() {
             <h2 className="text-2xl font-black text-white mb-1">
               Hey {student?.firstName ?? 'there'}.
             </h2>
-            <p className="text-white/50 text-sm mb-8">What would you like to work on today?</p>
+            <p className="text-white/50 text-sm mb-6">What would you like to work on today?</p>
+
+            {/* Teacher recommendation banner */}
+            {student?.subjects.some(s => s.teacherSuggested) && (
+              <div className="mb-6 px-4 py-3 bg-amber-500/10 border border-amber-500/25 rounded-2xl flex items-start gap-3">
+                <div className="w-7 h-7 shrink-0 bg-amber-500/20 rounded-full flex items-center justify-center mt-0.5">
+                  <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-amber-300 text-sm font-bold">Your teacher has a session for you</p>
+                  <p className="text-amber-300/60 text-xs mt-0.5">
+                    {student.subjects.find(s => s.teacherSuggested)?.label}
+                    {student.subjects.find(s => s.teacherSuggested)?.subtopic
+                      ? ` · ${student.subjects.find(s => s.teacherSuggested)!.subtopic}`
+                      : ''}
+                    {' '}— tap it below to start
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Pending assignments banner */}
+            {assignments.filter(a => a.submissionStatus === 'pending').length > 0 && (
+              <div className="mb-6 px-4 py-3 bg-sky-500/10 border border-sky-500/25 rounded-2xl flex items-start gap-3">
+                <div className="w-7 h-7 shrink-0 bg-sky-500/20 rounded-full flex items-center justify-center mt-0.5">
+                  <AlertCircle className="w-3.5 h-3.5 text-sky-400" />
+                </div>
+                <div>
+                  <p className="text-sky-300 text-sm font-bold">
+                    {assignments.filter(a => a.submissionStatus === 'pending').length} assignment{assignments.filter(a => a.submissionStatus === 'pending').length > 1 ? 's' : ''} pending
+                  </p>
+                  <p className="text-sky-300/60 text-xs mt-0.5">
+                    Study the topic first, then complete your assignment
+                  </p>
+                </div>
+              </div>
+            )}
 
             <p className="text-xs font-bold text-white/30 uppercase tracking-wider mb-3">
               Your Subjects
@@ -477,23 +578,36 @@ function LearnContent() {
                   <button
                     key={card.key}
                     onClick={() => startSession(card)}
-                    className="group w-full flex items-center justify-between px-4 py-4 bg-white/5 hover:bg-violet-500/10 border border-white/8 hover:border-violet-500/30 rounded-2xl text-left transition-all"
+                    className={`group w-full flex items-center justify-between px-4 py-4 border rounded-2xl text-left transition-all ${
+                      card.teacherSuggested
+                        ? 'bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20'
+                        : 'bg-white/5 hover:bg-violet-500/10 border-white/8 hover:border-violet-500/30'
+                    }`}
                   >
                     <div>
                       <div className="flex items-center gap-2 mb-0.5">
                         <span className="font-bold text-white text-sm">{card.label}</span>
-                        {card.recommended && (
+                        {card.teacherSuggested && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500/20 border border-amber-500/30 rounded-full text-[10px] font-bold text-amber-300">
+                            <BookOpen className="w-2.5 h-2.5" />
+                            Teacher session
+                          </span>
+                        )}
+                        {!card.teacherSuggested && card.recommended && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-violet-500/20 border border-violet-500/30 rounded-full text-[10px] font-bold text-violet-300">
                             <Star className="w-2.5 h-2.5" />
                             Recommended
                           </span>
                         )}
                       </div>
+                      {card.subtopic && card.teacherSuggested && (
+                        <p className="text-xs text-amber-300/70 mb-0.5">{card.subtopic}</p>
+                      )}
                       <p className={`text-xs ${LEVEL_COLORS[card.level]}`}>
                         Level {card.level}/4 · {LEVEL_LABELS[card.level]}
                       </p>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-violet-400 shrink-0 transition-colors" />
+                    <ChevronRight className={`w-4 h-4 shrink-0 transition-colors ${card.teacherSuggested ? 'text-amber-400/50 group-hover:text-amber-400' : 'text-white/20 group-hover:text-violet-400'}`} />
                   </button>
                 ))}
               </div>

@@ -189,7 +189,7 @@ export function validateStrandAssessment(data: {
 // ===========================================
 
 export async function checkDuplicateAssessment(
-  supabase: any,
+  supabase: Pick<import('@supabase/supabase-js').SupabaseClient, 'from'>,
   studentId: string,
   term: number,
   year: number

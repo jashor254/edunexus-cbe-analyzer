@@ -52,8 +52,8 @@ export async function GET(
     }))
 
     return apiSuccess({ assignment, submissions: enriched })
-  } catch (e: any) {
-    console.error('[teacher/assignments/[id] GET]', e.message)
+  } catch (e: unknown) {
+    console.error('[teacher/assignments/[id] GET]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')
   }
 }
@@ -96,8 +96,8 @@ export async function PATCH(
     if (error || !assignment) return apiNotFound('Assignment not found')
 
     return apiSuccess({ assignment })
-  } catch (e: any) {
-    console.error('[teacher/assignments/[id] PATCH]', e.message)
+  } catch (e: unknown) {
+    console.error('[teacher/assignments/[id] PATCH]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')
   }
 }

@@ -76,8 +76,8 @@ export async function GET() {
     const response = apiSuccess({ classes: classesWithStats })
     response.headers.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=60')
     return response
-  } catch (e: any) {
-    console.error('[teacher/classes GET]', e.message)
+  } catch (e: unknown) {
+    console.error('[teacher/classes GET]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')
   }
 }
@@ -138,8 +138,8 @@ export async function POST(req: Request) {
     }
 
     return apiSuccess({ class: cls }, 201)
-  } catch (e: any) {
-    console.error('[teacher/classes POST]', e.message)
+  } catch (e: unknown) {
+    console.error('[teacher/classes POST]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')
   }
 }

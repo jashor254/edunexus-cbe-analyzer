@@ -84,8 +84,8 @@ export async function GET(_req: Request, { params }: RouteContext) {
         ...levelCounts,
       },
     })
-  } catch (e: any) {
-    console.error('[tsc-view GET]', e.message)
+  } catch (e: unknown) {
+    console.error('[tsc-view GET]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')
   }
 }

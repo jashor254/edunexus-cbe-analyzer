@@ -71,8 +71,8 @@ export async function POST(req: Request) {
     })
 
     return apiSuccess({ groupId: group.id, inviteCode })
-  } catch (error: any) {
-    console.error('[groups/create] error:', error.message)
+  } catch (error: unknown) {
+    console.error('[groups/create] error:', error instanceof Error ? error.message : String(error))
     return apiError('Internal server error')
   }
 }

@@ -73,7 +73,7 @@ export default function SubjectMatrixPage() {
 
           {/* Legend row */}
           <div className="shrink-0 flex flex-wrap gap-3 pt-2 text-[10px] text-slate-400">
-            {[['bg-red-400','L1 Below'],['bg-amber-400','L2 Approaching'],['bg-green-500','L3 Meeting'],['bg-teal-500','L4 Exceeding']].map(([cls,lbl]) => (
+            {[['bg-red-400','L1 Emerging'],['bg-amber-400','L2 Developing'],['bg-green-500','L3 Proficient'],['bg-teal-500','L4 Exemplary']].map(([cls,lbl]) => (
               <span key={lbl} className="flex items-center gap-1"><span className={`w-2 h-2 rounded-full inline-block ${cls}`} />{lbl}</span>
             ))}
             <span className="ml-2 flex items-center gap-1"><span className="text-green-600 font-black">↑</span>Improving</span>
