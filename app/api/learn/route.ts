@@ -1,7 +1,7 @@
 // app/api/learn/route.ts
 import { createServiceClient } from '@/utils/supabase/service'
 import { callDeepSeek } from '@/lib/ai/deepseek'
-import { getOrCreateSession, readSession, writeSession, resolveSubject } from '@/lib/compass/session'
+import { getOrCreateSession, readSession, writeSession, resolveSubject, recordExchange } from '@/lib/compass/session'
 import { buildCompassPrompt, type CompassPromptParams } from '@/lib/compass/prompt'
 import { getGradeTopics } from '@/lib/compass/topics'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
@@ -87,6 +87,32 @@ export async function POST(req: Request) {
     if (!learnerId) return apiError('learnerId is required', 400)
     const db = createServiceClient()
     const studentId = learnerId as string
+
+    // ── Keepalive: if session idle > 20 min, return soft nudge without calling DeepSeek
+    if (sessionId) {
+      const { data: sessionRow } = await db
+        .from('compass_sessions')
+        .select('updated_at')
+        .eq('id', sessionId as string)
+        .maybeSingle()
+
+      const CLOSING_WORDS = ['done', 'goodbye', 'bye', 'kwa heri', 'tutaonana', "that's all", 'stop', 'quit']
+      const isClosing = CLOSING_WORDS.some(w => (message as string).toLowerCase().includes(w))
+
+      const lastActive = sessionRow?.updated_at as string | null
+      if (lastActive && !isClosing) {
+        const idleMs = Date.now() - new Date(lastActive).getTime()
+        if (idleMs > 20 * 60 * 1000) {
+          return apiSuccess({
+            text:          "Still there? Your session is still active.",
+            evalSummary:   null,
+            sessionId,
+            sessionUpdate: null,
+            tokensRemaining: -1,
+          })
+        }
+      }
+    }
 
     // ── Parallel DB reads ─────────────────────────────────────────────────────
     const [savedSession, studentResult, contextResult] = await Promise.all([
@@ -215,7 +241,13 @@ export async function POST(req: Request) {
       { temperature: 0.3, maxTokens: 400, history }
     )
 
+    // ── Increment exchange count ──────────────────────────────────────────────
+    await recordExchange(activeSessionId)
+
     // ── Parse eval block (if session is closing) ──────────────────────────────
+    console.log('[learn] raw response:', response?.slice(0, 200))
+    console.log('[learn] has eval:', response?.includes('COMPASS_EVAL_START'))
+
     type CompassEval = {
       genuine_progress: boolean
       recommend_subject_rest: boolean

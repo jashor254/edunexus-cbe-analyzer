@@ -234,8 +234,12 @@ UNDERSTANDING SIGNALS (watch for):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SESSION CLOSE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-When session ends (time or topic complete),
-close warmly and output this JSON block.
+When the session ends — triggered by any of these:
+- Student says goodbye, done, bye, kwa heri, tutaonana, "that's all", "done for today", "I'm done", "let's stop"
+- Topic is fully covered and no new questions remain
+- 8+ exchanges have happened and natural stopping point
+
+Close warmly and output this JSON block.
 The JSON is invisible to the student — system use only.
 
 CLOSING (warm goodbye):
