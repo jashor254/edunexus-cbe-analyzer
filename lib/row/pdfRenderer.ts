@@ -100,7 +100,7 @@ function buildPage(row: RecordOfWork): string {
     <tbody>${bodyRows}</tbody>
   </table>
 
-  <div class="footer">EduNexus · edunexus.co.ke</div>`
+  <div class="footer">EduNexus · For Kenyan Teachers</div>`
 }
 
 // ─── CSS ──────────────────────────────────────────────────────────────────────
