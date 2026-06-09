@@ -497,7 +497,7 @@ function StudentCard({ student }: { student: Student }) {
           <PlusCircle className="w-3.5 h-3.5" /> Add Assessment
         </Link>
         <Link
-          href={`/chat?student=${student.id}`}
+          href={`/learn?student=${student.id}`}
           className="text-xs font-bold bg-amber-50 text-amber-700 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
         >
           <Compass className="w-3.5 h-3.5" /> Compass
@@ -830,7 +830,7 @@ export default function DashboardPage() {
                 sub: 'Adapts to your child\'s level',
                 gradient: 'from-amber-500 to-orange-500',
                 shadow: 'shadow-amber-500/20',
-                href: '/chat',
+                href: '/learn',
                 badge: null,
               },
               {

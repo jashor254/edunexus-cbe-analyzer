@@ -78,6 +78,7 @@ async function savePlans(
     step_3: plan.step3,
     conclusion: plan.conclusion,
     extended_activities: plan.extendedActivities,
+    reflection: plan.reflection,
     status: 'generated',
   }))
 

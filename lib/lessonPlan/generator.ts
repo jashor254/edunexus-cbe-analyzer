@@ -1,4 +1,5 @@
 import type { LessonPlanContext, GeneratedLessonPlan } from './types'
+import { isKiswahiliSubject, isSocialStudies } from '@/lib/curriculum/subjectUtils'
 
 function parseDeepSeekJSON(raw: string): any {
   const cleaned = raw
@@ -44,6 +45,42 @@ function buildLessonPlanPrompt(ctx: LessonPlanContext): string {
   const outcomes = ctx.learningOutcomes
   const questions = ctx.keyInquiryQuestions
 
+  const languageInstruction = isKiswahiliSubject(ctx.learningArea)
+    ? `
+LUGHA YA MAUDHUI:
+Andika maudhui YOTE ya mpango huu wa somo kwa KISWAHILI SANIFU.
+Hii inajumuisha: utangulizi, hatua za mafunzo, hitimisho, shughuli za ziada,
+maswali ya uchunguzi, na maelezo ya mpangilio wa kujifunza.
+Tumia Kiswahili fasaha na sahihi kinachofaa kwa wanafunzi wa CBC Kenya.
+Hata maneno ya kitaalamu yaandikwe kwa Kiswahili katika somo hili.
+`
+    : `Write all lesson plan content in English.`
+
+  const resourceInstruction = isSocialStudies(ctx.learningArea)
+    ? `
+RESOURCES — SOCIAL STUDIES RULES:
+Suggest ONLY resources immediately available in a typical Kenyan classroom.
+ALLOWED: textbooks (e.g. "KLB Social Studies Grade 9"), charts, maps, atlas, globe,
+photographs/pictures, newspaper clippings, video clips (if projector available),
+flashcards, locally available objects (soil, seeds, coins), whiteboard and markers.
+STRICTLY AVOID: field trips to named places, live guest speakers/resource persons,
+visits to offices/courts/factories, any activity requiring leaving school or advance booking.
+If a concept relates to a place (e.g. Great Rift Valley), use:
+"Map of Kenya showing the Rift Valley" or "Photographs of the Great Rift Valley" — NOT "Visit the Rift Valley".
+`
+    : ''
+
+  const organisationHint = ctx.learningArea.toLowerCase().includes('practical') ||
+    ctx.strand?.toLowerCase().includes('practical')
+    ? 'practical'
+    : ctx.strand?.toLowerCase().includes('discuss') ? 'discussion' : 'standard'
+
+  const reflectionTemplate = organisationHint === 'practical'
+    ? `Learners engaged well with the practical activity. The hands-on approach helped clarify ${ctx.subStrand}. Some learners struggled with [specific step] — will provide more guided practice next week.`
+    : organisationHint === 'discussion'
+    ? `Class discussion was lively and learners demonstrated good understanding of ${ctx.subStrand}. Participation was satisfactory. Will allocate more time to this concept in the upcoming lessons.`
+    : `The lesson was taught as planned. Most learners understood the core concepts. A few learners will need additional time to fully grasp ${ctx.subStrand}. Will revisit in the next lesson.`
+
   return `
 You are an experienced Kenyan CBC teacher writing a lesson plan for a TSC inspection.
 
@@ -55,6 +92,8 @@ Sub-Strand: ${ctx.subStrand}
 Term: ${ctx.term}, Year: ${ctx.year}
 Week: ${ctx.weekNumber}, Lesson: ${ctx.lessonNumber}
 
+${languageInstruction}
+${resourceInstruction}
 SPECIFIC LEARNING OUTCOMES (already set):
 a) ${outcomes[0] || ''}
 b) ${outcomes[1] || ''}
@@ -75,7 +114,8 @@ Generate ONLY these sections as JSON:
   "step2": "10 minutes. Group/pair activity. Learners apply concept. Teacher role during this step.",
   "step3": "10 minutes. Individual application or class discussion. Assessment moment. Links to learning outcomes.",
   "conclusion": "5 minutes. Summarize key points. Brief formative check. Preview next lesson.",
-  "extendedActivities": "2-3 activities for fast finishers OR homework tasks that extend learning beyond the classroom."
+  "extendedActivities": "2-3 activities for fast finishers OR homework tasks that extend learning beyond the classroom.",
+  "reflection": "A realistic 2-sentence teacher self-evaluation. Base it on this template but replace bracketed parts with real content from this lesson: ${reflectionTemplate}"
 }
 
 RULES:
@@ -85,6 +125,7 @@ RULES:
 - No Values/PCIs section needed
 - Steps must directly address the learning outcomes
 - Each step: clear teacher actions + learner actions
+- reflection must sound like a real teacher wrote it — specific, not generic
 - Return ONLY valid JSON, no markdown
 `
 }
@@ -121,6 +162,11 @@ export async function generateLessonPlan(
       parsed.conclusion &&
       parsed.extendedActivities
     ) {
+      // reflection is optional in response — fall back to template if missing
+      const reflection = typeof parsed.reflection === 'string' && parsed.reflection.trim()
+        ? parsed.reflection
+        : `The lesson on ${ctx.subStrand} was taught as planned. Most learners achieved the intended outcomes. Will revisit any gaps in the next lesson.`
+
       return {
         context: ctx,
         organisationOfLearning: parsed.organisationOfLearning,
@@ -130,6 +176,7 @@ export async function generateLessonPlan(
         step3: parsed.step3,
         conclusion: parsed.conclusion,
         extendedActivities: parsed.extendedActivities,
+        reflection,
         generatedAt: new Date().toISOString(),
       }
     }
@@ -147,6 +194,11 @@ function generateFallbackReflection(ctx: LessonPlanContext, variant: number): st
   const outcome = ctx.learningOutcomes[0] || 'the lesson objective'
 
   const variants: Record<string, string[]> = {
+    kiswahili: [
+      `Wanafunzi wengi walifaulu ${outcome} wakati wa somo. Baadhi ya wanafunzi walihitaji msaada zaidi katika ${subStrand} — nitawapa msaada wa ziada katika somo lijalo.`,
+      `Somo la ${subStrand} lilifanyika vizuri. Wanafunzi walishiriki kikamilifu katika mazungumzo. Mazoezi zaidi ya uandishi yanahitajika katika somo lijalo.`,
+      `Ushiriki wa wanafunzi ulikuwa mzuri katika somo la ${subStrand}. Wanafunzi wachache walihitaji msaada zaidi — nitawapanga vikundi ili wanafunzi wazuri wawasaidie wenzao.`,
+    ],
     agriculture: [
       `Most learners were able to ${outcome} with reasonable accuracy during the practical session. A few learners needed additional guidance on the hands-on activity — will provide follow-up support in the next lesson.`,
       `The lesson on ${subStrand} was well received. Learners demonstrated understanding through group discussions and practical work. Recommend more practice on application to real farm situations.`,
@@ -188,6 +240,10 @@ export async function generateReflectionSuggestions(
     generateFallbackReflection(context, 3),
   ]
 
+  const reflectionLanguage = isKiswahiliSubject(context.learningArea)
+    ? 'Write all 3 reflection options in Kiswahili (Kiswahili sanifu).'
+    : 'Write all 3 reflection options in English.'
+
   const prompt = `
 You are a Kenyan CBC teacher writing lesson reflection notes for a TSC inspection.
 
@@ -200,6 +256,8 @@ Learning Outcomes:
   a) ${context.learningOutcomes[0] || ''}
   b) ${context.learningOutcomes[1] || ''}
   c) ${context.learningOutcomes[2] || ''}
+
+${reflectionLanguage}
 
 Generate 3 DIFFERENT reflection options.
 Each should be 2-3 sentences.

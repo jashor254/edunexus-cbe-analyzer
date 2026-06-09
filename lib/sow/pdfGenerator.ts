@@ -4,6 +4,34 @@
 
 import type { SOWPreviewData, GeneratedLesson, BreakItem } from './types'
 
+const NAMED_BREAK_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  'August Holiday':    { bg: '#FEF3C7', text: '#92400E', border: '#F59E0B' },
+  'Half Term':         { bg: '#DBEAFE', text: '#1E40AF', border: '#3B82F6' },
+  'October Holiday':   { bg: '#FCE7F3', text: '#9D174D', border: '#EC4899' },
+  'Games Day':         { bg: '#D1FAE5', text: '#065F46', border: '#10B981' },
+  'Public Holiday':    { bg: '#FEE2E2', text: '#991B1B', border: '#EF4444' },
+  'Revision Week':     { bg: '#EDE9FE', text: '#5B21B6', border: '#8B5CF6' },
+  'Exam Week':         { bg: '#FEE2E2', text: '#991B1B', border: '#EF4444' },
+}
+
+const BREAK_FALLBACK = [
+  { bg: '#FEF3C7', text: '#92400E', border: '#F59E0B' },
+  { bg: '#DBEAFE', text: '#1E40AF', border: '#3B82F6' },
+  { bg: '#D1FAE5', text: '#065F46', border: '#10B981' },
+  { bg: '#FCE7F3', text: '#9D174D', border: '#EC4899' },
+  { bg: '#EDE9FE', text: '#5B21B6', border: '#8B5CF6' },
+]
+
+function buildBreakColorMap(breaks: BreakItem[]): Record<string, { bg: string; text: string; border: string }> {
+  const names = [...new Set(breaks.map(b => b.title))]
+  return Object.fromEntries(
+    names.map((name, i) => [
+      name,
+      NAMED_BREAK_COLORS[name] ?? BREAK_FALLBACK[i % BREAK_FALLBACK.length],
+    ])
+  )
+}
+
 export function generateSOWHtml(data: SOWPreviewData): string {
   const { meta, lessons } = data
   const isKcse = meta.curriculumMode.startsWith('844')
@@ -18,6 +46,7 @@ export function generateSOWHtml(data: SOWPreviewData): string {
     a.startWeek !== b.startWeek ? a.startWeek - b.startWeek : a.startLesson - b.startLesson
   )
 
+  const breakColorMap = buildBreakColorMap(sortedBreaks)
   const rowParts: string[] = []
   let bi = 0
 
@@ -25,14 +54,15 @@ export function generateSOWHtml(data: SOWPreviewData): string {
     const wkRange = b.startWeek === b.endWeek
       ? `Wk ${b.startWeek}`
       : `Wk ${b.startWeek}–${b.endWeek}`
+    const c = breakColorMap[b.title] ?? BREAK_FALLBACK[0]
     return `
-    <tr class="break-row">
-      <td class="cell-center">${b.startWeek}</td>
-      <td class="cell-center">—</td>
+    <tr style="background-color:${c.bg};border-left:4px solid ${c.border};">
+      <td class="cell-center" style="color:${c.text};font-weight:700;">${b.startWeek}</td>
+      <td class="cell-center" style="color:${c.text};">—</td>
       <td colspan="8" style="padding:5px 8px;">
-        <span class="break-badge">BREAK</span>
-        <strong style="color:#633806;margin-left:5px;">${escHtml(b.title)}</strong>
-        <span style="color:#854F0B;font-size:7pt;margin-left:6px;">${escHtml(wkRange)}</span>
+        <span style="display:inline-block;background:${c.border};color:#fff;font-size:7pt;font-weight:900;padding:1px 6px;border-radius:3px;letter-spacing:0.5px;">BREAK</span>
+        <strong style="color:${c.text};margin-left:6px;">${escHtml(b.title)}</strong>
+        <span style="color:${c.text};font-size:7pt;margin-left:6px;opacity:0.7;">${escHtml(wkRange)}</span>
       </td>
     </tr>`
   }
@@ -154,17 +184,7 @@ export function generateSOWHtml(data: SOWPreviewData): string {
     ul { margin: 0; padding-left: 14px; }
     ul li { margin-bottom: 2px; }
 
-    /* Break rows */
-    .break-row td { background: #FEF3C7 !important; }
-    .break-badge {
-      font-size: 6.5pt;
-      padding: 1px 5px;
-      border-radius: 8px;
-      background: #FDE68A;
-      color: #92400E;
-      font-weight: bold;
-      white-space: nowrap;
-    }
+    /* Break row colors now applied via inline styles */
 
     /* Summary */
     .summary {

@@ -1,53 +1,41 @@
 'use client'
 
-import { useState, useEffect, useCallback, use } from 'react'
+import { useState, useEffect, useCallback, useRef, use } from 'react'
 import Link from 'next/link'
 import {
   ChevronLeft, Loader2, Download, CheckCircle2,
-  ClipboardList, Sparkles, AlertTriangle,
+  ClipboardList, Sparkles, AlertTriangle, Check,
 } from 'lucide-react'
 
 interface ROWEntry {
-  id: string
-  week: number
-  lesson: number
+  id:          string
+  week:        number
+  lesson:      number
   date_taught: string | null
-  strand: string
-  substrand: string
-  reflection: string
+  strand:      string
+  substrand:   string
+  reflection:  string
 }
 
 interface ROWRecord {
-  id: string
-  school: string
-  grade: string
-  learning_area: string
-  term: string
-  year: number
+  id:              string
+  school:          string
+  grade:           string
+  learning_area:   string
+  term:            string
+  year:            number
   curriculum_mode: string | null
-  teacher_name: string
-  scheme_id: string | null
+  teacher_name:    string
+  scheme_id:       string | null
 }
 
-const WEEK_GRADIENTS = [
-  'from-teal-500 to-emerald-500',
-  'from-indigo-500 to-violet-500',
-  'from-amber-500 to-orange-500',
-  'from-rose-500 to-pink-500',
-  'from-cyan-500 to-blue-500',
-  'from-purple-500 to-fuchsia-500',
-  'from-lime-500 to-green-500',
-  'from-red-500 to-rose-500',
-  'from-sky-500 to-cyan-500',
-  'from-orange-500 to-red-500',
-]
-
 export default function RecordOfWorkEditorPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id }              = use(params)
-  const [row, setRow]       = useState<ROWRecord | null>(null)
+  const { id }               = use(params)
+  const [row, setRow]        = useState<ROWRecord | null>(null)
   const [entries, setEntries] = useState<ROWEntry[]>([])
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving]   = useState<string | null>(null)
+  const [saveState, setSaveState] = useState<'idle' | 'editing' | 'saved'>('idle')
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useEffect(() => {
     fetch(`/api/teacher/records-of-work/${id}`)
@@ -58,15 +46,19 @@ export default function RecordOfWorkEditorPage({ params }: { params: Promise<{ i
       }).catch(() => setLoading(false))
   }, [id])
 
-  const updateEntry = useCallback(async (entryId: string, field: string, value: string) => {
-    setEntries(prev => prev.map(e => e.id === entryId ? { ...e, [field]: value } : e))
-    setSaving(entryId)
-    await fetch(`/api/teacher/records-of-work/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ entryId, [field]: value }),
-    })
-    setSaving(null)
+  const updateReflection = useCallback((entryId: string, value: string) => {
+    setEntries(prev => prev.map(e => e.id === entryId ? { ...e, reflection: value } : e))
+    setSaveState('editing')
+    clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(async () => {
+      await fetch(`/api/teacher/records-of-work/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entryId, reflection: value }),
+      })
+      setSaveState('saved')
+      setTimeout(() => setSaveState('idle'), 2000)
+    }, 800)
   }, [id])
 
   function handleDownload() {
@@ -107,17 +99,17 @@ export default function RecordOfWorkEditorPage({ params }: { params: Promise<{ i
 
       {/* Hero */}
       <div className="bg-[#0c1929] relative overflow-hidden">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:40px_40px]" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-size-[40px_40px]" />
         <div className="absolute top-0 right-1/3 w-56 h-56 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-6">
+        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 py-6">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <Link href="/teacher/record-of-work"
                 className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:bg-white/10 transition">
                 <ChevronLeft className="w-4 h-4" />
               </Link>
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-teal-900/40 shrink-0">
+              <div className="w-10 h-10 rounded-2xl bg-linear-to-br from-teal-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-teal-900/40 shrink-0">
                 <ClipboardList className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -125,15 +117,31 @@ export default function RecordOfWorkEditorPage({ params }: { params: Promise<{ i
                 <p className="text-slate-400 text-xs mt-0.5">
                   {row.grade} · Term {row.term} · {row.year}
                   {row.school && <> · {row.school}</>}
-                  {row.scheme_id && <span className="ml-2 text-teal-400 flex-inline items-center gap-0.5"><Sparkles className="w-2.5 h-2.5 inline" /> From SOW</span>}
+                  {row.scheme_id && (
+                    <span className="ml-2 text-teal-400 inline-flex items-center gap-0.5">
+                      <Sparkles className="w-2.5 h-2.5" /> From SOW
+                    </span>
+                  )}
                 </p>
               </div>
             </div>
 
-            <button onClick={handleDownload}
-              className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-violet-500 text-white px-4 py-2.5 rounded-xl font-black text-sm hover:opacity-90 transition shadow-lg shadow-indigo-900/30">
-              <Download className="w-4 h-4" /> Print / Download
-            </button>
+            <div className="flex items-center gap-3">
+              {saveState === 'editing' && (
+                <span className="flex items-center gap-1.5 text-xs text-amber-400 font-semibold">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Saving…
+                </span>
+              )}
+              {saveState === 'saved' && (
+                <span className="flex items-center gap-1.5 text-xs text-emerald-400 font-semibold">
+                  <Check className="w-3 h-3" /> Saved
+                </span>
+              )}
+              <button onClick={handleDownload}
+                className="flex items-center gap-2 bg-linear-to-r from-indigo-500 to-violet-500 text-white px-4 py-2.5 rounded-xl font-black text-sm hover:opacity-90 transition shadow-lg shadow-indigo-900/30">
+                <Download className="w-4 h-4" /> Print / Download
+              </button>
+            </div>
           </div>
 
           {/* Progress */}
@@ -144,7 +152,7 @@ export default function RecordOfWorkEditorPage({ params }: { params: Promise<{ i
             </div>
             <div className="w-full bg-white/10 rounded-full h-2">
               <div
-                className={`h-2 rounded-full transition-all duration-500 ${pct === 100 ? 'bg-gradient-to-r from-teal-500 to-emerald-500' : 'bg-gradient-to-r from-indigo-500 to-violet-500'}`}
+                className={`h-2 rounded-full transition-all duration-500 ${pct === 100 ? 'bg-linear-to-r from-teal-500 to-emerald-500' : 'bg-linear-to-r from-indigo-500 to-violet-500'}`}
                 style={{ width: `${pct}%` }}
               />
             </div>
@@ -153,7 +161,7 @@ export default function RecordOfWorkEditorPage({ params }: { params: Promise<{ i
       </div>
 
       {/* Table */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-7">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-7">
         {entries.length === 0 ? (
           <div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 p-12 text-center">
             <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto mb-3" />
@@ -161,97 +169,100 @@ export default function RecordOfWorkEditorPage({ params }: { params: Promise<{ i
             <p className="text-gray-400 text-sm">This record has no lessons — link a Scheme of Work to auto-populate.</p>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-            {/* Table header */}
-            <div className="bg-gradient-to-r from-slate-800 to-[#0c1929]">
-              <div className="grid grid-cols-[60px_120px_1fr_1fr_1.6fr] gap-0">
-                {['Week', 'Date', 'Strand', 'Sub-Strand', 'Reflection'].map((h, i) => (
-                  <div key={i} className="px-4 py-3.5 text-xs font-black text-slate-300 uppercase tracking-wide border-r border-white/5 last:border-0">
-                    {h}
-                  </div>
-                ))}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            {/* Meta header */}
+            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50">
+              <div className="grid grid-cols-3 gap-x-8 gap-y-1 text-sm">
+                <div><span className="font-semibold text-slate-500">School:</span> <span className="text-slate-800">{row.school}</span></div>
+                <div><span className="font-semibold text-slate-500">Subject:</span> <span className="text-slate-800">{row.learning_area}</span></div>
+                <div><span className="font-semibold text-slate-500">Grade:</span> <span className="text-slate-800">{row.grade}</span></div>
+                <div><span className="font-semibold text-slate-500">Teacher:</span> <span className="text-slate-800">{row.teacher_name || '—'}</span></div>
+                <div><span className="font-semibold text-slate-500">Term:</span> <span className="text-slate-800">{row.term}</span></div>
+                <div><span className="font-semibold text-slate-500">Year:</span> <span className="text-slate-800">{row.year}</span></div>
               </div>
             </div>
 
-            {/* Rows */}
-            <div className="divide-y divide-slate-50">
-              {entries.map((entry, idx) => {
-                const grad      = WEEK_GRADIENTS[(entry.week - 1) % WEEK_GRADIENTS.length]
-                const isSaving  = saving === entry.id
-                const hasDone   = entry.reflection?.trim().length > 0
-                return (
-                  <div
-                    key={entry.id}
-                    className={`grid grid-cols-[60px_120px_1fr_1fr_1.6fr] gap-0 group transition-colors ${hasDone ? 'bg-teal-50/20' : 'hover:bg-slate-50/70'}`}
-                  >
-                    {/* Week */}
-                    <div className="px-4 py-3 flex items-start pt-3.5 border-r border-slate-50">
-                      <span className={`w-8 h-8 rounded-xl bg-gradient-to-br ${grad} flex items-center justify-center text-white font-black text-xs shadow-sm shrink-0`}>
-                        {entry.week}
-                      </span>
-                    </div>
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="bg-[#1e293b] text-white">
+                    <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wide border-r border-slate-600 w-27.5">Date</th>
+                    <th className="px-3 py-3 text-center text-xs font-bold uppercase tracking-wide border-r border-slate-600 w-20">Wk / Lesson</th>
+                    <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wide border-r border-slate-600">Work Done</th>
+                    <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wide border-r border-slate-600 w-50">Reflection</th>
+                    <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wide w-22.5">Signature</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {entries.map((entry, idx) => {
+                    const hasDone = entry.reflection?.trim().length > 0
+                    return (
+                      <tr key={entry.id} className={idx % 2 === 1 ? 'bg-slate-50' : 'bg-white'}>
+                        {/* Date */}
+                        <td className="px-3 py-3 border-r border-slate-100 align-top text-slate-600 text-xs">
+                          {entry.date_taught
+                            ? new Date(entry.date_taught).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })
+                            : <span className="text-slate-300 italic">not set</span>}
+                        </td>
 
-                    {/* Date */}
-                    <div className="px-3 py-3 border-r border-slate-50 flex items-start">
-                      <input
-                        type="date"
-                        defaultValue={entry.date_taught || ''}
-                        onBlur={e => updateEntry(entry.id, 'date_taught', e.target.value)}
-                        className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 bg-white transition"
-                      />
-                    </div>
+                        {/* Wk / Lesson */}
+                        <td className="px-3 py-3 border-r border-slate-100 align-top text-center">
+                          <span className="font-black text-slate-700 text-sm">Wk {entry.week}</span>
+                          <div className="text-xs text-slate-400 mt-0.5">L{entry.lesson}</div>
+                        </td>
 
-                    {/* Strand */}
-                    <div className="px-3 py-3 border-r border-slate-50 flex items-start">
-                      <textarea
-                        rows={2}
-                        defaultValue={entry.strand}
-                        onBlur={e => updateEntry(entry.id, 'strand', e.target.value)}
-                        className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 resize-none focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 bg-white transition leading-relaxed"
-                      />
-                    </div>
+                        {/* Work Done */}
+                        <td className="px-3 py-3 border-r border-slate-100 align-top">
+                          <div className="text-xs">
+                            <div className="mb-1">
+                              <span className="font-semibold text-slate-500">Strand: </span>
+                              <span className="text-slate-800">{entry.strand || '—'}</span>
+                            </div>
+                            <div>
+                              <span className="font-semibold text-slate-500">Sub-Strand: </span>
+                              <span className="text-slate-800">{entry.substrand || '—'}</span>
+                            </div>
+                          </div>
+                        </td>
 
-                    {/* Sub-Strand */}
-                    <div className="px-3 py-3 border-r border-slate-50 flex items-start">
-                      <textarea
-                        rows={2}
-                        defaultValue={entry.substrand}
-                        onBlur={e => updateEntry(entry.id, 'substrand', e.target.value)}
-                        className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 resize-none focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 bg-white transition leading-relaxed"
-                      />
-                    </div>
+                        {/* Reflection — only editable cell */}
+                        <td className="px-3 py-3 border-r border-slate-100 align-top">
+                          <div className="relative">
+                            <textarea
+                              rows={3}
+                              defaultValue={entry.reflection}
+                              onBlur={e => updateReflection(entry.id, e.target.value)}
+                              placeholder="Add reflection…"
+                              className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-2 resize-none focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-100 bg-white transition leading-relaxed"
+                            />
+                            <div className="absolute top-2 right-2">
+                              {hasDone
+                                ? <CheckCircle2 className="w-3 h-3 text-teal-500" />
+                                : <div className="w-3 h-3 rounded-full border-2 border-slate-200" />}
+                            </div>
+                          </div>
+                        </td>
 
-                    {/* Reflection */}
-                    <div className="px-3 py-3 flex items-start gap-2">
-                      <textarea
-                        rows={2}
-                        defaultValue={entry.reflection}
-                        onBlur={e => updateEntry(entry.id, 'reflection', e.target.value)}
-                        placeholder="Teacher's reflection..."
-                        className="flex-1 text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 resize-none focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-100 bg-white transition leading-relaxed"
-                      />
-                      <div className="shrink-0 mt-0.5">
-                        {isSaving
-                          ? <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
-                          : hasDone
-                            ? <CheckCircle2 className="w-3.5 h-3.5 text-teal-500" />
-                            : <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-200" />
-                        }
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
+                        {/* Signature */}
+                        <td className="px-3 py-3 align-top">
+                          <div className="h-8 border-b border-slate-200 mt-4" />
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
 
             {/* Footer */}
             <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
               <span className="text-xs text-gray-400">
-                Auto-saved on blur · {total} lessons total
+                Auto-saved · {total} lessons total · Only Reflection is editable
               </span>
               <div className="flex items-center gap-4 text-xs">
                 <span className="flex items-center gap-1.5 text-teal-600 font-bold">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> {done} done
+                  <CheckCircle2 className="w-3.5 h-3.5" /> {done} with reflection
                 </span>
                 <span className="flex items-center gap-1.5 text-slate-400 font-medium">
                   <div className="w-3 h-3 rounded-full border-2 border-slate-300" /> {total - done} pending
@@ -268,81 +279,107 @@ export default function RecordOfWorkEditorPage({ params }: { params: Promise<{ i
 // ─── Print HTML ───────────────────────────────────────────────────────────────
 
 function buildPrintHtml(row: ROWRecord, entries: ROWEntry[]): string {
-  const rows = entries.map(e => `
-    <tr>
-      <td class="center">${e.week}</td>
-      <td>${e.date_taught ? new Date(e.date_taught).toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}</td>
-      <td>${e.strand || ''}</td>
-      <td>${e.substrand || ''}</td>
-      <td>${e.reflection || ''}</td>
-    </tr>`).join('')
+  const rows = entries.map((e, i) => {
+    const date = e.date_taught
+      ? new Date(e.date_taught).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })
+      : '—'
+    return `
+    <tr class="${i % 2 === 1 ? 'alt' : ''}">
+      <td class="col-date">${date}</td>
+      <td class="col-wk center">Wk ${e.week}<br/><span class="sub">L${e.lesson}</span></td>
+      <td class="col-work">
+        <div class="wd-row"><span class="lbl">Strand:</span> ${e.strand || '—'}</div>
+        <div class="wd-row"><span class="lbl">Sub-Strand:</span> ${e.substrand || '—'}</div>
+      </td>
+      <td class="col-ref">${e.reflection || ''}</td>
+      <td class="col-sig"></td>
+    </tr>`
+  }).join('')
 
   return `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8"/>
 <title>Record of Work — ${row.learning_area}</title>
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family: Arial, sans-serif; font-size: 11px; padding: 15mm; color: #111; }
-  .header { text-align: center; margin-bottom: 14px; }
-  .header h1 { font-size: 15px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
-  .header h2 { font-size: 12px; margin-top: 3px; color: #333; }
-  .meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; border: 1px solid #bbb; padding: 10px; border-radius: 4px; }
-  .meta-label { font-size: 8px; text-transform: uppercase; color: #666; font-weight: 700; }
-  .meta-value { font-weight: 900; font-size: 11px; border-bottom: 1px solid #ddd; padding-bottom: 3px; margin-top: 2px; }
-  table { width: 100%; border-collapse: collapse; }
-  thead tr { background: #1e293b; }
-  th { color: white; padding: 7px 8px; text-align: left; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; }
-  td { border: 1px solid #e2e8f0; padding: 6px 8px; vertical-align: top; line-height: 1.5; font-size: 10px; }
-  td.center { text-align: center; font-weight: 900; }
-  tr:nth-child(even) td { background: #f8fafc; }
-  .sig { margin-top: 24px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; }
-  .sig-block { border-top: 1px solid #111; padding-top: 5px; }
-  .sig-label { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #444; }
-  .sig-line { margin-top: 16px; border-bottom: 1px solid #999; }
-  @media print { body { padding: 8mm; } @page { size: A4 portrait; margin: 8mm; } }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; font-size: 10pt; color: #000; background: #fff; padding: 15mm; }
+
+  .doc-title {
+    font-size: 13pt; font-weight: 900; text-align: center;
+    text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px;
+  }
+  .meta-table { width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; margin-bottom: 14px; }
+  .meta-table td { padding: 5px 8px; border: 1px solid #cbd5e1; font-size: 10pt; }
+  .ml { font-weight: 700; width: 18%; background: #f8fafc; }
+  .mv { width: 32%; }
+
+  .row-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .col-date  { width: 25mm; }
+  .col-wk    { width: 20mm; }
+  .col-work  { width: 90mm; }
+  .col-ref   { width: 35mm; }
+  .col-sig   { width: 20mm; }
+
+  thead tr {
+    background: #1e293b !important; color: #fff !important;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  th {
+    padding: 7px 6px; text-align: left; font-size: 9pt; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid #334155;
+  }
+  td {
+    padding: 6px 6px; border: 1px solid #cbd5e1; vertical-align: top;
+    font-size: 10pt; line-height: 1.45; min-height: 50px;
+  }
+  tr.alt td { background: #f8fafc; }
+  .center { text-align: center; }
+  .sub { font-size: 8pt; color: #64748b; }
+  .lbl { font-weight: 700; }
+  .wd-row { margin-bottom: 3px; }
+
+  .footer { margin-top: 10px; font-size: 8pt; color: #94a3b8; text-align: right; }
+
+  @media print {
+    body { padding: 0; }
+    @page { size: A4 portrait; margin: 15mm; }
+    thead tr { background: #1e293b !important; color: #fff !important;
+               -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    tr { page-break-inside: avoid; }
+  }
 </style>
 </head>
 <body>
-<div class="header">
-  <h1>Record of Work Covered</h1>
-  <h2>${row.school || ''}</h2>
-</div>
-<div class="meta">
-  <div><div class="meta-label">Learning Area / Subject</div><div class="meta-value">${row.learning_area}</div></div>
-  <div><div class="meta-label">Grade / Form</div><div class="meta-value">${row.grade}</div></div>
-  <div><div class="meta-label">Term</div><div class="meta-value">${row.term}</div></div>
-  <div><div class="meta-label">Year</div><div class="meta-value">${row.year}</div></div>
-  <div><div class="meta-label">Teacher's Name</div><div class="meta-value">${row.teacher_name || ''}</div></div>
-  <div><div class="meta-label">Curriculum</div><div class="meta-value">${row.curriculum_mode || 'CBC'}</div></div>
-</div>
-<table>
-  <thead>
+  <div class="doc-title">Record of Work Covered</div>
+  <table class="meta-table">
     <tr>
-      <th style="width:6%">Week</th>
-      <th style="width:12%">Date</th>
-      <th style="width:18%">Strand</th>
-      <th style="width:22%">Sub-Strand</th>
-      <th style="width:42%">Reflection</th>
+      <td class="ml">School:</td>   <td class="mv">${row.school || '—'}</td>
+      <td class="ml">Subject:</td>  <td class="mv">${row.learning_area}</td>
     </tr>
-  </thead>
-  <tbody>${rows}</tbody>
-</table>
-<div class="sig">
-  <div class="sig-block">
-    <div class="sig-label">Teacher's Signature</div>
-    <div class="sig-line"></div>
-  </div>
-  <div class="sig-block">
-    <div class="sig-label">HOD's Signature</div>
-    <div class="sig-line"></div>
-  </div>
-  <div class="sig-block">
-    <div class="sig-label">Principal's Signature</div>
-    <div class="sig-line"></div>
-  </div>
-</div>
+    <tr>
+      <td class="ml">Grade:</td>    <td class="mv">${row.grade}</td>
+      <td class="ml">Teacher:</td>  <td class="mv">${row.teacher_name || '—'}</td>
+    </tr>
+    <tr>
+      <td class="ml">Term:</td>     <td class="mv">${row.term}</td>
+      <td class="ml">Year:</td>     <td class="mv">${row.year}</td>
+    </tr>
+  </table>
+
+  <table class="row-table">
+    <thead>
+      <tr>
+        <th class="col-date">Date</th>
+        <th class="col-wk">Wk / Lesson</th>
+        <th class="col-work">Work Done</th>
+        <th class="col-ref">Reflection</th>
+        <th class="col-sig">Signature</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="footer">EduNexus · edunexus.co.ke</div>
 </body>
 </html>`
 }

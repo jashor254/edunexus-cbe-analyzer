@@ -38,6 +38,7 @@ export interface GeneratedLessonPlan {
   step3: string
   conclusion: string
   extendedActivities: string
+  reflection: string
   generatedAt: string
 }
 

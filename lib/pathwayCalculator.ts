@@ -26,8 +26,7 @@ export const PATHWAY_DISCLAIMER = {
 
   source:
     'Source: KNEC KJSEA 2025 Results & Placement ' +
-    'Criteria, Ministry of Education Kenya, ' +
-    'December 2025.',
+    'Criteria, December 2025.',
 }
 
 // ─── Pathway Rules & Weights ──────────────────────────────────────────────────

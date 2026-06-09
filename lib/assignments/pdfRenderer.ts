@@ -165,7 +165,7 @@ ${tasks.map((task, i) => `
   </div>
 </div>
 
-<div class="footer">EduNexus AI — KICD Aligned &nbsp;·&nbsp; edunexus.co.ke</div>
+<div class="footer">EduNexus &nbsp;·&nbsp; edunexus.co.ke</div>
 </body>
 </html>`
 }

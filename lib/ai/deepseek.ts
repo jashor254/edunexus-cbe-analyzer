@@ -6,7 +6,11 @@ import { DEEPSEEK_CONFIG } from '@/lib/config/api'
 export async function callDeepSeek(
   prompt: string,
   systemPrompt?: string,
-  options?: { temperature?: number; maxTokens?: number }
+  options?: {
+    temperature?: number
+    maxTokens?:  number
+    history?:    { role: 'user' | 'assistant'; content: string }[]
+  }
 ): Promise<string> {
   const response = await fetch(`${DEEPSEEK_CONFIG.baseURL}/v1/chat/completions`, {
     method: 'POST',
@@ -22,6 +26,7 @@ export async function callDeepSeek(
           content: systemPrompt ||
             'You are a helpful Kenyan CBC tutor. Always respond with valid JSON only — no markdown, no explanation, just the raw JSON.',
         },
+        ...(options?.history ?? []),
         {
           role: 'user',
           content: prompt,

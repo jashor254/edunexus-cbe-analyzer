@@ -1,16 +1,14 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, useRef, useCallback, use } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   ChevronLeft,
   Loader2,
   Download,
-  Save,
   GraduationCap,
   Check,
-  Pencil,
   CalendarCheck,
   Sparkles,
   ClipboardList,
@@ -60,10 +58,8 @@ export default function LessonPlanDetailPage({ params }: { params: Promise<{ pla
   const [plan, setPlan]         = useState<LessonPlanRecord | null>(null)
   const [sow, setSow]           = useState<SOWMeta | null>(null)
   const [loading, setLoading]   = useState(true)
-  const [editingKey, setEditingKey] = useState<keyof LessonPlanRecord | null>(null)
-  const [editValue, setEditValue]   = useState('')
-  const [saving, setSaving]         = useState(false)
-  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [saveState, setSaveState] = useState<'idle' | 'editing' | 'saved'>('idle')
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const [downloading, setDownloading] = useState(false)
   const [showTaughtForm, setShowTaughtForm]     = useState(startTaught)
   const [taughtDate, setTaughtDate]             = useState(new Date().toISOString().split('T')[0])
@@ -96,34 +92,30 @@ export default function LessonPlanDetailPage({ params }: { params: Promise<{ pla
       .finally(() => setLoading(false))
   }, [planId])
 
-  function startEdit(key: keyof LessonPlanRecord) {
-    setEditingKey(key)
-    setEditValue(String(plan?.[key] || ''))
-  }
-
-  async function saveField() {
-    if (!editingKey || !plan) return
-    setSaving(true)
-    setError('')
-    try {
-      const res = await fetch(`/api/lesson-plans/${planId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ field: editingKey, value: editValue }),
-      })
-      const d = await res.json()
-      if (d.success) {
-        setPlan(d.data.plan)
-        setEditingKey(null)
-        setSaveSuccess(true)
-        setTimeout(() => setSaveSuccess(false), 2000)
-      } else {
-        setError(d.error || 'Save failed')
+  const saveField = useCallback((key: keyof LessonPlanRecord, value: string) => {
+    if (!plan) return
+    setPlan(prev => prev ? { ...prev, [key]: value } : prev)
+    setSaveState('editing')
+    clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/lesson-plans/${planId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ field: key, value }),
+        })
+        const d = await res.json()
+        if (d.success) {
+          setSaveState('saved')
+          setTimeout(() => setSaveState('idle'), 2000)
+        } else {
+          setSaveState('idle')
+        }
+      } catch {
+        setSaveState('idle')
       }
-    } finally {
-      setSaving(false)
-    }
-  }
+    }, 800)
+  }, [plan, planId])
 
   async function handleMarkTaught() {
     if (!taughtDate) return
@@ -139,8 +131,8 @@ export default function LessonPlanDetailPage({ params }: { params: Promise<{ pla
       if (d.success) {
         setPlan(d.data.plan)
         setShowTaughtForm(false)
-        setSaveSuccess(true)
-        setTimeout(() => setSaveSuccess(false), 2000)
+        setSaveState('saved')
+        setTimeout(() => setSaveState('idle'), 2000)
       } else {
         setError(d.error || 'Failed to mark as taught')
       }
@@ -218,9 +210,14 @@ export default function LessonPlanDetailPage({ params }: { params: Promise<{ pla
         </Link>
 
         <div className="flex items-center gap-2">
-          {saveSuccess && (
+          {saveState === 'editing' && (
+            <span className="flex items-center gap-1 text-sm text-amber-500 font-semibold">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Editing…
+            </span>
+          )}
+          {saveState === 'saved' && (
             <span className="flex items-center gap-1 text-sm text-green-600 font-semibold">
-              <Check className="w-4 h-4" /> Saved
+              <Check className="w-3.5 h-3.5" /> Saved
             </span>
           )}
           <button
@@ -421,59 +418,34 @@ export default function LessonPlanDetailPage({ params }: { params: Promise<{ pla
         </div>
       </div>
 
-      {/* Editable sections */}
+      {/* Editable sections — click any section to edit, auto-saves after 800ms */}
       {SECTIONS.map(({ key, label, hint }) => {
         const value = plan[key] as string | null
-        const isEditing = editingKey === key
 
         return (
           <div key={String(key)} className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-b border-gray-100">
-              <div>
-                <div className="font-bold text-gray-900 text-sm">{label}</div>
-                {hint && <div className="text-xs text-gray-400">{hint}</div>}
-              </div>
-              {!isEditing && (
-                <button
-                  onClick={() => startEdit(key)}
-                  className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-blue-600 transition"
-                >
-                  <Pencil className="w-3.5 h-3.5" /> Edit
-                </button>
-              )}
+            <div className="px-5 py-3 bg-gray-50 border-b border-gray-100">
+              <div className="font-bold text-gray-900 text-sm">{label}</div>
+              {hint && <div className="text-xs text-gray-400">{hint}</div>}
             </div>
-
             <div className="px-5 py-4">
-              {isEditing ? (
-                <div className="space-y-3">
-                  <textarea
-                    value={editValue}
-                    onChange={e => setEditValue(e.target.value)}
-                    rows={5}
-                    autoFocus
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none resize-y"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={saveField}
-                      disabled={saving}
-                      className="flex items-center gap-1.5 bg-teal-600 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-teal-700 transition disabled:opacity-60"
-                    >
-                      {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                      Save
-                    </button>
-                    <button
-                      onClick={() => setEditingKey(null)}
-                      className="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl transition"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
-                  {value || <span className="text-gray-300 italic">Not yet filled in</span>}
-                </div>
+              <div
+                contentEditable
+                suppressContentEditableWarning
+                onBlur={e => {
+                  const v = e.currentTarget.textContent ?? ''
+                  if (v !== (value ?? '')) saveField(key, v)
+                }}
+                onPaste={e => {
+                  e.preventDefault()
+                  document.execCommand('insertText', false, e.clipboardData.getData('text/plain'))
+                }}
+                className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed min-h-[2rem] outline-none focus:bg-amber-50 focus:ring-1 focus:ring-amber-400/50 rounded-lg px-2 py-1 -mx-2 cursor-text transition-colors"
+              >
+                {value || ''}
+              </div>
+              {!value && (
+                <p className="text-xs text-gray-300 italic pointer-events-none -mt-6">Click to add…</p>
               )}
             </div>
           </div>
@@ -492,7 +464,7 @@ export default function LessonPlanDetailPage({ params }: { params: Promise<{ pla
       {sow && (
         <div className="text-xs text-gray-400 text-center py-2">
           {sow.teacher_name} · TSC {sow.tsc_number} · {sow.school} · Term {sow.term} {sow.year}
-          <br />Generated by EduNexus AI · KICD Aligned
+          <br />Generated by EduNexus · edunexus.co.ke
         </div>
       )}
 
