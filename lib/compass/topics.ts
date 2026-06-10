@@ -1,19 +1,24 @@
 import { createServiceClient } from '@/utils/supabase/service'
 
+const topicsCache = new Map<string, string[]>()
+
 export async function getGradeTopics(
   grade: number,
   subject: string,
-  _weakestFirst: boolean = true
+  options?: { minGrade?: number }
 ): Promise<string[]> {
   try {
     const db = createServiceClient()
+    const minGrade = options?.minGrade ?? grade
+    const cacheKey = `${minGrade}-${grade}-${subject}`
+    if (topicsCache.has(cacheKey)) return topicsCache.get(cacheKey)!
 
-    // 1. Grade IDs matching numeric_grade
-    const { data: gradeRows } = await db
-      .from('sow_grades')
-      .select('id')
-      .eq('numeric_grade', grade)
+    // 1. Grade IDs — exact grade for senior/8-4-4; full range (minGrade..grade) for junior revisers
+    const gradeQuery = minGrade < grade
+      ? db.from('sow_grades').select('id').gte('numeric_grade', minGrade).lte('numeric_grade', grade)
+      : db.from('sow_grades').select('id').eq('numeric_grade', grade)
 
+    const { data: gradeRows } = await gradeQuery
     if (!gradeRows?.length) return []
     const gradeIds = gradeRows.map((g: { id: string }) => g.id)
 
@@ -45,9 +50,11 @@ export async function getGradeTopics(
       .order('order_index')
       .limit(5)
 
-    return (substrands ?? [])
+    const results = (substrands ?? [])
       .map((s: { title: string }) => s.title)
       .filter(Boolean)
+    topicsCache.set(cacheKey, results)
+    return results
   } catch {
     return []
   }

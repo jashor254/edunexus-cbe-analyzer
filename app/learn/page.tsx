@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Compass, Send, Trophy, Star, Clock, ChevronRight, BookOpen, AlertCircle } from 'lucide-react'
+import { createClient } from '@/utils/supabase/client'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -282,10 +283,17 @@ function LearnContent() {
       : `Let's begin our ${card.label} session.`
 
     try {
-      const res  = await fetch('/api/learn', {
-        method:       'POST',
-        credentials:  'include',
-        headers:      { 'Content-Type': 'application/json' },
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        window.location.href = '/login?returnTo=/learn'
+        return
+      }
+
+      const res = await fetch('/api/learn', {
+        method:      'POST',
+        credentials: 'include',
+        headers:     { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message:             opening,
           sessionId:           null,
@@ -296,17 +304,84 @@ function LearnContent() {
           conversationHistory: [],
         }),
       })
-      const json = await res.json() as LearnApiResponse
-      if (json.success) {
-        if (json.data.sessionId) setSessionId(json.data.sessionId)
-        setMessages([{ id: `c-${Date.now()}`, role: 'compass', content: json.data.text }])
-        setConversationHistory([
-          { role: 'user',      content: opening       },
-          { role: 'assistant', content: json.data.text },
-        ])
-        if (json.data.evalSummary) setSessionSummary(json.data.evalSummary)
-        setExchangeCount(1)
+
+      if (!res.ok) return
+
+      const newSessionId = res.headers.get('X-Session-Id')
+      if (newSessionId) setSessionId(newSessionId)
+
+      if (!res.body) {
+        const json = await res.json() as { success: boolean; data: { text: string; evalSummary?: string | null } }
+        if (json.success) {
+          setMessages([{ id: `c-${Date.now()}`, role: 'compass', content: json.data.text }])
+          setConversationHistory([
+            { role: 'user',      content: opening        },
+            { role: 'assistant', content: json.data.text },
+          ])
+          if (json.data.evalSummary) setSessionSummary(json.data.evalSummary)
+          setExchangeCount(1)
+        }
+        return
       }
+
+      const decoder = new TextDecoder()
+      const msgId = `c-${Date.now()}`
+      let accumulated = ''
+      let streamStarted = false
+
+      try {
+        const reader = res.body.getReader()
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            const chunk = decoder.decode(value, { stream: true })
+            accumulated += chunk
+            if (!streamStarted) {
+              streamStarted = true
+              setIsLoading(false)
+            }
+            setMessages([{ id: msgId, role: 'compass', content: accumulated }])
+          }
+        } finally {
+          reader.releaseLock()
+        }
+      } catch (err) {
+        console.error('[learn] stream error:', err)
+        setMessages([{
+          id:      `e-${Date.now()}`,
+          role:    'compass',
+          content: 'Samahani — kulikuwa na tatizo. Jaribu tena baada ya sekunde chache.',
+        }])
+        setIsLoading(false)
+        return
+      }
+
+      if (!streamStarted) return
+
+      // Strip COMPASS_EVAL from display and extract eval summary
+      const EVAL_START = 'COMPASS_EVAL_START'
+      const EVAL_END   = 'COMPASS_EVAL_END'
+      const si = accumulated.indexOf(EVAL_START)
+      const ei = accumulated.indexOf(EVAL_END)
+      let visibleText = accumulated
+      let evalSummary: string | null = null
+
+      if (si !== -1 && ei !== -1 && ei > si) {
+        visibleText = (accumulated.slice(0, si) + accumulated.slice(ei + EVAL_END.length)).trim()
+        try {
+          const ev = JSON.parse(accumulated.slice(si + EVAL_START.length, ei).trim()) as { one_line_summary?: string }
+          evalSummary = ev.one_line_summary ?? null
+        } catch { /* malformed eval JSON */ }
+      }
+
+      setMessages([{ id: msgId, role: 'compass', content: visibleText }])
+      setConversationHistory([
+        { role: 'user',      content: opening    },
+        { role: 'assistant', content: visibleText },
+      ])
+      if (evalSummary) setSessionSummary(evalSummary)
+      setExchangeCount(1)
     } catch {
       // Non-fatal — user can type first message manually
     } finally {
@@ -329,10 +404,17 @@ function LearnContent() {
     const historyForRequest = [...conversationHistory, { role: 'user' as const, content: text }]
 
     try {
-      const res  = await fetch('/api/learn', {
-        method:       'POST',
-        credentials:  'include',
-        headers:      { 'Content-Type': 'application/json' },
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        window.location.href = '/login?returnTo=/learn'
+        return
+      }
+
+      const res = await fetch('/api/learn', {
+        method:      'POST',
+        credentials: 'include',
+        headers:     { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message:             text,
           sessionId,
@@ -343,20 +425,109 @@ function LearnContent() {
           conversationHistory: historyForRequest,
         }),
       })
-      const json = await res.json() as LearnApiResponse
-      if (json.success) {
-        if (json.data.sessionId) setSessionId(json.data.sessionId)
-        setConversationHistory([
-          ...historyForRequest,
-          { role: 'assistant', content: json.data.text },
-        ])
-        setMessages(prev => [...prev, { id: `c-${Date.now()}`, role: 'compass', content: json.data.text }])
-        if (json.data.evalSummary) {
-          setSessionSummary(json.data.evalSummary)
-          setTimeout(() => setPageState('session_complete'), 1500)
-        }
-        setExchangeCount(prev => prev + 1)
+
+      if (!res.ok) {
+        setMessages(prev => [...prev, {
+          id:      `err-${Date.now()}`,
+          role:    'compass',
+          content: 'Something went wrong. Please try again.',
+        }])
+        return
       }
+
+      const newSessionId = res.headers.get('X-Session-Id')
+      if (newSessionId) setSessionId(newSessionId)
+
+      if (!res.body) {
+        const json = await res.json() as { success: boolean; data: { text: string; evalSummary?: string | null } }
+        if (json.success) {
+          setConversationHistory([...historyForRequest, { role: 'assistant', content: json.data.text }])
+          setMessages(prev => [...prev, { id: `c-${Date.now()}`, role: 'compass', content: json.data.text }])
+          if (json.data.evalSummary) {
+            setSessionSummary(json.data.evalSummary)
+            setTimeout(() => setPageState('session_complete'), 1500)
+          }
+          setExchangeCount(prev => prev + 1)
+        }
+        return
+      }
+
+      const decoder = new TextDecoder()
+      const msgId = `c-${Date.now()}`
+      let accumulated = ''
+      let streamStarted = false
+
+      try {
+        const reader = res.body.getReader()
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            const chunk = decoder.decode(value, { stream: true })
+            accumulated += chunk
+
+            if (!streamStarted) {
+              streamStarted = true
+              setIsLoading(false)
+              setMessages(prev => [...prev, { id: msgId, role: 'compass', content: accumulated }])
+            } else {
+              setMessages(prev => {
+                const idx = prev.findIndex(m => m.id === msgId)
+                if (idx === -1) return prev
+                return [...prev.slice(0, idx), { ...prev[idx], content: accumulated }, ...prev.slice(idx + 1)]
+              })
+            }
+          }
+        } finally {
+          reader.releaseLock()
+        }
+      } catch (err) {
+        console.error('[learn] stream error:', err)
+        setMessages(prev => [...prev, {
+          id:      `e-${Date.now()}`,
+          role:    'compass',
+          content: 'Samahani — kulikuwa na tatizo. Jaribu tena baada ya sekunde chache.',
+        }])
+        setIsLoading(false)
+        return
+      }
+
+      if (!streamStarted) return
+
+      // Strip COMPASS_EVAL from display and extract eval summary
+      const EVAL_START = 'COMPASS_EVAL_START'
+      const EVAL_END   = 'COMPASS_EVAL_END'
+      const si = accumulated.indexOf(EVAL_START)
+      const ei = accumulated.indexOf(EVAL_END)
+      let visibleText = accumulated
+      let evalSummary: string | null = null
+
+      if (si !== -1 && ei !== -1 && ei > si) {
+        visibleText = (accumulated.slice(0, si) + accumulated.slice(ei + EVAL_END.length)).trim()
+        try {
+          const ev = JSON.parse(accumulated.slice(si + EVAL_START.length, ei).trim()) as { one_line_summary?: string }
+          evalSummary = ev.one_line_summary ?? null
+        } catch { /* malformed eval JSON */ }
+      }
+
+      // Update final message content (with eval stripped)
+      setMessages(prev => {
+        const idx = prev.findIndex(m => m.id === msgId)
+        if (idx === -1) return prev
+        return [...prev.slice(0, idx), { ...prev[idx], content: visibleText }, ...prev.slice(idx + 1)]
+      })
+
+      setConversationHistory([
+        ...historyForRequest,
+        { role: 'assistant', content: visibleText },
+      ])
+
+      if (evalSummary) {
+        setSessionSummary(evalSummary)
+        setTimeout(() => setPageState('session_complete'), 1500)
+      }
+
+      setExchangeCount(prev => prev + 1)
     } catch {
       setMessages(prev => [...prev, {
         id:      `err-${Date.now()}`,

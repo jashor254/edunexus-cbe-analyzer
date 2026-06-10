@@ -1,12 +1,12 @@
 // app/api/learn/route.ts
 import { createServiceClient } from '@/utils/supabase/service'
-import { callDeepSeek } from '@/lib/ai/deepseek'
+import { streamDeepSeek } from '@/lib/ai/deepseek'
 import { getOrCreateSession, readSession, writeSession, resolveSubject, recordExchange } from '@/lib/compass/session'
 import { buildCompassPrompt, type CompassPromptParams } from '@/lib/compass/prompt'
 import { getGradeTopics } from '@/lib/compass/topics'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
 import { type FeatureKey } from '@/lib/payments/config'
-import { apiSuccess, apiError } from '@/lib/api/response'
+import { apiError } from '@/lib/api/response'
 
 const FEATURE: FeatureKey = 'learning_compass'
 
@@ -48,6 +48,34 @@ function tierToLevel(tier: string): 1 | 2 | 3 | 4 {
   return 1 // remedial or unknown
 }
 
+// Keywords that unambiguously belong to maths — not to any science subject
+const MATH_ONLY_KEYWORDS = [
+  'equation', 'linear', 'algebra', 'polynomial', 'quadratic',
+  'factori', 'indices', 'surds', 'logarithm', 'trigonometr',
+  'calculus', 'matrix', 'vector',
+]
+
+// Keywords that unambiguously belong to science — not to mathematics
+const SCIENCE_ONLY_KEYWORDS = [
+  'photosynthesis', 'respiration', 'ecosystem', 'genetics',
+  'evolution', 'organisms', 'digestion', 'periodic table',
+  'atomic', 'ionic', 'covalent', 'momentum', 'magnetism',
+]
+
+function isSubtopicCompatible(subject: string, subtopic: string): boolean {
+  const subj = subject.toLowerCase().replace(/_/g, ' ')
+  const sub  = subtopic.toLowerCase().replace(/_/g, ' ')
+
+  const isScienceSubject = subj.includes('science') || subj.includes('biology') ||
+                           subj.includes('chemistry') || subj.includes('physics')
+  const isMathSubject    = subj.includes('math') || subj.includes('mathematics')
+
+  if (isScienceSubject && MATH_ONLY_KEYWORDS.some(kw => sub.includes(kw))) return false
+  if (isMathSubject    && SCIENCE_ONLY_KEYWORDS.some(kw => sub.includes(kw))) return false
+
+  return true
+}
+
 const VALID_PATHWAYS = ['STEM', 'Social Sciences', 'Arts & Sports'] as const
 type ValidPathway = (typeof VALID_PATHWAYS)[number]
 
@@ -62,6 +90,7 @@ function normalisePathway(raw: string | null): ValidPathway | null {
 
 export async function POST(req: Request) {
   try {
+    const t0 = Date.now()
     const {
       message,
       sessionId,
@@ -85,6 +114,7 @@ export async function POST(req: Request) {
     }
 
     if (!learnerId) return apiError('learnerId is required', 400)
+    console.log('[learn] auth done:', Date.now() - t0, 'ms')
     const db = createServiceClient()
     const studentId = learnerId as string
 
@@ -103,12 +133,11 @@ export async function POST(req: Request) {
       if (lastActive && !isClosing) {
         const idleMs = Date.now() - new Date(lastActive).getTime()
         if (idleMs > 20 * 60 * 1000) {
-          return apiSuccess({
-            text:          "Still there? Your session is still active.",
-            evalSummary:   null,
-            sessionId,
-            sessionUpdate: null,
-            tokensRemaining: -1,
+          return new Response("Still there? Your session is still active.", {
+            headers: {
+              'Content-Type': 'text/plain; charset=utf-8',
+              'X-Session-Id': sessionId as string,
+            },
           })
         }
       }
@@ -178,10 +207,15 @@ export async function POST(req: Request) {
         )
 
     // Subtopic — locked substrand → compass_bridge concept → subject name
+    // compass_bridge.firstConcept is validated: if it belongs to a different subject (e.g.
+    // linear_equations stored against integrated_science), treat it as null so we fall back
+    // to the subject name rather than confusing the AI with a mismatched topic.
     const compassBridge = (ctx?.compass_bridge ?? {}) as Record<string, unknown>
-    const subtopic = activeSubstrand
-      ?? (compassBridge.firstConcept as string | null)
-      ?? subject
+    const bridgeConcept = compassBridge.firstConcept as string | null
+    const validBridgeConcept = bridgeConcept && isSubtopicCompatible(subject, bridgeConcept)
+      ? bridgeConcept
+      : null
+    const subtopic = activeSubstrand ?? validBridgeConcept ?? subject
 
     // Teacher recommendation — only when teacher explicitly set a compass topic
     const teacherSuggested: boolean = !!(compassBridge.teacherSuggested)
@@ -196,12 +230,14 @@ export async function POST(req: Request) {
     // Term mode
     const { mode, holidayWeek } = detectMode(new Date())
 
-    // ── Grade topics from KICD curriculum ────────────────────────────────────
-    const gradeTopics = await getGradeTopics(grade, subject)
-
-    // ── Create / resume compass_sessions DB record ─────────────────────────────
-    const session = await getOrCreateSession(studentId, subject, mode)
-    console.log('[learn] session:', session)
+    // ── Parallel: topics (4 DB hops, cached after first call) + session upsert ─
+    // Junior (Grade 7–9): include topics from all lower grades so revision sessions have KICD context.
+    // Senior (Grade 10+): locked to their own grade.
+    const [gradeTopics, session] = await Promise.all([
+      getGradeTopics(grade, subject, { minGrade: isJunior ? 7 : grade }),
+      getOrCreateSession(studentId, subject, mode),
+    ])
+    console.log('[learn] topics+session done:', Date.now() - t0, 'ms')
 
     const activeSessionId = sessionId ?? session.sessionId
 
@@ -231,24 +267,15 @@ export async function POST(req: Request) {
     }
 
     const systemPrompt = buildCompassPrompt(promptParams)
+    console.log('[learn] prompt built:', Date.now() - t0, 'ms')
+    console.log('[learn] prompt tokens estimate:', Math.round(systemPrompt.length / 4))
 
-    // ── Call DeepSeek ─────────────────────────────────────────────────────────
     const history = Array.isArray(conversationHistory)
       ? (conversationHistory as { role: 'user' | 'assistant'; content: string }[])
       : []
 
-    const response = await callDeepSeek(
-      message,
-      systemPrompt,
-      { temperature: 0.3, maxTokens: 400, history }
-    )
-
-    // ── Increment exchange count ──────────────────────────────────────────────
-    await recordExchange(activeSessionId)
-
-    // ── Parse eval block (if session is closing) ──────────────────────────────
-    console.log('[learn] raw response:', response?.slice(0, 200))
-    console.log('[learn] has eval:', response?.includes('COMPASS_EVAL_START'))
+    // ── Stream from DeepSeek ──────────────────────────────────────────────────
+    const rawStream = await streamDeepSeek(systemPrompt, message as string, history, { temperature: 0.3 })
 
     type CompassEval = {
       genuine_progress: boolean
@@ -259,119 +286,157 @@ export async function POST(req: Request) {
     const EVAL_START = 'COMPASS_EVAL_START'
     const EVAL_END   = 'COMPASS_EVAL_END'
 
-    const evalStartIdx = response.indexOf(EVAL_START)
-    const evalEndIdx   = response.indexOf(EVAL_END)
+    const encoder = new TextEncoder()
+    let accumulated  = ''
+    let sseBuffer    = ''
+    let firstToken   = false
 
-    let visibleResponse = response
-    let parsedEval: CompassEval | null = null
+    const transformStream = new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        sseBuffer += new TextDecoder().decode(chunk)
+        const lines = sseBuffer.split('\n')
+        sseBuffer = lines.pop() ?? ''
 
-    if (evalStartIdx !== -1 && evalEndIdx !== -1 && evalEndIdx > evalStartIdx) {
-      visibleResponse = (
-        response.slice(0, evalStartIdx) +
-        response.slice(evalEndIdx + EVAL_END.length)
-      ).trim()
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const data = line.slice(6).trim()
+          if (data === '[DONE]') continue
+          try {
+            const parsed = JSON.parse(data) as { choices: [{ delta: { content?: string } }] }
+            const content = parsed.choices[0]?.delta?.content ?? ''
+            if (content) {
+              if (!firstToken) {
+                console.log('[learn] first token:', Date.now() - t0, 'ms')
+                firstToken = true
+              }
+              accumulated += content
+              controller.enqueue(encoder.encode(content))
+            }
+          } catch { /* malformed SSE line */ }
+        }
+      },
 
-      try {
-        parsedEval = JSON.parse(
-          response.slice(evalStartIdx + EVAL_START.length, evalEndIdx).trim()
-        ) as CompassEval
-      } catch (parseErr) {
-        console.error('[learn] eval parse failed:', parseErr)
-      }
-    }
+      async flush(controller) {
+        // Flush any remaining SSE buffer line
+        if (sseBuffer.startsWith('data: ')) {
+          const data = sseBuffer.slice(6).trim()
+          if (data && data !== '[DONE]') {
+            try {
+              const parsed = JSON.parse(data) as { choices: [{ delta: { content?: string } }] }
+              const content = parsed.choices[0]?.delta?.content ?? ''
+              if (content) {
+                accumulated += content
+                controller.enqueue(encoder.encode(content))
+              }
+            } catch { /* malformed */ }
+          }
+        }
 
-    // ── Clear teacherSuggested flag after first message so greeting only fires once
-    if (teacherSuggested && session.isNew) {
-      const updatedBridge = { ...compassBridge, teacherSuggested: false }
-      await db.from('student_learning_context')
-        .update({ compass_bridge: updatedBridge })
-        .eq('student_id', studentId)
-    }
+        // Parse eval block if session is closing
+        const evalStartIdx = accumulated.indexOf(EVAL_START)
+        const evalEndIdx   = accumulated.indexOf(EVAL_END)
 
-    // ── Persist eval results ──────────────────────────────────────────────────
-    if (parsedEval !== null) {
-      const currentSwi = (ctx?.sessions_without_improvement as number | null) ?? 0
+        let parsedEval: CompassEval | null = null
+        if (evalStartIdx !== -1 && evalEndIdx !== -1 && evalEndIdx > evalStartIdx) {
+          try {
+            parsedEval = JSON.parse(
+              accumulated.slice(evalStartIdx + EVAL_START.length, evalEndIdx).trim()
+            ) as CompassEval
+          } catch (parseErr) {
+            console.error('[learn] eval parse failed:', parseErr)
+          }
+        }
 
-      try {
-        await db.from('compass_sessions')
-          .update({ one_line_summary: parsedEval.one_line_summary })
-          .eq('id', activeSessionId)
+        const visibleResponse = parsedEval
+          ? (accumulated.slice(0, evalStartIdx) + accumulated.slice(evalEndIdx + EVAL_END.length)).trim()
+          : accumulated.trim()
 
-        await db.from('student_learning_context')
-          .update({
-            sessions_without_improvement: parsedEval.genuine_progress ? 0 : currentSwi + 1,
-            ...(parsedEval.recommend_subject_rest && {
-              subject_rest_until: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-            }),
-          })
-          .eq('student_id', studentId)
-      } catch (err) {
-        console.error('[learn] eval DB update failed:', err)
-      }
-    }
+        // Increment exchange count
+        await recordExchange(activeSessionId)
 
-    // ── Save session state ────────────────────────────────────────────────────
-    await writeSession(activeSessionId, {
-      lockedSubject:    lockedSubject    || savedSession?.lockedSubject    || null,
-      lockedSubstrand:  activeSubstrand,
-      lockedGrade:      (lockedGrade as number | null) || savedSession?.lockedGrade || null,
-      isRevision,
-      studentGrade:     grade,
-      overallLevel:     level,
-      consecutiveRight: savedSession?.consecutiveRight ?? 0,
-      consecutiveWrong: savedSession?.consecutiveWrong ?? 0,
-      initialized:      true,
+        // Clear teacherSuggested flag after first message so greeting only fires once
+        if (teacherSuggested && session.isNew) {
+          const updatedBridge = { ...compassBridge, teacherSuggested: false }
+          await db.from('student_learning_context')
+            .update({ compass_bridge: updatedBridge })
+            .eq('student_id', studentId)
+        }
+
+        // Persist eval results
+        if (parsedEval !== null) {
+          const currentSwi = (ctx?.sessions_without_improvement as number | null) ?? 0
+          try {
+            await db.from('compass_sessions')
+              .update({ one_line_summary: parsedEval.one_line_summary })
+              .eq('id', activeSessionId)
+
+            await db.from('student_learning_context')
+              .update({
+                sessions_without_improvement: parsedEval.genuine_progress ? 0 : currentSwi + 1,
+                ...(parsedEval.recommend_subject_rest && {
+                  subject_rest_until: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+                }),
+              })
+              .eq('student_id', studentId)
+          } catch (err) {
+            console.error('[learn] eval DB update failed:', err)
+          }
+        }
+
+        // Save session state
+        await writeSession(activeSessionId, {
+          lockedSubject:    lockedSubject    || savedSession?.lockedSubject    || null,
+          lockedSubstrand:  activeSubstrand,
+          lockedGrade:      (lockedGrade as number | null) || savedSession?.lockedGrade || null,
+          isRevision,
+          studentGrade:     grade,
+          overallLevel:     level,
+          consecutiveRight: savedSession?.consecutiveRight ?? 0,
+          consecutiveWrong: savedSession?.consecutiveWrong ?? 0,
+          initialized:      true,
+        })
+
+        // Log messages
+        await db.from('compass_messages').insert([
+          {
+            session_id: activeSessionId,
+            role:       'user',
+            content:    message,
+            created_at: new Date().toISOString(),
+          },
+          {
+            session_id: activeSessionId,
+            role:       'assistant',
+            content:    visibleResponse,
+            metadata: {
+              subject,
+              substrand: activeSubstrand,
+              level,
+            },
+            created_at: new Date(Date.now() + 1).toISOString(),
+          },
+        ])
+
+        // Deduct tokens
+        if (access.deductTokens) {
+          await deductFeatureTokens(access.userId, FEATURE, access.cost)
+        }
+      },
     })
 
-    // ── Log messages ──────────────────────────────────────────────────────────
-    await db.from('compass_messages').insert([
-      {
-        session_id: activeSessionId,
-        role:       'user',
-        content:    message,
-        created_at: new Date().toISOString(),
+    return new Response(rawStream.pipeThrough(transformStream), {
+      headers: {
+        'Content-Type':     'text/plain; charset=utf-8',
+        'Transfer-Encoding': 'chunked',
+        'X-Session-Id':     activeSessionId,
       },
-      {
-        session_id: activeSessionId,
-        role:       'assistant',
-        content:    visibleResponse,
-        metadata: {
-          subject,
-          substrand: activeSubstrand,
-          level,
-        },
-        created_at: new Date(Date.now() + 1).toISOString(),
-      },
-    ])
-
-    // ── Deduct tokens ─────────────────────────────────────────────────────────
-    let tokensRemaining = -1
-    if (access.deductTokens) {
-      await deductFeatureTokens(access.userId, FEATURE, access.cost)
-      const { data: bal } = await db
-        .from('token_balances')
-        .select('balance')
-        .eq('user_id', access.userId)
-        .maybeSingle()
-      tokensRemaining = (bal?.balance as number | null) ?? 0
-    }
-
-    // ── Return ────────────────────────────────────────────────────────────────
-    return apiSuccess({
-      text:        visibleResponse,
-      evalSummary: parsedEval?.one_line_summary ?? null,
-      sessionId:   activeSessionId,
-      sessionUpdate: {
-        currentSubject:  subject,
-        currentConcept:  activeSubstrand || '',
-        lockedSubject,
-        lockedSubstrand: activeSubstrand,
-      },
-      tokensRemaining,
     })
 
   } catch (error) {
-    console.error('[learn] Error:', error)
-    return apiError('Internal server error', 500)
+    console.error('[learn] FATAL:', error)
+    return new Response(
+      JSON.stringify({ error: 'Internal server error' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    )
   }
 }

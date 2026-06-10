@@ -20,29 +20,48 @@ export type AccessResult =
   | { allowed: true;  tier: 'token'; deductTokens: true; cost: number; userId: string }
   | { allowed: false; reason: 'unauthenticated' | 'insufficient_tokens' | 'no_access' }
 
+const accessCache = new Map<string, { result: AccessResult; expiresAt: number }>()
+const CACHE_TTL_MS = 60_000
+
 /**
  * Checks whether the currently authenticated user can use a gated feature.
  * Resolution order: admin → teacher-free → subscriber → token balance.
  * Always returns userId in the allowed result to avoid double auth calls in routes.
+ *
+ * auth.getUser() always runs (security boundary). The 3–4 DB queries that follow
+ * are cached per user+feature for 60 seconds — a session of 10 exchanges pays
+ * the full DB cost only on the first message.
  */
 export async function checkFeatureAccess(
   feature: FeatureKey
 ): Promise<AccessResult> {
-  // 1. Auth check — always first, never trust body userId
+  // 1. Auth check — always runs, never trust body userId, needed for cache key
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (!user || authError) {
     return { allowed: false, reason: 'unauthenticated' }
   }
 
-  // 2. Admin bypass — full access, no token cost, no subscription required
+  // 2. Cache check — short-circuits all DB queries after the first call
+  const cacheKey = `${user.id}-${feature}`
+  const cached = accessCache.get(cacheKey)
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.result
+  }
+
+  const cacheAndReturn = (result: AccessResult): AccessResult => {
+    accessCache.set(cacheKey, { result, expiresAt: Date.now() + CACHE_TTL_MS })
+    return result
+  }
+
+  // 3. Admin bypass — full access, no token cost, no subscription required
   if (await isAdmin(user.id, user.email ?? undefined)) {
-    return { allowed: true, tier: 'subscriber', deductTokens: false, userId: user.id }
+    return cacheAndReturn({ allowed: true, tier: 'subscriber', deductTokens: false, userId: user.id })
   }
 
   const db = createServiceClient()
 
-  // 3. Role check — profiles.id = auth.users.id (not user_id)
+  // 4. Role check — profiles.id = auth.users.id (not user_id)
   //    Select both role and secondary_role for dual-role users
   const { data: profile } = await db
     .from('profiles')
@@ -56,16 +75,16 @@ export async function checkFeatureAccess(
   // A parent who is also a teacher gets teacher privileges on teacher-tier features
   const isTeacherRole = primaryRole === 'teacher' || secondaryRole === 'teacher'
 
-  // 4. Teacher tier — free for teacher-designated features
+  // 5. Teacher tier — free for teacher-designated features
   if (isTeacherRole) {
     const teacherAccess = FEATURE_ACCESS[feature].teacher
     if (teacherAccess === 'free') {
-      return { allowed: true, tier: 'teacher', deductTokens: false, userId: user.id }
+      return cacheAndReturn({ allowed: true, tier: 'teacher', deductTokens: false, userId: user.id })
     }
     // Teacher accessing a parent-tier feature (clinic, compass, career) → falls through
   }
 
-  // 5. Active subscription → unlimited access, no deduction
+  // 6. Active subscription → unlimited access, no deduction
   const { data: subscription } = await db
     .from('subscriptions')
     .select('id, expires_at')
@@ -75,10 +94,10 @@ export async function checkFeatureAccess(
     .maybeSingle()
 
   if (subscription) {
-    return { allowed: true, tier: 'subscriber', deductTokens: false, userId: user.id }
+    return cacheAndReturn({ allowed: true, tier: 'subscriber', deductTokens: false, userId: user.id })
   }
 
-  // 6. Token balance check — last resort
+  // 7. Token balance check — last resort
   const cost = TOKEN_COSTS[feature]
 
   const { data: balance } = await db
@@ -89,10 +108,10 @@ export async function checkFeatureAccess(
 
   const available = balance?.balance ?? 0
   if (available < cost) {
-    return { allowed: false, reason: 'insufficient_tokens' }
+    return cacheAndReturn({ allowed: false, reason: 'insufficient_tokens' })
   }
 
-  return { allowed: true, tier: 'token', deductTokens: true, cost, userId: user.id }
+  return cacheAndReturn({ allowed: true, tier: 'token', deductTokens: true, cost, userId: user.id })
 }
 
 /**
