@@ -26,7 +26,7 @@ export async function GET() {
         id, name, grade, school, current_pathway, curriculum_type, created_at,
         assessments(id, term, year, grade, subject_scores, created_at)
       `)
-      .eq('user_id', user.id)
+      .or(`user_id.eq.${user.id},parent_user_id.eq.${user.id}`)
       .order('name')
 
     if (error) return apiError(error.message)

@@ -44,11 +44,11 @@ export async function POST(request: Request) {
     const plan = subscription?.plan || 'free'
     const maxStudents = PLAN_LIMITS[plan] ?? 1
 
-    // Count current students
+    // Count current students (including admin-linked via parent_user_id)
     const { count, error: countError } = await service
       .from('students')
       .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
+      .or(`user_id.eq.${user.id},parent_user_id.eq.${user.id}`)
 
     if (countError) return apiError(countError.message)
 

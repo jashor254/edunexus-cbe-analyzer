@@ -20,7 +20,7 @@ export async function GET(req: Request) {
         .from('students')
         .select('id')
         .eq('id', studentId)
-        .eq('user_id', user.id)
+        .or(`user_id.eq.${user.id},parent_user_id.eq.${user.id}`)
         .single()
       if (!student) return apiError('Student not found', 403)
     } else {
@@ -28,7 +28,7 @@ export async function GET(req: Request) {
       const { data: students } = await db
         .from('students')
         .select('id')
-        .eq('user_id', user.id)
+        .or(`user_id.eq.${user.id},parent_user_id.eq.${user.id}`)
         .limit(1)
       targetStudentId = students?.[0]?.id || null
     }
