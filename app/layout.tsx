@@ -126,7 +126,7 @@ export default function RootLayout({
               "name": "EduNexus Kenya",
               "url": "https://edunexus.co.ke",
               "logo": "https://edunexus.co.ke/logo.png",
-              "description": "Mwongozo wa CBC na mustakabali wa taaluma kwa wanafunzi wa Kenya",
+              "description": "kenya first education intelligence system",
               "address": {
                 "@type": "PostalAddress",
                 "addressCountry": "KE",

@@ -1,4 +1,6 @@
 // lib/career/types.ts
+import type { PathwayResult } from '@/lib/pathwayCalculator'
+export type { PathwayResult }
 
 export type CareerCategory =
   | 'technology'
@@ -13,6 +15,19 @@ export type CareerCategory =
   | 'finance'
 
 export type DoorType = 'employment' | 'self_employment' | 'entrepreneurship' | 'ai_era'
+
+export type AISovereignty = {
+  the_shift: string
+  what_you_can_build: string[]
+  tools_to_learn: string[]
+  sovereignty_example: string
+}
+
+export type EarlyStart = {
+  age_14_16: string[]
+  age_16_18: string[]
+  first_win: string
+}
 
 export type SalaryTier = {
   min: number
@@ -48,6 +63,11 @@ export type CareerDoor = {
   ai_opportunity?: string
   skills_needed?: string[]
   early_mover_advantage?: boolean
+  ai_sovereignty?: AISovereignty
+  // Entrepreneurship enhanced
+  the_gap?: string
+  example_ventures?: string[]
+  market_note?: string
 }
 
 export type AIImpact = {
@@ -93,7 +113,9 @@ export type Career = {
   skill_timeline: SkillTimelineItem[]
   future_skills: string[]
   kenya_examples: KenyaExample[] | null
-  pathway: 'STEM' | 'Social' | 'Arts' | 'Creative' | 'Trades'
+  pathway: 'STEM' | 'Social' | 'Social Sciences' | 'Arts' | 'Arts & Sports' | 'Creative' | 'Trades'
+  early_start?: EarlyStart
+  university_courses?: string[]
   disclaimer: string
   created_at: string
   updated_at: string
@@ -215,6 +237,7 @@ export type ClinicReport = {
   recommended_pathway: string | null        // Junior: STEM/Social/Arts etc
   kjsea_composite?: number                  // Junior: KJSEA 2025 composite score
   stem_viable?: boolean                     // Junior: STEM within reach (one blocker)
+  pathwayGapAnalysis?: PathwayResult        // Junior: two-step pathway gap detail
   top_career: CareerMatchWithDetail | null  // Senior only
   career_gap_rows?: SubjectScoreRow[]       // Senior: career-required subjects with gap data
   top_career_detail: Career | null          // Senior only (for subject gaps)

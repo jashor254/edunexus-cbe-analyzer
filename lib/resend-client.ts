@@ -9,7 +9,7 @@ if (!process.env.RESEND_API_KEY) {
 export const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Email sender configuration
-export const EMAIL_FROM = 'EduNexus <noreply@edunexus.app>';
+export const EMAIL_FROM = 'EduNexus <hello@edunexus.co.ke>';
 
 // For development, use onboarding domain
 export const EMAIL_FROM_DEV = 'EduNexus <onboarding@resend.dev>';

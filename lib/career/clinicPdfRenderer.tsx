@@ -107,11 +107,11 @@ const S = StyleSheet.create({
   pathwayHead: { fontSize: 20, fontWeight: 700, marginBottom: 6 },
   pathwayBody: { fontSize: 10, lineHeight: 1.6 },
 
-  // Action card
-  actionCard:  { marginBottom: 14, padding: 14, borderRadius: 6, borderLeftWidth: 3 },
-  actionTitle: { fontSize: 11, fontWeight: 700, color: C.text, marginBottom: 4 },
-  actionWhy:   { fontSize: 9, color: C.muted, marginBottom: 6, lineHeight: 1.5 },
-  actionText:  { fontSize: 10, color: C.text, lineHeight: 1.6 },
+  // Action card — compact to fit 4 on one page
+  actionCard:  { marginBottom: 10, padding: 10, borderRadius: 6, borderLeftWidth: 3 },
+  actionTitle: { fontSize: 10, fontWeight: 700, color: C.text, marginBottom: 3 },
+  actionWhy:   { fontSize: 8.5, color: C.muted, marginBottom: 4, lineHeight: 1.4 },
+  actionText:  { fontSize: 9.5, color: C.text, lineHeight: 1.5 },
 
   // Timeline item
   timelineItem: { marginBottom: 12, paddingLeft: 12, borderLeftWidth: 2, borderLeftColor: C.gold },
@@ -262,100 +262,150 @@ function PathwayCareerPage({ report }: { report: ClinicReport }) {
         {report.section === 'junior' ? (
           <>
             <Text style={S.sectionLabel}>SECTION 2 — PATHWAY ANALYSIS</Text>
-            <Text style={S.sectionTitle}>Recommended Pathway: {report.recommended_pathway ?? 'Not yet determined'}</Text>
+            <Text style={S.sectionTitle}>Grade 10 Pathway Placement</Text>
             <View style={S.divider} />
 
-            {report.recommended_pathway && pw && (
-              <View style={[S.pathwayBox, { backgroundColor: pw.bg, borderWidth: 1, borderColor: pw.color + '40' }]}>
-                <Text style={[S.pathwayHead, { color: pw.color }]}>{report.recommended_pathway}</Text>
-                <Text style={[S.pathwayBody, { color: C.text }]}>{pw.desc}</Text>
-              </View>
-            )}
+            {/* ── BLOCK A: Your Pathway Now ─────────────────────────────── */}
+            {(() => {
+              const gap       = report.pathwayGapAnalysis
+              const firstName = report.student_name.split(' ')[0]
+              const composite = gap?.compositeScore ?? report.kjsea_composite
+              const maxScore  = gap?.kjseaMaxScore ?? 72
+              const qualFor   = gap?.qualifiesFor ?? (report.recommended_pathway ? [report.recommended_pathway] : [])
+              const alsoFor   = qualFor.filter(p => p !== report.recommended_pathway)
+              const partial   = gap?.isPartialComposite ?? false
+              const entered   = gap?.subjectsEntered ?? 9
 
-            {/* All subject scores */}
-            <Text style={{ fontSize: 11, fontWeight: 700, color: C.text, marginBottom: 12 }}>
-              Full Subject Performance
-            </Text>
-            {[...report.top_subjects, ...report.weak_subjects].map(s => (
-              <View key={s.subject} style={S.subjectRow}>
-                <Text style={S.subjectName}>{s.display_name}</Text>
-                <View style={[S.scoreBar, { width: s.score * 40, backgroundColor: statusColor(s.status) }]} />
-                <View style={[{ backgroundColor: statusBg(s.status), paddingHorizontal: 8, paddingVertical: 2, borderRadius: 3 }]}>
-                  <Text style={[S.scoreLabel, { color: statusColor(s.status) }]}>
-                    {s.score.toFixed(1)} — {s.status === 'strong' ? 'Exceeds' : s.status === 'meets' ? 'Meets' : s.status === 'needs_work' ? 'Approaching' : 'Below'}
-                  </Text>
-                </View>
-              </View>
-            ))}
-
-            <View style={S.divider} />
-            <Text style={{ fontSize: 9, color: C.muted, lineHeight: 1.5, marginBottom: 16 }}>
-              CBC Grade {report.grade} — Pathway placement is based on current performance and is reviewed each term. Students can change pathways up to Grade 10.
-            </Text>
-
-            {/* Fix 2: Fill blank space with meaningful context box */}
-            <View style={{ backgroundColor: '#eff6ff', borderRadius: 8, padding: 18, borderLeftWidth: 4, borderLeftColor: '#1d4ed8' }}>
-              <Text style={{ fontSize: 10, fontWeight: 700, color: '#1d4ed8', marginBottom: 8, letterSpacing: 0.5 }}>
-                What This Means for {report.student_name.split(' ')[0]}
-              </Text>
-              <Text style={{ fontSize: 10, color: C.text, lineHeight: 1.7, marginBottom: 8 }}>
-                {report.student_name.split(' ')[0]} is in Grade {report.grade} — {report.grade === 9 ? 'the final year of Junior Secondary' : 'Junior Secondary'}. The {report.recommended_pathway ?? 'recommended'} pathway recommendation will guide subject choices entering Grade 10.
-              </Text>
-              <Text style={{ fontSize: 10, color: C.text, lineHeight: 1.7, marginBottom: 8 }}>
-                {report.recommended_pathway === 'STEM'
-                  ? 'Strong performance in Sciences and Mathematics will open the most doors — including medicine, engineering, and technology. These subjects become harder in senior school, so every term of solid foundation counts.'
-                  : report.recommended_pathway === 'Social Sciences'
-                  ? 'Strong performance in English, History, and Social Studies builds the analytical and communication skills that define careers in law, education, and public service.'
-                  : report.recommended_pathway === 'Arts & Sports Science'
-                  ? 'Creative and physical excellence combined with academic performance opens unique opportunities in the growing arts and sports economy.'
-                  : 'A strong overall performance at this level keeps all options open for Grade 10 subject selection.'}
-              </Text>
-              <Text style={{ fontSize: 9, color: C.muted, lineHeight: 1.5 }}>
-                Pathway can be reviewed each term based on performance. Final selection happens at Grade 10 entry.
-              </Text>
-            </View>
-
-            {/* STEM within reach — shown when Social Sciences but composite + science signal exists */}
-            {report.recommended_pathway === 'Social Sciences' && report.stem_viable && (() => {
-              const sciSubject = [...report.top_subjects, ...report.weak_subjects]
-                .find(s => s.subject === 'integrated_science' || s.subject === 'mathematics')
-              const strongSci = report.top_subjects.find(s => s.subject === 'integrated_science')
-              const weakMath  = report.weak_subjects.find(s => s.subject === 'mathematics')
-              if (!sciSubject) return null
               return (
-                <View style={{ backgroundColor: '#f0fdf4', borderRadius: 6, padding: 14, borderLeftWidth: 3, borderLeftColor: '#16a34a', marginTop: 10 }}>
-                  <Text style={{ fontSize: 10, fontWeight: 700, color: '#15803d', marginBottom: 6 }}>
-                    STEM Pathway: Within Reach
-                  </Text>
-                  {weakMath && (
-                    <Text style={{ fontSize: 9, color: C.text, lineHeight: 1.6, marginBottom: 4 }}>
-                      {`Mathematics needs to reach Level 3 (currently Level ${weakMath.score.toFixed(0)}). One level of improvement unlocks the full STEM pathway.`}
+                <View style={{ flexDirection: 'row', marginBottom: 14 }}>
+                  {/* Left: pathway pill */}
+                  <View style={[S.pathwayBox, { flex: 1, marginRight: 8, backgroundColor: pw?.bg ?? C.offWhite, borderWidth: 1, borderColor: (pw?.color ?? C.teal) + '40' }]}>
+                    <Text style={{ fontSize: 8, color: pw?.color ?? C.teal, letterSpacing: 2, marginBottom: 4 }}>YOUR PATHWAY NOW</Text>
+                    <Text style={[S.pathwayHead, { color: pw?.color ?? C.teal, fontSize: 16 }]}>
+                      {report.recommended_pathway ?? 'Not yet determined'}
                     </Text>
-                  )}
-                  {strongSci && (
-                    <Text style={{ fontSize: 9, color: C.text, lineHeight: 1.6, marginBottom: 4 }}>
-                      {`Integrated Science is already strong at Level ${strongSci.score.toFixed(0)} — this is a real STEM signal.`}
+                    {composite !== undefined && (
+                      <Text style={{ fontSize: 10, color: partial ? C.amber : C.text, marginTop: 4 }}>
+                        {partial
+                          ? `KJSEA composite: ${composite} / ${maxScore} points (${entered} of 9 subjects)`
+                          : `KJSEA composite: ${composite} / ${maxScore} points`}
+                      </Text>
+                    )}
+                    {partial && (
+                      <Text style={{ fontSize: 8, color: C.amber, marginTop: 3, lineHeight: 1.4 }}>
+                        Add remaining subjects for complete KJSEA composite analysis.
+                      </Text>
+                    )}
+                    <Text style={{ fontSize: 9, color: C.muted, marginTop: 6 }}>
+                      {`Qualifies for: ${qualFor.join(', ')}`}
                     </Text>
-                  )}
-                  <Text style={{ fontSize: 9, color: C.muted, lineHeight: 1.5 }}>
-                    {`KJSEA composite: ${report.kjsea_composite ?? '—'}/72 (threshold: 20). Social Sciences remains a strong pathway now.`}
-                  </Text>
+                    {alsoFor.length > 0 && (
+                      <View style={{ backgroundColor: '#dcfce7', borderRadius: 3, paddingHorizontal: 6, paddingVertical: 3, marginTop: 6, alignSelf: 'flex-start' }}>
+                        <Text style={{ fontSize: 8, color: '#15803d', fontWeight: 700 }}>
+                          {`Also qualifies for: ${alsoFor.join(', ')}`}
+                        </Text>
+                      </View>
+                    )}
+                    <Text style={{ fontSize: 9, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>
+                      {firstName} is in Grade {report.grade}
+                      {report.grade === 9 ? ' — final year of Junior Secondary.' : ' — Junior Secondary.'}
+                      {' '}Pathway selection confirmed at Grade 10 entry.
+                    </Text>
+                  </View>
+
+                  {/* Right: subject scores */}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 8, color: C.muted, letterSpacing: 1, marginBottom: 6 }}>SUBJECT SCORES</Text>
+                    {[...report.top_subjects, ...report.weak_subjects].map(s => (
+                      <View key={s.subject} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
+                        <Text style={{ fontSize: 8, color: C.text, flex: 1 }}>{s.display_name}</Text>
+                        <View style={{ backgroundColor: statusBg(s.status), paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3 }}>
+                          <Text style={{ fontSize: 8, color: '#ffffff', fontWeight: 700 }}>L{s.score.toFixed(0)}</Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
                 </View>
               )
             })()}
 
-            {/* KJSEA composite + disclaimer */}
-            <View style={{ backgroundColor: '#f8f9fa', borderLeftWidth: 3, borderLeftColor: '#6b7280', paddingHorizontal: 12, paddingVertical: 8, marginTop: 12 }}>
-              {report.kjsea_composite !== undefined && (
-                <Text style={{ fontSize: 9, color: '#6b7280', fontStyle: 'italic', marginBottom: 4 }}>
-                  {`KJSEA composite: ${report.kjsea_composite}/72 points (STEM threshold: 20 points)`}
-                </Text>
-              )}
-              <Text style={{ fontSize: 9, color: '#6b7280', fontStyle: 'italic', marginBottom: 2 }}>
-                {PATHWAY_DISCLAIMER.short}
+            <View style={S.divider} />
+
+            {/* ── BLOCK B: Next Door (STEM) ─────────────────────────────── */}
+            {report.pathwayGapAnalysis?.nextPathway && (() => {
+              const next      = report.pathwayGapAnalysis!.nextPathway!
+              const lever     = next.keyLever
+              const firstName = report.student_name.split(' ')[0]
+              return (
+                <View style={{ backgroundColor: '#eff6ff', borderRadius: 8, padding: 16, borderWidth: 1, borderColor: '#bfdbfe', marginBottom: 12 }}>
+                  <Text style={{ fontSize: 8, color: '#1d4ed8', letterSpacing: 2, marginBottom: 4 }}>NEXT DOOR</Text>
+                  <Text style={{ fontSize: 13, fontWeight: 700, color: '#1e3a8a', marginBottom: 8 }}>
+                    {`The ${next.name} Door`}
+                  </Text>
+
+                  {/* Unlock message */}
+                  <Text style={{ fontSize: 10, color: C.text, lineHeight: 1.65, marginBottom: 10 }}>
+                    {next.unlockMessage}
+                  </Text>
+
+                  {/* Visual: [Current] → [Target] → [STEM] */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                    <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 4, borderWidth: 1, borderColor: '#d97706' }}>
+                      <Text style={{ fontSize: 8, color: '#92400e', fontWeight: 700 }}>
+                        {`${lever.subject} L${lever.currentLevel}`}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 11, color: C.muted, marginHorizontal: 5 }}>{'->'}</Text>
+                    <View style={{ backgroundColor: '#dcfce7', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 4, borderWidth: 1, borderColor: '#16a34a' }}>
+                      <Text style={{ fontSize: 8, color: '#14532d', fontWeight: 700 }}>
+                        {`${lever.subject} L${lever.targetLevel}`}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 11, color: C.muted, marginHorizontal: 5 }}>{'->'}</Text>
+                    <View style={{ backgroundColor: '#1d4ed8', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 4 }}>
+                      <Text style={{ fontSize: 8, color: '#ffffff', fontWeight: 700 }}>{next.name} Open</Text>
+                    </View>
+                  </View>
+
+                  <Text style={{ fontSize: 9, color: '#3b82f6', fontStyle: 'italic', marginBottom: 6 }}>
+                    One subject. One level. One term.
+                  </Text>
+
+                  {lever.wouldUnlock ? (
+                    <Text style={{ fontSize: 9, color: '#15803d', fontWeight: 700 }}>
+                      This single improvement is enough to open {next.name}.
+                    </Text>
+                  ) : (
+                    <Text style={{ fontSize: 9, color: C.muted }}>
+                      {next.currentGap > 0
+                        ? `This brings ${firstName} within ${next.currentGap} points of ${next.name}.`
+                        : `The composite qualifies. Focus is on the subject requirements above.`}
+                    </Text>
+                  )}
+                </View>
+              )
+            })()}
+
+            {/* ── BLOCK C: Disclaimer ───────────────────────────────────── */}
+            <View style={{ backgroundColor: C.offWhite, borderRadius: 4, padding: 10, borderWidth: 1, borderColor: C.border }}>
+              <Text style={{ fontSize: 7.5, color: C.muted, lineHeight: 1.5 }}>
+                {report.pathwayGapAnalysis?.disclaimer ?? PATHWAY_DISCLAIMER.short}
               </Text>
-              <Text style={{ fontSize: 9, color: '#6b7280', fontStyle: 'italic' }}>
+              <Text style={{ fontSize: 7.5, color: C.muted, lineHeight: 1.5, marginTop: 2 }}>
                 {PATHWAY_DISCLAIMER.source}
+              </Text>
+            </View>
+
+            {/* Career exploration CTA */}
+            <View style={{ backgroundColor: '#f5f3ff', borderRadius: 8, padding: 14, borderLeftWidth: 4, borderLeftColor: '#7c3aed', marginTop: 12 }}>
+              <Text style={{ fontSize: 10, fontWeight: 700, color: '#5b21b6', marginBottom: 6 }}>
+                Explore Careers in This Pathway
+              </Text>
+              <Text style={{ fontSize: 9.5, color: '#3b0764', lineHeight: 1.65, marginBottom: 6 }}>
+                {`Visit edunexus.co.ke/career to see every career in the ${report.recommended_pathway ?? 'recommended'} pathway — including employment salaries, business opportunities, and what AI makes possible in each field.`}
+              </Text>
+              <Text style={{ fontSize: 9, color: '#6d28d9', fontWeight: 600 }}>
+                edunexus.co.ke/career
               </Text>
             </View>
           </>
@@ -371,12 +421,12 @@ function PathwayCareerPage({ report }: { report: ClinicReport }) {
 
             {report.top_career ? (
               <>
-                {/* Truncated description — full description causes Page 2 overflow */}
+                {/* Description — capped to prevent Page 2 overflow */}
                 <View style={[S.summaryBox]}>
                   <Text style={S.summaryText}>
                     {(() => {
                       const desc = report.top_career.career.description ?? ''
-                      return desc.length > 200 ? desc.slice(0, 200) + '…' : desc
+                      return desc.length > 320 ? desc.slice(0, 320) + '…' : desc
                     })()}
                   </Text>
                 </View>
@@ -418,6 +468,19 @@ function PathwayCareerPage({ report }: { report: ClinicReport }) {
                 </Text>
               </View>
             )}
+
+            {/* Career Explorer CTA */}
+            <View style={{ backgroundColor: '#f5f3ff', borderRadius: 8, padding: 14, borderLeftWidth: 4, borderLeftColor: '#7c3aed', marginTop: 14 }}>
+              <Text style={{ fontSize: 10, fontWeight: 700, color: '#5b21b6', marginBottom: 5 }}>
+                Go Deeper — Career Explorer
+              </Text>
+              <Text style={{ fontSize: 9.5, color: '#3b0764', lineHeight: 1.65, marginBottom: 6 }}>
+                For detailed career analysis, salary data, and pathway planning, visit the Career Explorer at edunexus.co.ke/careers
+              </Text>
+              <Text style={{ fontSize: 9, color: '#6d28d9', fontWeight: 600 }}>
+                edunexus.co.ke/careers
+              </Text>
+            </View>
           </>
         )}
       </View>
@@ -438,6 +501,7 @@ function SkillsParentPage({ report }: { report: ClinicReport }) {
     { border: C.gold,  bg: C.goldLight },
     { border: C.teal,  bg: '#f0fdfa'  },
     { border: C.l4,    bg: C.l4bg    },
+    { border: C.green, bg: '#f0fdf4'  },
   ]
 
   return (
@@ -451,17 +515,17 @@ function SkillsParentPage({ report }: { report: ClinicReport }) {
         <View style={S.divider} />
 
         {report.current_phase ? (
-          <View style={{ marginBottom: 16 }}>
+          <View style={{ marginBottom: 10 }}>
             <View style={S.timelineItem}>
               <Text style={S.timelineLabel}>NOW — Ages {report.current_phase.age_range} ({report.current_phase.phase})</Text>
               <Text style={S.timelineText}>{report.current_phase.why}</Text>
-              {report.current_phase.skills.slice(0, 4).map(sk => (
-                <Text key={sk} style={{ fontSize: 9, color: C.muted, marginTop: 3 }}>• {sk}</Text>
+              {report.current_phase.skills.slice(0, 3).map(sk => (
+                <Text key={sk} style={{ fontSize: 9, color: C.muted, marginTop: 2 }}>• {sk}</Text>
               ))}
             </View>
           </View>
         ) : (
-          <View style={[S.summaryBox, { marginBottom: 16 }]}>
+          <View style={[S.summaryBox, { marginBottom: 10 }]}>
             <Text style={S.summaryText}>
               Skill timeline will populate as career data is matched. Focus on broad exposure and curiosity at this stage.
             </Text>
@@ -469,28 +533,28 @@ function SkillsParentPage({ report }: { report: ClinicReport }) {
         )}
 
         {report.next_phase && (
-          <View style={{ marginBottom: 16 }}>
+          <View style={{ marginBottom: 10 }}>
             <View style={[S.timelineItem, { borderLeftColor: C.teal }]}>
               <Text style={[S.timelineLabel, { color: C.teal }]}>NEXT — Ages {report.next_phase.age_range} ({report.next_phase.phase})</Text>
               <Text style={S.timelineText}>{report.next_phase.why}</Text>
               {report.next_phase.skills.slice(0, 3).map(sk => (
-                <Text key={sk} style={{ fontSize: 9, color: C.muted, marginTop: 3 }}>• {sk}</Text>
+                <Text key={sk} style={{ fontSize: 9, color: C.muted, marginTop: 2 }}>• {sk}</Text>
               ))}
             </View>
           </View>
         )}
 
-        <View style={S.divider} />
+        <View style={[S.divider, { marginVertical: 8 }]} />
 
         {/* Parent Actions */}
-        <Text style={[S.sectionLabel, { marginBottom: 10 }]}>3 PARENT ACTIONS THIS TERM</Text>
-        {report.parent_actions.slice(0, 3).map((act, i) => (
+        <Text style={[S.sectionLabel, { marginBottom: 8 }]}>{report.parent_actions.length} PARENT ACTIONS THIS TERM</Text>
+        {report.parent_actions.slice(0, 4).map((act, i) => (
           <View key={i} style={[S.actionCard, { borderLeftColor: ACTION_COLORS[i]?.border ?? C.gold, backgroundColor: ACTION_COLORS[i]?.bg ?? C.goldLight }]}>
             <Text style={S.actionTitle}>{i + 1}. {act.title}</Text>
             <Text style={S.actionWhy}>{act.why}</Text>
             <Text style={S.actionText}>{act.action}</Text>
             {act.link && (
-              <Text style={{ fontSize: 9, color: C.teal, marginTop: 4 }}>→ edunexus.co.ke{act.link}</Text>
+              <Text style={{ fontSize: 9, color: C.teal, marginTop: 4 }}>edunexus.co.ke{act.link}</Text>
             )}
           </View>
         ))}

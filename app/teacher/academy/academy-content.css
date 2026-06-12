@@ -1,0 +1,420 @@
+/* ─── Academy lesson content styles ─────────────────────────────────────────
+   Applied inside .prose via dangerouslySetInnerHTML on the module page.
+   All colours are intentionally soft to complement the dark hero header.
+───────────────────────────────────────────────────────────────────────────── */
+
+/* ── Callouts ── */
+.callout {
+  background: #f0fdfa;
+  border-left: 4px solid #14b8a6;
+  border-radius: 0 12px 12px 0;
+  padding: 1rem 1.25rem;
+  margin: 1.25rem 0;
+  color: #134e4a;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.callout--purple {
+  background: #f5f3ff;
+  border-left-color: #7c3aed;
+  color: #3b0764;
+}
+
+.callout--amber {
+  background: #fffbeb;
+  border-left-color: #f59e0b;
+  color: #78350f;
+}
+
+.callout--teal {
+  background: #f0fdfa;
+  border-left-color: #14b8a6;
+  color: #134e4a;
+}
+
+.callout--coral {
+  background: #fff1f2;
+  border-left-color: #f43f5e;
+  color: #881337;
+}
+
+/* ── Example card ── */
+.example-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin: 1.25rem 0;
+  font-size: 0.9375rem;
+  color: #334155;
+  line-height: 1.6;
+}
+
+/* ── Task box ── */
+.task-box {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin: 1.5rem 0;
+  font-size: 0.9375rem;
+  color: #1e3a5f;
+  line-height: 1.7;
+}
+
+/* ── Sovereignty / final message boxes ── */
+.sovereignty-box {
+  background: linear-gradient(135deg, #f0fdfa 0%, #f5f3ff 100%);
+  border: 1px solid #a5f3eb;
+  border-radius: 14px;
+  padding: 1.25rem 1.5rem;
+  margin: 1.5rem 0;
+  font-size: 0.9375rem;
+  color: #1e293b;
+  line-height: 1.7;
+}
+
+.final-message {
+  background: #0c1929;
+  border-radius: 14px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  color: #e2e8f0;
+  font-size: 0.9375rem;
+  line-height: 1.7;
+}
+
+/* ── Myth items ── */
+.myth-item {
+  margin: 1rem 0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.myth-wrong {
+  background: #fff1f2;
+  border-bottom: 1px solid #fecdd3;
+  padding: 0.75rem 1rem;
+  font-size: 0.9375rem;
+  color: #9f1239;
+}
+
+.myth-right {
+  background: #f0fdf4;
+  padding: 0.75rem 1rem;
+  font-size: 0.9375rem;
+  color: #14532d;
+}
+
+/* ── Compare block ── */
+.compare-block {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+}
+
+@media (max-width: 640px) {
+  .compare-block {
+    grid-template-columns: 1fr;
+  }
+}
+
+.compare-bad {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 12px;
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: #881337;
+  line-height: 1.6;
+}
+
+.compare-good {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: #14532d;
+  line-height: 1.6;
+}
+
+/* ── Formula box ── */
+.formula-box {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+}
+
+@media (max-width: 640px) {
+  .formula-box {
+    grid-template-columns: 1fr;
+  }
+}
+
+.formula-part {
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  border: 1px solid transparent;
+}
+
+.formula-part--purple {
+  background: #f5f3ff;
+  border-color: #ddd6fe;
+  color: #3b0764;
+}
+
+.formula-part--teal {
+  background: #f0fdfa;
+  border-color: #a5f3eb;
+  color: #134e4a;
+}
+
+.formula-part--amber {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #78350f;
+}
+
+.formula-part--red {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #881337;
+}
+
+/* ── Mistake items ── */
+.mistake-item {
+  background: #f8fafc;
+  border-left: 3px solid #94a3b8;
+  border-radius: 0 10px 10px 0;
+  padding: 0.85rem 1rem;
+  margin: 0.75rem 0;
+  font-size: 0.9375rem;
+  color: #334155;
+  line-height: 1.6;
+}
+
+/* ── Time grid ── */
+.time-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+}
+
+@media (min-width: 640px) {
+  .time-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.time-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.time-before {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.time-num {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #ef4444;
+  line-height: 1.1;
+}
+
+.time-task {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin: 0.25rem 0;
+  font-weight: 600;
+}
+
+.time-after {
+  font-size: 0.8rem;
+  font-weight: 900;
+  color: #14b8a6;
+  margin-top: 0.25rem;
+}
+
+/* ── Week grid ── */
+.week-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+}
+
+@media (min-width: 640px) {
+  .week-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+.day-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1rem;
+  font-size: 0.8125rem;
+  color: #334155;
+  line-height: 1.6;
+}
+
+.day-card strong {
+  display: block;
+  font-size: 0.875rem;
+  color: #0f172a;
+  margin-bottom: 0.35rem;
+  font-weight: 900;
+}
+
+/* ── Privacy grid ── */
+.privacy-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+}
+
+@media (min-width: 640px) {
+  .privacy-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.privacy-safe {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: #14532d;
+  line-height: 1.6;
+}
+
+.privacy-caution {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 12px;
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: #78350f;
+  line-height: 1.6;
+}
+
+.privacy-avoid {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 12px;
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: #881337;
+  line-height: 1.6;
+}
+
+/* ── Achievement grid ── */
+.achievement-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+}
+
+@media (min-width: 640px) {
+  .achievement-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.achievement {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: #334155;
+  line-height: 1.6;
+}
+
+.achievement strong {
+  display: block;
+  font-weight: 900;
+  color: #0f172a;
+  margin-bottom: 0.25rem;
+}
+
+/* ── Challenge grid ── */
+.challenge-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+}
+
+@media (min-width: 640px) {
+  .challenge-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.challenge-week {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 3px solid #14b8a6;
+  border-radius: 0 12px 12px 0;
+  padding: 1rem 1.1rem;
+  font-size: 0.875rem;
+  color: #334155;
+  line-height: 1.7;
+}
+
+.challenge-week strong {
+  display: block;
+  font-weight: 900;
+  color: #0f172a;
+  margin-bottom: 0.35rem;
+}
+
+/* ── Guide table ── */
+.guide-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.25rem 0;
+  font-size: 0.875rem;
+}
+
+.guide-table th {
+  background: #f1f5f9;
+  font-weight: 800;
+  text-align: left;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid #e2e8f0;
+  color: #1e293b;
+}
+
+.guide-table td {
+  padding: 0.6rem 0.9rem;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  vertical-align: top;
+}
+
+.guide-table tr:nth-child(even) td {
+  background: #f8fafc;
+}

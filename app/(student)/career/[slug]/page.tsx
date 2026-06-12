@@ -190,7 +190,9 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
   const [saved, setSaved] = useState(false)
   const [studentId, setStudentId] = useState<string | null>(null)
   const [studentAge, setStudentAge] = useState<number>(15)
+  const [studentGrade, setStudentGrade] = useState<number | null>(null)
   const [activeTimelineIdx, setActiveTimelineIdx] = useState(0)
+  const [earlyStartTab, setEarlyStartTab] = useState<'14-16' | '16-18'>('14-16')
 
   useEffect(() => {
     fetch('/api/students/list')
@@ -204,6 +206,7 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
             const age = Math.floor((Date.now() - new Date(s.date_of_birth as string).getTime()) / (365.25 * 24 * 3600 * 1000))
             setStudentAge(age)
           }
+          if (s.grade) setStudentGrade(s.grade as number)
         }
       })
       .catch(() => null)
@@ -258,6 +261,9 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
 
   const currentTimeline = career.skill_timeline[activeTimelineIdx]
   const aiImpact = career.ai_impact
+  const sovereignty = career.doors.find(d => d.type === 'ai_era')?.ai_sovereignty
+  const isJunior = studentGrade !== null && studentGrade >= 7 && studentGrade <= 9
+  const isSenior = studentGrade !== null && studentGrade >= 10 && studentGrade <= 12
 
   return (
     <div className="min-h-screen bg-[#0a0a14]">
@@ -359,6 +365,66 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
               {career.doors.map(door => (
                 <DoorCard key={door.type} door={door} />
               ))}
+            </div>
+          </section>
+        )}
+
+        {/* ══ AI SOVEREIGNTY ════════════════════════════════════════════════════ */}
+        {sovereignty && (
+          <section className="space-y-5">
+            <div>
+              <h2 className="text-white font-bold text-xl mb-1 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-violet-400" />
+                What AI Lets You Do in This Field
+              </h2>
+              <p className="text-white/40 text-sm">Previously needed a team. Now possible solo.</p>
+            </div>
+
+            {/* The shift — pull quote */}
+            <div className="relative bg-violet-900/20 border border-violet-500/20 rounded-2xl p-6">
+              <div className="text-violet-400/30 text-6xl font-serif leading-none select-none absolute top-4 left-5">&ldquo;</div>
+              <p className="text-violet-200/90 text-base leading-relaxed font-medium pl-6 pt-2">{sovereignty.the_shift}</p>
+            </div>
+
+            {/* What you can build — cards */}
+            <div>
+              <div className="text-white/40 text-xs font-semibold uppercase tracking-wide mb-3">What you can build</div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                {sovereignty.what_you_can_build.map((item, i) => {
+                  const icons = [Zap, Rocket, Target, Briefcase]
+                  const Icon = icons[i % icons.length]
+                  return (
+                    <div key={i} className="flex items-start gap-3 bg-white/5 border border-white/10 rounded-xl p-4">
+                      <div className="w-8 h-8 rounded-lg bg-violet-500/15 border border-violet-500/20 flex items-center justify-center shrink-0">
+                        <Icon className="w-4 h-4 text-violet-400" />
+                      </div>
+                      <p className="text-white/70 text-sm leading-relaxed">{item}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Tools row */}
+            {sovereignty.tools_to_learn.length > 0 && (
+              <div>
+                <div className="text-white/40 text-xs font-semibold uppercase tracking-wide mb-2">Tools to learn</div>
+                <div className="flex flex-wrap gap-2">
+                  {sovereignty.tools_to_learn.map(tool => (
+                    <span key={tool} className="text-xs bg-violet-500/10 border border-violet-500/20 px-3 py-1.5 rounded-full text-violet-300/80 font-medium">
+                      {tool}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Sovereignty example — story card */}
+            <div className="border-l-4 border-violet-500/60 bg-white/3 rounded-r-2xl pl-5 pr-5 py-5">
+              <div className="text-violet-400 text-xs font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <Star className="w-3.5 h-3.5" /> Real example
+              </div>
+              <p className="text-white/70 text-sm leading-relaxed italic">{sovereignty.sovereignty_example}</p>
             </div>
           </section>
         )}
@@ -591,6 +657,110 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
                 </span>
               ))}
             </div>
+          </section>
+        )}
+
+        {/* ── JUNIOR: EARLY START ────────────────────────────────────────────── */}
+        {isJunior && career.early_start && (
+          <section className="space-y-4">
+            <div>
+              <h2 className="text-white font-bold text-xl mb-1 flex items-center gap-2">
+                <GraduationCap className="w-5 h-5 text-amber-400" />
+                Start Now — Before Form 1
+              </h2>
+              <p className="text-white/40 text-sm">What you can do right now to get ahead in this career.</p>
+            </div>
+
+            {/* Age band tabs */}
+            <div className="flex gap-2">
+              {(['14-16', '16-18'] as const).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setEarlyStartTab(tab)}
+                  className={`px-5 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
+                    earlyStartTab === tab
+                      ? 'bg-amber-500/20 border-amber-500/30 text-amber-300'
+                      : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/8'
+                  }`}
+                >
+                  Age {tab}
+                </button>
+              ))}
+            </div>
+
+            {/* Age band action list */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-2.5">
+              {(earlyStartTab === '14-16' ? career.early_start.age_14_16 : career.early_start.age_16_18).map((action, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-500/20 flex items-center justify-center shrink-0 text-amber-400 text-xs font-bold mt-0.5">
+                    {i + 1}
+                  </div>
+                  <p className="text-white/70 text-sm leading-relaxed">{action}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* First win */}
+            <div className="bg-gradient-to-br from-amber-900/20 to-orange-900/20 border border-amber-500/30 rounded-2xl p-5">
+              <div className="text-amber-400 text-xs font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <Star className="w-3.5 h-3.5" /> Your First Win Target
+              </div>
+              <p className="text-amber-300/90 text-sm leading-relaxed font-medium">{career.early_start.first_win}</p>
+            </div>
+          </section>
+        )}
+
+        {/* ── SENIOR: KCSE + UNIVERSITY ───────────────────────────────────────── */}
+        {isSenior && (
+          <section className="space-y-5">
+            <div>
+              <h2 className="text-white font-bold text-xl mb-1 flex items-center gap-2">
+                <GraduationCap className="w-5 h-5 text-indigo-400" />
+                KCSE & University Pathway
+              </h2>
+              <p className="text-white/40 text-sm">What you need to hit before the gate closes.</p>
+            </div>
+
+            {/* Required subjects table */}
+            {career.required_subjects.length > 0 && (
+              <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                <div className="px-5 py-3 border-b border-white/8">
+                  <span className="text-white/60 text-xs font-semibold uppercase tracking-wide">Required KCSE Subjects</span>
+                </div>
+                <div className="divide-y divide-white/5">
+                  {career.required_subjects.map(subj => {
+                    const importance = career.subject_importance?.[subj] ?? 'helpful'
+                    const badgeClass =
+                      importance === 'critical' ? 'bg-violet-500/20 text-violet-300 border-violet-500/30' :
+                      importance === 'important' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' :
+                      'bg-white/5 text-white/40 border-white/10'
+                    return (
+                      <div key={subj} className="flex items-center justify-between px-5 py-3">
+                        <span className="text-white/80 text-sm capitalize">{subj.replace(/_/g, ' ')}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-lg border font-medium ${badgeClass}`}>{importance}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* University courses */}
+            {career.university_courses && career.university_courses.length > 0 && (
+              <div className="bg-indigo-900/20 border border-indigo-500/20 rounded-2xl p-5 space-y-3">
+                <div className="text-indigo-300 text-xs font-bold uppercase tracking-wide flex items-center gap-1.5">
+                  <BookOpen className="w-3.5 h-3.5" /> University Courses in Kenya
+                </div>
+                <ul className="space-y-2">
+                  {career.university_courses.map(course => (
+                    <li key={course} className="flex items-start gap-2 text-sm text-white/70">
+                      <ChevronRight className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+                      {course}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </section>
         )}
 

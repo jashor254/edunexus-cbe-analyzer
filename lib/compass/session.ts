@@ -48,7 +48,8 @@ const PATHWAY_SUBJECTS: Record<string, string[]> = {
   'Arts & Sports':   ['creative_arts', 'music', 'physical_education', 'art_design'],
 }
 
-const SESSION_TTL_MS = 30 * 60 * 1000 // 30 minutes
+const SESSION_TTL_MS        = 30 * 60 * 1000       // 30 min — used by isSessionExpired (client keepalive)
+const SCHOOL_RESUME_MS      = 3 * 60 * 60 * 1000   // 3 h  — resume window during school day
 
 // ── 1. getOrCreateSession ──────────────────────────────────────────────────────
 
@@ -58,7 +59,12 @@ export async function getOrCreateSession(
   mode:      'school' | 'holiday'
 ): Promise<SessionHandle> {
   const db = createServiceClient()
-  const thirtyMinsAgo = new Date(Date.now() - SESSION_TTL_MS).toISOString()
+
+  // School sessions: resume any active session touched in the last 3 h AND started today.
+  // Holiday sessions: 30-minute window (shorter, focused bursts).
+  const resumeMs      = mode === 'school' ? SCHOOL_RESUME_MS : SESSION_TTL_MS
+  const resumeCutoff  = new Date(Date.now() - resumeMs).toISOString()
+  const todayStart    = new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
 
   const { data: existing } = await db
     .from('compass_sessions')
@@ -66,8 +72,9 @@ export async function getOrCreateSession(
     .eq('learner_id', studentId)
     .eq('subject', subject)
     .eq('status', 'active')
-    .gte('created_at', thirtyMinsAgo)
-    .order('created_at', { ascending: false })
+    .gte('updated_at', resumeCutoff)   // last exchange was recent
+    .gte('created_at', todayStart)     // started today — don't bleed across days
+    .order('updated_at', { ascending: false })
     .limit(1)
     .maybeSingle()
 

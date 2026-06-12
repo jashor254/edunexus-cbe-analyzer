@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, BookOpen, FileText, BarChart3,
   AlertTriangle, ClipboardList, Settings,
-  LogOut, Scroll, NotebookPen, Sparkles, ChevronRight, FolderOpen,
+  LogOut, Scroll, NotebookPen, Sparkles, ChevronRight, FolderOpen, GraduationCap,
 } from 'lucide-react'
 import { RoleSwitcher } from '@/components/layout/RoleSwitcher'
 import { Logo } from '@/components/ui/Logo'
@@ -21,6 +21,7 @@ const NAV = [
   { href: '/teacher/insights',       icon: BarChart3,       label: 'Insights'       },
   { href: '/teacher/alerts',         icon: AlertTriangle,   label: 'Alerts'         },
   { href: '/teacher/reports',        icon: ClipboardList,   label: 'Reports'        },
+  { href: '/teacher/academy',        icon: GraduationCap,   label: 'AI Academy', badge: 'NEW' },
   { href: '/teacher/settings',       icon: Settings,        label: 'Settings'       },
 ]
 

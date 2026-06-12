@@ -8,8 +8,9 @@ import {
   Users, BookOpen, FileText, AlertTriangle,
   PlusCircle, ChevronRight, Eye, Clock,
   TrendingUp, CheckCircle2, Scroll, NotebookPen,
-  Sparkles, ArrowUpRight, Zap, FlaskConical,
+  Sparkles, ArrowUpRight, Zap, FlaskConical, GraduationCap,
 } from 'lucide-react'
+import { getAcademyStats } from '@/lib/academy/queries'
 
 function getTermInfo() {
   const month = new Date().getMonth() + 1
@@ -52,6 +53,8 @@ export default async function TeacherDashboardPage() {
   const today = new Date().toLocaleDateString('en-KE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+
+  const academyStats = await getAcademyStats(teacher.id)
 
   const [classesResult, alertsResult, assignmentsResult, schemesResult] = await Promise.all([
     db.from('teacher_classes')
@@ -491,6 +494,57 @@ export default async function TeacherDashboardPage() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* AI Academy card */}
+        <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-2xl p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-teal-100 rounded-2xl flex items-center justify-center shrink-0">
+                <GraduationCap className="w-6 h-6 text-teal-600" />
+              </div>
+              <div>
+                <h2 className="font-black text-teal-900 text-base">AI Academy — Phase 1</h2>
+                <p className="text-sm text-teal-700 mt-0.5">
+                  {academyStats.allComplete
+                    ? 'Phase 1 complete! Claim your Pioneer Teacher certificate.'
+                    : 'Become an AI-fluent teacher in 6 focused modules.'}
+                </p>
+                <div className="mt-2.5 flex items-center gap-3">
+                  <div className="w-32 bg-teal-200 rounded-full h-1.5">
+                    <div
+                      className="h-1.5 rounded-full bg-teal-500 transition-all"
+                      style={{
+                        width: academyStats.totalLessons > 0
+                          ? `${Math.round((academyStats.completedLessons / academyStats.totalLessons) * 100)}%`
+                          : '0%',
+                      }}
+                    />
+                  </div>
+                  <span className="text-xs text-teal-600 font-semibold">
+                    {academyStats.completedLessons}/{academyStats.totalLessons} lessons
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {academyStats.allComplete && (
+                <Link
+                  href="/teacher/academy/certificate"
+                  className="flex items-center gap-2 bg-amber-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-amber-600 transition"
+                >
+                  Claim Certificate
+                </Link>
+              )}
+              <Link
+                href="/teacher/academy"
+                className="flex items-center gap-2 bg-teal-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-teal-700 transition"
+              >
+                <GraduationCap className="w-4 h-4" />
+                {academyStats.completedLessons > 0 ? 'Continue Learning' : 'Start Academy'}
+              </Link>
+            </div>
+          </div>
         </div>
 
         {/* Upgrade nudge */}

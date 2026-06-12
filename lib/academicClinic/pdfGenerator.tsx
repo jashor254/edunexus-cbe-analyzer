@@ -913,10 +913,10 @@ function CompassPage({ report }: { report: AcademicClinicReport }) {
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 10, fontWeight: 700, color: C.navy }}>Start your first session now</Text>
             <Text style={{ fontSize: 9, color: C.navy, marginTop: 4 }}>
-              Open your browser and visit edunexus.co.ke/chat to begin
+              Open your browser and visit edunexus.co.ke/learn to begin
             </Text>
           </View>
-          <Text style={{ fontSize: 12, fontWeight: 700, color: C.navy }}>edunexus.co.ke/chat</Text>
+          <Text style={{ fontSize: 12, fontWeight: 700, color: C.navy }}>edunexus.co.ke/learn</Text>
         </View>
       </View>
       <PageFooter reportId={report.reportId} />

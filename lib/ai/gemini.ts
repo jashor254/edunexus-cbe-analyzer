@@ -7,7 +7,7 @@ function getModel() {
   const key = process.env.GOOGLE_GEMINI_API_KEY
   if (!key) throw new Error('Missing GOOGLE_GEMINI_API_KEY in environment variables')
   return new GoogleGenerativeAI(key).getGenerativeModel({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-1.5-flash',
     generationConfig: { temperature: 0.7, maxOutputTokens: 800 },
   })
 }

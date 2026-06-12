@@ -2,6 +2,46 @@
 
 export type SubjectScores = Record<string, number>
 
+// ─── Subject key normalisation ────────────────────────────────────────────────
+// Essential Mathematics (emat) is DISTINCT from Core Mathematics:
+//   Core Maths  → qualifies for STEM gate + STEM pathway weights
+//   Essential Maths → does NOT count toward STEM; contributes to Arts & Sports
+//
+// Shortcodes (emat, geo, csl, hisc) are normalised to canonical keys so all
+// downstream pathway logic is consistent regardless of how the school entered them.
+
+const SUBJECT_KEY_ALIASES: Record<string, string> = {
+  // Mathematics variants
+  emat:               'essential_mathematics',
+  essential_maths:    'essential_mathematics',
+  'essential maths':  'essential_mathematics',
+  core_mathematics:   'mathematics',           // core = mathematics for STEM gate
+  // Subject shortcodes used by some schools
+  geo:                'geography',
+  csl:                'community_service_learning',
+  hisc:               'home_science',
+  // Religion abbreviations
+  ire:                'islamic_religious_education',
+  // Technical / Arts aliases
+  pre_technical:      'pre_technical_studies',
+  creative_arts:      'creative_arts_sports',
+  agriculture:        'agriculture_nutrition',
+}
+
+export function normalizeSubjectKey(key: string): string {
+  return SUBJECT_KEY_ALIASES[key.toLowerCase()] ?? key.toLowerCase()
+}
+
+export function normalizeSubjectScores(scores: SubjectScores): SubjectScores {
+  const out: SubjectScores = {}
+  for (const [k, v] of Object.entries(scores)) {
+    const canon = normalizeSubjectKey(k)
+    // On key collision, keep the higher value (belt-and-suspenders for messy imports)
+    if (out[canon] === undefined || v > out[canon]) out[canon] = v
+  }
+  return out
+}
+
 // ─── KJSEA 2025 Disclaimer ────────────────────────────────────────────────────
 
 export const PATHWAY_DISCLAIMER = {
@@ -361,7 +401,7 @@ export function cbcToKJSEAPoints(level: number): number {
 export function calculateKJSEAComposite(
   scores: SubjectScores
 ): number {
-  // Sum KJSEA points across all subjects
+  scores = normalizeSubjectScores(scores)
   return Object.values(scores)
     .filter(v => v > 0)
     .reduce((sum, level) => sum + cbcToKJSEAPoints(level), 0)
@@ -389,9 +429,12 @@ export function getPathwayCompositeMinimum(
  * Scores arrive as CBC 1–4 from the assessment pipeline.
  */
 export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRecommendation {
+  // Normalise first — essential_mathematics stays distinct from mathematics,
+  // so the STEM gate below correctly ignores students with Essential Maths only.
+  scores = normalizeSubjectScores(scores)
 
   // ── Gate subject levels ───────────────────────────────────────────────────────
-  const mathLevel = scores.mathematics        ?? 0
+  const mathLevel = scores.mathematics        ?? 0  // core maths only — essential_mathematics excluded
   const sciLevel  = scores.integrated_science ?? 0
   const engLevel  = scores.english            ?? 0
   const kisLevel  = scores.kiswahili          ?? 0
@@ -666,22 +709,28 @@ function buildGuidanceMessage(
  */
 export function formatSubjectName(key: string): string {
   const specialNames: Record<string, string> = {
-    'creative_arts_sports': 'Creative Arts and Sports',
-    'pre_technical_studies': 'Pre-Technical Studies',
-    'integrated_science': 'Integrated Science',
-    'agriculture_nutrition': 'Agriculture and Nutrition',
-    'christian_religious_education': 'Christian Religious Education',
-    'islamic_religious_education': 'Islamic Religious Education',
-    'social_studies': 'Social Studies',
-    'kiswahili_ksl': 'Kiswahili/KSL',
-    'community_service_learning': 'Community Service Learning',
-    'core_mathematics': 'Core Mathematics',
-    'essential_mathematics': 'Essential Mathematics',
-    'physical_education': 'Physical Education',
-    'ict': 'ICT',
-    'christian_education': 'Christian Religious Education',
-    'islamic_education': 'Islamic Religious Education',
-    'hindu_education': 'Hindu Religious Education'
+    'creative_arts_sports':         'Creative Arts and Sports',
+    'pre_technical_studies':        'Pre-Technical Studies',
+    'integrated_science':           'Integrated Science',
+    'agriculture_nutrition':        'Agriculture and Nutrition',
+    'christian_religious_education':'Christian Religious Education',
+    'islamic_religious_education':  'Islamic Religious Education',
+    'social_studies':               'Social Studies',
+    'kiswahili_ksl':                'Kiswahili/KSL',
+    'community_service_learning':   'Community Service Learning',
+    'core_mathematics':             'Core Mathematics',
+    'essential_mathematics':        'Essential Mathematics',
+    'physical_education':           'Physical Education',
+    'home_science':                 'Home Science',
+    'ict':                          'ICT',
+    'christian_education':          'Christian Religious Education',
+    'islamic_education':            'Islamic Religious Education',
+    'hindu_education':              'Hindu Religious Education',
+    // shortcodes
+    'emat':  'Essential Mathematics',
+    'geo':   'Geography',
+    'csl':   'Community Service Learning',
+    'hisc':  'Home Science',
   }
 
   if (specialNames[key]) return specialNames[key]
@@ -712,6 +761,235 @@ export function getConfidenceBadge(confidence: string): string {
     case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-300'
     case 'low': return 'bg-gray-100 text-gray-800 border-gray-300'
     default: return 'bg-gray-100 text-gray-800 border-gray-300'
+  }
+}
+
+// ─── Pathway Gap Analysis (Junior reports) ────────────────────────────────────
+
+export type PathwayKeyLever = {
+  subject: string       // e.g. "Mathematics"
+  currentLevel: number  // e.g. 2
+  targetLevel: number   // e.g. 3
+  pointsGained: number  // composite points gained by this one-level improvement
+  wouldUnlock: boolean  // does this single improvement satisfy ALL STEM gates?
+}
+
+export type PathwayNextDoor = {
+  name: string          // next pathway up, e.g. "STEM"
+  threshold: number     // composite threshold for that pathway
+  currentGap: number    // composite points short (0 if already above threshold)
+  keyLever: PathwayKeyLever
+  unlockMessage: string // plain-English summary for the report
+}
+
+export type PathwayResult = {
+  recommendedPathway: 'STEM' | 'Social Sciences' | 'Arts & Sports'
+  compositeScore: number
+  kjseaMaxScore: number
+  subjectsEntered: number
+  isPartialComposite: boolean   // true when fewer than 9 KJSEA subjects have scores
+  qualifiesFor: string[]
+  nextPathway: PathwayNextDoor | null  // null if already at STEM
+  disclaimer: string
+}
+
+// The 9 canonical KJSEA subject groups — canonical keys only (aliases are normalised before use)
+const KJSEA_SUBJECT_GROUPS: readonly (readonly string[])[] = [
+  ['english'],
+  ['kiswahili', 'kiswahili_ksl'],
+  ['mathematics', 'essential_mathematics'],   // one or the other per student
+  ['integrated_science'],
+  ['social_studies'],
+  ['agriculture_nutrition'],
+  ['christian_religious_education', 'islamic_religious_education', 'hindu_education'],
+  ['creative_arts_sports'],
+  ['pre_technical_studies'],
+] as const
+
+/** Count how many of the 9 KJSEA subject groups have at least one score > 0. */
+export function countKJSEASubjectsEntered(scores: SubjectScores): number {
+  scores = normalizeSubjectScores(scores)
+  return KJSEA_SUBJECT_GROUPS.filter(group =>
+    group.some(key => (scores[key] ?? 0) > 0)
+  ).length
+}
+
+/**
+ * Calculate full pathway gap analysis for a junior student.
+ * Returns recommended pathway, composite, what they currently qualify for,
+ * and the single subject improvement that would open the next pathway.
+ */
+export function calculatePathwayGapAnalysis(
+  scores: SubjectScores,
+  recommendedPathway?: string | null,
+): PathwayResult {
+  scores = normalizeSubjectScores(scores)
+  const composite        = calculateKJSEAComposite(scores)
+  const KJSEA_MAX        = 72
+  const KJSEA_TOTAL      = 9
+  const subjectsEntered  = countKJSEASubjectsEntered(scores)
+  const isPartialComposite = subjectsEntered < KJSEA_TOTAL
+
+  const mathLevel = scores.mathematics        ?? 0
+  const sciLevel  = scores.integrated_science ?? 0
+
+  // Derive recommended pathway if not supplied
+  const derivedRaw = recommendedPathway ?? calculateJuniorPathwayAffinity(scores).top_pathway
+  const recPathway: 'STEM' | 'Social Sciences' | 'Arts & Sports' =
+    derivedRaw === 'STEM'             ? 'STEM'
+    : derivedRaw === 'Social Sciences' ? 'Social Sciences'
+    : 'Arts & Sports'
+
+  // qualifiesFor — check all three pathway thresholds
+  const qualifiesFor: string[] = []
+  if (recPathway === 'STEM' || (composite >= 20 && mathLevel >= 3 && sciLevel >= 3)) {
+    qualifiesFor.push('STEM')
+  }
+  if (composite >= 25) {
+    qualifiesFor.push('Social Sciences')
+    qualifiesFor.push('Arts & Sports')
+  }
+  // Guarantee recommended pathway is always present
+  if (!qualifiesFor.includes(recPathway)) {
+    qualifiesFor.unshift(recPathway)
+  }
+
+  // Deduplicate while preserving order (recommended first)
+  const seen = new Set<string>()
+  const qualifiesForDeduped: string[] = []
+  for (const p of qualifiesFor) {
+    if (!seen.has(p)) { seen.add(p); qualifiesForDeduped.push(p) }
+  }
+
+  const disclaimer =
+    'Based on KNEC KJSEA 2025 criteria. Subject to change as CBC evolves. ' +
+    'Final placement determined by KNEC.'
+
+  // STEM is the top pathway — nothing higher to unlock
+  if (recPathway === 'STEM') {
+    return {
+      recommendedPathway: 'STEM',
+      compositeScore:     composite,
+      kjseaMaxScore:      KJSEA_MAX,
+      subjectsEntered,
+      isPartialComposite,
+      qualifiesFor:       qualifiesForDeduped,
+      nextPathway:        null,
+      disclaimer,
+    }
+  }
+
+  // ── Social Sciences or Arts & Sports → next door is STEM ─────────────────────
+  const stemThreshold = 20
+  const compositeGap  = Math.max(0, stemThreshold - composite)
+
+  const mathNeeded = Math.max(0, 3 - mathLevel)
+  const sciNeeded  = Math.max(0, 3 - sciLevel)
+
+  // If composite is already above threshold AND both subjects meet gate — shouldn't happen
+  // (student would have been placed in STEM), but handle defensively
+  if (compositeGap === 0 && mathNeeded === 0 && sciNeeded === 0) {
+    return {
+      recommendedPathway: recPathway,
+      compositeScore:     composite,
+      kjseaMaxScore:      KJSEA_MAX,
+      subjectsEntered,
+      isPartialComposite,
+      qualifiesFor:       qualifiesForDeduped,
+      nextPathway:        null,
+      disclaimer,
+    }
+  }
+
+  // Build lever candidates for STEM subject gates
+  const leverCandidates: Array<{ subject: string; currentLevel: number; pointsGained: number }> = []
+
+  if (mathNeeded > 0) {
+    const gained = cbcToKJSEAPoints(Math.min(4, mathLevel + 1)) - cbcToKJSEAPoints(mathLevel)
+    leverCandidates.push({ subject: 'mathematics', currentLevel: mathLevel, pointsGained: gained })
+  }
+  if (sciNeeded > 0) {
+    const gained = cbcToKJSEAPoints(Math.min(4, sciLevel + 1)) - cbcToKJSEAPoints(sciLevel)
+    leverCandidates.push({ subject: 'integrated_science', currentLevel: sciLevel, pointsGained: gained })
+  }
+
+  // If only composite is missing (subject gates already met), use any low-scoring subject
+  if (leverCandidates.length === 0 && compositeGap > 0) {
+    const bestSubj = Object.entries(scores)
+      .filter(([, v]) => v > 0 && v < 4)
+      .sort(([, a], [, b]) => b - a)[0]
+    if (bestSubj) {
+      const gained = cbcToKJSEAPoints(Math.min(4, bestSubj[1] + 1)) - cbcToKJSEAPoints(bestSubj[1])
+      leverCandidates.push({ subject: bestSubj[0], currentLevel: bestSubj[1], pointsGained: gained })
+    }
+  }
+
+  if (leverCandidates.length === 0) {
+    return {
+      recommendedPathway: recPathway,
+      compositeScore:     composite,
+      kjseaMaxScore:      KJSEA_MAX,
+      subjectsEntered,
+      isPartialComposite,
+      qualifiesFor:       qualifiesForDeduped,
+      nextPathway:        null,
+      disclaimer,
+    }
+  }
+
+  // Sort by pointsGained desc; prefer mathematics on tie
+  leverCandidates.sort((a, b) => {
+    if (b.pointsGained !== a.pointsGained) return b.pointsGained - a.pointsGained
+    return a.subject === 'mathematics' ? -1 : 1
+  })
+
+  const lever       = leverCandidates[0]
+  const targetLevel = lever.subject === 'mathematics' || lever.subject === 'integrated_science' ? 3 : Math.min(4, lever.currentLevel + 1)
+  const subjectLabel = lever.subject === 'mathematics' ? 'Mathematics' : lever.subject === 'integrated_science' ? 'Integrated Science' : formatSubjectName(lever.subject)
+
+  // Would this single improvement cause ALL STEM gates to pass?
+  const mathAfter = lever.subject === 'mathematics' ? Math.min(4, lever.currentLevel + 1) : mathLevel
+  const sciAfter  = lever.subject === 'integrated_science' ? Math.min(4, lever.currentLevel + 1) : sciLevel
+  const wouldUnlock = mathAfter >= 3 && sciAfter >= 3 && (composite + lever.pointsGained) >= stemThreshold
+
+  // Build unlock message
+  const bothBlocked = mathNeeded > 0 && sciNeeded > 0
+  let unlockMessage: string
+  if (bothBlocked) {
+    unlockMessage =
+      'Mathematics and Integrated Science both need to reach Level 3 to open the STEM pathway. ' +
+      `${subjectLabel} is the stronger lever — start there.`
+  } else if (wouldUnlock) {
+    unlockMessage =
+      `${subjectLabel} from Level ${lever.currentLevel} → Level ${targetLevel} ` +
+      `adds ${lever.pointsGained} points and opens the STEM pathway at Grade 10.`
+  } else {
+    unlockMessage =
+      `${subjectLabel} from Level ${lever.currentLevel} → Level ${targetLevel} ` +
+      `is the key step toward the STEM pathway.`
+  }
+
+  return {
+    recommendedPathway: recPathway,
+    compositeScore:     composite,
+    kjseaMaxScore:      KJSEA_MAX,
+    subjectsEntered,
+    isPartialComposite,
+    qualifiesFor:       qualifiesForDeduped,
+    nextPathway: {
+      name:        'STEM',
+      threshold:   stemThreshold,
+      currentGap:  compositeGap,
+      keyLever: {
+        subject:      subjectLabel,
+        currentLevel: lever.currentLevel,
+        targetLevel,
+        pointsGained: lever.pointsGained,
+        wouldUnlock,
+      },
+      unlockMessage,
+    },
+    disclaimer,
   }
 }
 

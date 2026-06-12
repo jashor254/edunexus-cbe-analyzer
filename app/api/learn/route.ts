@@ -104,8 +104,6 @@ export async function POST(req: Request) {
       conversationHistory,
     } = await req.json()
 
-    console.log('[learn] conversationHistory received:', JSON.stringify(conversationHistory?.slice(-3)))
-
     // ── Auth ──────────────────────────────────────────────────────────────────
     const access = await checkFeatureAccess(FEATURE)
     if (access.allowed === false) {
@@ -114,7 +112,6 @@ export async function POST(req: Request) {
     }
 
     if (!learnerId) return apiError('learnerId is required', 400)
-    console.log('[learn] auth done:', Date.now() - t0, 'ms')
     const db = createServiceClient()
     const studentId = learnerId as string
 
@@ -237,8 +234,6 @@ export async function POST(req: Request) {
       getGradeTopics(grade, subject, { minGrade: isJunior ? 7 : grade }),
       getOrCreateSession(studentId, subject, mode),
     ])
-    console.log('[learn] topics+session done:', Date.now() - t0, 'ms')
-
     const activeSessionId = sessionId ?? session.sessionId
 
     // Derived from level
@@ -267,8 +262,6 @@ export async function POST(req: Request) {
     }
 
     const systemPrompt = buildCompassPrompt(promptParams)
-    console.log('[learn] prompt built:', Date.now() - t0, 'ms')
-    console.log('[learn] prompt tokens estimate:', Math.round(systemPrompt.length / 4))
 
     const history = Array.isArray(conversationHistory)
       ? (conversationHistory as { role: 'user' | 'assistant'; content: string }[])
@@ -306,7 +299,6 @@ export async function POST(req: Request) {
             const content = parsed.choices[0]?.delta?.content ?? ''
             if (content) {
               if (!firstToken) {
-                console.log('[learn] first token:', Date.now() - t0, 'ms')
                 firstToken = true
               }
               accumulated += content

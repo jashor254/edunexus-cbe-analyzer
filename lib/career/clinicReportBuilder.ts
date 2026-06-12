@@ -6,32 +6,43 @@ import { getCareerBySlug, getMatchesForStudent, getCurrentSkillsForAge, getNextS
 import { generateCareerMatches } from './matchEngine'
 import { STANDARD_DISCLAIMER } from './types'
 import type { ClinicReport, SubjectScoreRow, Career, SkillTimelineItem } from './types'
-import { calculateKJSEAComposite, calculateJuniorPathwayAffinity, PATHWAY_DISCLAIMER } from '@/lib/pathwayCalculator'
+import { calculateKJSEAComposite, calculateJuniorPathwayAffinity, calculatePathwayGapAnalysis, PATHWAY_DISCLAIMER, normalizeSubjectScores } from '@/lib/pathwayCalculator'
 
 // ─── Subject display names (Fix 3) ────────────────────────────────────────────
 
 const SUBJECT_DISPLAY_NAMES: Record<string, string> = {
-  cre:                    'Christian Religious Education',
-  pre_technical_studies:  'Pre-Technical Studies',
-  pre_technical:          'Pre-Technical Studies',
-  creative_arts_sports:   'Creative Arts & Sports',
-  creative_arts:          'Creative Arts & Sports',
-  agriculture_nutrition:  'Agriculture & Nutrition',
-  agriculture:            'Agriculture',
-  social_studies:         'Social Studies',
-  integrated_science:     'Integrated Science',
-  mathematics:            'Mathematics',
-  english:                'English',
-  kiswahili:              'Kiswahili',
-  biology:                'Biology',
-  chemistry:              'Chemistry',
-  physics:                'Physics',
-  history:                'History & Citizenship',
-  geography:              'Geography',
-  business_studies:       'Business Studies',
-  ire:                    'Islamic Religious Education',
-  home_science:           'Home Science',
-  computer_studies:       'Computer Studies',
+  cre:                          'Christian Religious Education',
+  christian_religious_education:'Christian Religious Education',
+  pre_technical_studies:        'Pre-Technical Studies',
+  pre_technical:                'Pre-Technical Studies',
+  creative_arts_sports:         'Creative Arts & Sports',
+  creative_arts:                'Creative Arts & Sports',
+  agriculture_nutrition:        'Agriculture & Nutrition',
+  agriculture:                  'Agriculture',
+  social_studies:               'Social Studies',
+  integrated_science:           'Integrated Science',
+  mathematics:                  'Mathematics',
+  core_mathematics:             'Mathematics',
+  // Essential Mathematics is distinct — does NOT display as plain "Mathematics"
+  essential_mathematics:        'Essential Mathematics',
+  'essential maths':            'Essential Mathematics',
+  essential_maths:              'Essential Mathematics',
+  emat:                         'Essential Mathematics',
+  english:                      'English',
+  kiswahili:                    'Kiswahili',
+  biology:                      'Biology',
+  chemistry:                    'Chemistry',
+  physics:                      'Physics',
+  history:                      'History & Citizenship',
+  geography:                    'Geography',
+  geo:                          'Geography',
+  business_studies:             'Business Studies',
+  ire:                          'Islamic Religious Education',
+  home_science:                 'Home Science',
+  hisc:                         'Home Science',
+  community_service_learning:   'Community Service Learning',
+  csl:                          'Community Service Learning',
+  computer_studies:             'Computer Studies',
 }
 
 function displayName(raw: string): string {
@@ -62,8 +73,14 @@ function calcAge(dob: string | null | undefined, grade: number): number {
 
 // ─── Subject cluster detection ────────────────────────────────────────────────
 
+// Essential Mathematics is NOT a STEM/science subject — students with emat are on Arts/Social pathway
 const SCIENCE_SUBJECTS   = ['biology', 'chemistry', 'physics', 'mathematics', 'core_mathematics', 'integrated_science']
-const HUMANITIES_SUBJECTS = ['history', 'geography', 'social_studies', 'cre', 'christian_religious_education', 'islamic_religious_education']
+const HUMANITIES_SUBJECTS = [
+  'history', 'geography', 'geo', 'social_studies',
+  'cre', 'christian_religious_education', 'islamic_religious_education',
+  'home_science', 'hisc',
+  'community_service_learning', 'csl',
+]
 const BUSINESS_SUBJECTS  = ['business_studies', 'economics', 'accounting', 'commerce']
 const ARTS_SUBJECTS      = ['creative_arts', 'music', 'art_design', 'creative_arts_sports']
 
@@ -262,11 +279,11 @@ function levelTarget(score: number): string {
   return `Currently Level ${current} (${LABELS[current] ?? ''}) — target Level ${target} (${LABELS[target] ?? ''}) this term`
 }
 
-function concreteAction(subject: string, score: number): { action: string; time: string } {
+function concreteAction(subject: string, score: number, firstName: string = 'your child'): { action: string; time: string } {
   const actions: Record<string, { action: string; time: string }> = {
     mathematics:        { action: 'Mental maths daily — not textbook, just real life: market prices, distances, time calculations. No pen needed.', time: '10 minutes daily' },
     integrated_science: { action: 'Pick one science concept per week and look it up in real life. How does a fridge work? Why does bread rise? Curiosity drives retention.', time: '20 minutes, twice a week' },
-    social_studies:     { action: 'Read one newspaper article together each week and discuss it. Ask Marion: "What caused this? What would you do differently?"', time: '30 minutes, once a week' },
+    social_studies:     { action: `Read one newspaper article together each week and discuss it. Ask ${firstName}: "What caused this? What would you do differently?"`, time: '30 minutes, once a week' },
     english:            { action: 'Read aloud together for 10 minutes each evening — any book, newspaper, or story. Discuss what was read. Vocabulary grows through exposure.', time: '10 minutes daily' },
     kiswahili:          { action: 'Watch Kiswahili news together and encourage responses in Kiswahili. Casual conversation in Kiswahili builds fluency faster than revision.', time: '15 minutes daily' },
     biology:            { action: 'Walk outside and name 5 living things. Discuss how they work. Real observation beats memorisation every time.', time: '20 minutes, twice a week' },
@@ -316,9 +333,13 @@ export async function buildClinicReport(
   const subjectMap: Record<string, number> = {}
   if (assessments?.length) {
     const scores = (assessments[0].subject_scores as Record<string, number>) ?? {}
+    // Normalise shorthand keys (emat→essential_mathematics, geo→geography, etc.)
+    // so all downstream pathway logic, display names, and career matching are consistent.
+    const rawMap: Record<string, number> = {}
     Object.entries(scores).forEach(([k, v]) => {
-      if (typeof v === 'number') subjectMap[k.toLowerCase()] = v
+      if (typeof v === 'number') rawMap[k.toLowerCase()] = v
     })
+    Object.assign(subjectMap, normalizeSubjectScores(rawMap))
   }
 
   const subjectRows: SubjectScoreRow[] = Object.entries(subjectMap).map(([subj, score]) => ({
@@ -431,7 +452,13 @@ export async function buildClinicReport(
     ? (top_career_detail.required_subjects ?? []).map(subject => {
         const imp      = (top_career_detail.subject_importance ?? {})[subject]
         const required = imp === 'critical' ? 3 : 2
-        const score    = subjectMap[subject] ?? 0
+        // If career needs core mathematics but student only has essential_mathematics, use that score
+        // so the row shows "Essential Mathematics L2 / Need 3" rather than "Mathematics: Not studied"
+        const resolvedSubject =
+          subject === 'mathematics' && !subjectMap[subject] && subjectMap['essential_mathematics']
+            ? 'essential_mathematics'
+            : subject
+        const score    = subjectMap[resolvedSubject] ?? 0
         const gap      = Math.max(0, required - score)
         const status: 'strong' | 'meets' | 'needs_work' | 'critical' =
           score >= required + 1 ? 'strong'
@@ -439,8 +466,8 @@ export async function buildClinicReport(
           : gap >= 2            ? 'critical'
           : 'needs_work'
         return {
-          subject,
-          display_name: displayName(subject),
+          subject:      resolvedSubject,
+          display_name: displayName(resolvedSubject),
           score,
           required,
           gap,
@@ -464,13 +491,19 @@ export async function buildClinicReport(
     next_phase    = pathwayTimeline.next
   }
 
+  // 6b. Pathway gap analysis (junior only)
+  const pathwayGapAnalysis = section === 'junior'
+    ? calculatePathwayGapAnalysis(subjectMap, recommended_pathway)
+    : undefined
+
   // 7. Fix 4 — Specific parent actions
   const parent_actions: ClinicReport['parent_actions'] = []
+  const studentFirstName = (student.name as string).split(' ')[0]
 
   // Action 1: weakest subject — specific with level, why, concrete activity, time
   if (weakSubjects.length > 0) {
     const weak  = weakSubjects[0]
-    const { action, time } = concreteAction(weak.subject, weak.score)
+    const { action, time } = concreteAction(weak.subject, weak.score, studentFirstName)
     const why = top_career_detail
       ? `${weak.display_name} is ${top_career_detail.subject_importance?.[weak.subject] ?? 'important'} for ${top_career_detail.title}. ${levelTarget(weak.score)}.`
       : `${subjectPathwayWhy(weak.subject, recommended_pathway)} ${levelTarget(weak.score)}.`
@@ -496,13 +529,28 @@ export async function buildClinicReport(
     })
   }
 
-  // Action 3: Learning Compass session
-  const firstSubject = ctx?.first_subject as string ?? topSubjects[0]?.display_name ?? 'their strongest subject'
+  // Action 3: Career Explorer CTA (Section 2 — after career description)
+  const careerCtaTitle = top_career
+    ? `Explore ${top_career.career.title} and Other Matches`
+    : 'Explore Career Options'
+  const careerCtaWhy = top_career
+    ? `${student.name as string}'s top career match is ${top_career.career.title} (${top_career.match_score}% match). The Career Explorer shows the full picture — salary ranges, what the job actually involves, Kenyan examples, and the exact subjects and skills needed to get there.`
+    : 'Exploring careers early helps students make subject choices with purpose. The Career Explorer shows realistic Kenyan salary data, what each career actually involves day-to-day, and what it takes to get there.'
+  parent_actions.push({
+    title:  careerCtaTitle,
+    why:    careerCtaWhy,
+    action: 'Open the Career Explorer together. Read the full career profile — the salary tiers, Kenyan success stories, and the skill timeline. Ask your child: "Does this excite you?" That conversation matters more than the match score.',
+    link:   '/career',
+  })
+
+  // Action 4: Learning Compass session
+  const rawFirstSubject = ctx?.first_subject as string ?? topSubjects[0]?.subject ?? ''
+  const firstSubject = rawFirstSubject ? displayName(rawFirstSubject) : (topSubjects[0]?.display_name ?? 'their strongest subject')
   parent_actions.push({
     title:  'Start a Learning Compass Session',
     why:    `The Learning Compass already knows ${student.name as string}'s exact level and will start precisely where they are — no wasted time.`,
     action: `Open the Learning Compass in ${firstSubject}. It will greet them by name, explain what they\'re working on, and adapt in real time. First session takes 10 minutes.`,
-    link:   '/chat',
+    link:   '/learn',
   })
 
   return {
@@ -522,6 +570,7 @@ export async function buildClinicReport(
     recommended_pathway,
     kjsea_composite,
     stem_viable,
+    pathwayGapAnalysis,
     top_career,
     career_gap_rows: career_gap_rows.length > 0 ? career_gap_rows : undefined,
     top_career_detail,

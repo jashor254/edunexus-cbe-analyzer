@@ -128,19 +128,12 @@ function shapeAndReturn(data: Record<string, unknown>) {
     ? (compassBridge.firstConcept as string | null)
     : null
 
-  console.log('[student-route] name:', data.name)
-  console.log('[student-route] grade:', grade)
-  console.log('[student-route] isJunior:', isJunior)
-  console.log('[student-route] tiers keys:', Object.keys(tiers))
-
   // ── Subject filtering ────────────────────────────────────────────────────────
   const selected = (data.selected_subjects as string[] | null) ?? []
 
   const subjectKeys: string[] = isJunior
     ? Object.keys(tiers).filter(k => JUNIOR_SUBJECTS.includes(k))
     : (selected.length > 0 ? selected : Object.keys(tiers))
-
-  console.log('[student-route] after filter:', subjectKeys)
 
   // ── Sort weakest first, flag recommended ─────────────────────────────────────
   const sorted = subjectKeys
@@ -160,8 +153,6 @@ function shapeAndReturn(data: Record<string, unknown>) {
   }))
 
   const firstName = formatFirstName(data.name as string | null)
-
-  console.log('[student-route] firstName:', firstName)
 
   return apiSuccess({
     id:        data.id as string,
