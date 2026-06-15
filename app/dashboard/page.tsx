@@ -63,6 +63,7 @@ interface Student {
   curriculum_type: 'cbc' | 'igcse' | 'ib' | 'other'
   created_at: string
   assessments: Assessment[]
+  teacherManaged: boolean  // true = Scenario B (teacher-created, parent linked via invite)
 }
 
 interface Assignment {
@@ -167,11 +168,25 @@ function Skeleton({ className }: { className?: string }) {
 }
 
 // ─── Add Student Modal ────────────────────────────────────────────────────────
+// Two-scenario modal:
+//   Scenario A — parent creates student independently (no teacher involved)
+//   Scenario B — teacher already created student, parent links via invite
 
 const CBC_GRADES = [7, 8, 9, 10, 11, 12]
 const IGCSE_YEARS = [7, 8, 9, 10, 11]
 
-function AddStudentModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+type ModalStep = 'choose' | 'create' | 'invite_info'
+
+function AddStudentModal({
+  onClose,
+  onSuccess,
+  hasTeacherManagedStudents,
+}: {
+  onClose: () => void
+  onSuccess: () => void
+  hasTeacherManagedStudents: boolean
+}) {
+  const [step, setStep] = useState<ModalStep>(hasTeacherManagedStudents ? 'choose' : 'choose')
   const [name, setName] = useState('')
   const [curriculum, setCurriculum] = useState<'cbc' | 'igcse'>('cbc')
   const [grade, setGrade] = useState(7)
@@ -247,15 +262,102 @@ function AddStudentModal({ onClose, onSuccess }: { onClose: () => void; onSucces
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-y-auto max-h-[85vh]">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-y-auto max-h-[90vh]">
+
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-100">
-          <h2 className="text-xl font-black text-slate-900">Add Student</h2>
+          <div className="flex items-center gap-2">
+            {step !== 'choose' && (
+              <button
+                onClick={() => setStep('choose')}
+                className="text-slate-400 hover:text-slate-600 transition-colors mr-1"
+              >
+                ←
+              </button>
+            )}
+            <h2 className="text-xl font-black text-slate-900">
+              {step === 'choose' ? 'Add a Student' : step === 'create' ? 'Add Independently' : 'Link via Teacher Invite'}
+            </h2>
+          </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
 
+        {/* ── Step 1: Choose scenario ── */}
+        {step === 'choose' && (
+          <div className="p-6 space-y-4">
+            {hasTeacherManagedStudents && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+                You already have a child linked through their teacher. Adding another student here is for a <strong>different child</strong> not yet on EduNexus.
+              </div>
+            )}
+            <p className="text-slate-600 text-sm">How is your child enrolled with EduNexus?</p>
+
+            <button
+              onClick={() => setStep('invite_info')}
+              className="w-full text-left p-4 rounded-2xl border-2 border-teal-200 bg-teal-50 hover:border-teal-400 hover:bg-teal-100 transition-all group"
+            >
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">🏫</span>
+                <div>
+                  <p className="font-black text-slate-900 text-sm">Through their school or teacher</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Their teacher manages assessments on EduNexus — you just need an invite link from the teacher to connect.</p>
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setStep('create')}
+              className="w-full text-left p-4 rounded-2xl border-2 border-violet-200 bg-violet-50 hover:border-violet-400 hover:bg-violet-100 transition-all group"
+            >
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">🏠</span>
+                <div>
+                  <p className="font-black text-slate-900 text-sm">No teacher on EduNexus yet</p>
+                  <p className="text-xs text-slate-500 mt-0.5">You manage your child's assessments yourself — home schooling, tuition, or the school isn't on EduNexus.</p>
+                </div>
+              </div>
+            </button>
+          </div>
+        )}
+
+        {/* ── Step 2A: Invite info (Scenario B) ── */}
+        {step === 'invite_info' && (
+          <div className="p-6 space-y-5">
+            <div className="bg-teal-50 border border-teal-200 rounded-2xl p-5 space-y-3">
+              <div className="flex items-center gap-2 font-black text-teal-800">
+                <span className="text-xl">✅</span> How it works
+              </div>
+              <ol className="space-y-3 text-sm text-slate-700">
+                <li className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-teal-500 text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5 font-black">1</span>
+                  Ask your child&apos;s teacher to share the <strong>EduNexus invite link</strong> for your child.
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-teal-500 text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5 font-black">2</span>
+                  The teacher generates it from their portal: <span className="font-mono text-xs bg-white border border-teal-200 px-1.5 py-0.5 rounded">Teacher Portal → Class → Students → Share Invite</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-teal-500 text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5 font-black">3</span>
+                  Click the link while logged in here — your account links to your child automatically. No duplicate needed!
+                </li>
+              </ol>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs text-slate-500">
+              <strong className="text-slate-700">Why not just add the student yourself?</strong> The teacher&apos;s student record already has their assessments, class, and learning profile. Creating a duplicate here would lose all that data and show a blank compass.
+            </div>
+            <button
+              onClick={onClose}
+              className="w-full bg-teal-600 hover:bg-teal-700 text-white py-3 rounded-xl font-black transition-colors"
+            >
+              Got it — I&apos;ll ask the teacher
+            </button>
+          </div>
+        )}
+
+        {/* ── Step 2B: Create independently (Scenario A) ── */}
+        {step === 'create' && (
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {/* Name */}
           <div>
@@ -424,11 +526,13 @@ function AddStudentModal({ onClose, onSuccess }: { onClose: () => void; onSucces
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-violet-600 to-purple-600 text-white py-3.5 rounded-xl font-black hover:scale-[1.02] transition-all disabled:opacity-60 disabled:scale-100"
+            className="w-full bg-linear-to-r from-violet-600 to-purple-600 text-white py-3.5 rounded-xl font-black hover:scale-[1.02] transition-all disabled:opacity-60 disabled:scale-100"
           >
             {loading ? 'Adding...' : 'Add Student'}
           </button>
         </form>
+        )}
+
       </div>
     </div>
   )
@@ -447,7 +551,7 @@ function StudentCard({ student }: { student: Student }) {
       <div className="flex items-start justify-between mb-3">
         <div>
           <h3 className="font-black text-slate-900 text-base">{student.name}</h3>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
             {isCbc ? (
               <span className="text-xs font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
                 🇰🇪 CBC · Grade {student.grade}
@@ -455,6 +559,11 @@ function StudentCard({ student }: { student: Student }) {
             ) : (
               <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
                 🌍 IGCSE · Year {student.grade}
+              </span>
+            )}
+            {student.teacherManaged && (
+              <span className="text-xs font-bold bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full">
+                🏫 via teacher
               </span>
             )}
           </div>
@@ -529,7 +638,8 @@ export default function DashboardPage() {
   const [statsError, setStatsError] = useState('')
   const [studentsError, setStudentsError] = useState('')
 
-  const [showAddModal, setShowAddModal] = useState(false)
+  const [showAddModal, setShowAddModal]   = useState(false)
+  const [selfCreatedCount, setSelfCreatedCount] = useState(0)
 
   // ── Fetch user identity (from Supabase client) ────────────────────────────
   useEffect(() => {
@@ -577,6 +687,7 @@ export default function DashboardPage() {
         ),
       }))
       setStudents(sorted)
+      setSelfCreatedCount(json.data.selfCreatedCount ?? 0)
     } catch {
       setStudentsError('Could not load students.')
     } finally {
@@ -1055,6 +1166,7 @@ export default function DashboardPage() {
         <AddStudentModal
           onClose={() => setShowAddModal(false)}
           onSuccess={() => { fetchStudents(); fetchStats() }}
+          hasTeacherManagedStudents={students.some(s => s.teacherManaged)}
         />
       )}
     </div>

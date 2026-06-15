@@ -19,17 +19,24 @@ export async function GET() {
 
     const service = createServiceClient()
 
-    // Fetch students with their assessments
-    const { data: students, error } = await service
+    // Fetch students with their assessments — include user_id to detect scenario
+    const { data: rawStudents, error } = await service
       .from('students')
       .select(`
-        id, name, grade, school, current_pathway, curriculum_type, created_at,
+        id, name, grade, school, current_pathway, curriculum_type, created_at, user_id,
         assessments(id, term, year, grade, subject_scores, created_at)
       `)
       .or(`user_id.eq.${user.id},parent_user_id.eq.${user.id}`)
       .order('name')
 
     if (error) return apiError(error.message)
+
+    // teacherManaged = true  → Scenario B (teacher created, parent linked via invite)
+    // teacherManaged = false → Scenario A (parent created directly, no teacher involved)
+    const students = (rawStudents ?? []).map(({ user_id, ...rest }) => ({
+      ...rest,
+      teacherManaged: user_id !== user.id,
+    }))
 
     // Get subscription/plan
     const { data: subscription } = await service
@@ -45,7 +52,10 @@ export async function GET() {
     const plan = subscription?.plan || 'free'
     const maxStudents = PLAN_LIMITS[plan] ?? 1
 
-    return apiSuccess({ students: students ?? [], plan, maxStudents })
+    // selfCreated counts only students the parent owns directly (Scenario A)
+    const selfCreatedCount = students.filter(s => !s.teacherManaged).length
+
+    return apiSuccess({ students, plan, maxStudents, selfCreatedCount })
   } catch (err) {
     console.error('[students/list]', err)
     return apiError('Server error')

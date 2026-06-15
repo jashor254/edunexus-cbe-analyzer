@@ -26,10 +26,11 @@ const JUNIOR_SUBJECTS = [
   'creative_arts_sports', 'cre', 'business_studies',
 ]
 
-// Full select — !inner ensures only students WITH a learning_context row are returned
+// Left join — students without a learning_context row still load; shapeAndReturn
+// handles the null ctx case and returns needsAssessment: true so the UI can prompt.
 const SELECT = `
   id, name, grade, current_pathway, selected_subjects,
-  student_learning_context!inner (
+  student_learning_context (
     subject_tiers,
     recommended_pathway,
     sessions_without_improvement,
@@ -112,8 +113,23 @@ function shapeAndReturn(data: Record<string, unknown>) {
   const raw = data.student_learning_context
   const ctx = (Array.isArray(raw) ? raw[0] : raw) as Record<string, unknown> | null
 
-  const tiers         = (ctx?.subject_tiers  ?? {}) as Record<string, string>
-  const compassBridge = (ctx?.compass_bridge ?? {}) as Record<string, unknown>
+  // No assessment done yet — tell the UI to redirect to onboarding
+  if (!ctx) {
+    const grade     = (data.grade as number | null) ?? 7
+    const firstName = formatFirstName(data.name as string | null)
+    return apiSuccess({
+      id:             data.id as string,
+      firstName,
+      grade,
+      isJunior:       grade <= 9,
+      pathway:        null,
+      subjects:       [],
+      needsAssessment: true,
+    })
+  }
+
+  const tiers         = (ctx.subject_tiers  ?? {}) as Record<string, string>
+  const compassBridge = (ctx.compass_bridge ?? {}) as Record<string, unknown>
   const pathwayRaw = (
     (ctx?.recommended_pathway as string | null) ??
     (data.current_pathway     as string | null)

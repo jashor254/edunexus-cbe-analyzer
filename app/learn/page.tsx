@@ -7,7 +7,7 @@ import { createClient } from '@/utils/supabase/client'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type PageState = 'student_select' | 'subject_select' | 'active_session' | 'session_complete'
+type PageState = 'student_select' | 'subject_select' | 'active_session' | 'session_complete' | 'needs_assessment'
 type Level = 1 | 2 | 3 | 4
 
 interface SubjectCard {
@@ -50,12 +50,13 @@ interface StudentSummaryCard {
 }
 
 type StudentApiResponse = {
-  id:        string
-  firstName: string
-  grade:     number
-  isJunior:  boolean
-  pathway:   string | null
-  subjects:  Array<{ key: string; level: Level; recommended: boolean; teacherSuggested: boolean; subtopic: string | null }>
+  id:              string
+  firstName:       string
+  grade:           number
+  isJunior:        boolean
+  pathway:         string | null
+  subjects:        Array<{ key: string; level: Level; recommended: boolean; teacherSuggested: boolean; subtopic: string | null }>
+  needsAssessment?: boolean
 }
 
 type StudentListApiResponse = {
@@ -187,6 +188,12 @@ function LearnContent() {
         }
 
         const d = json.data as StudentApiResponse
+
+        if (d.needsAssessment) {
+          setPageState('needs_assessment')
+          return
+        }
+
         const studentId = d.id
         setStudent({
           id:        studentId,
@@ -219,6 +226,12 @@ function LearnContent() {
       const json = await res.json() as { success: boolean; data: StudentApiResponse }
       if (!res.ok || !json.success) return
       const d = json.data
+
+      if (d.needsAssessment) {
+        setPageState('needs_assessment')
+        return
+      }
+
       setStudent({
         id:        d.id,
         firstName: d.firstName,
@@ -633,6 +646,30 @@ function LearnContent() {
             I'm Done Today
           </button>
         </div>
+      </div>
+    )
+  }
+
+  // ── State: Assessment not yet done ─────────────────────────────────────────
+
+  if (pageState === 'needs_assessment') {
+    return (
+      <div className="h-screen bg-[#0a0a14] flex flex-col items-center justify-center px-6 text-center gap-6">
+        <div className="w-16 h-16 bg-linear-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-xl">
+          <AlertCircle className="w-8 h-8 text-white" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold text-white">Assessment Needed</h2>
+          <p className="text-white/50 max-w-xs">
+            This student hasn&apos;t completed their initial assessment yet. Ask their teacher to run the assessment first so the Compass can personalise their learning.
+          </p>
+        </div>
+        <button
+          onClick={() => router.push('/dashboard')}
+          className="px-6 py-3 bg-violet-600 hover:bg-violet-500 text-white rounded-xl font-medium transition-colors"
+        >
+          Back to Dashboard
+        </button>
       </div>
     )
   }
