@@ -183,30 +183,29 @@ function SchemeCard({
 
           <div className="flex-1 min-w-0">
             <h3 className="font-black text-gray-900 text-base leading-tight">{scheme.learning_area}</h3>
-            <p className="text-gray-500 text-sm">{scheme.grade} · Term {scheme.term} · {scheme.year}</p>
-            <p className="text-gray-400 text-xs mt-0.5">
-              {scheme.total_lessons} lessons · {scheme.total_weeks} weeks · {scheme.lessons_per_week} per week
+            <p className="text-gray-400 text-xs mt-1 truncate">
+              {scheme.grade} · Term {scheme.term} · {scheme.year} · {scheme.total_lessons} lessons · {scheme.total_weeks} wks
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap sm:shrink-0">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:shrink-0">
           <Link
             href={`/teacher/scheme-of-work/${scheme.id}`}
-            className="text-xs font-bold text-gray-600 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition"
+            className="text-xs font-bold text-gray-600 border border-gray-200 px-3 py-2 rounded-lg hover:bg-gray-50 transition text-center"
           >
             View SOW
           </Link>
 
           {allDone ? (
-            <span className="text-xs font-bold text-teal-700 bg-teal-50 border border-teal-200 px-3 py-1.5 rounded-lg">
+            <span className="text-xs font-bold text-teal-700 bg-teal-50 border border-teal-200 px-3 py-2 rounded-lg text-center">
               All plans done ✓
             </span>
           ) : (
             <button
               onClick={handleGenerateLP}
               disabled={busy}
-              className="flex items-center gap-1.5 text-xs font-bold bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-1.5 text-xs font-bold bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
             >
               {generatingLP
                 ? <><Loader2 className="w-3 h-3 animate-spin" /> Generating…</>
@@ -217,7 +216,7 @@ function SchemeCard({
       </div>
 
       {/* ── Section 2: Progress bars ───────────────────────────────────────────── */}
-      <div className="px-4 sm:px-5 pb-4 sm:pb-5 pt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-5 border-t border-gray-100">
+      <div className="px-4 sm:px-5 pb-4 sm:pb-5 pt-4 grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-5 border-t border-gray-100">
 
         {/* SOW — always complete */}
         <div>
