@@ -170,10 +170,10 @@ export default async function TeacherDashboardPage() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-10 lg:py-14">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mb-3 flex-wrap">
                 <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse shrink-0" />
                 <span className="text-teal-400 text-sm font-semibold">{today}</span>
-                <span className="w-1 h-1 rounded-full bg-slate-600" />
+                <span className="w-1 h-1 rounded-full bg-slate-600 hidden sm:block" />
                 <span className="text-slate-400 text-sm">{term}, {new Date().getFullYear()}</span>
               </div>
               <p className="text-slate-400 text-sm font-medium mb-1 tracking-wide uppercase">Welcome back</p>
@@ -199,7 +199,7 @@ export default async function TeacherDashboardPage() {
           </div>
 
           {/* Stats row — inside the dark hero */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-7">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mt-7">
             {stats.map((stat, i) => (
               <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-sm hover:bg-white/8 transition-all">
                 <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${stat.gradient} shadow-lg ${stat.glow} flex items-center justify-center mb-3`}>
@@ -259,7 +259,7 @@ export default async function TeacherDashboardPage() {
             <Zap className="w-4 h-4 text-amber-500" />
             <h2 className="text-base font-black text-gray-900">Quick Actions</h2>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {quickActions.map((action, i) => (
               <Link
                 key={i}
@@ -307,7 +307,7 @@ export default async function TeacherDashboardPage() {
               </Link>
             </div>
           ) : (
-            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {classesWithStats.slice(0, 6).map((cls) => {
                 const grade = levelGradient(cls.avgLevel || 0)
                 return (
@@ -395,7 +395,7 @@ export default async function TeacherDashboardPage() {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Link
                     href={`/teacher/classes/${topClass.id}?tab=clinic`}
                     className="flex items-center gap-2 bg-violet-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-violet-700 transition"
@@ -527,7 +527,7 @@ export default async function TeacherDashboardPage() {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 flex-wrap">
               {academyStats.allComplete && (
                 <Link
                   href="/teacher/academy/certificate"

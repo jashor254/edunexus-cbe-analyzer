@@ -81,10 +81,10 @@ Asante! 🙏`
   const info = alerts.filter(a => alertSeverity(a.alert_type) === 'info')
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-black text-gray-900 flex items-center gap-3">
-          <AlertTriangle className="w-8 h-8 text-red-500" />
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-black text-gray-900 flex items-center gap-3">
+          <AlertTriangle className="w-6 h-6 sm:w-8 sm:h-8 text-red-500 shrink-0" />
           Early Warning Alerts
         </h1>
         <p className="text-gray-500 mt-1">Students who may need your attention</p>

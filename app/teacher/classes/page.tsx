@@ -84,15 +84,15 @@ export default function TeacherClassesPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6 sm:mb-8">
         <div>
-          <h1 className="text-3xl font-black text-gray-900">My Classes</h1>
+          <h1 className="text-2xl sm:text-3xl font-black text-gray-900">My Classes</h1>
           <p className="text-gray-500 mt-1">Manage your classes and share codes with parents</p>
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 bg-teal-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-teal-700 transition shadow-sm"
+          className="flex items-center justify-center gap-2 bg-teal-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-teal-700 transition shadow-sm sm:self-auto self-start"
         >
           <PlusCircle className="w-4 h-4" /> Create Class
         </button>
@@ -115,7 +115,7 @@ export default function TeacherClassesPage() {
           </button>
         </div>
       ) : (
-        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {classes.map((cls) => (
             <div key={cls.id} className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition">
               <div className="flex items-start justify-between mb-3">

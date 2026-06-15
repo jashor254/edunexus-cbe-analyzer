@@ -301,14 +301,14 @@ export default function ReportsPage() {
   const selectedClassObj = classes.find(c => c.id === selectedClass)
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
       <div className="mb-6">
-        <h1 className="text-3xl font-black text-gray-900">Reports</h1>
+        <h1 className="text-2xl sm:text-3xl font-black text-gray-900">Reports</h1>
         <p className="text-gray-500 mt-1">Academic Clinic Reports and class data exports</p>
       </div>
 
       {/* Tab switcher */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl mb-7 w-fit">
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl mb-7 overflow-x-auto">
         <button
           onClick={() => setActiveTab('clinic')}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition ${

@@ -172,23 +172,25 @@ function SchemeCard({
     <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
 
       {/* ── Section 1: Header ──────────────────────────────────────────────────── */}
-      <div className="p-5 flex items-start gap-4">
-        <div
-          className="w-12 h-12 rounded-xl flex items-center justify-center text-sm font-black shrink-0"
-          style={{ backgroundColor: colors.bg, color: colors.text }}
-        >
-          {colors.abbr}
+      <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4">
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <div
+            className="w-11 h-11 rounded-xl flex items-center justify-center text-sm font-black shrink-0"
+            style={{ backgroundColor: colors.bg, color: colors.text }}
+          >
+            {colors.abbr}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <h3 className="font-black text-gray-900 text-base leading-tight">{scheme.learning_area}</h3>
+            <p className="text-gray-500 text-sm">{scheme.grade} · Term {scheme.term} · {scheme.year}</p>
+            <p className="text-gray-400 text-xs mt-0.5">
+              {scheme.total_lessons} lessons · {scheme.total_weeks} weeks · {scheme.lessons_per_week} per week
+            </p>
+          </div>
         </div>
 
-        <div className="flex-1 min-w-0">
-          <h3 className="font-black text-gray-900 text-base leading-tight">{scheme.learning_area}</h3>
-          <p className="text-gray-500 text-sm">{scheme.grade} · Term {scheme.term} · {scheme.year}</p>
-          <p className="text-gray-400 text-xs mt-0.5">
-            {scheme.total_lessons} lessons · {scheme.total_weeks} weeks · {scheme.lessons_per_week} per week
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+        <div className="flex items-center gap-2 flex-wrap sm:shrink-0">
           <Link
             href={`/teacher/scheme-of-work/${scheme.id}`}
             className="text-xs font-bold text-gray-600 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition"
@@ -215,7 +217,7 @@ function SchemeCard({
       </div>
 
       {/* ── Section 2: Progress bars ───────────────────────────────────────────── */}
-      <div className="px-5 pb-5 pt-4 grid grid-cols-3 gap-5 border-t border-gray-100">
+      <div className="px-4 sm:px-5 pb-4 sm:pb-5 pt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-5 border-t border-gray-100">
 
         {/* SOW — always complete */}
         <div>
@@ -355,7 +357,7 @@ export default function MySchemesPage() {
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-5">
 
         {/* ── Header ──────────────────────────────────────────────────────────── */}
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-black text-gray-900">My Schemes of Work</h1>
             <p className="text-gray-500 text-sm mt-0.5">
@@ -364,7 +366,7 @@ export default function MySchemesPage() {
           </div>
           <Link
             href="/teacher/scheme-of-work/new"
-            className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-700 transition shadow-sm"
+            className="flex items-center justify-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-700 transition shadow-sm self-start"
           >
             <Plus className="w-4 h-4" /> New Scheme
           </Link>
