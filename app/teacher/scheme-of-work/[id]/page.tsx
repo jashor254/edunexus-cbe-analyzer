@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, use } from 'react'
 import Link from 'next/link'
 import {
-  ChevronLeft, Loader2, Download, Check, BookOpen, AlertCircle, FolderOpen,
+  ChevronLeft, Loader2, Download, Check, BookOpen, AlertCircle, FolderOpen, NotebookPen, ClipboardList, ArrowRight,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -289,6 +289,66 @@ export default function SOWDetailPage({ params }: { params: Promise<{ id: string
             {scheme.tsc_number && <span><span className="text-slate-500">TSC:</span> {scheme.tsc_number}</span>}
             {scheme.textbook && <span><span className="text-slate-500">Textbook:</span> {scheme.textbook}</span>}
             <span className="text-slate-500 text-xs italic">Click any cell to edit · Auto-saves after 800ms</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── My Documents card ───────────────────────────────────────────────── */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-5">
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-gray-100">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-indigo-50 rounded-xl flex items-center justify-center">
+                <FolderOpen className="w-4 h-4 text-indigo-600" />
+              </div>
+              <span className="font-black text-gray-900 text-sm">My Documents</span>
+            </div>
+            <Link
+              href="/teacher/documents"
+              className="flex items-center gap-1 text-xs font-bold text-indigo-600 hover:underline"
+            >
+              View all <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
+            {/* Lesson Plans */}
+            <div className="px-4 sm:px-5 py-4 flex items-start gap-3">
+              <div className="w-9 h-9 bg-violet-50 rounded-xl flex items-center justify-center shrink-0">
+                <NotebookPen className="w-4 h-4 text-violet-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-gray-900 text-sm">Lesson Plans</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Generate week-by-week lesson plans from this scheme
+                </p>
+                <Link
+                  href="/teacher/lesson-plans"
+                  className="mt-2.5 inline-flex items-center gap-1.5 bg-violet-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-violet-700 transition"
+                >
+                  <NotebookPen className="w-3 h-3" /> Go to Lesson Plans
+                </Link>
+              </div>
+            </div>
+
+            {/* Record of Work */}
+            <div className="px-4 sm:px-5 py-4 flex items-start gap-3">
+              <div className="w-9 h-9 bg-teal-50 rounded-xl flex items-center justify-center shrink-0">
+                <ClipboardList className="w-4 h-4 text-teal-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-gray-900 text-sm">Record of Work</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Log what was taught each week against this scheme
+                </p>
+                <Link
+                  href="/teacher/record-of-work"
+                  className="mt-2.5 inline-flex items-center gap-1.5 bg-teal-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-teal-700 transition"
+                >
+                  <ClipboardList className="w-3 h-3" /> Go to Record of Work
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       </div>

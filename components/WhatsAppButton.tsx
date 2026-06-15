@@ -8,7 +8,7 @@ export default function WhatsAppButton() {
   const whatsappUrl = "https://wa.me/254141799322?text=Hello%20EduNexus%2C%20I%20have%20a%20question%20about%20the%20Academic%20Clinic.";
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div className="fixed bottom-20 right-4 lg:bottom-6 lg:right-6 z-50">
       {/* Working hours indicator (optional) */}
       <div className="absolute bottom-16 right-0 bg-white text-xs text-gray-600 px-3 py-1 rounded-full shadow-md border border-green-200 mb-2 whitespace-nowrap">
         <Clock className="w-3 h-3 inline mr-1 text-green-600" />
