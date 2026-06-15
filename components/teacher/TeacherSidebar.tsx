@@ -154,7 +154,7 @@ export default function TeacherSidebar({ teacherName, school, subject }: Props) 
       </aside>
 
       {/* ── Mobile Header ─────────────────────────────────────────────────────── */}
-      <header className="lg:hidden sticky top-0 z-20 bg-[#0c1929] border-b border-white/10 px-4 py-3 flex items-center justify-between">
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-20 bg-[#0c1929] border-b border-white/10 px-4 py-3 flex items-center justify-between">
         <Link href="/teacher/dashboard">
           <Logo variant="dark" size="sm" />
         </Link>
@@ -213,7 +213,7 @@ export default function TeacherSidebar({ teacherName, school, subject }: Props) 
 
       {/* Sheet */}
       <div
-        className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0c1929] rounded-t-3xl transition-transform duration-300 ease-out ${moreOpen ? 'translate-y-0' : 'translate-y-full'}`}
+        className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0c1929] rounded-t-3xl transition-transform duration-300 ease-out max-h-[85vh] overflow-y-auto ${moreOpen ? 'translate-y-0' : 'translate-y-full'}`}
       >
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1">

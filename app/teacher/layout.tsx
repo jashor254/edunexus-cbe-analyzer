@@ -37,14 +37,14 @@ export default async function TeacherLayout({ children }: { children: React.Reac
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50">
       <TeacherSidebar
         teacherName={teacher.full_name || 'Mwalimu'}
         school={teacher.school || ''}
         subject={teacher.subject}
       />
-      <div className="flex-1 lg:ml-64 flex flex-col min-h-screen">
-        <main className="flex-1 pb-20 lg:pb-0">
+      <div className="lg:ml-64 flex flex-col min-h-screen pt-14 lg:pt-0">
+        <main className="flex-1 pb-24 lg:pb-0">
           {children}
         </main>
       </div>
