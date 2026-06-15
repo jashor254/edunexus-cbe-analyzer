@@ -51,6 +51,12 @@ Rotate activity structures: Demonstration, Problem-solving, Case study, Simulati
   Gallery walk, Debate, Jigsaw, Role play, Think-Pair-Share, Question and Answer,
   Discussion, Brainstorming, Sorting, Peer teaching
 
+LENGTH RULE — NON-NEGOTIABLE:
+Each learning experience = ONE sentence only. Maximum 20 words.
+Format: "[Activity type]: [What learners do] using [Kenyan context]."
+WRONG: "Learners work in pairs to identify triggers then share with class."
+RIGHT: "Think-Pair-Share: Learners identify conflict triggers from a Kisumu boundary dispute."
+
 RULE 5 — ASSESSMENT DIVERSITY
 Never use the same 3 assessments in consecutive lessons.
 Use: observation checklist, oral questioning, written exercise, practical demonstration,
@@ -89,7 +95,7 @@ async function callDeepSeek(prompt: string): Promise<string> {
         { role: 'user',   content: prompt },
       ],
       temperature: TEMPERATURE,
-      max_tokens: 2000,
+      max_tokens: 1200,
     }),
   })
 
@@ -223,7 +229,10 @@ ${verbAvoidLine}
   const classroomRule = `IMPORTANT: All activities happen INSIDE the classroom only.
 No field trips, no external visitors, no going to other locations.
 Use only: discussion, role play, think-pair-share, gallery walk, case study, group work, Q&A, debate, demonstration.
-Each activity: 1–2 sentences max. Total time: 35–40 minutes for 30–45 students.
+LENGTH RULE — NON-NEGOTIABLE: Each learning experience = ONE sentence only. Maximum 20 words.
+Format: "[Activity type]: [What learners do] using [Kenyan context]."
+BAD: "Learners set up an experiment to test active listening. In pairs, one describes a conflict while the other listens without interrupting, then they switch roles."
+GOOD: "Think-Pair-Share: Learners identify conflict triggers from a Kisumu boundary dispute."
 Kenyan contexts appear as discussion examples only — not as places the class physically visits.`
 
   const experienceInstruction = seed
