@@ -216,6 +216,35 @@ export type SubjectScoreRow = {
   status: 'strong' | 'meets' | 'needs_work' | 'critical'
 }
 
+export type RoadmapStep = {
+  subject: string
+  fromLevel: number
+  toLevel: number
+}
+
+export type FutureOpportunity = {
+  name: string
+  alignment: string
+  futureTrend: string
+  aiReality: string
+}
+
+export type PlanAction = {
+  action: string
+}
+
+export type ParentPlan = {
+  thisWeek: PlanAction[]
+  thisMonth: PlanAction[]
+  thisTerm: PlanAction[]
+}
+
+export type CompassPrescription = {
+  focusTopics: string[]
+  sessionFrequency: string
+  estimatedWindow: string
+}
+
 export type ClinicReport = {
   student_id: string
   student_name: string
@@ -234,7 +263,7 @@ export type ClinicReport = {
   summary_sentence: string
 
   // Section 2 — Career / Pathway
-  recommended_pathway: string | null        // Junior: STEM/Social/Arts etc
+  recommended_pathway: string | null        // Junior: STEM/Social/Arts etc; Senior: chosen pathway
   kjsea_composite?: number                  // Junior: KJSEA 2025 composite score
   stem_viable?: boolean                     // Junior: STEM within reach (one blocker)
   pathwayGapAnalysis?: PathwayResult        // Junior: two-step pathway gap detail
@@ -249,13 +278,26 @@ export type ClinicReport = {
   current_phase: SkillTimelineItem | null
   next_phase: SkillTimelineItem | null
 
-  // Section 4 — Parent Actions
+  // Section 4 — Parent Actions (legacy flat list — kept for junior + in-app view)
   parent_actions: Array<{
     title: string
     why: string
     action: string
     link?: string
   }>
+
+  // Senior school academic diagnosis fields
+  academicHealthStatus?: string
+  academicDiagnosis?: string
+  pathwayReadinessLabel?: 'Developing' | 'On Track' | 'Strong'
+  readinessScore?: number
+  strongContributors?: SubjectScoreRow[]
+  currentConstraints?: SubjectScoreRow[]
+  nextLevelRoadmap?: RoadmapStep[]
+  futureOpportunities?: FutureOpportunity[]
+  parentPlan?: ParentPlan
+  expectedOutcome?: string[]
+  compassPrescription?: CompassPrescription
 
   disclaimer: string
 }

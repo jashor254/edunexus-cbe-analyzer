@@ -144,6 +144,50 @@ export interface GraphData {
   }>
 }
 
+// ─── Junior Clinic Redesign (3-page) ─────────────────────────────────────────
+
+export interface PathwayGapRow {
+  subjectKey: string
+  displayName: string
+  currentLevel: number
+  requiredLevel: number
+  gap: number
+  status: 'met' | 'one_step' | 'two_steps'
+}
+
+export interface PathwayReadinessCard {
+  pathway: 'STEM' | 'Social Sciences' | 'Arts & Sports Science'
+  score: number
+  statusLabel: 'Strongly Ready' | 'Within Reach' | 'Requires Improvement' | 'Significant Preparation Needed'
+  statusColor: string
+  diagnosis: string
+  gapRows: PathwayGapRow[]
+}
+
+export interface PathwayRoadmap {
+  targetPathway: string
+  steps: Array<{ subject: string; fromLevel: number; toLevel: number }>
+  timeline: string
+  currentScore: number
+  projectedScore: number
+}
+
+export interface TermPlanAction {
+  action: string
+}
+
+export interface TermActionPlan {
+  thisWeek: TermPlanAction[]
+  thisMonth: TermPlanAction[]
+  beforeGrade10: TermPlanAction[]
+}
+
+export interface JuniorFutureOpportunity {
+  pathway: string
+  examples: string[]
+  whyItFits: string
+}
+
 // ─── Main Report ─────────────────────────────────────────────────────────────
 
 import type { DreamCareerAnalysis } from './careerEngine'
@@ -163,4 +207,10 @@ export interface AcademicClinicReport {
   graphData: GraphData
   reportId: string
   generatedAt: string
+  // ── Junior 3-page redesign fields
+  academicStatusLabel?: string
+  pathwayReadinessCards?: PathwayReadinessCard[]
+  pathwayRoadmap?: PathwayRoadmap
+  termActionPlan?: TermActionPlan
+  juniorFutureOpportunities?: JuniorFutureOpportunity[]
 }

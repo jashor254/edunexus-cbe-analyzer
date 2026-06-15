@@ -17,6 +17,7 @@ export type AcademyLesson = {
   title: string
   order: number
   content: string
+  practice_prompt: string | null
   created_at: string
 }
 

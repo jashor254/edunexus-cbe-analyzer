@@ -2,11 +2,10 @@ import { createServiceClient } from '@/utils/supabase/service'
 import type { RecordOfWork, ROWEntry } from './pdfRenderer'
 
 interface LessonPlanRow {
-  week_number:       number
-  lesson_number:     number
-  strand:            string
-  sub_strand:        string
-  learning_outcomes: string[]
+  week_number:   number
+  lesson_number: number
+  strand:        string
+  sub_strand:    string
 }
 
 export async function buildRecordOfWork(
@@ -17,7 +16,7 @@ export async function buildRecordOfWork(
 
   const { data: plans, error: plansErr } = await db
     .from('lesson_plans')
-    .select('week_number, lesson_number, strand, sub_strand, learning_outcomes')
+    .select('week_number, lesson_number, strand, sub_strand')
     .eq('sow_id', sowId)
     .eq('week_number', weekNumber)
     .order('lesson_number', { ascending: true })
@@ -44,7 +43,7 @@ export async function buildRecordOfWork(
     lesson_number: p.lesson_number,
     strand:        p.strand,
     sub_strand:    p.sub_strand,
-    objectives:    p.learning_outcomes ?? [],
+    work_done:     `${p.strand} — ${p.sub_strand}`,
     reflection:    '',
   }))
 

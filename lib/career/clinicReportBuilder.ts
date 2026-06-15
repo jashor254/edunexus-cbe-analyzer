@@ -5,7 +5,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getCareerBySlug, getMatchesForStudent, getCurrentSkillsForAge, getNextSkillsForAge, getAgeRangeLabel } from './careerEngine'
 import { generateCareerMatches } from './matchEngine'
 import { STANDARD_DISCLAIMER } from './types'
-import type { ClinicReport, SubjectScoreRow, Career, SkillTimelineItem } from './types'
+import type {
+  ClinicReport, SubjectScoreRow, Career, SkillTimelineItem,
+  RoadmapStep, FutureOpportunity, ParentPlan, CompassPrescription,
+} from './types'
 import { calculateKJSEAComposite, calculateJuniorPathwayAffinity, calculatePathwayGapAnalysis, PATHWAY_DISCLAIMER, normalizeSubjectScores } from '@/lib/pathwayCalculator'
 
 // ─── Subject display names (Fix 3) ────────────────────────────────────────────
@@ -296,6 +299,356 @@ function concreteAction(subject: string, score: number, firstName: string = 'you
     ?? { action: `Dedicate focused practice time to ${displayName(subject)} each week — even 20 minutes of undistracted study beats two hours of passive reading.`, time: '20 minutes, 3x a week' }
 }
 
+// ─── Senior school diagnosis helpers ─────────────────────────────────────────
+
+const PATHWAY_SUBJECTS: Record<string, Set<string>> = {
+  'STEM': new Set([
+    'mathematics', 'core_mathematics', 'biology', 'chemistry', 'physics',
+    'integrated_science', 'computer_studies', 'pre_technical', 'pre_technical_studies',
+  ]),
+  'Social Sciences': new Set([
+    'english', 'kiswahili', 'history', 'geography', 'geo',
+    'cre', 'christian_religious_education', 'ire', 'islamic_religious_education',
+    'social_studies', 'business_studies', 'community_service_learning', 'csl',
+    'home_science', 'hisc', 'agriculture', 'agriculture_nutrition',
+  ]),
+  'Arts & Sports Science': new Set([
+    'creative_arts', 'creative_arts_sports', 'music_dance',
+    'physical_education', 'sports_recreation', 'fine_arts', 'theatre_film',
+  ]),
+  'Business': new Set([
+    'business_studies', 'economics', 'accounting',
+    'mathematics', 'core_mathematics', 'essential_mathematics',
+  ]),
+}
+
+const ACADEMIC_HEALTH_STATUS: Record<number, string> = {
+  1: 'Critical Intervention Required',
+  2: 'Developing Foundation',
+  3: 'On Track',
+  4: 'Advanced Performance',
+}
+
+function buildSeniorDiagnosis(
+  firstName: string,
+  pathway: string | null,
+  strongNames: string[],
+  constraintNames: string[],
+  overallLevel: number
+): string {
+  const pw = pathway ?? 'chosen'
+
+  if (overallLevel >= 4) {
+    const s = strongNames.slice(0, 2).join(' and ')
+    return `${firstName} demonstrates advanced competency within the ${pw} pathway, with exceptional performance across assessed subjects.${s ? ` Outstanding results in ${s} position ${firstName} as a high-readiness learner.` : ''} The current trajectory is strong. Continued enrichment and depth of engagement are recommended to sustain this performance through the final years of Senior School.`
+  }
+
+  if (overallLevel >= 3) {
+    const s = strongNames.slice(0, 2).join(' and ')
+    const c = constraintNames.slice(0, 2).join(' and ')
+    return `${firstName} demonstrates solid competency within the ${pw} pathway${s ? `, with clear strengths in ${s}` : ''}.${c ? ` Current performance in ${c} presents an opportunity — targeted attention here will strengthen overall pathway readiness.` : ''} The overall trajectory indicates a learner who is on track and well-positioned for continued Senior School progression.`
+  }
+
+  if (overallLevel >= 2) {
+    const s = strongNames.slice(0, 2).join(' and ')
+    const c = constraintNames.slice(0, 2).join(' and ')
+    let narrative = `${firstName} demonstrates emerging competency within the ${pw} pathway.`
+    if (s) narrative += ` Strengths are visible in ${s}.`
+    if (c) {
+      narrative += ` Current performance suggests challenges in ${c} are affecting overall pathway readiness.`
+      const lowerC = constraintNames.join(' ').toLowerCase()
+      if (lowerC.includes('kiswahili') || lowerC.includes('english')) {
+        narrative += ` Language-related gaps tend to have a cascading effect across subjects — strengthening these areas will unlock progress elsewhere.`
+      } else if (lowerC.includes('mathematics') || lowerC.includes('math')) {
+        narrative += ` Mathematical foundations at this level have a significant impact on quantitative reasoning across multiple pathway subjects.`
+      }
+    }
+    narrative += ` Closing these gaps will meaningfully improve pathway readiness before the final years of Senior School.`
+    return narrative
+  }
+
+  // Level 1
+  const c = constraintNames.slice(0, 2).join(' and ')
+  return `${firstName}'s current assessment reveals critical gaps across multiple areas of the ${pw} pathway.${c ? ` Priority intervention is urgently needed in ${c}.` : ''} Intensive and structured support across the curriculum is essential at this stage. The intervention plan in this report outlines the specific steps required to begin reversing this trajectory. Early and consistent action yields the most significant outcomes — this term is a critical window.`
+}
+
+const FUTURE_OPPORTUNITIES: Record<string, FutureOpportunity[]> = {
+  'Social Sciences': [
+    {
+      name: 'Education & Training',
+      alignment: "Communication and social reasoning align with Kenya's growing demand for qualified educators, trainers, and curriculum designers at every level of the system.",
+      futureTrend: "Africa's education sector is digitalising rapidly — demand for educators who can blend technology, mentorship, and curriculum design is increasing significantly.",
+      aiReality: 'AI will handle routine content delivery and assessment grading. Skilled educators who can mentor, inspire, facilitate critical thinking, and build trust with families become more valuable, not less.',
+    },
+    {
+      name: 'Public Service & Policy',
+      alignment: "Analytical thinking and civic awareness developed through social sciences subjects are the core competencies of effective public administration and policy work in Kenya.",
+      futureTrend: "Kenya's Vision 2030 and devolution create growing demand for data-literate public servants who can bridge community needs and national policy objectives.",
+      aiReality: 'AI will automate administrative processing and routine data analysis, creating space for public servants to focus on complex judgment, stakeholder engagement, and community leadership.',
+    },
+    {
+      name: 'Communication & Media',
+      alignment: 'Language proficiency and social awareness form the foundation of effective journalism, public relations, digital media production, and community communication.',
+      futureTrend: "Kenya's digital and social media industry is expanding — podcasting, video content, and online publishing are growing commercial opportunities accessible to locally trained communicators.",
+      aiReality: 'AI will automate basic content production, but skilled communicators who can craft original ideas, build audience trust, and tell authentic stories will remain highly valuable.',
+    },
+  ],
+  'STEM': [
+    {
+      name: 'Technology & Computing',
+      alignment: 'Mathematical reasoning and scientific thinking are the foundational skills for software development, data science, cybersecurity, and systems engineering.',
+      futureTrend: "Nairobi is East Africa's technology hub — Kenya's growing tech ecosystem creates consistent demand for locally trained engineers, developers, and data analysts.",
+      aiReality: 'AI will assist with repetitive coding and analysis tasks. Engineers who can design systems, solve novel problems, and direct AI tools strategically will be the most sought-after professionals.',
+    },
+    {
+      name: 'Health Sciences',
+      alignment: 'Biology and chemistry competency directly supports preparation for medicine, nursing, pharmacy, public health, and medical research careers.',
+      futureTrend: "Africa's healthcare gap creates significant opportunity — Kenya needs far more trained health professionals than currently exist at every level of the system.",
+      aiReality: 'AI will improve diagnostic speed and support clinical decisions. However, healthcare remains deeply human — patient empathy, clinical judgment, and hands-on skill are irreplaceable.',
+    },
+    {
+      name: 'Engineering & Infrastructure',
+      alignment: "Physics and mathematics provide the core reasoning skills for civil, mechanical, and electrical engineering — sectors central to Kenya's infrastructure development agenda.",
+      futureTrend: "Kenya's infrastructure ambitions — roads, energy, housing, and water systems — create sustained demand for qualified engineers across the next two decades.",
+      aiReality: 'AI-assisted design and simulation tools are transforming engineering workflows. Engineers who can apply these tools to African infrastructure challenges will be in high demand.',
+    },
+  ],
+  'Arts & Sports Science': [
+    {
+      name: 'Creative & Design Industries',
+      alignment: 'Creative expression and visual thinking are core competencies for graphic design, architecture, interior design, fashion, and brand development — all growing sectors in Kenya.',
+      futureTrend: "Africa's creative economy is gaining global recognition — Kenyan fashion, art, and design are building international audiences and commercial markets.",
+      aiReality: 'AI can generate images and designs, but original creative vision, cultural understanding, client relationships, and artistic judgment are human strengths that cannot be replicated.',
+    },
+    {
+      name: 'Sports & Coaching',
+      alignment: 'Physical aptitude and discipline developed through sports science form the foundation for coaching, sports management, physiotherapy, and sports nutrition careers.',
+      futureTrend: "Kenya's sports sector is professionalising — athletics, football, basketball, and rugby are growing as commercial industries with increasing local and international investment.",
+      aiReality: 'AI in sports is used for performance analytics and injury prediction. Coaches who can interpret this data, develop athletes, and build team culture remain essential.',
+    },
+    {
+      name: 'Media & Entertainment',
+      alignment: "Creative talent combined with communication skills aligns with Kenya's growing film, music, digital content, and entertainment industry — at home and internationally.",
+      futureTrend: "African film, music, and digital content are gaining global audiences. Kenya's creative industries are expanding beyond borders through streaming and social media platforms.",
+      aiReality: 'AI will produce content at scale, but authentic storytelling rooted in African culture and lived experience is something AI cannot replicate. Original voice is a competitive advantage.',
+    },
+  ],
+  'Business': [
+    {
+      name: 'Finance & Accounting',
+      alignment: 'Quantitative reasoning and commercial awareness are the core competencies for accounting, financial analysis, banking, and investment management.',
+      futureTrend: "Kenya's financial sector is digitalising rapidly — mobile money, fintech, and digital banking are creating new roles that blend finance and technology.",
+      aiReality: 'AI will automate routine bookkeeping and financial reporting. Accountants and analysts who can interpret complex financial situations and advise on strategy will remain in demand.',
+    },
+    {
+      name: 'Entrepreneurship & Business',
+      alignment: 'Commercial thinking, problem identification, and practical business skills align directly with the realities of starting and growing a successful business in Kenya.',
+      futureTrend: "Kenya's startup ecosystem is one of Africa's most active — Nairobi entrepreneurs are creating solutions in agriculture, health, education, and logistics that scale regionally.",
+      aiReality: 'AI is a tool that gives entrepreneurs more leverage, not less. Entrepreneurs who can identify real problems, build teams, and create value in their communities will benefit most.',
+    },
+    {
+      name: 'Marketing & Communications',
+      alignment: 'Understanding customers, markets, and communication channels is the foundation of marketing, advertising, and brand management careers in Kenya and across Africa.',
+      futureTrend: 'Digital marketing is growing rapidly — every business in Kenya needs professionals who understand online audiences and can reach them effectively and affordably.',
+      aiReality: 'AI will automate content scheduling and basic targeting. Marketers who can craft compelling narratives, build brand identity, and understand human behaviour will remain essential.',
+    },
+  ],
+}
+
+function getFutureOpportunities(pathway: string | null): FutureOpportunity[] {
+  return FUTURE_OPPORTUNITIES[pathway ?? ''] ?? FUTURE_OPPORTUNITIES['Social Sciences']
+}
+
+// Specific weekly, monthly, and term actions per subject (parent-facing)
+
+const WEEKLY_ACTIONS: Record<string, string> = {
+  kiswahili:                 'Read a Kiswahili article together three times this week and discuss its main ideas in simple Kiswahili sentences.',
+  english:                   'Read one newspaper article together each evening, then ask your child to summarise it in three sentences. Correct gently.',
+  mathematics:               'Spend 10 minutes on mental maths daily using real situations — market prices, distances, time calculations. No pen needed.',
+  core_mathematics:          'Work through 3 past paper questions from the weakest topic this week, focusing on understanding over speed.',
+  essential_mathematics:     'Practice 5 real-world calculations daily — budgeting, measurements, ratios. Connect every exercise to a real situation.',
+  geography:                 'Explore one Kenyan county on a map together — its physical features, economy, and climate. 20 minutes, once this week.',
+  geo:                       'Explore one Kenyan county on a map together — its physical features, economy, and climate. 20 minutes, once this week.',
+  history:                   'Watch a 10-minute documentary clip about a Kenyan historical event together and discuss: "What would you have done differently?"',
+  biology:                   'Identify 5 living things outside the house and discuss how each one works or what it needs to survive.',
+  chemistry:                 'Try a simple kitchen experiment — salt dissolving, vinegar and baking soda. Connect it to what was taught in class.',
+  physics:                   'Spot physics in daily life together: a bicycle, a door hinge, light through a window. Ask "why does this work?" before looking up the answer.',
+  business_studies:          'Visit a local market together and discuss: Who is the supplier? Who is the customer? What is the approximate profit margin?',
+  cre:                       'Read one passage from the relevant CRE set text together and discuss the main moral lesson it teaches.',
+  christian_religious_education: 'Read one passage from the relevant CRE set text together and discuss the main moral lesson it teaches.',
+  community_service_learning:'Identify one community problem visible near your home. Discuss: What causes it? What could your child realistically do about it?',
+  csl:                       'Identify one community problem visible near your home. Discuss: What causes it? What could your child realistically do about it?',
+  computer_studies:          'Practice one spreadsheet skill — SUM, AVERAGE, or IF formula — using a practical example such as tracking household expenses.',
+  social_studies:            'Read one news article together and discuss its civic significance. Ask: "Who made this decision and why?"',
+}
+
+const MONTHLY_ACTIONS: Record<string, string> = {
+  kiswahili:                 'Start a simple Kiswahili vocabulary notebook — 5 new words per day, each used in a sentence. Review together once a week.',
+  english:                   'Read one short book or long article together this month. Ask your child to write a one-page response: "What did you learn?"',
+  mathematics:               'Complete one full set of past paper questions under timed conditions. Review every wrong answer together — understanding why matters more than the score.',
+  core_mathematics:          'Complete two past paper topic sections this month. Identify the 3 most common mistake types and address them specifically.',
+  essential_mathematics:     'Build a simple household budget spreadsheet together — this applies maths in a context your child can see and understand.',
+  geography:                 'Complete a 30-question geography revision set from past papers. Review every incorrect answer and understand why the correct answer is right.',
+  geo:                       'Complete a 30-question geography revision set from past papers. Review every incorrect answer and understand why the correct answer is right.',
+  history:                   'Write a one-page essay on one historical topic. Focus on structure: introduction, evidence, argument, conclusion.',
+  biology:                   'Create a simple biology diagram together — a cell, a plant, or a body system — with all parts labelled correctly from memory.',
+  chemistry:                 'Balance 20 chemical equations from past papers. This is a high-frequency exam skill that improves rapidly with consistent practice.',
+  physics:                   'Solve 5 numerical physics problems from the term topics. Show full working clearly for each one.',
+  business_studies:          'Write a simple one-page business plan for a small business of your child\'s choice. Focus on: the customer, the product, and the cost.',
+  cre:                       'Write a structured essay response to a CRE past paper question. Practise the format: context, teaching, application to modern life.',
+  christian_religious_education: 'Write a structured essay response to a CRE past paper question. Practise the format: context, teaching, application to modern life.',
+  community_service_learning:'Complete a short community project this month — helping a neighbour, organising something at school, or identifying a local problem and proposing a solution.',
+  csl:                       'Complete a short community project this month — helping a neighbour, organising something at school, or identifying a local problem and proposing a solution.',
+  computer_studies:          'Build a simple spreadsheet or document that solves a real household or school problem. Focus on applying the skills, not just practising them in isolation.',
+  social_studies:            'Research one Kenyan county in depth — its history, economy, and current challenges. Write a one-page summary.',
+}
+
+const TERM_ACTIONS: Record<string, string> = {
+  kiswahili:                 'Ensure consistent Kiswahili practice 5 days a week throughout this term. By end of term, your child should attempt a composition with minimal assistance.',
+  english:                   'Ensure your child reads at least 3 full texts this term — books, magazines, or long articles — and writes a response to each one.',
+  mathematics:               'Work through all syllabus topics at least once this term. Target: attempt every past paper question type with confidence by end of term.',
+  core_mathematics:          'Complete full past papers for each major topic by end of term. Focus especially on the areas with the lowest current scores.',
+  essential_mathematics:     'Ensure your child can apply mathematics to real-world problems — budgeting, measurement, estimation — without prompting by end of term.',
+  geography:                 'Ensure all map reading, climate, and physical geography topics are revised systematically. Geography rewards students who practise consistent structured review.',
+  geo:                       'Ensure all map reading, climate, and physical geography topics are revised systematically. Geography rewards students who practise consistent structured review.',
+  history:                   'Ensure your child can construct a structured argument about any set event or figure by end of term — not just recall facts, but analyse and evaluate.',
+  biology:                   'Ensure all biology diagrams for the term\'s topics can be drawn and labelled from memory. This is the single highest-value biology exam skill.',
+  chemistry:                 'Master the key equations, reactions, and calculations for the term. Chemistry rewards students who practise consistently over time.',
+  physics:                   'Work through every formula in the current syllabus section at least twice this term — once to learn, once to practise under timed conditions.',
+  business_studies:          'Complete all past paper questions from the current topic by end of term. Business studies rewards consistent application of concepts to new scenarios.',
+  cre:                       'Read and summarise all set text teachings for the term. CRE rewards students who can apply moral teachings to contemporary Kenyan ethical situations.',
+  christian_religious_education: 'Read and summarise all set text teachings for the term. CRE rewards students who can apply moral teachings to contemporary Kenyan ethical situations.',
+  community_service_learning:'Maintain a CSL journal this term — recording at least one community action per week with written reflections on what was learned.',
+  csl:                       'Maintain a CSL journal this term — recording at least one community action per week with written reflections on what was learned.',
+  computer_studies:          'Build one substantial computer project this term — a database, presentation, or simple program — that demonstrates mastery of syllabus skills.',
+  social_studies:            'Ensure all civic, historical, and geographic topics for the term are covered systematically. Social Studies rewards broad, well-connected knowledge.',
+}
+
+function buildParentPlan(
+  weakSubjects: SubjectScoreRow[],
+  studentName: string
+): ParentPlan {
+  const firstName = studentName.split(' ')[0]
+  const weak = weakSubjects.slice(0, 3)
+
+  const thisWeek = weak.slice(0, 2).map(s => ({
+    action: WEEKLY_ACTIONS[s.subject]
+      ?? `Spend 20 focused minutes on ${s.display_name} with ${firstName} this week — even casual conversation about the subject builds familiarity and confidence.`,
+  }))
+
+  if (thisWeek.length === 0) {
+    thisWeek.push({
+      action: `Ask ${firstName} to teach you one concept from their strongest subject this week — explaining something clearly is the most effective way to master it.`,
+    })
+  }
+
+  const thisMonth = weak.slice(0, 2).map(s => ({
+    action: MONTHLY_ACTIONS[s.subject]
+      ?? `Complete one structured revision session per week for ${s.display_name} this month, focusing on the topics with the lowest current scores.`,
+  }))
+
+  thisMonth.push({
+    action: `Use the EduNexus Learning Compass 3 times this week with ${firstName}. Open the first session with their weakest subject — the system already knows exactly where they are.`,
+  })
+
+  const thisTerm = weak.slice(0, 2).map(s => ({
+    action: TERM_ACTIONS[s.subject]
+      ?? `Ensure ${s.display_name} is reviewed at least twice per week every week this term. Small consistent effort compounds into significant improvement by end of term.`,
+  }))
+
+  thisTerm.push({
+    action: `Attend at least one parent-teacher meeting this term and specifically ask about ${firstName}'s progress in the priority subjects identified in this report.`,
+  })
+
+  return { thisWeek, thisMonth, thisTerm }
+}
+
+function buildExpectedOutcome(
+  weak: SubjectScoreRow[],
+  readinessLabel: 'Developing' | 'On Track' | 'Strong'
+): string[] {
+  const outcomes: string[] = []
+
+  for (const s of weak.slice(0, 2)) {
+    const fromLevel = Math.max(1, Math.round(s.score))
+    const toLevel   = Math.min(4, fromLevel + 1)
+    outcomes.push(`${s.display_name}: Level ${fromLevel} → Level ${toLevel} is achievable within one term of consistent support.`)
+  }
+
+  if (readinessLabel === 'Developing') {
+    outcomes.push('Overall pathway readiness moves from Developing → On Track within one term.')
+  } else if (readinessLabel === 'On Track') {
+    outcomes.push('Overall pathway readiness strengthens from On Track → Strong this term.')
+  } else {
+    outcomes.push('Advanced performance maintained and deepened across all pathway subjects.')
+  }
+
+  return outcomes
+}
+
+function buildCompassPrescription(
+  weak: SubjectScoreRow[]
+): CompassPrescription {
+  const focusTopics = weak.slice(0, 3).map(s => {
+    if (s.score <= 1) return `${s.display_name} — foundational concept review and vocabulary building`
+    if (s.score <= 2) return `${s.display_name} — key concept reinforcement and exam-style practice`
+    return `${s.display_name} — depth extension and advanced application`
+  })
+
+  const hasCritical = weak.some(s => s.score <= 1)
+
+  return {
+    focusTopics,
+    sessionFrequency: hasCritical ? '4–5 sessions per week' : '3 sessions per week',
+    estimatedWindow:  hasCritical ? '6–8 weeks of consistent intervention' : '4–6 weeks of consistent intervention',
+  }
+}
+
+function computeSeniorPathwayData(
+  pathway: string | null,
+  subjectRows: SubjectScoreRow[],
+  firstName: string,
+  overallLevel: number
+) {
+  const pathwaySubjectSet = PATHWAY_SUBJECTS[pathway ?? ''] ?? new Set<string>()
+  const pathwayRows       = pathwaySubjectSet.size > 0
+    ? subjectRows.filter(s => pathwaySubjectSet.has(s.subject))
+    : subjectRows
+  const effectiveRows     = pathwayRows.length >= 2 ? pathwayRows : subjectRows
+
+  const strongContributors = effectiveRows.filter(s => s.score >= 3).sort((a, b) => b.score - a.score).slice(0, 3)
+  const currentConstraints = effectiveRows.filter(s => s.score <= 2).sort((a, b) => a.score - b.score).slice(0, 3)
+
+  const avg           = effectiveRows.length > 0 ? effectiveRows.reduce((sum, s) => sum + s.score, 0) / effectiveRows.length : 0
+  const readinessScore = Math.round(Math.max(0, Math.min(100, ((avg - 1) / 3) * 100)))
+  const pathwayReadinessLabel: 'Developing' | 'On Track' | 'Strong' =
+    readinessScore >= 67 ? 'Strong' : readinessScore >= 44 ? 'On Track' : 'Developing'
+
+  const nextLevelRoadmap: RoadmapStep[] = currentConstraints.slice(0, 3).map(s => ({
+    subject:   s.display_name,
+    fromLevel: Math.max(1, Math.round(s.score)),
+    toLevel:   Math.min(4, Math.max(1, Math.round(s.score)) + 1),
+  }))
+
+  const academicHealthStatus = ACADEMIC_HEALTH_STATUS[overallLevel] ?? 'Developing Foundation'
+  const academicDiagnosis    = buildSeniorDiagnosis(
+    firstName, pathway,
+    strongContributors.map(s => s.display_name),
+    currentConstraints.map(s => s.display_name),
+    overallLevel
+  )
+
+  return {
+    strongContributors,
+    currentConstraints,
+    readinessScore,
+    pathwayReadinessLabel,
+    nextLevelRoadmap,
+    academicHealthStatus,
+    academicDiagnosis,
+  }
+}
+
 // ─── Main builder ──────────────────────────────────────────────────────────────
 
 export async function buildClinicReport(
@@ -306,7 +659,7 @@ export async function buildClinicReport(
   // 1. Student profile
   const { data: student, error: studentError } = await db
     .from('students')
-    .select('id, name, grade, curriculum_type, date_of_birth')
+    .select('id, name, grade, curriculum_type, date_of_birth, current_pathway')
     .eq('id', studentId)
     .single()
 
@@ -371,7 +724,11 @@ export async function buildClinicReport(
     .eq('student_id', studentId)
     .maybeSingle()
 
-  const recommended_pathway = ctx?.recommended_pathway as string | null
+  // For senior students, prefer the student's actual chosen pathway over the learning-context recommendation
+  const studentCurrentPathway = (student.current_pathway as string | null)
+  const recommended_pathway   = section === 'senior'
+    ? (studentCurrentPathway ?? ctx?.recommended_pathway as string | null)
+    : (ctx?.recommended_pathway as string | null)
   const kjsea_composite     = section === 'junior' ? calculateKJSEAComposite(subjectMap) : undefined
   const stem_viable         = section === 'junior'
     ? calculateJuniorPathwayAffinity(subjectMap).stem_viable
@@ -553,6 +910,31 @@ export async function buildClinicReport(
     link:   '/learn',
   })
 
+  // Senior school diagnostic computation
+  const studentFirstNameForDiag = (student.name as string).split(' ')[0]
+  const seniorData = section === 'senior'
+    ? computeSeniorPathwayData(recommended_pathway, subjectRows, studentFirstNameForDiag, overall_level)
+    : null
+
+  const seniorParentPlan = section === 'senior'
+    ? buildParentPlan(seniorData!.currentConstraints.length > 0 ? seniorData!.currentConstraints : weakSubjects, student.name as string)
+    : undefined
+
+  const seniorExpectedOutcome = section === 'senior' && seniorData
+    ? buildExpectedOutcome(
+        seniorData.currentConstraints.length > 0 ? seniorData.currentConstraints : weakSubjects,
+        seniorData.pathwayReadinessLabel
+      )
+    : undefined
+
+  const seniorCompassPrescription = section === 'senior'
+    ? buildCompassPrescription(seniorData!.currentConstraints.length > 0 ? seniorData!.currentConstraints : weakSubjects)
+    : undefined
+
+  const seniorFutureOpportunities = section === 'senior'
+    ? getFutureOpportunities(recommended_pathway)
+    : undefined
+
   return {
     student_id:        studentId,
     student_name:      student.name as string,
@@ -580,6 +962,18 @@ export async function buildClinicReport(
     current_phase,
     next_phase,
     parent_actions,
+    // Senior school academic diagnosis
+    academicHealthStatus:  seniorData?.academicHealthStatus,
+    academicDiagnosis:     seniorData?.academicDiagnosis,
+    pathwayReadinessLabel: seniorData?.pathwayReadinessLabel,
+    readinessScore:        seniorData?.readinessScore,
+    strongContributors:    seniorData?.strongContributors,
+    currentConstraints:    seniorData?.currentConstraints,
+    nextLevelRoadmap:      seniorData?.nextLevelRoadmap,
+    futureOpportunities:   seniorFutureOpportunities,
+    parentPlan:            seniorParentPlan,
+    expectedOutcome:       seniorExpectedOutcome,
+    compassPrescription:   seniorCompassPrescription,
     disclaimer: `This report reflects ${student.name as string}'s actual assessment scores. Sit with your child and read it together — they should know where they stand and where they're going.`,
   }
 }

@@ -357,7 +357,7 @@ export function downloadSOWAsText(data: SOWPreviewData): string {
     lines.push(`Strand:    ${l.strand}`)
     lines.push(`Substrand: ${l.substrand}`)
     lines.push('')
-    lines.push('Learning Outcomes:')
+    lines.push('Lesson Learning Outcomes:')
     l.learningOutcomes.forEach(o => lines.push(`  • ${o}`))
     lines.push('')
     lines.push('Learning Experiences:')

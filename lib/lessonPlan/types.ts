@@ -12,6 +12,7 @@ export interface LessonPlanContext {
   strand: string
   subStrand: string
   learningOutcomes: string[]
+  learningExperiences: string[]
   keyInquiryQuestions: string[]
   learningResources: string[]
   assessmentMethods: string[]

@@ -11,7 +11,7 @@ import type {
 } from './types'
 
 const ASSESSMENT_COLS = 'id, class_id, teacher_id, title, assessment_type, term, year, max_score, subjects, curriculum_type, grade_scale_id, created_at, updated_at'
-const MARK_COLS       = 'id, assessment_id, class_id, teacher_id, student_name, admission_number, subject_scores, total_marks, mean_score, mean_grade, position, created_at, updated_at'
+const MARK_COLS       = 'id, assessment_id, class_id, teacher_id, student_name, admission_number, student_id, subject_scores, total_marks, mean_score, mean_grade, position, created_at, updated_at'
 
 function sumScores(scores: Record<string, number>): number {
   return Object.values(scores).reduce((s, v) => s + (Number(v) || 0), 0)
@@ -278,6 +278,19 @@ export async function bulkSaveMarks(
 
   if (marks.length === 0) return []
 
+  const admNos = marks.map(m => m.admNo).filter(Boolean) as string[]
+  const studentMap = new Map<string, string>()
+  if (admNos.length > 0) {
+    const { data: students } = await db
+      .from('students')
+      .select('id, admission_number')
+      .in('admission_number', admNos)
+      .eq('teacher_id', teacherId)
+    students?.forEach(s => {
+      if (s.admission_number) studentMap.set(s.admission_number, s.id)
+    })
+  }
+
   const rows = marks.map((m) => {
     const ms = calculateMeanScore(m.subjectScores)
     return {
@@ -290,6 +303,7 @@ export async function bulkSaveMarks(
       total_marks:      sumScores(m.subjectScores),
       mean_score:       ms,
       mean_grade:       calculateMeanGrade(ms, maxScore, curriculumType),
+      student_id:       m.admNo ? (studentMap.get(m.admNo) ?? null) : null,
     }
   })
 

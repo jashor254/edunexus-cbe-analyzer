@@ -1,13 +1,15 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { ChevronDown, CheckCircle2, Circle, Loader2 } from 'lucide-react'
+import { ChevronDown, CheckCircle2, Circle, Loader2, PenLine } from 'lucide-react'
 import type { LessonWithCompletion } from '@/lib/academy/types'
 
 interface Props {
   lessons: LessonWithCompletion[]
   moduleColor: string
 }
+
+const PRACTICE_MIN_CHARS = 15
 
 export default function LessonAccordion({ lessons: initial, moduleColor }: Props) {
   const [lessons, setLessons] = useState<LessonWithCompletion[]>(initial)
@@ -17,9 +19,19 @@ export default function LessonAccordion({ lessons: initial, moduleColor }: Props
   })
   const [isPending, startTransition] = useTransition()
   const [markingId, setMarkingId] = useState<string | null>(null)
+  const [practiceAnswers, setPracticeAnswers] = useState<Record<string, string>>({})
 
   function toggle(id: string) {
     setOpenId(prev => (prev === id ? null : id))
+  }
+
+  function handlePracticeChange(lessonId: string, value: string) {
+    setPracticeAnswers(prev => ({ ...prev, [lessonId]: value }))
+  }
+
+  function canComplete(lesson: LessonWithCompletion): boolean {
+    if (!lesson.practice_prompt) return true
+    return (practiceAnswers[lesson.id] ?? '').trim().length >= PRACTICE_MIN_CHARS
   }
 
   async function handleMarkComplete(lessonId: string) {
@@ -40,13 +52,12 @@ export default function LessonAccordion({ lessons: initial, moduleColor }: Props
               : l
           )
         )
-        // Auto-open next incomplete lesson
         const idx = lessons.findIndex(l => l.id === lessonId)
         const next = lessons.slice(idx + 1).find(l => !l.completed && l.id !== lessonId)
         if (next) setOpenId(next.id)
       })
     } catch {
-      // keep marking state — user can retry
+      // keep state — user can retry
     } finally {
       setMarkingId(null)
     }
@@ -57,6 +68,11 @@ export default function LessonAccordion({ lessons: initial, moduleColor }: Props
       {lessons.map((lesson, idx) => {
         const isOpen = openId === lesson.id
         const isMarking = markingId === lesson.id
+        const practiceText = practiceAnswers[lesson.id] ?? ''
+        const ready = canComplete(lesson)
+        const charsLeft = lesson.practice_prompt
+          ? Math.max(0, PRACTICE_MIN_CHARS - practiceText.trim().length)
+          : 0
 
         return (
           <div
@@ -79,8 +95,8 @@ export default function LessonAccordion({ lessons: initial, moduleColor }: Props
                   <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                 ) : (
                   <Circle
-                    className="w-5 h-5 text-gray-300"
-                    style={{ color: isOpen ? moduleColor : undefined }}
+                    className="w-5 h-5"
+                    style={{ color: isOpen ? moduleColor : '#d1d5db' }}
                   />
                 )}
               </div>
@@ -111,11 +127,37 @@ export default function LessonAccordion({ lessons: initial, moduleColor }: Props
                   className="prose prose-sm max-w-none text-gray-700 prose-headings:text-gray-900 prose-headings:font-black mb-5"
                   dangerouslySetInnerHTML={{ __html: lesson.content }}
                 />
+
+                {/* Practice prompt — shown before completion */}
+                {!lesson.completed && lesson.practice_prompt && (
+                  <div className="mb-5 rounded-xl border-2 border-dashed border-gray-200 p-4 bg-gray-50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <PenLine className="w-4 h-4 shrink-0" style={{ color: moduleColor }} />
+                      <span className="text-xs font-black text-gray-700">Before you continue — write your answer</span>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-3 leading-relaxed">{lesson.practice_prompt}</p>
+                    <textarea
+                      value={practiceText}
+                      onChange={e => handlePracticeChange(lesson.id, e.target.value)}
+                      placeholder="Type your answer here…"
+                      rows={3}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 resize-none"
+                      style={{ focusRingColor: moduleColor } as React.CSSProperties}
+                    />
+                    {charsLeft > 0 && (
+                      <p className="text-[11px] text-gray-400 mt-1.5">
+                        Keep going — {charsLeft} more {charsLeft === 1 ? 'character' : 'characters'}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {!lesson.completed && (
                   <button
                     onClick={() => handleMarkComplete(lesson.id)}
-                    disabled={isMarking || isPending}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-60"
+                    disabled={isMarking || isPending || !ready}
+                    title={!ready ? `Write your answer above first` : undefined}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
                     style={{ background: moduleColor }}
                   >
                     {isMarking ? (
@@ -129,6 +171,7 @@ export default function LessonAccordion({ lessons: initial, moduleColor }: Props
                     )}
                   </button>
                 )}
+
                 {lesson.completed && lesson.completed_at && (
                   <p className="text-xs text-emerald-600 font-semibold mt-1 flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5" />

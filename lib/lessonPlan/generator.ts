@@ -41,9 +41,33 @@ async function callDeepSeek(prompt: string): Promise<string> {
   return data.choices[0].message.content
 }
 
+function deriveLocation(learningArea: string, grade: string): string {
+  const area = learningArea.toLowerCase()
+  const gradeNum = parseInt(grade.replace(/\D/g, ''), 10)
+  const isSenior = gradeNum >= 10 && gradeNum <= 12
+
+  if (area.includes('physical education') || area.includes(' pe ') || area === 'pe') {
+    return 'School grounds/field'
+  }
+  if (area.includes('agriculture')) {
+    return 'School farm or compound'
+  }
+  if (
+    isSenior &&
+    (area.includes('science') || area.includes('biology') ||
+      area.includes('chemistry') || area.includes('physics'))
+  ) {
+    return 'Laboratory'
+  }
+  return 'Classroom'
+}
+
 function buildLessonPlanPrompt(ctx: LessonPlanContext): string {
   const outcomes = ctx.learningOutcomes
   const questions = ctx.keyInquiryQuestions
+  const experiences = ctx.learningExperiences ?? []
+
+  const location = deriveLocation(ctx.learningArea, ctx.grade)
 
   const languageInstruction = isKiswahiliSubject(ctx.learningArea)
     ? `
@@ -55,31 +79,6 @@ Tumia Kiswahili fasaha na sahihi kinachofaa kwa wanafunzi wa CBC Kenya.
 Hata maneno ya kitaalamu yaandikwe kwa Kiswahili katika somo hili.
 `
     : `Write all lesson plan content in English.`
-
-  const resourceInstruction = isSocialStudies(ctx.learningArea)
-    ? `
-RESOURCES — SOCIAL STUDIES RULES:
-Suggest ONLY resources immediately available in a typical Kenyan classroom.
-ALLOWED: textbooks (e.g. "KLB Social Studies Grade 9"), charts, maps, atlas, globe,
-photographs/pictures, newspaper clippings, video clips (if projector available),
-flashcards, locally available objects (soil, seeds, coins), whiteboard and markers.
-STRICTLY AVOID: field trips to named places, live guest speakers/resource persons,
-visits to offices/courts/factories, any activity requiring leaving school or advance booking.
-If a concept relates to a place (e.g. Great Rift Valley), use:
-"Map of Kenya showing the Rift Valley" or "Photographs of the Great Rift Valley" — NOT "Visit the Rift Valley".
-`
-    : ''
-
-  const organisationHint = ctx.learningArea.toLowerCase().includes('practical') ||
-    ctx.strand?.toLowerCase().includes('practical')
-    ? 'practical'
-    : ctx.strand?.toLowerCase().includes('discuss') ? 'discussion' : 'standard'
-
-  const reflectionTemplate = organisationHint === 'practical'
-    ? `Learners engaged well with the practical activity. The hands-on approach helped clarify ${ctx.subStrand}. Some learners struggled with [specific step] — will provide more guided practice next week.`
-    : organisationHint === 'discussion'
-    ? `Class discussion was lively and learners demonstrated good understanding of ${ctx.subStrand}. Participation was satisfactory. Will allocate more time to this concept in the upcoming lessons.`
-    : `The lesson was taught as planned. Most learners understood the core concepts. A few learners will need additional time to fully grasp ${ctx.subStrand}. Will revisit in the next lesson.`
 
   return `
 You are an experienced Kenyan CBC teacher writing a lesson plan for a TSC inspection.
@@ -93,7 +92,7 @@ Term: ${ctx.term}, Year: ${ctx.year}
 Week: ${ctx.weekNumber}, Lesson: ${ctx.lessonNumber}
 
 ${languageInstruction}
-${resourceInstruction}
+
 SPECIFIC LEARNING OUTCOMES (already set):
 a) ${outcomes[0] || ''}
 b) ${outcomes[1] || ''}
@@ -104,29 +103,45 @@ KEY INQUIRY QUESTIONS (already set):
 2. ${questions[1] || ''}
 3. ${questions[2] || ''}
 
+SOW LEARNING EXPERIENCES (steps MUST be built from these — do not invent new activities):
+Step 1 activity: ${experiences[0] || ''}
+Step 2 activity: ${experiences[1] || ''}
+Step 3 activity: ${experiences[2] || ''}
+
 LEARNING RESOURCES: ${ctx.learningResources.join(', ')}
 
 Generate ONLY these sections as JSON:
 {
-  "organisationOfLearning": "Brief note on grouping/seating arrangement",
+  "organisationOfLearning": "${location} — [brief note on grouping or seating e.g. pairs, groups of 4, whole class]",
   "introduction": "5-minute set induction. Review previous lesson, connect to new topic. 2-3 specific teacher actions/questions.",
-  "step1": "10 minutes. Guided discovery activity. What teacher does, what learners do. Specific and practical for ${ctx.learningArea}.",
-  "step2": "10 minutes. Group/pair activity. Learners apply concept. Teacher role during this step.",
-  "step3": "10 minutes. Individual application or class discussion. Assessment moment. Links to learning outcomes.",
+  "step1": "10 minutes. Expand on the SOW activity: '${experiences[0] || ''}'. Describe what the teacher does and what learners do. Keep the same activity type and Kenyan context.",
+  "step2": "10 minutes. Expand on the SOW activity: '${experiences[1] || ''}'. Describe what the teacher does and what learners do. Keep the same activity type and Kenyan context.",
+  "step3": "10 minutes. Expand on the SOW activity: '${experiences[2] || ''}'. Describe what the teacher does and what learners do. Keep the same activity type and Kenyan context.",
   "conclusion": "5 minutes. Summarize key points. Brief formative check. Preview next lesson.",
   "extendedActivities": "2-3 activities for fast finishers OR homework tasks that extend learning beyond the classroom.",
-  "reflection": "A realistic 2-sentence teacher self-evaluation. Base it on this template but replace bracketed parts with real content from this lesson: ${reflectionTemplate}"
+  "reflection": "Were learners able to ${outcomes[0] || '[outcome a]'}? Were learners able to ${outcomes[1] || '[outcome b]'}? Were learners able to ${outcomes[2] || '[outcome c]'}? If not, how will you assist them in the next lesson?"
 }
 
 RULES:
 - CBC learner-centered approach
-- Use Kenyan context and local examples
 - No Core Competencies section needed
 - No Values/PCIs section needed
-- Steps must directly address the learning outcomes
-- Each step: clear teacher actions + learner actions
-- reflection must sound like a real teacher wrote it — specific, not generic
+- Steps 1, 2, 3 MUST use the same activity type from the SOW experiences above — do not substitute or invent new ones
+- The reflection field must be output exactly as the guiding questions shown above — do not rewrite it
 - Return ONLY valid JSON, no markdown
+
+LEARNER-CENTERED RULE — NON-NEGOTIABLE:
+Every sentence in step1, step2, step3 must have "Learners" as the subject.
+The teacher only guides, asks questions, or facilitates — never the main actor.
+WRONG: "The teacher reads aloud a case study on land conflicts in Kisumu."
+RIGHT: "Learners read a printed case study on land conflicts in pairs and identify key triggers."
+WRONG: "The teacher demonstrates how to calculate the area of a triangle."
+RIGHT: "Learners work through a sample triangle problem on the board and explain each step aloud."
+
+KENYAN CONTEXT VARIETY RULE:
+Each step must reference a DIFFERENT Kenyan location, community, or example from the others.
+Do not repeat the same location across step1, step2, and step3.
+If step1 uses Kisumu, step2 must use a different place (e.g. Nakuru, Eldoret, Mombasa, Kisii, Machakos, Nyeri, Garissa, Turkana).
 `
 }
 
@@ -162,10 +177,10 @@ export async function generateLessonPlan(
       parsed.conclusion &&
       parsed.extendedActivities
     ) {
-      // reflection is optional in response — fall back to template if missing
+      const reflectionFallback = `Were learners able to ${ctx.learningOutcomes[0] || '[outcome a]'}? Were learners able to ${ctx.learningOutcomes[1] || '[outcome b]'}? Were learners able to ${ctx.learningOutcomes[2] || '[outcome c]'}? If not, how will you assist them in the next lesson?`
       const reflection = typeof parsed.reflection === 'string' && parsed.reflection.trim()
         ? parsed.reflection
-        : `The lesson on ${ctx.subStrand} was taught as planned. Most learners achieved the intended outcomes. Will revisit any gaps in the next lesson.`
+        : reflectionFallback
 
       return {
         context: ctx,

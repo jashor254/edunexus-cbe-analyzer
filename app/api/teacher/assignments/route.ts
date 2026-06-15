@@ -21,8 +21,10 @@ export async function GET() {
     const { data: assignments, error } = await db
       .from('assignments')
       .select(`
-        *,
-        teacher_classes(name, grade, subject)
+        id, class_id, teacher_id, title, subject, topic, type, status,
+        due_date, max_score, is_compass_guided, is_holiday_assignment,
+        holiday_period, lesson_plan_id, created_at, updated_at,
+        teacher_classes(name, grade)
       `)
       .eq('teacher_id', teacher.id)
       .order('created_at', { ascending: false })

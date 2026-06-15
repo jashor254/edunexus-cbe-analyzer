@@ -223,3 +223,33 @@ export function gradeBandKey(grade: string): 'EE' | 'ME' | 'AE' | 'BE' {
   if (grade === 'B-' || grade === 'C+' || grade === 'C') return 'AE'
   return 'BE'
 }
+
+export function normaliseScore(rawScore: number, maxScore: number): number {
+  if (maxScore === 0) return 0
+  return Math.round((rawScore / maxScore) * 100)
+}
+
+export function getBandForScore(
+  normalisedScore: number,
+  bands: Array<{ min: number; max: number; level: string; label: string }>
+): { level: string; label: string } {
+  const sorted = [...bands].sort((a, b) => b.min - a.min)
+  return (
+    sorted.find(b => normalisedScore >= b.min && normalisedScore <= b.max)
+    ?? sorted[sorted.length - 1]
+  )
+}
+
+export function getSubjectLevels(
+  subjectScores: Record<string, number>,
+  maxScore: number,
+  bands: Array<{ min: number; max: number; level: string; label: string }>
+): Record<string, { raw: number; normalised: number; level: string; label: string }> {
+  const result: Record<string, { raw: number; normalised: number; level: string; label: string }> = {}
+  for (const [subject, raw] of Object.entries(subjectScores)) {
+    const normalised = normaliseScore(raw, maxScore)
+    const band = getBandForScore(normalised, bands)
+    result[subject] = { raw, normalised, ...band }
+  }
+  return result
+}

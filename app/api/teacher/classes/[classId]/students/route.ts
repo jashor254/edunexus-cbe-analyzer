@@ -95,11 +95,29 @@ export async function POST(
         }
 
         // Link to class
-        await db.from('class_students').insert({
+        const { error: enrollErr } = await db.from('class_students').insert({
           class_id:   classId,
           student_id: student.id,
-          teacher_id: teacher.id,
         })
+        if (enrollErr) throw new Error(`Failed to enroll student: ${enrollErr.message}`)
+
+        // Backfill pending submissions for any active assignments in this class
+        const { data: activeAssignments } = await db
+          .from('assignments')
+          .select('id')
+          .eq('class_id', classId)
+          .gte('due_date', new Date().toISOString())
+
+        if (activeAssignments && activeAssignments.length > 0) {
+          await db.from('assignment_submissions').insert(
+            activeAssignments.map((a: { id: string }) => ({
+              assignment_id: a.id,
+              student_id:    student.id,
+              class_id:      classId,
+              status:        'pending',
+            }))
+          )
+        }
 
         // Generate invite token
         let signupToken: string | null = null

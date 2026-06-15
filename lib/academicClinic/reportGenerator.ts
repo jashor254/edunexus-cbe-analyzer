@@ -18,6 +18,12 @@ import {
   HolidayActionPlan,
   WeekPlan,
   LearningCompassRec,
+  PathwayGapRow,
+  PathwayReadinessCard,
+  PathwayRoadmap,
+  TermPlanAction,
+  TermActionPlan,
+  JuniorFutureOpportunity,
 } from './types'
 
 // ─── Subject Metadata ─────────────────────────────────────────────────────────
@@ -675,6 +681,250 @@ export function generateGraphData(subjects: SubjectProgress[]): GraphData {
   }
 }
 
+// ─── Junior 3-Page Redesign Helpers ──────────────────────────────────────────
+
+const ACADEMIC_STATUS_LABELS: Record<number, string> = {
+  1: 'Foundation Support Required',
+  2: 'Developing',
+  3: 'Meeting Expectations',
+  4: 'Exceeding Expectations',
+}
+
+type PathwayStatusLabel =
+  | 'Strongly Ready'
+  | 'Within Reach'
+  | 'Requires Improvement'
+  | 'Significant Preparation Needed'
+
+function getPathwayStatus(score: number): { label: PathwayStatusLabel; color: string } {
+  if (score >= 80) return { label: 'Strongly Ready',                   color: '#16a34a' }
+  if (score >= 60) return { label: 'Within Reach',                     color: '#d97706' }
+  if (score >= 40) return { label: 'Requires Improvement',             color: '#ea580c' }
+  return             { label: 'Significant Preparation Needed',        color: '#dc2626' }
+}
+
+type PathwayReq = { subjects: string[]; displayName: string; required: number }
+
+const PATHWAY_REQS: Record<string, PathwayReq[]> = {
+  'STEM': [
+    { subjects: ['mathematics', 'core_mathematics'], displayName: 'Mathematics',        required: 3 },
+    { subjects: ['integrated_science'],              displayName: 'Integrated Science',  required: 3 },
+    { subjects: ['english'],                          displayName: 'English',             required: 3 },
+    { subjects: ['kiswahili', 'kiswahili_ksl'],      displayName: 'Kiswahili',           required: 2 },
+  ],
+  'Social Sciences': [
+    { subjects: ['english'],                                           displayName: 'English',                  required: 3 },
+    { subjects: ['kiswahili', 'kiswahili_ksl'],                       displayName: 'Kiswahili',                required: 3 },
+    { subjects: ['social_studies', 'history_citizenship', 'history'], displayName: 'Social Studies / History', required: 3 },
+    { subjects: ['geography'],                                          displayName: 'Geography',                required: 2 },
+  ],
+  'Arts & Sports Science': [
+    { subjects: ['creative_arts_sports'],           displayName: 'Creative Arts & Sports', required: 2 },
+    { subjects: ['english'],                         displayName: 'English',                required: 2 },
+    { subjects: ['kiswahili', 'kiswahili_ksl'],     displayName: 'Kiswahili',              required: 2 },
+    { subjects: ['mathematics', 'core_mathematics'], displayName: 'Mathematics',            required: 2 },
+  ],
+}
+
+function buildPathwayReadinessCards(
+  subjects: SubjectProgress[],
+  pathwayReadiness: { stem: number; social_sciences: number; arts: number }
+): PathwayReadinessCard[] {
+  const subjectMap: Record<string, number> = {}
+  const subjectKeyMap: Record<string, string> = {}
+  for (const s of subjects) {
+    subjectMap[s.subject] = s.level
+    subjectKeyMap[s.subject] = s.subject
+  }
+
+  const PATHWAYS: Array<{ key: 'STEM' | 'Social Sciences' | 'Arts & Sports Science'; score: number }> = [
+    { key: 'STEM',                  score: pathwayReadiness.stem },
+    { key: 'Social Sciences',       score: pathwayReadiness.social_sciences },
+    { key: 'Arts & Sports Science', score: pathwayReadiness.arts },
+  ]
+
+  return PATHWAYS.map(({ key, score }) => {
+    const status = getPathwayStatus(score)
+    const reqs   = PATHWAY_REQS[key] ?? []
+
+    const gapRows: PathwayGapRow[] = []
+    for (const req of reqs) {
+      let bestLevel = 0
+      let bestKey   = req.subjects[0]
+      for (const subj of req.subjects) {
+        const lvl = subjectMap[subj] ?? 0
+        if (lvl > bestLevel) { bestLevel = lvl; bestKey = subj }
+      }
+      if (bestLevel === 0) continue
+
+      const gap       = Math.max(0, req.required - bestLevel)
+      const rowStatus: PathwayGapRow['status'] = gap === 0 ? 'met' : gap === 1 ? 'one_step' : 'two_steps'
+      gapRows.push({
+        subjectKey:   bestKey,
+        displayName:  req.displayName,
+        currentLevel: bestLevel,
+        requiredLevel: req.required,
+        gap,
+        status: rowStatus,
+      })
+    }
+
+    const metNames = gapRows.filter(r => r.status === 'met').map(r => r.displayName)
+    const gapNames = gapRows.filter(r => r.status !== 'met').map(r => r.displayName)
+
+    let diagnosis: string
+    if (status.label === 'Strongly Ready') {
+      diagnosis = `All key ${key} requirements are met. ${metNames.length > 0 ? `Strong performance in ${metNames.slice(0, 2).join(' and ')} confirms readiness.` : 'Maintain current performance to secure this pathway.'}`
+    } else if (status.label === 'Within Reach') {
+      diagnosis = `${key} is within reach. ${gapNames.length > 0 ? `Closing the gap in ${gapNames.slice(0, 2).join(' and ')} will confirm readiness.` : 'Continue current momentum.'}`
+    } else if (status.label === 'Requires Improvement') {
+      diagnosis = `${key} requires focused effort before Grade 10. ${gapNames.length > 0 ? `Priority: ${gapNames.slice(0, 2).join(' and ')}.` : ''} One to two terms of consistent work can bridge these gaps.`
+    } else {
+      diagnosis = `Significant preparation needed for ${key}. ${gapNames.length > 0 ? `Multiple gaps across ${gapNames.slice(0, 2).join(' and ')}.` : ''} Start intervention now to keep this option open.`
+    }
+
+    return { pathway: key, score, statusLabel: status.label, statusColor: status.color, diagnosis, gapRows }
+  })
+}
+
+function buildPathwayRoadmap(
+  recommendedPathway: string,
+  cards: PathwayReadinessCard[]
+): PathwayRoadmap | undefined {
+  const card = cards.find(c => c.pathway === recommendedPathway)
+  if (!card) return undefined
+
+  const gapSteps = card.gapRows
+    .filter(r => r.status !== 'met')
+    .slice(0, 3)
+    .map(r => ({ subject: r.displayName, fromLevel: r.currentLevel, toLevel: r.requiredLevel }))
+
+  if (gapSteps.length === 0) {
+    return {
+      targetPathway: recommendedPathway,
+      steps: [],
+      timeline: 'Pathway secured — maintain current performance',
+      currentScore: card.score,
+      projectedScore: Math.min(100, card.score + 5),
+    }
+  }
+
+  const maxGap = Math.max(...card.gapRows.filter(r => r.status !== 'met').map(r => r.gap))
+  const timeline = maxGap >= 2
+    ? 'Estimated 8–12 weeks of consistent effort'
+    : 'Estimated 4–6 weeks of consistent effort'
+  const projectedScore = Math.min(100, card.score + gapSteps.length * 10)
+
+  return { targetPathway: recommendedPathway, steps: gapSteps, timeline, currentScore: card.score, projectedScore }
+}
+
+const WEEKLY_ACTIONS: Record<string, string> = {
+  mathematics:           'Complete 3 problem-solving exercises daily. Show all working — method matters more than the answer.',
+  core_mathematics:      'Attempt 3 past paper questions per session. Focus on understanding each step fully before moving on.',
+  integrated_science:    'Draw and label 2 scientific diagrams from this term\'s topics from memory each day.',
+  english:               'Read one short article and write a 5-sentence summary. Focus on clarity and correct grammar.',
+  kiswahili:             'Read one page of Kiswahili text. Write 5 new vocabulary words and use each one in a sentence.',
+  kiswahili_ksl:         'Read one page of Kiswahili text. Write 5 new vocabulary words and use each one in a sentence.',
+  social_studies:        'Review one civic or geographical topic. Write 3 key facts and one real-world Kenya connection.',
+  history_citizenship:   'Create a one-page timeline of one key historical period from this term\'s work.',
+  history:               'Create a one-page timeline of one key historical period from this term\'s work.',
+  geography:             'Study one map from the geography syllabus. Label all features from memory without looking.',
+  creative_arts_sports:  'Practise your primary art form or sport for 3 sessions of 30 minutes each this week.',
+  pre_technical:         'Complete one technical drawing exercise and check it for accuracy of measurement.',
+  agriculture_nutrition: 'Review this week\'s topics and connect them to a real farming or nutrition example in your area.',
+  home_science:          'Review nutrition content and practise one home science practical skill this week.',
+  cre:                   'Read one set text passage and write 3 lessons it teaches for life today.',
+  ire:                   'Read one set text passage and write 3 lessons it teaches for life today.',
+  business_studies:      'Study one business concept and find a real Kenyan company that applies it. Write 5 facts.',
+}
+
+const MONTHLY_ACTIONS: Record<string, string> = {
+  mathematics:           'Complete a full past paper under timed conditions. Review every incorrect answer with your teacher.',
+  core_mathematics:      'Complete two past paper topic sections. Identify the 3 most common mistake types and fix each one.',
+  integrated_science:    'Write a one-page summary of every major topic from this term. Include key diagrams and definitions.',
+  english:               'Write one formal essay and one creative piece. Ask your teacher to mark and return with corrections.',
+  kiswahili:             'Write one Kiswahili composition (insha). Practise the introduction-body-conclusion structure.',
+  kiswahili_ksl:         'Write one Kiswahili composition (insha). Practise the introduction-body-conclusion structure.',
+  social_studies:        'Complete a structured revision of all civic and geographical topics covered this term.',
+  history_citizenship:   'Write a structured essay on one historical event or figure. Focus on argument, evidence, conclusion.',
+  history:               'Write a structured essay on one historical event or figure. Focus on argument, evidence, conclusion.',
+  geography:             'Complete a map-work exercise from a past paper. Study all physical geography topics systematically.',
+  creative_arts_sports:  'Complete one creative project or sports performance that demonstrates clear growth from last term.',
+  pre_technical:         'Complete a full design or practical project. Aim for accuracy and clear presentation of all steps.',
+  agriculture_nutrition: 'Complete a full revision of all agriculture and nutrition topics for this term.',
+  home_science:          'Complete a full practical assignment and revise all home science theory content for this term.',
+  cre:                   'Write a structured essay response to a CRE past paper question. Use context-teaching-application format.',
+  ire:                   'Write a structured essay response to an IRE past paper question. Use context-teaching-application format.',
+  business_studies:      'Create a simple business plan for a small youth enterprise. Include a marketing and finance section.',
+}
+
+const BEFORE_GRADE10_ACTIONS: Record<string, string> = {
+  mathematics:           'Achieve Level 3 in Mathematics — the most important single academic goal for STEM pathway access.',
+  core_mathematics:      'Achieve Level 3 in Mathematics before Grade 10. This unlocks the widest range of Senior School pathways.',
+  integrated_science:    'Achieve Level 3 in Integrated Science. This feeds directly into Biology, Chemistry, and Physics.',
+  english:               'Achieve Level 3 in English — required for every Senior School pathway without exception.',
+  kiswahili:             'Achieve Level 3 in Kiswahili. Strong national language performance opens more pathway options in Senior School.',
+  kiswahili_ksl:         'Achieve Level 3 in Kiswahili. Strong national language performance opens more pathway options in Senior School.',
+  social_studies:        'Build Level 3 performance in Social Studies — this underpins Social Sciences pathway readiness.',
+  history_citizenship:   'Develop strong essay-writing skills in History. Structured argument is rewarded heavily in Senior School.',
+  history:               'Develop strong essay-writing skills in History. Structured argument is rewarded heavily in Senior School.',
+  geography:             'Strengthen Geography, especially map work. These are core Senior School Social Sciences topics.',
+  creative_arts_sports:  'Build a portfolio or performance record in Creative Arts & Sports before Grade 10 selection.',
+  business_studies:      'Reach Level 3 in Business Studies — this opens Business pathway and strengthens Social Sciences readiness.',
+}
+
+function buildTermActionPlan(
+  subjects: SubjectProgress[],
+  recommendedPathway: string,
+  cards: PathwayReadinessCard[]
+): TermActionPlan {
+  const sortedByLevel = [...subjects].sort((a, b) => a.level - b.level)
+  const weakest       = sortedByLevel.filter(s => s.level <= 2).slice(0, 2)
+  const card          = cards.find(c => c.pathway === recommendedPathway)
+  const gapRows       = card?.gapRows.filter(r => r.status !== 'met').slice(0, 2) ?? []
+
+  const weeklySource = weakest.length > 0 ? weakest : sortedByLevel.slice(0, 2)
+  const thisWeek: TermPlanAction[] = weeklySource.slice(0, 2).map(s => ({
+    action: WEEKLY_ACTIONS[s.subject] ?? `Spend 20 focused minutes on ${s.displayName} three times this week — review your class notes carefully.`,
+  }))
+
+  const thisMonth: TermPlanAction[] = gapRows.slice(0, 2).map(r => ({
+    action: MONTHLY_ACTIONS[r.subjectKey] ??
+      `Complete one full structured revision session per week for ${r.displayName} this month.`,
+  }))
+  thisMonth.push({
+    action: 'Use the EduNexus Learning Compass at least 3 times this week — always start with your weakest subject.',
+  })
+
+  const beforeGrade10: TermPlanAction[] = gapRows.slice(0, 2).map(r => ({
+    action: BEFORE_GRADE10_ACTIONS[r.subjectKey] ??
+      `Reach Level ${r.requiredLevel} in ${r.displayName} before Grade 10 pathway selection.`,
+  }))
+  beforeGrade10.push({
+    action: `Confirm your ${recommendedPathway} pathway readiness by end of Grade 9 — share this report with your class teacher at least one term before Grade 10 selection.`,
+  })
+
+  return { thisWeek, thisMonth, beforeGrade10 }
+}
+
+const JUNIOR_FUTURE_OPPORTUNITIES: JuniorFutureOpportunity[] = [
+  {
+    pathway: 'STEM',
+    examples: ['Medicine & Health', 'Engineering', 'Computing', 'Applied Sciences'],
+    whyItFits: 'Strong Mathematics and Science performance builds the foundation for analytical, technical, and problem-solving careers in high demand in Kenya and globally.',
+  },
+  {
+    pathway: 'Social Sciences',
+    examples: ['Law', 'Business & Finance', 'Education', 'Public Administration'],
+    whyItFits: 'Strong language and reasoning skills align with careers that require clear communication, critical thinking, and working effectively with communities and institutions.',
+  },
+  {
+    pathway: 'Arts & Sports Science',
+    examples: ['Creative Industries', 'Sports Science', 'Design', 'Media'],
+    whyItFits: 'Strong creative and practical competencies open Kenya\'s growing creative economy, sports industry, and digital media sector.',
+  },
+]
+
 // ─── Main Report Generator ────────────────────────────────────────────────────
 
 export function generateReport(
@@ -747,6 +997,28 @@ export function generateReport(
       alternative_pathway:     pr.alternative_pathway,
     }
   }
+  // ── Junior 3-page redesign fields
+  let academicStatusLabel:       string | undefined
+  let pathwayReadinessCards:     PathwayReadinessCard[] | undefined
+  let pathwayRoadmap:            PathwayRoadmap | undefined
+  let termActionPlan:            TermActionPlan | undefined
+  let juniorFutureOpportunities: JuniorFutureOpportunity[] | undefined
+
+  if (isJunior && pathwayAnalysis) {
+    academicStatusLabel = ACADEMIC_STATUS_LABELS[clinicalOverview.overallCompetencyLevel] ?? 'Developing'
+    const pr = pathwayAnalysis.pathway_readiness
+    if (pr) {
+      pathwayReadinessCards     = buildPathwayReadinessCards(subjects, pr)
+      pathwayRoadmap            = buildPathwayRoadmap(pathwayAnalysis.recommendedPathway, pathwayReadinessCards)
+      termActionPlan            = buildTermActionPlan(subjects, pathwayAnalysis.recommendedPathway, pathwayReadinessCards)
+      juniorFutureOpportunities = [...JUNIOR_FUTURE_OPPORTUNITIES].sort((a, b) =>
+        a.pathway === pathwayAnalysis!.recommendedPathway ? -1
+        : b.pathway === pathwayAnalysis!.recommendedPathway ? 1
+        : 0
+      )
+    }
+  }
+
   const holidayPlan        = generateHolidayPlan(subjects)
   const learningCompassRec = generateLearningCompassRec(subjects)
 
@@ -775,6 +1047,11 @@ export function generateReport(
     graphData,
     reportId,
     generatedAt: new Date().toISOString(),
+    academicStatusLabel,
+    pathwayReadinessCards,
+    pathwayRoadmap,
+    termActionPlan,
+    juniorFutureOpportunities,
   }
 }
 

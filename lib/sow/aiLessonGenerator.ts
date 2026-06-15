@@ -53,9 +53,13 @@ Rotate activity structures: Demonstration, Problem-solving, Case study, Simulati
 
 LENGTH RULE — NON-NEGOTIABLE:
 Each learning experience = ONE sentence only. Maximum 20 words.
-Format: "[Activity type]: [What learners do] using [Kenyan context]."
-WRONG: "Learners work in pairs to identify triggers then share with class."
-RIGHT: "Think-Pair-Share: Learners identify conflict triggers from a Kisumu boundary dispute."
+Plain sentence only — NO activity-type labels or prefixes.
+WRONG: "Think-Pair-Share: Learners identify conflict triggers from a Kisumu boundary dispute."
+RIGHT: "Learners identify conflict triggers from a boundary dispute case study in Kisumu."
+
+MAP RULE — NON-NEGOTIABLE:
+Never reference a specific city map a teacher cannot access (e.g. "map of Kisumu", "Nairobi map", "map of Mombasa").
+Use generic terms only: "a sample topographical map", "a printed map", "a hand-drawn map", "a blackboard sketch map".
 
 RULE 5 — ASSESSMENT DIVERSITY
 Never use the same 3 assessments in consecutive lessons.
@@ -70,14 +74,14 @@ Correct: "Learners discuss how maize farmers in the Rift Valley manage soil eros
 Correct: "Learners analyse trade practices at Gikomba market using case study cards"
 WRONG:   "Learners visit Gikomba market" / "Invite a local elder to class"
 
-RESOURCE VARIETY RULE:
-Always lead with the class textbook and teacher's guide as the first two resources.
-Add classroom-realistic resources only: charts (hand-drawn or printed), real objects from
-  the school compound (stones, leaves, soil), newspaper clippings, blackboard diagrams,
-  flash cards, locally made models, digital devices if the school has them.
-NEVER generate: community resource persons, farm visits, audio recordings from specific
-  radio stations, maps from government offices, materials requiring purchase or ordering,
-  or internet resources unless digital devices are confirmed available.`
+RESOURCE RULE — NON-NEGOTIABLE:
+Output EXACTLY 3 resources. No more, no fewer.
+Format: clean name only — no page numbers, no descriptions, no dashes, no extra text.
+1. "[Textbook name]"
+2. "Teacher's Guide for [Subject] [Grade]"
+3. "[One classroom item: chart / blackboard diagram / newspaper cutout / real object]"
+NEVER: page numbers, "pp.", descriptions after the name, community resource persons,
+  farm visits, radio recordings, government maps, purchased materials, internet resources.`
 
 // ─── DeepSeek API call ───────────────────────────────────────────────────────
 
@@ -229,10 +233,11 @@ ${verbAvoidLine}
   const classroomRule = `IMPORTANT: All activities happen INSIDE the classroom only.
 No field trips, no external visitors, no going to other locations.
 Use only: discussion, role play, think-pair-share, gallery walk, case study, group work, Q&A, debate, demonstration.
-LENGTH RULE — NON-NEGOTIABLE: Each learning experience = ONE sentence only. Maximum 20 words.
-Format: "[Activity type]: [What learners do] using [Kenyan context]."
-BAD: "Learners set up an experiment to test active listening. In pairs, one describes a conflict while the other listens without interrupting, then they switch roles."
-GOOD: "Think-Pair-Share: Learners identify conflict triggers from a Kisumu boundary dispute."
+LENGTH RULE — NON-NEGOTIABLE: Each learning experience = ONE plain sentence only. Maximum 20 words.
+No activity-type labels or prefixes (no "Think-Pair-Share:", "Demonstration:", "Pair practice:", etc.).
+BAD: "Think-Pair-Share: Learners identify conflict triggers from a Kisumu boundary dispute."
+GOOD: "Learners identify conflict triggers from a boundary dispute case study in Kisumu."
+MAP RULE: Never name a specific city map. Use "a sample topographical map", "a printed map", or "a blackboard sketch map" only.
 Kenyan contexts appear as discussion examples only — not as places the class physically visits.`
 
   const experienceInstruction = seed
@@ -298,16 +303,11 @@ ${questionInstruction}
 
 ${assessmentInstruction}
 
-RESOURCES — REALISTIC FOR A KENYAN PUBLIC SCHOOL CLASSROOM:
-First two are MANDATORY in every lesson:
-1. "${textbook || `${learningArea} ${isCBC ? 'Grade' : 'Form'} ${grade} Textbook`}" — relevant pages on ${substrand}
-2. Teacher's Guide for ${learningArea} ${isCBC ? 'Grade' : 'Form'} ${grade}
-Then add 1–2 of these ONLY (classroom-available):
-- Charts (hand-drawn or printed)
-- Locally available real objects (stones, leaves, soil — found in any Kenyan classroom or compound)
-- Newspaper or magazine cutouts
-- Blackboard and chalk diagrams
-- Digital devices only if explicitly available at the school
+RESOURCES — EXACTLY 3 ITEMS, CLEAN NAMES ONLY:
+1. "${textbook || `${learningArea} ${isCBC ? 'Grade' : 'Form'} ${grade} Textbook`}"
+2. "Teacher's Guide for ${learningArea} ${isCBC ? 'Grade' : 'Form'} ${grade}"
+3. "[One classroom item: chart / blackboard diagram / newspaper cutout / real object]"
+No page numbers. No descriptions. No dashes after the name. Clean names only.
 NEVER: community resource persons, farm visits, radio recordings, government maps, purchased materials.
 
 KEYWORD REQUIREMENT:
@@ -341,9 +341,9 @@ OUTPUT — Return ONLY this JSON structure:
     "${seed?.assessmentMethods[2] ?? 'Written exercise: [specific task]'}"
   ],
   "learning_resources": [
-    "${textbook || `${learningArea} ${isCBC ? 'Grade' : 'Form'} ${grade} Textbook`} — pages on ${substrand}",
+    "${textbook || `${learningArea} ${isCBC ? 'Grade' : 'Form'} ${grade} Textbook`}",
     "Teacher's Guide for ${learningArea} ${isCBC ? 'Grade' : 'Form'} ${grade}",
-    "[One classroom resource: chart / real object / newspaper cutout / blackboard diagram]"
+    "[chart / blackboard diagram / newspaper cutout / real object]"
   ],
   "core_competencies": "${competenciesStr}",
   "values": "${valuesStr}",

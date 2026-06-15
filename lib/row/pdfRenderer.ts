@@ -1,6 +1,6 @@
 // lib/row/pdfRenderer.ts
 // HTML → browser print renderer for Record of Work.
-// Portrait A4, 5-column: Date | Wk/Lesson | Work Done | Reflection | Signature
+// Portrait A4, 6-column: Date | Strand | Sub-Strand | Work Done | Reflection | Signature
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -10,7 +10,7 @@ export interface ROWEntry {
   date_taught?:  string | null
   strand:        string
   sub_strand:    string
-  objectives:    string | string[]
+  work_done:     string
   reflection:    string
 }
 
@@ -42,31 +42,19 @@ function fmtDate(raw: string | null | undefined): string {
   return d.toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-function fmtObjectives(v: string | string[] | undefined | null): string {
-  if (!v) return ''
-  const items = Array.isArray(v) ? v.filter(Boolean) : [v]
-  if (!items.length) return ''
-  return items.join(' ')
-}
-
 // ─── HTML builder ─────────────────────────────────────────────────────────────
 
 function buildPage(row: RecordOfWork): string {
-  const bodyRows = row.entries.map((e, i) => {
-    const objText = fmtObjectives(e.objectives)
-    return `
+  const bodyRows = row.entries.map((e, i) => `
     <tr class="${i % 2 === 1 ? 'alt' : ''}">
       <td class="col-date">${esc(fmtDate(e.date_taught))}</td>
-      <td class="col-wk center">Wk ${e.week_number}<br/><span class="sub">L${e.lesson_number}</span></td>
-      <td class="col-work">
-        <div class="wd-strand"><span class="lbl">Strand:</span> ${esc(e.strand)}</div>
-        <div class="wd-sub"><span class="lbl">Sub-Strand:</span> ${esc(e.sub_strand)}</div>
-        ${objText ? `<div class="wd-obj"><span class="lbl">Objectives:</span> ${esc(objText)}</div>` : ''}
-      </td>
+      <td class="col-strand">${esc(e.strand)}</td>
+      <td class="col-sub">${esc(e.sub_strand)}</td>
+      <td class="col-work">${esc(e.work_done)}</td>
       <td class="col-ref">${esc(e.reflection)}</td>
       <td class="col-sig"></td>
     </tr>`
-  }).join('')
+  ).join('')
 
   return `
   <div class="header-block">
@@ -91,7 +79,8 @@ function buildPage(row: RecordOfWork): string {
     <thead>
       <tr>
         <th class="col-date">Date</th>
-        <th class="col-wk">Wk / Lesson</th>
+        <th class="col-strand">Strand</th>
+        <th class="col-sub">Sub-Strand</th>
         <th class="col-work">Work Done</th>
         <th class="col-ref">Reflection</th>
         <th class="col-sig">Signature</th>
@@ -122,11 +111,12 @@ const CSS = `
 
   /* ── ROW table ── */
   .row-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .col-date  { width: 25mm; }
-  .col-wk    { width: 20mm; }
-  .col-work  { width: 90mm; }
-  .col-ref   { width: 35mm; }
-  .col-sig   { width: 20mm; }
+  .col-date   { width: 22mm; }
+  .col-strand { width: 35mm; }
+  .col-sub    { width: 35mm; }
+  .col-work   { width: 55mm; }
+  .col-ref    { width: 33mm; }
+  .col-sig    { width: 20mm; }
 
   thead tr { background: #1e293b; color: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   th {
@@ -140,11 +130,6 @@ const CSS = `
   tr.alt td { background: #f8fafc; }
   .center { text-align: center; }
   .sub { font-size: 8pt; color: #64748b; }
-
-  /* ── Work Done cell ── */
-  .lbl { font-weight: 700; }
-  .wd-strand, .wd-sub { margin-bottom: 3px; }
-  .wd-obj { margin-top: 4px; color: #1e293b; }
 
   /* ── Footer ── */
   .footer { margin-top: 10px; font-size: 8pt; color: #94a3b8; text-align: right; }

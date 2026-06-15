@@ -55,7 +55,7 @@ export async function getModuleWithLessons(slug: string, teacherId: string): Pro
 
   const { data: rawLessons, error: lessonErr } = await db
     .from('academy_lessons')
-    .select('id, module_id, title, order, content, created_at')
+    .select('id, module_id, title, order, content, practice_prompt, created_at')
     .eq('module_id', module.id)
     .order('order')
 
