@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, use } from 'react'
 import Link from 'next/link'
 import {
-  ChevronLeft, Loader2, Download, Check, BookOpen, AlertCircle,
+  ChevronLeft, Loader2, Download, Check, BookOpen, AlertCircle, FolderOpen,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -250,7 +250,7 @@ export default function SOWDetailPage({ params }: { params: Promise<{ id: string
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               {/* Save indicator */}
               {saveState === 'editing' && (
                 <span className="flex items-center gap-1.5 text-xs text-amber-400 font-semibold">
@@ -262,6 +262,14 @@ export default function SOWDetailPage({ params }: { params: Promise<{ id: string
                   <Check className="w-3 h-3" /> Saved
                 </span>
               )}
+
+              <Link
+                href="/teacher/documents"
+                className="flex items-center gap-2 bg-white/10 hover:bg-white/15 border border-white/20 text-white px-4 py-2 rounded-xl font-bold text-sm transition"
+              >
+                <FolderOpen className="w-4 h-4" />
+                My Documents
+              </Link>
 
               <button
                 onClick={handleDownload}
