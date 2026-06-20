@@ -1,14 +1,12 @@
 // lib/academicClinic/careerEngine.ts
 // ============================================================
-// SINGLE UNIFIED FILE — replaces careerDatabase.ts,
-// careerIntelligence.ts, careerMatcher.ts, dynamicCareerGenerator.ts
+// Career matching engine for the Academic Clinic report:
+// CAREER_DATABASE + CareerEngine.matchCareers/analyze + analyzeDreamCareer.
 // ============================================================
 
 import { createServiceClient } from '@/utils/supabase/service'
-import { DEEPSEEK_CONFIG } from '@/lib/config/api'
 import { analyzePerformance } from '@/lib/adaptiveLearning'
 import { formatSubjectName } from '@/lib/pathwayCalculator'
-import { unstable_cache } from 'next/cache'
 
 // ============================================================
 // SECTION 1 — LEGACY TYPES (from careerDatabase.ts)
@@ -91,11 +89,19 @@ export interface CareerMatch {
   gapSubjects: string[]
 }
 
+export interface CareerParentSummary {
+  oneLine: string
+  whatTheyDo: string
+  salaryRange: string
+  futureOutlook: string
+}
+
 export interface EnrichedCareerMatch extends CareerMatch {
   marketSignal: MarketSignal
   disruption: KenyaDisruptionAssessment
   shortDescription: string
   urgency: 'start_now' | 'build_toward' | 'long_term'
+  parentSummary: CareerParentSummary
 }
 
 export interface CompassBridge {
@@ -130,114 +136,6 @@ export interface CareerAnalysisResult {
     criticalSubject: string
     careerReadiness: string
   }
-}
-
-// ============================================================
-// SECTION 3 — LEGACY TYPES (from careerIntelligence.ts)
-// ============================================================
-
-export interface KenyanMarketData {
-  sectorGrowth: 'declining' | 'stable' | 'growing' | 'booming'
-  entryBarriers: 'low' | 'medium' | 'high' | 'very_high'
-  saturationLevel: 'underserved' | 'balanced' | 'saturated' | 'oversaturated'
-  keyEmployers: string[]
-  salaryRangeKES: { entry: number; mid: number; senior: number }
-  ruralVsUrban: 'rural_viable' | 'urban_only' | 'hybrid'
-}
-
-export interface CBCPathwayMapping {
-  juniorSchoolFocus: string[]
-  seniorSchoolPathways: ('STEM' | 'Arts & Sports' | 'Social Sciences' | 'TVET')[]
-  keyLearningAreas: string[]
-  suggestedCCAs: string[]
-  portfolioProjects: string[]
-}
-
-export interface AIImpactForecast {
-  automationRisk: number
-  timeline: 'immediate' | '5_years' | '10_years' | '20_years'
-  humanAdvantage: string[]
-  pivotOpportunities: string[]
-}
-
-export interface CareerIntelligence {
-  id: string
-  name: string
-  category: 'traditional' | 'emerging' | 'future' | 'hybrid'
-  description: string
-  kenyanMarket: KenyanMarketData
-  cbcMapping: CBCPathwayMapping
-  aiForecast: AIImpactForecast
-  realStories: {
-    successProfile: string
-    challengesFaced: string[]
-    adviceForStudents: string
-  }
-  verificationStatus: 'ai_generated' | 'expert_reviewed' | 'profession_validated'
-  lastUpdated: Date
-}
-
-export type CareerProfile = {
-  studentName: string
-  grade: number
-  pathway: string
-  subjectScores: Record<string, number>
-  strengths: string[]
-  weaknesses: string[]
-  pathwayConfidence: 'high' | 'medium' | 'low'
-}
-
-export type CareerRecommendation = {
-  career: string
-  matchScore: number
-  reasoning: string
-  requiredSubjects: string[]
-  currentGaps: string[]
-  kenyanUniversities: string[]
-  tvetOptions: string[]
-  internationalOptions: string[]
-  industryDemand: 'very_high' | 'high' | 'moderate' | 'low'
-  earningPotential: 'exceptional' | 'very_lucrative' | 'lucrative' | 'moderate' | 'lower_but_stable'
-  jobSecurity: 'very_high' | 'high' | 'moderate' | 'low'
-  kenyanMarketReality: string
-  aiDisruptionRisk: 'very_low' | 'low' | 'moderate' | 'high' | 'very_high'
-  careerPath: string[]
-}
-
-export type IntegratedLearningPlan = {
-  career: string
-  subject: string
-  currentLevel: number
-  targetLevel: number
-  whyItMatters: string
-  careerSpecificSteps: string[]
-  careerSpecificResources: string[]
-  successStories: string[]
-  milestones: Array<{ month: number; goal: string; careerRelevance: string }>
-}
-
-// ============================================================
-// SECTION 4 — DYNAMIC CAREER TYPE (from dynamicCareerGenerator.ts)
-// ============================================================
-
-export interface DynamicCareer {
-  name: string
-  description: string
-  match_percentage?: number
-  salary_range: string
-  education_path: string
-  education_duration: string
-  why_matched?: string
-  required_subjects: string[]
-  required_subjects_display?: string[]
-  current_gaps?: unknown[]
-  outlook: 'excellent' | 'good' | 'moderate' | 'emerging' | 'stable'
-  demand_in_kenya: 'very_high' | 'high' | 'moderate' | 'low'
-  ai_disruption_risk: 'very_low' | 'low' | 'moderate' | 'high'
-  universities_in_kenya?: string[]
-  tvet_options?: string[]
-  career_path?: string[]
-  is_ai_generated?: boolean
 }
 
 // ============================================================
@@ -2592,25 +2490,6 @@ const KENYA_DISRUPTION: Record<string, KenyaDisruptionAssessment> = {
 // SECTION 7 — CAREER DATABASE HELPERS
 // ============================================================
 
-export function getMatchingCareers(pathway: string, scores: Record<string, number>): CareerData[] {
-  if (!CAREER_DATABASE || CAREER_DATABASE.length === 0) return []
-  return CAREER_DATABASE
-    .filter(career => {
-      if (career.pathway !== pathway) return false
-      return Object.entries(career.matchRequirements.minimumLevels).every(
-        ([subject, minLevel]) => (scores[subject] ?? 0) >= minLevel
-      )
-    })
-    .sort((a, b) => {
-      const getSurplus = (career: CareerData) =>
-        Object.entries(career.matchRequirements.minimumLevels).reduce(
-          (sum, [subject, minLevel]) => sum + ((scores[subject] ?? 0) - minLevel), 0
-        )
-      return getSurplus(b) - getSurplus(a)
-    })
-    .slice(0, 5)
-}
-
 export function findCareerByName(careerName: string): CareerData | null {
   const normalized = careerName.toLowerCase().trim()
   return (
@@ -2618,23 +2497,6 @@ export function findCareerByName(careerName: string): CareerData | null {
     CAREER_DATABASE.find(c => c.name.toLowerCase().includes(normalized) || normalized.includes(c.name.toLowerCase())) ||
     CAREER_DATABASE.find(c => c.id === normalized.replace(/\s+/g, '_')) ||
     null
-  )
-}
-
-export function getAllCareerNames(): string[] {
-  return CAREER_DATABASE.map(c => c.name)
-}
-
-export function getCareersByPathway(pathway: string): CareerData[] {
-  return CAREER_DATABASE.filter(c => c.pathway === pathway)
-}
-
-export function searchCareers(keyword: string): CareerData[] {
-  const n = keyword.toLowerCase().trim()
-  return CAREER_DATABASE.filter(
-    c => c.name.toLowerCase().includes(n) ||
-         c.id.includes(n) ||
-         c.marketReality.kenyanContext.toLowerCase().includes(n)
   )
 }
 
@@ -2759,14 +2621,50 @@ export class CareerEngine {
       const urgency: EnrichedCareerMatch['urgency'] =
         match.career.kenyaShortageScore >= 70 && match.matchScore >= 60 ? 'start_now' :
         match.matchScore >= 50 ? 'build_toward' : 'long_term'
+      const parentSummary = this.buildParentSummary(match.career, match.matchScore)
       return {
         ...match,
         marketSignal,
         disruption,
         shortDescription: match.career.realityCheck.typicalDay.substring(0, 120),
         urgency,
+        parentSummary,
       }
     }))
+  }
+
+  // Qualitative wording, not the raw matchScore — a parent reading "35% match" reads as
+  // a warning, not encouragement. Strength language stays honest without being discouraging.
+  private buildParentSummary(career: CareerData, matchScore: number): CareerParentSummary {
+    const salaryMap: Record<EarningPotential, string> = {
+      lower_but_stable: 'KES 30,000-60,000/month',
+      moderate: 'KES 60,000-100,000/month',
+      lucrative: 'KES 100,000-200,000/month',
+      very_lucrative: 'KES 200,000-500,000/month',
+      exceptional: 'KES 500,000+/month',
+    }
+
+    const shortageLabel = career.kenyaShortageScore >= 70 ? 'severe shortage' :
+                          career.kenyaShortageScore >= 50 ? 'growing demand' :
+                          'stable demand'
+
+    const matchLabel = matchScore >= 70 ? 'an excellent match' :
+                        matchScore >= 50 ? 'a good match' :
+                        'an early-stage match worth exploring'
+
+    const outlookMap: Record<JobGrowthOutlook, string> = {
+      declining: 'Declining — consider other options',
+      stable: 'Stable — good long-term career',
+      growing: 'Growing — good prospects',
+      booming: 'Booming — excellent future',
+    }
+
+    return {
+      oneLine: `Kenya has a ${shortageLabel} for ${career.name} — ${matchLabel} for this student`,
+      whatTheyDo: career.realityCheck.typicalDay.split('.')[0] + '.',
+      salaryRange: salaryMap[career.marketReality.earningPotential],
+      futureOutlook: outlookMap[career.aiImpact.growthOutlook],
+    }
   }
 
   private async getMarketSignal(careerId: string, useCache: boolean): Promise<MarketSignal> {
@@ -2905,22 +2803,6 @@ export class CareerEngine {
       `edunexus.co.ke/compass`
 
     return { openingMessage, subjectPriorities, guidedTopics, sessionGoal, weeklyMilestones, parentMessage }
-  }
-
-  // ── SECTION E: UNKNOWN CAREER FALLBACK ──────────────────────
-
-  async generateUnknownCareer(careerName: string): Promise<CareerData> {
-    return generateDynamicCareer(careerName).then(d => ({
-      id: careerName.toLowerCase().replace(/\s+/g, '_'),
-      name: d.name,
-      pathway: 'STEM',
-      kenyaShortageScore: 50,
-      matchRequirements: { primarySubjects: d.required_subjects, minimumLevels: {} },
-      marketReality: { earningPotential: 'moderate', jobSecurity: 'moderate', demandLevel: 'moderate', kenyanContext: d.description },
-      cbeReadiness: { coreCompetencies: [], recommendedSeniorPath: d.education_path, universities: d.universities_in_kenya ?? [], tvetOptions: d.tvet_options ?? [] },
-      aiImpact: { disruptionRisk: d.ai_disruption_risk as AIDisruptionRisk, disruptionPercentage: 30, growthOutlook: d.outlook === 'excellent' ? 'booming' : d.outlook === 'good' ? 'growing' : 'stable', growthPercentage: 50, timeline: { shortTerm: '', midTerm: '', longTerm: '' }, survivalStrategy: d.career_path ?? [] },
-      realityCheck: { pros: [], challenges: [], typicalDay: d.description },
-    }))
   }
 
   // ── SECTION F: FULL PIPELINE ─────────────────────────────────
@@ -3150,589 +3032,3 @@ function buildCareerSubjectReason(subject: string, career: string): string {
   return reasons[subject]?.[career] ?? reasons[subject]?.['default'] ?? `${subject} supports the skills needed for ${career}`
 }
 
-// ============================================================
-// SECTION 9 — LEGACY CAREER INTELLIGENCE ENGINE
-// ============================================================
-
-const KENYAN_MARKET_REALITIES: Record<string, Partial<KenyanMarketData>> = {
-  software_engineer:            { sectorGrowth: 'booming', saturationLevel: 'balanced', keyEmployers: ['Safaricom', 'Andela', 'Microsoft ADC', 'Cellulant', 'Twiga Foods'], salaryRangeKES: { entry: 80000, mid: 180000, senior: 400000 }, ruralVsUrban: 'hybrid' },
-  doctor:                       { sectorGrowth: 'stable', entryBarriers: 'very_high', saturationLevel: 'underserved', keyEmployers: ['Kenyatta National Hospital', 'MP Shah', 'Aga Khan', 'County Hospitals'], salaryRangeKES: { entry: 120000, mid: 250000, senior: 600000 }, ruralVsUrban: 'rural_viable' },
-  data_scientist:               { sectorGrowth: 'booming', entryBarriers: 'high', saturationLevel: 'underserved', keyEmployers: ['Safaricom', 'KCB', 'Equity Bank', 'IBM Research', 'iHub'], salaryRangeKES: { entry: 100000, mid: 220000, senior: 500000 }, ruralVsUrban: 'urban_only' },
-  teacher:                      { sectorGrowth: 'stable', entryBarriers: 'medium', saturationLevel: 'saturated', keyEmployers: ['TSC', 'Private Schools', 'International Schools'], salaryRangeKES: { entry: 35000, mid: 60000, senior: 120000 }, ruralVsUrban: 'rural_viable' },
-  renewable_energy_technician:  { sectorGrowth: 'booming', entryBarriers: 'medium', saturationLevel: 'underserved', keyEmployers: ['KenGen', 'Rural Electrification', 'Solar Companies', 'KPLC'], salaryRangeKES: { entry: 40000, mid: 90000, senior: 180000 }, ruralVsUrban: 'rural_viable' },
-}
-
-export class CareerIntelligenceEngine {
-  private _supabase: ReturnType<typeof createServiceClient> | null = null
-  private get supabase() {
-    if (!this._supabase) this._supabase = createServiceClient()
-    return this._supabase
-  }
-
-  async getCareerIntelligence(careerName: string): Promise<CareerIntelligence> {
-    const normalizedName = this.normalizeCareerName(careerName)
-    const verified = await this.getVerifiedCareer(normalizedName)
-    if (verified) return verified
-    const localData = KENYAN_MARKET_REALITIES[normalizedName]
-    if (localData) return this.generateWithLocalContext(normalizedName, localData)
-    return this.generateFromScratch(normalizedName)
-  }
-
-  async compareCareers(careerNames: string[]): Promise<{ comparison: Record<string, CareerIntelligence>; recommendation: string; riskAnalysis: string }> {
-    const careers = await Promise.all(careerNames.map(name => this.getCareerIntelligence(name)))
-    const comparison = Object.fromEntries(careers.map(c => [c.id, c]))
-    const analysis = await this.generateComparisonAnalysis(careers)
-    return { comparison, recommendation: analysis.recommendation, riskAnalysis: analysis.riskAnalysis }
-  }
-
-  private normalizeCareerName(name: string): string {
-    return name.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '_').trim()
-  }
-
-  private async getVerifiedCareer(name: string): Promise<CareerIntelligence | null> {
-    const { data } = await this.supabase
-      .from('career_intelligence')
-      .select('id, name, category, description, kenyan_market, cbc_mapping, ai_forecast, real_stories, verification_status, last_updated')
-      .eq('id', name)
-      .eq('verification_status', 'profession_validated')
-      .single()
-    return data as unknown as CareerIntelligence | null
-  }
-
-  private async generateWithLocalContext(name: string, localData: Partial<KenyanMarketData>): Promise<CareerIntelligence> {
-    const prompt = this.buildAnchoredPrompt(name, localData)
-    const aiData = await this.callDeepSeek(prompt)
-    return this.mergeWithLocalData(aiData, localData)
-  }
-
-  private async generateFromScratch(name: string): Promise<CareerIntelligence> {
-    let webContext = ''
-    try {
-      const searchQuery = encodeURIComponent(name + ' career Kenya salary requirements 2025')
-      const ddgRes = await fetch('https://api.duckduckgo.com/?q=' + searchQuery + '&format=json&no_html=1', { signal: AbortSignal.timeout(3000) })
-      const ddgData = await ddgRes.json() as { Abstract?: string; RelatedTopics?: Array<{ Text?: string }> }
-      webContext = ddgData.Abstract ?? ddgData.RelatedTopics?.[0]?.Text ?? ''
-    } catch { webContext = '' }
-    const prompt = this.buildComprehensivePrompt(name) + (webContext ? '\n\nWEB CONTEXT: ' + webContext : '')
-    const aiData = await this.callDeepSeek(prompt)
-    await this.supabase.from('career_intelligence').upsert({ id: name, name: aiData.name, ...aiData, verification_status: 'ai_generated', last_updated: new Date().toISOString() }, { onConflict: 'id' })
-    return { ...aiData, verificationStatus: 'ai_generated', lastUpdated: new Date() }
-  }
-
-  private buildAnchoredPrompt(name: string, localData: Partial<KenyanMarketData>): string {
-    return `You are a Kenyan career intelligence expert. Research: "${name}"\nKNOWN DATA: Sector Growth: ${localData.sectorGrowth}, Key Employers: ${localData.keyEmployers?.join(', ')}\nReturn JSON with cbcMapping, aiForecast, realStories fields.`
-  }
-
-  private buildComprehensivePrompt(name: string): string {
-    return `Research career: "${name}" for Kenyan CBC students. Return JSON with: id, name, category, description, kenyanMarket, cbcMapping, aiForecast, realStories. Use real Kenyan companies and universities.`
-  }
-
-  private async callDeepSeek(prompt: string): Promise<CareerIntelligence> {
-    const response = await fetch(`${DEEPSEEK_CONFIG.baseURL}/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEEPSEEK_CONFIG.getKeyOrThrow()}` },
-      body: JSON.stringify({
-        model: DEEPSEEK_CONFIG.model,
-        messages: [
-          { role: 'system', content: 'You are a Kenyan career intelligence expert. Return ONLY valid JSON.' },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.5, max_tokens: 2500,
-      }),
-    })
-    if (!response.ok) throw new Error(`DeepSeek API error: ${response.status}`)
-    const data = await response.json() as { choices: Array<{ message: { content: string } }> }
-    const content = data.choices[0].message.content
-    const jsonMatch = content.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) throw new Error('No JSON found in response')
-    return JSON.parse(jsonMatch[0]) as CareerIntelligence
-  }
-
-  private mergeWithLocalData(aiData: CareerIntelligence, localData: Partial<KenyanMarketData>): CareerIntelligence {
-    return { ...aiData, kenyanMarket: { ...aiData.kenyanMarket, ...localData }, verificationStatus: 'expert_reviewed', lastUpdated: new Date() }
-  }
-
-  private async generateComparisonAnalysis(careers: CareerIntelligence[]): Promise<{ recommendation: string; riskAnalysis: string }> {
-    const prompt = `Compare these careers for a Kenyan student: ${careers.map(c => `${c.name}: Growth ${c.kenyanMarket.sectorGrowth}`).join(', ')}. Return JSON: {"recommendation": "...", "riskAnalysis": "..."}`
-    const result = await this.callDeepSeek(prompt)
-    return { recommendation: (result as unknown as { recommendation: string }).recommendation ?? '', riskAnalysis: (result as unknown as { riskAnalysis: string }).riskAnalysis ?? '' }
-  }
-}
-
-export const careerIntelligenceEngine = new CareerIntelligenceEngine()
-// backward-compat alias
-export const careerEngine = careerIntelligenceEngine
-
-export const getCachedCareerAnalysis = (careerName: string) =>
-  unstable_cache(
-    () => careerIntelligenceEngine.getCareerIntelligence(careerName),
-    [`career_intel_${careerName.toLowerCase().replace(/\s+/g, '_')}`],
-    { revalidate: 21600, tags: ['career-intelligence'] }
-  )()
-
-// ============================================================
-// SECTION 10 — analyzeCareerOptions + generateCareerIntegratedLearningPlan
-// ============================================================
-
-async function callDeepSeekText(prompt: string): Promise<string> {
-  const response = await fetch(`${DEEPSEEK_CONFIG.baseURL}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEEPSEEK_CONFIG.getKeyOrThrow()}` },
-    body: JSON.stringify({
-      model: DEEPSEEK_CONFIG.model,
-      messages: [
-        { role: 'system', content: 'You are a helpful assistant. Always respond with valid JSON only — no markdown, no explanation, just the raw JSON.' },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.7,
-    }),
-  })
-  if (!response.ok) { const err = await response.text(); throw new Error(`DeepSeek API error ${response.status}: ${err}`) }
-  const data = await response.json() as { choices: Array<{ message: { content: string } }> }
-  return data.choices[0].message.content
-}
-
-export async function analyzeCareerOptions(profile: CareerProfile): Promise<CareerRecommendation[]> {
-  const prompt = `You are an expert Kenyan education and career counselor specializing in the CBC system.
-
-STUDENT PROFILE:
-- Name: ${profile.studentName}
-- Grade: ${profile.grade}
-- Current Pathway Affinity: ${profile.pathway}
-- Pathway Confidence: ${profile.pathwayConfidence}
-
-PERFORMANCE DATA:
-Strengths (Score >= 3): ${profile.strengths.join(', ')}
-Weaknesses (Score <= 2): ${profile.weaknesses.join(', ')}
-
-Subject Scores (1-4 CBC scale):
-${Object.entries(profile.subjectScores).map(([subject, score]) => `- ${subject}: ${score}`).join('\n')}
-
-TASK: Provide 5 career recommendations that match the student's strengths, are realistic for Kenya's job market, consider TVET options, and account for AI disruption.
-
-For EACH career return: career, matchScore (0-100), reasoning, requiredSubjects, currentGaps, kenyanUniversities (top 3), tvetOptions, internationalOptions, industryDemand (very_high/high/moderate/low), earningPotential (exceptional/very_lucrative/lucrative/moderate/lower_but_stable), jobSecurity (very_high/high/moderate/low), kenyanMarketReality (2-3 sentences), aiDisruptionRisk (very_low/low/moderate/high/very_high), careerPath (3-5 steps)
-
-CRITICAL: DO NOT include specific salary numbers. Return as a JSON array ONLY.`
-
-  try {
-    const text = await callDeepSeekText(prompt)
-    const jsonMatch = text.match(/\[[\s\S]*\]/)
-    if (!jsonMatch) throw new Error('Failed to parse AI response')
-    const careers = JSON.parse(jsonMatch[0]) as CareerRecommendation[]
-    return careers.slice(0, 5)
-  } catch (error) {
-    console.error('Career analysis error:', error)
-    throw new Error('Failed to generate career recommendations')
-  }
-}
-
-export async function generateCareerIntegratedLearningPlan(
-  career: string, subject: string, currentLevel: number, targetLevel: number, studentName: string
-): Promise<IntegratedLearningPlan> {
-  const prompt = `You are a personalized learning coach for ${studentName}, a Kenyan CBC student.
-
-CONTEXT:
-- Career Goal: ${career}
-- Subject: ${subject}
-- Current CBC Level: ${currentLevel} (1=Below Expectations, 2=Approaching, 3=Meeting, 4=Exceeding)
-- Target Level: ${targetLevel}
-
-Create a personalized learning plan. Return as JSON ONLY:
-{
-  "whyItMatters": "...",
-  "careerSpecificSteps": ["step1", "step2", "step3"],
-  "careerSpecificResources": ["resource1", "resource2", "resource3"],
-  "successStories": ["story1", "story2"],
-  "milestones": [
-    {"month": 1, "goal": "...", "careerRelevance": "..."},
-    {"month": 2, "goal": "...", "careerRelevance": "..."},
-    {"month": 3, "goal": "Reach level ${targetLevel}", "careerRelevance": "..."}
-  ]
-}
-
-Make it INSPIRING and SPECIFIC to ${career}. Use Kenyan context. Prioritize FREE resources.`
-
-  try {
-    const text = await callDeepSeekText(prompt)
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) throw new Error('Failed to parse AI response')
-    const plan = JSON.parse(jsonMatch[0]) as Omit<IntegratedLearningPlan, 'career' | 'subject' | 'currentLevel' | 'targetLevel'>
-    return { career, subject, currentLevel, targetLevel, ...plan }
-  } catch (error) {
-    console.error('Integrated learning plan error:', error)
-    throw new Error('Failed to generate integrated learning plan')
-  }
-}
-
-// ============================================================
-// SECTION 11 — CAREER MATCHER CLASS (from careerMatcher.ts)
-// ============================================================
-
-interface StudentAssessmentInternal {
-  academic: {
-    grade: number
-    subjectScores: Record<string, number>
-    learningStyle: 'visual' | 'auditory' | 'kinesthetic' | 'reading'
-    strongestSubjects: string[]
-    strugglingSubjects: string[]
-  }
-  psychometric: { personalityType: string; interests: string[]; workValues: string[]; stressTolerance: 'low' | 'medium' | 'high' }
-  practical: { preferredLocations: string[]; financialConstraints: 'low' | 'medium' | 'high'; familyExpectations: string[] }
-  behavioral: { engagementPattern: 'consistent' | 'bursty' | 'struggling'; persistenceScore: number }
-}
-
-export interface MatchReport {
-  topMatches: MatcherCareerMatch[]
-  hiddenGems: MatcherCareerMatch[]
-  avoidThese: MatcherCareerMatch[]
-  developmentPlan: { immediate: string[]; shortTerm: string[]; longTerm: string[] }
-  parentGuidance: { howToSupport: string[]; conversationsToHave: string[]; warningSigns: string[] }
-  isLocked?: boolean
-}
-
-interface MatcherCareerMatch {
-  career: CareerIntelligence
-  matchScore: number
-  matchDimensions: { academicFit: number; personalityFit: number; interestAlignment: number; practicalViability: number; futureProofing: number }
-  pathway: { currentReadiness: 'ready' | 'developing' | 'early'; nextSteps: string[]; criticalGaps: string[]; estimatedTimeline: string }
-  risks: { level: 'low' | 'medium' | 'high'; factors: string[]; mitigationStrategies: string[] }
-  alternatives: { ifAcademicFails: string[]; ifMarketChanges: string[]; ifInterestShifts: string[] }
-}
-
-export class CareerMatcher {
-  private _supabase: ReturnType<typeof createServiceClient> | null = null
-  private get supabase() {
-    if (!this._supabase) this._supabase = createServiceClient()
-    return this._supabase
-  }
-
-  async generateMatches(studentId: string, isPremium = false): Promise<MatchReport> {
-    try {
-      const { data: studentMeta } = await this.supabase.from('students').select('id, name, grade, curriculum_type, year_level').eq('id', studentId).single()
-      const curriculumType = (studentMeta as { curriculum_type?: string } | null)?.curriculum_type ?? 'cbc'
-      const assessment = await this.compileStudentAssessment(studentId)
-      const careers = await this.getRelevantCareers(assessment.academic.grade, curriculumType)
-      const scoredMatches = await this.scoreAllCareers(careers, assessment)
-      const topMatches = scoredMatches.slice(0, 5)
-      if (!isPremium) {
-        return {
-          topMatches: [topMatches[0]],
-          hiddenGems: [], avoidThese: [],
-          developmentPlan: { immediate: ['Focus on ' + (topMatches[0].pathway.criticalGaps[0] ?? 'core subjects')], shortTerm: ['Upgrade to Premium to see full roadmap'], longTerm: [] },
-          parentGuidance: { howToSupport: ['Upgrade for full parental guidance reports'], conversationsToHave: [], warningSigns: [] },
-          isLocked: true,
-        }
-      }
-      const hiddenGems = scoredMatches.filter(m => m.matchDimensions.futureProofing > 80 && m.matchScore < 75).slice(0, 3)
-      const avoidThese = scoredMatches.filter(m => m.matchScore < 40).slice(0, 2)
-      const developmentPlan = this.createDevelopmentPlan(topMatches[0], assessment)
-      const parentGuidance = this.generateParentGuidance(assessment, topMatches[0])
-      await this.saveMatchReport(studentId, topMatches)
-      return { topMatches, hiddenGems, avoidThese, developmentPlan, parentGuidance, isLocked: false }
-    } catch (error) {
-      console.error('Match Engine Error:', error)
-      throw new Error('Failed to align student with careers.')
-    }
-  }
-
-  async assessSpecificCareer(studentId: string, careerName: string): Promise<{
-    studentId: string; career: { id: string; name: string; description: string; pathway: string; category: string }
-    assessment: { matchScore: number; compatibility: string; readiness: string }
-    gaps: string[]; recommendedActions: string[]
-    pathway: { currentPhase: string; nextMilestones: string[]; recommendedSubjects: string[]; extracurriculars: string[] }
-    estimatedTimeToReady: string
-  }> {
-    const { data: student, error: studentError } = await this.supabase.from('students').select('id, name, grade, curriculum_type, year_level').eq('id', studentId).single()
-    if (studentError || !student) throw new Error('Student not found')
-    const { data: career, error: careerError } = await this.supabase.from('career_intelligence').select('id, name, description, category, salary_range_kes, required_subjects, cbc_mapping, ai_forecast, pathway').ilike('name', `%${careerName}%`).single()
-    if (careerError || !career) throw new Error(`Career "${careerName}" not found`)
-    const assessment = await this.compileStudentAssessment(studentId)
-    const matchScore = this.calculateSingleMatchScore(student, career, assessment)
-    const gaps = this.identifySkillGaps(student, career, assessment)
-    const pathway = this.generatePathway(student, career)
-    return {
-      studentId,
-      career: { id: (career as { id: string }).id, name: (career as { name: string }).name, description: (career as { description: string }).description, pathway: (career as { pathway: string }).pathway, category: (career as { category: string }).category },
-      assessment: { matchScore, compatibility: this.getCompatibilityLabel(matchScore), readiness: this.calculateReadiness(student, career) },
-      gaps, recommendedActions: this.generateActions(gaps, (student as { grade: number }).grade), pathway,
-      estimatedTimeToReady: this.estimatePreparationTime(gaps, (student as { grade: number }).grade),
-    }
-  }
-
-  private async compileStudentAssessment(studentId: string): Promise<StudentAssessmentInternal> {
-    const [academic, psych, behavior, profile] = await Promise.all([
-      this.getAcademicStats(studentId), this.getPsychometricData(studentId),
-      this.getBehavioralData(), this.getProfilePracticalData(studentId),
-    ])
-    return { academic, psychometric: psych, behavioral: behavior, practical: profile }
-  }
-
-  private async getAcademicStats(studentId: string): Promise<StudentAssessmentInternal['academic']> {
-    const { data: assessments } = await this.supabase.from('assessments').select('subject_scores, grade').eq('student_id', studentId).order('created_at', { ascending: false })
-    const latest = assessments?.[0] as { subject_scores?: Record<string, number>; grade?: number } | undefined
-    const scores = latest?.subject_scores ?? {}
-    return {
-      grade: latest?.grade ?? 7, subjectScores: scores, learningStyle: 'visual',
-      strongestSubjects: Object.entries(scores).sort(([, a], [, b]) => b - a).slice(0, 3).map(([s]) => s),
-      strugglingSubjects: Object.entries(scores).filter(([, s]) => s < 2.5).map(([s]) => s),
-    }
-  }
-
-  private async getPsychometricData(studentId: string): Promise<StudentAssessmentInternal['psychometric']> {
-    const { data } = await this.supabase.from('psychometric_assessments').select('personality_type, holland_codes, work_values, stress_tolerance').eq('student_id', studentId).single()
-    const d = data as { personality_type?: string; holland_codes?: string[]; work_values?: string[]; stress_tolerance?: string } | null
-    return { personalityType: d?.personality_type ?? 'analytical', interests: d?.holland_codes ?? ['Social', 'Investigative'], workValues: d?.work_values ?? ['Stability'], stressTolerance: (d?.stress_tolerance as 'low' | 'medium' | 'high') ?? 'medium' }
-  }
-
-  private getBehavioralData(): StudentAssessmentInternal['behavioral'] {
-    return { engagementPattern: 'consistent', persistenceScore: 85 }
-  }
-
-  private async getProfilePracticalData(studentId: string): Promise<StudentAssessmentInternal['practical']> {
-    const { data } = await this.supabase.from('students').select('location_preference, financial_tier').eq('id', studentId).single()
-    const d = data as { location_preference?: string[]; financial_tier?: string } | null
-    return { preferredLocations: d?.location_preference ?? ['urban'], financialConstraints: (d?.financial_tier as 'low' | 'medium' | 'high') ?? 'medium', familyExpectations: [] }
-  }
-
-  private async scoreAllCareers(careers: CareerIntelligence[], assessment: StudentAssessmentInternal): Promise<MatcherCareerMatch[]> {
-    return careers.map(career => {
-      const academicFit = this.calculateAcademicFit(career, assessment)
-      const marketViability = 100 - career.aiForecast.automationRisk
-      const personalityFit = this.calculatePersonalityFit(assessment)
-      const matchScore = Math.round((academicFit * 0.3) + (marketViability * 0.3) + (personalityFit * 0.4))
-      return {
-        career, matchScore,
-        matchDimensions: { academicFit, personalityFit, interestAlignment: personalityFit, practicalViability: 80, futureProofing: marketViability },
-        pathway: {
-          currentReadiness: (academicFit > 80 ? 'ready' : 'developing') as 'ready' | 'developing' | 'early',
-          nextSteps: [`Focus on ${career.cbcMapping.keyLearningAreas[0] ?? 'core subjects'}`, `Join ${career.cbcMapping.suggestedCCAs?.[0] ?? 'Science Club'}`],
-          criticalGaps: academicFit < 60 ? [`Low performance in ${career.cbcMapping.keyLearningAreas[0] ?? 'core subjects'}`] : [],
-          estimatedTimeline: '4-6 Years',
-        },
-        risks: { level: (career.aiForecast.automationRisk > 50 ? 'high' : 'low') as 'low' | 'medium' | 'high', factors: [`AI automation risk: ${career.aiForecast.automationRisk}%`], mitigationStrategies: ['Focus on uniquely human creativity'] },
-        alternatives: { ifAcademicFails: career.aiForecast.pivotOpportunities, ifMarketChanges: ['Consultancy', 'Teaching'], ifInterestShifts: ['Data Analytics'] },
-      }
-    }).sort((a, b) => b.matchScore - a.matchScore)
-  }
-
-  private calculateAcademicFit(career: CareerIntelligence, assessment: StudentAssessmentInternal): number {
-    const reqs = career.cbcMapping.keyLearningAreas
-    const scores = assessment.academic.subjectScores
-    if (reqs.length === 0) return 70
-    const total = reqs.reduce((sum, subject) => sum + ((scores[subject] ?? 0) / 4), 0)
-    return Math.round((total / reqs.length) * 100)
-  }
-
-  private calculatePersonalityFit(assessment: StudentAssessmentInternal): number {
-    return assessment.psychometric.interests.length > 0 ? 85 : 60
-  }
-
-  private calculateSingleMatchScore(student: { grade?: number }, career: { ai_forecast?: { automationRisk?: number }; cbc_mapping?: { keyLearningAreas?: string[] } }, assessment: StudentAssessmentInternal): number {
-    const academicFit = this.calculateAcademicFit({ cbcMapping: { keyLearningAreas: career.cbc_mapping?.keyLearningAreas ?? [], juniorSchoolFocus: [], seniorSchoolPathways: [], suggestedCCAs: [], portfolioProjects: [] }, aiForecast: { automationRisk: career.ai_forecast?.automationRisk ?? 30, pivotOpportunities: [], humanAdvantage: [], timeline: '5_years' }, kenyanMarket: { sectorGrowth: 'stable', keyEmployers: [], saturationLevel: 'balanced', entryBarriers: 'medium', ruralVsUrban: 'hybrid', salaryRangeKES: { entry: 0, mid: 0, senior: 0 } }, id: '', name: '', category: 'traditional', description: '', realStories: { successProfile: '', challengesFaced: [], adviceForStudents: '' }, verificationStatus: 'ai_generated', lastUpdated: new Date() }, assessment)
-    const marketViability = 100 - (career.ai_forecast?.automationRisk ?? 30)
-    return Math.round((academicFit * 0.3) + (marketViability * 0.3) + (this.calculatePersonalityFit(assessment) * 0.4))
-  }
-
-  private getCompatibilityLabel(score: number): string {
-    if (score >= 90) return 'Excellent Fit'; if (score >= 80) return 'Strong Match'
-    if (score >= 70) return 'Good Potential'; if (score >= 60) return 'Possible with Work'
-    return 'Challenging Path'
-  }
-
-  private calculateReadiness(student: { grade?: number }, _career: unknown): string {
-    const grade = (student as { grade?: number }).grade ?? 7
-    if (grade >= 10) return 'Ready for specialization'; if (grade >= 7) return 'Good time to start preparation'
-    return 'Early exploration phase'
-  }
-
-  private identifySkillGaps(_student: unknown, career: { cbc_mapping?: { keyLearningAreas?: string[] } }, assessment: StudentAssessmentInternal): string[] {
-    const requiredSubjects = career.cbc_mapping?.keyLearningAreas ?? []
-    const scores = assessment.academic.subjectScores
-    const gaps = requiredSubjects.filter((subject: string) => !scores[subject] || scores[subject] < 3)
-    return gaps.length > 0 ? gaps : ['No critical gaps identified']
-  }
-
-  private generatePathway(student: { grade?: number }, career: { cbc_mapping?: { seniorSchoolPathways?: string[]; suggestedCCAs?: string[] } }): { currentPhase: string; nextMilestones: string[]; recommendedSubjects: string[]; extracurriculars: string[] } {
-    const currentGrade = (student as { grade?: number }).grade ?? 7
-    return {
-      currentPhase: currentGrade <= 3 ? 'Foundation' : currentGrade <= 6 ? 'Exploration' : currentGrade <= 9 ? 'Specialization' : 'Preparation',
-      nextMilestones: Array.from({ length: Math.min(3, 12 - currentGrade) }, (_, i) => `Grade ${currentGrade + i + 1}: Master core competencies`),
-      recommendedSubjects: career.cbc_mapping?.seniorSchoolPathways ?? [],
-      extracurriculars: career.cbc_mapping?.suggestedCCAs ?? [],
-    }
-  }
-
-  private generateActions(gaps: string[], grade: number): string[] {
-    if (gaps.length === 0 || gaps[0] === 'No critical gaps identified') return ['Maintain current performance', 'Explore advanced topics']
-    return gaps.map(gap => grade <= 6 ? `Build foundational ${gap} through daily practice` : `Advanced ${gap} preparation with mentor guidance`)
-  }
-
-  private estimatePreparationTime(gaps: string[], grade: number): string {
-    if (gaps.length === 0 || gaps[0] === 'No critical gaps identified') return 'On track with standard progression'
-    const years = Math.ceil(gaps.length / 2)
-    return grade + years > 12 ? 'Extended preparation needed' : `${years} year${years > 1 ? 's' : ''} with consistent effort`
-  }
-
-  private createDevelopmentPlan(topMatch: MatcherCareerMatch, _assessment: StudentAssessmentInternal): MatchReport['developmentPlan'] {
-    return {
-      immediate: [`Master ${topMatch.career.cbcMapping.juniorSchoolFocus[0] ?? 'core subjects'} basics`],
-      shortTerm: [`Select ${topMatch.career.cbcMapping.seniorSchoolPathways[0] ?? 'your pathway'} in Grade 10`],
-      longTerm: [`Aim for ${topMatch.career.kenyanMarket.keyEmployers[0] ?? 'top employers'} internships`],
-    }
-  }
-
-  private generateParentGuidance(_assessment: StudentAssessmentInternal, topMatch: MatcherCareerMatch): MatchReport['parentGuidance'] {
-    return {
-      howToSupport: [`Buy books about ${topMatch.career.name}`],
-      conversationsToHave: [`Discuss the role of AI in ${topMatch.career.name}`],
-      warningSigns: [`Lack of interest in ${topMatch.career.cbcMapping.keyLearningAreas[0] ?? 'core subjects'}`],
-    }
-  }
-
-  private async getRelevantCareers(grade: number, curriculumType = 'cbc'): Promise<CareerIntelligence[]> {
-    const dbFallback: CareerIntelligence[] = CAREER_DATABASE.map(c => ({
-      id: c.id, name: c.name, category: 'traditional' as const, description: c.realityCheck.typicalDay,
-      cbcMapping: { juniorSchoolFocus: c.matchRequirements.primarySubjects, seniorSchoolPathways: [c.pathway] as ('STEM' | 'Arts & Sports' | 'Social Sciences' | 'TVET')[], keyLearningAreas: c.matchRequirements.primarySubjects, suggestedCCAs: [], portfolioProjects: [] },
-      aiForecast: { automationRisk: c.aiImpact.disruptionPercentage, pivotOpportunities: c.aiImpact.survivalStrategy, humanAdvantage: [], timeline: '5_years' as const },
-      kenyanMarket: { sectorGrowth: c.aiImpact.growthOutlook === 'booming' ? 'booming' : (c.aiImpact.growthOutlook as KenyanMarketData['sectorGrowth']), keyEmployers: [], saturationLevel: 'balanced', entryBarriers: 'medium', ruralVsUrban: 'hybrid', salaryRangeKES: { entry: 50000, mid: 120000, senior: 250000 } },
-      realStories: { successProfile: '', challengesFaced: c.realityCheck.challenges, adviceForStudents: '' },
-      verificationStatus: 'ai_generated', lastUpdated: new Date(),
-    }))
-
-    let query = this.supabase.from('career_intelligence').select('id, name, description, category, salary_range_kes, required_subjects, cbc_mapping, ai_forecast, kenyan_market, pathway, university_path').limit(20)
-    if (curriculumType === 'igcse') query = query.or('curriculum_type.eq.igcse,curriculum_type.eq.both')
-    else query = query.or('curriculum_type.eq.cbc,curriculum_type.eq.both,curriculum_type.is.null')
-
-    const { data } = await query
-    if (!data || data.length === 0) return dbFallback
-    return data as unknown as CareerIntelligence[]
-  }
-
-  private async saveMatchReport(studentId: string, matches: MatcherCareerMatch[]): Promise<void> {
-    await this.supabase.from('career_match_reports').upsert({ student_id: studentId, top_career_id: matches[0].career.id, score: matches[0].matchScore, updated_at: new Date().toISOString() }, { onConflict: 'student_id' })
-  }
-}
-
-export const careerMatcher = new CareerMatcher()
-
-// ============================================================
-// SECTION 12 — DYNAMIC CAREER GENERATOR (from dynamicCareerGenerator.ts)
-// ============================================================
-
-export function convertCareerDataToDynamic(career: CareerData): DynamicCareer {
-  const outlookMap: Record<string, DynamicCareer['outlook']> = { booming: 'excellent', growing: 'good', stable: 'stable', declining: 'moderate' }
-  return {
-    name: career.name,
-    description: career.realityCheck.typicalDay,
-    salary_range: `See Kenyan market rates for ${career.name}`,
-    education_path: career.cbeReadiness.recommendedSeniorPath,
-    education_duration: '3-4 years',
-    outlook: outlookMap[career.aiImpact.growthOutlook] ?? 'good',
-    demand_in_kenya: career.marketReality.demandLevel as DynamicCareer['demand_in_kenya'],
-    ai_disruption_risk: career.aiImpact.disruptionRisk as DynamicCareer['ai_disruption_risk'],
-    required_subjects: career.matchRequirements.primarySubjects,
-    required_subjects_display: career.matchRequirements.primarySubjects.map(s => s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())),
-    universities_in_kenya: career.cbeReadiness.universities,
-    tvet_options: career.cbeReadiness.tvetOptions,
-    career_path: career.aiImpact.survivalStrategy,
-    is_ai_generated: false,
-  }
-}
-
-export async function generateDynamicCareer(careerName: string): Promise<DynamicCareer> {
-  const staticCareer = findCareerByName(careerName)
-  if (staticCareer) return convertCareerDataToDynamic(staticCareer)
-
-  const prompt = `Research career: "${careerName}" for Kenyan CBC student.
-Return JSON only:
-{
-  "name": "exact career name",
-  "description": "day-to-day reality in Kenya",
-  "salary_range": "KES X - Y/month",
-  "education_path": "degree/diploma needed",
-  "education_duration": "X years",
-  "outlook": "excellent|good|moderate|emerging|stable",
-  "demand_in_kenya": "very_high|high|moderate|low",
-  "ai_disruption_risk": "very_low|low|moderate|high",
-  "required_subjects": ["cbc_subject_key"],
-  "required_subjects_display": ["Subject Name"],
-  "universities_in_kenya": ["Real Kenyan University"],
-  "tvet_options": ["TVET option or empty array"],
-  "career_path": ["Step 1", "Step 2", "Step 3", "Step 4"]
-}`
-
-  try {
-    const response = await fetch(`${DEEPSEEK_CONFIG.baseURL}/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEEPSEEK_CONFIG.getKeyOrThrow()}` },
-      body: JSON.stringify({ model: DEEPSEEK_CONFIG.model, messages: [{ role: 'system', content: 'You are a Kenyan career intelligence expert. Return ONLY valid JSON with no extra text.' }, { role: 'user', content: prompt }], temperature: 0.4, max_tokens: 1500 }),
-    })
-    if (!response.ok) throw new Error(`DeepSeek API error: ${response.status}`)
-    const data = await response.json() as { choices: Array<{ message: { content: string } }> }
-    const content = data.choices[0].message.content
-    const jsonMatch = content.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) throw new Error('No JSON in DeepSeek response')
-    const aiData = JSON.parse(jsonMatch[0]) as DynamicCareer
-    return {
-      name: aiData.name || careerName,
-      description: aiData.description || `A career in ${careerName} in Kenya.`,
-      salary_range: aiData.salary_range || 'KES 50,000 - 250,000/month',
-      education_path: aiData.education_path || "Bachelor's degree in relevant field",
-      education_duration: aiData.education_duration || '3-4 years',
-      outlook: aiData.outlook || 'good',
-      demand_in_kenya: aiData.demand_in_kenya || 'moderate',
-      ai_disruption_risk: aiData.ai_disruption_risk || 'moderate',
-      required_subjects: Array.isArray(aiData.required_subjects) ? aiData.required_subjects : ['mathematics', 'english'],
-      required_subjects_display: Array.isArray(aiData.required_subjects_display) ? aiData.required_subjects_display : ['Mathematics', 'English'],
-      universities_in_kenya: Array.isArray(aiData.universities_in_kenya) ? aiData.universities_in_kenya : ['University of Nairobi', 'Kenyatta University'],
-      tvet_options: Array.isArray(aiData.tvet_options) ? aiData.tvet_options : [],
-      career_path: Array.isArray(aiData.career_path) ? aiData.career_path : ['Entry Level', 'Mid Level', 'Senior Level', 'Expert'],
-      is_ai_generated: true,
-    }
-  } catch (err) {
-    console.error('DeepSeek career generation failed:', err)
-    return {
-      name: careerName,
-      description: `A career path in ${careerName} offering opportunities for growth and development in Kenya.`,
-      salary_range: 'KES 50,000 - 250,000/month (varies by experience)',
-      education_path: "Bachelor's degree or diploma in relevant field",
-      education_duration: '3-4 years',
-      outlook: 'good',
-      demand_in_kenya: 'moderate',
-      ai_disruption_risk: 'moderate',
-      required_subjects: ['mathematics', 'english', 'kiswahili'],
-      required_subjects_display: ['Mathematics', 'English', 'Kiswahili'],
-      universities_in_kenya: ['University of Nairobi', 'Kenyatta University', 'Moi University'],
-      tvet_options: [],
-      career_path: ['Entry Level', 'Mid Level', 'Senior Level', 'Expert / Consultant'],
-      is_ai_generated: true,
-    }
-  }
-}
-
-export async function enhanceCareerWithAI(baseCareer: DynamicCareer): Promise<DynamicCareer> {
-  const prompt = `Add insights about "${baseCareer.name}" career in Kenya. Return JSON only: {"market_insight": "...", "salary_trend": "rising|stable|declining"}`
-  try {
-    const response = await fetch(`${DEEPSEEK_CONFIG.baseURL}/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEEPSEEK_CONFIG.getKeyOrThrow()}` },
-      body: JSON.stringify({ model: DEEPSEEK_CONFIG.model, messages: [{ role: 'system', content: 'You are a Kenyan career intelligence expert. Return ONLY valid JSON.' }, { role: 'user', content: prompt }], temperature: 0.4, max_tokens: 500 }),
-    })
-    if (!response.ok) throw new Error(`DeepSeek API error: ${response.status}`)
-    const data = await response.json() as { choices: Array<{ message: { content: string } }> }
-    const content = data.choices[0].message.content
-    const jsonMatch = content.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) throw new Error('No JSON in response')
-    const insights = JSON.parse(jsonMatch[0]) as { market_insight?: string }
-    return { ...baseCareer, description: insights.market_insight ? `${baseCareer.description} ${insights.market_insight}` : baseCareer.description }
-  } catch (err) {
-    console.error('Career enhancement failed:', err)
-    return baseCareer
-  }
-}
-
-// ============================================================
-// SECTION 13 — SINGLETON EXPORT
-// ============================================================
-
-export const careerEngineInstance = new CareerEngine()

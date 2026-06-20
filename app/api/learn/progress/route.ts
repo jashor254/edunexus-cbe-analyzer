@@ -1,6 +1,7 @@
 import { checkFeatureAccess } from '@/lib/payments/access'
 import { getStudentProgress } from '@/lib/learn/progress'
-import { apiSuccess, apiError } from '@/lib/api/response'
+import { createServiceClient } from '@/utils/supabase/service'
+import { apiSuccess, apiError, apiForbidden } from '@/lib/api/response'
 
 export async function GET(req: Request): Promise<Response> {
   try {
@@ -12,6 +13,16 @@ export async function GET(req: Request): Promise<Response> {
     if (access.allowed === false) {
       return apiError(access.reason, access.reason === 'unauthenticated' ? 401 : 403)
     }
+
+    const db = createServiceClient()
+    const { data: student } = await db
+      .from('students')
+      .select('id')
+      .eq('id', studentId)
+      .or(`user_id.eq.${access.userId},parent_user_id.eq.${access.userId}`)
+      .maybeSingle()
+
+    if (!student) return apiForbidden()
 
     const progress = await getStudentProgress(studentId)
     return apiSuccess({ progress })

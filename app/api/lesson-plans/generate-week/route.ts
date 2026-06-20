@@ -48,7 +48,21 @@ export async function POST(req: Request) {
       status: 'processing',
     }).select('id').single()
 
-    const result = await generateSpecificWeekPlans(sowId, access.userId, weekNumber)
+    let result
+    try {
+      result = await generateSpecificWeekPlans(sowId, access.userId, weekNumber)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Generation failed'
+      console.error('[lesson-plans/generate-week]', message)
+      if (job) {
+        await db.from('generation_jobs').update({
+          status: 'failed',
+          error_message: message,
+          completed_at: new Date().toISOString(),
+        }).eq('id', job.id)
+      }
+      return apiError(message)
+    }
 
     if (job) {
       await db.from('generation_jobs').update({

@@ -1,7 +1,13 @@
 // app/api/admin/trigger-cleanup/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { apiUnauthorized } from '@/lib/api/response';
+import { ADMIN_CONFIG } from '@/lib/config/api';
 
 export async function POST(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  const secret = ADMIN_CONFIG.adminSecret;
+  if (!secret || authHeader !== `Bearer ${secret}`) return apiUnauthorized();
+
   try {
     // Call the cron endpoint manually
     const response = await fetch(

@@ -413,6 +413,22 @@ function AddAssessmentContent() {
                              selectedElectives.filter(e => scores[e]).length
   const igcseScoredCount   = igcseSelectedSubjects.filter(id => igcseScores[id]).length
 
+  // Runs the scoring pipeline so Compass picks up the new student_learning_context.
+  // Non-fatal: the clinic report itself reads from `assessments` directly, so a
+  // failure here shouldn't block the parent from seeing their report.
+  const processAssessment = async (studentId: string, assessmentId: string) => {
+    try {
+      const res = await fetch('/api/parent/assessments/process', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ student_id: studentId, assessment_id: assessmentId }),
+      })
+      if (!res.ok) console.error('[assessments/add] process pipeline failed:', await res.text())
+    } catch (err) {
+      console.error('[assessments/add] process pipeline failed:', err)
+    }
+  }
+
   // ── Submit ──────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     setError(null)
@@ -445,10 +461,17 @@ function AddAssessmentContent() {
           assessment_style: assessmentStyle,
           mathematics_type: null,
           pathway_electives: null,
+          source:           'parent',
         }
 
-        const { error: insertError } = await supabase.from('assessments').insert(assessmentData)
+        const { data: inserted, error: insertError } = await supabase
+          .from('assessments')
+          .insert(assessmentData)
+          .select('id')
+          .single()
         if (insertError) throw insertError
+
+        await processAssessment(selectedStudent, inserted.id)
 
         router.push(`/dashboard/clinic/reports/${selectedStudent}`)
         return
@@ -509,11 +532,15 @@ function AddAssessmentContent() {
         raw_marks:         inputMode === 'marks' ? rawMarks : {},
       }
 
-      const { error: insertError } = await supabase
+      const { data: inserted, error: insertError } = await supabase
         .from('assessments')
         .insert(assessmentData)
+        .select('id')
+        .single()
 
       if (insertError) throw insertError
+
+      await processAssessment(selectedStudent, inserted.id)
 
       // Save dream career separately — stored in interests JSONB as { dream_career: "..." }
       if (dreamCareer.trim()) {

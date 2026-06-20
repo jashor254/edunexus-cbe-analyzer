@@ -8,6 +8,7 @@ import { STANDARD_DISCLAIMER } from './types'
 import type {
   ClinicReport, SubjectScoreRow, Career, SkillTimelineItem,
   RoadmapStep, FutureOpportunity, ParentPlan, CompassPrescription,
+  CareerMatchWithDetail,
 } from './types'
 import { calculateKJSEAComposite, calculateJuniorPathwayAffinity, calculatePathwayGapAnalysis, PATHWAY_DISCLAIMER, normalizeSubjectScores } from '@/lib/pathwayCalculator'
 
@@ -526,7 +527,8 @@ const TERM_ACTIONS: Record<string, string> = {
 
 function buildParentPlan(
   weakSubjects: SubjectScoreRow[],
-  studentName: string
+  studentName: string,
+  topCareer?: CareerMatchWithDetail | null
 ): ParentPlan {
   const firstName = studentName.split(' ')[0]
   const weak = weakSubjects.slice(0, 3)
@@ -558,6 +560,12 @@ function buildParentPlan(
 
   thisTerm.push({
     action: `Attend at least one parent-teacher meeting this term and specifically ask about ${firstName}'s progress in the priority subjects identified in this report.`,
+  })
+
+  thisTerm.push({
+    action: topCareer
+      ? `Open the Career Explorer together at edunexus.co.ke/career/${topCareer.career.slug} — ${firstName}'s top match is ${topCareer.career.title} (${topCareer.match_score}% match). Read the full profile — salary tiers, Kenyan examples, and the skill timeline — and ask: "Does this excite you?"`
+      : `Open the Career Explorer at edunexus.co.ke/career with ${firstName} this term. Read a few full career profiles together — salary tiers, Kenyan examples, and skill timelines — to make subject choices with purpose.`,
   })
 
   return { thisWeek, thisMonth, thisTerm }
@@ -897,7 +905,7 @@ export async function buildClinicReport(
     title:  careerCtaTitle,
     why:    careerCtaWhy,
     action: 'Open the Career Explorer together. Read the full career profile — the salary tiers, Kenyan success stories, and the skill timeline. Ask your child: "Does this excite you?" That conversation matters more than the match score.',
-    link:   '/career',
+    link:   top_career ? `/career/${top_career.career.slug}` : '/career',
   })
 
   // Action 4: Learning Compass session
@@ -917,7 +925,7 @@ export async function buildClinicReport(
     : null
 
   const seniorParentPlan = section === 'senior'
-    ? buildParentPlan(seniorData!.currentConstraints.length > 0 ? seniorData!.currentConstraints : weakSubjects, student.name as string)
+    ? buildParentPlan(seniorData!.currentConstraints.length > 0 ? seniorData!.currentConstraints : weakSubjects, student.name as string, top_career)
     : undefined
 
   const seniorExpectedOutcome = section === 'senior' && seniorData

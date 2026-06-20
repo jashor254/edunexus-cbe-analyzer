@@ -331,15 +331,21 @@ export default async function StudentReportPage({
               <Award className="w-6 h-6" />
               Career Matches
             </h2>
-            <div className="grid md:grid-cols-3 gap-4">
-              {report.seniorGuidance.topCareers.map((career, idx) => (
-                <div key={idx} className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20">
-                  <p className="font-bold text-lg mb-1">{career.name}</p>
-                  <p className="text-2xl font-black mb-2">{career.matchPercentage}%</p>
-                  <p className="text-sm text-indigo-100">{career.description}</p>
-                </div>
-              ))}
-            </div>
+            {report.seniorGuidance.topCareers.length > 0 ? (
+              <div className="grid md:grid-cols-3 gap-4">
+                {report.seniorGuidance.topCareers.map((career, idx) => (
+                  <div key={idx} className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20">
+                    <p className="font-bold text-lg mb-1">{career.name}</p>
+                    <p className="text-2xl font-black mb-2">{career.matchPercentage}%</p>
+                    <p className="text-sm text-indigo-100">{career.description}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-indigo-100">
+                No confident career match yet — complete more assessments to unlock personalised recommendations.
+              </p>
+            )}
           </div>
         )}
 

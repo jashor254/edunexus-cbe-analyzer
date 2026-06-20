@@ -20,6 +20,8 @@ import {
   Zap,
   Sparkles,
   Shield,
+  Brain,
+  Trash2,
 } from 'lucide-react'
 import { NoStudentsEmpty } from '@/components/ui/empty-states'
 import {
@@ -540,13 +542,35 @@ function AddStudentModal({
 
 // ─── Student Card ─────────────────────────────────────────────────────────────
 
-function StudentCard({ student }: { student: Student }) {
+function StudentCard({
+  student,
+  onRemoved,
+}: {
+  student: Student
+  onRemoved: () => void
+}) {
   const summary = getStudentSummary(student)
   const latest = student.assessments?.[0]
   const isCbc = student.curriculum_type !== 'igcse'
+  const [removing, setRemoving] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+
+  async function handleRemove() {
+    setRemoving(true)
+    try {
+      const method = student.teacherManaged ? 'PATCH' : 'DELETE'
+      const res = await fetch(`/api/students/${student.id}`, { method })
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error)
+      onRemoved()
+    } catch {
+      setRemoving(false)
+      setConfirmOpen(false)
+    }
+  }
 
   return (
-    <div className={`bg-white border border-slate-200 border-l-4 ${summary.borderClass} rounded-2xl p-5 shadow-sm hover:-translate-y-0.5 hover:shadow-md transition-all`}>
+    <div className={`bg-white border border-slate-200 border-l-4 ${summary.borderClass} rounded-2xl p-5 shadow-sm hover:-translate-y-0.5 hover:shadow-md transition-all relative`}>
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div>
@@ -568,11 +592,20 @@ function StudentCard({ student }: { student: Student }) {
             )}
           </div>
         </div>
-        {summary.label !== 'No data' && (
-          <span className={`text-xs font-black px-2.5 py-1 rounded-xl ${summary.badgeClass}`}>
-            {summary.label}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {summary.label !== 'No data' && (
+            <span className={`text-xs font-black px-2.5 py-1 rounded-xl ${summary.badgeClass}`}>
+              {summary.label}
+            </span>
+          )}
+          <button
+            onClick={() => setConfirmOpen(true)}
+            className="text-slate-300 hover:text-red-400 transition-colors p-1 rounded-lg hover:bg-red-50"
+            title={student.teacherManaged ? 'Unlink from teacher' : 'Remove student'}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Latest assessment */}
@@ -599,12 +632,18 @@ function StudentCard({ student }: { student: Student }) {
 
       {/* Actions */}
       <div className="flex gap-2 flex-wrap">
-        <Link
-          href={`/dashboard/assessments/add?student=${student.id}`}
-          className="text-xs font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
-        >
-          <PlusCircle className="w-3.5 h-3.5" /> Add Assessment
-        </Link>
+        {student.teacherManaged ? (
+          <span className="text-xs font-bold bg-teal-50 text-teal-600 px-3 py-1.5 rounded-lg flex items-center gap-1">
+            🏫 Teacher adds assessments
+          </span>
+        ) : (
+          <Link
+            href={`/dashboard/assessments/add?student=${student.id}`}
+            className="text-xs font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+          >
+            <PlusCircle className="w-3.5 h-3.5" /> Add Assessment
+          </Link>
+        )}
         <Link
           href={`/learn?student=${student.id}`}
           className="text-xs font-bold bg-amber-50 text-amber-700 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
@@ -618,6 +657,37 @@ function StudentCard({ student }: { student: Student }) {
           <TrendingUp className="w-3.5 h-3.5" /> History
         </Link>
       </div>
+
+      {/* Confirm remove/unlink dialog */}
+      {confirmOpen && (
+        <div className="absolute inset-0 bg-white/95 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center p-6 z-10 text-center">
+          <Trash2 className="w-8 h-8 text-red-400 mb-3" />
+          <p className="font-black text-slate-900 text-sm mb-1">
+            {student.teacherManaged ? 'Unlink from teacher?' : 'Remove student?'}
+          </p>
+          <p className="text-xs text-slate-500 mb-5">
+            {student.teacherManaged
+              ? `You'll stop seeing ${student.name}'s updates. The teacher's record stays intact.`
+              : `This permanently deletes ${student.name} and all their assessments.`}
+          </p>
+          <div className="flex gap-3 w-full">
+            <button
+              onClick={() => setConfirmOpen(false)}
+              disabled={removing}
+              className="flex-1 py-2 rounded-xl border border-slate-200 text-slate-600 text-xs font-black hover:bg-slate-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleRemove}
+              disabled={removing}
+              className="flex-1 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs font-black transition-colors disabled:opacity-60"
+            >
+              {removing ? 'Removing…' : student.teacherManaged ? 'Unlink' : 'Delete'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -925,7 +995,13 @@ export default function DashboardPage() {
             <NoStudentsEmpty onAddStudent={() => setShowAddModal(true)} />
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {students.map(s => <StudentCard key={s.id} student={s} />)}
+              {students.map(s => (
+                <StudentCard
+                  key={s.id}
+                  student={s}
+                  onRemoved={() => { fetchStudents(); fetchStats() }}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -987,6 +1063,15 @@ export default function DashboardPage() {
                 gradient: 'from-cyan-500 to-blue-500',
                 shadow: 'shadow-cyan-500/20',
                 href: '/career',
+                badge: null,
+              },
+              {
+                icon: Brain,
+                title: 'Career Intelligence',
+                sub: 'Capability profile · parent view',
+                gradient: 'from-violet-500 to-indigo-500',
+                shadow: 'shadow-violet-500/20',
+                href: '/parent/career-intelligence',
                 badge: null,
               },
               {

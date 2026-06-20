@@ -1,10 +1,16 @@
 // app/api/admin/cleanup-stats/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/utils/supabase/service';
-
-const supabase = createServiceClient();
+import { apiUnauthorized } from '@/lib/api/response';
+import { ADMIN_CONFIG } from '@/lib/config/api';
 
 export async function GET(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  const secret = ADMIN_CONFIG.adminSecret;
+  if (!secret || authHeader !== `Bearer ${secret}`) return apiUnauthorized();
+
+  const supabase = createServiceClient();
+
   try {
     // Get cleanup statistics
     const { data: stats, error } = await supabase

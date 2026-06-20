@@ -1,6 +1,33 @@
 import type { LessonPlanContext, GeneratedLessonPlan } from './types'
 import { isKiswahiliSubject, isSocialStudies } from '@/lib/curriculum/subjectUtils'
 
+const KENYAN_COUNTIES = [
+  'Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Kisii', 'Machakos',
+  'Nyeri', 'Garissa', 'Turkana', 'Kakamega', 'Meru', 'Embu', 'Kitale',
+  'Malindi', 'Lamu', 'Isiolo', 'Nanyuki', 'Kericho', 'Bomet', 'Migori',
+  'Homabay', 'Siaya', 'Bungoma', 'Busia', 'Kilifi', 'Kwale', 'Kajiado',
+  'Narok', 'Baringo', 'Nandi', 'Uasin Gishu', 'Laikipia', 'Kirinyaga',
+  'Murang\'a', 'Kiambu', 'Makueni', 'Kitui', 'Marsabit', 'Wajir', 'Mandera',
+]
+
+function pickDistinctCounties(n: number): string[] {
+  const shuffled = [...KENYAN_COUNTIES].sort(() => Math.random() - 0.5)
+  return shuffled.slice(0, n)
+}
+
+function sanitizeResource(resource: string): string {
+  return resource
+    .replace(/\s*,?\s*pages?\s+on\s+[^,;]*/gi, '')
+    .replace(/\s*,?\s*pp\.\s*[\d–\-]+\s+on\s+[^,;]*/gi, '')
+    .replace(/\s*,?\s*p\.\s*\d+\s+on\s+[^,;]*/gi, '')
+    .replace(/,\s*$/, '')
+    .trim()
+}
+
+function sanitizeResources(resources: string[]): string[] {
+  return resources.map(sanitizeResource).filter(r => r.length > 0)
+}
+
 function parseDeepSeekJSON(raw: string): Record<string, unknown> {
   const cleaned = raw
     .replace(/^```json\s*/i, '')
@@ -68,6 +95,8 @@ function buildLessonPlanPrompt(ctx: LessonPlanContext): string {
   const experiences = ctx.learningExperiences ?? []
 
   const location = deriveLocation(ctx.learningArea, ctx.grade)
+  const resources = sanitizeResources(ctx.learningResources)
+  const [county1, county2, county3] = pickDistinctCounties(3)
 
   const languageInstruction = isKiswahiliSubject(ctx.learningArea)
     ? `
@@ -108,40 +137,50 @@ Step 1 activity: ${experiences[0] || ''}
 Step 2 activity: ${experiences[1] || ''}
 Step 3 activity: ${experiences[2] || ''}
 
-LEARNING RESOURCES: ${ctx.learningResources.join(', ')}
+LEARNING RESOURCES: ${resources.join(', ')}
+
+LEARNER-CENTERED RULE — READ THIS FIRST, APPLIES TO EVERY FIELD:
+CBC is LEARNER-CENTERED. Learners are ALWAYS the subject of every sentence.
+The teacher ONLY guides, prompts, or facilitates — never the main actor.
+
+BANNED phrases (never use these as a sentence subject):
+  ✗ "The teacher reads..."
+  ✗ "The teacher demonstrates..."
+  ✗ "The teacher distributes..."
+  ✗ "The teacher explains..."
+  ✗ "The teacher writes..."
+  ✗ "The teacher asks..."
+
+CORRECT pattern — learners act, teacher supports:
+  ✓ "Learners read a printed case study in pairs and identify key triggers."
+  ✓ "Learners share their findings as the teacher records key points on the board."
+  ✓ "Learners work through a sample problem and explain each step aloud."
+  ✓ "Learners discuss in groups then present one trigger to the class."
+  ✓ "Learners respond to the prompt: 'Have you ever seen a land dispute?'"
 
 Generate ONLY these sections as JSON:
 {
-  "organisationOfLearning": "${location} — [brief note on grouping or seating e.g. pairs, groups of 4, whole class]",
-  "introduction": "5-minute set induction. Review previous lesson, connect to new topic. 2-3 specific teacher actions/questions.",
-  "step1": "10 minutes. Expand on the SOW activity: '${experiences[0] || ''}'. Describe what the teacher does and what learners do. Keep the same activity type and Kenyan context.",
-  "step2": "10 minutes. Expand on the SOW activity: '${experiences[1] || ''}'. Describe what the teacher does and what learners do. Keep the same activity type and Kenyan context.",
-  "step3": "10 minutes. Expand on the SOW activity: '${experiences[2] || ''}'. Describe what the teacher does and what learners do. Keep the same activity type and Kenyan context.",
-  "conclusion": "5 minutes. Summarize key points. Brief formative check. Preview next lesson.",
-  "extendedActivities": "2-3 activities for fast finishers OR homework tasks that extend learning beyond the classroom.",
+  "organisationOfLearning": "${location} — [brief note on grouping: pairs, groups of 4, whole class]",
+  "introduction": "5-minute set induction. Learners respond to an opening question linked to prior learning, then predict or share ideas about the new topic. The teacher only poses the question and guides — learners speak and act.",
+  "step1": "10 minutes. Learners carry out the SOW activity: '${experiences[0] || ''}'. Write ONLY what LEARNERS do. Keep the same activity type and Kenyan context. Teacher role: prompt questions only.",
+  "step2": "10 minutes. Learners carry out the SOW activity: '${experiences[1] || ''}'. Write ONLY what LEARNERS do. Keep the same activity type and Kenyan context. Teacher role: circulate and guide only.",
+  "step3": "10 minutes. Learners carry out the SOW activity: '${experiences[2] || ''}'. Write ONLY what LEARNERS do. Keep the same activity type and Kenyan context. Teacher role: facilitate sharing only.",
+  "conclusion": "5 minutes. Learners summarize the key lesson points. Learners answer 1-2 quick oral questions to check understanding. Teacher previews the next lesson.",
+  "extendedActivities": "2-3 learner-led tasks for fast finishers OR homework activities that extend learning beyond the classroom.",
   "reflection": "Were learners able to ${outcomes[0] || '[outcome a]'}? Were learners able to ${outcomes[1] || '[outcome b]'}? Were learners able to ${outcomes[2] || '[outcome c]'}? If not, how will you assist them in the next lesson?"
 }
 
-RULES:
-- CBC learner-centered approach
-- No Core Competencies section needed
-- No Values/PCIs section needed
+ADDITIONAL RULES:
 - Steps 1, 2, 3 MUST use the same activity type from the SOW experiences above — do not substitute or invent new ones
 - The reflection field must be output exactly as the guiding questions shown above — do not rewrite it
 - Return ONLY valid JSON, no markdown
 
-LEARNER-CENTERED RULE — NON-NEGOTIABLE:
-Every sentence in step1, step2, step3 must have "Learners" as the subject.
-The teacher only guides, asks questions, or facilitates — never the main actor.
-WRONG: "The teacher reads aloud a case study on land conflicts in Kisumu."
-RIGHT: "Learners read a printed case study on land conflicts in pairs and identify key triggers."
-WRONG: "The teacher demonstrates how to calculate the area of a triangle."
-RIGHT: "Learners work through a sample triangle problem on the board and explain each step aloud."
-
-KENYAN CONTEXT VARIETY RULE:
-Each step must reference a DIFFERENT Kenyan location, community, or example from the others.
-Do not repeat the same location across step1, step2, and step3.
-If step1 uses Kisumu, step2 must use a different place (e.g. Nakuru, Eldoret, Mombasa, Kisii, Machakos, Nyeri, Garissa, Turkana).
+KENYAN LOCATION RULE — STRICTLY ENFORCED:
+Each step is pre-assigned a DIFFERENT Kenyan county. Use ONLY these — no swaps, no extras, no repeats:
+- step1: "${county1}"
+- step2: "${county2}"
+- step3: "${county3}"
+Do NOT mention any other Kenyan county or town in any step. Each step uses exactly one location: the one assigned above.
 `
 }
 

@@ -15,6 +15,9 @@ import {
   Clock,
   ChevronRight,
   Zap,
+  Sparkles,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 
 interface LessonPlan {
@@ -26,6 +29,7 @@ interface LessonPlan {
   sub_strand: string
   status: 'generated' | 'edited' | 'taught'
   taught_date: string | null
+  teacher_flagged_followup: 'none' | 'minor' | 'major' | null
 }
 
 interface SOW {
@@ -45,6 +49,33 @@ interface SavedSOW {
   grade: string
   term: string
   year: number
+}
+
+type QuickCheckContent = {
+  id: string
+  suggested_activity: string
+  questions: string[]
+  generated_at: string
+}
+
+type RemedialCard = {
+  substrand_health_id: string
+  sow_id: string
+  strand: string
+  sub_strand: string
+  struggle_count: number
+  root_cause: string | null
+  quick_check: QuickCheckContent | null
+}
+
+const ROOT_CAUSE_LABELS: Record<string, string> = {
+  PACE_MISMATCH:    'Needs more time',
+  CONCEPT_LEAP:     'Big concept jump',
+  PREREQUISITE_GAP: 'Prior knowledge',
+  LANGUAGE_BARRIER: 'Language support',
+  RESOURCE_MISMATCH:'Try different resources',
+  TEACHER_STRATEGY: 'Try a new approach',
+  UNKNOWN:          'Needs revisiting',
 }
 
 const STATUS_COLORS = {
@@ -71,7 +102,11 @@ export default function LessonPlansPage() {
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState<number | null>(null)
   const [downloadingWeek, setDownloadingWeek] = useState<number | null>(null)
+  const [pendingEvaluations, setPendingEvaluations] = useState(0)
   const [error, setError] = useState('')
+  const [remedialCards, setRemedialCards] = useState<RemedialCard[]>([])
+  const [generatingCheckId, setGeneratingCheckId] = useState<string | null>(null)
+  const [expandedCheckId, setExpandedCheckId] = useState<string | null>(null)
 
   // Load available SOWs
   useEffect(() => {
@@ -97,6 +132,9 @@ export default function LessonPlansPage() {
       if (d.success) {
         setPlans(d.data.plans || [])
         setSow(d.data.sow || null)
+        const pending = d.data.pendingEvaluations ?? 0
+        setPendingEvaluations(pending)
+        sessionStorage.setItem('pendingEvaluations', String(pending))
         // Set initial week to first week that has plans, or week 1
         const weeks = [...new Set((d.data.plans || []).map((p: LessonPlan) => p.week_number) as number[])].sort((a, b) => a - b)
         if (weeks.length) setSelectedWeek(weeks[0] as number)
@@ -111,6 +149,49 @@ export default function LessonPlansPage() {
   useEffect(() => {
     if (selectedSowId) loadPlans(selectedSowId)
   }, [selectedSowId, loadPlans])
+
+  useEffect(() => {
+    if (!selectedSowId) return
+    setRemedialCards([])
+    setExpandedCheckId(null)
+    fetch(`/api/teaching-intelligence/remedial-bank?sowId=${selectedSowId}`)
+      .then(r => r.json())
+      .then(d => { if (d.success) setRemedialCards(d.data.cards ?? []) })
+      .catch(() => {})
+  }, [selectedSowId])
+
+  async function handleGenerateQuickCheck(card: RemedialCard) {
+    if (!sow || generatingCheckId) return
+    setGeneratingCheckId(card.substrand_health_id)
+    try {
+      const res = await fetch('/api/teaching-intelligence/quick-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          substrandHealthId: card.substrand_health_id,
+          sowId:             card.sow_id,
+          strand:            card.strand,
+          subStrand:         card.sub_strand,
+          grade:             sow.grade,
+          learningArea:      sow.learning_area,
+          struggleCount:     card.struggle_count,
+          rootCause:         card.root_cause,
+        }),
+      })
+      const d = await res.json()
+      if (d.success && d.data.quickCheck) {
+        const qc = d.data.quickCheck as QuickCheckContent
+        setRemedialCards(prev => prev.map(c =>
+          c.substrand_health_id === card.substrand_health_id
+            ? { ...c, quick_check: qc }
+            : c
+        ))
+        setExpandedCheckId(card.substrand_health_id)
+      }
+    } finally {
+      setGeneratingCheckId(null)
+    }
+  }
 
   async function handleGenerateWeek(weekNumber: number) {
     if (!selectedSowId) return
@@ -209,6 +290,11 @@ export default function LessonPlansPage() {
           <h1 className="text-2xl font-black text-gray-900 flex items-center gap-2">
             <BookOpen className="w-6 h-6 text-teal-600" />
             Lesson Plans
+            {pendingEvaluations > 0 && (
+              <span className="inline-flex items-center gap-1 text-xs font-bold bg-amber-100 text-amber-700 border border-amber-300 px-2.5 py-0.5 rounded-full">
+                {pendingEvaluations} taught, not evaluated
+              </span>
+            )}
           </h1>
           {sow && (
             <p className="text-sm text-gray-500 mt-0.5">
@@ -232,6 +318,92 @@ export default function LessonPlansPage() {
           </select>
         )}
       </div>
+
+      {/* This Week's Quick Wins — only shown when the remedial bank has items */}
+      {remedialCards.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="flex items-center gap-2 px-5 py-3.5 border-b border-gray-100">
+            <Sparkles className="w-4 h-4 text-teal-600" />
+            <span className="font-bold text-gray-900 text-sm">This Week&apos;s Quick Wins</span>
+            <span className="text-xs text-gray-400 font-medium">
+              {remedialCards.length} sub-strand{remedialCards.length !== 1 ? 's' : ''} to revisit
+            </span>
+          </div>
+
+          <div className="divide-y divide-gray-50">
+            {remedialCards.map(card => {
+              const isExpanded = expandedCheckId === card.substrand_health_id
+              const isGenerating = generatingCheckId === card.substrand_health_id
+              const label = card.root_cause ? ROOT_CAUSE_LABELS[card.root_cause] : null
+
+              return (
+                <div key={card.substrand_health_id}>
+                  <div className="flex items-start gap-3 px-5 py-3.5">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-900 text-sm truncate">{card.sub_strand}</div>
+                      <div className="text-xs text-gray-400 truncate">{card.strand}</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-gray-500">
+                          {card.struggle_count} follow-up{card.struggle_count !== 1 ? 's' : ''}
+                        </span>
+                        {label && (
+                          <span className="text-xs font-medium bg-sky-50 text-sky-700 border border-sky-200 px-2 py-0.5 rounded-full">
+                            {label}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {card.quick_check ? (
+                        <button
+                          onClick={() => setExpandedCheckId(isExpanded ? null : card.substrand_health_id)}
+                          className="flex items-center gap-1.5 text-xs font-semibold text-teal-700 border border-teal-200 bg-teal-50 hover:bg-teal-100 px-3 py-1.5 rounded-lg transition"
+                        >
+                          {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                          View Check
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleGenerateQuickCheck(card)}
+                          disabled={!!generatingCheckId}
+                          className="flex items-center gap-1.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-60 px-3 py-1.5 rounded-lg transition"
+                        >
+                          {isGenerating ? (
+                            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</>
+                          ) : (
+                            <><Zap className="w-3.5 h-3.5" /> Quick Check</>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {isExpanded && card.quick_check && (
+                    <div className="mx-5 mb-4 bg-teal-50 border border-teal-100 rounded-xl p-4 space-y-3">
+                      <div>
+                        <div className="text-xs font-bold text-teal-700 uppercase tracking-wide mb-1">10-Minute Activity</div>
+                        <p className="text-sm text-gray-800 leading-relaxed">{card.quick_check.suggested_activity}</p>
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-teal-700 uppercase tracking-wide mb-1">Check for Understanding</div>
+                        <ol className="space-y-1.5">
+                          {card.quick_check.questions.map((q, i) => (
+                            <li key={i} className="text-sm text-gray-800 flex gap-2">
+                              <span className="text-teal-600 font-bold shrink-0">{i + 1}.</span>
+                              <span>{q}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-3 text-red-700 text-sm font-medium">
@@ -327,18 +499,30 @@ export default function LessonPlansPage() {
                     </div>
                     <CheckCircle2 className="w-5 h-5 text-green-500" />
                   </div>
-                  <button
-                    onClick={() => handleDownloadWeek(selectedWeek)}
-                    disabled={downloadingWeek === selectedWeek}
-                    className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 hover:text-teal-700 border border-gray-200 hover:border-teal-300 px-4 py-2 rounded-xl transition disabled:opacity-60"
-                  >
-                    {downloadingWeek === selectedWeek ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Download className="w-4 h-4" />
-                    )}
-                    Download All Week {selectedWeek}
-                  </button>
+                  <div className="flex flex-col items-end gap-1.5">
+                    {(() => {
+                      const weekPending = weekPlans.filter(
+                        p => p.status === 'taught' && !p.teacher_flagged_followup
+                      ).length
+                      return weekPending > 0 ? (
+                        <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                          {weekPending} lesson{weekPending !== 1 ? 's' : ''} not yet evaluated
+                        </span>
+                      ) : null
+                    })()}
+                    <button
+                      onClick={() => handleDownloadWeek(selectedWeek)}
+                      disabled={downloadingWeek === selectedWeek}
+                      className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 hover:text-teal-700 border border-gray-200 hover:border-teal-300 px-4 py-2 rounded-xl transition disabled:opacity-60"
+                    >
+                      {downloadingWeek === selectedWeek ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4" />
+                      )}
+                      Download All Week {selectedWeek}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Lesson rows */}

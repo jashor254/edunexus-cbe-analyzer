@@ -456,7 +456,7 @@ export const SEED_CAREERS: SeedCareer[] = [
     slug: 'teacher-education-technologist',
     title: 'Teacher / Education Technologist',
     category: 'education',
-    pathway: 'Social',
+    pathway: 'Social Sciences',
     description: 'Teachers are the most important profession in any country. In Kenya, the shift to CBC creates demand for a new generation of educators who understand competency-based learning, technology, and child development. Education technologists design the tools and systems that improve how children learn.',
     doors: [
       {
@@ -565,7 +565,7 @@ export const SEED_CAREERS: SeedCareer[] = [
     slug: 'entrepreneur-business',
     title: 'Entrepreneur / Business Owner',
     category: 'business',
-    pathway: 'Social',
+    pathway: 'Social Sciences',
     description: 'Kenya is one of Africa\'s most entrepreneurial countries. From the mama mboga who uses M-Pesa to the founder raising millions at a Nairobi accelerator, entrepreneurship is embedded in Kenyan culture. This career is not a fallback — it is a deliberate choice to create value, jobs, and wealth.',
     doors: [
       {
@@ -668,7 +668,7 @@ export const SEED_CAREERS: SeedCareer[] = [
     slug: 'journalist-content-creator',
     title: 'Journalist / Content Creator',
     category: 'media',
-    pathway: 'Arts',
+    pathway: 'Arts & Sports Science',
     description: 'Journalists investigate, report, and explain the world. Content creators build audiences around their ideas, expertise, and personality. In Kenya, the media landscape is shifting fast — from Nation and KBC to YouTube channels, podcasts, and X (Twitter) with hundreds of thousands of followers.',
     doors: [
       {
@@ -886,7 +886,7 @@ export const SEED_CAREERS: SeedCareer[] = [
     slug: 'graphic-designer-creative-technologist',
     title: 'Graphic Designer / Creative Technologist',
     category: 'creative',
-    pathway: 'Creative',
+    pathway: 'Arts & Sports Science',
     description: 'Designers create the visual communication that makes brands, products, and ideas understood. Creative technologists combine design with coding to build interactive experiences. In Kenya, the demand for design spans advertising, packaging, app design, film, and fashion — and it\'s growing.',
     doors: [
       {
@@ -995,7 +995,7 @@ export const SEED_CAREERS: SeedCareer[] = [
     slug: 'accountant-financial-analyst',
     title: 'Accountant / Financial Analyst',
     category: 'finance',
-    pathway: 'Social',
+    pathway: 'Social Sciences',
     description: 'Accountants and financial analysts manage, analyze, and report on money. Every organization — hospital, NGO, startup, government, or corporation — needs this skill. In Kenya, CPA qualification opens doors in both employment and consulting across East Africa.',
     doors: [
       {
@@ -1213,7 +1213,7 @@ export const SEED_CAREERS: SeedCareer[] = [
     slug: 'journalist-media-producer',
     title: 'Journalist & Media Producer',
     category: 'media',
-    pathway: 'Arts & Sports',
+    pathway: 'Arts & Sports Science',
     description: 'Journalists and media producers create the news stories, documentaries, and factual content that inform Kenya. Beyond writing, modern media professionals direct cameras, edit video, produce podcasts, and build digital media businesses. In 2026, the most powerful media voices in Kenya include independent journalists with nothing but a phone, a microphone, and an audience.',
     doors: [
       {
@@ -1763,7 +1763,7 @@ export const SEED_CAREERS: SeedCareer[] = [
     slug: 'graphic-designer-creative-director',
     title: 'Graphic Designer & Creative Director',
     category: 'creative',
-    pathway: 'Arts & Sports',
+    pathway: 'Arts & Sports Science',
     description: 'Creative directors lead the visual communication of brands, campaigns, and products. They are not just executors of design — they decide what a brand stands for visually and culturally. In Kenya\'s growing creative economy, the demand for visual identity, brand strategy, and AI-augmented content creation is outpacing supply.',
     doors: [
       {
@@ -1873,7 +1873,7 @@ export const SEED_CAREERS: SeedCareer[] = [
     slug: 'sports-coach-athlete-development',
     title: 'Sports Coach & Athlete Development',
     category: 'education',
-    pathway: 'Arts & Sports',
+    pathway: 'Arts & Sports Science',
     description: 'Sports coaches develop athletes, build teams, and shape the physical and mental resilience of the next generation. Kenya is a global sports powerhouse — marathon world records, growing football and rugby talent, and an emerging sports economy. The professionals who develop that talent — coaches, sports scientists, performance analysts, and sports business operators — are in short supply.',
     doors: [
       {
@@ -1978,6 +1978,704 @@ export const SEED_CAREERS: SeedCareer[] = [
     disclaimer: D,
   },
 ]
+
+// ── COS Phase 1: Capability requirements + decision intelligence metadata ─────
+// Keyed by slug. Run seedCareersCOS() to push these to the DB after migration.
+
+import type { CareerCapabilityRequirements, KCSEMinimum, CostToQualify, SocialReality } from './types'
+
+type COSMeta = {
+  required_capabilities:      CareerCapabilityRequirements
+  capability_cluster:         string[]
+  difficulty:                 'accessible' | 'moderate' | 'hard' | 'very_hard'
+  kenya_demand:               'critical_shortage' | 'undersupplied' | 'balanced' | 'saturated'
+  saturation_note?:           string
+  kcse_minimum:               KCSEMinimum
+  time_to_income_years:       number
+  cost_to_qualify:            CostToQualify
+  risk_level:                 'low' | 'medium' | 'high' | 'variable'
+  prestige_level:             1 | 2 | 3 | 4 | 5
+  social_reality:             SocialReality
+  alternative_career_slugs:   string[]
+  complementary_career_slugs: string[]
+}
+
+const CAREER_COS_META: Record<string, COSMeta> = {
+
+  'software-engineer': {
+    required_capabilities: {
+      analytical_reasoning: { minimum: 0.50, ideal: 0.75, weight: 0.35, note: 'Algorithm thinking, debugging, system design — all require rigorous logical analysis' },
+      technical_aptitude:   { minimum: 0.55, ideal: 0.80, weight: 0.35, note: 'Maths + pre-technical foundations translate directly to programming capability' },
+      creative_thinking:    { minimum: 0.30, ideal: 0.55, weight: 0.15, note: 'Good software design requires creative problem decomposition' },
+      communication:        { minimum: 0.30, ideal: 0.55, weight: 0.10, note: 'Team collaboration, documentation, and translating user needs into code' },
+      social_intelligence:  { minimum: 0.20, ideal: 0.45, weight: 0.03, note: 'Understanding users and working in agile teams' },
+      resilience:           { minimum: 0.35, ideal: 0.60, weight: 0.02, note: 'Every programmer hits walls — persistence through frustration is essential' },
+    },
+    capability_cluster:   ['technical_aptitude', 'analytical_reasoning'],
+    difficulty:           'moderate',
+    kenya_demand:         'critical_shortage',
+    kcse_minimum: {
+      overall_grade:      'C+',
+      subject_grades:     { mathematics: 'B', physics: 'C+' },
+      alternative_routes: ['Bootcamp (6–12 months) + portfolio', 'Certificate in IT (KNEC)', 'Self-taught with GitHub proof-of-work'],
+      note:               'University CS requires B+ maths. But industry increasingly hires on portfolio. A strong GitHub beats a weak degree.',
+    },
+    time_to_income_years: 3,
+    cost_to_qualify: { min: 200000, max: 600000, note: 'University (4yr): KES 400K–1.2M. Bootcamp: KES 80K–200K. Self-taught: internet costs only.' },
+    risk_level:    'low',
+    prestige_level: 3,
+    social_reality: {
+      prestige_level: 3,
+      common_misconception: 'You need to be a maths genius to code',
+      honest_reality_check: 'Most professional coding is English + Google + patience. The maths matters at senior level — not day one.',
+      parent_frame: {
+        opening: 'Software engineers build the technology billions of people use every day.',
+        key_points: ['One of the highest-paying careers in Kenya right now', 'Remote work means global clients, global salaries', 'Entry-level: KES 50K–80K/month. Senior: KES 200K–500K/month'],
+        honest_challenges: ['First 2 years have steep learning curve', 'Industry changes fast — continuous learning is mandatory', 'Bootcamp route works but requires self-discipline without a classroom'],
+      },
+    },
+    alternative_career_slugs:   ['civil-engineer', 'accountant-financial-analyst', 'economist-policy-analyst'],
+    complementary_career_slugs: ['graphic-designer-creative-technologist', 'entrepreneur-business'],
+  },
+
+  'medical-doctor': {
+    required_capabilities: {
+      analytical_reasoning: { minimum: 0.65, ideal: 0.85, weight: 0.30, note: 'Diagnosing requires pattern recognition and systematic reasoning under pressure' },
+      technical_aptitude:   { minimum: 0.50, ideal: 0.75, weight: 0.25, note: 'Anatomy, physiology, pharmacology are science-heavy technical domains' },
+      social_intelligence:  { minimum: 0.55, ideal: 0.80, weight: 0.25, note: 'Patient trust, bedside manner, and cross-team communication save lives' },
+      communication:        { minimum: 0.55, ideal: 0.80, weight: 0.15, note: 'Explaining diagnoses clearly to patients and families is core to the job' },
+      resilience:           { minimum: 0.55, ideal: 0.80, weight: 0.03, note: 'Medicine is high-stakes and emotionally demanding — resilience is not optional' },
+      creative_thinking:    { minimum: 0.25, ideal: 0.45, weight: 0.02, note: 'Differential diagnosis benefits from lateral thinking in complex cases' },
+    },
+    capability_cluster:   ['analytical_reasoning', 'social_intelligence'],
+    difficulty:           'very_hard',
+    kenya_demand:         'critical_shortage',
+    kcse_minimum: {
+      overall_grade:  'A-',
+      subject_grades: { biology: 'A-', chemistry: 'A-', physics: 'B+', mathematics: 'B+', english: 'B+' },
+      alternative_routes: ['Clinical Medicine (3-year diploma route to practitioner)', 'Nursing → specialisation', 'Pharmacy (slightly easier entry)'],
+      note: 'MBChB is one of the hardest programs to enter in Kenya. Most universities require A in sciences. Consider clinical officer pathway as alternative.',
+    },
+    time_to_income_years: 7,
+    cost_to_qualify: { min: 2000000, max: 6000000, note: 'Public universities: KES 1.5M–3M (6 years). Private: KES 3M–6M. Government sponsorship (HELB) partially available.' },
+    risk_level:    'low',
+    prestige_level: 5,
+    social_reality: {
+      prestige_level: 5,
+      common_misconception: 'Being a doctor means you will be rich immediately',
+      honest_reality_check: 'Government doctors earn KES 70K–150K/month. Specialists in private practice earn KES 300K–1M+. The gap is 10–15 years of training and specialisation.',
+      parent_frame: {
+        opening: 'Medicine is one of the most respected and impactful careers in Kenya — and one of the hardest to get into.',
+        key_points: ['Kenya has a critical shortage of doctors — 1 doctor per 5,000 people', 'Specialised doctors (surgeons, cardiologists) earn KES 500K–2M/month', 'A doctor is never unemployed in Kenya'],
+        honest_challenges: ['7 years to first income. Requires sustained A-grade performance', 'Internship and residency years are brutal — 80+ hour weeks', 'HELB debt can take 5–10 years to clear'],
+      },
+    },
+    alternative_career_slugs:   ['counselling-psychologist', 'environmental-scientist'],
+    complementary_career_slugs: ['agricultural-scientist', 'social-worker-community-developer'],
+  },
+
+  'agricultural-scientist': {
+    required_capabilities: {
+      analytical_reasoning: { minimum: 0.35, ideal: 0.60, weight: 0.30, note: 'Soil science, crop data, and yield analysis require systematic reasoning' },
+      technical_aptitude:   { minimum: 0.35, ideal: 0.60, weight: 0.25, note: 'Agronomy tools, irrigation systems, and lab techniques are hands-on technical skills' },
+      creative_thinking:    { minimum: 0.30, ideal: 0.55, weight: 0.20, note: 'Solving climate-driven agricultural challenges requires creative solutions' },
+      communication:        { minimum: 0.30, ideal: 0.50, weight: 0.15, note: 'Advising farmers and writing research reports' },
+      social_intelligence:  { minimum: 0.35, ideal: 0.60, weight: 0.08, note: 'Working with rural farming communities requires deep cultural sensitivity' },
+      resilience:           { minimum: 0.40, ideal: 0.65, weight: 0.02, note: 'Field work is physically demanding and results can take seasons to materialise' },
+    },
+    capability_cluster:   ['analytical_reasoning', 'technical_aptitude'],
+    difficulty:           'moderate',
+    kenya_demand:         'undersupplied',
+    kcse_minimum: {
+      overall_grade:  'C+',
+      subject_grades: { biology: 'B', chemistry: 'C+', geography: 'C+' },
+      alternative_routes: ['Certificate in Agriculture (KNEC)', 'Diploma in Agribusiness', 'Kenya Forestry College programs'],
+      note: 'BSc Agriculture is accessible with C+ overall. Agribusiness management is an alternative degree that is slightly more flexible.',
+    },
+    time_to_income_years: 4,
+    cost_to_qualify: { min: 150000, max: 500000, note: 'Public university: KES 150K–400K (4 years). Government sponsorship available. Field-based diploma routes are cheaper.' },
+    risk_level:    'medium',
+    prestige_level: 3,
+    social_reality: {
+      prestige_level: 3,
+      common_misconception: 'Agriculture is for people who failed to get "real" careers',
+      honest_reality_check: 'Kenya\'s top agribusiness CEOs earn more than most doctors. Agriculture is a multi-billion shilling industry with massive tech disruption happening now.',
+      parent_frame: {
+        opening: 'Kenya\'s economy runs on agriculture — and the sector is urgently modernising.',
+        key_points: ['Government priority sector — strong scholarship and loan access', 'AgriTech is the fastest growing startup category in Kenya (2025)', 'Export market (flowers, tea, vegetables) creates high-income opportunities'],
+        honest_challenges: ['Entry-level government jobs pay KES 30K–50K — private sector is better', 'Rural postings are common — requires willingness to work outside cities', 'Income highly variable in entrepreneurial agriculture'],
+      },
+    },
+    alternative_career_slugs:   ['environmental-scientist', 'medical-doctor'],
+    complementary_career_slugs: ['entrepreneur-business', 'economist-policy-analyst'],
+  },
+
+  'civil-engineer': {
+    required_capabilities: {
+      analytical_reasoning: { minimum: 0.55, ideal: 0.80, weight: 0.35, note: 'Structural calculations, load analysis, and project problem-solving are mathematically rigorous' },
+      technical_aptitude:   { minimum: 0.55, ideal: 0.80, weight: 0.35, note: 'Physics, maths, and technical drawing translate directly to engineering' },
+      creative_thinking:    { minimum: 0.35, ideal: 0.60, weight: 0.15, note: 'Infrastructure design requires creative solutions within constraints' },
+      communication:        { minimum: 0.30, ideal: 0.55, weight: 0.10, note: 'Client presentations, site team leadership, and regulatory submissions' },
+      social_intelligence:  { minimum: 0.25, ideal: 0.50, weight: 0.03, note: 'Managing construction site teams and community relations' },
+      resilience:           { minimum: 0.40, ideal: 0.65, weight: 0.02, note: 'Long projects with complex logistics require sustained focus' },
+    },
+    capability_cluster:   ['analytical_reasoning', 'technical_aptitude'],
+    difficulty:           'hard',
+    kenya_demand:         'undersupplied',
+    kcse_minimum: {
+      overall_grade:  'B',
+      subject_grades: { mathematics: 'B+', physics: 'B', chemistry: 'B-' },
+      alternative_routes: ['Diploma in Civil Engineering (KNEC)', 'Higher National Diploma route to direct year 2', 'Technician Certificate + experience'],
+      note: 'BSc Civil Engineering at UoN requires B+ mathematics. HND route is a genuine alternative that leads to the same industry.',
+    },
+    time_to_income_years: 5,
+    cost_to_qualify: { min: 300000, max: 800000, note: 'Public university: KES 300K–700K (5 years). HELB typically covers most of this. Private universities: KES 600K–1.5M.' },
+    risk_level:    'low',
+    prestige_level: 4,
+    social_reality: {
+      prestige_level: 4,
+      common_misconception: 'Engineers just sit in offices drawing plans',
+      honest_reality_check: 'Civil engineers run Kenya\'s infrastructure — roads, dams, airports, buildings. Mid-career engineers on government tenders earn KES 200K–600K/month.',
+      parent_frame: {
+        opening: 'Every road, building, and bridge in Kenya was designed by a civil engineer.',
+        key_points: ['Kenya infrastructure boom (Vision 2030 + SGR + housing projects) = massive demand', 'Mid-career: KES 150K–400K/month. Consulting engineers: KES 300K–1M/month', 'Professional Engineer (PE) registration opens government contract eligibility'],
+        honest_challenges: ['5-year degree is demanding — maths must be consistently strong', 'First 2 years in industry are low-paid (KES 40K–70K)', 'Site work can mean months away from family'],
+      },
+    },
+    alternative_career_slugs:   ['software-engineer', 'agricultural-scientist'],
+    complementary_career_slugs: ['entrepreneur-business', 'public-administrator'],
+  },
+
+  'teacher-education-technologist': {
+    required_capabilities: {
+      communication:        { minimum: 0.55, ideal: 0.80, weight: 0.35, note: 'Teaching is communication — clarity, patience, and tone adaptation are essential' },
+      social_intelligence:  { minimum: 0.55, ideal: 0.80, weight: 0.30, note: 'Reading the classroom, building student relationships, managing group dynamics' },
+      creative_thinking:    { minimum: 0.35, ideal: 0.60, weight: 0.20, note: 'Designing engaging lessons, finding new ways to explain difficult concepts' },
+      analytical_reasoning: { minimum: 0.35, ideal: 0.60, weight: 0.10, note: 'Curriculum planning, student progress analysis, and EdTech evaluation' },
+      technical_aptitude:   { minimum: 0.25, ideal: 0.50, weight: 0.03, note: 'Growing requirement — digital learning tools, virtual classrooms, and EdTech platforms' },
+      resilience:           { minimum: 0.40, ideal: 0.65, weight: 0.02, note: 'Challenging classrooms and slow systemic change require stamina' },
+    },
+    capability_cluster:   ['communication', 'social_intelligence'],
+    difficulty:           'accessible',
+    kenya_demand:         'undersupplied',
+    kcse_minimum: {
+      overall_grade:  'C',
+      subject_grades: {},
+      alternative_routes: ['P1 certificate (primary teaching)', 'Diploma in Education (secondary)', 'BEd (degree route)'],
+      note: 'Teaching has multiple entry points. P1 teachers can earn degree-level qualifications through distance learning while employed.',
+    },
+    time_to_income_years: 4,
+    cost_to_qualify: { min: 100000, max: 400000, note: 'BEd: KES 200K–500K (4 years). Diploma: KES 80K–200K. Government training programmes subsidise most costs.' },
+    risk_level:    'low',
+    prestige_level: 2,
+    social_reality: {
+      prestige_level: 2,
+      common_misconception: 'Teaching is what you do when you can\'t do anything else',
+      honest_reality_check: 'Kenya is short 80,000 qualified teachers. EdTech teachers and curriculum designers earn KES 100K–300K/month. International schools pay KES 100K–250K/month.',
+      parent_frame: {
+        opening: 'Teaching shapes every other career — it is the career behind all careers.',
+        key_points: ['Government teachers have TSC job security and pension', 'International schools pay KES 80K–250K/month', 'EdTech + curriculum design is an emerging high-pay lane'],
+        honest_challenges: ['Government teacher starting salary: KES 25K–40K', 'Large classes (40–60 students) are the reality in public schools', 'Career growth can feel slow without active self-development'],
+      },
+    },
+    alternative_career_slugs:   ['counselling-psychologist', 'social-worker-community-developer'],
+    complementary_career_slugs: ['journalist-content-creator', 'public-administrator'],
+  },
+
+  'entrepreneur-business': {
+    required_capabilities: {
+      communication:        { minimum: 0.50, ideal: 0.75, weight: 0.25, note: 'Pitching to investors, selling to customers, and leading teams are all communication' },
+      creative_thinking:    { minimum: 0.50, ideal: 0.75, weight: 0.25, note: 'Identifying market gaps, building products, and pivoting when needed' },
+      social_intelligence:  { minimum: 0.45, ideal: 0.70, weight: 0.20, note: 'Reading people, building trust, and hiring/managing well determine startup survival' },
+      analytical_reasoning: { minimum: 0.35, ideal: 0.60, weight: 0.20, note: 'Unit economics, market sizing, and data-driven decisions matter at every stage' },
+      resilience:           { minimum: 0.55, ideal: 0.80, weight: 0.08, note: 'Most businesses fail. Resilience is the single biggest predictor of eventual success.' },
+      technical_aptitude:   { minimum: 0.20, ideal: 0.45, weight: 0.02, note: 'Useful but not essential — you can hire technical talent' },
+    },
+    capability_cluster:   ['creative_thinking', 'communication', 'resilience'],
+    difficulty:           'hard',
+    kenya_demand:         'balanced',
+    kcse_minimum: {
+      overall_grade:  'C',
+      subject_grades: {},
+      alternative_routes: ['No formal requirement — business requires proof of market, not certificates', 'Business management diploma', 'Entrepreneurship degree (KCA, Strathmore, USIU)'],
+      note: 'Entrepreneurship is the only career with no mandatory KCSE requirement. What you build matters more than your certificate.',
+    },
+    time_to_income_years: 2,
+    cost_to_qualify: { min: 50000, max: 500000, note: 'Startup costs are extremely variable. Some businesses start with KES 10K (mobile service). Tech startups may need KES 200K–2M for MVP.' },
+    risk_level:    'high',
+    prestige_level: 4,
+    social_reality: {
+      prestige_level: 4,
+      common_misconception: 'Entrepreneurship is a shortcut to wealth',
+      honest_reality_check: '70% of Kenyan SMEs fail within 3 years. Successful entrepreneurs succeed after multiple attempts — not on the first try.',
+      parent_frame: {
+        opening: 'Entrepreneurs create the jobs that other careers fill.',
+        key_points: ['The most successful Kenyans under 35 are entrepreneurs', 'A business that works earns more than any salary ceiling', 'Equity and ownership create generational wealth'],
+        honest_challenges: ['Most first businesses fail — this is normal and educational', 'Income is zero for months, then unpredictable', 'Requires capital, hustle, and tolerance for uncertainty'],
+      },
+    },
+    alternative_career_slugs:   ['accountant-financial-analyst', 'journalist-content-creator'],
+    complementary_career_slugs: ['software-engineer', 'graphic-designer-creative-technologist'],
+  },
+
+  'journalist-content-creator': {
+    required_capabilities: {
+      communication:        { minimum: 0.60, ideal: 0.85, weight: 0.40, note: 'Journalism is communication — writing, speaking, and storytelling are the entire craft' },
+      creative_thinking:    { minimum: 0.50, ideal: 0.75, weight: 0.30, note: 'Story angles, format choices, and original perspectives differentiate good journalists' },
+      social_intelligence:  { minimum: 0.40, ideal: 0.65, weight: 0.15, note: 'Source relationships, interviewing, and reading room dynamics' },
+      analytical_reasoning: { minimum: 0.30, ideal: 0.55, weight: 0.10, note: 'Data journalism and investigative reporting require analytical rigour' },
+      technical_aptitude:   { minimum: 0.20, ideal: 0.45, weight: 0.03, note: 'Digital tools, video editing, and SEO/social platforms are now baseline skills' },
+      resilience:           { minimum: 0.40, ideal: 0.65, weight: 0.02, note: 'Rejection, criticism, and difficult stories require emotional resilience' },
+    },
+    capability_cluster:   ['communication', 'creative_thinking'],
+    difficulty:           'moderate',
+    kenya_demand:         'balanced',
+    saturation_note:      'Traditional broadcast/print media is shrinking. Digital content creation and brand journalism are growing rapidly.',
+    kcse_minimum: {
+      overall_grade:  'C+',
+      subject_grades: { english: 'B' },
+      alternative_routes: ['Certificate in Journalism (KNEC)', 'Online content creator portfolio', 'Blogging + social media following as credential'],
+      note: 'BA Journalism requires C+ overall and B in English. But the industry increasingly values portfolio over degree — start publishing now.',
+    },
+    time_to_income_years: 2,
+    cost_to_qualify: { min: 100000, max: 400000, note: 'University: KES 200K–500K (3 years). Certificate: KES 50K–120K. Self-built media brand: cost of equipment + internet.' },
+    risk_level:    'medium',
+    prestige_level: 3,
+    social_reality: {
+      prestige_level: 3,
+      common_misconception: 'You need a journalism degree to be a journalist',
+      honest_reality_check: 'Kenya\'s most-followed creators have no journalism degrees. The best credential is an audience. Digital platforms pay Kenyan creators KES 50K–500K/month at scale.',
+      parent_frame: {
+        opening: 'Journalism shapes public opinion — it is one of the most influential careers in society.',
+        key_points: ['Senior broadcast journalists earn KES 150K–400K/month', 'YouTube/TikTok creators with 100K+ Kenyan subscribers can earn KES 100K–500K/month', 'Corporate communications and PR are high-paying adjacent roles'],
+        honest_challenges: ['Entry-level print/radio journalism pays KES 20K–40K', 'Media industry is contracting — digital pivot is essential', 'Freelance income is unpredictable in early years'],
+      },
+    },
+    alternative_career_slugs:   ['journalist-media-producer', 'graphic-designer-creative-director'],
+    complementary_career_slugs: ['entrepreneur-business', 'public-administrator'],
+  },
+
+  'environmental-scientist': {
+    required_capabilities: {
+      analytical_reasoning: { minimum: 0.45, ideal: 0.70, weight: 0.30, note: 'Environmental impact assessments and data analysis require strong analytical skills' },
+      technical_aptitude:   { minimum: 0.40, ideal: 0.65, weight: 0.25, note: 'Field equipment, GIS software, and laboratory analysis are technical competencies' },
+      creative_thinking:    { minimum: 0.35, ideal: 0.60, weight: 0.20, note: 'Designing sustainable solutions and policy recommendations require creative systems thinking' },
+      social_intelligence:  { minimum: 0.35, ideal: 0.60, weight: 0.15, note: 'Community engagement and stakeholder management in conservation work' },
+      communication:        { minimum: 0.35, ideal: 0.60, weight: 0.08, note: 'Research reports, environmental impact statements, and public advocacy' },
+      resilience:           { minimum: 0.35, ideal: 0.60, weight: 0.02, note: 'Fieldwork in remote areas and slow policy change require patience' },
+    },
+    capability_cluster:   ['analytical_reasoning', 'technical_aptitude'],
+    difficulty:           'moderate',
+    kenya_demand:         'undersupplied',
+    kcse_minimum: {
+      overall_grade:  'C+',
+      subject_grades: { biology: 'B-', geography: 'B-', chemistry: 'C+' },
+      alternative_routes: ['BSc Geography with Environmental Studies', 'Diploma in Natural Resource Management', 'BSc Agriculture with environmental specialisation'],
+      note: 'Multiple degree pathways lead to environmental work. Geography + biology combination is the most accessible route.',
+    },
+    time_to_income_years: 5,
+    cost_to_qualify: { min: 200000, max: 600000, note: 'Public university BSc: KES 200K–500K (4 years). International NGO employment often requires postgraduate study (add KES 200K–500K).' },
+    risk_level:    'medium',
+    prestige_level: 3,
+    social_reality: {
+      prestige_level: 3,
+      common_misconception: 'Environmental science is only about saving animals in forests',
+      honest_reality_check: 'Environmental Impact Assessment (EIA) is required for every major construction project in Kenya. EIA consultants earn KES 200K–500K per report. It is very much a business career.',
+      parent_frame: {
+        opening: 'Kenya\'s natural resources — its water, forests, and wildlife — are worth billions of shillings and require expert management.',
+        key_points: ['Climate finance is creating thousands of new environmental jobs globally', 'NEMA (National Environment Management Authority) employs environmental scientists', 'Carbon credit consulting is an emerging high-income specialisation'],
+        honest_challenges: ['Government environmental jobs have slow promotions and modest salaries', 'NGO sector has unstable project-based funding', 'Private sector environmental consulting income takes 5+ years to build'],
+      },
+    },
+    alternative_career_slugs:   ['agricultural-scientist', 'public-administrator'],
+    complementary_career_slugs: ['economist-policy-analyst', 'social-worker-community-developer'],
+  },
+
+  'graphic-designer-creative-technologist': {
+    required_capabilities: {
+      creative_thinking:    { minimum: 0.60, ideal: 0.85, weight: 0.40, note: 'Visual problem-solving is the entire craft — creativity is not optional here' },
+      technical_aptitude:   { minimum: 0.40, ideal: 0.65, weight: 0.25, note: 'Design tools, web technology, and production software are technical skills' },
+      communication:        { minimum: 0.35, ideal: 0.60, weight: 0.20, note: 'Understanding client briefs and presenting creative work persuasively' },
+      analytical_reasoning: { minimum: 0.25, ideal: 0.50, weight: 0.10, note: 'Brand strategy, user research, and design metrics require analytical thinking' },
+      social_intelligence:  { minimum: 0.25, ideal: 0.50, weight: 0.03, note: 'Client relationships and collaborative creative teams' },
+      resilience:           { minimum: 0.35, ideal: 0.60, weight: 0.02, note: 'Creative rejection and revision cycles are constant' },
+    },
+    capability_cluster:   ['creative_thinking', 'technical_aptitude'],
+    difficulty:           'moderate',
+    kenya_demand:         'undersupplied',
+    kcse_minimum: {
+      overall_grade:  'C',
+      subject_grades: { art_design: 'B-', english: 'C+' },
+      alternative_routes: ['Certificate in Graphic Design', 'Online portfolio (Behance, Dribbble)', 'Self-taught + client work as credential'],
+      note: 'Portfolio matters far more than grades in design. Many of Kenya\'s best designers are self-taught via YouTube + online courses.',
+    },
+    time_to_income_years: 2,
+    cost_to_qualify: { min: 50000, max: 300000, note: 'Design diploma: KES 80K–200K. Self-taught: cost of software (Adobe Creative Cloud ~KES 5K/month) + computer.' },
+    risk_level:    'medium',
+    prestige_level: 2,
+    social_reality: {
+      prestige_level: 2,
+      common_misconception: 'Graphic design is just making things look pretty',
+      honest_reality_check: 'Strategic brand design and UX/UI design are premium services. Senior UX designers at Kenyan tech companies earn KES 150K–400K/month. Remote work for international clients is transformative.',
+      parent_frame: {
+        opening: 'Every brand, website, app, and product in the world needs a designer.',
+        key_points: ['UI/UX design is one of the highest-paid digital skills globally', 'Remote work for international clients pays in USD — KES 200K–600K/month equivalent', 'Creative freelancers can earn KES 100K–300K/month within 3 years'],
+        honest_challenges: ['Commoditised design work (logos, flyers) pays very little', 'Building a premium client base takes 2–4 years of consistent work', 'Requires continuous portfolio development and skill updating'],
+      },
+    },
+    alternative_career_slugs:   ['journalist-content-creator', 'graphic-designer-creative-director'],
+    complementary_career_slugs: ['entrepreneur-business', 'software-engineer'],
+  },
+
+  'accountant-financial-analyst': {
+    required_capabilities: {
+      analytical_reasoning: { minimum: 0.55, ideal: 0.80, weight: 0.40, note: 'Financial analysis, variance reports, and audit work are deeply analytical' },
+      technical_aptitude:   { minimum: 0.40, ideal: 0.65, weight: 0.25, note: 'Accounting software, Excel modelling, and financial systems are technical tools' },
+      communication:        { minimum: 0.40, ideal: 0.65, weight: 0.20, note: 'Presenting financial insights to non-financial stakeholders and audit reports' },
+      social_intelligence:  { minimum: 0.25, ideal: 0.50, weight: 0.10, note: 'Client advisory relationships and audit team dynamics' },
+      creative_thinking:    { minimum: 0.20, ideal: 0.40, weight: 0.03, note: 'Financial structuring and problem-solving in complex tax/investment scenarios' },
+      resilience:           { minimum: 0.35, ideal: 0.60, weight: 0.02, note: 'Tax season and audit crunch periods require sustained high-pressure performance' },
+    },
+    capability_cluster:   ['analytical_reasoning', 'technical_aptitude'],
+    difficulty:           'moderate',
+    kenya_demand:         'balanced',
+    saturation_note:      'Basic bookkeeping is saturated. CPA (K) qualified accountants and financial analysts remain in demand, especially in audit, treasury, and FP&A.',
+    kcse_minimum: {
+      overall_grade:  'C+',
+      subject_grades: { mathematics: 'B-', english: 'C+' },
+      alternative_routes: ['KATC (Kenya Accountants and Secretaries Examination Board)', 'CPA (K) Part 1 without university degree', 'ACCA (global qualification)'],
+      note: 'CPA (K) is highly valued and can be started without a university degree. Big 4 audit firms recruit directly from CPA programmes.',
+    },
+    time_to_income_years: 4,
+    cost_to_qualify: { min: 150000, max: 500000, note: 'BCom/BBA: KES 200K–500K (3–4 years). CPA (K) self-study: KES 80K–200K. ACCA: KES 200K–600K.' },
+    risk_level:    'low',
+    prestige_level: 3,
+    social_reality: {
+      prestige_level: 3,
+      common_misconception: 'Accounting is boring work that just involves adding numbers',
+      honest_reality_check: 'CFOs and financial analysts at Kenyan corporations earn KES 400K–2M/month. Finance is where business decisions are ultimately made.',
+      parent_frame: {
+        opening: 'Every business and government agency in Kenya needs accountants — this career has zero unemployment at the qualified level.',
+        key_points: ['CPA (K) qualification opens senior finance roles in banks, NGOs, and corporations', 'CFOs in Kenyan corporates earn KES 400K–1.5M/month', 'Big 4 audit firms (KPMG, Deloitte, EY, PwC) pay KES 80K–200K at entry'],
+        honest_challenges: ['First 2 years in audit are demanding and modestly paid', 'CPA (K) requires 3 levels of exams — takes 3–5 years part-time', 'AI is automating basic bookkeeping — analytical skills increasingly important'],
+      },
+    },
+    alternative_career_slugs:   ['economist-policy-analyst', 'public-administrator'],
+    complementary_career_slugs: ['entrepreneur-business', 'software-engineer'],
+  },
+
+  'advocate-lawyer': {
+    required_capabilities: {
+      communication:        { minimum: 0.65, ideal: 0.85, weight: 0.40, note: 'Oral advocacy, legal drafting, and client consultation are the core competencies of law' },
+      analytical_reasoning: { minimum: 0.55, ideal: 0.80, weight: 0.30, note: 'Legal research, case analysis, and statutory interpretation require rigorous reasoning' },
+      social_intelligence:  { minimum: 0.45, ideal: 0.70, weight: 0.20, note: 'Reading judges, juries, clients, and opposing counsel is an art form' },
+      creative_thinking:    { minimum: 0.35, ideal: 0.60, weight: 0.07, note: 'Building legal arguments and finding precedents requires lateral thinking' },
+      resilience:           { minimum: 0.50, ideal: 0.75, weight: 0.02, note: 'Losing cases, difficult clients, and adversarial proceedings require thick skin' },
+      technical_aptitude:   { minimum: 0.20, ideal: 0.40, weight: 0.01, note: 'Legal tech tools are increasingly part of practice management' },
+    },
+    capability_cluster:   ['communication', 'analytical_reasoning'],
+    difficulty:           'hard',
+    kenya_demand:         'saturated',
+    saturation_note:      'General civil and criminal practice is overcrowded. Commercial law, international arbitration, IP, and tech law are undersupplied.',
+    kcse_minimum: {
+      overall_grade:  'B',
+      subject_grades: { english: 'B+', history: 'B' },
+      alternative_routes: ['LLB + CPSP-K (Council of Legal Education)', 'Paralegal career (Certificate level)', 'Legal studies diploma'],
+      note: 'LLB at University of Nairobi requires B+ overall. Moi, CUEA, and Mount Kenya University are accessible with B. CPSP-K exam follows the degree.',
+    },
+    time_to_income_years: 6,
+    cost_to_qualify: { min: 400000, max: 1200000, note: 'LLB: KES 400K–1.2M (4–5 years) + CPSP-K pupilage (1 year). HELB loans available. Private firms pay KES 30K–60K during pupilage.' },
+    risk_level:    'medium',
+    prestige_level: 4,
+    social_reality: {
+      prestige_level: 4,
+      common_misconception: 'Lawyers always win and always earn big',
+      honest_reality_check: 'Most new lawyers in Kenya earn KES 30K–60K for 3–5 years. Partners at top law firms earn KES 500K–2M/month. The gap is a decade of high-pressure work.',
+      parent_frame: {
+        opening: 'Law is one of the most respected professions in Kenya — and one of the most competitive.',
+        key_points: ['Senior partners at Kenyan law firms earn KES 500K–2M/month', 'Corporate legal counsel at banks and multinationals earn KES 200K–600K', 'Law opens doors to politics, judiciary, and executive careers'],
+        honest_challenges: ['Junior lawyers (advocates) earn KES 30K–60K for years 1–3', 'Market is crowded — specialisation is essential', '6-year training pipeline before first real income'],
+      },
+    },
+    alternative_career_slugs:   ['public-administrator', 'economist-policy-analyst'],
+    complementary_career_slugs: ['entrepreneur-business', 'journalist-content-creator'],
+  },
+
+  'journalist-media-producer': {
+    required_capabilities: {
+      communication:        { minimum: 0.60, ideal: 0.85, weight: 0.40, note: 'Multi-format storytelling — video, audio, text — is the entire product of journalism' },
+      creative_thinking:    { minimum: 0.55, ideal: 0.80, weight: 0.30, note: 'Compelling media production requires constant creative decisions' },
+      social_intelligence:  { minimum: 0.40, ideal: 0.65, weight: 0.15, note: 'Source relationships, interview skills, and reading audience psychology' },
+      technical_aptitude:   { minimum: 0.30, ideal: 0.55, weight: 0.10, note: 'Video editing, audio production, and digital publishing are technical competencies' },
+      analytical_reasoning: { minimum: 0.25, ideal: 0.50, weight: 0.03, note: 'Data journalism and audience analytics are growing requirements' },
+      resilience:           { minimum: 0.40, ideal: 0.65, weight: 0.02, note: 'High-pressure news cycles and difficult stories require emotional durability' },
+    },
+    capability_cluster:   ['communication', 'creative_thinking'],
+    difficulty:           'moderate',
+    kenya_demand:         'balanced',
+    kcse_minimum: {
+      overall_grade:  'C+',
+      subject_grades: { english: 'B' },
+      alternative_routes: ['Certificate in Media Studies', 'Video production portfolio on YouTube/TikTok', 'Radio internship pathway'],
+      note: 'Portfolio increasingly replaces certificates. Start producing content now — a 10K-subscriber YouTube channel is a credential.',
+    },
+    time_to_income_years: 2,
+    cost_to_qualify: { min: 80000, max: 400000, note: 'Media studies degree: KES 200K–500K. Certificate: KES 50K–150K. Self-built channel: equipment cost (KES 50K–200K).' },
+    risk_level:    'medium',
+    prestige_level: 3,
+    social_reality: {
+      prestige_level: 3,
+      common_misconception: 'You need to work for Citizen TV to be a successful media producer',
+      honest_reality_check: 'Kenya has 30+ active YouTube channels earning USD 1,000–10,000/month. Independent media producers earn more than many broadcast journalists.',
+      parent_frame: {
+        opening: 'Media shapes what Kenya thinks, debates, and decides — it is enormously influential work.',
+        key_points: ['Senior broadcast journalists earn KES 150K–400K/month', 'Digital media creators at scale earn KES 100K–600K/month', 'Corporate video production is a KES 500M+ industry in Kenya'],
+        honest_challenges: ['Entry-level broadcast journalism pays very little (KES 20K–40K)', 'Digital income takes 2–3 years to build to sustainable levels', 'Traditional media is contracting — digital pivot is essential'],
+      },
+    },
+    alternative_career_slugs:   ['journalist-content-creator', 'graphic-designer-creative-director'],
+    complementary_career_slugs: ['entrepreneur-business', 'public-administrator'],
+  },
+
+  'social-worker-community-developer': {
+    required_capabilities: {
+      social_intelligence:  { minimum: 0.65, ideal: 0.85, weight: 0.40, note: 'Understanding people in difficult circumstances is the entire foundation of social work' },
+      communication:        { minimum: 0.55, ideal: 0.80, weight: 0.30, note: 'Advocacy, counselling, and report writing are all communication-intensive' },
+      resilience:           { minimum: 0.50, ideal: 0.75, weight: 0.15, note: 'Secondary trauma and slow systemic change require strong emotional resilience' },
+      creative_thinking:    { minimum: 0.30, ideal: 0.55, weight: 0.10, note: 'Designing community programmes and finding solutions with limited resources' },
+      analytical_reasoning: { minimum: 0.25, ideal: 0.50, weight: 0.03, note: 'Needs assessments, programme evaluation, and grant writing' },
+      technical_aptitude:   { minimum: 0.15, ideal: 0.35, weight: 0.02, note: 'Database management and digital case management tools are increasingly required' },
+    },
+    capability_cluster:   ['social_intelligence', 'communication'],
+    difficulty:           'accessible',
+    kenya_demand:         'undersupplied',
+    kcse_minimum: {
+      overall_grade:  'C',
+      subject_grades: {},
+      alternative_routes: ['Diploma in Community Development', 'Certificate in Social Work', 'NGO internship-to-employment pathway'],
+      note: 'Social work entry is accessible. International NGOs require degree-level qualifications for senior roles.',
+    },
+    time_to_income_years: 4,
+    cost_to_qualify: { min: 80000, max: 350000, note: 'BSW: KES 150K–400K. Diploma: KES 60K–150K. Many entry roles are via NGO volunteer → intern → staff pipelines.' },
+    risk_level:    'low',
+    prestige_level: 2,
+    social_reality: {
+      prestige_level: 2,
+      common_misconception: 'Social workers earn very little',
+      honest_reality_check: 'Programme managers at international NGOs (UNICEF, World Bank, Amref) earn KES 200K–600K/month. Social work is the entry point to a high-paying international development career.',
+      parent_frame: {
+        opening: 'Social workers are Kenya\'s frontline responders to poverty, trauma, and inequality.',
+        key_points: ['International NGO programme managers earn KES 200K–600K/month', 'UN agencies employ senior social development specialists at USD 80K–150K/year', 'Social entrepreneurship creates income while doing good'],
+        honest_challenges: ['Government social work pays KES 25K–50K — international sector is far better', 'Emotional toll of working with vulnerable populations is real', 'Career advancement requires postgraduate qualifications'],
+      },
+    },
+    alternative_career_slugs:   ['counselling-psychologist', 'teacher-education-technologist'],
+    complementary_career_slugs: ['public-administrator', 'economist-policy-analyst'],
+  },
+
+  'public-administrator': {
+    required_capabilities: {
+      communication:        { minimum: 0.55, ideal: 0.80, weight: 0.35, note: 'Policy writing, public speaking, and stakeholder management are core to governance' },
+      analytical_reasoning: { minimum: 0.45, ideal: 0.70, weight: 0.25, note: 'Policy analysis, budget evaluation, and regulatory decision-making' },
+      social_intelligence:  { minimum: 0.50, ideal: 0.75, weight: 0.25, note: 'Political navigation, community engagement, and managing diverse interests' },
+      creative_thinking:    { minimum: 0.25, ideal: 0.50, weight: 0.10, note: 'Designing policy solutions and programme innovations' },
+      technical_aptitude:   { minimum: 0.20, ideal: 0.45, weight: 0.03, note: 'E-government systems and data management increasingly required' },
+      resilience:           { minimum: 0.35, ideal: 0.60, weight: 0.02, note: 'Bureaucratic systems and political pressures require patience and persistence' },
+    },
+    capability_cluster:   ['communication', 'social_intelligence'],
+    difficulty:           'moderate',
+    kenya_demand:         'balanced',
+    kcse_minimum: {
+      overall_grade:  'C+',
+      subject_grades: { english: 'B-', history: 'B-' },
+      alternative_routes: ['BA Public Administration', 'BA Political Science', 'Kenya School of Government programmes'],
+      note: 'Public administration degrees are offered at most Kenyan universities. Kenya School of Government offers specialised short courses for career advancement.',
+    },
+    time_to_income_years: 4,
+    cost_to_qualify: { min: 150000, max: 500000, note: 'BA degree: KES 200K–500K. Government positions require competitive civil service examinations.' },
+    risk_level:    'low',
+    prestige_level: 3,
+    social_reality: {
+      prestige_level: 3,
+      common_misconception: 'Government jobs are only for people with connections',
+      honest_reality_check: 'Kenya\'s civil service has 300,000+ positions. Competitive examinations determine most appointments. Senior public administrators (PSs, directors) earn KES 200K–600K/month.',
+      parent_frame: {
+        opening: 'Public administrators run the systems that every Kenyan depends on — from hospitals to schools to roads.',
+        key_points: ['Job security is the highest of any sector — government does not go bankrupt', 'Pension scheme provides retirement security', 'Senior civil servants earn KES 150K–600K/month'],
+        honest_challenges: ['Entry-level positions are modest (KES 25K–50K)', 'Political environments can be frustrating for change-makers', 'Promotion requires competitive examinations and seniority'],
+      },
+    },
+    alternative_career_slugs:   ['advocate-lawyer', 'economist-policy-analyst'],
+    complementary_career_slugs: ['social-worker-community-developer', 'journalist-content-creator'],
+  },
+
+  'economist-policy-analyst': {
+    required_capabilities: {
+      analytical_reasoning: { minimum: 0.65, ideal: 0.85, weight: 0.40, note: 'Economic modelling, statistical analysis, and policy evaluation are highly analytical' },
+      communication:        { minimum: 0.55, ideal: 0.80, weight: 0.25, note: 'Policy briefs, research papers, and public presentations are core outputs' },
+      creative_thinking:    { minimum: 0.35, ideal: 0.60, weight: 0.20, note: 'Designing policy solutions and building new economic frameworks' },
+      social_intelligence:  { minimum: 0.30, ideal: 0.55, weight: 0.10, note: 'Stakeholder engagement and understanding behavioural economics' },
+      technical_aptitude:   { minimum: 0.35, ideal: 0.60, weight: 0.03, note: 'Statistical software (STATA, R), economic databases, and data visualisation' },
+      resilience:           { minimum: 0.40, ideal: 0.65, weight: 0.02, note: 'Policy impact takes years to measure — requires long-term thinking and patience' },
+    },
+    capability_cluster:   ['analytical_reasoning', 'communication'],
+    difficulty:           'hard',
+    kenya_demand:         'undersupplied',
+    kcse_minimum: {
+      overall_grade:  'B',
+      subject_grades: { mathematics: 'B+', english: 'B' },
+      alternative_routes: ['BA Economics', 'BA Statistics', 'BA Development Studies with quantitative focus'],
+      note: 'BSc Economics at UoN requires B+ mathematics. Strong quantitative skills are essential — economics is increasingly statistical.',
+    },
+    time_to_income_years: 5,
+    cost_to_qualify: { min: 250000, max: 700000, note: 'BSc Economics: KES 250K–600K. MSc typically required for senior roles (add KES 200K–500K). World Bank and IMF programmes available for top graduates.' },
+    risk_level:    'low',
+    prestige_level: 4,
+    social_reality: {
+      prestige_level: 4,
+      common_misconception: 'Economists just study old theories in books',
+      honest_reality_check: 'Kenya\'s National Treasury, Central Bank, and IMF employ economists at KES 200K–800K/month. Development economists at the World Bank earn USD 100K–200K/year.',
+      parent_frame: {
+        opening: 'Economists design the policies that determine how Kenya grows — interest rates, tax policy, trade agreements.',
+        key_points: ['Central Bank economists earn KES 200K–500K/month', 'World Bank/IMF economists earn USD 100K–200K/year', 'Think tanks (KIPPRA, IPAR) are respected research employers'],
+        honest_challenges: ['Postgraduate degree (MSc/PhD) effectively required for senior policy roles', 'Academic economics requires 7–10 year training pipeline', 'Applied roles pay well but are very competitive to enter'],
+      },
+    },
+    alternative_career_slugs:   ['accountant-financial-analyst', 'public-administrator'],
+    complementary_career_slugs: ['advocate-lawyer', 'agricultural-scientist'],
+  },
+
+  'counselling-psychologist': {
+    required_capabilities: {
+      social_intelligence:  { minimum: 0.65, ideal: 0.85, weight: 0.35, note: 'The therapeutic relationship is the primary instrument — empathy and attunement are essential' },
+      communication:        { minimum: 0.60, ideal: 0.85, weight: 0.30, note: 'Reflective listening, psychoeducation, and written case notes are core skills' },
+      resilience:           { minimum: 0.55, ideal: 0.80, weight: 0.20, note: 'Vicarious trauma and emotionally heavy sessions require strong personal boundaries' },
+      analytical_reasoning: { minimum: 0.40, ideal: 0.65, weight: 0.10, note: 'Psychometric assessment, diagnostic formulation, and treatment planning' },
+      creative_thinking:    { minimum: 0.30, ideal: 0.55, weight: 0.03, note: 'Designing therapeutic interventions and adapting evidence-based approaches to Kenyan contexts' },
+      technical_aptitude:   { minimum: 0.20, ideal: 0.40, weight: 0.02, note: 'Psychological testing tools and teletherapy platforms' },
+    },
+    capability_cluster:   ['social_intelligence', 'communication', 'resilience'],
+    difficulty:           'hard',
+    kenya_demand:         'critical_shortage',
+    saturation_note:      'Kenya has 1 psychologist per 1.5 million people. Demand vastly exceeds supply at every qualification level.',
+    kcse_minimum: {
+      overall_grade:  'B-',
+      subject_grades: { english: 'B', biology: 'C+' },
+      alternative_routes: ['BSc Psychology', 'BA Counselling Psychology', 'Diploma in Counselling (for certificate-level counsellors)'],
+      note: 'Full counselling psychology practice requires BSc + MSc + 2-year supervised practicum. Diploma-level counsellors can work in community settings with supervision.',
+    },
+    time_to_income_years: 6,
+    cost_to_qualify: { min: 400000, max: 1000000, note: 'BSc Psychology: KES 250K–600K + MSc (KES 200K–500K). Supervised practicum is typically paid but at low rates. Private practice costs minimal (KES 50K setup).' },
+    risk_level:    'low',
+    prestige_level: 3,
+    social_reality: {
+      prestige_level: 3,
+      common_misconception: 'Psychologists only help "crazy people"',
+      honest_reality_check: 'Corporate EAP psychologists work with top executives. School psychologists are in every budget. Private practice clinical psychologists in Nairobi earn KES 150K–500K/month.',
+      parent_frame: {
+        opening: 'Mental health is Kenya\'s most underfunded health crisis — and the most underprovided career opportunity.',
+        key_points: ['Kenya has fewer than 100 trained psychiatrists for 55 million people', 'Private practice psychologists in Nairobi earn KES 150K–500K/month', 'Corporate wellness is a growing employer — banks, telcos, NGOs all hire'],
+        honest_challenges: ['Full qualification takes 6–8 years', 'Supervised practicum years are demanding and modestly paid', 'Stigma still limits help-seeking in many communities — advocacy work is part of the job'],
+      },
+    },
+    alternative_career_slugs:   ['social-worker-community-developer', 'teacher-education-technologist'],
+    complementary_career_slugs: ['medical-doctor', 'public-administrator'],
+  },
+
+  'graphic-designer-creative-director': {
+    required_capabilities: {
+      creative_thinking:    { minimum: 0.65, ideal: 0.90, weight: 0.40, note: 'Creative direction requires not just skill but vision — the ability to see what does not yet exist' },
+      communication:        { minimum: 0.45, ideal: 0.70, weight: 0.25, note: 'Creative directors present, sell, and defend their vision constantly' },
+      technical_aptitude:   { minimum: 0.40, ideal: 0.65, weight: 0.20, note: 'Mastery of design tools and production systems is prerequisite to creative leadership' },
+      social_intelligence:  { minimum: 0.35, ideal: 0.60, weight: 0.10, note: 'Leading creative teams, managing client expectations, and building agency culture' },
+      analytical_reasoning: { minimum: 0.25, ideal: 0.50, weight: 0.03, note: 'Brand strategy, market analysis, and campaign measurement' },
+      resilience:           { minimum: 0.40, ideal: 0.65, weight: 0.02, note: 'Creative rejection is constant — great directors develop and maintain creative confidence' },
+    },
+    capability_cluster:   ['creative_thinking', 'communication'],
+    difficulty:           'moderate',
+    kenya_demand:         'undersupplied',
+    kcse_minimum: {
+      overall_grade:  'C',
+      subject_grades: { art_design: 'B' },
+      alternative_routes: ['BFA (Bachelor of Fine Arts)', 'Advanced Diploma in Design', 'Portfolio + work experience path'],
+      note: 'Portfolio is the primary credential. Creative directors are promoted from designers — the path is demonstrated excellence, not certificates.',
+    },
+    time_to_income_years: 3,
+    cost_to_qualify: { min: 100000, max: 500000, note: 'Design degree: KES 200K–600K. Many creative directors are self-taught — total cost is portfolio development + software.' },
+    risk_level:    'medium',
+    prestige_level: 3,
+    social_reality: {
+      prestige_level: 3,
+      common_misconception: 'Creative directors just approve other people\'s work',
+      honest_reality_check: 'Creative directors at Kenyan agencies earn KES 200K–600K/month. Those building independent studios can earn significantly more. The title comes from proven excellence, not years of service.',
+      parent_frame: {
+        opening: 'Creative directors shape how brands communicate with millions of consumers.',
+        key_points: ['Agency creative directors earn KES 200K–600K/month', 'Independent creative studios can earn KES 300K–1M/month', 'Film and advertising CDs work on campaigns worth hundreds of millions'],
+        honest_challenges: ['First 5 years as a designer before creative leadership is realistic', 'Agency culture can be demanding and stressful', 'Building from designer to creative director requires proactive portfolio development'],
+      },
+    },
+    alternative_career_slugs:   ['journalist-content-creator', 'graphic-designer-creative-technologist'],
+    complementary_career_slugs: ['entrepreneur-business', 'journalist-media-producer'],
+  },
+
+  'sports-coach-athlete-development': {
+    required_capabilities: {
+      social_intelligence:  { minimum: 0.60, ideal: 0.85, weight: 0.35, note: 'Coaching is fundamentally about understanding what motivates and blocks each athlete' },
+      communication:        { minimum: 0.55, ideal: 0.80, weight: 0.30, note: 'Coaching cues, team talks, and media relations are all communication-intensive' },
+      resilience:           { minimum: 0.60, ideal: 0.85, weight: 0.20, note: 'High-performance sport is relentless — coaches face public criticism and athlete failure regularly' },
+      technical_aptitude:   { minimum: 0.30, ideal: 0.55, weight: 0.10, note: 'Sports science, performance analytics, and video analysis tools are modern coaching requirements' },
+      analytical_reasoning: { minimum: 0.30, ideal: 0.55, weight: 0.03, note: 'Game analysis, performance data, and strategic planning' },
+      creative_thinking:    { minimum: 0.25, ideal: 0.50, weight: 0.02, note: 'Tactical creativity and innovative training methodologies' },
+    },
+    capability_cluster:   ['social_intelligence', 'communication', 'resilience'],
+    difficulty:           'hard',
+    kenya_demand:         'undersupplied',
+    saturation_note:      'Club-level football coaching is overcrowded. Athletics, swimming, basketball, and corporate wellness coaching are undersupplied.',
+    kcse_minimum: {
+      overall_grade:  'C',
+      subject_grades: {},
+      alternative_routes: ['Certificate in Sports Management', 'National coaching licence (AK, FKF, Basketball Kenya)', 'Kenyatta University BSc Physical Education'],
+      note: 'International coaching certifications (UEFA, World Athletics) are more valued than Kenyan academic credentials at elite level.',
+    },
+    time_to_income_years: 3,
+    cost_to_qualify: { min: 50000, max: 300000, note: 'BSc Physical Education: KES 200K–400K. Coaching licence: KES 20K–80K. International certifications: KES 50K–200K.' },
+    risk_level:    'high',
+    prestige_level: 2,
+    social_reality: {
+      prestige_level: 2,
+      common_misconception: 'You have to be a former elite athlete to coach at a high level',
+      honest_reality_check: 'The world\'s best coaches were rarely world-class athletes. Patrick Sang (coach of Eliud Kipchoge) ran competitively but never won an Olympic medal. Coaching intelligence is different from athletic talent.',
+      parent_frame: {
+        opening: 'Kenya is a global athletics powerhouse — and the demand for certified coaches is growing faster than supply.',
+        key_points: ['Elite athletics coaches manage athlete earnings of KES 5M–50M/year and earn 10–20% commission', 'Corporate wellness coaching (gyms, corporates) pays KES 80K–200K/month', 'Sports development NGOs provide stable salaried positions'],
+        honest_challenges: ['Most coaching careers start unpaid or near-unpaid for 2–3 years', 'Football coaching market is overcrowded — specialise in other sports', 'Income is very variable unless in an institutional role'],
+      },
+    },
+    alternative_career_slugs:   ['teacher-education-technologist', 'social-worker-community-developer'],
+    complementary_career_slugs: ['entrepreneur-business', 'journalist-media-producer'],
+  },
+}
+
+export async function seedCareersCOS(): Promise<{ updated: number; errors: string[] }> {
+  const supabase = createServiceClient()
+  const errors: string[] = []
+  let updated = 0
+
+  for (const [slug, meta] of Object.entries(CAREER_COS_META)) {
+    const { error } = await supabase
+      .from('careers')
+      .update(meta)
+      .eq('slug', slug)
+
+    if (error) {
+      errors.push(`${slug}: ${error.message}`)
+    } else {
+      updated++
+    }
+  }
+
+  return { updated, errors }
+}
 
 export async function seedCareers(): Promise<{ inserted: number; errors: string[] }> {
   const supabase = createServiceClient()

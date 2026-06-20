@@ -1,15 +1,18 @@
-// PATCH: Save teacher self-evaluation for a taught lesson
-// Body: { evaluation: string }
+// PATCH: Save teacher evaluation for a taught lesson (TIE Phase 1a)
+// Body: { evaluation: string, followUp: 'none' | 'minor' | 'major', reflectionSource?: string }
+//
+// followUp is the teacher's tap (Hapana/Kidogo/Ndiyo) — required, no default.
+// On followUp !== 'none', substrand_health.struggle_count is incremented synchronously.
+// Core logic lives in lib/lessonPlan/evaluation.ts — called by both this route and scripts.
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
-import { createServiceClient } from '@/utils/supabase/service'
 import {
   apiSuccess,
   apiError,
   apiUnauthorized,
-  apiForbidden,
   apiBadRequest,
 } from '@/lib/api/response'
+import { submitEvaluation } from '@/lib/lessonPlan/evaluation'
 
 interface RouteContext {
   params: Promise<{ planId: string }>
@@ -17,6 +20,8 @@ interface RouteContext {
 
 const EvaluationSchema = z.object({
   evaluation: z.string().min(1, 'evaluation is required'),
+  followUp: z.enum(['none', 'minor', 'major']),
+  reflectionSource: z.enum(['manual', 'edited_suggestion', 'ai_suggestion']).optional(),
 })
 
 export async function PATCH(req: Request, { params }: RouteContext) {
@@ -30,35 +35,17 @@ export async function PATCH(req: Request, { params }: RouteContext) {
     if (!parsed.success) {
       return apiBadRequest(parsed.error.issues.map(i => i.message).join(', '))
     }
-    const { evaluation } = parsed.data
+    const { evaluation, followUp, reflectionSource } = parsed.data
 
-    const db = createServiceClient()
-
-    // Verify plan is taught before allowing evaluation save
-    const { data: existing } = await db
-      .from('lesson_plans')
-      .select('status')
-      .eq('id', planId)
-      .eq('teacher_id', user.id)
-      .single()
-
-    if (!existing) return apiForbidden()
-    if (existing.status !== 'taught') {
-      return apiBadRequest('Cannot save evaluation — mark the lesson as taught first')
+    try {
+      const plan = await submitEvaluation(planId, user.id, { evaluation, followUp, reflectionSource })
+      return apiSuccess({ plan })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Evaluation failed'
+      if (msg.includes('must be marked as taught')) return apiBadRequest(msg)
+      if (msg.includes('not found or not owned')) return apiUnauthorized()
+      throw err
     }
-
-    const { data: plan, error } = await db
-      .from('lesson_plans')
-      .update({ teacher_self_evaluation: evaluation })
-      .eq('id', planId)
-      .eq('teacher_id', user.id)
-      .eq('status', 'taught')
-      .select()
-      .single()
-
-    if (error || !plan) return apiForbidden()
-
-    return apiSuccess({ plan })
   } catch (err: unknown) {
     return apiError(err instanceof Error ? err.message : 'Update failed')
   }

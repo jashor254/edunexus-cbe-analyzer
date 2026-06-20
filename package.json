@@ -10,7 +10,8 @@
     "test:report": "tsx scripts/test-report.ts",
     "sow:grade10-bio-t1": "tsx scripts/generateGrade10BiologyTerm1.ts",
     "seed:grade10": "tsx scripts/seedGrade10Subjects.ts",
-    "scrape:kicd": "tsx scripts/scrapeKicdCurriculum.ts"
+    "scrape:kicd": "tsx scripts/scrapeKicdCurriculum.ts",
+    "seed:demo": "node --env-file=.env.local node_modules/.bin/tsx scripts/seed-demo-teacher.ts"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^2.0.32",

@@ -880,19 +880,17 @@ function ClinicReportView({ studentId, studentName, onClose }: {
 
 // ─── Learning Progress Widget ─────────────────────────────────────────────────
 
-interface TopicProgress {
-  topic:         string
-  topicDisplay:  string
-  subject:       string
-  sessions:      { date: string; mastery: number; correct: number; attempted: number }[]
-  latestMastery: number
-  improvement:   number
-  mastered:      boolean
-  trend:         'improving' | 'steady' | 'needs_work'
+interface SubjectProgress {
+  subject:           string
+  subjectDisplay:    string
+  completedSessions: number
+  totalMinutes:      number
+  lastCompletedAt:   string | null
+  recentSummaries:   string[]
 }
 
 function StudentProgressWidget({ studentId }: { studentId: string }) {
-  const [progress, setProgress] = useState<TopicProgress[] | null>(null)
+  const [progress, setProgress] = useState<SubjectProgress[] | null>(null)
 
   useEffect(() => {
     fetch(`/api/learn/progress?studentId=${studentId}`)
@@ -924,33 +922,15 @@ function StudentProgressWidget({ studentId }: { studentId: string }) {
       </p>
       <div className="space-y-2">
         {progress.map(p => (
-          <div key={p.topic} className="flex items-center justify-between">
+          <div key={p.subject} className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-700 font-medium">{p.topicDisplay}</p>
+              <p className="text-xs text-slate-700 font-medium">{p.subjectDisplay}</p>
               <p className="text-[10px] text-slate-400">
-                {p.sessions.length} session{p.sessions.length !== 1 ? 's' : ''}
+                {p.completedSessions} session{p.completedSessions !== 1 ? 's' : ''}
+                {p.lastCompletedAt && ` · last ${new Date(p.lastCompletedAt).toLocaleDateString()}`}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="flex gap-0.5 items-end h-6">
-                {p.sessions.map((s, i) => (
-                  <div
-                    key={i}
-                    className={`w-2 rounded-sm ${
-                      s.mastery >= 80 ? 'bg-green-500'
-                      : s.mastery >= 60 ? 'bg-amber-400'
-                      : 'bg-violet-400'
-                    }`}
-                    style={{ height: `${Math.max(4, s.mastery * 0.22)}px` }}
-                  />
-                ))}
-              </div>
-              {p.mastered ? (
-                <span className="text-[10px] text-green-600 font-bold">✓ Mastered</span>
-              ) : (
-                <span className="text-[10px] text-slate-400">{p.latestMastery}%</span>
-              )}
-            </div>
+            <span className="text-[10px] text-slate-400">{p.totalMinutes} min</span>
           </div>
         ))}
       </div>

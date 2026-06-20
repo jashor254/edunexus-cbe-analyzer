@@ -3,20 +3,58 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
-  Search, Sparkles, TrendingUp, MapPin, ChevronRight, Star,
+  Search, Sparkles, TrendingUp, ChevronRight, Star,
   Loader2, AlertCircle, Briefcase, Zap, RefreshCw, BookOpen,
-  Target, ArrowRight, Clock
+  ArrowRight, Clock, Brain, TrendingDown, Minus, ArrowUpRight,
+  Target, CheckCircle, AlertTriangle, ChevronDown, ChevronUp,
+  DollarSign, Timer, BarChart3, Flame,
 } from 'lucide-react'
-import type { CareerSummary, CareerMatchWithDetail } from '@/lib/career/types'
+import type {
+  CareerSummary,
+  CapabilityMatchReport,
+  CapabilityCareerMatch,
+  CapabilityProfile,
+  CapabilityDimension,
+  CapabilityGrowthReport,
+} from '@/lib/career/types'
+import { CAPABILITY_LABELS } from '@/lib/career/capabilityExtractor'
+import { alignmentToPercent, tierLabel, tierColor, demandLabel } from '@/lib/career/capabilityMatchEngine'
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// ── Constants ────────────────────────────────────────────────────────────────
 
 const AI_IMPACT_BADGE: Record<string, { label: string; classes: string }> = {
-  low:          { label: 'AI-Safe',       classes: 'bg-green-500/20 text-green-400 border-green-500/30' },
-  medium:       { label: 'AI-Assisted',   classes: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
-  high:         { label: 'AI-Disrupted',  classes: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
-  transforming: { label: 'AI-Evolving',   classes: 'bg-violet-500/20 text-violet-400 border-violet-500/30' },
+  low:          { label: 'AI-Safe',      classes: 'bg-green-500/20 text-green-400 border-green-500/30' },
+  medium:       { label: 'AI-Assisted',  classes: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
+  high:         { label: 'AI-Disrupted', classes: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
+  transforming: { label: 'AI-Evolving',  classes: 'bg-violet-500/20 text-violet-400 border-violet-500/30' },
 }
+
+const TIER_STYLES: Record<string, { border: string; badge: string; glow: string }> = {
+  primary:        { border: 'border-green-500/40',  badge: 'bg-green-500/20 text-green-400',    glow: 'from-green-900/20 to-emerald-900/20' },
+  stretch:        { border: 'border-blue-500/40',   badge: 'bg-blue-500/20 text-blue-400',      glow: 'from-blue-900/20 to-indigo-900/20' },
+  alternative:    { border: 'border-amber-500/40',  badge: 'bg-amber-500/20 text-amber-400',    glow: 'from-amber-900/20 to-yellow-900/20' },
+  entrepreneurial:{ border: 'border-purple-500/40', badge: 'bg-purple-500/20 text-purple-400',  glow: 'from-purple-900/20 to-violet-900/20' },
+}
+
+const LEVEL_COLORS: Record<string, string> = {
+  exceptional: 'bg-green-500',
+  strong:      'bg-emerald-500',
+  capable:     'bg-blue-500',
+  developing:  'bg-amber-500',
+  emerging:    'bg-red-500/70',
+}
+
+const DIMENSION_ORDER: CapabilityDimension[] = [
+  'analytical_reasoning', 'technical_aptitude', 'communication',
+  'creative_thinking', 'social_intelligence', 'resilience',
+]
+
+const PATHWAYS = [
+  { value: '',                      label: 'All Pathways' },
+  { value: 'STEM',                  label: 'STEM' },
+  { value: 'Social Sciences',       label: 'Social Sciences' },
+  { value: 'Arts & Sports Science', label: 'Arts & Sports Science' },
+]
 
 const CATEGORIES = [
   { value: '',            label: 'All Careers' },
@@ -32,18 +70,307 @@ const CATEGORIES = [
   { value: 'finance',     label: 'Finance' },
 ]
 
-function ScoreBadge({ score }: { score: number }) {
-  const color =
-    score >= 75 ? 'text-green-400' :
-    score >= 55 ? 'text-amber-400' :
-    'text-orange-400'
+// ── Trend icon ───────────────────────────────────────────────────────────────
+
+function TrendIcon({ trend }: { trend: string }) {
+  if (trend === 'accelerating') return <ArrowUpRight className="w-3.5 h-3.5 text-green-400" />
+  if (trend === 'growing')      return <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+  if (trend === 'declining')    return <TrendingDown className="w-3.5 h-3.5 text-red-400" />
+  return <Minus className="w-3.5 h-3.5 text-white/30" />
+}
+
+// ── Capability profile card ───────────────────────────────────────────────────
+
+function CapabilityBar({
+  dimension,
+  score,
+  level,
+  trend,
+  isDominant,
+  confidence,
+}: {
+  dimension: CapabilityDimension
+  score:     number
+  level:     string
+  trend:     string
+  isDominant:boolean
+  confidence:number
+}) {
+  const pct   = Math.round(score * 100)
+  const color = LEVEL_COLORS[level] ?? 'bg-white/30'
+
   return (
-    <span className={`text-2xl font-black ${color}`}>{score}%</span>
+    <div className={`space-y-1.5 ${confidence < 0.4 ? 'opacity-60' : ''}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className={`text-xs font-semibold ${isDominant ? 'text-violet-300' : 'text-white/60'}`}>
+          {CAPABILITY_LABELS[dimension]}
+          {isDominant && <Star className="inline w-3 h-3 ml-1 text-violet-400 fill-violet-400" />}
+        </span>
+        <div className="flex items-center gap-1.5">
+          <TrendIcon trend={trend} />
+          <span className="text-xs text-white/40 capitalize">{level}</span>
+          <span className="text-xs font-bold text-white/70 w-8 text-right">{pct}%</span>
+        </div>
+      </div>
+      <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-700 ${color} ${isDominant ? 'opacity-100' : 'opacity-70'}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
   )
 }
 
-function CareerCard({ career, matchScore }: { career: CareerSummary; matchScore?: number }) {
-  const badge = AI_IMPACT_BADGE[career.ai_impact.level] ?? AI_IMPACT_BADGE.medium
+function CapabilityProfileCard({
+  profile,
+  dominant,
+  assessmentCount,
+  onRecompute,
+  loading,
+}: {
+  profile:        CapabilityProfile
+  dominant:       string[]
+  assessmentCount:number
+  onRecompute:    () => void
+  loading:        boolean
+}) {
+  return (
+    <div className="bg-white/5 border border-violet-500/20 rounded-2xl p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Brain className="w-5 h-5 text-violet-400" />
+          <h3 className="text-white font-bold">Your Capability Profile</h3>
+        </div>
+        <button
+          onClick={onRecompute}
+          disabled={loading}
+          className="flex items-center gap-1.5 text-xs text-violet-400 hover:text-violet-300 font-semibold disabled:opacity-50 transition-colors"
+        >
+          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+          Update
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        {DIMENSION_ORDER.map(dim => {
+          const s = profile[dim]
+          return (
+            <CapabilityBar
+              key={dim}
+              dimension={dim}
+              score={s.raw_score}
+              level={s.level}
+              trend={s.trend}
+              isDominant={dominant.includes(dim)}
+              confidence={s.confidence}
+            />
+          )
+        })}
+      </div>
+
+      <div className="flex items-center justify-between pt-2 border-t border-white/5">
+        <span className="text-xs text-white/30">Based on {assessmentCount} assessment{assessmentCount !== 1 ? 's' : ''}</span>
+        {dominant.length > 0 && (
+          <span className="text-xs text-violet-400/70">
+            ★ Dominant: {dominant.map(d => CAPABILITY_LABELS[d as CapabilityDimension] ?? d).join(', ')}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Capability match card ─────────────────────────────────────────────────────
+
+function CapabilityMatchCard({ match }: { match: CapabilityCareerMatch }) {
+  const style   = TIER_STYLES[match.tier] ?? TIER_STYLES.alternative
+  const pct     = alignmentToPercent(match.alignment_score)
+  const topGap  = match.gaps.find(g => g.gap_severity === 'significant' || g.gap_severity === 'moderate')
+  const rc      = match.reality_check
+
+  return (
+    <Link
+      href={`/career/${match.career_slug}`}
+      className={`group block bg-gradient-to-br ${style.glow} border ${style.border} rounded-2xl p-5 hover:opacity-90 transition-all space-y-3`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${style.badge}`}>
+          {tierLabel(match.tier)}
+        </span>
+        <span className={`text-2xl font-black ${pct >= 75 ? 'text-green-400' : pct >= 55 ? 'text-blue-400' : 'text-amber-400'}`}>
+          {pct}%
+        </span>
+      </div>
+
+      <h3 className="text-white font-bold text-base leading-snug group-hover:text-violet-300 transition-colors">
+        {match.career_title}
+      </h3>
+
+      <p className="text-white/50 text-xs leading-relaxed line-clamp-3">
+        {match.narrative}
+      </p>
+
+      {/* Reality check chips */}
+      <div className="flex flex-wrap gap-1.5">
+        {rc.kenya_demand === 'critical_shortage' && (
+          <span className="flex items-center gap-1 text-[11px] bg-green-500/15 text-green-400 rounded-full px-2 py-0.5">
+            <Flame className="w-3 h-3" /> High Demand
+          </span>
+        )}
+        {rc.kenya_demand === 'undersupplied' && (
+          <span className="flex items-center gap-1 text-[11px] bg-emerald-500/15 text-emerald-400 rounded-full px-2 py-0.5">
+            <TrendingUp className="w-3 h-3" /> Growing
+          </span>
+        )}
+        {rc.kenya_demand === 'saturated' && (
+          <span className="flex items-center gap-1 text-[11px] bg-amber-500/15 text-amber-400 rounded-full px-2 py-0.5">
+            <AlertTriangle className="w-3 h-3" /> Competitive
+          </span>
+        )}
+        <span className="flex items-center gap-1 text-[11px] bg-white/10 text-white/50 rounded-full px-2 py-0.5">
+          <Timer className="w-3 h-3" /> {rc.time_to_income_years}yr to income
+        </span>
+        <span className={`flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 ${
+          rc.cost_barrier === 'low' ? 'bg-green-500/10 text-green-400' :
+          rc.cost_barrier === 'high' ? 'bg-red-500/10 text-red-400' :
+          'bg-white/10 text-white/40'
+        }`}>
+          <DollarSign className="w-3 h-3" />
+          {rc.cost_barrier === 'low' ? 'Low cost' : rc.cost_barrier === 'high' ? 'High cost' : 'Med cost'}
+        </span>
+        {!rc.kcse_achievable && (
+          <span className="flex items-center gap-1 text-[11px] bg-orange-500/10 text-orange-400 rounded-full px-2 py-0.5">
+            <AlertTriangle className="w-3 h-3" /> KCSE stretch
+          </span>
+        )}
+      </div>
+
+      {/* Top gap */}
+      {topGap && (
+        <div className={`text-xs rounded-lg px-3 py-2 ${
+          topGap.gap_severity === 'significant' ? 'bg-red-500/10 text-red-400' : 'bg-amber-500/10 text-amber-400'
+        }`}>
+          Gap: {CAPABILITY_LABELS[topGap.dimension]} — {topGap.narrative}
+        </div>
+      )}
+
+      {match.strengths.length > 0 && !topGap && (
+        <div className="text-xs rounded-lg px-3 py-2 bg-green-500/10 text-green-400 flex items-start gap-2">
+          <CheckCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          {match.strengths[0].narrative}
+        </div>
+      )}
+
+      <div className="flex items-center gap-1 text-violet-400 text-xs font-semibold group-hover:translate-x-1 transition-transform">
+        Full deep-dive <ArrowRight className="w-3 h-3" />
+      </div>
+    </Link>
+  )
+}
+
+// ── 4-tier match panel ────────────────────────────────────────────────────────
+
+function CapabilityMatchPanel({
+  report,
+  onRefresh,
+  loading,
+}: {
+  report:    CapabilityMatchReport
+  onRefresh: () => void
+  loading:   boolean
+}) {
+  const [showAlternative, setShowAlternative] = useState(false)
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-white font-bold text-xl flex items-center gap-2">
+            <Target className="w-5 h-5 text-violet-400" />
+            Your Career Matches
+          </h2>
+          <p className="text-white/40 text-xs mt-1">
+            Matched from {report.total_careers_scored} careers · {report.assessment_count} assessment{report.assessment_count !== 1 ? 's' : ''}
+          </p>
+        </div>
+        <button
+          onClick={onRefresh}
+          disabled={loading}
+          className="flex items-center gap-1.5 text-sm text-violet-400 hover:text-violet-300 font-semibold disabled:opacity-50 transition-colors"
+        >
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+          Refresh
+        </button>
+      </div>
+
+      {/* Primary matches */}
+      {report.primary.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-green-400 text-sm font-bold flex items-center gap-2">
+            <CheckCircle className="w-4 h-4" /> Strong Matches
+          </h3>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {report.primary.map(m => <CapabilityMatchCard key={m.career_slug} match={m} />)}
+          </div>
+        </div>
+      )}
+
+      {/* Stretch matches */}
+      {report.stretch.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-blue-400 text-sm font-bold flex items-center gap-2">
+            <BarChart3 className="w-4 h-4" /> Stretch Goals
+          </h3>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {report.stretch.slice(0, 3).map(m => <CapabilityMatchCard key={m.career_slug} match={m} />)}
+          </div>
+        </div>
+      )}
+
+      {/* Entrepreneurial tier */}
+      {report.entrepreneurial.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-purple-400 text-sm font-bold flex items-center gap-2">
+            <Zap className="w-4 h-4" /> Entrepreneurial Opportunity
+          </h3>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {report.entrepreneurial.map(m => <CapabilityMatchCard key={`e-${m.career_slug}`} match={m} />)}
+          </div>
+        </div>
+      )}
+
+      {/* Alternative — collapsed by default */}
+      {report.alternative.length > 0 && (
+        <div className="space-y-3">
+          <button
+            onClick={() => setShowAlternative(v => !v)}
+            className="flex items-center gap-2 text-amber-400/70 text-sm font-semibold hover:text-amber-400 transition-colors"
+          >
+            {showAlternative ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            {showAlternative ? 'Hide' : 'Show'} Alternative Paths ({report.alternative.length})
+          </button>
+          {showAlternative && (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {report.alternative.map(m => <CapabilityMatchCard key={m.career_slug} match={m} />)}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Disclaimer */}
+      <p className="text-white/20 text-xs leading-relaxed border-t border-white/5 pt-4">
+        {report.disclaimer}
+      </p>
+    </div>
+  )
+}
+
+// ── Explore career card ───────────────────────────────────────────────────────
+
+function CareerCard({ career }: { career: CareerSummary }) {
+  const badge    = AI_IMPACT_BADGE[career.ai_impact.level] ?? AI_IMPACT_BADGE.medium
   const salaryMin = career.salary_range_kes?.entry
     ? `KES ${(career.salary_range_kes.entry.min / 1000).toFixed(0)}k`
     : null
@@ -57,13 +384,8 @@ function CareerCard({ career, matchScore }: { career: CareerSummary; matchScore?
         <h3 className="text-white font-bold text-base leading-tight group-hover:text-violet-300 transition-colors">
           {career.title}
         </h3>
-        {matchScore !== undefined && (
-          <ScoreBadge score={matchScore} />
-        )}
       </div>
-
       <p className="text-white/50 text-sm mb-4 line-clamp-2">{career.description}</p>
-
       <div className="flex flex-wrap gap-2 items-center">
         <span className={`text-xs font-semibold px-2 py-1 rounded-full border ${badge.classes}`}>
           {badge.label}
@@ -82,58 +404,153 @@ function CareerCard({ career, matchScore }: { career: CareerSummary; matchScore?
   )
 }
 
-function MatchCard({ match }: { match: CareerMatchWithDetail }) {
-  const badge = AI_IMPACT_BADGE[match.career.ai_impact.level] ?? AI_IMPACT_BADGE.medium
+// ── Growth Banner ─────────────────────────────────────────────────────────────
+
+function GrowthBanner({ growth }: { growth: CapabilityGrowthReport }) {
+  if (!growth.previous_computed_at) return null
+
+  const icon =
+    growth.overall_direction === 'improved' ? <TrendingUp className="w-4 h-4 text-green-400" /> :
+    growth.overall_direction === 'declined' ? <TrendingDown className="w-4 h-4 text-orange-400" /> :
+    <Minus className="w-4 h-4 text-white/40" />
+
+  const bg =
+    growth.overall_direction === 'improved' ? 'bg-green-500/10 border-green-500/20' :
+    growth.overall_direction === 'declined' ? 'bg-orange-500/10 border-orange-500/20' :
+    'bg-white/5 border-white/10'
+
+  const weeks = growth.weeks_tracked
+  const since = weeks < 2 ? 'this week' : `${weeks}w ago`
+
   return (
-    <Link
-      href={`/career/${match.career.slug}`}
-      className="group block bg-gradient-to-br from-violet-900/30 to-indigo-900/30 border border-violet-500/30 rounded-2xl p-5 hover:border-violet-400/60 transition-all"
-    >
-      <div className="flex items-center justify-between mb-2">
-        <span className={`text-xs font-semibold px-2 py-1 rounded-full border ${badge.classes}`}>
-          {badge.label}
+    <div className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${bg}`}>
+      {icon}
+      <div className="min-w-0">
+        <span className={`text-xs font-semibold ${
+          growth.overall_direction === 'improved' ? 'text-green-400' :
+          growth.overall_direction === 'declined' ? 'text-orange-400' :
+          'text-white/50'
+        }`}>
+          Since {since}:
         </span>
-        <ScoreBadge score={match.match_score} />
+        <span className="text-xs text-white/60 ml-1.5">{growth.highlight}</span>
       </div>
-      <h3 className="text-white font-bold text-lg mb-1 group-hover:text-violet-300 transition-colors">
-        {match.career.title}
-      </h3>
-      <p className="text-white/50 text-sm mb-3 line-clamp-2">{match.match_reasoning}</p>
-      {match.subject_gaps && (match.subject_gaps as Array<{ subject: string; gap: number }>).length > 0 && (
-        <div className="text-xs text-amber-400/80">
-          Gap: {(match.subject_gaps as Array<{ subject: string }>).map(g => g.subject).join(', ')}
-        </div>
-      )}
-      <div className="mt-3 flex items-center gap-1 text-violet-400 text-xs font-semibold group-hover:translate-x-1 transition-transform">
-        Full deep-dive <ArrowRight className="w-3 h-3" />
-      </div>
-    </Link>
+    </div>
   )
 }
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CareerPage() {
-  const [careers, setCareers] = useState<CareerSummary[]>([])
-  const [matches, setMatches] = useState<CareerMatchWithDetail[]>([])
-  const [loading, setLoading] = useState(true)
-  const [matchLoading, setMatchLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [query, setQuery] = useState('')
-  const [category, setCategory] = useState('')
-  const [studentId, setStudentId] = useState<string | null>(null)
-  const [seeded, setSeeded] = useState(false)
+  const [careers,         setCareers]         = useState<CareerSummary[]>([])
+  const [capabilityReport,setCapabilityReport] = useState<CapabilityMatchReport | null>(null)
+  const [profile,         setProfile]         = useState<CapabilityProfile | null>(null)
+  const [growth,          setGrowth]          = useState<CapabilityGrowthReport | null>(null)
+  const [loading,         setLoading]         = useState(true)
+  const [matchLoading,    setMatchLoading]    = useState(false)
+  const [profileLoading,  setProfileLoading]  = useState(false)
+  const [error,           setError]           = useState<string | null>(null)
+  const [query,           setQuery]           = useState('')
+  const [category,        setCategory]        = useState('')
+  const [pathway,         setPathway]         = useState('')
+  const [studentId,       setStudentId]       = useState<string | null>(null)
+  const [seeded,          setSeeded]          = useState(false)
 
-  // Load student profile to get studentId
+  // Load student
   useEffect(() => {
     fetch('/api/students/list')
       .then(r => r.json())
       .then(d => {
         const students = d?.data?.students ?? []
-        if (students.length > 0) setStudentId(students[0].id as string)
+        if (students.length > 0) {
+          const s = students[0]
+          setStudentId(s.id as string)
+          if (s.current_pathway) setPathway(s.current_pathway as string)
+        }
       })
       .catch(() => null)
   }, [])
+
+  // Load capability profile + matches + growth when studentId is ready
+  useEffect(() => {
+    if (!studentId) return
+
+    fetch(`/api/career/capability?studentId=${studentId}`)
+      .then(r => r.json())
+      .then(d => {
+        const p = d?.data?.profile as CapabilityProfile | null
+        setProfile(p)
+
+        if (p) {
+          // Load matches and growth in parallel
+          return Promise.all([
+            fetch(`/api/career/capability-matches?studentId=${studentId}`)
+              .then(r => r.json())
+              .then(d2 => setCapabilityReport(d2?.data ?? null)),
+            fetch(`/api/career/growth?studentId=${studentId}`)
+              .then(r => r.json())
+              .then(d3 => setGrowth(d3?.data?.growth ?? null)),
+          ])
+        }
+      })
+      .catch(() => null)
+  }, [studentId])
+
+  // Compute profile + matches (fresh)
+  const handleComputeMatches = async () => {
+    if (!studentId) return
+    setMatchLoading(true)
+    try {
+      const res  = await fetch('/api/career/capability-matches', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ studentId }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data?.error ?? 'Could not compute matches. Make sure assessments have been added.')
+        return
+      }
+      setCapabilityReport(data?.data ?? null)
+      // Update stored profile reference from the recomputed report
+      if (data?.data?.assessment_count) {
+        const p = await fetch(`/api/career/capability?studentId=${studentId}`)
+          .then(r => r.json())
+          .then(d => d?.data?.profile as CapabilityProfile | null)
+        setProfile(p)
+      }
+    } catch {
+      setError('Could not compute matches. Please try again.')
+    } finally {
+      setMatchLoading(false)
+    }
+  }
+
+  // Recompute profile only
+  const handleRecomputeProfile = async () => {
+    if (!studentId) return
+    setProfileLoading(true)
+    try {
+      await fetch('/api/career/capability', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ studentId }),
+      })
+      const p = await fetch(`/api/career/capability?studentId=${studentId}`)
+        .then(r => r.json())
+        .then(d => d?.data?.profile as CapabilityProfile | null)
+      setProfile(p)
+      // Refresh matches too
+      const report = await fetch(`/api/career/capability-matches?studentId=${studentId}`)
+        .then(r => r.json())
+        .then(d => d?.data as CapabilityMatchReport | null)
+      setCapabilityReport(report)
+    } catch {
+      // silent
+    } finally {
+      setProfileLoading(false)
+    }
+  }
 
   // Load careers
   const loadCareers = useCallback(async () => {
@@ -141,71 +558,23 @@ export default function CareerPage() {
     setError(null)
     try {
       const params = new URLSearchParams()
-      if (query) params.set('q', query)
+      if (query)    params.set('q',        query)
       if (category) params.set('category', category)
+      if (pathway)  params.set('pathway',  pathway)
 
-      const res = await fetch(`/api/career/search?${params}`)
+      const res  = await fetch(`/api/career/search?${params}`)
       const data = await res.json()
-
-      if (!res.ok) {
-        // If no careers yet, offer to seed
-        if (data?.data?.careers?.length === 0) {
-          setSeeded(false)
-        }
-        setCareers(data?.data?.careers ?? [])
-        return
-      }
-
       const list: CareerSummary[] = data?.data?.careers ?? []
       setCareers(list)
-      if (list.length > 0) setSeeded(true)
+      setSeeded(list.length > 0)
     } catch {
       setError('Could not load careers. Please refresh.')
     } finally {
       setLoading(false)
     }
-  }, [query, category])
+  }, [query, category, pathway])
 
   useEffect(() => { loadCareers() }, [loadCareers])
-
-  // Load AI matches
-  useEffect(() => {
-    if (!studentId) return
-    fetch(`/api/career/match?studentId=${studentId}`)
-      .then(r => r.json())
-      .then(d => setMatches(d?.data?.matches ?? []))
-      .catch(() => null)
-  }, [studentId])
-
-  const handleGenerateMatches = async () => {
-    if (!studentId) return
-    setMatchLoading(true)
-    try {
-      const res = await fetch('/api/career/match', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId, force: true }),
-      })
-      const data = await res.json()
-      setMatches(data?.data?.matches ?? [])
-    } catch {
-      // silent
-    } finally {
-      setMatchLoading(false)
-    }
-  }
-
-  const handleSeed = async () => {
-    setLoading(true)
-    try {
-      await fetch('/api/admin/career/seed', { method: 'POST' })
-      await loadCareers()
-    } catch {
-      setError('Seed failed. Ask an admin to run it.')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   return (
     <div className="min-h-screen bg-[#0a0a14]">
@@ -215,7 +584,7 @@ export default function CareerPage() {
         <div className="text-center space-y-4 py-8">
           <div className="inline-flex items-center gap-2 bg-violet-500/20 border border-violet-500/30 rounded-full px-4 py-2 text-violet-300 text-sm font-semibold">
             <Sparkles className="w-4 h-4" />
-            Career Reality Check
+            Career Operating System
           </div>
           <h1 className="text-4xl sm:text-5xl font-black text-white leading-tight">
             What does the world of work<br />
@@ -224,69 +593,97 @@ export default function CareerPage() {
             </span>
           </h1>
           <p className="text-white/50 text-lg max-w-2xl mx-auto">
-            Not generic advice — real Kenya salaries, honest AI impact, age-based skill timelines,
-            and career paths that actually exist in this country.
+            Not generic advice — matches built from your real capabilities, Kenya market data,
+            honest AI impact, and career paths that actually exist in this country.
           </p>
         </div>
 
-        {/* ── AI MATCH PANEL ───────────────────────────────────────────────── */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-white font-bold text-xl flex items-center gap-2">
-              <Target className="w-5 h-5 text-violet-400" />
-              Your Top Career Matches
-            </h2>
-            {studentId && (
-              <button
-                onClick={handleGenerateMatches}
-                disabled={matchLoading}
-                className="flex items-center gap-2 text-sm text-violet-400 hover:text-violet-300 font-semibold disabled:opacity-50 transition-colors"
-              >
-                {matchLoading
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating…</>
-                  : <><RefreshCw className="w-4 h-4" /> Refresh matches</>
-                }
-              </button>
-            )}
-          </div>
-
-          {matches.length > 0 ? (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {matches.slice(0, 3).map(m => (
-                <MatchCard key={m.id} match={m} />
-              ))}
-            </div>
-          ) : (
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
-              {!studentId ? (
-                <p className="text-white/40 text-sm">No student profile found. Add assessments to see career matches.</p>
-              ) : (
+        {/* ── CAPABILITY PROFILE ───────────────────────────────────────────── */}
+        {studentId && (
+          <section className="space-y-6">
+            {profile ? (
+              <div className="grid lg:grid-cols-[360px_1fr] gap-6 items-start">
+                {/* Profile bars + growth */}
                 <div className="space-y-3">
-                  <Briefcase className="w-10 h-10 text-white/20 mx-auto" />
-                  <p className="text-white/50 text-sm">No matches yet.</p>
-                  <button
-                    onClick={handleGenerateMatches}
-                    disabled={matchLoading}
-                    className="mx-auto flex items-center gap-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors disabled:opacity-50"
-                  >
-                    {matchLoading
-                      ? <><Loader2 className="w-4 h-4 animate-spin" /> Analysing your profile…</>
-                      : <><Sparkles className="w-4 h-4" /> Generate My Matches</>
-                    }
-                  </button>
-                  <p className="text-white/30 text-xs">Based on your subject scores and interests</p>
+                  <CapabilityProfileCard
+                    profile={profile}
+                    dominant={capabilityReport?.dominant_cluster ?? profile.dominant_cluster}
+                    assessmentCount={capabilityReport?.assessment_count ?? profile.assessment_count}
+                    onRecompute={handleRecomputeProfile}
+                    loading={profileLoading}
+                  />
+                  {growth && <GrowthBanner growth={growth} />}
                 </div>
-              )}
-            </div>
-          )}
-        </section>
 
-        {/* ── SEARCH + FILTER ──────────────────────────────────────────────── */}
+                {/* Matches */}
+                {capabilityReport ? (
+                  <CapabilityMatchPanel
+                    report={capabilityReport}
+                    onRefresh={handleComputeMatches}
+                    loading={matchLoading}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* No profile yet */
+              <div className="bg-white/5 border border-violet-500/20 rounded-2xl p-8 text-center space-y-4">
+                <Brain className="w-12 h-12 text-violet-400/40 mx-auto" />
+                <div>
+                  <h3 className="text-white font-bold text-lg mb-1">Build Your Capability Profile</h3>
+                  <p className="text-white/50 text-sm max-w-md mx-auto">
+                    We analyse your assessment results to map your 6 core capabilities — then match you
+                    to careers based on what you can actually do, not just your subjects.
+                  </p>
+                </div>
+                <button
+                  onClick={handleComputeMatches}
+                  disabled={matchLoading}
+                  className="mx-auto flex items-center gap-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold px-6 py-3 rounded-xl transition-colors disabled:opacity-50"
+                >
+                  {matchLoading
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Building your profile…</>
+                    : <><Sparkles className="w-4 h-4" /> Build My Capability Profile</>
+                  }
+                </button>
+                {error && (
+                  <div className="flex items-center gap-2 justify-center text-sm text-red-400">
+                    <AlertCircle className="w-4 h-4" /> {error}
+                  </div>
+                )}
+                <p className="text-white/25 text-xs">
+                  Requires at least one assessment. Add assessments in the Academic Clinic first.
+                </p>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* ── EXPLORE ALL CAREERS ──────────────────────────────────────────── */}
         <section>
           <h2 className="text-white font-bold text-xl mb-4 flex items-center gap-2">
             <Search className="w-5 h-5 text-violet-400" />
             Explore All Careers
           </h2>
+
+          <div className="flex flex-wrap gap-2 mb-4">
+            {PATHWAYS.map(p => (
+              <button
+                key={p.value}
+                onClick={() => setPathway(p.value)}
+                className={`text-sm font-semibold px-4 py-2 rounded-xl border transition-colors ${
+                  pathway === p.value
+                    ? 'bg-violet-600 border-violet-500 text-white'
+                    : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
 
           <div className="flex flex-col sm:flex-row gap-3 mb-6">
             <div className="relative flex-1">
@@ -310,7 +707,6 @@ export default function CareerPage() {
             </select>
           </div>
 
-          {/* AI Impact Legend */}
           <div className="flex flex-wrap gap-2 mb-6">
             {Object.entries(AI_IMPACT_BADGE).map(([key, badge]) => (
               <span key={key} className={`text-xs font-medium px-2.5 py-1 rounded-full border ${badge.classes}`}>
@@ -320,12 +716,11 @@ export default function CareerPage() {
             <span className="text-xs text-white/30 self-center ml-1">— AI impact on this career</span>
           </div>
 
-          {/* Career Grid */}
           {loading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
             </div>
-          ) : error ? (
+          ) : error && careers.length === 0 ? (
             <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 rounded-2xl p-5 text-red-400">
               <AlertCircle className="w-5 h-5 shrink-0" />
               <span className="text-sm">{error}</span>
@@ -337,7 +732,7 @@ export default function CareerPage() {
                 <>
                   <p className="text-white/50 text-sm">Career database is empty.</p>
                   <button
-                    onClick={handleSeed}
+                    onClick={loadCareers}
                     className="mx-auto flex items-center gap-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors"
                   >
                     <Zap className="w-4 h-4" /> Load Career Database
@@ -349,16 +744,9 @@ export default function CareerPage() {
             </div>
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {careers.map(career => {
-                const match = matches.find(m => m.career.slug === career.slug)
-                return (
-                  <CareerCard
-                    key={career.id}
-                    career={career}
-                    matchScore={match?.match_score}
-                  />
-                )
-              })}
+              {careers.map(career => (
+                <CareerCard key={career.id} career={career} />
+              ))}
             </div>
           )}
         </section>

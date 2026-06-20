@@ -2,10 +2,11 @@ import { createServiceClient } from '@/utils/supabase/service'
 import type { RecordOfWork, ROWEntry } from './pdfRenderer'
 
 interface LessonPlanRow {
-  week_number:   number
-  lesson_number: number
-  strand:        string
-  sub_strand:    string
+  week_number:             number
+  lesson_number:           number
+  strand:                  string
+  sub_strand:              string
+  teacher_self_evaluation: string | null
 }
 
 export async function buildRecordOfWork(
@@ -16,7 +17,7 @@ export async function buildRecordOfWork(
 
   const { data: plans, error: plansErr } = await db
     .from('lesson_plans')
-    .select('week_number, lesson_number, strand, sub_strand')
+    .select('week_number, lesson_number, strand, sub_strand, teacher_self_evaluation')
     .eq('sow_id', sowId)
     .eq('week_number', weekNumber)
     .order('lesson_number', { ascending: true })
@@ -38,13 +39,24 @@ export async function buildRecordOfWork(
     .eq('id', sow.teacher_id)
     .maybeSingle()
 
+  // Pull weekly_intelligence.teacher_note as fallback reflection for lessons
+  // without a personal teacher_self_evaluation
+  const { data: weeklyIntel } = await db
+    .from('weekly_intelligence')
+    .select('teacher_note')
+    .eq('sow_id', sowId)
+    .eq('week_number', weekNumber)
+    .maybeSingle()
+
+  const weekFallback = weeklyIntel?.teacher_note ?? ''
+
   const entries: ROWEntry[] = (plans as LessonPlanRow[]).map(p => ({
     week_number:   p.week_number,
     lesson_number: p.lesson_number,
     strand:        p.strand,
     sub_strand:    p.sub_strand,
-    work_done:     `${p.strand} — ${p.sub_strand}`,
-    reflection:    '',
+    work_done:     p.sub_strand,
+    reflection:    p.teacher_self_evaluation ?? weekFallback,
   }))
 
   return {

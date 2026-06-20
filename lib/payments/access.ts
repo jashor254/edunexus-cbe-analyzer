@@ -7,7 +7,6 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
-import { isAdmin } from '@/lib/auth/isAdmin'
 import {
   TOKEN_COSTS,
   FEATURE_ACCESS,
@@ -28,19 +27,20 @@ const CACHE_TTL_MS = 60_000
  * Resolution order: admin → teacher-free → subscriber → token balance.
  * Always returns userId in the allowed result to avoid double auth calls in routes.
  *
- * auth.getUser() always runs (security boundary). The 3–4 DB queries that follow
- * are cached per user+feature for 60 seconds — a session of 10 exchanges pays
- * the full DB cost only on the first message.
+ * getSession() reads the JWT from the cookie (no network round-trip). Safe here
+ * because this is an access-check, not a security-critical write path.
+ * The DB queries that follow are cached per user+feature for 60 seconds.
  */
 export async function checkFeatureAccess(
   feature: FeatureKey
 ): Promise<AccessResult> {
-  // 1. Auth check — always runs, never trust body userId, needed for cache key
+  // 1. Auth — getSession() reads the local JWT cookie, no Supabase network call
   const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (!user || authError) {
+  const { data: { session }, error: authError } = await supabase.auth.getSession()
+  if (!session?.user || authError) {
     return { allowed: false, reason: 'unauthenticated' }
   }
+  const user = session.user
 
   // 2. Cache check — short-circuits all DB queries after the first call
   const cacheKey = `${user.id}-${feature}`
@@ -54,15 +54,15 @@ export async function checkFeatureAccess(
     return result
   }
 
-  // 3. Admin bypass — full access, no token cost, no subscription required
-  if (await isAdmin(user.id, user.email ?? undefined)) {
+  // 3. Fast-path admin email check — no DB needed
+  if (user.email && (await import('@/lib/config/api')).ADMIN_CONFIG.isAdmin(user.email)) {
     return cacheAndReturn({ allowed: true, tier: 'subscriber', deductTokens: false, userId: user.id })
   }
 
   const db = createServiceClient()
 
-  // 4. Role check — profiles.id = auth.users.id (not user_id)
-  //    Select both role and secondary_role for dual-role users
+  // 4. Single profiles query — covers admin role, teacher role, and secondary_role
+  //    Replaces the separate isAdmin() DB call + profiles query that ran sequentially
   const { data: profile } = await db
     .from('profiles')
     .select('role, secondary_role')
@@ -71,6 +71,11 @@ export async function checkFeatureAccess(
 
   const primaryRole   = profile?.role         ?? 'parent'
   const secondaryRole = profile?.secondary_role ?? null
+
+  // Admin role in profiles → full bypass
+  if (primaryRole === 'admin') {
+    return cacheAndReturn({ allowed: true, tier: 'subscriber', deductTokens: false, userId: user.id })
+  }
 
   // A parent who is also a teacher gets teacher privileges on teacher-tier features
   const isTeacherRole = primaryRole === 'teacher' || secondaryRole === 'teacher'
@@ -84,29 +89,28 @@ export async function checkFeatureAccess(
     // Teacher accessing a parent-tier feature (clinic, compass, career) → falls through
   }
 
-  // 6. Active subscription → unlimited access, no deduction
-  const { data: subscription } = await db
-    .from('subscriptions')
-    .select('id, expires_at')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .gt('expires_at', new Date().toISOString())
-    .maybeSingle()
+  // 6. Subscription + token balance — fetched in parallel since both are needed
+  //    to make a final decision when there's no subscription
+  const [subscriptionRes, balanceRes] = await Promise.all([
+    db.from('subscriptions')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle(),
+    db.from('token_balances')
+      .select('balance')
+      .eq('user_id', user.id)
+      .maybeSingle(),
+  ])
 
-  if (subscription) {
+  if (subscriptionRes.data) {
     return cacheAndReturn({ allowed: true, tier: 'subscriber', deductTokens: false, userId: user.id })
   }
 
-  // 7. Token balance check — last resort
-  const cost = TOKEN_COSTS[feature]
-
-  const { data: balance } = await db
-    .from('token_balances')
-    .select('balance')
-    .eq('user_id', user.id)
-    .maybeSingle()
-
-  const available = balance?.balance ?? 0
+  // 7. Token balance — last resort
+  const cost      = TOKEN_COSTS[feature]
+  const available = balanceRes.data?.balance ?? 0
   if (available < cost) {
     return cacheAndReturn({ allowed: false, reason: 'insufficient_tokens' })
   }

@@ -420,9 +420,13 @@ function SeniorPathwayReadinessPage({ report }: { report: ClinicReport }) {
             Go deeper — EduNexus Career Explorer
           </Text>
           <Text style={{ fontSize: 8.5, color: '#3b0764', lineHeight: 1.55 }}>
-            For detailed career analysis, future trends, salary data, entrepreneurship opportunities, AI disruption analysis, and pathway planning, visit the Career Explorer.
+            {report.top_career
+              ? `${report.student_name.split(' ')[0]}'s top match is ${report.top_career.career.title} (${report.top_career.match_score}% match). See the full profile — salary tiers, entrepreneurship opportunities, honest AI disruption analysis, and pathway planning — in the Career Explorer.`
+              : 'For detailed career analysis, future trends, salary data, entrepreneurship opportunities, AI disruption analysis, and pathway planning, visit the Career Explorer.'}
           </Text>
-          <Text style={{ fontSize: 9, color: '#6d28d9', fontWeight: 700, marginTop: 4 }}>edunexus.co.ke/career</Text>
+          <Text style={{ fontSize: 9, color: '#6d28d9', fontWeight: 700, marginTop: 4 }}>
+            {report.top_career ? `edunexus.co.ke/career/${report.top_career.career.slug}` : 'edunexus.co.ke/career'}
+          </Text>
         </View>
       </View>
 

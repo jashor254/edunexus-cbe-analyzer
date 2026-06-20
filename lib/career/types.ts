@@ -2,6 +2,84 @@
 import type { PathwayResult } from '@/lib/pathwayCalculator'
 export type { PathwayResult }
 
+// ── COS Disclaimer ────────────────────────────────────────────────────────────
+// Attached to every capability profile, career match, and COS output.
+export const COS_DISCLAIMER =
+  'These are informed estimates based on current Kenya market data, real assessment performance, and global career trends. ' +
+  'Technology, job markets, and educational pathways change — sometimes rapidly. ' +
+  'We review and update this information regularly and will always be transparent about what has shifted. ' +
+  'The goal is not to predict the future perfectly, but to help you make better decisions with the best available information today.'
+
+// ── Capability Engine Types ───────────────────────────────────────────────────
+
+export type CapabilityLevel = 'emerging' | 'developing' | 'capable' | 'strong' | 'exceptional'
+export type CapabilityTrendDirection = 'declining' | 'stable' | 'growing' | 'accelerating'
+
+export type CapabilityScore = {
+  level:      CapabilityLevel
+  raw_score:  number              // 0.0–1.0
+  trend:      CapabilityTrendDirection
+  evidence:   string[]            // specific data points that drove this score
+  confidence: number              // 0.0–1.0 — how much data we have
+}
+
+export type CapabilityProfile = {
+  analytical_reasoning: CapabilityScore
+  communication:        CapabilityScore
+  creative_thinking:    CapabilityScore
+  technical_aptitude:   CapabilityScore
+  social_intelligence:  CapabilityScore
+  resilience:           CapabilityScore
+  dominant_cluster:     string[]  // top capabilities (raw_score >= 0.60)
+  emerging_cluster:     string[]  // growing capabilities (0.40–0.60)
+  computed_at:          string
+  assessment_count:     number
+  disclaimer:           string
+}
+
+export type CapabilityDimension =
+  | 'analytical_reasoning'
+  | 'communication'
+  | 'creative_thinking'
+  | 'technical_aptitude'
+  | 'social_intelligence'
+  | 'resilience'
+
+export type CapabilityRequirement = {
+  minimum: number   // 0.0–1.0 — below this, career is a major stretch
+  ideal:   number   // 0.0–1.0 — above this, strong alignment
+  weight:  number   // 0.0–1.0 — how much this capability matters for this career
+  note:    string   // why this capability matters for this specific career
+}
+
+export type CareerCapabilityRequirements = Record<CapabilityDimension, CapabilityRequirement>
+
+// ── Decision Intelligence Types ───────────────────────────────────────────────
+
+export type KCSEMinimum = {
+  overall_grade:      string                    // e.g. 'B+'
+  subject_grades:     Record<string, string>    // e.g. { biology: 'A-', chemistry: 'A-' }
+  alternative_routes: string[]
+  note:               string
+}
+
+export type CostToQualify = {
+  min:  number
+  max:  number
+  note: string
+}
+
+export type SocialReality = {
+  prestige_level:       1 | 2 | 3 | 4 | 5
+  common_misconception: string
+  honest_reality_check: string
+  parent_frame: {
+    opening:           string
+    key_points:        string[]
+    honest_challenges: string[]
+  }
+}
+
 export type CareerCategory =
   | 'technology'
   | 'health'
@@ -15,6 +93,9 @@ export type CareerCategory =
   | 'finance'
 
 export type DoorType = 'employment' | 'self_employment' | 'entrepreneurship' | 'ai_era'
+
+// The 3 official CBC senior-school pathways — every career must fall under exactly one.
+export type CareerPathway = 'STEM' | 'Social Sciences' | 'Arts & Sports Science'
 
 export type AISovereignty = {
   the_shift: string
@@ -113,12 +194,26 @@ export type Career = {
   skill_timeline: SkillTimelineItem[]
   future_skills: string[]
   kenya_examples: KenyaExample[] | null
-  pathway: 'STEM' | 'Social' | 'Social Sciences' | 'Arts' | 'Arts & Sports' | 'Creative' | 'Trades'
+  pathway: CareerPathway
   early_start?: EarlyStart
   university_courses?: string[]
   disclaimer: string
   created_at: string
   updated_at: string
+  // ── COS Phase 1: Capability Intelligence ──────────────────────────────────
+  required_capabilities?:      CareerCapabilityRequirements
+  capability_cluster?:         string[]
+  difficulty?:                 'accessible' | 'moderate' | 'hard' | 'very_hard'
+  kenya_demand?:               'critical_shortage' | 'undersupplied' | 'balanced' | 'saturated'
+  saturation_note?:            string | null
+  kcse_minimum?:               KCSEMinimum | null
+  time_to_income_years?:       number
+  cost_to_qualify?:            CostToQualify | null
+  risk_level?:                 'low' | 'medium' | 'high' | 'variable'
+  prestige_level?:             1 | 2 | 3 | 4 | 5
+  social_reality?:             SocialReality | null
+  alternative_career_slugs?:   string[]
+  complementary_career_slugs?: string[]
 }
 
 export type CareerSummary = Pick<
@@ -166,6 +261,7 @@ export type CareerMatchWithDetail = StudentCareerMatch & {
 export type CareerSearchFilters = {
   q?: string
   category?: CareerCategory
+  pathway?: CareerPathway
   ai_impact_level?: AIImpact['level']
   student_id?: string
 }
@@ -302,5 +398,139 @@ export type ClinicReport = {
   disclaimer: string
 }
 
+// ── Phase 2: Capability-to-Career Bridge types ───────────────────────────────
+
+export type CapabilityMatchTier = 'primary' | 'stretch' | 'alternative' | 'entrepreneurial'
+
+export type GapSeverity = 'none' | 'minor' | 'moderate' | 'significant'
+
+export type CapabilityGap = {
+  dimension:        CapabilityDimension
+  student_level:    CapabilityLevel
+  student_score:    number
+  required_minimum: number
+  required_ideal:   number
+  gap_severity:     GapSeverity
+  narrative:        string   // plain-English gap description
+}
+
+export type CapabilityStrength = {
+  dimension: CapabilityDimension
+  level:     CapabilityLevel
+  narrative: string
+}
+
+export type RealityCheck = {
+  kcse_achievable:      boolean
+  cost_barrier:         'low' | 'medium' | 'high'
+  time_to_income_years: number
+  risk_level:           string
+  difficulty:           string
+  kenya_demand:         string
+}
+
+export type CapabilityCareerMatch = {
+  career_slug:       string
+  career_title:      string
+  career_category:   CareerCategory
+  pathway:           CareerPathway
+  tier:              CapabilityMatchTier
+  alignment_score:   number                              // 0.0–1.0
+  dimension_scores:  Partial<Record<CapabilityDimension, number>>
+  gaps:              CapabilityGap[]
+  strengths:         CapabilityStrength[]
+  reality_check:     RealityCheck
+  narrative:         string                              // 2-sentence honest summary
+  disclaimer:        string
+}
+
+export type CapabilityMatchReport = {
+  student_id:             string
+  primary:                CapabilityCareerMatch[]        // score >= 0.70
+  stretch:                CapabilityCareerMatch[]        // 0.50–0.70
+  alternative:            CapabilityCareerMatch[]        // 0.35–0.50
+  entrepreneurial:        CapabilityCareerMatch[]        // cluster-routed entrepreneur tier
+  total_careers_scored:   number
+  assessment_count:       number
+  dominant_cluster:       string[]
+  generated_at:           string
+  disclaimer:             string
+}
+
 export const STANDARD_DISCLAIMER =
   'These are informed estimates based on current Kenya market data and global trends. Technology is changing fast — especially AI. We update this information regularly and will always be honest with you about what\'s shifting. The goal is not to predict the future perfectly, but to help your child build skills that remain valuable no matter what changes.'
+
+// ── Phase 5: Life Simulation Engine ──────────────────────────────────────────
+
+export type CareerPhaseLabel = 'studying' | 'entry' | 'mid' | 'senior'
+
+export type LifeSimulationYear = {
+  age:                number
+  year_offset:        number
+  phase:              CareerPhaseLabel
+  monthly_income_kes: number
+  annual_cost_kes:    number
+  net_this_year_kes:  number
+  cumulative_net_kes: number
+  milestone?:         string
+}
+
+export type LifeSimulation = {
+  career_slug:              string
+  career_title:             string
+  education_start_age:      number
+  income_start_age:         number
+  breakeven_age:            number | null
+  total_education_cost_kes: number
+  peak_monthly_kes:         number
+  entry_monthly_kes:        number
+  mid_monthly_kes:          number
+  senior_monthly_kes:       number
+  simulation:               LifeSimulationYear[]
+  disclaimer:               string
+}
+
+// ── Phase 6: Parent Intelligence ─────────────────────────────────────────────
+
+export type ParentIntelligenceReport = {
+  student_id:            string
+  student_name:          string
+  profile_summary:       string
+  top_strengths:         string[]
+  growth_areas:          string[]
+  recommended_careers:   CapabilityCareerMatch[]
+  conversation_starters: string[]
+  support_actions:       string[]
+  weekly_habits:         string[]
+  red_flags:             string[]
+  generated_at:          string
+  disclaimer:            string
+}
+
+// ── Phase 7: Student Growth Engine ───────────────────────────────────────────
+
+export type GrowthDirection = 'improved' | 'stable' | 'declined'
+
+export type DimensionGrowth = {
+  dimension:        CapabilityDimension
+  previous_level:   CapabilityLevel
+  current_level:    CapabilityLevel
+  previous_score:   number
+  current_score:    number
+  delta:            number
+  direction:        GrowthDirection
+  weeks_since_last: number
+}
+
+export type CapabilityGrowthReport = {
+  student_id:           string
+  current_computed_at:  string
+  previous_computed_at: string | null
+  dimensions:           DimensionGrowth[]
+  overall_direction:    GrowthDirection
+  biggest_win:          DimensionGrowth | null
+  biggest_drop:         DimensionGrowth | null
+  highlight:            string
+  weeks_tracked:        number
+  disclaimer:           string
+}

@@ -188,6 +188,78 @@ export interface JuniorFutureOpportunity {
   whyItFits: string
 }
 
+// ─── Junior Redesign v2 Types ─────────────────────────────────────────────────
+
+export interface JuniorImprovementCascade {
+  targetPathway: string
+  subjectKey: string
+  displayName: string
+  currentLevel: number
+  targetLevel: number
+  gap: number
+  estimatedTimeline: string
+  probability: 'High' | 'Medium' | 'Possible'
+  unlocks: string[]
+}
+
+export interface JuniorActionPriority {
+  rank: 1 | 2 | 3
+  subject: string
+  currentLevel: number
+  targetLevel: number
+  whyItMatters: string
+  compassReason: string
+  intervention: string
+  estimatedSessions: number
+  timeline: string
+}
+
+export interface ParentAction {
+  action: string
+}
+
+// ─── Senior Redesign v2 Types ─────────────────────────────────────────────────
+
+export interface SeniorReadinessIndicators {
+  pathwayReadinessScore: number
+  universityReadiness: 'Strong' | 'Developing' | 'Emerging' | 'Needs Work'
+  universityReadinessDetail: string
+  careerReadiness: 'Strong' | 'Developing' | 'Emerging' | 'Needs Work'
+  careerReadinessDetail: string
+  pathwayProgress: 'On Track' | 'Needs Attention' | 'Critical'
+  pathwayProgressDetail: string
+}
+
+export interface CareerInsightCard {
+  name: string
+  alignment: number
+  futureOutlook: string
+  aiImpact: string
+  selfEmploymentPotential: string
+  selfEmploymentExamples: string[]
+}
+
+export interface FutureScenario {
+  subject: string
+  currentLevel: number
+  improvedLevel: number
+  currentTrajectory: string
+  improvedImpacts: string[]
+}
+
+export interface SeniorActionPriority {
+  rank: 1 | 2 | 3
+  subject: string
+  currentLevel: number
+  targetLevel: number
+  whyItMatters: string
+  expectedBenefit: string
+  compassSubject: string
+  compassReason: string
+  estimatedSessions: number
+  timeline: string
+}
+
 // ─── Main Report ─────────────────────────────────────────────────────────────
 
 import type { DreamCareerAnalysis } from './careerEngine'
@@ -197,20 +269,29 @@ export interface AcademicClinicReport {
   subjectBreakdown: SubjectProgress[]
   vitals: Vitals
   actionPlan: ActionPlan
-  clinicalOverview: ClinicalOverview           // NEW — Page 2
-  pathwayAnalysis?: PathwayAnalysis            // NEW — Page 4A (Junior)
-  holidayPlan: HolidayActionPlan               // NEW — Page 5
-  learningCompassRec: LearningCompassRec       // NEW — Page 6
-  juniorGuidance?: JuniorGuidance              // kept for web UI
-  seniorGuidance?: SeniorGuidance              // kept for web UI (enriched)
+  clinicalOverview: ClinicalOverview
+  pathwayAnalysis?: PathwayAnalysis
+  holidayPlan: HolidayActionPlan
+  learningCompassRec: LearningCompassRec
+  juniorGuidance?: JuniorGuidance
+  seniorGuidance?: SeniorGuidance
   dreamCareerAnalysis?: DreamCareerAnalysis | null
   graphData: GraphData
   reportId: string
   generatedAt: string
-  // ── Junior 3-page redesign fields
+  // ── Junior 3-page redesign v1 fields (kept for compat)
   academicStatusLabel?: string
   pathwayReadinessCards?: PathwayReadinessCard[]
   pathwayRoadmap?: PathwayRoadmap
   termActionPlan?: TermActionPlan
   juniorFutureOpportunities?: JuniorFutureOpportunity[]
+  // ── Junior redesign v2 fields
+  juniorImprovementCascade?: JuniorImprovementCascade | null
+  juniorActionPriorities?: JuniorActionPriority[]
+  parentAction?: ParentAction
+  // ── Senior redesign v2 fields
+  seniorReadinessIndicators?: SeniorReadinessIndicators
+  careerInsightCards?: CareerInsightCard[]
+  futureScenario?: FutureScenario | null
+  seniorActionPriorities?: SeniorActionPriority[]
 }

@@ -6,57 +6,419 @@ import {
   ArrowLeft, Sparkles, TrendingUp, MapPin, Clock, BookOpen,
   Star, CheckCircle2, AlertTriangle, Loader2, Users, Heart,
   ChevronRight, Zap, Shield, Target, GraduationCap, Briefcase,
-  Info, Rocket, User, ArrowRight,
+  Info, Rocket, User, ArrowRight, Brain, TrendingDown, Minus,
+  ArrowUpRight, DollarSign, Timer, Flame, AlertCircle, CheckCircle,
 } from 'lucide-react'
-import type { Career, CareerMatchWithDetail, CareerDoor } from '@/lib/career/types'
+import type {
+  Career, CareerMatchWithDetail, CareerDoor,
+  CapabilityCareerMatch, CapabilityDimension,
+  KCSEMinimum, CostToQualify, SocialReality, LifeSimulation,
+} from '@/lib/career/types'
+import { CAPABILITY_LABELS } from '@/lib/career/capabilityExtractor'
+import { alignmentToPercent, tierLabel } from '@/lib/career/capabilityMatchEngine'
+import { buildLifeSimulation } from '@/lib/career/lifeSimulator'
 
 // ── Door config ───────────────────────────────────────────────────────────────
 
 const DOOR_CONFIG = {
-  employment: {
-    label: 'Employment',
-    icon: Briefcase,
-    bg: 'bg-blue-500/10',
-    border: 'border-blue-500/20',
-    badge: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    accent: 'text-blue-400',
-  },
-  self_employment: {
-    label: 'Self Employment',
-    icon: User,
-    bg: 'bg-green-500/10',
-    border: 'border-green-500/20',
-    badge: 'bg-green-500/20 text-green-400 border-green-500/30',
-    accent: 'text-green-400',
-  },
-  entrepreneurship: {
-    label: 'Build a Business',
-    icon: Rocket,
-    bg: 'bg-amber-500/10',
-    border: 'border-amber-500/20',
-    badge: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-    accent: 'text-amber-400',
-  },
-  ai_era: {
-    label: 'AI-Era Opportunity',
-    icon: Sparkles,
-    bg: 'bg-violet-500/10',
-    border: 'border-violet-500/20',
-    badge: 'bg-violet-500/20 text-violet-400 border-violet-500/30',
-    accent: 'text-violet-400',
-  },
+  employment:     { label: 'Employment',           icon: Briefcase, bg: 'bg-blue-500/10',   border: 'border-blue-500/20',   badge: 'bg-blue-500/20 text-blue-400 border-blue-500/30',     accent: 'text-blue-400'   },
+  self_employment:{ label: 'Self Employment',      icon: User,      bg: 'bg-green-500/10',  border: 'border-green-500/20',  badge: 'bg-green-500/20 text-green-400 border-green-500/30',  accent: 'text-green-400'  },
+  entrepreneurship:{ label: 'Build a Business',   icon: Rocket,    bg: 'bg-amber-500/10',  border: 'border-amber-500/20',  badge: 'bg-amber-500/20 text-amber-400 border-amber-500/30',  accent: 'text-amber-400'  },
+  ai_era:         { label: 'AI-Era Opportunity',  icon: Sparkles,  bg: 'bg-violet-500/10', border: 'border-violet-500/20', badge: 'bg-violet-500/20 text-violet-400 border-violet-500/30', accent: 'text-violet-400' },
 }
+
+const LEVEL_FILL: Record<string, string> = {
+  exceptional: 'bg-green-500',
+  strong:      'bg-emerald-500',
+  capable:     'bg-blue-500',
+  developing:  'bg-amber-500',
+  emerging:    'bg-red-500/70',
+}
+
+const DIMENSION_ORDER: CapabilityDimension[] = [
+  'analytical_reasoning', 'technical_aptitude', 'communication',
+  'creative_thinking', 'social_intelligence', 'resilience',
+]
 
 function formatKES(n: number): string {
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
-  if (n >= 1000) return `${(n / 1000).toFixed(0)}k`
+  if (n >= 1000)    return `${(n / 1000).toFixed(0)}k`
   return String(n)
 }
 
-// ── 4 Doors Section ───────────────────────────────────────────────────────────
+// ── Trend icon ────────────────────────────────────────────────────────────────
+
+function TrendIcon({ trend }: { trend: string }) {
+  if (trend === 'accelerating') return <ArrowUpRight className="w-3 h-3 text-green-400" />
+  if (trend === 'growing')      return <TrendingUp className="w-3 h-3 text-emerald-400" />
+  if (trend === 'declining')    return <TrendingDown className="w-3 h-3 text-red-400" />
+  return <Minus className="w-3 h-3 text-white/30" />
+}
+
+// ── Capability alignment section ──────────────────────────────────────────────
+
+function CapabilityAlignmentSection({ match }: { match: CapabilityCareerMatch }) {
+  const pct    = alignmentToPercent(match.alignment_score)
+  const tier   = match.tier
+  const tLabel = tierLabel(tier)
+
+  const tierColor =
+    tier === 'primary'        ? 'text-green-400'  :
+    tier === 'stretch'        ? 'text-blue-400'   :
+    tier === 'entrepreneurial'? 'text-purple-400' :
+    'text-amber-400'
+
+  const tierBorder =
+    tier === 'primary'        ? 'border-green-500/30 from-green-900/20 to-emerald-900/20' :
+    tier === 'stretch'        ? 'border-blue-500/30 from-blue-900/20 to-indigo-900/20'   :
+    tier === 'entrepreneurial'? 'border-purple-500/30 from-purple-900/20 to-violet-900/20':
+    'border-amber-500/30 from-amber-900/20 to-yellow-900/20'
+
+  return (
+    <section className={`bg-gradient-to-br ${tierBorder} border rounded-2xl p-6 space-y-5`}>
+      {/* Header row */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Brain className="w-5 h-5 text-violet-400" />
+            <h2 className="text-white font-bold text-lg">Your Capability Alignment</h2>
+          </div>
+          <p className="text-white/40 text-xs">How your real capabilities match what this career needs</p>
+        </div>
+        <div className="text-right shrink-0">
+          <div className={`text-4xl font-black ${tierColor}`}>{pct}%</div>
+          <div className={`text-xs font-bold mt-0.5 ${tierColor}`}>{tLabel}</div>
+        </div>
+      </div>
+
+      {/* Narrative */}
+      <p className="text-white/65 text-sm leading-relaxed">{match.narrative}</p>
+
+      {/* Dimension bars */}
+      <div className="space-y-3">
+        <div className="text-white/40 text-xs font-semibold uppercase tracking-wide">Dimension Breakdown</div>
+        {DIMENSION_ORDER.map(dim => {
+          const dimProfile = match.dimension_scores[dim]
+          const gap        = match.gaps.find(g => g.dimension === dim)
+          const strength   = match.strengths.find(s => s.dimension === dim)
+          const studentScore = gap?.student_score ?? strength ? (strength ? gap?.required_ideal ?? 0.8 : 0) : (dimProfile ?? 0)
+
+          // Find actual student score from gap or compute from contribution
+          const rawScore = gap?.student_score ?? (
+            match.strengths.find(s => s.dimension === dim) ? 0.85 : 0.45
+          )
+          const pctBar = Math.round(rawScore * 100)
+          const level  = gap?.student_level ?? (match.strengths.find(s => s.dimension === dim)?.level ?? 'capable')
+          const fill   = LEVEL_FILL[level] ?? 'bg-white/30'
+
+          const status =
+            gap?.gap_severity === 'significant' ? 'gap-sig' :
+            gap?.gap_severity === 'moderate'    ? 'gap-mod' :
+            gap?.gap_severity === 'minor'       ? 'gap-min' :
+            strength ? 'strength' : 'meets'
+
+          return (
+            <div key={dim} className="space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className={`text-xs font-semibold ${
+                  status === 'strength' ? 'text-green-300' :
+                  status === 'gap-sig'  ? 'text-red-400' :
+                  status === 'gap-mod'  ? 'text-amber-400' :
+                  'text-white/60'
+                }`}>
+                  {CAPABILITY_LABELS[dim]}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  {status === 'strength' && <CheckCircle className="w-3 h-3 text-green-400" />}
+                  {(status === 'gap-sig' || status === 'gap-mod') && <AlertTriangle className="w-3 h-3 text-amber-400" />}
+                  <span className="text-xs text-white/40 capitalize">{level}</span>
+                  <span className="text-xs font-bold text-white/70 w-7 text-right">{pctBar}%</span>
+                </div>
+              </div>
+              <div className="relative h-2 bg-white/8 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${fill} ${status === 'gap-sig' ? 'opacity-60' : 'opacity-80'}`}
+                  style={{ width: `${pctBar}%` }}
+                />
+                {/* Minimum requirement marker */}
+                {gap && (
+                  <div
+                    className="absolute top-0 h-full w-0.5 bg-red-400/60"
+                    style={{ left: `${Math.round(gap.required_minimum * 100)}%` }}
+                    title={`Minimum: ${Math.round(gap.required_minimum * 100)}%`}
+                  />
+                )}
+              </div>
+              {gap && gap.gap_severity !== 'none' && (
+                <p className={`text-[11px] leading-relaxed ${
+                  gap.gap_severity === 'significant' ? 'text-red-400/80' : 'text-amber-400/70'
+                }`}>
+                  {gap.narrative}
+                </p>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Strengths summary */}
+      {match.strengths.length > 0 && (
+        <div className="bg-green-500/8 border border-green-500/20 rounded-xl p-4 space-y-2">
+          <div className="text-green-400 text-xs font-bold uppercase tracking-wide flex items-center gap-1.5">
+            <CheckCircle className="w-3.5 h-3.5" /> Your Strengths for This Career
+          </div>
+          {match.strengths.slice(0, 2).map(s => (
+            <p key={s.dimension} className="text-green-300/70 text-xs leading-relaxed">{s.narrative}</p>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ── Reality check section ─────────────────────────────────────────────────────
+
+function RealityCheckSection({
+  career,
+  capMatch,
+}: {
+  career:   Career
+  capMatch: CapabilityCareerMatch | null
+}) {
+  const kcse    = career.kcse_minimum   as KCSEMinimum   | null | undefined
+  const cost    = career.cost_to_qualify as CostToQualify | null | undefined
+  const demand  = career.kenya_demand
+  const diff    = career.difficulty
+  const risk    = career.risk_level
+  const time    = career.time_to_income_years
+
+  if (!kcse && !cost && !demand) return null
+
+  const demandBadge =
+    demand === 'critical_shortage' ? { label: 'Critical Shortage', class: 'bg-green-500/15 text-green-400 border-green-500/25' } :
+    demand === 'undersupplied'     ? { label: 'Undersupplied',     class: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25' } :
+    demand === 'balanced'          ? { label: 'Balanced Demand',   class: 'bg-blue-500/15 text-blue-400 border-blue-500/25' } :
+    demand === 'saturated'         ? { label: 'Saturated Market',  class: 'bg-amber-500/15 text-amber-400 border-amber-500/25' } :
+    null
+
+  const kcseAchievable = capMatch?.reality_check.kcse_achievable ?? true
+
+  return (
+    <section className="space-y-4">
+      <div>
+        <h2 className="text-white font-bold text-xl flex items-center gap-2">
+          <Target className="w-5 h-5 text-violet-400" />
+          Reality Intelligence
+        </h2>
+        <p className="text-white/40 text-sm mt-1">What it actually takes — no sugarcoating.</p>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        {/* KCSE Minimum */}
+        {kcse && (
+          <div className={`rounded-2xl border p-5 space-y-3 ${
+            kcseAchievable
+              ? 'bg-green-500/8 border-green-500/20'
+              : 'bg-amber-500/8 border-amber-500/20'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <GraduationCap className={`w-4 h-4 ${kcseAchievable ? 'text-green-400' : 'text-amber-400'}`} />
+                <span className={`text-sm font-bold ${kcseAchievable ? 'text-green-400' : 'text-amber-400'}`}>
+                  KCSE Minimum
+                </span>
+              </div>
+              <span className={`text-xl font-black ${kcseAchievable ? 'text-green-400' : 'text-amber-400'}`}>
+                {kcse.overall_grade}
+              </span>
+            </div>
+
+            {Object.keys(kcse.subject_grades ?? {}).length > 0 && (
+              <div className="space-y-1">
+                <div className="text-white/40 text-xs uppercase tracking-wide">Key subject grades</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {Object.entries(kcse.subject_grades).map(([subj, grade]) => (
+                    <span key={subj} className="text-xs bg-white/5 border border-white/10 px-2 py-0.5 rounded-lg text-white/60">
+                      {subj.replace(/_/g, ' ')}: <strong className="text-white/80">{grade}</strong>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {!kcseAchievable && capMatch && (
+              <div className="flex items-start gap-1.5 text-xs text-amber-400/80">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                Your current analytical profile suggests KCSE for this career will need focused academic work.
+              </div>
+            )}
+
+            {kcse.alternative_routes && kcse.alternative_routes.length > 0 && (
+              <div className="space-y-1.5 pt-1 border-t border-white/8">
+                <div className="text-white/40 text-xs uppercase tracking-wide">Alternative routes</div>
+                {kcse.alternative_routes.map(r => (
+                  <div key={r} className="flex items-start gap-2 text-xs text-white/50">
+                    <ChevronRight className="w-3 h-3 text-violet-400 shrink-0 mt-0.5" />
+                    {r}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {kcse.note && (
+              <p className="text-white/30 text-xs italic pt-1 border-t border-white/8">{kcse.note}</p>
+            )}
+          </div>
+        )}
+
+        {/* Cost + time + risk */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
+          {cost && (
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-violet-400" />
+                <span className="text-sm font-bold text-white/80">Cost to Qualify</span>
+              </div>
+              <p className="text-white/70 font-semibold">
+                KES {formatKES(cost.min)} – {formatKES(cost.max)}
+              </p>
+              {cost.note && <p className="text-white/40 text-xs leading-relaxed">{cost.note}</p>}
+            </div>
+          )}
+
+          {time && (
+            <div className="flex items-center gap-3">
+              <Timer className="w-4 h-4 text-blue-400 shrink-0" />
+              <div>
+                <span className="text-sm font-bold text-white/80">{time} years</span>
+                <span className="text-white/40 text-xs ml-1">to first stable income</span>
+              </div>
+            </div>
+          )}
+
+          {risk && (
+            <div className="flex items-center gap-3">
+              <Shield className="w-4 h-4 text-white/40 shrink-0" />
+              <div>
+                <span className={`text-sm font-bold capitalize ${
+                  risk === 'low' ? 'text-green-400' :
+                  risk === 'high' || risk === 'variable' ? 'text-amber-400' : 'text-white/70'
+                }`}>
+                  {risk === 'low' ? 'Low risk' : risk === 'high' ? 'High risk' : risk === 'variable' ? 'Variable income' : 'Medium risk'}
+                </span>
+                <span className="text-white/30 text-xs ml-1">career path</span>
+              </div>
+            </div>
+          )}
+
+          {diff && (
+            <div className="flex items-center gap-3">
+              <BarChart className="w-4 h-4 text-white/40 shrink-0" />
+              <div>
+                <span className={`text-sm font-bold capitalize ${
+                  diff === 'accessible' ? 'text-green-400' :
+                  diff === 'very_hard' ? 'text-red-400' :
+                  'text-white/70'
+                }`}>
+                  {diff === 'very_hard' ? 'Very hard to enter' :
+                   diff === 'hard' ? 'Hard to enter' :
+                   diff === 'moderate' ? 'Moderate difficulty' :
+                   'Accessible'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {demandBadge && (
+            <div className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border ${demandBadge.class}`}>
+              <Flame className="w-3.5 h-3.5" />
+              {demandBadge.label}
+            </div>
+          )}
+
+          {career.saturation_note && (
+            <p className="text-white/35 text-xs italic border-t border-white/8 pt-3">{career.saturation_note}</p>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ── Social Reality section ────────────────────────────────────────────────────
+
+function SocialRealitySection({ sr }: { sr: SocialReality }) {
+  return (
+    <section className="space-y-4">
+      <div>
+        <h2 className="text-white font-bold text-xl flex items-center gap-2">
+          <Users className="w-5 h-5 text-violet-400" />
+          The Honest Reality
+        </h2>
+        <p className="text-white/40 text-sm mt-1">What people get wrong about this career — and what's actually true.</p>
+      </div>
+
+      {/* Misconception vs Reality */}
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div className="bg-red-500/8 border border-red-500/20 rounded-2xl p-5 space-y-2">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-red-400" />
+            <span className="text-red-400 text-xs font-bold uppercase tracking-wide">Common Misconception</span>
+          </div>
+          <p className="text-white/60 text-sm leading-relaxed italic">&ldquo;{sr.common_misconception}&rdquo;</p>
+        </div>
+
+        <div className="bg-green-500/8 border border-green-500/20 rounded-2xl p-5 space-y-2">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-green-400" />
+            <span className="text-green-400 text-xs font-bold uppercase tracking-wide">Honest Reality</span>
+          </div>
+          <p className="text-white/70 text-sm leading-relaxed">{sr.honest_reality_check}</p>
+        </div>
+      </div>
+
+      {/* Parent frame */}
+      {sr.parent_frame && (
+        <div className="bg-amber-500/8 border border-amber-500/20 rounded-2xl p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+            <span className="text-amber-400 text-xs font-bold uppercase tracking-wide">For Parents</span>
+          </div>
+          <p className="text-amber-200/80 text-sm leading-relaxed font-medium">{sr.parent_frame.opening}</p>
+
+          {sr.parent_frame.key_points.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-amber-400/60 text-xs uppercase tracking-wide">Key points</div>
+              {sr.parent_frame.key_points.map((pt, i) => (
+                <div key={i} className="flex items-start gap-2 text-sm text-white/60">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                  {pt}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {sr.parent_frame.honest_challenges.length > 0 && (
+            <div className="space-y-2 pt-3 border-t border-amber-500/15">
+              <div className="text-amber-400/60 text-xs uppercase tracking-wide">Honest challenges to prepare for</div>
+              {sr.parent_frame.honest_challenges.map((ch, i) => (
+                <div key={i} className="flex items-start gap-2 text-sm text-white/50">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400/60 shrink-0 mt-0.5" />
+                  {ch}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ── Door card ─────────────────────────────────────────────────────────────────
 
 function DoorCard({ door }: { door: CareerDoor }) {
-  const cfg = DOOR_CONFIG[door.type]
+  const cfg  = DOOR_CONFIG[door.type]
   const Icon = cfg.icon
   const isAIEra = door.type === 'ai_era'
 
@@ -80,22 +442,19 @@ function DoorCard({ door }: { door: CareerDoor }) {
       <h4 className="text-white font-bold text-base leading-tight">{door.title}</h4>
       <p className="text-white/60 text-sm leading-relaxed">{door.description}</p>
 
-      {/* Door-type specific details */}
       {door.type === 'employment' && (
         <div className="space-y-2">
           {door.salary_tiers && (
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 text-sm">
-                <TrendingUp className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                <span className="text-white/50 text-xs">
-                  Entry: KES {formatKES(door.salary_tiers.entry.min)}–{formatKES(door.salary_tiers.entry.max)} →
-                  Senior: KES {formatKES(door.salary_tiers.senior.min)}–{formatKES(door.salary_tiers.senior.max)}/mo
-                </span>
-              </div>
+            <div className="flex items-center gap-2 text-sm">
+              <TrendingUp className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+              <span className="text-white/50 text-xs">
+                Entry: KES {formatKES(door.salary_tiers.entry.min)}–{formatKES(door.salary_tiers.entry.max)} →
+                Senior: KES {formatKES(door.salary_tiers.senior.min)}–{formatKES(door.salary_tiers.senior.max)}/mo
+              </span>
             </div>
           )}
           {door.time_to_first_job && (
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-2">
               <Clock className="w-3.5 h-3.5 text-blue-400 shrink-0" />
               <span className="text-white/50 text-xs">{door.time_to_first_job}</span>
             </div>
@@ -105,9 +464,7 @@ function DoorCard({ door }: { door: CareerDoor }) {
               {door.employers.slice(0, 4).map(e => (
                 <span key={e} className="text-xs bg-white/5 border border-white/10 px-2 py-0.5 rounded-lg text-white/50">{e}</span>
               ))}
-              {door.employers.length > 4 && (
-                <span className="text-xs text-white/30">+{door.employers.length - 4} more</span>
-              )}
+              {door.employers.length > 4 && <span className="text-xs text-white/30">+{door.employers.length - 4} more</span>}
             </div>
           )}
         </div>
@@ -116,11 +473,9 @@ function DoorCard({ door }: { door: CareerDoor }) {
       {door.type === 'self_employment' && (
         <div className="space-y-2">
           {door.startup_cost_kes && (
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-2">
               <Zap className="w-3.5 h-3.5 text-green-400 shrink-0" />
-              <span className="text-white/70">
-                Start from KES {formatKES(door.startup_cost_kes.min)}
-              </span>
+              <span className="text-white/70">Start from KES {formatKES(door.startup_cost_kes.min)}</span>
             </div>
           )}
           {door.platforms && door.platforms.length > 0 && (
@@ -136,7 +491,7 @@ function DoorCard({ door }: { door: CareerDoor }) {
       {door.type === 'entrepreneurship' && (
         <div className="space-y-2">
           {door.market_size && (
-            <div className="flex items-start gap-2 text-sm">
+            <div className="flex items-start gap-2">
               <Target className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
               <span className="text-white/60 text-xs">{door.market_size}</span>
             </div>
@@ -148,17 +503,13 @@ function DoorCard({ door }: { door: CareerDoor }) {
               ))}
             </div>
           )}
-          {door.earnings_note && (
-            <p className="text-amber-400/60 text-xs italic pt-1">{door.earnings_note}</p>
-          )}
+          {door.earnings_note && <p className="text-amber-400/60 text-xs italic pt-1">{door.earnings_note}</p>}
         </div>
       )}
 
       {door.type === 'ai_era' && (
         <div className="space-y-2">
-          {door.ai_opportunity && (
-            <p className="text-violet-300/80 text-xs leading-relaxed">{door.ai_opportunity}</p>
-          )}
+          {door.ai_opportunity && <p className="text-violet-300/80 text-xs leading-relaxed">{door.ai_opportunity}</p>}
           {door.skills_needed && door.skills_needed.length > 0 && (
             <div className="flex flex-wrap gap-1.5 pt-1">
               {door.skills_needed.map(s => (
@@ -178,21 +529,219 @@ function DoorCard({ door }: { door: CareerDoor }) {
   )
 }
 
+// ── Life Simulation Section ───────────────────────────────────────────────────
+
+const PHASE_COLOR: Record<string, string> = {
+  studying: 'text-amber-400',
+  entry:    'text-blue-400',
+  mid:      'text-violet-400',
+  senior:   'text-green-400',
+}
+const PHASE_BG: Record<string, string> = {
+  studying: 'bg-amber-500/15 border-amber-500/25',
+  entry:    'bg-blue-500/15 border-blue-500/25',
+  mid:      'bg-violet-500/15 border-violet-500/25',
+  senior:   'bg-green-500/15 border-green-500/25',
+}
+const PHASE_FILL: Record<string, string> = {
+  studying: '#f59e0b',
+  entry:    '#60a5fa',
+  mid:      '#a78bfa',
+  senior:   '#34d399',
+}
+
+function LifeSimulationSection({ sim }: { sim: LifeSimulation }) {
+  const W = 360
+  const H = 120
+  const PAD_L = 40
+  const PAD_R = 12
+  const PAD_T = 12
+  const PAD_B = 28
+  const innerW = W - PAD_L - PAD_R
+  const innerH = H - PAD_T - PAD_B
+
+  const years       = sim.simulation
+  const minCumul    = Math.min(0, ...years.map(y => y.cumulative_net_kes))
+  const maxCumul    = Math.max(0, ...years.map(y => y.cumulative_net_kes))
+  const range       = maxCumul - minCumul || 1
+  const totalYears  = years.length - 1
+
+  const toX = (idx: number) => PAD_L + (idx / totalYears) * innerW
+  const toY = (val: number) => PAD_T + innerH - ((val - minCumul) / range) * innerH
+
+  const zeroY   = toY(0)
+  const pathD   = years.map((y, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(y.cumulative_net_kes).toFixed(1)}`).join(' ')
+
+  const breakX = sim.breakeven_age
+    ? toX(sim.breakeven_age - 18)
+    : null
+
+  // Y-axis labels
+  const yLabels: { val: number; y: number }[] = [
+    { val: maxCumul, y: PAD_T + 4 },
+    { val: 0,        y: zeroY },
+  ]
+  if (minCumul < 0) yLabels.push({ val: minCumul, y: PAD_T + innerH })
+
+  return (
+    <section className="bg-gradient-to-br from-indigo-900/20 to-blue-900/20 border border-indigo-500/20 rounded-2xl p-6 space-y-5">
+      <div>
+        <div className="flex items-center gap-2 mb-1">
+          <TrendingUp className="w-5 h-5 text-indigo-400" />
+          <h2 className="text-white font-bold text-lg">Your Financial Journey: Age 18–35</h2>
+        </div>
+        <p className="text-white/40 text-xs">Estimated cumulative earnings vs education cost over time</p>
+      </div>
+
+      {/* Key stat chips */}
+      <div className="flex flex-wrap gap-3">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
+          <GraduationCap className="w-3.5 h-3.5 text-amber-400" />
+          <span className="text-xs text-white/60">Income starts at age <span className="text-white font-bold">{sim.income_start_age}</span></span>
+        </div>
+        {sim.breakeven_age && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
+            <Target className="w-3.5 h-3.5 text-green-400" />
+            <span className="text-xs text-white/60">Breakeven at age <span className="text-green-400 font-bold">{sim.breakeven_age}</span></span>
+          </div>
+        )}
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
+          <DollarSign className="w-3.5 h-3.5 text-violet-400" />
+          <span className="text-xs text-white/60">Peak: <span className="text-white font-bold">KES {formatKES(sim.peak_monthly_kes)}/mo</span></span>
+        </div>
+      </div>
+
+      {/* Cumulative chart */}
+      <div className="overflow-x-auto">
+        <svg width={W} height={H} className="shrink-0">
+          {/* Zero baseline */}
+          <line x1={PAD_L} y1={zeroY} x2={W - PAD_R} y2={zeroY} stroke="rgba(255,255,255,0.12)" strokeWidth="1" strokeDasharray="4,3" />
+
+          {/* Area fill — positive zone */}
+          {years.length > 0 && (() => {
+            const posYears = years.filter(y => y.cumulative_net_kes > 0)
+            if (posYears.length === 0) return null
+            const firstPos = years.findIndex(y => y.cumulative_net_kes > 0)
+            const sliceP   = years.slice(firstPos)
+            const areaD    = `M${toX(firstPos).toFixed(1)},${zeroY} ` +
+              sliceP.map((y, i) => `L${toX(firstPos + i).toFixed(1)},${toY(y.cumulative_net_kes).toFixed(1)}`).join(' ') +
+              ` L${toX(years.length - 1).toFixed(1)},${zeroY} Z`
+            return <path d={areaD} fill="rgba(52,211,153,0.10)" />
+          })()}
+
+          {/* Negative area */}
+          {minCumul < 0 && (() => {
+            const lastNeg = years.reduce((acc, y, i) => y.cumulative_net_kes < 0 ? i : acc, -1)
+            if (lastNeg < 0) return null
+            const sliceN = years.slice(0, lastNeg + 1)
+            const areaN  = `M${toX(0).toFixed(1)},${zeroY} ` +
+              sliceN.map((y, i) => `L${toX(i).toFixed(1)},${toY(y.cumulative_net_kes).toFixed(1)}`).join(' ') +
+              ` L${toX(lastNeg).toFixed(1)},${zeroY} Z`
+            return <path d={areaN} fill="rgba(251,146,60,0.08)" />
+          })()}
+
+          {/* Coloured line segments by phase */}
+          {years.slice(0, -1).map((y, i) => (
+            <line
+              key={i}
+              x1={toX(i).toFixed(1)}   y1={toY(y.cumulative_net_kes).toFixed(1)}
+              x2={toX(i + 1).toFixed(1)} y2={toY(years[i + 1].cumulative_net_kes).toFixed(1)}
+              stroke={PHASE_FILL[y.phase] ?? '#94a3b8'}
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          ))}
+
+          {/* Breakeven marker */}
+          {breakX !== null && (
+            <>
+              <line x1={breakX.toFixed(1)} y1={PAD_T} x2={breakX.toFixed(1)} y2={H - PAD_B} stroke="#34d399" strokeWidth="1.5" strokeDasharray="3,2" />
+              <circle cx={breakX.toFixed(1)} cy={zeroY.toFixed(1)} r="4" fill="#34d399" />
+            </>
+          )}
+
+          {/* Milestone dots */}
+          {years.filter(y => y.milestone).map(y => {
+            const idx = years.indexOf(y)
+            return (
+              <circle key={y.age} cx={toX(idx).toFixed(1)} cy={toY(y.cumulative_net_kes).toFixed(1)} r="3.5" fill={PHASE_FILL[y.phase]} stroke="#0a0a14" strokeWidth="1.5" />
+            )
+          })}
+
+          {/* Y-axis labels */}
+          {yLabels.map(({ val, y }) => (
+            <text key={val} x={PAD_L - 4} y={y + 4} textAnchor="end" fill="rgba(255,255,255,0.3)" fontSize="9">
+              {val >= 1_000_000 ? `${(val / 1_000_000).toFixed(1)}M` : val >= 1_000 ? `${Math.round(val / 1_000)}k` : val}
+            </text>
+          ))}
+
+          {/* X-axis age labels */}
+          {[18, 22, 26, 30, 35].map(age => {
+            const idx = age - 18
+            return (
+              <text key={age} x={toX(idx).toFixed(1)} y={H - 6} textAnchor="middle" fill="rgba(255,255,255,0.25)" fontSize="9">
+                {age}
+              </text>
+            )
+          })}
+        </svg>
+      </div>
+
+      {/* Phase legend */}
+      <div className="flex flex-wrap gap-2 text-xs">
+        {(['studying', 'entry', 'mid', 'senior'] as const).map(ph => (
+          <span key={ph} className={`px-2.5 py-1 rounded-full border font-medium capitalize ${PHASE_BG[ph]} ${PHASE_COLOR[ph]}`}>
+            {ph === 'studying' ? 'Training / Study' : ph === 'entry' ? 'Entry Level' : ph === 'mid' ? 'Mid Career' : 'Senior Level'}
+          </span>
+        ))}
+      </div>
+
+      {/* Salary progression */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: 'Entry',  val: sim.entry_monthly_kes,  color: 'text-blue-400'   },
+          { label: 'Mid',    val: sim.mid_monthly_kes,    color: 'text-violet-400' },
+          { label: 'Senior', val: sim.senior_monthly_kes, color: 'text-green-400'  },
+        ].map(({ label, val, color }) => (
+          <div key={label} className="bg-white/5 border border-white/10 rounded-xl p-3 text-center">
+            <div className={`text-base font-black ${color}`}>KES {formatKES(val)}</div>
+            <div className="text-white/40 text-xs mt-0.5">{label} / mo</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Education cost note */}
+      <div className="flex items-start gap-2 text-xs text-white/40">
+        <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+        <span>
+          Estimated education cost: <span className="text-white/60 font-semibold">KES {formatKES(sim.total_education_cost_kes)}</span>.
+          {' '}Projections use average salary midpoints from current Kenya market data. Actual results depend on employer, location, and performance.
+        </span>
+      </div>
+    </section>
+  )
+}
+
+// Needed for RealityCheckSection — import after component definition avoids issues
+function BarChart({ className }: { className?: string }) {
+  return <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CareerDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params)
 
-  const [career, setCareer] = useState<Career | null>(null)
-  const [match, setMatch] = useState<CareerMatchWithDetail | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [studentId, setStudentId] = useState<string | null>(null)
-  const [studentAge, setStudentAge] = useState<number>(15)
-  const [studentGrade, setStudentGrade] = useState<number | null>(null)
+  const [career,          setCareer]          = useState<Career | null>(null)
+  const [capabilityMatch, setCapabilityMatch] = useState<CapabilityCareerMatch | null>(null)
+  const [loading,         setLoading]         = useState(true)
+  const [saving,          setSaving]          = useState(false)
+  const [saved,           setSaved]           = useState(false)
+  const [studentId,       setStudentId]       = useState<string | null>(null)
+  const [studentAge,      setStudentAge]      = useState<number>(15)
+  const [studentGrade,    setStudentGrade]    = useState<number | null>(null)
   const [activeTimelineIdx, setActiveTimelineIdx] = useState(0)
-  const [earlyStartTab, setEarlyStartTab] = useState<'14-16' | '16-18'>('14-16')
+  const [earlyStartTab,   setEarlyStartTab]   = useState<'14-16' | '16-18'>('14-16')
 
   useEffect(() => {
     fetch('/api/students/list')
@@ -218,7 +767,7 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
       .then(r => r.json())
       .then(d => {
         setCareer(d?.data?.career ?? null)
-        setMatch(d?.data?.student_match ?? null)
+        setCapabilityMatch(d?.data?.capability_match ?? null)
       })
       .catch(() => null)
       .finally(() => setLoading(false))
@@ -260,10 +809,12 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
   )
 
   const currentTimeline = career.skill_timeline[activeTimelineIdx]
-  const aiImpact = career.ai_impact
-  const sovereignty = career.doors.find(d => d.type === 'ai_era')?.ai_sovereignty
-  const isJunior = studentGrade !== null && studentGrade >= 7 && studentGrade <= 9
-  const isSenior = studentGrade !== null && studentGrade >= 10 && studentGrade <= 12
+  const aiImpact        = career.ai_impact
+  const sovereignty     = career.doors?.find(d => d.type === 'ai_era')?.ai_sovereignty
+  const socialReality   = career.social_reality as SocialReality | null | undefined
+  const lifeSim         = buildLifeSimulation(career)
+  const isJunior        = studentGrade !== null && studentGrade >= 7  && studentGrade <= 9
+  const isSenior        = studentGrade !== null && studentGrade >= 10 && studentGrade <= 12
 
   return (
     <div className="min-h-screen bg-[#0a0a14]">
@@ -298,6 +849,11 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
                 {career.pathway} Pathway
               </span>
             )}
+            {career.kenya_demand === 'critical_shortage' && (
+              <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-green-500/15 border border-green-500/25 text-green-400 flex items-center gap-1">
+                <Flame className="w-3 h-3" /> High Demand
+              </span>
+            )}
           </div>
           <h1 className="text-3xl sm:text-4xl font-black text-white mb-3">{career.title}</h1>
           <p className="text-white/60 text-base leading-relaxed">{career.description}</p>
@@ -307,9 +863,9 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
               <div className="text-xs text-white/40 uppercase tracking-wide font-semibold">Salary Journey</div>
               <div className="grid grid-cols-3 gap-2">
                 {([
-                  { tier: career.salary_range_kes.entry,  accent: 'bg-white/5 border-white/10',              textColor: 'text-white' },
-                  { tier: career.salary_range_kes.mid,    accent: 'bg-blue-500/10 border-blue-500/20',       textColor: 'text-blue-300' },
-                  { tier: career.salary_range_kes.senior, accent: 'bg-violet-500/10 border-violet-500/20',   textColor: 'text-violet-300' },
+                  { tier: career.salary_range_kes.entry,  accent: 'bg-white/5 border-white/10',            textColor: 'text-white' },
+                  { tier: career.salary_range_kes.mid,    accent: 'bg-blue-500/10 border-blue-500/20',     textColor: 'text-blue-300' },
+                  { tier: career.salary_range_kes.senior, accent: 'bg-violet-500/10 border-violet-500/20', textColor: 'text-violet-300' },
                 ] as Array<{ tier: typeof career.salary_range_kes.entry; accent: string; textColor: string }>).map(({ tier, accent, textColor }) => (
                   <div key={tier.label} className={`${accent} border rounded-xl px-3 py-3 text-center`}>
                     <div className="text-xs text-white/30 mb-1 leading-tight">{tier.label}</div>
@@ -329,29 +885,24 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
               {career.salary_range_kes.salary_growth_note && (
                 <p className="text-green-400/50 text-xs">{career.salary_range_kes.salary_growth_note}</p>
               )}
-              <p className="text-white/20 text-xs">
-                Source: Zaajira, MaxisHR, BrighterMonday Kenya 2026. Updated quarterly.
-              </p>
+              <p className="text-white/20 text-xs">Source: Zaajira, MaxisHR, BrighterMonday Kenya 2026. Updated quarterly.</p>
             </div>
           )}
         </div>
 
-        {/* ── MATCH SCORE ────────────────────────────────────────────────────── */}
-        {match && (
-          <div className="bg-gradient-to-br from-violet-900/30 to-indigo-900/30 border border-violet-500/30 rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-white font-bold flex items-center gap-2">
-                <Target className="w-5 h-5 text-violet-400" /> Your Match Score
-              </h2>
-              <span className={`text-3xl font-black ${match.match_score >= 75 ? 'text-green-400' : match.match_score >= 55 ? 'text-amber-400' : 'text-orange-400'}`}>
-                {match.match_score}%
-              </span>
-            </div>
-            <p className="text-white/60 text-sm">{match.match_reasoning}</p>
-          </div>
-        )}
+        {/* ── CAPABILITY ALIGNMENT ─────────────────────────────────────────── */}
+        {capabilityMatch && <CapabilityAlignmentSection match={capabilityMatch} />}
 
-        {/* ══ THE 4 DOORS ════════════════════════════════════════════════════════ */}
+        {/* ── REALITY INTELLIGENCE ─────────────────────────────────────────── */}
+        <RealityCheckSection career={career} capMatch={capabilityMatch} />
+
+        {/* ── LIFE SIMULATION ──────────────────────────────────────────────── */}
+        {lifeSim && <LifeSimulationSection sim={lifeSim} />}
+
+        {/* ── SOCIAL REALITY ───────────────────────────────────────────────── */}
+        {socialReality && <SocialRealitySection sr={socialReality} />}
+
+        {/* ══ THE 4 DOORS ═════════════════════════════════════════════════════ */}
         {career.doors && career.doors.length > 0 && (
           <section>
             <h2 className="text-white font-bold text-xl mb-2 flex items-center gap-2">
@@ -359,17 +910,15 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
               The 4 Ways to Build This Career
             </h2>
             <p className="text-white/40 text-sm mb-5">
-              Every career has more than one door. Employment is just one of them.
+              Employment is just one door. There are three more.
             </p>
             <div className="grid sm:grid-cols-2 gap-4">
-              {career.doors.map(door => (
-                <DoorCard key={door.type} door={door} />
-              ))}
+              {career.doors.map(door => <DoorCard key={door.type} door={door} />)}
             </div>
           </section>
         )}
 
-        {/* ══ AI SOVEREIGNTY ════════════════════════════════════════════════════ */}
+        {/* ══ AI SOVEREIGNTY ══════════════════════════════════════════════════ */}
         {sovereignty && (
           <section className="space-y-5">
             <div>
@@ -379,20 +928,16 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
               </h2>
               <p className="text-white/40 text-sm">Previously needed a team. Now possible solo.</p>
             </div>
-
-            {/* The shift — pull quote */}
             <div className="relative bg-violet-900/20 border border-violet-500/20 rounded-2xl p-6">
               <div className="text-violet-400/30 text-6xl font-serif leading-none select-none absolute top-4 left-5">&ldquo;</div>
               <p className="text-violet-200/90 text-base leading-relaxed font-medium pl-6 pt-2">{sovereignty.the_shift}</p>
             </div>
-
-            {/* What you can build — cards */}
             <div>
               <div className="text-white/40 text-xs font-semibold uppercase tracking-wide mb-3">What you can build</div>
               <div className="grid sm:grid-cols-2 gap-3">
                 {sovereignty.what_you_can_build.map((item, i) => {
                   const icons = [Zap, Rocket, Target, Briefcase]
-                  const Icon = icons[i % icons.length]
+                  const Icon  = icons[i % icons.length]
                   return (
                     <div key={i} className="flex items-start gap-3 bg-white/5 border border-white/10 rounded-xl p-4">
                       <div className="w-8 h-8 rounded-lg bg-violet-500/15 border border-violet-500/20 flex items-center justify-center shrink-0">
@@ -404,8 +949,6 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
                 })}
               </div>
             </div>
-
-            {/* Tools row */}
             {sovereignty.tools_to_learn.length > 0 && (
               <div>
                 <div className="text-white/40 text-xs font-semibold uppercase tracking-wide mb-2">Tools to learn</div>
@@ -418,8 +961,6 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
                 </div>
               </div>
             )}
-
-            {/* Sovereignty example — story card */}
             <div className="border-l-4 border-violet-500/60 bg-white/3 rounded-r-2xl pl-5 pr-5 py-5">
               <div className="text-violet-400 text-xs font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5">
                 <Star className="w-3.5 h-3.5" /> Real example
@@ -429,20 +970,15 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
           </section>
         )}
 
-        {/* ══ AI IMPACT SECTION ══════════════════════════════════════════════════ */}
+        {/* ══ AI IMPACT ═══════════════════════════════════════════════════════ */}
         {aiImpact && (
           <section>
             <h2 className="text-white font-bold text-xl mb-2 flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-violet-400" />
               How AI Is Changing This Career
             </h2>
-            <p className="text-white/40 text-sm mb-5">
-              Honest assessment — not fear, not hype. Just what's actually happening.
-            </p>
-
-            {/* 3-column grid */}
+            <p className="text-white/40 text-sm mb-5">Honest — not fear, not hype.</p>
             <div className="grid sm:grid-cols-3 gap-4 mb-5">
-              {/* Replacing */}
               <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <AlertTriangle className="w-4 h-4 text-red-400" />
@@ -451,14 +987,11 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
                 <ul className="space-y-2">
                   {aiImpact.replacing.map(task => (
                     <li key={task} className="flex items-start gap-2 text-xs text-white/60">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-500/50 shrink-0 mt-1.5" />
-                      {task}
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500/50 shrink-0 mt-1.5" />{task}
                     </li>
                   ))}
                 </ul>
               </div>
-
-              {/* Creating */}
               <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <TrendingUp className="w-4 h-4 text-green-400" />
@@ -467,14 +1000,11 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
                 <ul className="space-y-2">
                   {aiImpact.creating.map(opp => (
                     <li key={opp} className="flex items-start gap-2 text-xs text-white/60">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-green-400 shrink-0 mt-0.5" />
-                      {opp}
+                      <CheckCircle2 className="w-3.5 h-3.5 text-green-400 shrink-0 mt-0.5" />{opp}
                     </li>
                   ))}
                 </ul>
               </div>
-
-              {/* Human Advantage */}
               <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <Shield className="w-4 h-4 text-blue-400" />
@@ -483,33 +1013,27 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
                 <ul className="space-y-2">
                   {aiImpact.human_advantage.map(adv => (
                     <li key={adv} className="flex items-start gap-2 text-xs text-white/60">
-                      <Star className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
-                      {adv}
+                      <Star className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />{adv}
                     </li>
                   ))}
                 </ul>
               </div>
             </div>
-
-            {/* Honest summary */}
             <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3">
               <p className="text-white/70 text-sm leading-relaxed">{aiImpact.honest_summary}</p>
               <p className="text-white/40 text-xs flex items-start gap-1.5">
-                <Clock className="w-3.5 h-3.5 shrink-0 mt-0.5 text-white/30" />
-                {aiImpact.timeline}
+                <Clock className="w-3.5 h-3.5 shrink-0 mt-0.5 text-white/30" />{aiImpact.timeline}
               </p>
             </div>
           </section>
         )}
 
-        {/* ── SKILL AGE TIMELINE ──────────────────────────────────────────────── */}
+        {/* ── SKILL TIMELINE ───────────────────────────────────────────────── */}
         <section>
           <h2 className="text-white font-bold text-xl mb-2 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-violet-400" />
-            Skill Age Timeline
+            <Clock className="w-5 h-5 text-violet-400" /> Skill Age Timeline
           </h2>
           <p className="text-white/40 text-sm mb-5">Where you are now, and what to build next.</p>
-
           <div className="flex gap-2 overflow-x-auto pb-2 mb-5 scrollbar-hide">
             {career.skill_timeline.map((item, idx) => {
               const isActive = idx === activeTimelineIdx
@@ -534,7 +1058,6 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
               )
             })}
           </div>
-
           {currentTimeline && (
             <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-5">
               <div>
@@ -566,8 +1089,7 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
                   <ul className="space-y-2">
                     {currentTimeline.activities.map(activity => (
                       <li key={activity} className="flex items-start gap-2 text-sm text-white/60">
-                        <ChevronRight className="w-4 h-4 text-violet-400 shrink-0 mt-0.5" />
-                        {activity}
+                        <ChevronRight className="w-4 h-4 text-violet-400 shrink-0 mt-0.5" />{activity}
                       </li>
                     ))}
                   </ul>
@@ -577,7 +1099,7 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
           )}
         </section>
 
-        {/* ── REQUIRED SUBJECTS ──────────────────────────────────────────────── */}
+        {/* ── REQUIRED SUBJECTS ────────────────────────────────────────────── */}
         {career.required_subjects.length > 0 && (
           <section>
             <h2 className="text-white font-bold text-xl mb-4 flex items-center gap-2">
@@ -586,18 +1108,13 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
             <div className="flex flex-wrap gap-2">
               {career.required_subjects.map(subj => {
                 const importance = career.subject_importance?.[subj] ?? 'helpful'
-                const gap = match?.subject_gaps
-                  ? (match.subject_gaps as Array<{ subject: string }>).find(g => g.subject.toLowerCase() === subj.toLowerCase())
-                  : null
                 const classes =
-                  gap ? 'bg-amber-500/20 border-amber-500/30 text-amber-300' :
                   importance === 'critical' ? 'bg-violet-500/10 border-violet-500/20 text-violet-300' :
                   'bg-white/5 border-white/10 text-white/70'
                 return (
                   <span key={subj} className={`px-3 py-1.5 rounded-xl text-sm font-medium border ${classes}`}>
                     {subj.replace(/_/g, ' ')}
                     {importance === 'critical' && <span className="ml-1 text-xs opacity-60">(critical)</span>}
-                    {gap && <AlertTriangle className="inline-block w-3 h-3 ml-1.5 mb-0.5" />}
                   </span>
                 )
               })}
@@ -605,7 +1122,7 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
           </section>
         )}
 
-        {/* ── KENYA REALITY ──────────────────────────────────────────────────── */}
+        {/* ── KENYA MARKET REALITY ─────────────────────────────────────────── */}
         {career.kenya_market_outlook && (
           <section className="bg-gradient-to-br from-green-900/20 to-teal-900/20 border border-green-500/20 rounded-2xl p-6">
             <h2 className="text-white font-bold text-xl mb-3 flex items-center gap-2">
@@ -615,7 +1132,7 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
           </section>
         )}
 
-        {/* ── KENYA EXAMPLES ─────────────────────────────────────────────────── */}
+        {/* ── KENYA EXAMPLES ───────────────────────────────────────────────── */}
         {career.kenya_examples && career.kenya_examples.length > 0 && (
           <section>
             <h2 className="text-white font-bold text-xl mb-4 flex items-center gap-2">
@@ -628,14 +1145,11 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
                   <div key={example.name} className="bg-white/5 border border-white/10 rounded-2xl p-5">
                     <div className="flex items-start justify-between gap-3 mb-1">
                       <div className="font-bold text-white">{example.name}</div>
-                      {doorLabel && (
-                        <span className="text-xs text-white/30 bg-white/5 px-2 py-0.5 rounded-lg shrink-0">{doorLabel}</span>
-                      )}
+                      {doorLabel && <span className="text-xs text-white/30 bg-white/5 px-2 py-0.5 rounded-lg shrink-0">{doorLabel}</span>}
                     </div>
                     <p className="text-white/60 text-sm mb-2">{example.what_they_did}</p>
                     <div className="flex items-center gap-2 text-xs text-violet-400/70">
-                      <Briefcase className="w-3 h-3" />
-                      Started from: {example.started_from}
+                      <Briefcase className="w-3 h-3" /> Started from: {example.started_from}
                     </div>
                   </div>
                 )
@@ -644,11 +1158,11 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
           </section>
         )}
 
-        {/* ── FUTURE SKILLS ──────────────────────────────────────────────────── */}
+        {/* ── FUTURE SKILLS ────────────────────────────────────────────────── */}
         {career.future_skills && career.future_skills.length > 0 && (
           <section>
             <h2 className="text-white font-bold text-base mb-3 flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-green-400" /> Skills That Will Matter More as AI Grows
+              <TrendingUp className="w-4 h-4 text-green-400" /> Skills That Matter More as AI Grows
             </h2>
             <div className="flex flex-wrap gap-2">
               {career.future_skills.map(skill => (
@@ -660,18 +1174,15 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
           </section>
         )}
 
-        {/* ── JUNIOR: EARLY START ────────────────────────────────────────────── */}
+        {/* ── EARLY START (JUNIOR) ─────────────────────────────────────────── */}
         {isJunior && career.early_start && (
           <section className="space-y-4">
             <div>
               <h2 className="text-white font-bold text-xl mb-1 flex items-center gap-2">
-                <GraduationCap className="w-5 h-5 text-amber-400" />
-                Start Now — Before Form 1
+                <GraduationCap className="w-5 h-5 text-amber-400" /> Start Now — Before Form 1
               </h2>
-              <p className="text-white/40 text-sm">What you can do right now to get ahead in this career.</p>
+              <p className="text-white/40 text-sm">What you can do right now to get ahead.</p>
             </div>
-
-            {/* Age band tabs */}
             <div className="flex gap-2">
               {(['14-16', '16-18'] as const).map(tab => (
                 <button
@@ -687,8 +1198,6 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
                 </button>
               ))}
             </div>
-
-            {/* Age band action list */}
             <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-2.5">
               {(earlyStartTab === '14-16' ? career.early_start.age_14_16 : career.early_start.age_16_18).map((action, i) => (
                 <div key={i} className="flex items-start gap-3">
@@ -699,8 +1208,6 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
                 </div>
               ))}
             </div>
-
-            {/* First win */}
             <div className="bg-gradient-to-br from-amber-900/20 to-orange-900/20 border border-amber-500/30 rounded-2xl p-5">
               <div className="text-amber-400 text-xs font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5">
                 <Star className="w-3.5 h-3.5" /> Your First Win Target
@@ -710,18 +1217,15 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
           </section>
         )}
 
-        {/* ── SENIOR: KCSE + UNIVERSITY ───────────────────────────────────────── */}
+        {/* ── KCSE + UNIVERSITY (SENIOR) ───────────────────────────────────── */}
         {isSenior && (
           <section className="space-y-5">
             <div>
               <h2 className="text-white font-bold text-xl mb-1 flex items-center gap-2">
-                <GraduationCap className="w-5 h-5 text-indigo-400" />
-                KCSE & University Pathway
+                <GraduationCap className="w-5 h-5 text-indigo-400" /> KCSE & University Pathway
               </h2>
               <p className="text-white/40 text-sm">What you need to hit before the gate closes.</p>
             </div>
-
-            {/* Required subjects table */}
             {career.required_subjects.length > 0 && (
               <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
                 <div className="px-5 py-3 border-b border-white/8">
@@ -744,8 +1248,6 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
                 </div>
               </div>
             )}
-
-            {/* University courses */}
             {career.university_courses && career.university_courses.length > 0 && (
               <div className="bg-indigo-900/20 border border-indigo-500/20 rounded-2xl p-5 space-y-3">
                 <div className="text-indigo-300 text-xs font-bold uppercase tracking-wide flex items-center gap-1.5">
@@ -754,8 +1256,7 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
                 <ul className="space-y-2">
                   {career.university_courses.map(course => (
                     <li key={course} className="flex items-start gap-2 text-sm text-white/70">
-                      <ChevronRight className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-                      {course}
+                      <ChevronRight className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />{course}
                     </li>
                   ))}
                 </ul>
@@ -764,13 +1265,13 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
           </section>
         )}
 
-        {/* ── DISCLAIMER ─────────────────────────────────────────────────────── */}
+        {/* ── DISCLAIMER ───────────────────────────────────────────────────── */}
         <div className="bg-white/3 border border-white/8 rounded-xl p-4 flex items-start gap-2.5">
           <Info className="w-3.5 h-3.5 text-white/25 shrink-0 mt-0.5" />
           <p className="text-white/35 text-xs italic leading-relaxed">{career.disclaimer}</p>
         </div>
 
-        {/* ── SAVE CTA ───────────────────────────────────────────────────────── */}
+        {/* ── SAVE CTA ─────────────────────────────────────────────────────── */}
         <div className="text-center pb-8">
           <button
             onClick={handleSaveInterest}

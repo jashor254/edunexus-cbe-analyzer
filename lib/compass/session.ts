@@ -86,6 +86,33 @@ export async function getOrCreateSession(
     }
   }
 
+  // No resumable session — close out any stale 'active' rows left behind by a
+  // tab close/crash so they don't sit open forever (catches what an explicit
+  // end-session call would otherwise miss).
+  const { data: stale } = await db
+    .from('compass_sessions')
+    .select('id, created_at, updated_at')
+    .eq('learner_id', studentId)
+    .eq('subject', subject)
+    .eq('status', 'active')
+
+  if (stale && stale.length > 0) {
+    await Promise.all(
+      stale.map(row => {
+        const durationSeconds = Math.max(
+          0,
+          Math.round(
+            (new Date(row.updated_at as string).getTime() - new Date(row.created_at as string).getTime()) / 1000
+          )
+        )
+        return db
+          .from('compass_sessions')
+          .update({ status: 'abandoned', completed_at: new Date().toISOString(), duration_seconds: durationSeconds })
+          .eq('id', row.id as string)
+      })
+    )
+  }
+
   const { data: created, error } = await db
     .from('compass_sessions')
     .insert({
@@ -241,6 +268,32 @@ export function isSessionExpired(startedAt: string): boolean {
   return Date.now() - new Date(startedAt).getTime() > SESSION_TTL_MS
 }
 
+// ── 6. endSession ──────────────────────────────────────────────────────────────
+
+export async function endSession(
+  sessionId:       string,
+  learnerId:       string,
+  status:          'completed' | 'abandoned',
+  durationSeconds: number
+): Promise<void> {
+  const db = createServiceClient()
+
+  const { error } = await db
+    .from('compass_sessions')
+    .update({
+      status,
+      completed_at:     new Date().toISOString(),
+      duration_seconds: Math.max(0, Math.round(durationSeconds)),
+    })
+    .eq('id', sessionId)
+    .eq('learner_id', learnerId)
+    .eq('status', 'active')
+
+  if (error) {
+    throw new Error(`[compass/session] Failed to end session: ${error.message}`)
+  }
+}
+
 // ── Legacy: used by app/api/learn/route.ts ────────────────────────────────────
 
 export async function readSession(
@@ -281,20 +334,16 @@ export async function writeSession(
 ): Promise<void> {
   const db = createServiceClient()
 
-  const { data } = await db
-    .from('compass_sessions')
-    .select('session_state')
-    .eq('id', sessionId)
-    .maybeSingle()
-
-  const current  = (data?.session_state ?? {}) as Record<string, unknown>
-  const newState = { ...current, ...update, initialized: true }
+  // The only caller (app/api/learn/route.ts) passes all CompassSession fields,
+  // so the previous SELECT-then-merge pattern was reading back what was just written.
+  // Build the new state directly from the update and write in one round-trip.
+  const newState = { ...update, initialized: true }
 
   const { error } = await db
     .from('compass_sessions')
     .update({
       session_state: newState,
-      last_subject:  (update.lockedSubject as string | null) || (current.lockedSubject as string | null) || null,
+      last_subject:  (update.lockedSubject as string | null) ?? null,
       updated_at:    new Date().toISOString(),
     })
     .eq('id', sessionId)

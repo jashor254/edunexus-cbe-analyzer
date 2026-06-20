@@ -1,51 +1,31 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, BookOpen, FileText, BarChart3,
   AlertTriangle, ClipboardList, Settings,
   LogOut, Scroll, NotebookPen, Sparkles, ChevronRight, FolderOpen, GraduationCap,
-  MoreHorizontal, X,
 } from 'lucide-react'
 import { RoleSwitcher } from '@/components/layout/RoleSwitcher'
 import { Logo } from '@/components/ui/Logo'
+import TeacherBottomNav from '@/components/teacher/TeacherBottomNav'
 
 const NAV = [
   { href: '/teacher/dashboard',      icon: LayoutDashboard, label: 'Dashboard'      },
   { href: '/teacher/classes',        icon: BookOpen,        label: 'My Classes'     },
-  { href: '/teacher/assignments',    icon: FileText,        label: 'Assignments'    },
   { href: '/teacher/scheme-of-work', icon: Scroll,          label: 'Scheme of Work' },
-  { href: '/teacher/record-of-work', icon: ClipboardList,   label: 'Record of Work', badge: 'NEW' },
   { href: '/teacher/lesson-plans',   icon: NotebookPen,     label: 'Lesson Plans'   },
-  { href: '/teacher/documents',      icon: FolderOpen,      label: 'My Documents'   },
-  { href: '/teacher/insights',       icon: BarChart3,       label: 'Insights'       },
-  { href: '/teacher/analytics',      icon: BarChart3,       label: 'Analytics', badge: 'NEW' },
+  { href: '/teacher/documents',      icon: FolderOpen,      label: 'Documents'      },
+  { href: '/teacher/record-of-work', icon: ClipboardList,   label: 'Record of Work' },
+  { href: '/teacher/assignments',    icon: FileText,        label: 'Assignments'    },
+  { href: '/teacher/analytics',      icon: BarChart3,       label: 'Analytics'      },
   { href: '/teacher/alerts',         icon: AlertTriangle,   label: 'Alerts'         },
   { href: '/teacher/reports',        icon: ClipboardList,   label: 'Reports'        },
-  { href: '/teacher/academy',        icon: GraduationCap,   label: 'AI Academy', badge: 'NEW' },
+  { href: '/teacher/academy',        icon: GraduationCap,   label: 'AI Academy'     },
   { href: '/teacher/settings',       icon: Settings,        label: 'Settings'       },
 ]
 
-const MOBILE_NAV = [
-  { href: '/teacher/dashboard',      icon: LayoutDashboard, label: 'Home'        },
-  { href: '/teacher/classes',        icon: BookOpen,        label: 'Classes'     },
-  { href: '/teacher/assignments',    icon: FileText,        label: 'Assignments' },
-  { href: '/teacher/scheme-of-work', icon: Scroll,          label: 'Schemes'     },
-]
-
-const MORE_NAV = [
-  { href: '/teacher/record-of-work', icon: ClipboardList,   label: 'Record of Work', badge: 'NEW' },
-  { href: '/teacher/lesson-plans',   icon: NotebookPen,     label: 'Lesson Plans'   },
-  { href: '/teacher/documents',      icon: FolderOpen,      label: 'My Documents'   },
-  { href: '/teacher/insights',       icon: BarChart3,       label: 'Insights'       },
-  { href: '/teacher/analytics',      icon: BarChart3,       label: 'Analytics', badge: 'NEW' },
-  { href: '/teacher/alerts',         icon: AlertTriangle,   label: 'Alerts'         },
-  { href: '/teacher/reports',        icon: ClipboardList,   label: 'Reports'        },
-  { href: '/teacher/academy',        icon: GraduationCap,   label: 'AI Academy', badge: 'NEW' },
-  { href: '/teacher/settings',       icon: Settings,        label: 'Settings'       },
-]
 
 interface Props {
   teacherName: string
@@ -55,15 +35,12 @@ interface Props {
 
 export default function TeacherSidebar({ teacherName, school, subject }: Props) {
   const pathname = usePathname()
-  const [moreOpen, setMoreOpen] = useState(false)
   const initials = teacherName.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
 
   function isActive(href: string) {
     if (href === '/teacher/dashboard') return pathname === href
     return pathname.startsWith(href)
   }
-
-  const moreIsActive = MORE_NAV.some(item => isActive(item.href))
 
   return (
     <>
@@ -119,11 +96,6 @@ export default function TeacherSidebar({ teacherName, school, subject }: Props) 
                 )}
                 <item.icon className={`w-4.5 h-4.5 shrink-0 transition-colors ${active ? 'text-teal-400' : 'text-slate-500 group-hover:text-slate-300'}`} />
                 <span className="flex-1">{item.label}</span>
-                {item.badge && (
-                  <span className="text-[10px] bg-teal-500 text-white px-1.5 py-0.5 rounded-md font-black tracking-wide">
-                    {item.badge}
-                  </span>
-                )}
                 {active && <ChevronRight className="w-3 h-3 text-teal-400/60" />}
               </Link>
             )
@@ -166,116 +138,7 @@ export default function TeacherSidebar({ teacherName, school, subject }: Props) 
         </div>
       </header>
 
-      {/* ── Mobile Bottom Nav ─────────────────────────────────────────────────── */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-[#0c1929] border-t border-white/10">
-        <div className="flex items-stretch h-16">
-          {MOBILE_NAV.map(item => {
-            const active = isActive(item.href)
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex-1 flex flex-col items-center justify-center gap-1 relative transition-all"
-              >
-                {active && (
-                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-teal-400 rounded-full" />
-                )}
-                <item.icon className={`w-5 h-5 transition-colors ${active ? 'text-teal-400' : 'text-slate-500'}`} />
-                <span className={`text-[10px] font-bold transition-colors ${active ? 'text-teal-400' : 'text-slate-500'}`}>
-                  {item.label}
-                </span>
-              </Link>
-            )
-          })}
-
-          {/* More button */}
-          <button
-            onClick={() => setMoreOpen(true)}
-            className="flex-1 flex flex-col items-center justify-center gap-1 relative transition-all"
-          >
-            {moreIsActive && !moreOpen && (
-              <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-teal-400 rounded-full" />
-            )}
-            <MoreHorizontal className={`w-5 h-5 transition-colors ${moreIsActive ? 'text-teal-400' : 'text-slate-500'}`} />
-            <span className={`text-[10px] font-bold transition-colors ${moreIsActive ? 'text-teal-400' : 'text-slate-500'}`}>
-              More
-            </span>
-          </button>
-        </div>
-      </nav>
-
-      {/* ── More Drawer ───────────────────────────────────────────────────────── */}
-      {/* Backdrop */}
-      <div
-        className={`lg:hidden fixed inset-0 z-30 bg-black/50 transition-opacity duration-300 ${moreOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-        onClick={() => setMoreOpen(false)}
-      />
-
-      {/* Sheet */}
-      <div
-        className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0c1929] rounded-t-3xl transition-transform duration-300 ease-out max-h-[85vh] overflow-y-auto ${moreOpen ? 'translate-y-0' : 'translate-y-full'}`}
-      >
-        {/* Handle */}
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 bg-white/20 rounded-full" />
-        </div>
-
-        {/* Sheet header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
-          <span className="text-white font-black text-base">Menu</span>
-          <button
-            onClick={() => setMoreOpen(false)}
-            className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center active:scale-95 transition-transform"
-          >
-            <X className="w-4 h-4 text-white" />
-          </button>
-        </div>
-
-        {/* Nav grid */}
-        <div className="px-4 py-4 grid grid-cols-3 gap-2">
-          {MORE_NAV.map(item => {
-            const active = isActive(item.href)
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMoreOpen(false)}
-                className={`relative flex flex-col items-center gap-2 px-2 py-3 rounded-2xl transition-all active:scale-95 ${
-                  active ? 'bg-teal-500/15' : 'bg-white/5 active:bg-white/10'
-                }`}
-              >
-                {item.badge && (
-                  <span className="absolute top-2 right-2 text-[8px] bg-teal-500 text-white px-1 py-0.5 rounded font-black leading-none">
-                    {item.badge}
-                  </span>
-                )}
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${active ? 'bg-teal-500/20' : 'bg-white/8'}`}>
-                  <item.icon className={`w-5 h-5 ${active ? 'text-teal-400' : 'text-slate-400'}`} />
-                </div>
-                <span className={`text-[11px] font-bold text-center leading-tight ${active ? 'text-teal-300' : 'text-slate-400'}`}>
-                  {item.label}
-                </span>
-              </Link>
-            )
-          })}
-        </div>
-
-        {/* Footer actions */}
-        <div className="px-4 pb-6 pt-2 border-t border-white/10 flex items-center justify-between gap-3">
-          <div className="flex-1">
-            <RoleSwitcher />
-          </div>
-          <form action="/auth/signout" method="POST">
-            <button
-              type="submit"
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-400 hover:text-red-400 bg-white/5 hover:bg-red-500/10 transition-all"
-            >
-              <LogOut className="w-4 h-4" />
-              Sign Out
-            </button>
-          </form>
-        </div>
-      </div>
+      <TeacherBottomNav />
     </>
   )
 }

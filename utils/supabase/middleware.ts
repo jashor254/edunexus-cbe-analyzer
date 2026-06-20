@@ -1,60 +1,54 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  })
+  // Must use NextResponse.next({ request }) so Next.js forwards the mutated
+  // request headers (including updated cookies) to the route handler.
+  let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value
+        // getAll/setAll is required for @supabase/ssr v0.5+ which chunks large
+        // session tokens across multiple cookies (sb-xxx-auth-token.0, .1 …).
+        // The old get/set/remove API reads only one cookie by exact name and
+        // silently misses chunked tokens — causing getSession() to see a stale
+        // session and trigger the "potentially insecure" warning in route handlers.
+        getAll() {
+          return request.cookies.getAll()
         },
-        set(name: string, value: string, options: CookieOptions) {
-          request.cookies.set({ name, value, ...options })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          response.cookies.set({ name, value, ...options })
-        },
-        remove(name: string, options: CookieOptions) {
-          request.cookies.set({ name, value: '', ...options })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          response.cookies.set({ name, value: '', ...options })
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          )
+          supabaseResponse = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          )
         },
       },
     }
   )
 
-  // IMPORTANT: Refresh session or get user
+  // getUser() validates the JWT with Supabase and writes the refreshed token
+  // back via setAll above. Route handlers then call getSession() which reads
+  // from this cookie — zero network round-trip, < 5ms.
   const { data: { user } } = await supabase.auth.getUser()
   const { pathname } = request.nextUrl
 
-  // Unauthenticated users trying to access dashboard → login
   if (!user && pathname.startsWith('/dashboard')) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  // Admin routes: only kariukidennis092@gmail.com is allowed
   if (pathname.startsWith('/admin')) {
     if (user?.email !== 'kariukidennis092@gmail.com') {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
   }
 
-  return response
+  return supabaseResponse
 }

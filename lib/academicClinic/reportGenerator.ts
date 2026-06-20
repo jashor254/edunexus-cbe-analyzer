@@ -24,6 +24,13 @@ import {
   TermPlanAction,
   TermActionPlan,
   JuniorFutureOpportunity,
+  JuniorImprovementCascade,
+  JuniorActionPriority,
+  ParentAction,
+  SeniorReadinessIndicators,
+  CareerInsightCard,
+  FutureScenario,
+  SeniorActionPriority,
 } from './types'
 
 // ─── Subject Metadata ─────────────────────────────────────────────────────────
@@ -390,7 +397,12 @@ export function generateSeniorGuidance(subjects: SubjectProgress[], firstName = 
   const subjectAvg = subjects.reduce((s, x) => s + x.level, 0) / subjects.length
   const tier: 'high' | 'mid' | 'low' = subjectAvg >= 3.0 ? 'high' : subjectAvg >= 2.0 ? 'mid' : 'low'
 
-  const engineResults = engine.matchCareers(scores, tier, 'cbc', currentPathway).slice(0, 3)
+  // Careers below this score read as discouraging ("21% match") rather than useful —
+  // hide them here at the report layer so the shared engine's hidden-gems threshold (35) stays intact.
+  const MIN_DISPLAY_SCORE = 45
+  const engineResults = engine.matchCareers(scores, tier, 'cbc', currentPathway)
+    .filter(match => match.matchScore >= MIN_DISPLAY_SCORE)
+    .slice(0, 3)
 
   const assessedSubjectKeys = subjects.map(s => s.subject)
 
@@ -435,8 +447,12 @@ export function generateSeniorGuidance(subjects: SubjectProgress[], firstName = 
     }
   })
 
-  const honestAssessment = subjectAvg >= 3.0
-    ? `Based on current performance data, ${topCareers[0]?.name} and ${topCareers[1]?.name} represent realistic and well-matched pathways. With sustained effort and targeted support in identified gap areas, these careers are genuinely achievable through the Kenyan university system.`
+  const honestAssessment = topCareers.length === 0
+    ? `Current subject performance hasn't yet produced a confident career match. Complete more assessments and focus on the action plan below — clearer pathway recommendations will follow as performance data builds up.`
+    : subjectAvg >= 3.0 && topCareers.length >= 2
+    ? `Based on current performance data, ${topCareers[0].name} and ${topCareers[1].name} represent realistic and well-matched pathways. With sustained effort and targeted support in identified gap areas, these careers are genuinely achievable through the Kenyan university system.`
+    : subjectAvg >= 3.0
+    ? `Based on current performance data, ${topCareers[0].name} represents a realistic and well-matched pathway. With sustained effort and targeted support in identified gap areas, this career is genuinely achievable through the Kenyan university system.`
     : `Current performance indicates that focused preparation will be required before these career pathways become fully accessible. The holiday action plan and consistent Learning Compass sessions are critical tools for closing the identified gaps before KCSE.`
 
   return {
@@ -925,6 +941,426 @@ const JUNIOR_FUTURE_OPPORTUNITIES: JuniorFutureOpportunity[] = [
   },
 ]
 
+// ─── Career Insight Meta ──────────────────────────────────────────────────────
+
+function getCareerMeta(name: string): {
+  futureOutlook: string; aiImpact: string; selfEmployment: string; examples: string[]
+} {
+  const n = name.toLowerCase()
+  if (n.includes('software') || n.includes('computing') || n.includes('cyber') || n.includes('data science') || n.includes('programming')) {
+    return { futureOutlook: 'Growing', aiImpact: 'High', selfEmployment: 'High', examples: ['Freelancing', 'Software startup', 'Digital agency'] }
+  }
+  if (n.includes('medicine') || n.includes('doctor') || n.includes('physician') || n.includes('medical')) {
+    return { futureOutlook: 'Growing', aiImpact: 'Medium', selfEmployment: 'High', examples: ['Private clinic', 'Telemedicine', 'Health consulting'] }
+  }
+  if (n.includes('nurs')) {
+    return { futureOutlook: 'Growing', aiImpact: 'Low–Medium', selfEmployment: 'Medium', examples: ['Private nursing care', 'Home care', 'Health consultancy'] }
+  }
+  if (n.includes('engineer') || n.includes('architect')) {
+    return { futureOutlook: 'Growing', aiImpact: 'Medium–High', selfEmployment: 'Medium', examples: ['Consulting firm', 'Project contracts', 'Technical services'] }
+  }
+  if (n.includes('teach') || n.includes('education') || n.includes('lectur')) {
+    return { futureOutlook: 'Stable', aiImpact: 'Low–Medium', selfEmployment: 'High', examples: ['Online tutoring', 'Educational content', 'Curriculum design'] }
+  }
+  if (n.includes('law') || n.includes('legal') || n.includes('advocate')) {
+    return { futureOutlook: 'Stable', aiImpact: 'Medium', selfEmployment: 'Medium', examples: ['Private practice', 'Legal consulting', 'Corporate law'] }
+  }
+  if (n.includes('account') || n.includes('audit') || n.includes('finance') || n.includes('bank')) {
+    return { futureOutlook: 'Stable', aiImpact: 'Medium–High', selfEmployment: 'Medium', examples: ['Accounting firm', 'Financial advisory', 'Tax consulting'] }
+  }
+  if (n.includes('business') || n.includes('entrepreneur') || n.includes('manag')) {
+    return { futureOutlook: 'Growing', aiImpact: 'Medium', selfEmployment: 'High', examples: ['Own business', 'Consulting', 'Trade & commerce'] }
+  }
+  if (n.includes('psychol') || n.includes('counsel')) {
+    return { futureOutlook: 'Growing', aiImpact: 'Low–Medium', selfEmployment: 'High', examples: ['Private practice', 'Online counselling', 'HR consulting'] }
+  }
+  if (n.includes('agri') || n.includes('farm') || n.includes('food')) {
+    return { futureOutlook: 'Growing', aiImpact: 'Low–Medium', selfEmployment: 'High', examples: ['Agribusiness', 'Farming enterprise', 'Food processing'] }
+  }
+  if (n.includes('journ') || n.includes('media') || n.includes('communicat')) {
+    return { futureOutlook: 'Stable', aiImpact: 'Medium', selfEmployment: 'High', examples: ['Freelance journalism', 'Content creation', 'Media agency'] }
+  }
+  if (n.includes('design') || n.includes('art') || n.includes('creat')) {
+    return { futureOutlook: 'Stable', aiImpact: 'Medium', selfEmployment: 'High', examples: ['Freelance design', 'Creative agency', 'Content creation'] }
+  }
+  if (n.includes('sport') || n.includes('physio') || n.includes('fitness')) {
+    return { futureOutlook: 'Growing', aiImpact: 'Low', selfEmployment: 'High', examples: ['Personal training', 'Sports coaching', 'Physiotherapy clinic'] }
+  }
+  return { futureOutlook: 'Stable', aiImpact: 'Medium', selfEmployment: 'Medium', examples: ['Consulting', 'Private practice', 'Freelancing'] }
+}
+
+// ─── Subject Improvement Impacts ─────────────────────────────────────────────
+
+const SUBJECT_IMPROVEMENT_IMPACTS: Record<string, string[]> = {
+  mathematics:          ['Engineering and computing programmes open up', 'STEM cluster points improve significantly', 'Quantitative career paths fully accessible'],
+  core_mathematics:     ['Engineering and computing programmes open up', 'STEM pathway options fully confirmed', 'Quantitative career paths fully accessible'],
+  biology:              ['Medical and health sciences programmes accessible', 'Nursing, pharmacy, and biomedical pathways open', 'Biology-dependent careers confirm access'],
+  chemistry:            ['Medicine, pharmacy, and chemical engineering programmes strengthen', 'Applied sciences career paths open', 'STEM pathway credibility improves'],
+  physics:              ['Engineering, architecture, and technology programmes unlock', 'Applied sciences career paths strengthen', 'Physical sciences degree options widen'],
+  english:              ['Wider university options across ALL programmes', 'Communication-heavy careers strengthen significantly', 'Scholarship eligibility improves'],
+  kiswahili:            ['National language requirement met for more programmes', 'Humanities and social sciences pathways confirm access', 'Scholarship opportunities increase'],
+  kiswahili_ksl:        ['National language requirement met for more programmes', 'Humanities and social sciences pathways confirm access', 'Scholarship opportunities increase'],
+  integrated_science:   ['STEM pathway foundation strengthens significantly', 'Science specialisations open up in Senior School', 'Health sciences university eligibility improves'],
+  social_studies:       ['Social sciences and humanities programmes strengthen', 'Public service and governance paths open', 'Community-facing career options widen'],
+  history_citizenship:  ['Law, political science, and governance programmes open', 'Humanities career paths strengthen', 'University humanities options widen'],
+  history:              ['Law, political science, and governance programmes open', 'Humanities career paths strengthen', 'University humanities options widen'],
+  geography:            ['Environmental science and urban planning pathways open', 'Geography-related career paths strengthen', 'Social sciences university options widen'],
+  business_studies:     ['Business and commerce university programmes open', 'Entrepreneurship and finance career paths confirm access', 'Business cluster points improve'],
+  computer_studies:     ['Technology and digital careers strengthen', 'Computing and IT university options widen', 'Digital entrepreneurship pathway confirms'],
+  creative_arts_sports: ['Arts & Sports Science pathway confirms access', 'Creative industry career paths open', 'Sports science and coaching programmes accessible'],
+}
+
+function getImprovementImpacts(subjectKey: string): string[] {
+  return SUBJECT_IMPROVEMENT_IMPACTS[subjectKey] ?? [
+    'Wider university options',
+    'Better scholarship opportunities',
+    'Improved competitiveness in chosen pathway',
+  ]
+}
+
+function getCurrentTrajectoryText(subjectKey: string, level: number): string {
+  const TEXT: Record<string, Record<number, string>> = {
+    mathematics: {
+      1: 'Engineering, computing, and most STEM degree programmes remain inaccessible without foundational support.',
+      2: 'STEM and engineering pathways remain partially closed until Mathematics reaches Level 3.',
+      3: 'Strong trajectory — maintain Level 3 to keep advanced STEM programmes accessible.',
+    },
+    biology: {
+      1: 'Medical, health sciences, and life sciences degree programmes are currently out of reach.',
+      2: 'Health sciences and medical pathways remain restricted. Level 3 is the minimum for most medical-adjacent programmes.',
+      3: 'Health sciences pathway is secured — maintain to keep top medical programmes accessible.',
+    },
+    english: {
+      1: 'Most university programmes require English above this level. This is the single most urgent gap to address.',
+      2: 'Competitive university programmes require Level 3 English minimum. Closing this gap has the highest overall impact.',
+      3: 'Good English foundation. Level 4 would further strengthen humanities and law career access.',
+    },
+    chemistry: {
+      1: 'Medicine, pharmacy, and chemical engineering programmes are not accessible at current level.',
+      2: 'Chemistry remains a restricting factor for medical and scientific career entry requirements.',
+      3: 'Chemistry is secured at proficient level. Maintain to protect STEM options.',
+    },
+    physics: {
+      1: 'Engineering and applied sciences programmes are not accessible at current level.',
+      2: 'Engineering and architecture pathways are partially restricted until Physics reaches Level 3.',
+      3: 'Physics secured. Maintain to protect engineering and applied sciences options.',
+    },
+  }
+  return TEXT[subjectKey]?.[level]
+    ?? `Performance in this subject at Level ${level} continues to limit pathway options. Improvement to Level ${level + 1} is the recommended next step.`
+}
+
+// ─── Junior Redesign v2 Generators ───────────────────────────────────────────
+
+const PATHWAY_UNLOCK_EXAMPLES: Record<string, string[]> = {
+  'STEM':                  ['STEM becomes available', 'Engineering pathway opens', 'Medical Sciences pathway opens', 'Technology pathway opens'],
+  'Social Sciences':       ['Social Sciences becomes available', 'Law pathway opens', 'Business & Finance pathway opens', 'Education pathway opens'],
+  'Arts & Sports Science': ['Arts & Sports Science becomes available', 'Design pathway opens', 'Sports Science pathway opens', 'Media pathway opens'],
+}
+
+export function buildJuniorImprovementCascade(
+  subjects: SubjectProgress[],
+  cards: PathwayReadinessCard[],
+  recommendedPathway: string
+): JuniorImprovementCascade | null {
+  const alternativeCards = cards
+    .filter(c => c.pathway !== recommendedPathway)
+    .sort((a, b) => b.score - a.score)
+
+  const target = alternativeCards[0]
+  if (!target) return null
+
+  const gapRows = target.gapRows.filter(r => r.status !== 'met')
+  const keyGap  = gapRows.find(r => r.status === 'one_step') ?? gapRows[0]
+
+  if (!keyGap) {
+    return {
+      targetPathway: target.pathway, subjectKey: '', displayName: '',
+      currentLevel: 0, targetLevel: 0, gap: 0,
+      estimatedTimeline: 'Pathway already within reach',
+      probability: 'High',
+      unlocks: PATHWAY_UNLOCK_EXAMPLES[target.pathway] ?? [],
+    }
+  }
+
+  const gap              = keyGap.gap
+  const estimatedTimeline = gap === 1 ? '1 Term' : '2 Terms'
+  const probability       = gap === 1 ? 'High' as const : gap === 2 ? 'Medium' as const : 'Possible' as const
+
+  return {
+    targetPathway: target.pathway,
+    subjectKey:    keyGap.subjectKey,
+    displayName:   keyGap.displayName,
+    currentLevel:  keyGap.currentLevel,
+    targetLevel:   keyGap.requiredLevel,
+    gap,
+    estimatedTimeline,
+    probability,
+    unlocks: PATHWAY_UNLOCK_EXAMPLES[target.pathway] ?? [],
+  }
+}
+
+const PRIORITY_WHY: Record<string, string> = {
+  mathematics:          'Mathematics Level 3 unlocks STEM eligibility — the highest-demand pathway in Kenya.',
+  core_mathematics:     'Core Mathematics Level 3 is the gateway to STEM and engineering degree programmes.',
+  integrated_science:   'Integrated Science Level 3 builds the foundation for Biology, Chemistry, and Physics in Senior School.',
+  english:              'English Level 3 is required for every Senior School pathway without exception.',
+  kiswahili:            'Kiswahili Level 3 broadens pathway options and meets the national language requirement.',
+  kiswahili_ksl:        'Kiswahili Level 3 broadens pathway options and meets the national language requirement.',
+  social_studies:       'Social Studies Level 3 underpins Social Sciences pathway readiness.',
+  history_citizenship:  'History competency directly supports Social Sciences and Law pathways.',
+  history:              'History competency directly supports Social Sciences and Law pathways.',
+  geography:            'Geography strengthens Social Sciences pathway and environmental career options.',
+  business_studies:     'Business Studies Level 3 opens Business pathway and strengthens Social Sciences readiness.',
+  computer_studies:     'Computing skills are foundational for the digital economy and STEM pathway support.',
+  creative_arts_sports: 'Creative Arts & Sports Level 3 confirms Arts & Sports Science pathway readiness.',
+  pre_technical:        'Pre-Technical Studies supports STEM readiness and builds practical skills for engineering pathways.',
+}
+
+const PRIORITY_COMPASS_REASON: Record<string, string> = {
+  mathematics:          'This is currently the single subject preventing STEM eligibility.',
+  core_mathematics:     'This is currently the single subject preventing STEM eligibility.',
+  english:              'English is required for every pathway — closing this gap has the highest overall impact.',
+  integrated_science:   'Integrated Science is the foundational gateway to STEM subjects in Senior School.',
+  social_studies:       'Social Studies is the core subject confirming Social Sciences pathway readiness.',
+  history_citizenship:  'History is the core subject confirming Social Sciences pathway readiness.',
+  creative_arts_sports: 'Creative Arts & Sports is the core subject confirming Arts & Sports Science pathway readiness.',
+}
+
+function getCompassReason(subjectKey: string, rank: number): string {
+  if (rank === 1) {
+    return PRIORITY_COMPASS_REASON[subjectKey]
+      ?? 'This is the highest-priority gap — addressing it first has the broadest impact on pathway readiness.'
+  }
+  return rank === 2
+    ? 'This is the second priority gap — consistent support here strengthens overall pathway readiness.'
+    : 'This is the third priority gap — closing this completes the foundation for Senior School success.'
+}
+
+export function buildJuniorActionPriorities(
+  subjects: SubjectProgress[],
+  cards: PathwayReadinessCard[],
+  recommendedPathway: string
+): JuniorActionPriority[] {
+  const recCard     = cards.find(c => c.pathway === recommendedPathway)
+  const gapSubjects = (recCard?.gapRows.filter(r => r.status !== 'met') ?? []).map(r => ({
+    subjectKey: r.subjectKey, displayName: r.displayName,
+    currentLevel: r.currentLevel, targetLevel: r.requiredLevel,
+  }))
+
+  const priorityKeys = new Set<string>()
+  const list: Array<{ subjectKey: string; displayName: string; currentLevel: number; targetLevel: number }> = []
+
+  for (const gap of gapSubjects.slice(0, 2)) {
+    if (!priorityKeys.has(gap.subjectKey)) { priorityKeys.add(gap.subjectKey); list.push(gap) }
+  }
+
+  const weakest = [...subjects].sort((a, b) => a.level - b.level)
+  for (const s of weakest) {
+    if (!priorityKeys.has(s.subject)) {
+      priorityKeys.add(s.subject)
+      list.push({ subjectKey: s.subject, displayName: s.displayName, currentLevel: s.level, targetLevel: Math.min(4, s.level + 1) })
+    }
+    if (list.length >= 3) break
+  }
+
+  return list.slice(0, 3).map((item, i) => {
+    const sessions = item.currentLevel === 1 ? 8 : item.currentLevel === 2 ? 6 : 4
+    const timeline = item.currentLevel === 1 ? '6–10 weeks' : item.currentLevel === 2 ? '4–8 weeks' : '3–5 weeks'
+    const rank     = (i + 1) as 1 | 2 | 3
+    return {
+      rank,
+      subject:          item.displayName,
+      currentLevel:     item.currentLevel,
+      targetLevel:      item.targetLevel,
+      whyItMatters:     PRIORITY_WHY[item.subjectKey] ?? `Level ${item.targetLevel} in ${item.displayName} opens key pathway options.`,
+      compassReason:    getCompassReason(item.subjectKey, rank),
+      intervention:     `${sessions} Learning Compass sessions`,
+      estimatedSessions: sessions,
+      timeline,
+    }
+  })
+}
+
+export function buildParentAction(subjects: SubjectProgress[], firstName: string): ParentAction {
+  const weakest = [...subjects].sort((a, b) => a.level - b.level)[0]
+  if (!weakest) return { action: `Review ${firstName}'s academic progress every Saturday and ask about one topic studied that week.` }
+
+  const TEMPLATES: Record<string, string> = {
+    mathematics:         `Spend 20 minutes every Saturday reviewing Mathematics with ${firstName} — ask to show you one problem solved step by step.`,
+    core_mathematics:    `Spend 20 minutes every Saturday reviewing Mathematics with ${firstName} — ask to show you one problem solved step by step.`,
+    english:             `Ask ${firstName} to read one article or short story aloud each Saturday and summarise it in 3 sentences.`,
+    kiswahili:           `Practise simple Kiswahili conversation with ${firstName} for 10 minutes daily — even basic sentences build confidence rapidly.`,
+    kiswahili_ksl:       `Practise simple Kiswahili conversation with ${firstName} for 10 minutes daily — even basic sentences build confidence rapidly.`,
+    integrated_science:  `Ask ${firstName} to explain one science topic each week using household items as examples — this strengthens understanding significantly.`,
+    biology:             `Ask ${firstName} to teach you one Biology concept each week. Teaching is the strongest test of true understanding.`,
+    social_studies:      `Spend 15 minutes weekly reading one news article together and discussing its civic or historical significance.`,
+    history_citizenship: `Read one news article together weekly and ask ${firstName} to connect it to a historical event from their studies.`,
+    history:             `Read one news article together weekly and ask ${firstName} to connect it to a historical event from their studies.`,
+    business_studies:    `Ask ${firstName} to identify one business they see each week and explain how it makes money.`,
+    geography:           `Use a map together for 15 minutes weekly — ask ${firstName} to identify geographical features and explain their significance.`,
+  }
+
+  return {
+    action: TEMPLATES[weakest.subject]
+      ?? `Spend 20 minutes every Saturday reviewing ${weakest.displayName} progress with ${firstName}. Ask them to explain one topic they studied that week — teaching reinforces learning.`,
+  }
+}
+
+// ─── Senior Redesign v2 Generators ───────────────────────────────────────────
+
+export function buildSeniorReadinessIndicators(
+  subjects: SubjectProgress[],
+  pathway: string | null | undefined,
+  trajectory: 'IMPROVING' | 'STABLE' | 'NEEDS ATTENTION' | 'CRITICAL',
+  firstName: string
+): SeniorReadinessIndicators {
+  const avg = subjects.reduce((s, x) => s + x.level, 0) / subjects.length
+  const pct = (avg / 4) * 100
+  const pathwayReadinessScore = Math.round(pct)
+  const pw  = pathway ?? 'chosen'
+
+  type RL = 'Strong' | 'Developing' | 'Emerging' | 'Needs Work'
+
+  const uniLabel: RL = pct >= 75 ? 'Strong' : pct >= 60 ? 'Developing' : pct >= 45 ? 'Emerging' : 'Needs Work'
+  const uniDetail: Record<RL, string> = {
+    'Strong':      `${firstName} is performing at a level that supports university access across multiple programmes in the ${pw} pathway.`,
+    'Developing':  `Current performance supports university access. Targeted improvement in priority subjects will significantly strengthen options.`,
+    'Emerging':    `Focused support this term can open university access. The subjects in the action plan are the critical gaps to close.`,
+    'Needs Work':  `Significant preparation is needed to maintain university pathway access. Early and consistent support is critical — start with the action plan below.`,
+  }
+
+  const carLabel: RL = pct >= 70 ? 'Strong' : pct >= 55 ? 'Developing' : pct >= 40 ? 'Emerging' : 'Needs Work'
+  const carDetail: Record<RL, string> = {
+    'Strong':      `Subject performance aligns well with career entry requirements in the ${pw} sector.`,
+    'Developing':  `Building strong foundations for ${pw} careers. One to two level improvements will confirm readiness.`,
+    'Emerging':    `Career pathway is visible from current performance. Consistent support is needed to reach entry requirements.`,
+    'Needs Work':  `${pw} career access requires significant academic improvement. Prioritise the three subjects in the clinical action plan.`,
+  }
+
+  const progLabel = trajectory === 'IMPROVING' ? 'On Track' as const
+    : trajectory === 'CRITICAL'        ? 'Critical' as const
+    : pct >= 60                        ? 'On Track' as const
+    : 'Needs Attention' as const
+
+  const progDetail: Record<typeof progLabel, string> = {
+    'On Track':        `${firstName} is progressing within the ${pw} pathway with consistent performance.`,
+    'Needs Attention': `Performance within the ${pw} pathway requires more consistent effort to stay on target for Grade 12.`,
+    'Critical':        `Performance within the ${pw} pathway needs urgent intervention before KCSE.`,
+  }
+
+  return {
+    pathwayReadinessScore,
+    universityReadiness:       uniLabel,
+    universityReadinessDetail: uniDetail[uniLabel],
+    careerReadiness:           carLabel,
+    careerReadinessDetail:     carDetail[carLabel],
+    pathwayProgress:           progLabel,
+    pathwayProgressDetail:     progDetail[progLabel],
+  }
+}
+
+export function buildCareerInsightCards(seniorGuidance: SeniorGuidance): CareerInsightCard[] {
+  return seniorGuidance.topCareers.slice(0, 3).map(c => {
+    const meta = getCareerMeta(c.name)
+    return {
+      name:                   c.name,
+      alignment:              c.matchPercentage,
+      futureOutlook:          meta.futureOutlook,
+      aiImpact:               meta.aiImpact,
+      selfEmploymentPotential: meta.selfEmployment,
+      selfEmploymentExamples: meta.examples,
+    }
+  })
+}
+
+export function buildFutureScenario(subjects: SubjectProgress[]): FutureScenario | null {
+  const byAsc = [...subjects].sort((a, b) => a.level - b.level)
+  const target = byAsc.find(s => s.level < 4)
+  if (!target) return null
+
+  return {
+    subject:           target.displayName,
+    currentLevel:      target.level,
+    improvedLevel:     target.level + 1,
+    currentTrajectory: getCurrentTrajectoryText(target.subject, target.level),
+    improvedImpacts:   [
+      'Wider university options',
+      'Better scholarship opportunities',
+      'Improved competitiveness',
+      ...getImprovementImpacts(target.subject).slice(0, 1),
+    ].slice(0, 4),
+  }
+}
+
+const SENIOR_WHY: Record<string, string> = {
+  mathematics:          'Mathematics at Level 3+ is required for engineering, computing, and most STEM degree entry requirements.',
+  core_mathematics:     'Core Mathematics at Level 3 is the minimum for engineering and computing university programmes.',
+  biology:              'Biology at Level 3 is required for medicine, nursing, pharmacy, and all health sciences pathways.',
+  chemistry:            'Chemistry at Level 3 supports medicine, chemical engineering, and pharmaceutical career access.',
+  physics:              'Physics at Level 3 confirms engineering and applied sciences university pathway access.',
+  english:              'English at Level 3 is required for admission to virtually every university programme in Kenya.',
+  kiswahili:            'Kiswahili at Level 3 meets the national language requirement for most university programmes.',
+  kiswahili_ksl:        'Kiswahili at Level 3 meets the national language requirement for most university programmes.',
+  history_citizenship:  'History at Level 3 strengthens law, political science, and public administration pathways.',
+  history:              'History at Level 3 strengthens law, political science, and public administration pathways.',
+  geography:            'Geography at Level 3 opens environmental science, urban planning, and social sciences pathways.',
+  business_studies:     'Business Studies at Level 3 confirms commerce and entrepreneurship pathway access.',
+  computer_studies:     'Computing at Level 3 opens digital careers and technology-focused university programmes.',
+  social_studies:       'Social Studies at Level 3 strengthens the foundation for humanities and social sciences at university.',
+}
+
+const SENIOR_BENEFIT: Record<string, string> = {
+  mathematics:          'Engineering, computing, and STEM university cluster points improve. KCSE grade requirement met for more programmes.',
+  core_mathematics:     'Engineering and computing university cluster points improve significantly.',
+  biology:              'Medical, nursing, and health sciences programmes confirm eligibility. KCSE Biology requirement met.',
+  chemistry:            'Medicine and pharmacy KCSE cluster points strengthen. Chemical sciences careers accessible.',
+  physics:              'Engineering and architecture university eligibility confirms. Applied sciences pathways open.',
+  english:              'Across-the-board university eligibility strengthens. Communication-heavy careers confirm access.',
+  kiswahili:            'National language requirement satisfied. Additional humanities and social sciences options open.',
+  kiswahili_ksl:        'National language requirement satisfied. Additional humanities and social sciences options open.',
+  history_citizenship:  'Law and political science university cluster points strengthen. Governance careers confirm access.',
+  history:              'Law and political science university cluster points strengthen. Governance careers confirm access.',
+  geography:            'Environmental and social sciences university options widen. Geography-relevant careers open.',
+  business_studies:     'Commerce degree eligibility confirms. Entrepreneurship and management career paths open.',
+  computer_studies:     'Technology degree options widen. Digital economy career paths fully confirm access.',
+  social_studies:       'Humanities and social sciences university options strengthen. Public service career paths open.',
+}
+
+export function buildSeniorActionPriorities(
+  subjects: SubjectProgress[],
+  pathway: string | null | undefined,
+  firstName: string
+): SeniorActionPriority[] {
+  const pw    = pathway ?? 'chosen pathway'
+  const byAsc = [...subjects].sort((a, b) => a.level - b.level)
+  const top3  = byAsc.slice(0, 3)
+
+  return top3.map((s, i) => {
+    const sessions    = s.level === 1 ? 8 : s.level === 2 ? 6 : 4
+    const timeline    = s.level === 1 ? '6–10 weeks' : s.level === 2 ? '4–8 weeks' : '3–5 weeks'
+    const targetLevel = Math.min(4, s.level + 1)
+    const rank        = (i + 1) as 1 | 2 | 3
+
+    return {
+      rank,
+      subject:           s.displayName,
+      currentLevel:      s.level,
+      targetLevel,
+      whyItMatters:      SENIOR_WHY[s.subject]    ?? `${s.displayName} at Level ${targetLevel} is key to ${pw} access and university eligibility.`,
+      expectedBenefit:   SENIOR_BENEFIT[s.subject] ?? `Moving from Level ${s.level} to Level ${targetLevel} in ${s.displayName} will improve pathway and career access significantly.`,
+      compassSubject:    s.displayName,
+      compassReason:     rank === 1
+        ? `This is the single highest-impact subject — closing this gap has the broadest benefit for ${pw} and university access.`
+        : rank === 2
+        ? `Second highest-priority gap — consistent support here significantly strengthens overall pathway readiness.`
+        : `Third priority — closing this completes the foundation for KCSE performance in the ${pw} pathway.`,
+      estimatedSessions: sessions,
+      timeline,
+    }
+  })
+}
+
 // ─── Main Report Generator ────────────────────────────────────────────────────
 
 export function generateReport(
@@ -997,7 +1433,7 @@ export function generateReport(
       alternative_pathway:     pr.alternative_pathway,
     }
   }
-  // ── Junior 3-page redesign fields
+  // ── Junior 3-page redesign v1 fields
   let academicStatusLabel:       string | undefined
   let pathwayReadinessCards:     PathwayReadinessCard[] | undefined
   let pathwayRoadmap:            PathwayRoadmap | undefined
@@ -1017,6 +1453,30 @@ export function generateReport(
         : 0
       )
     }
+  }
+
+  // ── Junior redesign v2 fields
+  let juniorImprovementCascade: ReturnType<typeof buildJuniorImprovementCascade> = null
+  let juniorActionPriorities:   ReturnType<typeof buildJuniorActionPriorities> | undefined
+  let parentAction:             ReturnType<typeof buildParentAction> | undefined
+
+  if (isJunior && pathwayAnalysis && pathwayReadinessCards) {
+    juniorImprovementCascade = buildJuniorImprovementCascade(subjects, pathwayReadinessCards, pathwayAnalysis.recommendedPathway)
+    juniorActionPriorities   = buildJuniorActionPriorities(subjects, pathwayReadinessCards, pathwayAnalysis.recommendedPathway)
+    parentAction             = buildParentAction(subjects, firstName)
+  }
+
+  // ── Senior redesign v2 fields
+  let seniorReadinessIndicators: ReturnType<typeof buildSeniorReadinessIndicators> | undefined
+  let careerInsightCards:        ReturnType<typeof buildCareerInsightCards> | undefined
+  let futureScenario:            ReturnType<typeof buildFutureScenario> = null
+  let seniorActionPriorities:    ReturnType<typeof buildSeniorActionPriorities> | undefined
+
+  if (!isJunior && seniorGuidance) {
+    seniorReadinessIndicators = buildSeniorReadinessIndicators(subjects, studentProfile.pathway, clinicalOverview.trajectory, firstName)
+    careerInsightCards        = buildCareerInsightCards(seniorGuidance)
+    futureScenario            = buildFutureScenario(subjects)
+    seniorActionPriorities    = buildSeniorActionPriorities(subjects, studentProfile.pathway, firstName)
   }
 
   const holidayPlan        = generateHolidayPlan(subjects)
@@ -1047,11 +1507,21 @@ export function generateReport(
     graphData,
     reportId,
     generatedAt: new Date().toISOString(),
+    // v1 junior fields
     academicStatusLabel,
     pathwayReadinessCards,
     pathwayRoadmap,
     termActionPlan,
     juniorFutureOpportunities,
+    // v2 junior fields
+    juniorImprovementCascade,
+    juniorActionPriorities,
+    parentAction,
+    // v2 senior fields
+    seniorReadinessIndicators,
+    careerInsightCards,
+    futureScenario,
+    seniorActionPriorities,
   }
 }
 

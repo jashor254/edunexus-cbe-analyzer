@@ -19,11 +19,11 @@ export async function GET() {
 
     const service = createServiceClient()
 
-    // Fetch students with their assessments — include user_id to detect scenario
+    // Fetch students with their assessments — include added_by to detect scenario
     const { data: rawStudents, error } = await service
       .from('students')
       .select(`
-        id, name, grade, school, current_pathway, curriculum_type, created_at, user_id,
+        id, name, grade, school, current_pathway, curriculum_type, created_at, added_by,
         assessments(id, term, year, grade, subject_scores, created_at)
       `)
       .or(`user_id.eq.${user.id},parent_user_id.eq.${user.id}`)
@@ -33,9 +33,9 @@ export async function GET() {
 
     // teacherManaged = true  → Scenario B (teacher created, parent linked via invite)
     // teacherManaged = false → Scenario A (parent created directly, no teacher involved)
-    const students = (rawStudents ?? []).map(({ user_id, ...rest }) => ({
+    const students = (rawStudents ?? []).map(({ added_by, ...rest }) => ({
       ...rest,
-      teacherManaged: user_id !== user.id,
+      teacherManaged: added_by === 'teacher',
     }))
 
     // Get subscription/plan

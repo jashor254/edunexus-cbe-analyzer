@@ -3,6 +3,7 @@
 
 import { GoogleGenerativeAI, type GenerationConfig } from '@google/generative-ai'
 import { DEEPSEEK_CONFIG } from '@/lib/config/api'
+import { GEMINI_PRIMARY } from '@/lib/ai/models'
 
 const TIMEOUT_MS = 25_000
 const MAX_HISTORY = 20  // last 10 turns — keeps tokens bounded as session grows
@@ -175,7 +176,7 @@ async function streamGeminiFallback(
 
   const genAI = new GoogleGenerativeAI(key)
   const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
+    model: GEMINI_PRIMARY,
     systemInstruction: systemPrompt,
     generationConfig: {
       temperature,
@@ -190,7 +191,21 @@ async function streamGeminiFallback(
   }))
 
   const chat = model.startChat({ history: geminiHistory })
-  const result = await chat.sendMessageStream(userMessage)
+
+  // 15s timeout on Gemini TTFB — if no stream starts, fall through to DeepSeek
+  const GEMINI_TIMEOUT_MS = 15_000
+  const result = await new Promise<Awaited<ReturnType<typeof chat.sendMessageStream>>>(
+    (resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error('Gemini stream timeout after 15s')),
+        GEMINI_TIMEOUT_MS
+      )
+      void chat.sendMessageStream(userMessage).then(
+        r => { clearTimeout(timer); resolve(r) },
+        e => { clearTimeout(timer); reject(e) }
+      )
+    }
+  )
 
   const encoder = new TextEncoder()
   return new ReadableStream<Uint8Array>({

@@ -48,9 +48,10 @@ export async function GET(req: Request) {
     const classIds = classLinks.map(c => c.class_id)
 
     // Get active assignments for those classes
+    // Note: 'description' column does not exist — schema uses 'instructions' + 'topic'
     const { data: assignments, error } = await db
       .from('assignments')
-      .select('id, class_id, title, description, due_date, status, created_at, teacher_classes(name, grade, subject), teachers(full_name)')
+      .select('id, class_id, title, topic, instructions, type, is_compass_guided, due_date, status, created_at, teacher_classes(name, grade, subject), teachers(full_name)')
       .in('class_id', classIds)
       .eq('status', 'active')
       .order('due_date', { ascending: true })

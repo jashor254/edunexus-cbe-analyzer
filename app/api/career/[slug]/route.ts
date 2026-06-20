@@ -2,7 +2,14 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized, apiNotFound } from '@/lib/api/response'
-import { getCareerBySlug, getMatchesForStudent } from '@/lib/career/careerEngine'
+import {
+  getCareerBySlugWithCOS,
+  getMatchesForStudent,
+  searchOrGenerateCareer,
+  getCapabilityProfile,
+} from '@/lib/career/careerEngine'
+import { computeCapabilityMatches } from '@/lib/career/capabilityMatchEngine'
+import type { CapabilityCareerMatch } from '@/lib/career/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,17 +23,26 @@ export async function GET(
     if (authError || !user) return apiUnauthorized()
 
     const { slug } = await params
-    const career = await getCareerBySlug(slug)
+    let career = await getCareerBySlugWithCOS(slug)
+
+    // No exact slug match — generate on the fly so links never dead-end
+    if (!career) {
+      try {
+        career = await searchOrGenerateCareer(slug.replace(/-/g, ' '))
+      } catch (genErr) {
+        console.error('[career/slug] generation failed', genErr)
+      }
+    }
 
     if (!career) return apiNotFound(`Career '${slug}' not found`)
 
-    // Optionally attach match score if studentId provided
     const { searchParams } = new URL(req.url)
     const studentId = searchParams.get('studentId')
-    let studentMatch = null
+
+    let studentMatch   = null
+    let capabilityMatch: CapabilityCareerMatch | null = null
 
     if (studentId) {
-      // Verify student belongs to this user
       const { data: student } = await supabase
         .from('students')
         .select('id')
@@ -35,12 +51,28 @@ export async function GET(
         .maybeSingle()
 
       if (student) {
+        // Legacy AI match (kept for backward compat)
         const matches = await getMatchesForStudent(studentId)
         studentMatch = matches.find((m) => m.career.slug === slug) ?? null
+
+        // Capability match — fast, deterministic, no tokens
+        if (career.required_capabilities) {
+          const profile = await getCapabilityProfile(studentId)
+          if (profile) {
+            const report = computeCapabilityMatches(studentId, profile, [career])
+            const allMatches = [
+              ...report.primary,
+              ...report.stretch,
+              ...report.alternative,
+              ...report.entrepreneurial,
+            ]
+            capabilityMatch = allMatches.find(m => m.career_slug === slug) ?? null
+          }
+        }
       }
     }
 
-    return apiSuccess({ career, student_match: studentMatch })
+    return apiSuccess({ career, student_match: studentMatch, capability_match: capabilityMatch })
   } catch (err) {
     console.error('[career/slug]', err)
     return apiError('Failed to load career')

@@ -2,12 +2,13 @@
 // Shared Google Gemini API helper — fast chat responses
 
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GEMINI_PRIMARY } from '@/lib/ai/models'
 
 function getModel() {
   const key = process.env.GOOGLE_GEMINI_API_KEY
   if (!key) throw new Error('Missing GOOGLE_GEMINI_API_KEY in environment variables')
   return new GoogleGenerativeAI(key).getGenerativeModel({
-    model: 'gemini-1.5-flash',
+    model: GEMINI_PRIMARY,
     generationConfig: { temperature: 0.7, maxOutputTokens: 800 },
   })
 }

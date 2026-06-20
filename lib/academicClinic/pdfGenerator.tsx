@@ -1,194 +1,172 @@
 // lib/academicClinic/pdfGenerator.tsx
-// Junior School: 3-page Academic Clinic Report (Grades 7–9)
-// Senior School: 7-page Academic Clinic Report (Grades 10–12, legacy)
+// Junior School:  3-page parent decision-support report (Grades 7–9)
+// Senior School:  3-page parent decision-support report (Grades 10–12)
 
 import React from 'react'
 import {
-  Document, Page, Text, View, StyleSheet, Font, Svg, Circle, Polygon,
+  Document, Page, Text, View, StyleSheet, Svg, Circle, Polygon,
 } from '@react-pdf/renderer'
 import type { AcademicClinicReport, SubjectProgress } from './reportGenerator'
-import type { PathwayReadinessCard, PathwayGapRow } from './types'
+import type {
+  PathwayReadinessCard, PathwayGapRow,
+  JuniorActionPriority, SeniorActionPriority,
+  CareerInsightCard,
+} from './types'
 import { getLevelLabel, getClinicalObservation } from './reportGenerator'
 
 // ─── Color Palette ────────────────────────────────────────────────────────────
 
 const C = {
-  navy:        '#1a2744',
-  navyLight:   '#243358',
-  white:       '#ffffff',
-  offWhite:    '#f8fafc',
-  border:      '#e2e8f0',
-  text:        '#1e293b',
-  muted:       '#64748b',
-  gold:        '#f59e0b',
-  goldLight:   '#fef3c7',
-  // Level colours
-  l1:          '#dc2626',   // Red   — Emerging
-  l1bg:        '#fee2e2',
-  l2:          '#d97706',   // Amber — Developing
-  l2bg:        '#fef3c7',
-  l3:          '#16a34a',   // Green — Proficient
-  l3bg:        '#dcfce7',
-  l4:          '#7c3aed',   // Purple — Exemplary
-  l4bg:        '#ede9fe',
-  // Trajectory
-  improving:   '#16a34a',
-  stable:      '#3b82f6',
-  attention:   '#d97706',
-  critical:    '#dc2626',
+  navy:      '#1a2744',
+  navyLight: '#243358',
+  white:     '#ffffff',
+  offWhite:  '#f8fafc',
+  border:    '#e2e8f0',
+  text:      '#1e293b',
+  muted:     '#64748b',
+  gold:      '#f59e0b',
+  goldLight: '#fef3c7',
+  l1: '#dc2626', l1bg: '#fee2e2',
+  l2: '#d97706', l2bg: '#fef3c7',
+  l3: '#16a34a', l3bg: '#dcfce7',
+  l4: '#7c3aed', l4bg: '#ede9fe',
+  improving: '#16a34a', stable: '#3b82f6', attention: '#d97706', critical: '#dc2626',
 }
 
-function levelColor(l: number)   { return [C.l1, C.l2, C.l3, C.l4][l - 1] ?? C.muted }
-function levelBg(l: number)      { return [C.l1bg, C.l2bg, C.l3bg, C.l4bg][l - 1] ?? C.offWhite }
-function trendArrow(t: string)   { return t === 'improving' ? '+' : t === 'declining' ? '-' : '=' }
-function trendColor(t: string)   { return t === 'improving' ? C.l3 : t === 'declining' ? C.l1 : C.muted }
+function levelColor(l: number)  { return [C.l1, C.l2, C.l3, C.l4][l - 1] ?? C.muted }
+function levelBg(l: number)     { return [C.l1bg, C.l2bg, C.l3bg, C.l4bg][l - 1] ?? C.offWhite }
+function trendArrow(t: string)  { return t === 'improving' ? '+' : t === 'declining' ? '-' : '=' }
+function trendColor(t: string)  { return t === 'improving' ? C.l3 : t === 'declining' ? C.l1 : C.muted }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const S = StyleSheet.create({
-  // ── Pages
-  coverPage: { backgroundColor: C.navy, padding: 0, fontFamily: 'Helvetica' },
-  page:      { backgroundColor: C.white, fontFamily: 'Helvetica', paddingBottom: 50 },
+  page:     { backgroundColor: C.white, fontFamily: 'Helvetica', paddingBottom: 50 },
 
-  // ── Cover elements
-  coverHeader: { backgroundColor: C.navyLight, paddingHorizontal: 48, paddingVertical: 36, borderBottomWidth: 3, borderBottomColor: C.gold },
-  coverBrand:  { fontSize: 11, color: C.gold, letterSpacing: 3, marginBottom: 4 },
-  coverTitle:  { fontSize: 30, fontWeight: 700, color: C.white },
-  coverBody:   { paddingHorizontal: 48, paddingTop: 52 },
-  coverName:   { fontSize: 38, fontWeight: 700, color: C.gold, marginBottom: 10 },
-  coverMeta:   { fontSize: 13, color: '#94a3b8', marginBottom: 6 },
-  coverDivider:{ borderTopWidth: 1, borderTopColor: '#2d4070', marginVertical: 36 },
-  coverConfidential: { fontSize: 9, color: '#64748b', letterSpacing: 2, marginBottom: 6 },
-  coverReportId:     { fontSize: 9, color: '#475569' },
-  coverFooter: { position: 'absolute', bottom: 48, left: 48, right: 48 },
+  // Page header
+  pageHeader:      { backgroundColor: C.navy, paddingHorizontal: 36, paddingVertical: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  pageHeaderBrand: { fontSize: 8, color: C.gold, letterSpacing: 2 },
+  pageHeaderName:  { fontSize: 9, color: '#94a3b8', marginTop: 2 },
+  pageHeaderRight: { alignItems: 'flex-end' },
+  pageHeaderPage:  { fontSize: 8, color: '#94a3b8' },
+  pageHeaderId:    { fontSize: 7, color: '#475569', marginTop: 2 },
+  pageGoldLine:    { height: 2, backgroundColor: C.gold },
 
-  // ── Page header band
-  pageHeader:     { backgroundColor: C.navy, paddingHorizontal: 36, paddingVertical: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  pageHeaderBrand:{ fontSize: 8, color: C.gold, letterSpacing: 2 },
-  pageHeaderName: { fontSize: 9, color: '#94a3b8', marginTop: 2 },
-  pageHeaderRight:{ alignItems: 'flex-end' },
-  pageHeaderPage: { fontSize: 8, color: '#94a3b8' },
-  pageHeaderId:   { fontSize: 7, color: '#475569', marginTop: 2 },
-  pageGoldLine:   { height: 2, backgroundColor: C.gold },
-
-  // ── Page footer
+  // Page footer
   pageFooter:     { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 36, paddingVertical: 10, borderTopWidth: 1, borderTopColor: C.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   pageFooterText: { fontSize: 7, color: C.muted },
 
-  // ── Content
-  content: { paddingHorizontal: 36, paddingTop: 24 },
+  // Content
+  content: { paddingHorizontal: 36, paddingTop: 20 },
 
-  // ── Section headers
-  sectionLabel: { fontSize: 8, color: C.muted, letterSpacing: 2, marginBottom: 6 },
+  // Section labels
+  sectionLabel: { fontSize: 8, color: C.muted, letterSpacing: 2, marginBottom: 4 },
   sectionTitle: { fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 4 },
-  divider:      { borderTopWidth: 1, borderTopColor: C.border, marginVertical: 16 },
+  divider:      { borderTopWidth: 1, borderTopColor: C.border, marginVertical: 14 },
   dividerThin:  { borderTopWidth: 1, borderTopColor: C.border, marginVertical: 10 },
 
-  // ── Badges
+  // Badges
   badge:        { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 4 },
   badgeText:    { fontSize: 9, fontWeight: 700, letterSpacing: 1 },
   levelCircle:  { width: 26, height: 26, borderRadius: 13, justifyContent: 'center', alignItems: 'center' },
   levelCircleText: { fontSize: 11, fontWeight: 700 },
 
-  // ── Vitals row
-  vitalsRow: { flexDirection: 'row', marginBottom: 20 },
-  vitalCard: { flex: 1, padding: 12, borderRadius: 6, marginRight: 8 },
-  vitalLabel:{ fontSize: 8, color: C.muted, letterSpacing: 1, marginBottom: 4 },
-  vitalValue:{ fontSize: 22, fontWeight: 700 },
-  vitalSub:  { fontSize: 8, color: C.muted, marginTop: 2 },
+  // List rows
+  listRow:  { flexDirection: 'row', alignItems: 'center', marginBottom: 7 },
+  listDot:  { width: 8, height: 8, borderRadius: 4, marginRight: 10 },
+  listText: { fontSize: 9.5, color: C.text, flex: 1 },
+  listLevel:{ fontSize: 8, color: C.muted },
 
-  // ── Clinical paragraph box
-  clinBox:   { backgroundColor: C.offWhite, borderRadius: 6, padding: 16, borderLeftWidth: 3, borderLeftColor: C.gold, marginBottom: 20 },
-  clinText:  { fontSize: 10, color: C.text, lineHeight: 1.6 },
+  // Progress bar
+  barTrack: { flex: 1, height: 8, backgroundColor: C.border, borderRadius: 4, marginHorizontal: 8, overflow: 'hidden' },
+  barFill:  { height: 8, borderRadius: 4 },
 
-  // ── Strength / priority rows
-  listRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  listDot:   { width: 8, height: 8, borderRadius: 4, marginRight: 10 },
-  listText:  { fontSize: 10, color: C.text, flex: 1 },
-  listLevel: { fontSize: 8, color: C.muted },
-
-  // ── Subject matrix row
-  subjectRow:  { flexDirection: 'row', alignItems: 'center', paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: C.border },
-  subjectEmoji:{ fontSize: 11, width: 22 },
-  subjectName: { fontSize: 9, fontWeight: 700, color: C.text, width: 120 },
-  subjectLabel:{ fontSize: 8, color: C.muted, width: 62 },
-  // progress bar
-  barTrack:    { flex: 1, height: 8, backgroundColor: C.border, borderRadius: 4, marginHorizontal: 8, overflow: 'hidden' },
-  barFill:     { height: 8, borderRadius: 4 },
-  subjectTrend:{ fontSize: 11, width: 16, textAlign: 'center' },
-  subjectObs:  { fontSize: 7.5, color: C.muted, marginTop: 3, marginLeft: 22, width: 390 },
-
-  // ── Pathway readiness bars
+  // Readiness track
   readinessTrack: { height: 8, backgroundColor: '#E2E8F0', borderRadius: 4, overflow: 'hidden' },
   readinessFill:  { height: 8, borderRadius: 4 },
-  // ── STEM potential box
-  stemPotentialBox:   { backgroundColor: '#FEF3C7', borderLeftWidth: 3, borderLeftColor: '#D97706', borderRadius: 4, padding: 10, marginTop: 10, marginBottom: 0 },
-  stemPotentialTitle: { fontSize: 9, fontWeight: 700, color: '#92400E', marginBottom: 4, letterSpacing: 0.5 },
-  stemPotentialBody:  { fontSize: 8, color: '#78350F', marginBottom: 6 },
-  stemGapItem:        { fontSize: 8, color: '#92400E', marginBottom: 2 },
-  confidenceSubtitle: { fontSize: 7.5, color: '#64748B', fontStyle: 'italic', marginTop: 3 },
-  // ── Unlock / maintain boxes
-  unlockBox:    { borderLeftWidth: 2, borderLeftColor: '#1D9E75', backgroundColor: '#F0FDF4', borderRadius: 4, padding: 8 },
-  unlockTitle:  { fontSize: 8, fontWeight: 700, color: '#065F46', letterSpacing: 0.5, marginBottom: 5 },
-  maintainBox:  { borderLeftWidth: 2, borderLeftColor: '#378ADD', backgroundColor: '#EFF6FF', borderRadius: 4, padding: 8 },
-  maintainTitle:{ fontSize: 8, fontWeight: 700, color: '#1E40AF', letterSpacing: 0.5, marginBottom: 5 },
-  recommendedBg: { backgroundColor: C.navyLight, borderRadius: 6, padding: 14, marginTop: 12 },
 
-  // ── Career cards
-  careerCard:    { borderWidth: 1, borderColor: C.border, borderRadius: 6, padding: 12, marginBottom: 10 },
-  careerHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  careerName:    { fontSize: 11, fontWeight: 700, color: C.text },
-  careerDetail:  { fontSize: 9, color: C.muted, marginBottom: 3 },
-  honestBox:     { backgroundColor: C.offWhite, borderRadius: 6, padding: 14, borderLeftWidth: 3, borderLeftColor: C.l1 },
+  // Clinical paragraph
+  clinBox:  { backgroundColor: C.offWhite, borderRadius: 6, padding: 14, borderLeftWidth: 3, borderLeftColor: C.gold, marginBottom: 14 },
+  clinText: { fontSize: 9.5, color: C.text, lineHeight: 1.6 },
 
-  // ── Week cards
-  weekCard:      { borderLeftWidth: 3, paddingLeft: 12, marginBottom: 14 },
-  weekTitle:     { fontSize: 10, fontWeight: 700, color: C.text, marginBottom: 2 },
-  weekMeta:      { fontSize: 8, color: C.muted, marginBottom: 6 },
-  weekActivity:  { fontSize: 8.5, color: C.text, marginBottom: 3 },
-  weekBullet:    { fontSize: 8.5, color: C.muted },
+  // Subject row (compact grid)
+  subjectGridRow:  { flexDirection: 'row', alignItems: 'center', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: C.border },
+  subjectDot:      { width: 8, height: 8, borderRadius: 2, marginRight: 6 },
+  subjectGridName: { fontSize: 8.5, color: C.text, flex: 1 },
 
-  // ── Daily schedule
-  scheduleRow:   { flexDirection: 'row', paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: C.border, alignItems: 'center' },
-  scheduleTime:  { fontSize: 8.5, fontWeight: 700, color: C.text, width: 80 },
-  scheduleText:  { fontSize: 8.5, color: C.text, flex: 1 },
+  // Gap table
+  gapRow:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
 
-  // ── Compass
-  compassHighlight: { backgroundColor: C.navy, borderRadius: 8, padding: 18, marginBottom: 16 },
-  compassTitle:     { fontSize: 10, color: C.gold, letterSpacing: 1, marginBottom: 6 },
-  compassSubject:   { fontSize: 18, fontWeight: 700, color: C.white },
-  topicRow:         { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 },
-  topicNum:         { fontSize: 9, fontWeight: 700, color: C.gold, width: 20 },
-  topicText:        { fontSize: 9.5, color: C.text, flex: 1, lineHeight: 1.5 },
+  // Compass Rx box
+  rxBox:       { backgroundColor: C.navy, borderRadius: 6, padding: 14, marginBottom: 12 },
+  rxTitle:     { fontSize: 9, color: C.gold, letterSpacing: 1, marginBottom: 6 },
+  rxLabel:     { fontSize: 7.5, color: '#94a3b8', letterSpacing: 0.5, marginBottom: 2 },
+  rxValue:     { fontSize: 10, color: C.white, marginBottom: 8 },
+  rxDetailRow: { flexDirection: 'row', marginBottom: 5 },
+  rxDetailKey: { fontSize: 8, color: '#94a3b8', width: 110 },
+  rxDetailVal: { fontSize: 8.5, color: C.white, flex: 1, lineHeight: 1.4 },
+  rxCTA:       { backgroundColor: C.gold, borderRadius: 4, paddingVertical: 6, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', marginTop: 8 },
+  rxCtaText:   { fontSize: 9, fontWeight: 700, color: C.navy, flex: 1 },
+  rxCtaLink:   { fontSize: 9, fontWeight: 700, color: C.navy },
 
-  // ── Dream career section
-  dreamSection:    { backgroundColor: '#E6F1FB', borderLeftWidth: 3, borderLeftColor: '#185FA5', borderRadius: 4, padding: 10, marginBottom: 12 },
-  dreamLabel:      { fontSize: 8, fontWeight: 700, color: '#185FA5', letterSpacing: 0.5, marginBottom: 2 },
-  dreamTitle:      { fontSize: 14, fontWeight: 700, color: '#0C447C', marginBottom: 6 },
-  dreamMeterRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 3 },
-  dreamMeterTrack: { flex: 1, height: 10, backgroundColor: '#B5D4F4', borderRadius: 5, marginRight: 8, overflow: 'hidden' },
-  dreamMeterFill:  { height: 10, backgroundColor: '#185FA5', borderRadius: 5 },
-  dreamScore:      { fontSize: 16, fontWeight: 700, color: '#0C447C', width: 40 },
-  dreamReadiness:  { fontSize: 9, color: '#185FA5', marginBottom: 6 },
-  dreamGapsBox:    { backgroundColor: '#FAEEDA', borderLeftWidth: 2, borderLeftColor: '#EF9F27', padding: 6, borderRadius: 3, marginBottom: 6 },
-  dreamGapsTitle:  { fontSize: 8, fontWeight: 700, color: '#854F0B', marginBottom: 3 },
-  dreamGapItem:    { fontSize: 8, color: '#633806', marginBottom: 2 },
-  dreamEstimate:   { fontSize: 8, color: '#854F0B', fontStyle: 'italic', marginTop: 4 },
-  dreamEncourage:  { fontSize: 8, color: '#0C447C', lineHeight: 1.5, marginBottom: 6 },
-  dreamAltTitle:   { fontSize: 8, fontWeight: 700, color: '#185FA5', marginBottom: 2 },
-  dreamAltItem:    { fontSize: 8, color: '#185FA5', marginBottom: 1 },
+  // Priority blocks
+  priorityBlock:   { borderLeftWidth: 3, borderRadius: 4, paddingLeft: 12, paddingRight: 10, paddingVertical: 10, marginBottom: 12 },
+  priorityRankRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  priorityRankBadge: { width: 22, height: 22, borderRadius: 3, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
+  priorityRankText:  { fontSize: 10, fontWeight: 700 },
+  prioritySubject:   { fontSize: 12, fontWeight: 700, color: C.text },
+  priorityLevelRow:  { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  priorityDetailRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 },
+  priorityKey:       { fontSize: 8, color: C.muted, width: 100 },
+  priorityVal:       { fontSize: 8.5, color: C.text, flex: 1, lineHeight: 1.4 },
 
-  // ── Teacher page
-  teacherBox:    { borderWidth: 1, borderColor: C.border, borderRadius: 6, padding: 14, marginBottom: 14 },
-  teacherLabel:  { fontSize: 8, color: C.muted, letterSpacing: 1, marginBottom: 6 },
-  teacherLine:   { borderBottomWidth: 1, borderBottomColor: C.border, marginBottom: 10, height: 18 },
-  sigRow:        { flexDirection: 'row', marginTop: 8 },
-  sigBlock:      { flex: 1, marginRight: 16 },
-  sigLine:       { borderBottomWidth: 1, borderBottomColor: C.text, marginBottom: 4, height: 24 },
-  sigLabel:      { fontSize: 8, color: C.muted },
+  // Parent action
+  parentActionBox: { borderWidth: 1.5, borderColor: C.gold, borderRadius: 6, padding: 12, marginBottom: 12, backgroundColor: C.goldLight },
+  parentActionLabel:{ fontSize: 8, fontWeight: 700, color: '#92400e', letterSpacing: 1, marginBottom: 5 },
+  parentActionText: { fontSize: 9.5, color: '#78350f', lineHeight: 1.5 },
+
+  // Career directions (junior)
+  careerDirBox:  { backgroundColor: C.offWhite, borderRadius: 6, padding: 12, marginBottom: 10 },
+  careerDirTitle:{ fontSize: 9, fontWeight: 700, color: C.text, letterSpacing: 1, marginBottom: 6 },
+  careerDirItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  careerDirDot:  { width: 5, height: 5, borderRadius: 3, backgroundColor: C.navy, marginRight: 8 },
+  careerDirText: { fontSize: 9, color: C.text },
+
+  // Senior readiness indicators
+  indicatorRow:    { flexDirection: 'row', marginBottom: 14 },
+  indicatorCard:   { flex: 1, borderRadius: 6, padding: 10, marginRight: 8 },
+  indicatorLabel:  { fontSize: 7.5, color: C.muted, letterSpacing: 0.5, marginBottom: 4 },
+  indicatorValue:  { fontSize: 11, fontWeight: 700, marginBottom: 4 },
+  indicatorDetail: { fontSize: 8, lineHeight: 1.4 },
+
+  // Career insight cards (senior)
+  insightCard:      { borderWidth: 1, borderColor: C.border, borderRadius: 5, padding: 10, marginBottom: 8 },
+  insightHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  insightName:      { fontSize: 10, fontWeight: 700, color: C.text, flex: 1 },
+  insightAlignment: { fontSize: 12, fontWeight: 700, color: C.navy },
+  insightMetaRow:   { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 4 },
+  insightMetaChip:  { flexDirection: 'row', alignItems: 'center', marginRight: 12, marginBottom: 2 },
+  insightMetaKey:   { fontSize: 7.5, color: C.muted, marginRight: 3 },
+  insightMetaVal:   { fontSize: 7.5, fontWeight: 700, color: C.text },
+  insightExamples:  { fontSize: 7.5, color: C.muted, lineHeight: 1.3 },
+
+  // Future scenario
+  scenarioRow: { flexDirection: 'row', marginTop: 8 },
+  scenarioBox: { flex: 1, borderRadius: 6, padding: 12 },
+  scenarioTitle: { fontSize: 8, fontWeight: 700, letterSpacing: 0.5, marginBottom: 6 },
+  scenarioBody:  { fontSize: 8.5, lineHeight: 1.45 },
+  scenarioCheck: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 },
+  scenarioCheckMark: { fontSize: 9, fontWeight: 700, width: 14 },
+  scenarioCheckText: { fontSize: 8.5, flex: 1, lineHeight: 1.35 },
+
+  // Senior pathway readiness score (page 1)
+  snapshotScoreBlock: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
+  snapshotScoreCircle: { width: 80, height: 80, borderRadius: 40, borderWidth: 5, justifyContent: 'center', alignItems: 'center' },
+  snapshotScoreValue:  { fontSize: 26, fontWeight: 700 },
+  snapshotScoreLabel:  { fontSize: 8, color: C.muted, marginTop: 4, textAlign: 'center' },
 })
 
-// ─── Reusable: Page Header ────────────────────────────────────────────────────
+// ─── Shared Components ────────────────────────────────────────────────────────
 
 function PageHeader({ name, grade, pageNum, totalPages, reportId }: {
   name: string; grade: number; pageNum: number; totalPages: number; reportId: string
@@ -210,8 +188,6 @@ function PageHeader({ name, grade, pageNum, totalPages, reportId }: {
   )
 }
 
-// ─── Reusable: Page Footer ────────────────────────────────────────────────────
-
 function PageFooter({ reportId }: { reportId: string }) {
   return (
     <View style={S.pageFooter}>
@@ -221,24 +197,6 @@ function PageFooter({ reportId }: { reportId: string }) {
     </View>
   )
 }
-
-// ─── Reusable: Trajectory Badge ───────────────────────────────────────────────
-
-function TrajectoryBadge({ t }: { t: 'IMPROVING' | 'STABLE' | 'NEEDS ATTENTION' | 'CRITICAL' }) {
-  const colors: Record<string, string> = {
-    IMPROVING: C.l3, STABLE: '#3b82f6', 'NEEDS ATTENTION': C.l2, CRITICAL: C.l1,
-  }
-  const bgs: Record<string, string> = {
-    IMPROVING: C.l3bg, STABLE: '#dbeafe', 'NEEDS ATTENTION': C.l2bg, CRITICAL: C.l1bg,
-  }
-  return (
-    <View style={[S.badge, { backgroundColor: bgs[t] ?? C.offWhite }]}>
-      <Text style={[S.badgeText, { color: colors[t] ?? C.muted }]}>{t}</Text>
-    </View>
-  )
-}
-
-// ─── Reusable: Level Badge ────────────────────────────────────────────────────
 
 function LevelBadge({ level }: { level: number }) {
   return (
@@ -250,953 +208,64 @@ function LevelBadge({ level }: { level: number }) {
   )
 }
 
-// ─── Reusable: Progress Bar (View-based) ─────────────────────────────────────
-
-function ProgressBar({ pct, color, height = 8 }: { pct: number; color: string; height?: number }) {
-  const safePct = Math.max(0, Math.min(100, pct))
+function TrajectoryBadge({ t }: { t: 'IMPROVING' | 'STABLE' | 'NEEDS ATTENTION' | 'CRITICAL' }) {
+  const colors: Record<string, string> = { IMPROVING: C.l3, STABLE: '#3b82f6', 'NEEDS ATTENTION': C.l2, CRITICAL: C.l1 }
+  const bgs:    Record<string, string> = { IMPROVING: C.l3bg, STABLE: '#dbeafe', 'NEEDS ATTENTION': C.l2bg, CRITICAL: C.l1bg }
   return (
-    <View style={[S.barTrack, { height }]}>
-      <View style={[S.barFill, { width: `${safePct}%`, backgroundColor: color, height }]} />
+    <View style={[S.badge, { backgroundColor: bgs[t] ?? C.offWhite }]}>
+      <Text style={[S.badgeText, { color: colors[t] ?? C.muted }]}>{t}</Text>
     </View>
   )
 }
 
-// ─── PAGE 1: COVER ────────────────────────────────────────────────────────────
-
-function CoverPage({ report }: { report: AcademicClinicReport }) {
-  const sp      = report.studentProfile
-  const dateStr = new Date(report.generatedAt).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })
-
+function ProgressBar({ pct, color, height = 8 }: { pct: number; color: string; height?: number }) {
   return (
-    <Page size="A4" style={S.coverPage}>
-      {/* Header band */}
-      <View style={[S.coverHeader, { flexDirection: 'row', alignItems: 'center', gap: 20 }]}>
-        {/* Compass icon */}
-        <Svg width={52} height={52} viewBox="0 0 64 64">
-          <Circle cx="32" cy="32" r="30" fill="#243358" stroke="#4f46e5" strokeWidth="1.5" />
-          <Circle cx="32" cy="32" r="20" fill="none" stroke="#312e81" strokeWidth="0.8" strokeDasharray="2 5" />
-          <Polygon points="32,4 36.5,28.5 32,30 27.5,28.5" fill="#f59e0b" />
-          <Polygon points="32,60 36.5,35.5 32,34 27.5,35.5" fill="#818cf8" />
-          <Polygon points="4,32 28.5,27.5 30,32 28.5,36.5" fill="#10b981" />
-          <Polygon points="60,32 35.5,27.5 34,32 35.5,36.5" fill="#f43f5e" />
-          <Circle cx="32" cy="32" r="4" fill="#0f0e2a" stroke="#f59e0b" strokeWidth="1.5" />
-          <Circle cx="32" cy="32" r="1.8" fill="#fde68a" />
-        </Svg>
-        {/* Wordmark */}
-        <View>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 4 }}>
-            <Text style={{ fontSize: 30, fontWeight: 700, color: C.white }}>Edu</Text>
-            <Text style={{ fontSize: 30, fontWeight: 700, color: C.gold }}>Nexus</Text>
-          </View>
-          <Text style={S.coverBrand}>Academic Clinic</Text>
-          <Text style={{ fontSize: 10, color: '#94a3b8', marginTop: 4, letterSpacing: 1.5 }}>
-            EVERY CHILD FINDS THEIR WAY
-          </Text>
-        </View>
-      </View>
-
-      {/* Body */}
-      <View style={S.coverBody}>
-        <Text style={S.coverName}>{sp.name}</Text>
-        <Text style={S.coverMeta}>Grade {sp.grade} · {sp.level}</Text>
-        {sp.school && <Text style={S.coverMeta}>{sp.school}</Text>}
-        <Text style={S.coverMeta}>Term {sp.term}, {sp.year}</Text>
-
-        <View style={S.coverDivider} />
-
-        {/* Key stats */}
-        <View style={{ flexDirection: 'row', marginBottom: 40 }}>
-          <View style={{ marginRight: 36 }}>
-            <Text style={{ fontSize: 9, color: C.gold, letterSpacing: 2, marginBottom: 4 }}>OVERALL COMPETENCY</Text>
-            <Text style={{ fontSize: 28, fontWeight: 700, color: C.white }}>
-              {report.clinicalOverview.overallCompetencyLabel}
-            </Text>
-            <Text style={{ fontSize: 10, color: '#94a3b8' }}>Level {report.clinicalOverview.overallCompetencyLevel} of 4</Text>
-          </View>
-          <View>
-            <Text style={{ fontSize: 9, color: C.gold, letterSpacing: 2, marginBottom: 4 }}>TRAJECTORY</Text>
-            <Text style={{ fontSize: 14, fontWeight: 700, color: C.white }}>{report.clinicalOverview.trajectory}</Text>
-            <Text style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>
-              {report.subjectBreakdown.length} subjects assessed
-            </Text>
-          </View>
-        </View>
-
-        <View style={{ borderTopWidth: 1, borderTopColor: '#2d4070', paddingTop: 24 }}>
-          <Text style={S.coverConfidential}>CONFIDENTIAL — FOR PARENT AND TEACHER USE ONLY</Text>
-          <Text style={S.coverReportId}>Report ID: {report.reportId}</Text>
-          <Text style={[S.coverReportId, { marginTop: 4 }]}>Generated: {dateStr}</Text>
-        </View>
-      </View>
-
-      {/* Gold accent bar at bottom */}
-      <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 4, backgroundColor: C.gold }} />
-    </Page>
+    <View style={[S.barTrack, { height }]}>
+      <View style={[S.barFill, { width: `${Math.max(0, Math.min(100, pct))}%`, backgroundColor: color, height }]} />
+    </View>
   )
 }
-
-// ─── PAGE 2: CLINICAL OVERVIEW ────────────────────────────────────────────────
-
-function ClinicalOverviewPage({ report }: { report: AcademicClinicReport }) {
-  const co = report.clinicalOverview
-  const sp = report.studentProfile
-
-  return (
-    <Page size="A4" style={S.page}>
-      <PageHeader name={sp.name} grade={sp.grade} pageNum={2} totalPages={7} reportId={report.reportId} />
-      <View style={S.content}>
-        <Text style={S.sectionLabel}>CLINICAL OVERVIEW</Text>
-        <Text style={S.sectionTitle}>Academic Performance Assessment</Text>
-        <View style={S.divider} />
-
-        {/* Overall competency + trajectory row */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
-          <View style={{ marginRight: 16 }}>
-            <Text style={{ fontSize: 8, color: C.muted, letterSpacing: 1, marginBottom: 4 }}>OVERALL COMPETENCY</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={[S.levelCircle, { backgroundColor: levelBg(co.overallCompetencyLevel), marginRight: 8 }]}>
-                <Text style={[S.levelCircleText, { color: levelColor(co.overallCompetencyLevel) }]}>
-                  {co.overallCompetencyLevel}
-                </Text>
-              </View>
-              <LevelBadge level={co.overallCompetencyLevel} />
-            </View>
-          </View>
-          <View style={{ flex: 1 }} />
-          <View>
-            <Text style={{ fontSize: 8, color: C.muted, letterSpacing: 1, marginBottom: 4 }}>TRAJECTORY</Text>
-            <TrajectoryBadge t={co.trajectory} />
-          </View>
-        </View>
-
-        {/* Vitals */}
-        <View style={S.vitalsRow}>
-          <View style={[S.vitalCard, { backgroundColor: '#dbeafe', marginRight: 8 }]}>
-            <Text style={S.vitalLabel}>SUBJECTS</Text>
-            <Text style={[S.vitalValue, { color: '#3b82f6' }]}>{report.subjectBreakdown.length}</Text>
-            <Text style={S.vitalSub}>assessed</Text>
-          </View>
-          <View style={[S.vitalCard, { backgroundColor: C.l3bg, marginRight: 8 }]}>
-            <Text style={S.vitalLabel}>STRENGTHS</Text>
-            <Text style={[S.vitalValue, { color: C.l3 }]}>{report.vitals.strengths}</Text>
-            <Text style={S.vitalSub}>Level 3–4</Text>
-          </View>
-          <View style={[S.vitalCard, { backgroundColor: C.l2bg, marginRight: 8 }]}>
-            <Text style={S.vitalLabel}>DEVELOPING</Text>
-            <Text style={[S.vitalValue, { color: C.l2 }]}>{report.vitals.needsWork}</Text>
-            <Text style={S.vitalSub}>Level 2</Text>
-          </View>
-          <View style={[S.vitalCard, { backgroundColor: C.l1bg, marginRight: 0 }]}>
-            <Text style={S.vitalLabel}>PRIORITY</Text>
-            <Text style={[S.vitalValue, { color: C.l1 }]}>{report.vitals.urgent}</Text>
-            <Text style={S.vitalSub}>Level 1</Text>
-          </View>
-        </View>
-
-        {/* Clinical paragraph */}
-        <View style={S.clinBox}>
-          <Text style={{ fontSize: 8, color: C.gold, letterSpacing: 1, marginBottom: 8 }}>CLINICAL ASSESSMENT</Text>
-          <Text style={S.clinText}>{co.clinicalParagraph}</Text>
-        </View>
-
-        {/* Strengths + Priority side by side */}
-        <View style={{ flexDirection: 'row' }}>
-          <View style={{ flex: 1, marginRight: 20 }}>
-            <Text style={{ fontSize: 9, fontWeight: 700, color: C.l3, letterSpacing: 1, marginBottom: 8 }}>
-              CLINICAL STRENGTHS
-            </Text>
-            {co.clinicalStrengths.length > 0
-              ? co.clinicalStrengths.map((s, i) => (
-                  <View key={i} style={S.listRow}>
-                    <View style={[S.listDot, { backgroundColor: C.l3 }]} />
-                    <Text style={S.listText}>{s.displayName}</Text>
-                    <Text style={[S.listLevel, { color: levelColor(s.level) }]}>Level {s.level}</Text>
-                  </View>
-                ))
-              : <Text style={{ fontSize: 9, color: C.muted }}>Building across all subjects</Text>
-            }
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 9, fontWeight: 700, color: C.l1, letterSpacing: 1, marginBottom: 8 }}>
-              PRIORITY INTERVENTION AREAS
-            </Text>
-            {co.priorityAreas.length > 0
-              ? co.priorityAreas.map((s, i) => (
-                  <View key={i} style={S.listRow}>
-                    <View style={[S.listDot, { backgroundColor: C.l1 }]} />
-                    <Text style={S.listText}>{s.displayName}</Text>
-                    <Text style={[S.listLevel, { color: levelColor(s.level) }]}>Level {s.level}</Text>
-                  </View>
-                ))
-              : <Text style={{ fontSize: 9, color: C.muted }}>No critical priority areas identified</Text>
-            }
-          </View>
-        </View>
-      </View>
-      <PageFooter reportId={report.reportId} />
-    </Page>
-  )
-}
-
-// ─── PAGE 3: SUBJECT PERFORMANCE MATRIX ──────────────────────────────────────
-
-function SubjectMatrixPage({ report }: { report: AcademicClinicReport }) {
-  const sp = report.studentProfile
-
-  return (
-    <Page size="A4" style={S.page}>
-      <PageHeader name={sp.name} grade={sp.grade} pageNum={3} totalPages={7} reportId={report.reportId} />
-      <View style={S.content}>
-        <Text style={S.sectionLabel}>SUBJECT ANALYSIS</Text>
-        <Text style={S.sectionTitle}>Performance Matrix</Text>
-        <View style={S.divider} />
-
-        {/* Column headers */}
-        <View style={{ flexDirection: 'row', paddingBottom: 6, borderBottomWidth: 2, borderBottomColor: C.navy, marginBottom: 4 }}>
-          <Text style={{ fontSize: 7, color: C.muted, letterSpacing: 1, width: 22 }}> </Text>
-          <Text style={{ fontSize: 7, color: C.muted, letterSpacing: 1, width: 120 }}>SUBJECT</Text>
-          <Text style={{ fontSize: 7, color: C.muted, letterSpacing: 1, width: 62 }}>LEVEL</Text>
-          <Text style={{ fontSize: 7, color: C.muted, letterSpacing: 1, flex: 1, marginHorizontal: 8 }}>COMPETENCY</Text>
-          <Text style={{ fontSize: 7, color: C.muted, letterSpacing: 1, width: 16 }}>TRD</Text>
-        </View>
-
-        {report.subjectBreakdown.map((s, i) => {
-          const pct   = (s.level / 4) * 100
-          const color = levelColor(s.level)
-          const obs   = getClinicalObservation(s.subject, s.level)
-          return (
-            <View key={i}>
-              <View style={S.subjectRow}>
-                <View style={{ width: 22, justifyContent: 'center', alignItems: 'center' }}>
-                  <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: levelColor(s.level) }} />
-                </View>
-                <Text style={S.subjectName}>{s.displayName}</Text>
-                <View style={{ width: 62 }}>
-                  <View style={[S.badge, { backgroundColor: levelBg(s.level), paddingVertical: 2, paddingHorizontal: 5 }]}>
-                    <Text style={[S.badgeText, { color, fontSize: 7 }]}>
-                      {s.level} · {getLevelLabel(s.level).toUpperCase()}
-                    </Text>
-                  </View>
-                </View>
-                <ProgressBar pct={pct} color={color} height={8} />
-                <Text style={[S.subjectTrend, { color: trendColor(s.trend) }]}>{trendArrow(s.trend)}</Text>
-              </View>
-              <Text style={S.subjectObs}>{obs}</Text>
-              {i < report.subjectBreakdown.length - 1 && (
-                <View style={{ borderBottomWidth: 0.5, borderBottomColor: '#f1f5f9', marginBottom: 2 }} />
-              )}
-            </View>
-          )
-        })}
-      </View>
-      <PageFooter reportId={report.reportId} />
-    </Page>
-  )
-}
-
-// ─── PAGE 4A: PATHWAY ANALYSIS (JUNIOR) ──────────────────────────────────────
-
-const REC_COLOR  = '#1D9E75'
-const ALT_COLOR  = '#378ADD'
-const GREY_COLOR = '#CBD5E1'
-
-function PathwayPage({ report }: { report: AcademicClinicReport }) {
-  const sp = report.studentProfile
-  const pa = report.pathwayAnalysis!
-  const pr = pa.pathway_readiness
-
-  const confColor = pa.confidenceLevel === 'HIGH' ? C.l3 : pa.confidenceLevel === 'MEDIUM' ? C.l2 : C.l1
-  const confBg    = pa.confidenceLevel === 'HIGH' ? C.l3bg : pa.confidenceLevel === 'MEDIUM' ? C.l2bg : C.l1bg
-
-  const READINESS_BARS = [
-    { label: 'STEM',                  score: pr?.stem            ?? 0 },
-    { label: 'Social Sciences',       score: pr?.social_sciences ?? 0 },
-    { label: 'Arts & Sports Science', score: pr?.arts            ?? 0 },
-  ]
-
-  function barColor(label: string): string {
-    if (label === pa.recommendedPathway)  return REC_COLOR
-    if (label === pa.alternative_pathway) return ALT_COLOR
-    return GREY_COLOR
-  }
-
-  const unlockItems = pa.alternative_pathway === 'STEM'
-    ? (pa.to_unlock_stem   ?? [])
-    : (pa.to_unlock_social ?? [])
-
-  return (
-    <Page size="A4" style={S.page}>
-      <PageHeader name={sp.name} grade={sp.grade} pageNum={4} totalPages={7} reportId={report.reportId} />
-      <View style={S.content}>
-        <Text style={S.sectionLabel}>PATHWAY ANALYSIS · GRADES 7–9</Text>
-        <Text style={S.sectionTitle}>Senior School Pathway Recommendation</Text>
-        <View style={S.divider} />
-
-        {/* ── Pathway Readiness bars ── */}
-        <Text style={{ fontSize: 9, color: C.muted, letterSpacing: 1, marginBottom: 10 }}>PATHWAY READINESS</Text>
-        {READINESS_BARS.map((bar, i) => {
-          const color = barColor(bar.label)
-          const isRec = bar.label === pa.recommendedPathway
-          return (
-            <View key={i} style={{ marginBottom: 10 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  {isRec && (
-                    <View style={[S.badge, { backgroundColor: color, marginRight: 8, paddingVertical: 2 }]}>
-                      <Text style={[S.badgeText, { color: C.white, fontSize: 7 }]}>RECOMMENDED</Text>
-                    </View>
-                  )}
-                  <Text style={{ fontSize: 10, fontWeight: 700, color: isRec ? color : C.text }}>{bar.label}</Text>
-                </View>
-                <Text style={{ fontSize: 10, fontWeight: 700, color }}>{bar.score}%</Text>
-              </View>
-              <View style={S.readinessTrack}>
-                <View style={[S.readinessFill, { width: `${bar.score}%`, backgroundColor: color }]} />
-              </View>
-            </View>
-          )
-        })}
-
-        {/* ── Recommended / Alternative / Confidence ── */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, marginBottom: 12 }}>
-          <View style={{ marginRight: 24 }}>
-            <Text style={{ fontSize: 8, color: C.muted, letterSpacing: 1 }}>RECOMMENDED</Text>
-            <Text style={{ fontSize: 11, fontWeight: 700, color: REC_COLOR, marginTop: 2 }}>{pa.recommendedPathway}</Text>
-          </View>
-          {pa.alternative_pathway && (
-            <View style={{ marginRight: 24 }}>
-              <Text style={{ fontSize: 8, color: C.muted, letterSpacing: 1 }}>ALTERNATIVE</Text>
-              <Text style={{ fontSize: 11, fontWeight: 700, color: ALT_COLOR, marginTop: 2 }}>{pa.alternative_pathway}</Text>
-            </View>
-          )}
-          <View style={{ alignItems: 'flex-end', marginLeft: 'auto' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ fontSize: 8, color: C.muted, marginRight: 6 }}>Confidence:</Text>
-              <View style={[S.badge, { backgroundColor: confBg }]}>
-                <Text style={[S.badgeText, { color: confColor }]}>
-                  {pa.confidenceLevel === 'HIGH'
-                    ? 'HIGH'
-                    : pa.confidenceLevel === 'MEDIUM'
-                    ? 'GOOD FIT'
-                    : 'MULTIPLE PATHWAYS'}
-                </Text>
-              </View>
-            </View>
-            {pa.confidenceLevel === 'DEVELOPING' && (
-              <Text style={S.confidenceSubtitle}>
-                This learner has the ability to succeed in more than one pathway.
-              </Text>
-            )}
-          </View>
-        </View>
-
-        <View style={S.dividerThin} />
-
-        {/* ── STEM potential gold box ── */}
-        {pa.stem_viable && pa.stem_gap_subjects && pa.stem_gap_subjects.length > 0 && (
-          <View style={S.stemPotentialBox}>
-            <Text style={S.stemPotentialTitle}>STEM PATHWAY POTENTIAL</Text>
-            <Text style={S.stemPotentialBody}>
-              This learner is one step away from STEM. Improve the following before Grade 10:
-            </Text>
-            {pa.stem_gap_subjects.map((subject, i) => (
-              <Text key={i} style={S.stemGapItem}>
-                {'• '}{subject.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}{' — currently Level 2, needs Level 3'}
-              </Text>
-            ))}
-          </View>
-        )}
-
-        {/* ── TO UNLOCK / TO MAINTAIN ── */}
-        <View style={{ flexDirection: 'row', marginTop: 12, marginBottom: 12 }}>
-          <View style={[S.unlockBox, { flex: 1, marginRight: 10 }]}>
-            <Text style={S.unlockTitle}>TO UNLOCK {(pa.alternative_pathway ?? 'STEM').toUpperCase()}</Text>
-            {unlockItems.length > 0
-              ? unlockItems.map((item, i) => (
-                  <View key={i} style={{ flexDirection: 'row', marginBottom: 3 }}>
-                    <Text style={{ fontSize: 7.5, color: '#475569', width: 10 }}>•</Text>
-                    <Text style={{ fontSize: 7.5, color: '#475569', flex: 1 }}>{item}</Text>
-                  </View>
-                ))
-              : <Text style={{ fontSize: 7.5, color: C.muted }}>No additional requirements</Text>
-            }
-          </View>
-          <View style={[S.maintainBox, { flex: 1 }]}>
-            <Text style={S.maintainTitle}>TO MAINTAIN {pa.recommendedPathway.toUpperCase()}</Text>
-            {(pa.to_maintain_recommended ?? []).map((item, i) => (
-              <View key={i} style={{ flexDirection: 'row', marginBottom: 3 }}>
-                <Text style={{ fontSize: 7.5, color: '#475569', width: 10 }}>•</Text>
-                <Text style={{ fontSize: 7.5, color: '#475569', flex: 1 }}>{item}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <View style={S.dividerThin} />
-
-        {/* ── Why this pathway / Subjects to strengthen ── */}
-        <View style={{ flexDirection: 'row', marginBottom: 12 }}>
-          <View style={{ flex: 1, marginRight: 20 }}>
-            <Text style={{ fontSize: 9, fontWeight: 700, color: C.text, letterSpacing: 1, marginBottom: 8 }}>WHY THIS PATHWAY FITS</Text>
-            {pa.reasons.map((r, i) => (
-              <View key={i} style={[S.listRow, { marginBottom: 5 }]}>
-                <View style={[S.listDot, { backgroundColor: C.navy }]} />
-                <Text style={[S.listText, { fontSize: 8.5 }]}>{r}</Text>
-              </View>
-            ))}
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 9, fontWeight: 700, color: C.text, letterSpacing: 1, marginBottom: 8 }}>SUBJECTS TO STRENGTHEN BEFORE GRADE 10</Text>
-            {pa.subjectsToStrengthen.map((s, i) => (
-              <View key={i} style={[S.listRow, { marginBottom: 5 }]}>
-                <View style={[S.listDot, { backgroundColor: C.gold }]} />
-                <Text style={[S.listText, { fontSize: 8.5 }]}>{s}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <View style={S.dividerThin} />
-
-        {/* ── Future message ── */}
-        <View style={{ backgroundColor: C.navyLight, borderRadius: 6, padding: 14 }}>
-          <Text style={{ fontSize: 8, color: C.gold, letterSpacing: 1, marginBottom: 6 }}>WHAT THIS MEANS FOR YOUR CHILD'S FUTURE</Text>
-          <Text style={{ fontSize: 9.5, color: C.white, lineHeight: 1.6 }}>{pa.futureMessage}</Text>
-        </View>
-      </View>
-      <PageFooter reportId={report.reportId} />
-    </Page>
-  )
-}
-
-// ─── PAGE 4B: CAREER INTELLIGENCE (SENIOR) ───────────────────────────────────
-
-function CareerPage({ report }: { report: AcademicClinicReport }) {
-  const sp = report.studentProfile
-  const sg = report.seniorGuidance!
-
-  const strengthColor = (m?: string) =>
-    m === 'STRONG' ? C.l3 : m === 'GOOD' ? C.l2 : C.muted
-  const strengthBg = (m?: string) =>
-    m === 'STRONG' ? C.l3bg : m === 'GOOD' ? C.l2bg : C.offWhite
-
-  return (
-    <Page size="A4" style={S.page}>
-      <PageHeader name={sp.name} grade={sp.grade} pageNum={4} totalPages={7} reportId={report.reportId} />
-      <View style={S.content}>
-        <Text style={S.sectionLabel}>CAREER ANALYSIS · GRADES 10–12</Text>
-        <Text style={S.sectionTitle}>Career Intelligence Report</Text>
-        <View style={S.divider} />
-
-        {report.dreamCareerAnalysis?.found && (
-          <View style={S.dreamSection}>
-            <Text style={S.dreamLabel}>DREAM CAREER ANALYSIS</Text>
-            <Text style={S.dreamTitle}>{report.dreamCareerAnalysis.dreamCareer}</Text>
-
-            <View style={S.dreamMeterRow}>
-              <View style={S.dreamMeterTrack}>
-                <View style={[S.dreamMeterFill, { width: `${report.dreamCareerAnalysis.readinessScore}%` }]} />
-              </View>
-              <Text style={S.dreamScore}>{report.dreamCareerAnalysis.readinessScore}%</Text>
-            </View>
-            <Text style={S.dreamReadiness}>{report.dreamCareerAnalysis.readinessLabel}</Text>
-
-            {report.dreamCareerAnalysis.gapSubjects.length > 0 && (
-              <View style={S.dreamGapsBox}>
-                <Text style={S.dreamGapsTitle}>TO QUALIFY:</Text>
-                {report.dreamCareerAnalysis.gapSubjects.map(g => (
-                  <Text key={g.subject} style={S.dreamGapItem}>
-                    {'•'} {g.displayName}: Level {g.currentLevel} {'→'} Level {g.requiredLevel} ({g.gapSize === 1 ? 'one step away' : 'two steps'})
-                  </Text>
-                ))}
-                {report.dreamCareerAnalysis.estimatedTerms > 0 && (
-                  <Text style={S.dreamEstimate}>
-                    Estimated: {report.dreamCareerAnalysis.estimatedTerms} term(s) with EduNexus Learning Compass
-                  </Text>
-                )}
-              </View>
-            )}
-
-            <Text style={S.dreamEncourage}>{report.dreamCareerAnalysis.encouragement}</Text>
-
-            {report.dreamCareerAnalysis.alternativeCareers.length > 0 && (
-              <View>
-                <Text style={S.dreamAltTitle}>RELATED CAREERS IN SAME PATHWAY:</Text>
-                {report.dreamCareerAnalysis.alternativeCareers.map(alt => (
-                  <Text key={alt.name} style={S.dreamAltItem}>
-                    {alt.name} — {alt.matchScore}% match
-                  </Text>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
-
-        {sg.topCareers.map((c, i) => (
-          <View key={i} style={S.careerCard}>
-            <View style={S.careerHeader}>
-              <Text style={S.careerName}>{i + 1}. {c.name}</Text>
-              <View style={[S.badge, { backgroundColor: strengthBg(c.matchStrength) }]}>
-                <Text style={[S.badgeText, { color: strengthColor(c.matchStrength) }]}>
-                  {c.matchStrength ?? 'POSSIBLE'} MATCH
-                </Text>
-              </View>
-            </View>
-            {c.whyItFits && (
-              <Text style={[S.careerDetail, { marginBottom: 5 }]}>
-                <Text style={{ fontWeight: 700, color: C.text }}>Why it fits: </Text>
-                {c.whyItFits}
-              </Text>
-            )}
-            {c.keyGap && (
-              <Text style={[S.careerDetail, { marginBottom: 5 }]}>
-                <Text style={{ fontWeight: 700, color: C.l1 }}>Key gap: </Text>
-                {c.keyGap}
-              </Text>
-            )}
-            {c.kenyanPathway && (
-              <Text style={[S.careerDetail, { marginBottom: 0, color: C.navy }]}>
-                <Text style={{ fontWeight: 700 }}>Kenyan pathway: </Text>
-                {c.kenyanPathway}
-              </Text>
-            )}
-          </View>
-        ))}
-
-        <View style={S.dividerThin} />
-
-        {/* Honest assessment */}
-        <View style={S.honestBox}>
-          <Text style={{ fontSize: 8, color: C.l1, letterSpacing: 1, marginBottom: 8 }}>HONEST ASSESSMENT</Text>
-          <Text style={{ fontSize: 10, color: C.text, lineHeight: 1.6 }}>
-            {sg.honestAssessment ?? sg.reasoning}
-          </Text>
-        </View>
-
-        <View style={S.dividerThin} />
-
-        {/* Next steps */}
-        <Text style={{ fontSize: 9, fontWeight: 700, color: C.text, letterSpacing: 1, marginBottom: 8 }}>RECOMMENDED NEXT STEPS</Text>
-        {sg.nextSteps.map((step, i) => (
-          <View key={i} style={[S.listRow, { marginBottom: 6 }]}>
-            <View style={[S.listDot, { backgroundColor: C.navy }]} />
-            <Text style={[S.listText, { fontSize: 9 }]}>{step}</Text>
-          </View>
-        ))}
-      </View>
-      <PageFooter reportId={report.reportId} />
-    </Page>
-  )
-}
-
-// ─── PAGE 5: HOLIDAY ACTION PLAN ─────────────────────────────────────────────
-
-function HolidayPlanPage({ report }: { report: AcademicClinicReport }) {
-  const sp = report.studentProfile
-  const hp = report.holidayPlan
-
-  const weekColors = [C.l1, C.l2, C.l3]
-  const weekBgs    = [C.l1bg, C.l2bg, C.l3bg]
-  const weekMinutes = [45, 30, 20]
-
-  return (
-    <Page size="A4" style={S.page}>
-      <PageHeader name={sp.name} grade={sp.grade} pageNum={5} totalPages={7} reportId={report.reportId} />
-      <View style={S.content}>
-        <Text style={S.sectionLabel}>HOLIDAY STUDY PROGRAMME</Text>
-        <Text style={S.sectionTitle}>3-Week Holiday Action Plan</Text>
-        <Text style={{ fontSize: 9, color: C.muted, marginTop: 2, marginBottom: 14 }}>Designed for boarding school students · Starts Day 1 of the holiday</Text>
-        <View style={S.divider} />
-
-        {/* Three week cards */}
-        {hp.weeks.map((week, wi) => (
-          <View key={wi} style={[S.weekCard, { borderLeftColor: weekColors[wi], marginBottom: 16 }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-              <View style={[S.badge, { backgroundColor: weekBgs[wi], marginRight: 8 }]}>
-                <Text style={[S.badgeText, { color: weekColors[wi], fontSize: 8 }]}>
-                  WEEK {week.weekNumber} · DAYS {wi * 7 + 1}–{(wi + 1) * 7}
-                </Text>
-              </View>
-              <Text style={{ fontSize: 8, color: C.muted }}>{weekMinutes[wi]} min/day · {week.focusSubjects.join(', ')}</Text>
-            </View>
-            <Text style={S.weekTitle}>{week.title} — {week.theme}</Text>
-            <Text style={[S.weekMeta, { marginBottom: 6 }]}>Goal: {week.goal}</Text>
-            {week.activities.slice(0, 3).map((act, ai) => (
-              <View key={ai} style={{ flexDirection: 'row', marginBottom: 3 }}>
-                <Text style={{ fontSize: 8, color: weekColors[wi], width: 12 }}>▸</Text>
-                <Text style={{ fontSize: 8.5, color: C.text, flex: 1 }}>{act}</Text>
-              </View>
-            ))}
-          </View>
-        ))}
-
-        <View style={S.dividerThin} />
-
-        {/* Daily schedule template */}
-        <Text style={{ fontSize: 9, fontWeight: 700, color: C.text, letterSpacing: 1, marginBottom: 8 }}>RECOMMENDED DAILY SCHEDULE</Text>
-        <View style={{ borderWidth: 1, borderColor: C.border, borderRadius: 6, overflow: 'hidden' }}>
-          <View style={[S.scheduleRow, { backgroundColor: C.offWhite, paddingHorizontal: 12 }]}>
-            <Text style={S.scheduleTime}>MORNING</Text>
-            <Text style={S.scheduleText}>{hp.morningRoutine}</Text>
-          </View>
-          <View style={[S.scheduleRow, { paddingHorizontal: 12 }]}>
-            <Text style={S.scheduleTime}>AFTERNOON</Text>
-            <Text style={S.scheduleText}>{hp.afternoonRoutine}</Text>
-          </View>
-          <View style={[S.scheduleRow, { backgroundColor: C.offWhite, paddingHorizontal: 12, borderBottomWidth: 0 }]}>
-            <Text style={S.scheduleTime}>EVENING</Text>
-            <Text style={S.scheduleText}>{hp.eveningRoutine}</Text>
-          </View>
-        </View>
-      </View>
-      <PageFooter reportId={report.reportId} />
-    </Page>
-  )
-}
-
-// ─── PAGE 6: LEARNING COMPASS ─────────────────────────────────────────────────
-
-function CompassPage({ report }: { report: AcademicClinicReport }) {
-  const sp  = report.studentProfile
-  const rec = report.learningCompassRec
-
-  return (
-    <Page size="A4" style={S.page}>
-      <PageHeader name={sp.name} grade={sp.grade} pageNum={6} totalPages={7} reportId={report.reportId} />
-      <View style={S.content}>
-        <Text style={S.sectionLabel}>LEARNING COMPASS GUIDANCE</Text>
-        <Text style={S.sectionTitle}>Learning Compass Recommendations</Text>
-        <View style={S.divider} />
-
-        {/* First session highlight */}
-        <View style={S.compassHighlight}>
-          <Text style={S.compassTitle}>START YOUR FIRST SESSION WITH</Text>
-          <Text style={S.compassSubject}>{rec.firstSessionSubject}</Text>
-          <Text style={{ fontSize: 9, color: '#94a3b8', marginTop: 6 }}>
-            This is your highest-priority intervention area based on this assessment.
-          </Text>
-        </View>
-
-        {/* Session frequency */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 9, color: C.muted, letterSpacing: 1, marginBottom: 4 }}>RECOMMENDED SESSION FREQUENCY</Text>
-            <Text style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{rec.sessionFrequency}</Text>
-          </View>
-          <View style={[S.badge, { backgroundColor: C.navy }]}>
-            <Text style={[S.badgeText, { color: C.gold }]}>HOLIDAY GOAL</Text>
-          </View>
-        </View>
-
-        {/* Session goal */}
-        <View style={[S.clinBox, { marginBottom: 20 }]}>
-          <Text style={S.clinText}>{rec.sessionGoal}</Text>
-        </View>
-
-        <View style={S.dividerThin} />
-
-        {/* Topics to ask */}
-        <Text style={{ fontSize: 9, fontWeight: 700, color: C.text, letterSpacing: 1, marginBottom: 12 }}>
-          3 SPECIFIC TOPICS TO ASK YOUR LEARNING COMPASS TUTOR
-        </Text>
-        {rec.topicsToAsk.map((topic, i) => (
-          <View key={i} style={[S.topicRow, { marginBottom: 12 }]}>
-            <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: C.navy, justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
-              <Text style={{ fontSize: 10, fontWeight: 700, color: C.gold }}>{i + 1}</Text>
-            </View>
-            <Text style={[S.topicText, { flex: 1 }]}>{topic}</Text>
-          </View>
-        ))}
-
-        <View style={S.dividerThin} />
-
-        {/* CTA */}
-        <View style={{ backgroundColor: C.gold, borderRadius: 6, padding: 14, flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 10, fontWeight: 700, color: C.navy }}>Start your first session now</Text>
-            <Text style={{ fontSize: 9, color: C.navy, marginTop: 4 }}>
-              Open your browser and visit edunexus.co.ke/learn to begin
-            </Text>
-          </View>
-          <Text style={{ fontSize: 12, fontWeight: 700, color: C.navy }}>edunexus.co.ke/learn</Text>
-        </View>
-      </View>
-      <PageFooter reportId={report.reportId} />
-    </Page>
-  )
-}
-
-// ─── PAGE 7: TEACHER COLLABORATION ───────────────────────────────────────────
-
-function TeacherPage({ report }: { report: AcademicClinicReport }) {
-  const sp = report.studentProfile
-  const co = report.clinicalOverview
-  const byDesc = [...report.subjectBreakdown].sort((a, b) => b.level - a.level)
-  const byAsc  = [...report.subjectBreakdown].sort((a, b) => a.level - b.level)
-  const strengths = byDesc.filter(s => s.level >= 3).slice(0, 3)
-  const supports  = byAsc.filter(s => s.level <= 2).slice(0, 3)
-  const dateStr   = new Date(report.generatedAt).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })
-
-  return (
-    <Page size="A4" style={S.page}>
-      <PageHeader name={sp.name} grade={sp.grade} pageNum={7} totalPages={7} reportId={report.reportId} />
-      <View style={S.content}>
-        <Text style={S.sectionLabel}>TEACHER REFERENCE PAGE</Text>
-        <Text style={S.sectionTitle}>For the Class Teacher</Text>
-        <View style={S.divider} />
-
-        {/* Summary box */}
-        <View style={S.teacherBox}>
-          <Text style={S.teacherLabel}>STUDENT PERFORMANCE SUMMARY</Text>
-          <Text style={{ fontSize: 10, color: C.text, lineHeight: 1.6, marginBottom: 6 }}>
-            {sp.name} (Grade {sp.grade}) has completed an EduNexus Academic Clinic assessment for Term {sp.term}, {sp.year}.
-            Overall competency is rated <Text style={{ fontWeight: 700 }}>{co.overallCompetencyLabel} (Level {co.overallCompetencyLevel})</Text> with a trajectory of <Text style={{ fontWeight: 700 }}>{co.trajectory}</Text>.
-          </Text>
-          <Text style={{ fontSize: 10, color: C.text, lineHeight: 1.6 }}>
-            {report.subjectBreakdown.length} subjects were assessed.
-            {report.vitals.strengths > 0 ? ` ${report.vitals.strengths} subject(s) are at Proficient or Exemplary level.` : ''}
-            {report.vitals.urgent > 0 ? ` ${report.vitals.urgent} subject(s) require urgent intervention.` : ''}
-          </Text>
-        </View>
-
-        <View style={{ flexDirection: 'row', marginBottom: 14 }}>
-          {/* Classroom support areas */}
-          <View style={[S.teacherBox, { flex: 1, marginRight: 10, marginBottom: 0 }]}>
-            <Text style={S.teacherLabel}>SUGGESTED CLASSROOM SUPPORT AREAS</Text>
-            {supports.length > 0
-              ? supports.map((s, i) => (
-                  <View key={i} style={[S.listRow, { marginBottom: 5 }]}>
-                    <View style={[S.listDot, { backgroundColor: C.l1 }]} />
-                    <Text style={{ fontSize: 9, color: C.text, flex: 1 }}>{s.displayName}</Text>
-                    <Text style={{ fontSize: 8, color: C.l1 }}>Level {s.level}</Text>
-                  </View>
-                ))
-              : <Text style={{ fontSize: 9, color: C.muted }}>No critical support areas identified</Text>
-            }
-          </View>
-          {/* Leadership opportunities */}
-          <View style={[S.teacherBox, { flex: 1, marginBottom: 0 }]}>
-            <Text style={[S.teacherLabel, { color: C.l3 }]}>AREAS WHERE THIS STUDENT EXCELS — CONSIDER LEADERSHIP OPPORTUNITIES</Text>
-            {strengths.length > 0
-              ? strengths.map((s, i) => (
-                  <View key={i} style={[S.listRow, { marginBottom: 5 }]}>
-                    <View style={[S.listDot, { backgroundColor: C.l3 }]} />
-                    <Text style={{ fontSize: 9, color: C.text, flex: 1 }}>{s.displayName}</Text>
-                    <Text style={{ fontSize: 8, color: C.l3 }}>Level {s.level}</Text>
-                  </View>
-                ))
-              : <Text style={{ fontSize: 9, color: C.muted }}>Building toward strengths</Text>
-            }
-          </View>
-        </View>
-
-        {/* Teacher observations */}
-        <View style={S.teacherBox}>
-          <Text style={S.teacherLabel}>TEACHER'S OBSERVATIONS</Text>
-          {[1, 2, 3].map(i => (
-            <View key={i} style={S.teacherLine} />
-          ))}
-        </View>
-
-        {/* Action agreed */}
-        <View style={[S.teacherBox, { marginBottom: 0 }]}>
-          <Text style={S.teacherLabel}>ACTION AGREED WITH PARENT</Text>
-          {[1, 2].map(i => (
-            <View key={i} style={S.teacherLine} />
-          ))}
-        </View>
-
-        {/* Signature row — fixed to bottom of this page */}
-        <View style={{ marginTop: 40 }} />
-        <View style={S.sigRow} wrap={false}>
-          <View style={S.sigBlock}>
-            <View style={S.sigLine} />
-            <Text style={S.sigLabel}>Teacher's Signature</Text>
-          </View>
-          <View style={S.sigBlock}>
-            <View style={S.sigLine} />
-            <Text style={S.sigLabel}>Parent's Signature</Text>
-          </View>
-          <View style={[S.sigBlock, { marginRight: 0, flex: 0.6 }]}>
-            <View style={S.sigLine} />
-            <Text style={S.sigLabel}>Date</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Override footer with custom teacher footer */}
-      <View style={[S.pageFooter, { flexDirection: 'column', alignItems: 'center' }]}>
-        <Text style={[S.pageFooterText, { marginBottom: 2 }]}>
-          This report was generated by EduNexus Academic Clinic · {dateStr} · Report ID: {report.reportId}
-        </Text>
-        <Text style={S.pageFooterText}>edunexus.co.ke · CONFIDENTIAL — For Parent and Teacher Use Only</Text>
-      </View>
-    </Page>
-  )
-}
-
-// ─── JUNIOR PAGE 1: ACADEMIC READINESS SNAPSHOT ──────────────────────────────
-
-function JuniorSnapshotPage({ report }: { report: AcademicClinicReport }) {
-  const sp  = report.studentProfile
-  const co  = report.clinicalOverview
-  const byDesc = [...report.subjectBreakdown].sort((a, b) => b.level - a.level)
-  const byAsc  = [...report.subjectBreakdown].sort((a, b) => a.level - b.level)
-  const strengths = byDesc.filter(s => s.level >= 3).slice(0, 3)
-  const priority  = byAsc.filter(s => s.level <= 2).slice(0, 3)
-
-  const statusColors: Record<string, string> = {
-    'Foundation Support Required': '#dc2626',
-    'Developing':                  '#d97706',
-    'Meeting Expectations':        '#16a34a',
-    'Exceeding Expectations':      '#7c3aed',
-  }
-  const statusBgs: Record<string, string> = {
-    'Foundation Support Required': '#fee2e2',
-    'Developing':                  '#fef3c7',
-    'Meeting Expectations':        '#dcfce7',
-    'Exceeding Expectations':      '#ede9fe',
-  }
-  const status    = report.academicStatusLabel ?? 'Developing'
-  const statusClr = statusColors[status] ?? C.muted
-  const statusBg  = statusBgs[status]  ?? C.offWhite
-
-  // Compact subject grid: 2 columns
-  const half = Math.ceil(report.subjectBreakdown.length / 2)
-  const leftCol  = report.subjectBreakdown.slice(0, half)
-  const rightCol = report.subjectBreakdown.slice(half)
-
-  return (
-    <Page size="A4" style={S.page}>
-      <PageHeader name={sp.name} grade={sp.grade} pageNum={1} totalPages={3} reportId={report.reportId} />
-      <View style={S.content}>
-        <Text style={S.sectionLabel}>JUNIOR SCHOOL ACADEMIC CLINIC · GRADES 7–9</Text>
-        <Text style={S.sectionTitle}>Academic Readiness Snapshot</Text>
-        <View style={S.divider} />
-
-        {/* ── Identity row ── */}
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14 }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 18, fontWeight: 700, color: C.text }}>{sp.name}</Text>
-            <Text style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>
-              Grade {sp.grade} · {sp.level} · Term {sp.term}, {sp.year}
-              {sp.school ? ` · ${sp.school}` : ''}
-            </Text>
-          </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <View style={[S.badge, { backgroundColor: statusBg, marginBottom: 5 }]}>
-              <Text style={[S.badgeText, { color: statusClr }]}>{status.toUpperCase()}</Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <LevelBadge level={co.overallCompetencyLevel} />
-              <View style={{ marginLeft: 6 }}>
-                <TrajectoryBadge t={co.trajectory} />
-              </View>
-            </View>
-          </View>
-        </View>
-
-        <View style={S.dividerThin} />
-
-        {/* ── Strengths / Priority areas ── */}
-        <View style={{ flexDirection: 'row', marginBottom: 14 }}>
-          <View style={{ flex: 1, marginRight: 20 }}>
-            <Text style={{ fontSize: 9, fontWeight: 700, color: C.l3, letterSpacing: 1, marginBottom: 7 }}>TOP STRENGTHS</Text>
-            {strengths.length > 0
-              ? strengths.map((s, i) => (
-                  <View key={i} style={[S.listRow, { marginBottom: 6 }]}>
-                    <View style={[S.listDot, { backgroundColor: C.l3 }]} />
-                    <Text style={[S.listText, { fontSize: 9 }]}>{s.displayName}</Text>
-                    <View style={[S.badge, { backgroundColor: levelBg(s.level), paddingVertical: 1, paddingHorizontal: 6 }]}>
-                      <Text style={[S.badgeText, { color: levelColor(s.level), fontSize: 8 }]}>L{s.level}</Text>
-                    </View>
-                  </View>
-                ))
-              : <Text style={{ fontSize: 9, color: C.muted }}>Building across all subjects</Text>
-            }
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 9, fontWeight: 700, color: C.l1, letterSpacing: 1, marginBottom: 7 }}>TOP DEVELOPMENT AREAS</Text>
-            {priority.length > 0
-              ? priority.map((s, i) => (
-                  <View key={i} style={[S.listRow, { marginBottom: 6 }]}>
-                    <View style={[S.listDot, { backgroundColor: C.l1 }]} />
-                    <Text style={[S.listText, { fontSize: 9 }]}>{s.displayName}</Text>
-                    <View style={[S.badge, { backgroundColor: levelBg(s.level), paddingVertical: 1, paddingHorizontal: 6 }]}>
-                      <Text style={[S.badgeText, { color: levelColor(s.level), fontSize: 8 }]}>L{s.level}</Text>
-                    </View>
-                  </View>
-                ))
-              : <Text style={{ fontSize: 9, color: C.muted }}>No critical priority areas identified</Text>
-            }
-          </View>
-        </View>
-
-        <View style={S.dividerThin} />
-
-        {/* ── Academic Diagnosis ── */}
-        <Text style={{ fontSize: 9, fontWeight: 700, color: C.text, letterSpacing: 1, marginBottom: 6 }}>ACADEMIC DIAGNOSIS</Text>
-        <View style={[S.clinBox, { marginBottom: 14 }]}>
-          <Text style={S.clinText}>{co.clinicalParagraph}</Text>
-        </View>
-
-        <View style={S.dividerThin} />
-
-        {/* ── Compact subject grid ── */}
-        <Text style={{ fontSize: 9, fontWeight: 700, color: C.text, letterSpacing: 1, marginBottom: 7 }}>SUBJECT PERFORMANCE</Text>
-        <View style={{ flexDirection: 'row' }}>
-          <View style={{ flex: 1, marginRight: 14 }}>
-            {leftCol.map((s, i) => (
-              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: C.border }}>
-                <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: levelColor(s.level), marginRight: 6 }} />
-                <Text style={{ fontSize: 8.5, color: C.text, flex: 1 }}>{s.displayName}</Text>
-                <View style={[S.badge, { backgroundColor: levelBg(s.level), paddingVertical: 1, paddingHorizontal: 5 }]}>
-                  <Text style={[S.badgeText, { color: levelColor(s.level), fontSize: 7.5 }]}>L{s.level}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-          <View style={{ flex: 1 }}>
-            {rightCol.map((s, i) => (
-              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: C.border }}>
-                <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: levelColor(s.level), marginRight: 6 }} />
-                <Text style={{ fontSize: 8.5, color: C.text, flex: 1 }}>{s.displayName}</Text>
-                <View style={[S.badge, { backgroundColor: levelBg(s.level), paddingVertical: 1, paddingHorizontal: 5 }]}>
-                  <Text style={[S.badgeText, { color: levelColor(s.level), fontSize: 7.5 }]}>L{s.level}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        </View>
-      </View>
-      <PageFooter reportId={report.reportId} />
-    </Page>
-  )
-}
-
-// ─── JUNIOR PAGE 2: SENIOR SCHOOL PATHWAY READINESS ──────────────────────────
 
 function statusDot(color: string) {
+  return <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: color, marginRight: 4 }} />
+}
+
+function SubjectGrid({ subjects }: { subjects: SubjectProgress[] }) {
+  const half   = Math.ceil(subjects.length / 2)
+  const left   = subjects.slice(0, half)
+  const right  = subjects.slice(half)
+  const cols   = [left, right]
   return (
-    <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: color, marginRight: 4 }} />
+    <View style={{ flexDirection: 'row' }}>
+      {cols.map((col, ci) => (
+        <View key={ci} style={{ flex: 1, marginRight: ci === 0 ? 14 : 0 }}>
+          {col.map((s, i) => (
+            <View key={i} style={S.subjectGridRow}>
+              <View style={[S.subjectDot, { backgroundColor: levelColor(s.level) }]} />
+              <Text style={S.subjectGridName}>{s.displayName}</Text>
+              <View style={[S.badge, { backgroundColor: levelBg(s.level), paddingVertical: 1, paddingHorizontal: 5 }]}>
+                <Text style={[S.badgeText, { color: levelColor(s.level), fontSize: 7.5 }]}>L{s.level}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      ))}
+    </View>
   )
 }
 
 function GapTable({ rows }: { rows: PathwayGapRow[] }) {
-  const gapColor = (row: PathwayGapRow) =>
-    row.status === 'met' ? C.l3 : row.status === 'one_step' ? C.l2 : C.l1
-
+  const gapColor = (r: PathwayGapRow) => r.status === 'met' ? C.l3 : r.status === 'one_step' ? C.l2 : C.l1
   return (
-    <View style={{ marginTop: 5 }}>
-      {/* Header */}
+    <View style={{ marginTop: 4 }}>
       <View style={{ flexDirection: 'row', paddingBottom: 3, borderBottomWidth: 1, borderBottomColor: C.border }}>
-        <Text style={{ fontSize: 7, color: C.muted, letterSpacing: 0.5, flex: 1 }}>SUBJECT</Text>
-        <Text style={{ fontSize: 7, color: C.muted, letterSpacing: 0.5, width: 44, textAlign: 'center' }}>CURRENT</Text>
-        <Text style={{ fontSize: 7, color: C.muted, letterSpacing: 0.5, width: 44, textAlign: 'center' }}>REQUIRED</Text>
-        <Text style={{ fontSize: 7, color: C.muted, letterSpacing: 0.5, width: 50, textAlign: 'center' }}>STATUS</Text>
+        <Text style={{ fontSize: 7, color: C.muted, flex: 1 }}>SUBJECT</Text>
+        <Text style={{ fontSize: 7, color: C.muted, width: 44, textAlign: 'center' }}>CURRENT</Text>
+        <Text style={{ fontSize: 7, color: C.muted, width: 44, textAlign: 'center' }}>REQUIRED</Text>
+        <Text style={{ fontSize: 7, color: C.muted, width: 50, textAlign: 'center' }}>STATUS</Text>
       </View>
       {rows.map((row, i) => (
-        <View key={i} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' }}>
+        <View key={i} style={[S.gapRow]}>
           <Text style={{ fontSize: 8, color: C.text, flex: 1 }}>{row.displayName}</Text>
           <View style={{ width: 44, alignItems: 'center' }}>
             <View style={[S.badge, { backgroundColor: levelBg(row.currentLevel), paddingVertical: 1, paddingHorizontal: 4 }]}>
@@ -1210,10 +279,8 @@ function GapTable({ rows }: { rows: PathwayGapRow[] }) {
           </View>
           <View style={{ width: 50, alignItems: 'center' }}>
             {row.status === 'met'
-              ? <Text style={{ fontSize: 8, color: C.l3, fontWeight: 700 }}>MET</Text>
-              : <Text style={{ fontSize: 7.5, color: gapColor(row), fontWeight: 700 }}>
-                  {row.gap === 1 ? '+1 LEVEL' : '+2 LEVELS'}
-                </Text>
+              ? <Text style={{ fontSize: 8, color: C.l3, fontWeight: 700 }}>MET ✓</Text>
+              : <Text style={{ fontSize: 7.5, color: gapColor(row), fontWeight: 700 }}>{row.gap === 1 ? '+1 LEVEL' : '+2 LEVELS'}</Text>
             }
           </View>
         </View>
@@ -1222,52 +289,368 @@ function GapTable({ rows }: { rows: PathwayGapRow[] }) {
   )
 }
 
-function JuniorPathwayPage({ report }: { report: AcademicClinicReport }) {
-  const sp    = report.studentProfile
-  const cards = report.pathwayReadinessCards ?? []
-  const road  = report.pathwayRoadmap
-  const pa    = report.pathwayAnalysis
+function PriorityBlock({ p, colors }: {
+  p: JuniorActionPriority | SeniorActionPriority
+  colors: { border: string; rankBg: string; blockBg: string; rankText: string }
+}) {
+  return (
+    <View style={[S.priorityBlock, { borderLeftColor: colors.border, backgroundColor: colors.blockBg }]}>
+      <View style={S.priorityRankRow}>
+        <View style={[S.priorityRankBadge, { backgroundColor: colors.rankBg }]}>
+          <Text style={[S.priorityRankText, { color: colors.rankText }]}>{p.rank}</Text>
+        </View>
+        <Text style={S.prioritySubject}>{p.subject}</Text>
+      </View>
+      <View style={S.priorityLevelRow}>
+        <LevelBadge level={p.currentLevel} />
+        <Text style={{ fontSize: 12, color: C.muted, marginHorizontal: 8 }}>→</Text>
+        <LevelBadge level={p.targetLevel} />
+      </View>
+      <View style={S.priorityDetailRow}>
+        <Text style={S.priorityKey}>Why it matters:</Text>
+        <Text style={S.priorityVal}>{p.whyItMatters}</Text>
+      </View>
+      {'expectedBenefit' in p && (
+        <View style={S.priorityDetailRow}>
+          <Text style={S.priorityKey}>Expected benefit:</Text>
+          <Text style={S.priorityVal}>{(p as SeniorActionPriority).expectedBenefit}</Text>
+        </View>
+      )}
+      {'intervention' in p && (
+        <View style={S.priorityDetailRow}>
+          <Text style={S.priorityKey}>Intervention:</Text>
+          <Text style={S.priorityVal}>{(p as JuniorActionPriority).intervention} · {p.timeline}</Text>
+        </View>
+      )}
+      {'estimatedSessions' in p && !('intervention' in p) && (
+        <View style={S.priorityDetailRow}>
+          <Text style={S.priorityKey}>Compass:</Text>
+          <Text style={S.priorityVal}>{p.estimatedSessions} sessions · {p.timeline}</Text>
+        </View>
+      )}
+    </View>
+  )
+}
 
-  const STATUS_LEGEND: Array<{ label: string; color: string }> = [
-    { label: 'Strongly Ready',                 color: '#16a34a' },
-    { label: 'Within Reach',                   color: '#d97706' },
-    { label: 'Requires Improvement',           color: '#ea580c' },
+const PRIORITY_COLORS = [
+  { border: C.l1, rankBg: C.l1, blockBg: '#fff5f5', rankText: C.white },
+  { border: C.l2, rankBg: C.l2, blockBg: '#fffbeb', rankText: C.white },
+  { border: '#3b82f6', rankBg: '#3b82f6', blockBg: '#eff6ff', rankText: C.white },
+]
+
+function RxBox({ subject, reason, outcome, sessions, timeline }: {
+  subject: string; reason: string; outcome: string; sessions: number; timeline: string
+}) {
+  return (
+    <View style={S.rxBox}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+        <View style={{ width: 32, height: 32, borderRadius: 5, backgroundColor: C.gold, justifyContent: 'center', alignItems: 'center', marginRight: 10 }}>
+          <Text style={{ fontSize: 14, fontWeight: 700, color: C.navy }}>Rx</Text>
+        </View>
+        <View>
+          <Text style={S.rxTitle}>LEARNING COMPASS PRESCRIPTION</Text>
+          <Text style={{ fontSize: 7.5, color: '#94a3b8' }}>edunexus.co.ke/learn</Text>
+        </View>
+      </View>
+      <View style={S.rxDetailRow}><Text style={S.rxDetailKey}>Subject:</Text><Text style={S.rxDetailVal}>{subject}</Text></View>
+      <View style={S.rxDetailRow}><Text style={S.rxDetailKey}>Reason:</Text><Text style={S.rxDetailVal}>{reason}</Text></View>
+      <View style={S.rxDetailRow}><Text style={S.rxDetailKey}>Expected outcome:</Text><Text style={S.rxDetailVal}>{outcome}</Text></View>
+      <View style={S.rxDetailRow}><Text style={S.rxDetailKey}>Estimated sessions:</Text><Text style={S.rxDetailVal}>{sessions}</Text></View>
+      <View style={S.rxDetailRow}><Text style={S.rxDetailKey}>Expected timeline:</Text><Text style={S.rxDetailVal}>{timeline}</Text></View>
+      <View style={S.rxCTA}>
+        <Text style={S.rxCtaText}>Start your first session now</Text>
+        <Text style={S.rxCtaLink}>edunexus.co.ke/learn</Text>
+      </View>
+    </View>
+  )
+}
+
+// ─── JUNIOR PAGE 1: CURRENT POSITION ─────────────────────────────────────────
+
+const PATHWAY_CAREER_DIRECTIONS: Record<string, string[]> = {
+  'STEM':                  ['Medicine & Health Sciences', 'Engineering', 'Computing & Technology', 'Applied Sciences'],
+  'Social Sciences':       ['Law', 'Education', 'Public Administration', 'Business & Finance', 'Community Development'],
+  'Arts & Sports Science': ['Sports Science & Coaching', 'Creative Arts & Design', 'Media & Performing Arts', 'Physical Education'],
+}
+
+function JuniorCurrentPositionPage({ report }: { report: AcademicClinicReport }) {
+  const sp      = report.studentProfile
+  const co      = report.clinicalOverview
+  const byDesc  = [...report.subjectBreakdown].sort((a, b) => b.level - a.level)
+  const byAsc   = [...report.subjectBreakdown].sort((a, b) => a.level - b.level)
+  const strengths = byDesc.filter(s => s.level >= 3).slice(0, 3)
+  const priority  = byAsc.filter(s => s.level <= 2).slice(0, 3)
+  const cards     = report.pathwayReadinessCards ?? []
+  const pa        = report.pathwayAnalysis
+
+  const STATUS_COLORS: Record<string, string> = {
+    'Strongly Ready': C.l3, 'Within Reach': C.l2,
+    'Requires Improvement': '#ea580c', 'Significant Preparation Needed': C.l1,
+  }
+  const STATUS_BG: Record<string, string> = {
+    'Strongly Ready': C.l3bg, 'Within Reach': C.l2bg,
+    'Requires Improvement': '#fff7ed', 'Significant Preparation Needed': C.l1bg,
+  }
+
+  return (
+    <Page size="A4" style={S.page}>
+      <PageHeader name={sp.name} grade={sp.grade} pageNum={1} totalPages={3} reportId={report.reportId} />
+      <View style={S.content}>
+        <Text style={S.sectionLabel}>JUNIOR SCHOOL ACADEMIC CLINIC · GRADES 7–9</Text>
+        <Text style={S.sectionTitle}>Current Position</Text>
+
+        {/* Identity + overall */}
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 18, fontWeight: 700, color: C.text }}>{sp.name}</Text>
+            <Text style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>
+              Grade {sp.grade} · {sp.level} · Term {sp.term}, {sp.year}
+              {sp.school ? ` · ${sp.school}` : ''}
+            </Text>
+          </View>
+          <View style={{ alignItems: 'flex-end', flexDirection: 'row', gap: 8 }}>
+            <LevelBadge level={co.overallCompetencyLevel} />
+            <TrajectoryBadge t={co.trajectory} />
+          </View>
+        </View>
+
+        <View style={S.dividerThin} />
+
+        {/* Pathway Readiness */}
+        <Text style={{ fontSize: 9, fontWeight: 700, color: C.text, letterSpacing: 1, marginBottom: 8 }}>
+          CURRENT PATHWAY READINESS
+        </Text>
+        <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+          {cards.map((card, i) => {
+            const isRec   = card.pathway === pa?.recommendedPathway
+            const statClr = STATUS_COLORS[card.statusLabel] ?? C.muted
+            const statBg  = STATUS_BG[card.statusLabel] ?? C.offWhite
+            return (
+              <View key={i} style={{
+                flex: 1, marginRight: i < cards.length - 1 ? 8 : 0,
+                borderRadius: 6, padding: 10,
+                backgroundColor: isRec ? C.navyLight : C.offWhite,
+                borderWidth: isRec ? 0 : 1, borderColor: C.border,
+              }}>
+                {isRec && (
+                  <Text style={{ fontSize: 6.5, color: C.gold, letterSpacing: 1, marginBottom: 2 }}>RECOMMENDED</Text>
+                )}
+                <Text style={{ fontSize: 9, fontWeight: 700, color: isRec ? C.white : C.text, marginBottom: 4 }}>
+                  {card.pathway}
+                </Text>
+                <Text style={{ fontSize: 18, fontWeight: 700, color: isRec ? C.gold : statClr, marginBottom: 2 }}>
+                  {card.score}%
+                </Text>
+                <View style={[S.badge, { backgroundColor: isRec ? '#ffffff22' : statBg, paddingHorizontal: 6, paddingVertical: 2 }]}>
+                  <Text style={[S.badgeText, { color: isRec ? C.gold : statClr, fontSize: 7 }]}>
+                    {card.statusLabel.toUpperCase()}
+                  </Text>
+                </View>
+              </View>
+            )
+          })}
+        </View>
+
+        {/* WHY explanation */}
+        {pa && (
+          <View style={[S.clinBox, { marginBottom: 12 }]}>
+            <Text style={{ fontSize: 7.5, color: C.gold, letterSpacing: 1, marginBottom: 4 }}>WHY</Text>
+            <Text style={[S.clinText, { fontSize: 9 }]}>
+              {cards.find(c => c.pathway === pa.recommendedPathway)?.diagnosis ?? co.clinicalParagraph}
+            </Text>
+          </View>
+        )}
+
+        <View style={S.dividerThin} />
+
+        {/* Strengths + Needs Attention */}
+        <View style={{ flexDirection: 'row', marginBottom: 12 }}>
+          <View style={{ flex: 1, marginRight: 20 }}>
+            <Text style={{ fontSize: 9, fontWeight: 700, color: C.l3, letterSpacing: 1, marginBottom: 7 }}>
+              STRONGEST SUBJECTS
+            </Text>
+            {strengths.length > 0
+              ? strengths.map((s, i) => (
+                  <View key={i} style={S.listRow}>
+                    <View style={[S.listDot, { backgroundColor: C.l3 }]} />
+                    <Text style={[S.listText, { fontSize: 9 }]}>{s.displayName}</Text>
+                    <View style={[S.badge, { backgroundColor: levelBg(s.level), paddingVertical: 1, paddingHorizontal: 6 }]}>
+                      <Text style={[S.badgeText, { color: levelColor(s.level), fontSize: 7.5 }]}>L{s.level}</Text>
+                    </View>
+                  </View>
+                ))
+              : <Text style={{ fontSize: 9, color: C.muted }}>Building across all subjects</Text>
+            }
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 9, fontWeight: 700, color: C.l1, letterSpacing: 1, marginBottom: 7 }}>
+              NEEDS ATTENTION
+            </Text>
+            {priority.length > 0
+              ? priority.map((s, i) => (
+                  <View key={i} style={S.listRow}>
+                    <View style={[S.listDot, { backgroundColor: C.l1 }]} />
+                    <Text style={[S.listText, { fontSize: 9 }]}>{s.displayName}</Text>
+                    <View style={[S.badge, { backgroundColor: levelBg(s.level), paddingVertical: 1, paddingHorizontal: 6 }]}>
+                      <Text style={[S.badgeText, { color: levelColor(s.level), fontSize: 7.5 }]}>L{s.level}</Text>
+                    </View>
+                  </View>
+                ))
+              : <Text style={{ fontSize: 9, color: C.muted }}>No critical areas identified</Text>
+            }
+          </View>
+        </View>
+
+        <View style={S.dividerThin} />
+
+        {/* Subject Performance Grid */}
+        <Text style={{ fontSize: 9, fontWeight: 700, color: C.text, letterSpacing: 1, marginBottom: 7 }}>
+          SUBJECT PERFORMANCE
+        </Text>
+        <SubjectGrid subjects={report.subjectBreakdown} />
+      </View>
+      <PageFooter reportId={report.reportId} />
+    </Page>
+  )
+}
+
+// ─── JUNIOR PAGE 2: PATHWAY OPPORTUNITY ANALYSIS ─────────────────────────────
+
+function JuniorOpportunityPage({ report }: { report: AcademicClinicReport }) {
+  const sp      = report.studentProfile
+  const cards   = report.pathwayReadinessCards ?? []
+  const pa      = report.pathwayAnalysis
+  const cascade = report.juniorImprovementCascade
+
+  const recCard = cards.find(c => c.pathway === pa?.recommendedPathway)
+
+  const STATUS_LEGEND = [
+    { label: 'Strongly Ready', color: '#16a34a' },
+    { label: 'Within Reach',   color: '#d97706' },
+    { label: 'Requires Improvement', color: '#ea580c' },
     { label: 'Significant Preparation Needed', color: '#dc2626' },
   ]
+
+  const probColor = (p: string) => p === 'High' ? C.l3 : p === 'Medium' ? C.l2 : C.muted
+  const probBg    = (p: string) => p === 'High' ? C.l3bg : p === 'Medium' ? C.l2bg : C.offWhite
 
   return (
     <Page size="A4" style={S.page}>
       <PageHeader name={sp.name} grade={sp.grade} pageNum={2} totalPages={3} reportId={report.reportId} />
       <View style={S.content}>
         <Text style={S.sectionLabel}>PATHWAY ANALYSIS · GRADES 7–9</Text>
-        <Text style={S.sectionTitle}>Senior School Pathway Readiness</Text>
+        <Text style={S.sectionTitle}>Pathway Opportunity Analysis</Text>
+        <View style={S.divider} />
+
+        {/* CURRENT PATHWAY */}
+        {recCard && (
+          <View style={{ backgroundColor: C.navyLight, borderRadius: 6, padding: 14, marginBottom: 14 }}>
+            <Text style={{ fontSize: 8, color: C.gold, letterSpacing: 1, marginBottom: 4 }}>CURRENT PATHWAY</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+              <Text style={{ fontSize: 14, fontWeight: 700, color: C.white, flex: 1 }}>{recCard.pathway}</Text>
+              <Text style={{ fontSize: 20, fontWeight: 700, color: C.gold }}>{recCard.score}%</Text>
+              <View style={[S.badge, { backgroundColor: '#ffffff22', marginLeft: 8 }]}>
+                <Text style={[S.badgeText, { color: C.gold, fontSize: 7 }]}>{recCard.statusLabel.toUpperCase()}</Text>
+              </View>
+            </View>
+            <Text style={{ fontSize: 8.5, color: '#94a3b8', lineHeight: 1.45 }}>{recCard.diagnosis}</Text>
+          </View>
+        )}
+
+        {/* NEXT DOOR OPPORTUNITY */}
+        {cascade && cascade.subjectKey && (
+          <View style={{ borderWidth: 1.5, borderColor: C.gold, borderRadius: 6, padding: 14, marginBottom: 14, backgroundColor: C.goldLight }}>
+            <Text style={{ fontSize: 8, color: '#92400e', fontWeight: 700, letterSpacing: 1, marginBottom: 6 }}>
+              NEXT DOOR OPPORTUNITY
+            </Text>
+            <Text style={{ fontSize: 14, fontWeight: 700, color: C.navy, marginBottom: 10 }}>
+              {cascade.targetPathway} Pathway
+            </Text>
+
+            {/* Requirements table */}
+            <Text style={{ fontSize: 8, color: '#78350f', fontWeight: 700, letterSpacing: 0.5, marginBottom: 5 }}>REQUIREMENTS</Text>
+            <View style={{ flexDirection: 'row', marginBottom: 8, paddingBottom: 5, borderBottomWidth: 1, borderBottomColor: '#d97706' }}>
+              <Text style={{ fontSize: 7, color: '#78350f', flex: 1 }}>SUBJECT</Text>
+              <Text style={{ fontSize: 7, color: '#78350f', width: 56, textAlign: 'center' }}>CURRENT</Text>
+              <Text style={{ fontSize: 7, color: '#78350f', width: 56, textAlign: 'center' }}>REQUIRED</Text>
+              <Text style={{ fontSize: 7, color: '#78350f', width: 36, textAlign: 'center' }}>GAP</Text>
+              <Text style={{ fontSize: 7, color: '#78350f', width: 56, textAlign: 'center' }}>TIMELINE</Text>
+              <Text style={{ fontSize: 7, color: '#78350f', width: 50, textAlign: 'center' }}>PROB.</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+              <Text style={{ fontSize: 8.5, fontWeight: 700, color: C.navy, flex: 1 }}>{cascade.displayName}</Text>
+              <View style={{ width: 56, alignItems: 'center' }}>
+                <View style={[S.badge, { backgroundColor: levelBg(cascade.currentLevel), paddingVertical: 1, paddingHorizontal: 4 }]}>
+                  <Text style={[S.badgeText, { color: levelColor(cascade.currentLevel), fontSize: 7 }]}>L{cascade.currentLevel}</Text>
+                </View>
+              </View>
+              <View style={{ width: 56, alignItems: 'center' }}>
+                <View style={[S.badge, { backgroundColor: levelBg(cascade.targetLevel), paddingVertical: 1, paddingHorizontal: 4 }]}>
+                  <Text style={[S.badgeText, { color: levelColor(cascade.targetLevel), fontSize: 7 }]}>L{cascade.targetLevel}</Text>
+                </View>
+              </View>
+              <Text style={{ width: 36, fontSize: 8, fontWeight: 700, color: C.l1, textAlign: 'center' }}>
+                +{cascade.gap}
+              </Text>
+              <Text style={{ width: 56, fontSize: 8, color: '#78350f', textAlign: 'center' }}>
+                {cascade.estimatedTimeline}
+              </Text>
+              <View style={{ width: 50, alignItems: 'center' }}>
+                <View style={[S.badge, { backgroundColor: probBg(cascade.probability), paddingVertical: 1, paddingHorizontal: 4 }]}>
+                  <Text style={[S.badgeText, { color: probColor(cascade.probability), fontSize: 7 }]}>{cascade.probability.toUpperCase()}</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* What happens if this improves */}
+            <View style={{ backgroundColor: C.white, borderRadius: 5, padding: 10 }}>
+              <Text style={{ fontSize: 8, fontWeight: 700, color: '#92400e', letterSpacing: 0.5, marginBottom: 4 }}>
+                WHAT HAPPENS IF {cascade.displayName.toUpperCase()} IMPROVES?
+              </Text>
+              <Text style={{ fontSize: 8.5, color: '#78350f', marginBottom: 8 }}>
+                {cascade.displayName} Level {cascade.currentLevel} → Level {cascade.targetLevel}
+              </Text>
+              <Text style={{ fontSize: 8, color: C.muted, letterSpacing: 0.5, marginBottom: 5 }}>Result:</Text>
+              {cascade.unlocks.map((item, i) => (
+                <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                  <Text style={{ fontSize: 9, fontWeight: 700, color: C.l3, marginRight: 6 }}>✓</Text>
+                  <Text style={{ fontSize: 8.5, color: C.text }}>{item}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {!cascade && (
+          <View style={{ backgroundColor: C.l3bg, borderRadius: 6, padding: 12, marginBottom: 14, borderLeftWidth: 3, borderLeftColor: C.l3 }}>
+            <Text style={{ fontSize: 9, fontWeight: 700, color: C.l3, marginBottom: 4 }}>ALL PATHWAYS WITHIN REACH</Text>
+            <Text style={{ fontSize: 8.5, color: C.text }}>
+              This learner's performance profile opens more than one pathway option. Focus on maintaining strong performance across all subjects to keep all options open before Grade 10.
+            </Text>
+          </View>
+        )}
 
         {/* Status legend */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 6, marginBottom: 12 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 }}>
           {STATUS_LEGEND.map((s, i) => (
-            <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 14, marginBottom: 2 }}>
+            <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12, marginBottom: 2 }}>
               {statusDot(s.color)}
               <Text style={{ fontSize: 7.5, color: C.muted }}>{s.label}</Text>
             </View>
           ))}
         </View>
 
-        {/* Three pathway cards */}
+        {/* All pathway cards */}
         {cards.map((card, ci) => {
           const isRec = card.pathway === pa?.recommendedPathway
           return (
             <View key={ci} style={{
-              borderLeftWidth: 3,
-              borderLeftColor: card.statusColor,
+              borderLeftWidth: 3, borderLeftColor: card.statusColor,
               backgroundColor: isRec ? '#f0f7ff' : C.offWhite,
-              paddingLeft: 10,
-              paddingRight: 10,
-              paddingVertical: 8,
-              marginBottom: 10,
-              borderRadius: 3,
+              paddingLeft: 10, paddingRight: 10, paddingVertical: 8,
+              marginBottom: 8, borderRadius: 3,
             }}>
-              {/* Card header */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 3 }}>
                 {statusDot(card.statusColor)}
                 <Text style={{ fontSize: 10, fontWeight: 700, color: C.text, flex: 1 }}>{card.pathway}</Text>
                 {isRec && (
@@ -1277,70 +660,375 @@ function JuniorPathwayPage({ report }: { report: AcademicClinicReport }) {
                 )}
                 <Text style={{ fontSize: 9, fontWeight: 700, color: card.statusColor }}>{card.score}%</Text>
               </View>
-              {/* Score bar */}
-              <View style={[S.readinessTrack, { marginBottom: 5, marginRight: 4 }]}>
+              <View style={[S.readinessTrack, { marginBottom: 4, marginRight: 4 }]}>
                 <View style={[S.readinessFill, { width: `${card.score}%`, backgroundColor: card.statusColor }]} />
               </View>
-              {/* Status label + diagnosis */}
-              <Text style={{ fontSize: 8, fontWeight: 700, color: card.statusColor, marginBottom: 2 }}>
-                {card.statusLabel.toUpperCase()}
-              </Text>
-              <Text style={{ fontSize: 8, color: C.muted, lineHeight: 1.4, marginBottom: 4 }}>
-                {card.diagnosis}
-              </Text>
-              {/* Gap table */}
+              <Text style={{ fontSize: 7.5, fontWeight: 700, color: card.statusColor, marginBottom: 2 }}>{card.statusLabel.toUpperCase()}</Text>
               {card.gapRows.length > 0 && <GapTable rows={card.gapRows} />}
             </View>
           )
         })}
+      </View>
+      <PageFooter reportId={report.reportId} />
+    </Page>
+  )
+}
+
+// ─── JUNIOR PAGE 3: ACTION PLAN ───────────────────────────────────────────────
+
+function JuniorActionPlanPage({ report }: { report: AcademicClinicReport }) {
+  const sp         = report.studentProfile
+  const priorities = report.juniorActionPriorities ?? []
+  const parentAct  = report.parentAction
+  const pa         = report.pathwayAnalysis
+  const recPathway = pa?.recommendedPathway ?? 'STEM'
+  const directions = PATHWAY_CAREER_DIRECTIONS[recPathway] ?? []
+  const top        = priorities[0]
+  const dateStr    = new Date(report.generatedAt).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })
+
+  return (
+    <Page size="A4" style={S.page}>
+      <PageHeader name={sp.name} grade={sp.grade} pageNum={3} totalPages={3} reportId={report.reportId} />
+      <View style={S.content}>
+        <Text style={S.sectionLabel}>ACTION PLAN · PATHWAY PREPARATION</Text>
+        <Text style={S.sectionTitle}>Clinical Action Plan</Text>
+        <View style={S.divider} />
+
+        {/* 3 Priority Interventions */}
+        {priorities.slice(0, 3).map((p, i) => (
+          <PriorityBlock key={i} p={p} colors={PRIORITY_COLORS[i]} />
+        ))}
 
         <View style={S.dividerThin} />
 
-        {/* Pathway Roadmap */}
-        {road && (
-          <View>
-            <Text style={{ fontSize: 9, fontWeight: 700, color: C.text, letterSpacing: 1, marginBottom: 8 }}>
-              PATHWAY ROADMAP · {road.targetPathway.toUpperCase()}
+        {/* Parent Action */}
+        {parentAct && (
+          <View style={S.parentActionBox}>
+            <Text style={S.parentActionLabel}>PARENT ACTION</Text>
+            <Text style={S.parentActionText}>{parentAct.action}</Text>
+          </View>
+        )}
+
+        {/* Rx Prescription */}
+        {top && (
+          <RxBox
+            subject={top.subject}
+            reason={top.compassReason}
+            outcome={`Move from Level ${top.currentLevel} to Level ${top.targetLevel}`}
+            sessions={top.estimatedSessions}
+            timeline={top.timeline}
+          />
+        )}
+
+        <View style={S.dividerThin} />
+
+        {/* Junior Career Section */}
+        <View style={S.careerDirBox}>
+          <Text style={S.careerDirTitle}>POSSIBLE FUTURE DIRECTIONS</Text>
+          <Text style={{ fontSize: 8, color: C.muted, marginBottom: 6 }}>
+            If the {recPathway} pathway continues:
+          </Text>
+          {directions.map((dir, i) => (
+            <View key={i} style={S.careerDirItem}>
+              <View style={S.careerDirDot} />
+              <Text style={S.careerDirText}>{dir}</Text>
+            </View>
+          ))}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: C.border }}>
+            <Text style={{ fontSize: 8, color: C.muted, flex: 1 }}>
+              Explore detailed career analysis in EduNexus Career Explorer
             </Text>
-            {road.steps.length === 0
-              ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                  <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: C.l3, justifyContent: 'center', alignItems: 'center', marginRight: 8 }}>
-                    <Text style={{ fontSize: 8, color: C.white, fontWeight: 700 }}>✓</Text>
-                  </View>
-                  <Text style={{ fontSize: 9, color: C.l3, fontWeight: 700 }}>
-                    {road.targetPathway} pathway secured — maintain current performance
-                  </Text>
-                </View>
-              )
-              : road.steps.map((step, i) => (
-                <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                  <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: C.gold, justifyContent: 'center', alignItems: 'center', marginRight: 8 }}>
-                    <Text style={{ fontSize: 7.5, color: C.navy, fontWeight: 700 }}>{i + 1}</Text>
-                  </View>
-                  <Text style={{ fontSize: 9, color: C.text }}>
-                    <Text style={{ fontWeight: 700 }}>{step.subject}: </Text>
-                    {'Raise Level '}
-                    <Text style={{ color: levelColor(step.fromLevel), fontWeight: 700 }}>{step.fromLevel}</Text>
-                    {' → Level '}
-                    <Text style={{ color: levelColor(step.toLevel), fontWeight: 700 }}>{step.toLevel}</Text>
-                  </Text>
-                </View>
-              ))
-            }
-            <View style={{ flexDirection: 'row', marginTop: 4 }}>
-              <View style={{ flex: 1, backgroundColor: C.offWhite, borderRadius: 4, padding: 8, marginRight: 8 }}>
-                <Text style={{ fontSize: 7.5, color: C.muted, letterSpacing: 0.5 }}>TIMELINE</Text>
-                <Text style={{ fontSize: 9, fontWeight: 700, color: C.text, marginTop: 2 }}>{road.timeline}</Text>
+            <Text style={{ fontSize: 8, fontWeight: 700, color: C.navy }}>edunexus.co.ke/career</Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={[S.pageFooter, { flexDirection: 'column', alignItems: 'center' }]}>
+        <Text style={[S.pageFooterText, { marginBottom: 2 }]}>
+          EduNexus Academic Clinic · {dateStr} · Report ID: {report.reportId}
+        </Text>
+        <Text style={S.pageFooterText}>
+          This report is an academic readiness guide. Results reflect current performance and will change with consistent effort.
+        </Text>
+      </View>
+    </Page>
+  )
+}
+
+// ─── SENIOR PAGE 1: ACADEMIC SNAPSHOT ────────────────────────────────────────
+
+function SeniorSnapshotPage({ report }: { report: AcademicClinicReport }) {
+  const sp         = report.studentProfile
+  const co         = report.clinicalOverview
+  const indicators = report.seniorReadinessIndicators
+  const byDesc     = [...report.subjectBreakdown].sort((a, b) => b.level - a.level)
+  const byAsc      = [...report.subjectBreakdown].sort((a, b) => a.level - b.level)
+  const strong     = byDesc.filter(s => s.level >= 3).slice(0, 4)
+  const needs      = byAsc.filter(s => s.level <= 2).slice(0, 4)
+  const score      = indicators?.pathwayReadinessScore ?? Math.round((co.overallCompetencyLevel / 4) * 100)
+  const scoreClr   = score >= 75 ? C.l3 : score >= 60 ? C.l2 : score >= 45 ? '#ea580c' : C.l1
+  const pathway    = sp.pathway ?? 'Senior School'
+
+  return (
+    <Page size="A4" style={S.page}>
+      {/* Branded header */}
+      <View>
+        <View style={[S.pageHeader, { paddingVertical: 18 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Svg width={32} height={32} viewBox="0 0 64 64" style={{ marginRight: 10 }}>
+              <Circle cx="32" cy="32" r="30" fill="#243358" stroke="#4f46e5" strokeWidth="1.5" />
+              <Polygon points="32,4 36.5,28.5 32,30 27.5,28.5" fill="#f59e0b" />
+              <Polygon points="32,60 36.5,35.5 32,34 27.5,35.5" fill="#818cf8" />
+              <Polygon points="4,32 28.5,27.5 30,32 28.5,36.5" fill="#10b981" />
+              <Polygon points="60,32 35.5,27.5 34,32 35.5,36.5" fill="#f43f5e" />
+              <Circle cx="32" cy="32" r="4" fill="#0f0e2a" stroke="#f59e0b" strokeWidth="1.5" />
+            </Svg>
+            <View>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                <Text style={{ fontSize: 16, fontWeight: 700, color: C.white }}>Edu</Text>
+                <Text style={{ fontSize: 16, fontWeight: 700, color: C.gold }}>Nexus</Text>
+                <Text style={{ fontSize: 9, color: '#94a3b8', marginLeft: 8, letterSpacing: 1 }}>ACADEMIC CLINIC</Text>
               </View>
-              <View style={{ flex: 1, backgroundColor: C.l3bg, borderRadius: 4, padding: 8 }}>
-                <Text style={{ fontSize: 7.5, color: C.muted, letterSpacing: 0.5 }}>EXPECTED RESULT</Text>
-                <Text style={{ fontSize: 9, fontWeight: 700, color: C.l3, marginTop: 2 }}>
-                  {road.currentScore}% → {road.projectedScore}% readiness
-                </Text>
-              </View>
+              <Text style={{ fontSize: 8, color: '#475569', marginTop: 2 }}>SENIOR SCHOOL · GRADES 10–12</Text>
             </View>
           </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={{ fontSize: 8, color: '#94a3b8' }}>Page 1 of 3</Text>
+            <Text style={{ fontSize: 7, color: '#475569', marginTop: 2 }}>{report.reportId}</Text>
+          </View>
+        </View>
+        <View style={S.pageGoldLine} />
+      </View>
+
+      <View style={S.content}>
+        <Text style={S.sectionLabel}>ACADEMIC SNAPSHOT</Text>
+
+        {/* Student identity + pathway readiness score */}
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{sp.name}</Text>
+            <Text style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>
+              Grade {sp.grade} · {pathway}
+            </Text>
+            <Text style={{ fontSize: 10, color: C.muted }}>
+              Term {sp.term}, {sp.year}{sp.school ? ` · ${sp.school}` : ''}
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+              <LevelBadge level={co.overallCompetencyLevel} />
+              <TrajectoryBadge t={co.trajectory} />
+            </View>
+          </View>
+          <View style={S.snapshotScoreBlock}>
+            <View style={[S.snapshotScoreCircle, { borderColor: scoreClr }]}>
+              <Text style={[S.snapshotScoreValue, { color: scoreClr }]}>{score}%</Text>
+            </View>
+            <Text style={S.snapshotScoreLabel}>PATHWAY READINESS</Text>
+            <Text style={{ fontSize: 8, color: C.muted, textAlign: 'center', maxWidth: 90 }}>
+              {score >= 75 ? 'Strong' : score >= 60 ? 'Developing' : score >= 45 ? 'Emerging' : 'Needs Work'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={S.dividerThin} />
+
+        {/* Strong Subjects + Requires Intervention */}
+        <View style={{ flexDirection: 'row', marginBottom: 12 }}>
+          <View style={{ flex: 1, marginRight: 20 }}>
+            <Text style={{ fontSize: 9, fontWeight: 700, color: C.l3, letterSpacing: 1, marginBottom: 7 }}>
+              STRONG SUBJECTS
+            </Text>
+            {strong.length > 0
+              ? strong.map((s, i) => (
+                  <View key={i} style={S.listRow}>
+                    <View style={[S.listDot, { backgroundColor: C.l3 }]} />
+                    <Text style={[S.listText, { fontSize: 9 }]}>{s.displayName}</Text>
+                    <View style={[S.badge, { backgroundColor: levelBg(s.level), paddingVertical: 1, paddingHorizontal: 6 }]}>
+                      <Text style={[S.badgeText, { color: levelColor(s.level), fontSize: 7.5 }]}>L{s.level}</Text>
+                    </View>
+                  </View>
+                ))
+              : <Text style={{ fontSize: 9, color: C.muted }}>Building toward strengths</Text>
+            }
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 9, fontWeight: 700, color: C.l1, letterSpacing: 1, marginBottom: 7 }}>
+              REQUIRES INTERVENTION
+            </Text>
+            {needs.length > 0
+              ? needs.map((s, i) => (
+                  <View key={i} style={S.listRow}>
+                    <View style={[S.listDot, { backgroundColor: C.l1 }]} />
+                    <Text style={[S.listText, { fontSize: 9 }]}>{s.displayName}</Text>
+                    <View style={[S.badge, { backgroundColor: levelBg(s.level), paddingVertical: 1, paddingHorizontal: 6 }]}>
+                      <Text style={[S.badgeText, { color: levelColor(s.level), fontSize: 7.5 }]}>L{s.level}</Text>
+                    </View>
+                  </View>
+                ))
+              : <Text style={{ fontSize: 9, color: C.muted }}>No critical areas identified</Text>
+            }
+          </View>
+        </View>
+
+        <View style={S.dividerThin} />
+
+        {/* Academic diagnosis */}
+        <Text style={{ fontSize: 9, fontWeight: 700, color: C.text, letterSpacing: 1, marginBottom: 6 }}>
+          ACADEMIC ASSESSMENT
+        </Text>
+        <View style={[S.clinBox, { marginBottom: 12 }]}>
+          <Text style={S.clinText}>{co.clinicalParagraph}</Text>
+        </View>
+
+        <View style={S.dividerThin} />
+
+        {/* Subject performance grid */}
+        <Text style={{ fontSize: 9, fontWeight: 700, color: C.text, letterSpacing: 1, marginBottom: 7 }}>
+          SUBJECT PERFORMANCE
+        </Text>
+        <SubjectGrid subjects={report.subjectBreakdown} />
+      </View>
+      <PageFooter reportId={report.reportId} />
+    </Page>
+  )
+}
+
+// ─── SENIOR PAGE 2: FUTURE READINESS ─────────────────────────────────────────
+
+function SeniorFutureReadinessPage({ report }: { report: AcademicClinicReport }) {
+  const sp         = report.studentProfile
+  const indicators = report.seniorReadinessIndicators
+  const careers    = report.careerInsightCards ?? []
+  const scenario   = report.futureScenario
+
+  const readinessLabelColor: Record<string, string> = {
+    'Strong': C.l3, 'Developing': C.l2, 'Emerging': '#ea580c', 'Needs Work': C.l1,
+  }
+  const readinessLabelBg: Record<string, string> = {
+    'Strong': C.l3bg, 'Developing': C.l2bg, 'Emerging': '#fff7ed', 'Needs Work': C.l1bg,
+  }
+  const progressColor: Record<string, string> = {
+    'On Track': C.l3, 'Needs Attention': C.l2, 'Critical': C.l1,
+  }
+  const progressBg: Record<string, string> = {
+    'On Track': C.l3bg, 'Needs Attention': C.l2bg, 'Critical': C.l1bg,
+  }
+
+  const alignmentColor = (a: number) => a >= 75 ? C.l3 : a >= 55 ? C.l2 : C.muted
+
+  return (
+    <Page size="A4" style={S.page}>
+      <PageHeader name={sp.name} grade={sp.grade} pageNum={2} totalPages={3} reportId={report.reportId} />
+      <View style={S.content}>
+        <Text style={S.sectionLabel}>FUTURE READINESS ANALYSIS</Text>
+        <Text style={S.sectionTitle}>Future Readiness</Text>
+        <View style={S.divider} />
+
+        {/* Three readiness indicators */}
+        {indicators && (
+          <View style={S.indicatorRow}>
+            {/* University Readiness */}
+            <View style={[S.indicatorCard, { backgroundColor: readinessLabelBg[indicators.universityReadiness] ?? C.offWhite }]}>
+              <Text style={S.indicatorLabel}>UNIVERSITY READINESS</Text>
+              <Text style={[S.indicatorValue, { color: readinessLabelColor[indicators.universityReadiness] ?? C.muted }]}>
+                {indicators.universityReadiness}
+              </Text>
+              <Text style={[S.indicatorDetail, { color: C.text }]}>{indicators.universityReadinessDetail}</Text>
+            </View>
+            {/* Career Readiness */}
+            <View style={[S.indicatorCard, { backgroundColor: readinessLabelBg[indicators.careerReadiness] ?? C.offWhite }]}>
+              <Text style={S.indicatorLabel}>CAREER READINESS</Text>
+              <Text style={[S.indicatorValue, { color: readinessLabelColor[indicators.careerReadiness] ?? C.muted }]}>
+                {indicators.careerReadiness}
+              </Text>
+              <Text style={[S.indicatorDetail, { color: C.text }]}>{indicators.careerReadinessDetail}</Text>
+            </View>
+            {/* Pathway Progress */}
+            <View style={[S.indicatorCard, { backgroundColor: progressBg[indicators.pathwayProgress] ?? C.offWhite, marginRight: 0 }]}>
+              <Text style={S.indicatorLabel}>PATHWAY PROGRESS</Text>
+              <Text style={[S.indicatorValue, { color: progressColor[indicators.pathwayProgress] ?? C.muted }]}>
+                {indicators.pathwayProgress}
+              </Text>
+              <Text style={[S.indicatorDetail, { color: C.text }]}>{indicators.pathwayProgressDetail}</Text>
+            </View>
+          </View>
+        )}
+
+        <View style={S.dividerThin} />
+
+        {/* Career Insight Section */}
+        {careers.length > 0 && (
+          <>
+            <Text style={{ fontSize: 9, fontWeight: 700, color: C.text, letterSpacing: 1, marginBottom: 8 }}>
+              CAREER INSIGHT — TOP 3 DIRECTIONS
+            </Text>
+            {careers.map((c, i) => (
+              <View key={i} style={S.insightCard}>
+                <View style={S.insightHeader}>
+                  <Text style={S.insightName}>{i + 1}. {c.name}</Text>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={[S.insightAlignment, { color: alignmentColor(c.alignment) }]}>{c.alignment}%</Text>
+                    <Text style={{ fontSize: 7, color: C.muted }}>alignment</Text>
+                  </View>
+                </View>
+                <View style={S.insightMetaRow}>
+                  <View style={S.insightMetaChip}>
+                    <Text style={S.insightMetaKey}>Future Outlook:</Text>
+                    <Text style={S.insightMetaVal}>{c.futureOutlook}</Text>
+                  </View>
+                  <View style={S.insightMetaChip}>
+                    <Text style={S.insightMetaKey}>AI Impact:</Text>
+                    <Text style={S.insightMetaVal}>{c.aiImpact}</Text>
+                  </View>
+                  <View style={S.insightMetaChip}>
+                    <Text style={S.insightMetaKey}>Self-Employment:</Text>
+                    <Text style={S.insightMetaVal}>{c.selfEmploymentPotential}</Text>
+                  </View>
+                </View>
+                <Text style={S.insightExamples}>
+                  Examples: {c.selfEmploymentExamples.join(' · ')}
+                </Text>
+              </View>
+            ))}
+          </>
+        )}
+
+        <View style={S.dividerThin} />
+
+        {/* Future Scenario Analysis */}
+        {scenario && (
+          <>
+            <Text style={{ fontSize: 9, fontWeight: 700, color: C.text, letterSpacing: 1, marginBottom: 8 }}>
+              FUTURE SCENARIO ANALYSIS
+            </Text>
+            <View style={S.scenarioRow}>
+              {/* If nothing changes */}
+              <View style={[S.scenarioBox, { backgroundColor: C.l1bg, marginRight: 8 }]}>
+                <Text style={[S.scenarioTitle, { color: C.l1 }]}>IF NOTHING CHANGES</Text>
+                <Text style={{ fontSize: 8.5, color: C.text, marginBottom: 4 }}>
+                  {scenario.subject} remains at Level {scenario.currentLevel}
+                </Text>
+                <Text style={[S.scenarioBody, { color: '#7f1d1d' }]}>{scenario.currentTrajectory}</Text>
+              </View>
+              {/* If scores improve */}
+              <View style={[S.scenarioBox, { backgroundColor: C.l3bg }]}>
+                <Text style={[S.scenarioTitle, { color: C.l3 }]}>IF SCORES IMPROVE BY ONE LEVEL</Text>
+                <Text style={{ fontSize: 8.5, fontWeight: 700, color: C.text, marginBottom: 6 }}>
+                  {scenario.subject} Level {scenario.currentLevel} → Level {scenario.improvedLevel}
+                </Text>
+                {scenario.improvedImpacts.map((impact, i) => (
+                  <View key={i} style={S.scenarioCheck}>
+                    <Text style={[S.scenarioCheckMark, { color: C.l3 }]}>✓</Text>
+                    <Text style={[S.scenarioCheckText, { color: '#14532d' }]}>{impact}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+            <View style={{ backgroundColor: C.offWhite, borderRadius: 4, padding: 8, marginTop: 8 }}>
+              <Text style={{ fontSize: 8, color: C.muted, lineHeight: 1.4 }}>
+                Parents should clearly see the value of improvement. One level change in {scenario.subject} creates a meaningful difference in available options.
+              </Text>
+            </View>
+          </>
         )}
       </View>
       <PageFooter reportId={report.reportId} />
@@ -1348,150 +1036,44 @@ function JuniorPathwayPage({ report }: { report: AcademicClinicReport }) {
   )
 }
 
-// ─── JUNIOR PAGE 3: PATHWAY PREPARATION ACTION PLAN ──────────────────────────
+// ─── SENIOR PAGE 3: CLINICAL ACTION PLAN ─────────────────────────────────────
 
-function JuniorActionPage({ report }: { report: AcademicClinicReport }) {
-  const sp      = report.studentProfile
-  const plan    = report.termActionPlan
-  const compass = report.learningCompassRec
-  const opps    = report.juniorFutureOpportunities ?? []
-  const road    = report.pathwayRoadmap
-
-  const SECTION_STYLES = [
-    { label: 'THIS WEEK',               bg: '#fef9ec', border: C.gold,    textColor: '#92400e' },
-    { label: 'THIS MONTH',              bg: '#f0fdfa', border: '#0d9488', textColor: '#065f46' },
-    { label: 'BEFORE GRADE 10 SELECTION', bg: '#eff6ff', border: C.navy, textColor: '#1e3a8a' },
-  ]
-  const sections: Array<{ label: string; items: { action: string }[] }> = [
-    { label: 'THIS WEEK',               items: plan?.thisWeek     ?? [] },
-    { label: 'THIS MONTH',              items: plan?.thisMonth    ?? [] },
-    { label: 'BEFORE GRADE 10 SELECTION', items: plan?.beforeGrade10 ?? [] },
-  ]
-
-  const dateStr = new Date(report.generatedAt).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })
+function SeniorActionPage({ report }: { report: AcademicClinicReport }) {
+  const sp         = report.studentProfile
+  const priorities = report.seniorActionPriorities ?? []
+  const top        = priorities[0]
+  const dateStr    = new Date(report.generatedAt).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })
 
   return (
     <Page size="A4" style={S.page}>
       <PageHeader name={sp.name} grade={sp.grade} pageNum={3} totalPages={3} reportId={report.reportId} />
       <View style={S.content}>
-        <Text style={S.sectionLabel}>ACTION PLAN · PATHWAY PREPARATION</Text>
-        <Text style={S.sectionTitle}>Pathway Preparation Action Plan</Text>
+        <Text style={S.sectionLabel}>CLINICAL ACTION PLAN</Text>
+        <Text style={S.sectionTitle}>Top 3 Interventions — Ranked by Impact</Text>
         <View style={S.divider} />
 
-        {/* Three time-horizon sections */}
-        {sections.map((sec, si) => {
-          const style = SECTION_STYLES[si]
-          return (
-            <View key={si} style={{
-              backgroundColor: style.bg,
-              borderLeftWidth: 3,
-              borderLeftColor: style.border,
-              borderRadius: 4,
-              padding: 10,
-              marginBottom: 10,
-            }}>
-              <Text style={{ fontSize: 8, fontWeight: 700, color: style.textColor, letterSpacing: 1, marginBottom: 6 }}>
-                {sec.label}
-              </Text>
-              {sec.items.map((item, ii) => (
-                <View key={ii} style={{ flexDirection: 'row', marginBottom: 4 }}>
-                  <View style={{ width: 14, height: 14, borderRadius: 2, borderWidth: 1, borderColor: style.border, marginRight: 8, marginTop: 1 }} />
-                  <Text style={{ fontSize: 8.5, color: C.text, flex: 1, lineHeight: 1.45 }}>{item.action}</Text>
-                </View>
-              ))}
-            </View>
-          )
-        })}
+        {priorities.slice(0, 3).map((p, i) => (
+          <PriorityBlock key={i} p={p} colors={PRIORITY_COLORS[i]} />
+        ))}
 
         <View style={S.dividerThin} />
 
-        {/* Learning Compass Rx box */}
-        <View style={{ backgroundColor: C.navy, borderRadius: 6, padding: 14, marginBottom: 14 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-            <View style={{ width: 28, height: 28, borderRadius: 4, backgroundColor: C.gold, justifyContent: 'center', alignItems: 'center', marginRight: 10 }}>
-              <Text style={{ fontSize: 14, fontWeight: 700, color: C.navy }}>Rx</Text>
-            </View>
-            <View>
-              <Text style={{ fontSize: 9, color: C.gold, letterSpacing: 1 }}>LEARNING COMPASS PRESCRIPTION</Text>
-              <Text style={{ fontSize: 7.5, color: '#94a3b8', marginTop: 1 }}>edunexus.co.ke/learn</Text>
-            </View>
-          </View>
-          {/* Focus areas */}
-          <Text style={{ fontSize: 7.5, color: '#94a3b8', letterSpacing: 0.5, marginBottom: 4 }}>FOCUS AREAS</Text>
-          {compass.topicsToAsk.slice(0, 3).map((topic, i) => (
-            <View key={i} style={{ flexDirection: 'row', marginBottom: 3 }}>
-              <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: C.gold, justifyContent: 'center', alignItems: 'center', marginRight: 8 }}>
-                <Text style={{ fontSize: 8, fontWeight: 700, color: C.navy }}>{i + 1}</Text>
-              </View>
-              <Text style={{ fontSize: 8.5, color: C.white, flex: 1, lineHeight: 1.4 }}>{topic}</Text>
-            </View>
-          ))}
-          <View style={{ flexDirection: 'row', marginTop: 8 }}>
-            <View style={{ flex: 1, marginRight: 10 }}>
-              <Text style={{ fontSize: 7.5, color: '#94a3b8', letterSpacing: 0.5 }}>FREQUENCY</Text>
-              <Text style={{ fontSize: 9, color: C.white, marginTop: 2 }}>{compass.sessionFrequency}</Text>
-            </View>
-            {road && road.steps.length > 0 && (
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 7.5, color: '#94a3b8', letterSpacing: 0.5 }}>ESTIMATED WINDOW</Text>
-                <Text style={{ fontSize: 9, color: C.white, marginTop: 2 }}>{road.timeline.replace('Estimated ', '')}</Text>
-              </View>
-            )}
-          </View>
-          <View style={{ marginTop: 10, backgroundColor: C.gold, borderRadius: 4, paddingVertical: 6, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={{ fontSize: 9, fontWeight: 700, color: C.navy, flex: 1 }}>Start your first session now</Text>
-            <Text style={{ fontSize: 9, fontWeight: 700, color: C.navy }}>edunexus.co.ke/learn</Text>
-          </View>
-        </View>
-
-        <View style={S.dividerThin} />
-
-        {/* Future opportunities (compact — 15% of page) */}
-        <Text style={{ fontSize: 9, fontWeight: 700, color: C.text, letterSpacing: 1, marginBottom: 8 }}>
-          PATHWAYS WORTH EXPLORING
-        </Text>
-        <View style={{ flexDirection: 'row', marginBottom: 8 }}>
-          {opps.slice(0, 3).map((opp, i) => (
-            <View key={i} style={{
-              flex: 1,
-              marginRight: i < 2 ? 8 : 0,
-              backgroundColor: i === 0 ? C.navyLight : C.offWhite,
-              borderRadius: 4,
-              padding: 8,
-              borderLeftWidth: 2,
-              borderLeftColor: i === 0 ? C.gold : C.border,
-            }}>
-              {i === 0 && (
-                <Text style={{ fontSize: 6.5, color: C.gold, letterSpacing: 1, marginBottom: 2 }}>RECOMMENDED</Text>
-              )}
-              <Text style={{ fontSize: 8.5, fontWeight: 700, color: i === 0 ? C.white : C.text, marginBottom: 3 }}>{opp.pathway}</Text>
-              <Text style={{ fontSize: 7.5, color: i === 0 ? C.gold : C.muted, marginBottom: 3 }}>
-                {opp.examples.join(' · ')}
-              </Text>
-              <Text style={{ fontSize: 7.5, color: i === 0 ? '#94a3b8' : C.muted, lineHeight: 1.35 }}>
-                {opp.whyItFits.split('. ')[0] + '.'}
-              </Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Career Explorer referral */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: C.offWhite, borderRadius: 4, padding: 8 }}>
-          <Text style={{ fontSize: 8, color: C.muted, flex: 1 }}>
-            Ready to explore career possibilities? Visit the EduNexus Career Explorer — designed for Grade 9 learners preparing for pathway selection.
-          </Text>
-          <Text style={{ fontSize: 8, fontWeight: 700, color: C.navy, marginLeft: 10 }}>edunexus.co.ke/careers</Text>
-        </View>
+        {top && (
+          <RxBox
+            subject={top.compassSubject}
+            reason={top.compassReason}
+            outcome={`Move from Level ${top.currentLevel} to Level ${top.targetLevel}`}
+            sessions={top.estimatedSessions}
+            timeline={top.timeline}
+          />
+        )}
       </View>
 
-      {/* Custom footer with disclaimer */}
       <View style={[S.pageFooter, { flexDirection: 'column', alignItems: 'center' }]}>
         <Text style={[S.pageFooterText, { marginBottom: 2 }]}>
           EduNexus Academic Clinic · {dateStr} · Report ID: {report.reportId}
         </Text>
-        <Text style={S.pageFooterText}>
-          This report is an academic readiness guide, not a binding assessment. Results reflect current performance and will change with consistent effort.
-        </Text>
+        <Text style={S.pageFooterText}>CONFIDENTIAL — For Parent and Teacher Use Only · edunexus.co.ke</Text>
       </View>
     </Page>
   )
@@ -1507,11 +1089,11 @@ export const AcademicClinicPDF = ({ report }: { report: AcademicClinicReport }) 
       <Document
         title={`EduNexus Academic Clinic — ${report.studentProfile.name}`}
         author="EduNexus Academic Clinic"
-        subject="Junior School Academic Readiness Report"
+        subject="Junior School Parent Decision-Support Report"
       >
-        <JuniorSnapshotPage  report={report} />
-        <JuniorPathwayPage   report={report} />
-        <JuniorActionPage    report={report} />
+        <JuniorCurrentPositionPage report={report} />
+        <JuniorOpportunityPage     report={report} />
+        <JuniorActionPlanPage      report={report} />
       </Document>
     )
   }
@@ -1520,20 +1102,11 @@ export const AcademicClinicPDF = ({ report }: { report: AcademicClinicReport }) 
     <Document
       title={`EduNexus Academic Clinic — ${report.studentProfile.name}`}
       author="EduNexus Academic Clinic"
-      subject="Academic Performance Report"
+      subject="Senior School Parent Decision-Support Report"
     >
-      <CoverPage report={report} />
-      <ClinicalOverviewPage report={report} />
-      <SubjectMatrixPage report={report} />
-
-      {report.seniorGuidance
-        ? <CareerPage report={report} />
-        : <PathwayPage report={report} />
-      }
-
-      <HolidayPlanPage report={report} />
-      <CompassPage report={report} />
-      <TeacherPage report={report} />
+      <SeniorSnapshotPage       report={report} />
+      <SeniorFutureReadinessPage report={report} />
+      <SeniorActionPage          report={report} />
     </Document>
   )
 }

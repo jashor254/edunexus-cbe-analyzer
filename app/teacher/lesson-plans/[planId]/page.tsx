@@ -64,6 +64,7 @@ export default function LessonPlanDetailPage({ params }: { params: Promise<{ pla
   const [showTaughtForm, setShowTaughtForm]     = useState(startTaught)
   const [taughtDate, setTaughtDate]             = useState(new Date().toISOString().split('T')[0])
   const [reflection, setReflection]             = useState('')
+  const [followUp, setFollowUp]                 = useState<'none' | 'minor' | 'major' | null>(null)
   const [markingTaught, setMarkingTaught]       = useState(false)
   const [suggestions, setSuggestions]           = useState<string[]>([])
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
@@ -119,23 +120,53 @@ export default function LessonPlanDetailPage({ params }: { params: Promise<{ pla
 
   async function handleMarkTaught() {
     if (!taughtDate) return
+    if (followUp === null) {
+      setError('Please tap Hapana, Kidogo, or Ndiyo before confirming.')
+      return
+    }
     setMarkingTaught(true)
     setError('')
     try {
-      const res = await fetch(`/api/lesson-plans/${planId}/mark-taught`, {
+      // Step 1: mark as taught (status + date + lesson plan reflection field)
+      const markRes = await fetch(`/api/lesson-plans/${planId}/mark-taught`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ taughtDate, reflection }),
       })
-      const d = await res.json()
-      if (d.success) {
-        setPlan(d.data.plan)
-        setShowTaughtForm(false)
-        setSaveState('saved')
-        setTimeout(() => setSaveState('idle'), 2000)
-      } else {
-        setError(d.error || 'Failed to mark as taught')
+      const markData = await markRes.json()
+      if (!markData.success) {
+        setError(markData.error || 'Failed to mark as taught')
+        return
       }
+
+      // Step 2: save evaluation + followUp tap (writes teacher_self_evaluation,
+      // teacher_flagged_followup, reflection_source, and upserts substrand_health)
+      const reflectionSource =
+        selectedSuggestion !== null && reflection === suggestions[selectedSuggestion]
+          ? 'ai_suggestion'
+          : selectedSuggestion !== null
+          ? 'edited_suggestion'
+          : 'manual'
+
+      const evalRes = await fetch(`/api/lesson-plans/${planId}/evaluation`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          evaluation: reflection,
+          followUp,
+          reflectionSource,
+        }),
+      })
+      const evalData = await evalRes.json()
+      if (!evalData.success) {
+        // Non-fatal — plan is already marked taught; log but don't block
+        console.error('[evaluation save]', evalData.error)
+      }
+
+      setPlan(evalData.success ? evalData.data.plan : markData.data.plan)
+      setShowTaughtForm(false)
+      setSaveState('saved')
+      setTimeout(() => setSaveState('idle'), 2000)
     } finally {
       setMarkingTaught(false)
     }
@@ -353,11 +384,45 @@ export default function LessonPlanDetailPage({ params }: { params: Promise<{ pla
             />
           </div>
 
+          {/* Follow-up tap — Hapana / Kidogo / Ndiyo */}
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-bold text-green-800">
+              Je, darasa linahitaji kufuatilia? <span className="text-red-500">*</span>
+              <span className="font-normal text-green-600 ml-1">(Does this class need follow-up?)</span>
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  { value: 'none',  swahili: 'Hapana',  english: 'No follow-up',    active: 'bg-green-600 text-white border-green-600',  idle: 'border-gray-200 text-gray-600 hover:border-green-400 hover:text-green-700' },
+                  { value: 'minor', swahili: 'Kidogo',  english: 'Minor follow-up', active: 'bg-amber-500 text-white border-amber-500',   idle: 'border-gray-200 text-gray-600 hover:border-amber-400 hover:text-amber-700' },
+                  { value: 'major', swahili: 'Ndiyo',   english: 'Needs revisit',   active: 'bg-red-500 text-white border-red-500',       idle: 'border-gray-200 text-gray-600 hover:border-red-400 hover:text-red-700' },
+                ] as const
+              ).map(({ value, swahili, english, active, idle }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setFollowUp(value)}
+                  className={`py-2.5 rounded-xl border-2 font-bold text-sm transition flex flex-col items-center gap-0.5 ${
+                    followUp === value ? active : idle
+                  }`}
+                >
+                  <span className="text-base">{swahili}</span>
+                  <span className={`text-xs font-normal ${followUp === value ? 'opacity-80' : 'text-gray-400'}`}>
+                    {english}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {followUp === null && (
+              <p className="text-xs text-red-500 font-medium">Tap one option before confirming.</p>
+            )}
+          </div>
+
           <div className="flex gap-3">
             <button
               onClick={handleMarkTaught}
-              disabled={markingTaught}
-              className="bg-green-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-green-700 transition flex items-center gap-2 disabled:opacity-60"
+              disabled={markingTaught || followUp === null}
+              className="bg-green-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-green-700 transition flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {markingTaught ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
               Confirm

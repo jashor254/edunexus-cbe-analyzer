@@ -44,11 +44,13 @@ export async function POST(request: Request) {
     const plan = subscription?.plan || 'free'
     const maxStudents = PLAN_LIMITS[plan] ?? 1
 
-    // Count current students (including admin-linked via parent_user_id)
+    // Count only parent-owned students — exclude teacher-created ones so class
+    // students don't consume parent plan slots
     const { count, error: countError } = await service
       .from('students')
       .select('id', { count: 'exact', head: true })
       .or(`user_id.eq.${user.id},parent_user_id.eq.${user.id}`)
+      .neq('added_by', 'teacher')
 
     if (countError) return apiError(countError.message)
 

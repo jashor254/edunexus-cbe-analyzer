@@ -2,8 +2,27 @@
 
 import { useState, useRef, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Compass, Send, Trophy, Star, Clock, ChevronRight, BookOpen, AlertCircle } from 'lucide-react'
-import { createClient } from '@/utils/supabase/client'
+import { Compass, Send, Trophy, Star, Clock, ChevronRight, BookOpen, AlertCircle, Mic, MicOff } from 'lucide-react'
+
+// ── Voice API types (not universally in lib.dom) ──────────────────────────────
+
+interface SpeechRecognitionResultItem { readonly transcript: string }
+interface SpeechRecognitionResult { readonly 0: SpeechRecognitionResultItem }
+interface SpeechRecognitionResultList { readonly length: number; [index: number]: SpeechRecognitionResult }
+interface SpeechRecognitionEvent extends Event { readonly results: SpeechRecognitionResultList }
+interface SpeechRecognitionInstance {
+  lang:             string
+  interimResults:   boolean
+  continuous:       boolean
+  maxAlternatives:  number
+  onresult:         ((e: SpeechRecognitionEvent) => void) | null
+  onend:            (() => void) | null
+  onerror:          (() => void) | null
+  start():  void
+  stop():   void
+  abort():  void
+}
+type SpeechRecognitionCtor = new () => SpeechRecognitionInstance
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -57,6 +76,7 @@ type StudentApiResponse = {
   pathway:         string | null
   subjects:        Array<{ key: string; level: Level; recommended: boolean; teacherSuggested: boolean; subtopic: string | null }>
   needsAssessment?: boolean
+  hasTeacher?:      boolean
 }
 
 type StudentListApiResponse = {
@@ -143,6 +163,7 @@ function LearnContent() {
   const [student,     setStudent]     = useState<StudentData | null>(null)
   const [students,    setStudents]    = useState<StudentSummaryCard[]>([])
   const [dataLoading, setDataLoading] = useState(true)
+  const [needsAssessmentInfo, setNeedsAssessmentInfo] = useState<{ studentId: string; hasTeacher: boolean } | null>(null)
 
   // Assignments
   const [assignments, setAssignments] = useState<Assignment[]>([])
@@ -160,9 +181,76 @@ function LearnContent() {
   const [showWarning,     setShowWarning]     = useState(false)
   const [sessionSummary,  setSessionSummary]  = useState<string | null>(null)
 
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef       = useRef<HTMLInputElement>(null)
-  const warningShown   = useRef(false)
+  const messagesEndRef  = useRef<HTMLDivElement>(null)
+  const inputRef        = useRef<HTMLInputElement>(null)
+  const warningShown    = useRef(false)
+
+  // Voice input — auto-cycles between sw-KE and en-US so students can speak either
+  // language (or mix them) without any manual toggle
+  const [isListening,  setIsListening]  = useState(false)
+  const recognitionRef  = useRef<SpeechRecognitionInstance | null>(null)
+  const isListeningRef  = useRef(false)   // ref copy for use inside callbacks
+  const cycleLangRef    = useRef<'sw-KE' | 'en-US'>('sw-KE')
+
+  useEffect(() => () => { recognitionRef.current?.abort() }, [])
+
+  const startCycle = useCallback((SR: SpeechRecognitionCtor, lang: 'sw-KE' | 'en-US') => {
+    if (!isListeningRef.current) return
+
+    const r = new SR()
+    r.lang            = lang
+    r.interimResults  = true
+    r.continuous      = false
+    r.maxAlternatives = 1
+
+    r.onresult = (event: SpeechRecognitionEvent) => {
+      let transcript = ''
+      for (let i = 0; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript
+      }
+      if (transcript) setInput(transcript)
+    }
+
+    r.onend = () => {
+      if (!isListeningRef.current) return
+      // Alternate language and restart immediately — imperceptible gap
+      const next: 'sw-KE' | 'en-US' = lang === 'sw-KE' ? 'en-US' : 'sw-KE'
+      cycleLangRef.current = next
+      startCycle(SR, next)
+    }
+
+    r.onerror = () => {
+      if (!isListeningRef.current) return
+      // On error keep the same lang and retry
+      startCycle(SR, lang)
+    }
+
+    recognitionRef.current = r
+    r.start()
+  }, [])
+
+  const toggleVoice = useCallback(() => {
+    if (isListening) {
+      isListeningRef.current = false
+      recognitionRef.current?.abort()
+      recognitionRef.current = null
+      setIsListening(false)
+      return
+    }
+
+    const w = typeof window !== 'undefined' ? window as Window & {
+      SpeechRecognition?: SpeechRecognitionCtor
+      webkitSpeechRecognition?: SpeechRecognitionCtor
+    } : null
+
+    const SR = w?.SpeechRecognition ?? w?.webkitSpeechRecognition
+    if (!SR) return
+
+    isListeningRef.current = true
+    cycleLangRef.current   = 'sw-KE'
+    setIsListening(true)
+    startCycle(SR, 'sw-KE')
+  }, [isListening, startCycle])
 
   // Auto-scroll
   useEffect(() => {
@@ -190,6 +278,7 @@ function LearnContent() {
         const d = json.data as StudentApiResponse
 
         if (d.needsAssessment) {
+          setNeedsAssessmentInfo({ studentId: d.id, hasTeacher: Boolean(d.hasTeacher) })
           setPageState('needs_assessment')
           return
         }
@@ -228,6 +317,7 @@ function LearnContent() {
       const d = json.data
 
       if (d.needsAssessment) {
+        setNeedsAssessmentInfo({ studentId: d.id, hasTeacher: Boolean(d.hasTeacher) })
         setPageState('needs_assessment')
         return
       }
@@ -252,6 +342,19 @@ function LearnContent() {
     }
   }, [])
 
+  // Persist the session's terminal state server-side. Fire-and-forget —
+  // never blocks navigation, since the student is already leaving the page.
+  const endCompassSession = useCallback((status: 'completed' | 'abandoned') => {
+    if (!sessionId || !student?.id) return
+    const durationSeconds = Math.min(SESSION_SECS, Math.floor((Date.now() - startedAt) / 1000))
+    fetch('/api/learn/end', {
+      method:      'POST',
+      credentials: 'include',
+      headers:     { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, studentId: student.id, status, durationSeconds }),
+    }).catch(() => {})
+  }, [sessionId, student?.id, startedAt])
+
   // Countdown timer (only while active)
   useEffect(() => {
     if (pageState !== 'active_session' || !startedAt) return
@@ -267,12 +370,13 @@ function LearnContent() {
 
       if (remaining === 0) {
         clearInterval(id)
+        endCompassSession('completed')
         setPageState('session_complete')
       }
     }, 1000)
 
     return () => clearInterval(id)
-  }, [pageState, startedAt])
+  }, [pageState, startedAt, endCompassSession])
 
   // Start session — sends the opening message automatically
   const startSession = useCallback(async (card: SubjectCard) => {
@@ -296,13 +400,6 @@ function LearnContent() {
       : `Let's begin our ${card.label} session.`
 
     try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        window.location.href = '/login?returnTo=/learn'
-        return
-      }
-
       const res = await fetch('/api/learn', {
         method:      'POST',
         credentials: 'include',
@@ -417,13 +514,6 @@ function LearnContent() {
     const historyForRequest = [...conversationHistory, { role: 'user' as const, content: text }]
 
     try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        window.location.href = '/login?returnTo=/learn'
-        return
-      }
-
       const res = await fetch('/api/learn', {
         method:      'POST',
         credentials: 'include',
@@ -653,6 +743,7 @@ function LearnContent() {
   // ── State: Assessment not yet done ─────────────────────────────────────────
 
   if (pageState === 'needs_assessment') {
+    const hasTeacher = needsAssessmentInfo?.hasTeacher ?? true
     return (
       <div className="h-screen bg-[#0a0a14] flex flex-col items-center justify-center px-6 text-center gap-6">
         <div className="w-16 h-16 bg-linear-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-xl">
@@ -661,15 +752,26 @@ function LearnContent() {
         <div className="space-y-2">
           <h2 className="text-2xl font-bold text-white">Assessment Needed</h2>
           <p className="text-white/50 max-w-xs">
-            This student hasn&apos;t completed their initial assessment yet. Ask their teacher to run the assessment first so the Compass can personalise their learning.
+            {hasTeacher
+              ? "This student hasn't completed their initial assessment yet. Ask their teacher to run the assessment first so the Compass can personalise their learning."
+              : "Let's get this student's first assessment done so the Compass can personalise their learning."}
           </p>
         </div>
-        <button
-          onClick={() => router.push('/dashboard')}
-          className="px-6 py-3 bg-violet-600 hover:bg-violet-500 text-white rounded-xl font-medium transition-colors"
-        >
-          Back to Dashboard
-        </button>
+        {hasTeacher ? (
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="px-6 py-3 bg-violet-600 hover:bg-violet-500 text-white rounded-xl font-medium transition-colors"
+          >
+            Back to Dashboard
+          </button>
+        ) : (
+          <button
+            onClick={() => router.push(`/dashboard/assessments/add?student=${needsAssessmentInfo?.studentId ?? ''}`)}
+            className="px-6 py-3 bg-violet-600 hover:bg-violet-500 text-white rounded-xl font-medium transition-colors"
+          >
+            Add Assessment
+          </button>
+        )}
       </div>
     )
   }
@@ -844,13 +946,23 @@ function LearnContent() {
     ? 'text-amber-400'
     : 'text-white/50'
 
+  const progressPct = Math.min(100, Math.round(((SESSION_SECS - timeLeft) / SESSION_SECS) * 100))
+  const progressColor = timeLeft <= 2 * 60
+    ? 'bg-red-400'
+    : timeLeft <= WARNING_SECS
+    ? 'bg-amber-400'
+    : 'bg-violet-500'
+
   return (
     <div className="h-screen bg-[#0a0a14] flex flex-col">
 
       {/* Top bar */}
       <div className="px-4 py-3 border-b border-white/5 shrink-0 flex items-center gap-3">
         <button
-          onClick={() => setPageState('subject_select')}
+          onClick={() => {
+            endCompassSession('abandoned')
+            setPageState('subject_select')
+          }}
           className="text-white/30 hover:text-white/70 transition-colors p-1 -ml-1 shrink-0"
           aria-label="Back to subjects"
         >
@@ -864,6 +976,16 @@ function LearnContent() {
           </p>
         </div>
 
+        <button
+          onClick={() => {
+            endCompassSession('completed')
+            setPageState('session_complete')
+          }}
+          className="text-xs font-bold text-white/40 hover:text-white/70 transition-colors px-2 py-1 shrink-0"
+        >
+          End Session
+        </button>
+
         <div className="flex items-center gap-1.5 shrink-0">
           <Clock className="w-3.5 h-3.5 text-white/30" />
           <span className={`text-sm font-mono font-bold tabular-nums ${timerColor}`}>
@@ -872,11 +994,19 @@ function LearnContent() {
         </div>
       </div>
 
+      {/* 30-min progress bar */}
+      <div className="h-1 bg-white/5 shrink-0">
+        <div
+          className={`h-full transition-all duration-1000 ${progressColor}`}
+          style={{ width: `${progressPct}%` }}
+        />
+      </div>
+
       {/* 25-min warning banner */}
       {showWarning && (
         <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-center shrink-0">
           <p className="text-amber-300 text-xs font-medium">
-            Tunamaliza hivi karibuni — {fmt(timeLeft)} imebaki
+            Almost there — finish strong! {fmt(timeLeft)} imebaki
           </p>
         </div>
       )}
@@ -939,10 +1069,30 @@ function LearnContent() {
                 sendMessage()
               }
             }}
-            placeholder={isLoading ? 'Compass is thinking...' : 'Type your answer...'}
+            placeholder={isListening ? 'Listening...' : isLoading ? 'Compass is thinking...' : 'Type or speak your answer...'}
             disabled={isLoading}
-            className="flex-1 bg-white/5 border border-white/10 focus:border-violet-500/50 rounded-xl px-4 py-3 text-white text-sm placeholder-white/20 focus:outline-none disabled:opacity-40 transition-colors"
+            className={`flex-1 bg-white/5 border rounded-xl px-4 py-3 text-white text-sm placeholder-white/20 focus:outline-none disabled:opacity-40 transition-colors ${
+              isListening ? 'border-red-500/60 animate-pulse' : 'border-white/10 focus:border-violet-500/50'
+            }`}
           />
+
+          {/* Mic button */}
+          <button
+            onClick={toggleVoice}
+            disabled={isLoading}
+            aria-label={isListening ? 'Stop recording' : 'Start voice input'}
+            className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center transition-all disabled:opacity-30 ${
+              isListening
+                ? 'bg-red-500/20 border border-red-500/50 hover:bg-red-500/30'
+                : 'bg-white/5 border border-white/10 hover:bg-white/10'
+            }`}
+          >
+            {isListening
+              ? <MicOff className="w-4 h-4 text-red-400" />
+              : <Mic className="w-4 h-4 text-white/50" />
+            }
+          </button>
+
           <button
             onClick={sendMessage}
             disabled={!input.trim() || isLoading}

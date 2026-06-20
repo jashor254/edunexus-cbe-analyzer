@@ -29,7 +29,7 @@ const JUNIOR_SUBJECTS = [
 // Left join — students without a learning_context row still load; shapeAndReturn
 // handles the null ctx case and returns needsAssessment: true so the UI can prompt.
 const SELECT = `
-  id, name, grade, current_pathway, selected_subjects,
+  id, name, grade, current_pathway, selected_subjects, teacher_id,
   student_learning_context (
     subject_tiers,
     recommended_pathway,
@@ -125,6 +125,7 @@ function shapeAndReturn(data: Record<string, unknown>) {
       pathway:        null,
       subjects:       [],
       needsAssessment: true,
+      hasTeacher:     Boolean(data.teacher_id),
     })
   }
 

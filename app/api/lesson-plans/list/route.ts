@@ -41,7 +41,7 @@ export async function GET(req: Request) {
 
     let query = db
       .from('lesson_plans')
-      .select('id, sow_id, teacher_id, week_number, lesson_number, strand, sub_strand, learning_outcomes, key_inquiry_questions, learning_resources, organisation_of_learning, introduction, step_1, step_2, step_3, conclusion, extended_activities, reflection, status, taught_date, generated_at, created_at')
+      .select('id, sow_id, teacher_id, week_number, lesson_number, strand, sub_strand, learning_outcomes, key_inquiry_questions, learning_resources, organisation_of_learning, introduction, step_1, step_2, step_3, conclusion, extended_activities, reflection, status, taught_date, teacher_flagged_followup, generated_at, created_at')
       .eq('sow_id', sowId)
       .eq('teacher_id', user.id)
       .order('week_number')
@@ -52,7 +52,12 @@ export async function GET(req: Request) {
     const { data: plans, error } = await query
     if (error) return apiError('Failed to fetch lesson plans')
 
-    return apiSuccess({ plans: plans || [], sow })
+    // Count taught lessons that still need an evaluation tap (soft-nudge data)
+    const pendingEvaluations = (plans ?? []).filter(
+      p => p.status === 'taught' && !p.teacher_flagged_followup
+    ).length
+
+    return apiSuccess({ plans: plans || [], sow, pendingEvaluations })
   } catch (err: unknown) {
     console.error('[lesson-plans/list]', err)
     return apiError(err instanceof Error ? err.message : 'List failed')

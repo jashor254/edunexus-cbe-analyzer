@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { updateSession } from '@/utils/supabase/middleware'
 
 const PUBLIC_PREFIXES = [
   '/api/',
@@ -20,12 +21,18 @@ const PUBLIC_PREFIXES = [
 ]
 
 export async function proxy(request: NextRequest) {
+  // Validate the JWT and write the refreshed session cookie FIRST so that
+  // route handlers can call getSession() (local cookie read, ~0ms) instead of
+  // getUser() (remote network call, ~2s on slow connections).
+  const sessionResponse = await updateSession(request)
+
   const { pathname } = request.nextUrl
 
-  // Root and explicitly public paths bypass auth entirely
-  if (pathname === '/') return NextResponse.next()
+  // Root and public paths (including /api/*) return immediately with the
+  // sessionResponse so the Set-Cookie header is preserved for route handlers.
+  if (pathname === '/') return sessionResponse
   if (PUBLIC_PREFIXES.some(prefix => pathname.startsWith(prefix))) {
-    return NextResponse.next()
+    return sessionResponse
   }
 
   let response = NextResponse.next({

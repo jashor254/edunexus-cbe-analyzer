@@ -180,10 +180,7 @@ export async function POST(req: Request) {
         learning_outcomes:     p.learning_outcomes ?? [],
         key_inquiry_questions: p.key_inquiry_questions ?? [],
         learning_resources:    p.learning_resources ?? [],
-        activities_summary:    [p.step_1, p.step_2, p.step_3].filter(Boolean).join(' / '),
-        objectives:            p.learning_outcomes ?? [],
-        status:                p.status === 'taught' ? 'completed' : 'not_completed',
-        remarks:               '',
+        work_done:             p.sub_strand,
         reflection:            '',
       }))
 
