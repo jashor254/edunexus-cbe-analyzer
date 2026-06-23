@@ -7,7 +7,6 @@ import { apiSuccess, apiError, apiForbidden, getErrorMessage } from '@/lib/api/r
 
 const FEATURE: FeatureKey = 'learning_compass'
 
-// XP formula: base per exchange + completion bonus + progress bonus
 function calcXp(exchanges: number, completed: boolean, genuineProgress: boolean): number {
   const base     = Math.min(exchanges, 15) * 10
   const complete = completed       ? 40 : 0
@@ -15,17 +14,13 @@ function calcXp(exchanges: number, completed: boolean, genuineProgress: boolean)
   return base + complete + progress
 }
 
-// Streak: +1 if last session was yesterday, reset to 1 if gap > 1 day, keep if same day
-function calcStreak(lastDate: string | null, currentStreak: number): number {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  if (!lastDate) return 1
-  const last = new Date(lastDate)
-  last.setHours(0, 0, 0, 0)
-  const diffDays = Math.round((today.getTime() - last.getTime()) / (1000 * 60 * 60 * 24))
-  if (diffDays === 0) return currentStreak
-  if (diffDays === 1) return currentStreak + 1
-  return 1
+// Returns the Monday of the week containing `date` (YYYY-MM-DD string)
+function getMondayOf(date: Date): string {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  const day = d.getDay()                        // 0=Sun … 6=Sat
+  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1))
+  return d.toISOString().slice(0, 10)
 }
 
 type EndSessionBody = {
@@ -37,13 +32,13 @@ type EndSessionBody = {
 }
 
 export type EndSessionResult = {
-  ended:         boolean
-  xpEarned:      number
-  streakDays:    number
-  streakIsNew:   boolean
-  startingLevel: number | null
-  endingLevel:   number | null
-  levelGained:   boolean
+  ended:            boolean
+  xpEarned:         number
+  totalSessions:    number
+  sessionsThisWeek: number
+  startingLevel:    number | null
+  endingLevel:      number | null
+  levelGained:      boolean
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -84,40 +79,46 @@ export async function POST(req: Request): Promise<Response> {
         .eq('id', sessionId)
         .maybeSingle(),
       db.from('student_learning_context')
-        .select('overall_level, streak_days, last_session_date')
+        .select('overall_level, total_sessions, sessions_this_week, week_start_date')
         .eq('student_id', studentId)
         .maybeSingle(),
     ])
 
     const session       = sessionRes.data
     const ctx           = contextRes.data
-    const exchanges     = (session?.exchange_count as number | null) ?? 0
-    const startingLevel = (session?.starting_level as number | null) ?? null
-    const endingLevel   = (session?.ending_level   as number | null) ?? null
-    const currentStreak = (ctx?.streak_days        as number | null) ?? 0
-    const lastDate      = (ctx?.last_session_date  as string | null) ?? null
+    const exchanges     = (session?.exchange_count  as number | null) ?? 0
+    const startingLevel = (session?.starting_level  as number | null) ?? null
+    const endingLevel   = (session?.ending_level    as number | null) ?? null
 
-    const xpEarned   = calcXp(exchanges, status === 'completed', genuineProgress)
-    const newStreak  = calcStreak(lastDate, currentStreak)
-    const today      = new Date().toISOString().slice(0, 10)
-    const streakIsNew = lastDate !== today && (newStreak > currentStreak || newStreak === 1)
-    const levelGained = startingLevel !== null && endingLevel !== null && endingLevel > startingLevel
+    const prevTotal     = (ctx?.total_sessions     as number | null) ?? 0
+    const prevWeekly    = (ctx?.sessions_this_week as number | null) ?? 0
+    const prevWeekStart = (ctx?.week_start_date    as string | null) ?? null
+
+    const xpEarned       = calcXp(exchanges, status === 'completed', genuineProgress)
+    const levelGained    = startingLevel !== null && endingLevel !== null && endingLevel > startingLevel
+
+    const thisWeekMonday = getMondayOf(new Date())
+    const isSameWeek     = prevWeekStart === thisWeekMonday
+    const newWeekly      = isSameWeek ? prevWeekly + 1 : 1
+    const newTotal       = prevTotal + 1
 
     await Promise.all([
       endSession(sessionId, studentId, status, durationSeconds),
       db.from('compass_sessions').update({ xp_earned: xpEarned }).eq('id', sessionId),
-      streakIsNew
-        ? db.from('student_learning_context')
-            .update({ streak_days: newStreak, last_session_date: today })
-            .eq('student_id', studentId)
-        : Promise.resolve(),
+      db.from('student_learning_context')
+        .update({
+          total_sessions:     newTotal,
+          sessions_this_week: newWeekly,
+          week_start_date:    thisWeekMonday,
+        })
+        .eq('student_id', studentId),
     ])
 
     return apiSuccess<EndSessionResult>({
-      ended: true,
+      ended:            true,
       xpEarned,
-      streakDays:    newStreak,
-      streakIsNew,
+      totalSessions:    newTotal,
+      sessionsThisWeek: newWeekly,
       startingLevel,
       endingLevel,
       levelGained,

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Compass, Send, Trophy, Star, Clock, ChevronRight, BookOpen, AlertCircle, Mic, MicOff, Flame, Zap, TrendingUp } from 'lucide-react'
+import { Compass, Send, Trophy, Star, Clock, ChevronRight, BookOpen, AlertCircle, Mic, MicOff, Zap, TrendingUp } from 'lucide-react'
 
 // ── Voice API types (not universally in lib.dom) ──────────────────────────────
 
@@ -63,12 +63,12 @@ interface Message {
 }
 
 interface SessionResult {
-  xpEarned:      number
-  streakDays:    number
-  streakIsNew:   boolean
-  startingLevel: number | null
-  endingLevel:   number | null
-  levelGained:   boolean
+  xpEarned:         number
+  totalSessions:    number
+  sessionsThisWeek: number
+  startingLevel:    number | null
+  endingLevel:      number | null
+  levelGained:      boolean
 }
 
 interface StudentSummaryCard {
@@ -702,10 +702,10 @@ function LearnContent() {
     const elapsed  = startedAt ? Math.min(SESSION_SECS, Math.floor((Date.now() - startedAt) / 1000)) : SESSION_SECS
     const minutes  = Math.floor(elapsed / 60)
     const levelLabels: Record<number, string> = { 1: 'BE', 2: 'AE', 3: 'ME', 4: 'EE' }
-    const xp         = sessionResult?.xpEarned      ?? 0
-    const streak     = sessionResult?.streakDays     ?? 0
-    const streakNew  = sessionResult?.streakIsNew    ?? false
-    const lvlGained  = sessionResult?.levelGained    ?? false
+    const xp         = sessionResult?.xpEarned         ?? 0
+    const total      = sessionResult?.totalSessions    ?? 0
+    const weekly     = sessionResult?.sessionsThisWeek ?? 0
+    const lvlGained  = sessionResult?.levelGained      ?? false
     const lvlFrom    = sessionResult?.startingLevel
     const lvlTo      = sessionResult?.endingLevel
 
@@ -722,7 +722,7 @@ function LearnContent() {
           {activeSubject?.label} · {minutes > 0 ? `${minutes} min` : 'Quick session'} · {exchangeCount} exchange{exchangeCount !== 1 ? 's' : ''}
         </p>
 
-        {/* XP + Streak row */}
+        {/* XP + session count row */}
         <div className="flex items-center justify-center gap-4 mb-6">
           {xp > 0 && (
             <div className="flex items-center gap-2 px-4 py-2.5 bg-yellow-500/15 border border-yellow-500/25 rounded-2xl">
@@ -730,16 +730,10 @@ function LearnContent() {
               <span className="text-yellow-300 font-black text-lg">+{xp} XP</span>
             </div>
           )}
-          {streak > 0 && (
-            <div className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl ${
-              streakNew
-                ? 'bg-orange-500/20 border border-orange-500/30 animate-pulse'
-                : 'bg-white/6 border border-white/10'
-            }`}>
-              <Flame className={`w-4 h-4 ${streakNew ? 'text-orange-400' : 'text-white/40'}`} />
-              <span className={`font-black text-lg ${streakNew ? 'text-orange-300' : 'text-white/50'}`}>
-                {streak} day{streak !== 1 ? 's' : ''}
-              </span>
+          {total > 0 && (
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-violet-500/15 border border-violet-500/25 rounded-2xl">
+              <Star className="w-4 h-4 text-violet-400" />
+              <span className="text-violet-300 font-black text-lg">{total} session{total !== 1 ? 's' : ''}</span>
             </div>
           )}
         </div>
@@ -761,14 +755,17 @@ function LearnContent() {
           </p>
         )}
 
-        {/* Streak motivation */}
-        {streakNew && streak >= 2 && (
-          <div className="px-5 py-3 bg-gradient-to-r from-orange-500/10 to-yellow-500/10 border border-orange-500/20 rounded-2xl mb-5 max-w-xs">
-            <p className="text-orange-300 font-bold text-sm">
-              {streak === 2 ? '2 days straight! Come back tomorrow to keep it going.' :
-               streak === 3 ? '3 day streak! You\'re building a habit.' :
-               streak >= 7  ? `${streak} days! You\'re on fire. See you tomorrow.` :
-               `${streak} days in a row! Keep the streak alive tomorrow.`}
+        {/* Encouragement — celebrates any frequency, no shame for gaps */}
+        {total > 0 && (
+          <div className="px-5 py-3 bg-white/4 border border-white/8 rounded-2xl mb-5 max-w-xs">
+            <p className="text-white/60 text-sm text-center leading-snug">
+              {total === 1
+                ? 'First session done. Every journey starts here.'
+                : weekly >= 2
+                ? `${weekly} sessions this week — you\'re putting in the work.`
+                : total >= 10
+                ? `${total} sessions and counting. Progress is progress.`
+                : `Session ${total} done. Come back whenever you\'re ready.`}
             </p>
           </div>
         )}
@@ -923,11 +920,11 @@ function LearnContent() {
               <h2 className="text-2xl font-black text-white">
                 Hey {student?.firstName ?? 'there'}.
               </h2>
-              {/* Streak pill — shown when we have sessionResult streak or after completion */}
-              {sessionResult && sessionResult.streakDays >= 1 && (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500/15 border border-orange-500/25 rounded-full">
-                  <Flame className="w-3.5 h-3.5 text-orange-400" />
-                  <span className="text-orange-300 font-black text-sm">{sessionResult.streakDays}</span>
+              {/* Session count — shown after completing a session */}
+              {sessionResult && sessionResult.totalSessions >= 1 && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-500/15 border border-violet-500/25 rounded-full">
+                  <Star className="w-3 h-3 text-violet-400" />
+                  <span className="text-violet-300 font-black text-sm">{sessionResult.totalSessions}</span>
                 </div>
               )}
             </div>
