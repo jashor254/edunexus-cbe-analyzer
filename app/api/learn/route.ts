@@ -331,6 +331,13 @@ export async function POST(req: Request) {
       knowledgeContext = { ...knowledgeContext, graphOpener: true }
     }
 
+    // Record starting level on new sessions so completion screen can show level gained
+    if (session.isNew) {
+      void db.from('compass_sessions')
+        .update({ starting_level: level })
+        .eq('id', activeSessionId)
+    }
+
     // Derived from level
     const languageMode: 'mixed' | 'english-only'                  = level <= 2 ? 'mixed'              : 'english-only'
     const questionMode: 'mcq-and-structured' | 'structured-only'  = level <= 2 ? 'mcq-and-structured' : 'structured-only'

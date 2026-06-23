@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Compass, Send, Trophy, Star, Clock, ChevronRight, BookOpen, AlertCircle, Mic, MicOff } from 'lucide-react'
+import { Compass, Send, Trophy, Star, Clock, ChevronRight, BookOpen, AlertCircle, Mic, MicOff, Flame, Zap, TrendingUp } from 'lucide-react'
 
 // ── Voice API types (not universally in lib.dom) ──────────────────────────────
 
@@ -60,6 +60,15 @@ interface Message {
   id:      string
   role:    'student' | 'compass'
   content: string
+}
+
+interface SessionResult {
+  xpEarned:      number
+  streakDays:    number
+  streakIsNew:   boolean
+  startingLevel: number | null
+  endingLevel:   number | null
+  levelGained:   boolean
 }
 
 interface StudentSummaryCard {
@@ -180,6 +189,10 @@ function LearnContent() {
   const [timeLeft,        setTimeLeft]        = useState(SESSION_SECS)
   const [showWarning,     setShowWarning]     = useState(false)
   const [sessionSummary,  setSessionSummary]  = useState<string | null>(null)
+  const [sessionResult,   setSessionResult]   = useState<SessionResult | null>(null)
+  const [genuineProgress, setGenuineProgress] = useState(false)
+  const lastMessageAt     = useRef<number>(0)
+  const idleWrapTimer     = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const messagesEndRef  = useRef<HTMLDivElement>(null)
   const inputRef        = useRef<HTMLInputElement>(null)
@@ -342,18 +355,37 @@ function LearnContent() {
     }
   }, [])
 
-  // Persist the session's terminal state server-side. Fire-and-forget —
-  // never blocks navigation, since the student is already leaving the page.
-  const endCompassSession = useCallback((status: 'completed' | 'abandoned') => {
+  // Clear idle-wrap timer whenever it's no longer needed
+  const clearIdleTimer = useCallback(() => {
+    if (idleWrapTimer.current) { clearTimeout(idleWrapTimer.current); idleWrapTimer.current = null }
+  }, [])
+
+  // End session — calls API and surfaces XP/streak on the completion screen
+  const endCompassSession = useCallback(async (status: 'completed' | 'abandoned') => {
     if (!sessionId || !student?.id) return
+    clearIdleTimer()
     const durationSeconds = Math.min(SESSION_SECS, Math.floor((Date.now() - startedAt) / 1000))
-    fetch('/api/learn/end', {
-      method:      'POST',
-      credentials: 'include',
-      headers:     { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId, studentId: student.id, status, durationSeconds }),
-    }).catch(() => {})
-  }, [sessionId, student?.id, startedAt])
+    try {
+      const res  = await fetch('/api/learn/end', {
+        method:  'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ sessionId, studentId: student.id, status, durationSeconds, genuineProgress }),
+      })
+      const json = await res.json() as { success: boolean; data?: SessionResult }
+      if (json.success && json.data) setSessionResult(json.data)
+    } catch { /* non-fatal */ }
+  }, [sessionId, student?.id, startedAt, genuineProgress, clearIdleTimer])
+
+  // Auto-wrap: after 90s of student silence with ≥3 exchanges, close gracefully
+  const scheduleIdleWrap = useCallback(() => {
+    clearIdleTimer()
+    idleWrapTimer.current = setTimeout(() => {
+      if (exchangeCount >= 3) {
+        endCompassSession('completed')
+        setPageState('session_complete')
+      }
+    }, 90_000)
+  }, [clearIdleTimer, endCompassSession, exchangeCount])
 
   // Countdown timer (only while active)
   useEffect(() => {
@@ -370,7 +402,7 @@ function LearnContent() {
 
       if (remaining === 0) {
         clearInterval(id)
-        endCompassSession('completed')
+        void endCompassSession('completed')
         setPageState('session_complete')
       }
     }, 1000)
@@ -385,10 +417,13 @@ function LearnContent() {
     setConversationHistory([])
     setExchangeCount(0)
     setSessionSummary(null)
+    setSessionResult(null)
+    setGenuineProgress(false)
     setSessionId(null)
     setShowWarning(false)
     setTimeLeft(SESSION_SECS)
     warningShown.current = false
+    clearIdleTimer()
 
     const now = Date.now()
     setStartedAt(now)
@@ -627,7 +662,15 @@ function LearnContent() {
 
       if (evalSummary) {
         setSessionSummary(evalSummary)
-        setTimeout(() => setPageState('session_complete'), 1500)
+        setGenuineProgress(true)
+        setTimeout(async () => {
+          await endCompassSession('completed')
+          setPageState('session_complete')
+        }, 1500)
+      } else {
+        // Student replied — reset idle-wrap timer
+        lastMessageAt.current = Date.now()
+        scheduleIdleWrap()
       }
 
       setExchangeCount(prev => prev + 1)
@@ -641,7 +684,7 @@ function LearnContent() {
       setIsLoading(false)
       inputRef.current?.focus()
     }
-  }, [input, isLoading, activeSubject, sessionId, student, conversationHistory])
+  }, [input, isLoading, activeSubject, sessionId, student, conversationHistory, endCompassSession, scheduleIdleWrap])
 
   // ── Loading splash ──────────────────────────────────────────────────────────
 
@@ -658,72 +701,112 @@ function LearnContent() {
   if (pageState === 'session_complete') {
     const elapsed  = startedAt ? Math.min(SESSION_SECS, Math.floor((Date.now() - startedAt) / 1000)) : SESSION_SECS
     const minutes  = Math.floor(elapsed / 60)
+    const levelLabels: Record<number, string> = { 1: 'BE', 2: 'AE', 3: 'ME', 4: 'EE' }
+    const xp         = sessionResult?.xpEarned      ?? 0
+    const streak     = sessionResult?.streakDays     ?? 0
+    const streakNew  = sessionResult?.streakIsNew    ?? false
+    const lvlGained  = sessionResult?.levelGained    ?? false
+    const lvlFrom    = sessionResult?.startingLevel
+    const lvlTo      = sessionResult?.endingLevel
 
     return (
-      <div className="h-screen bg-[#0a0a14] flex flex-col items-center justify-center px-6 text-center">
-        <div className="w-16 h-16 bg-linear-to-br from-yellow-500 to-amber-600 rounded-2xl flex items-center justify-center mb-6">
+      <div className="min-h-screen bg-[#0a0a14] flex flex-col items-center justify-center px-6 py-10 text-center">
+
+        {/* Trophy icon */}
+        <div className="w-16 h-16 bg-gradient-to-br from-yellow-500 to-amber-600 rounded-2xl flex items-center justify-center mb-5 shadow-lg shadow-yellow-900/30">
           <Trophy className="w-8 h-8 text-white" />
         </div>
 
-        <h2 className="text-2xl font-black text-white mb-2">Session Complete</h2>
+        <h2 className="text-2xl font-black text-white mb-1">Session Complete!</h2>
+        <p className="text-white/40 text-sm mb-6">
+          {activeSubject?.label} · {minutes > 0 ? `${minutes} min` : 'Quick session'} · {exchangeCount} exchange{exchangeCount !== 1 ? 's' : ''}
+        </p>
 
-        <div className="flex items-center justify-center gap-3 mb-4 flex-wrap">
-          <span className="px-3 py-1 bg-violet-500/20 border border-violet-500/30 rounded-full text-sm font-bold text-violet-300">
-            {activeSubject?.label}
-          </span>
-          <span className="text-white/30 text-sm">
-            {minutes} min · {exchangeCount} exchanges
-          </span>
+        {/* XP + Streak row */}
+        <div className="flex items-center justify-center gap-4 mb-6">
+          {xp > 0 && (
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-yellow-500/15 border border-yellow-500/25 rounded-2xl">
+              <Zap className="w-4 h-4 text-yellow-400" />
+              <span className="text-yellow-300 font-black text-lg">+{xp} XP</span>
+            </div>
+          )}
+          {streak > 0 && (
+            <div className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl ${
+              streakNew
+                ? 'bg-orange-500/20 border border-orange-500/30 animate-pulse'
+                : 'bg-white/6 border border-white/10'
+            }`}>
+              <Flame className={`w-4 h-4 ${streakNew ? 'text-orange-400' : 'text-white/40'}`} />
+              <span className={`font-black text-lg ${streakNew ? 'text-orange-300' : 'text-white/50'}`}>
+                {streak} day{streak !== 1 ? 's' : ''}
+              </span>
+            </div>
+          )}
         </div>
 
+        {/* Level gained badge */}
+        {lvlGained && lvlFrom && lvlTo && (
+          <div className="flex items-center gap-3 px-5 py-3 bg-teal-500/15 border border-teal-500/25 rounded-2xl mb-5">
+            <TrendingUp className="w-5 h-5 text-teal-400 shrink-0" />
+            <span className="text-teal-200 font-bold text-sm">
+              Level up! {levelLabels[lvlFrom]} → {levelLabels[lvlTo]} in {activeSubject?.label}
+            </span>
+          </div>
+        )}
+
+        {/* AI summary */}
         {sessionSummary && (
-          <p className="text-white/60 text-sm max-w-sm mb-8 leading-relaxed">
-            {sessionSummary}
+          <p className="text-white/50 text-sm max-w-sm mb-6 leading-relaxed italic">
+            "{sessionSummary}"
           </p>
         )}
 
-        {/* Pending assignments for the just-completed subject */}
+        {/* Streak motivation */}
+        {streakNew && streak >= 2 && (
+          <div className="px-5 py-3 bg-gradient-to-r from-orange-500/10 to-yellow-500/10 border border-orange-500/20 rounded-2xl mb-5 max-w-xs">
+            <p className="text-orange-300 font-bold text-sm">
+              {streak === 2 ? '2 days straight! Come back tomorrow to keep it going.' :
+               streak === 3 ? '3 day streak! You\'re building a habit.' :
+               streak >= 7  ? `${streak} days! You\'re on fire. See you tomorrow.` :
+               `${streak} days in a row! Keep the streak alive tomorrow.`}
+            </p>
+          </div>
+        )}
+
+        {/* Pending assignments */}
         {(() => {
-          const subjectAssignments = assignments.filter(
-            a => a.submissionStatus === 'pending'
-          )
+          const subjectAssignments = assignments.filter(a => a.submissionStatus === 'pending')
           if (subjectAssignments.length === 0) return null
           return (
-            <div className="w-full max-w-xs mt-6 mb-2">
+            <div className="w-full max-w-xs mt-2 mb-4">
               <p className="text-xs font-bold text-white/30 uppercase tracking-wider mb-3 text-left">
                 Your Assignments
               </p>
               <div className="grid gap-2">
                 {subjectAssignments.map(a => (
-                  <div
-                    key={a.id}
-                    className="px-4 py-3 bg-sky-500/10 border border-sky-500/20 rounded-xl text-left"
-                  >
+                  <div key={a.id} className="px-4 py-3 bg-sky-500/10 border border-sky-500/20 rounded-xl text-left">
                     <p className="text-sm font-bold text-white">{a.title}</p>
                     <p className={`text-xs mt-0.5 ${a.isOverdue ? 'text-red-400' : 'text-sky-300/70'}`}>
                       {a.isOverdue
                         ? `Overdue by ${Math.abs(a.daysLeft)} day${Math.abs(a.daysLeft) !== 1 ? 's' : ''}`
-                        : a.daysLeft === 0
-                        ? 'Due today'
+                        : a.daysLeft === 0 ? 'Due today'
                         : `Due in ${a.daysLeft} day${a.daysLeft !== 1 ? 's' : ''}`}
                     </p>
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-white/30 mt-3 text-center">
-                Submit your assignments through your student portal
-              </p>
             </div>
           )
         })()}
 
-        <div className="flex flex-col gap-3 w-full max-w-xs mt-4">
+        <div className="flex flex-col gap-3 w-full max-w-xs mt-2">
           <button
             onClick={() => {
               setPageState('subject_select')
               setMessages([])
               setConversationHistory([])
               setActiveSubject(null)
+              setSessionResult(null)
             }}
             className="w-full px-6 py-3 bg-violet-600 hover:bg-violet-500 rounded-xl text-white font-bold text-sm transition-colors"
           >
@@ -836,9 +919,18 @@ function LearnContent() {
         {/* Scrollable subject list */}
         <div className="flex-1 overflow-y-auto px-5 py-6">
           <div className="max-w-lg mx-auto">
-            <h2 className="text-2xl font-black text-white mb-1">
-              Hey {student?.firstName ?? 'there'}.
-            </h2>
+            <div className="flex items-start justify-between mb-1">
+              <h2 className="text-2xl font-black text-white">
+                Hey {student?.firstName ?? 'there'}.
+              </h2>
+              {/* Streak pill — shown when we have sessionResult streak or after completion */}
+              {sessionResult && sessionResult.streakDays >= 1 && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500/15 border border-orange-500/25 rounded-full">
+                  <Flame className="w-3.5 h-3.5 text-orange-400" />
+                  <span className="text-orange-300 font-black text-sm">{sessionResult.streakDays}</span>
+                </div>
+              )}
+            </div>
             <p className="text-white/50 text-sm mb-6">What would you like to work on today?</p>
 
             {/* Teacher recommendation banner */}
@@ -959,8 +1051,8 @@ function LearnContent() {
       {/* Top bar */}
       <div className="px-4 py-3 border-b border-white/5 shrink-0 flex items-center gap-3">
         <button
-          onClick={() => {
-            endCompassSession('abandoned')
+          onClick={async () => {
+            await endCompassSession('abandoned')
             setPageState('subject_select')
           }}
           className="text-white/30 hover:text-white/70 transition-colors p-1 -ml-1 shrink-0"
@@ -977,8 +1069,8 @@ function LearnContent() {
         </div>
 
         <button
-          onClick={() => {
-            endCompassSession('completed')
+          onClick={async () => {
+            await endCompassSession('completed')
             setPageState('session_complete')
           }}
           className="text-xs font-bold text-white/40 hover:text-white/70 transition-colors px-2 py-1 shrink-0"
@@ -1007,6 +1099,16 @@ function LearnContent() {
         <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-center shrink-0">
           <p className="text-amber-300 text-xs font-medium">
             Almost there — finish strong! {fmt(timeLeft)} imebaki
+          </p>
+        </div>
+      )}
+
+      {/* Session goal banner — shown only at start (first 3 exchanges) */}
+      {exchangeCount < 3 && activeSubject?.subtopic && (
+        <div className="bg-violet-500/8 border-b border-violet-500/15 px-4 py-2 shrink-0 flex items-center gap-2">
+          <Star className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+          <p className="text-violet-300/80 text-xs font-medium">
+            Today&apos;s goal: <span className="text-violet-200 font-bold">{activeSubject.subtopic}</span>
           </p>
         </div>
       )}
