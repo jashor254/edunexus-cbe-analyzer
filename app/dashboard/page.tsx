@@ -10,7 +10,6 @@ import {
   BarChart3,
   BookOpen,
   Search,
-  Calendar,
   TrendingUp,
   PlusCircle,
   X,
@@ -22,7 +21,10 @@ import {
   Shield,
   Brain,
   Trash2,
+  ArrowUpRight,
+  Star,
 } from 'lucide-react'
+import type { CompassActivityResult, CompassActivitySession } from '@/app/api/parent/compass-activity/route'
 import { NoStudentsEmpty } from '@/components/ui/empty-states'
 import {
   SENIOR_PATHWAYS,
@@ -710,6 +712,8 @@ export default function DashboardPage() {
 
   const [showAddModal, setShowAddModal]   = useState(false)
   const [selfCreatedCount, setSelfCreatedCount] = useState(0)
+  const [compassActivity,  setCompassActivity]  = useState<CompassActivityResult | null>(null)
+  const [compassLoading,   setCompassLoading]   = useState(true)
 
   // ── Fetch user identity (from Supabase client) ────────────────────────────
   useEffect(() => {
@@ -765,6 +769,20 @@ export default function DashboardPage() {
     }
   }, [])
 
+  // ── Fetch Compass activity for parent ────────────────────────────────────
+  const fetchCompassActivity = useCallback(async () => {
+    setCompassLoading(true)
+    try {
+      const res  = await fetch('/api/parent/compass-activity')
+      const json = await res.json() as { success: boolean; data?: CompassActivityResult }
+      if (json.success && json.data) setCompassActivity(json.data)
+    } catch {
+      // non-fatal
+    } finally {
+      setCompassLoading(false)
+    }
+  }, [])
+
   // ── Fetch assignments ─────────────────────────────────────────────────────
   const fetchAssignments = useCallback(async () => {
     setAssignmentsLoading(true)
@@ -783,7 +801,8 @@ export default function DashboardPage() {
     fetchStats()
     fetchStudents()
     fetchAssignments()
-  }, [fetchStats, fetchStudents, fetchAssignments])
+    fetchCompassActivity()
+  }, [fetchStats, fetchStudents, fetchAssignments, fetchCompassActivity])
 
   const isAdmin = userEmail === ADMIN_EMAIL || stats?.isAdmin === true
 
@@ -1002,6 +1021,136 @@ export default function DashboardPage() {
                   onRemoved={() => { fetchStudents(); fetchStats() }}
                 />
               ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── SECTION 4b: Compass Activity ─────────────────────────────────── */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+              <Compass className="w-5 h-5 text-amber-500" />
+              Learning Compass Activity
+            </h2>
+            <Link href="/learn" className="text-xs font-bold text-amber-600 hover:underline flex items-center gap-0.5">
+              Open Compass <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          {compassLoading ? (
+            <div className="grid sm:grid-cols-2 gap-3">
+              {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-28" />)}
+            </div>
+          ) : !compassActivity || compassActivity.sessions.length === 0 ? (
+            <div className="bg-amber-50 border border-amber-100 border-dashed rounded-2xl p-6 text-center">
+              <Compass className="w-8 h-8 text-amber-300 mx-auto mb-3" />
+              <p className="text-slate-600 text-sm font-bold mb-1">No Compass sessions yet</p>
+              <p className="text-slate-400 text-xs mb-4">
+                When your child uses the Learning Compass, their progress will appear here — subject by subject.
+              </p>
+              <Link
+                href="/learn"
+                className="inline-flex items-center gap-1.5 bg-amber-500 text-white text-sm font-black px-4 py-2 rounded-xl hover:bg-amber-600 transition-colors"
+              >
+                Start First Session
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* This week summary bar */}
+              {compassActivity.weeklyCount > 0 && (
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl px-5 py-3 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-black text-slate-900 text-sm">
+                      {compassActivity.weeklyCount === 1
+                        ? `1 session this week`
+                        : `${compassActivity.weeklyCount} sessions this week`}
+                      {compassActivity.activeStudents.length > 0 && (
+                        <span className="text-amber-700 font-normal"> — {compassActivity.activeStudents.join(', ')}</span>
+                      )}
+                    </p>
+                    <p className="text-amber-600 text-xs mt-0.5">
+                      {compassActivity.totalXp > 0 ? `${compassActivity.totalXp} XP earned total · ` : ''}{compassActivity.totalSessions} sessions in last 30 days
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0 bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-xl">
+                    <Star className="w-3.5 h-3.5 text-amber-500" />
+                    <span className="text-amber-700 font-black text-sm">{compassActivity.totalSessions}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Session cards — most recent first, max 6 */}
+              <div className="grid sm:grid-cols-2 gap-3">
+                {compassActivity.sessions.slice(0, 6).map((s: CompassActivitySession) => (
+                  <div
+                    key={s.id}
+                    className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm"
+                  >
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <p className="font-black text-slate-900 text-sm">{s.studentName}</p>
+                        <p className="text-xs text-slate-500">Grade {s.grade} · {s.subject}</p>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${
+                        s.weekLabel === 'This week'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {s.weekLabel}
+                      </span>
+                    </div>
+
+                    {/* Level movement */}
+                    {s.startingLevel && s.endingLevel ? (
+                      <div className={`flex items-center gap-2 mb-2 px-3 py-1.5 rounded-xl ${
+                        s.levelGained
+                          ? 'bg-green-50 border border-green-200'
+                          : 'bg-slate-50 border border-slate-200'
+                      }`}>
+                        {s.levelGained ? (
+                          <>
+                            <ArrowUpRight className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                            <span className="text-xs font-bold text-green-700">
+                              Level up: {['','BE','AE','ME','EE'][s.startingLevel]} → {['','BE','AE','ME','EE'][s.endingLevel]}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-xs text-slate-500">
+                            Level: {['','BE','AE','ME','EE'][s.endingLevel]}
+                          </span>
+                        )}
+                      </div>
+                    ) : null}
+
+                    {/* AI summary */}
+                    {s.summary && (
+                      <p className="text-xs text-slate-500 leading-snug italic">
+                        &ldquo;{s.summary}&rdquo;
+                      </p>
+                    )}
+
+                    {/* Footer stats */}
+                    <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-100">
+                      <span className="text-[10px] text-slate-400 font-medium">
+                        {s.exchangeCount} exchange{s.exchangeCount !== 1 ? 's' : ''}
+                      </span>
+                      {s.xpEarned > 0 && (
+                        <span className="text-[10px] font-bold text-amber-600 flex items-center gap-0.5">
+                          <Zap className="w-3 h-3" /> +{s.xpEarned} XP
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {compassActivity.sessions.length > 6 && (
+                <p className="text-center text-xs text-slate-400 pt-1">
+                  Showing last 6 sessions · {compassActivity.sessions.length} total in past 30 days
+                </p>
+              )}
             </div>
           )}
         </div>

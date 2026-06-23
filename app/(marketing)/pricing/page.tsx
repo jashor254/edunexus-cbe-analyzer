@@ -502,22 +502,24 @@ function PricingContent() {
           <p className="font-black text-white mb-0.5">
             Not ready to commit to a full term?
           </p>
-          <p className="text-sm text-white/50 mb-6">Start with tokens.</p>
+          <p className="text-sm text-white/50 mb-6">
+            Start small — pay per report or per session, no subscription needed.
+          </p>
 
-          <div className="grid grid-cols-3 gap-3 mb-5">
+          <div className="grid grid-cols-2 gap-3 mb-5">
             {[
-              { label: 'KES 500',          sub: '10 tokens'          },
-              { label: '5 tokens',         sub: 'Academic Clinic'     },
-              { label: '1 token',          sub: 'Learning Compass'    },
+              { label: 'KES 250',  sub: 'Academic Clinic report', note: '(strand diagnosis + study plan PDF)' },
+              { label: 'KES 50',   sub: 'Compass session',        note: '(personalised tutoring, any subject)' },
             ].map((item, i) => (
-              <div key={i} className="bg-white/5 rounded-xl p-3.5 text-center">
-                <p className="text-lg font-black text-white leading-none">{item.label}</p>
-                <p className="text-[11px] text-white/35 mt-1.5 leading-tight">{item.sub}</p>
+              <div key={i} className="bg-white/5 rounded-xl p-4 text-center">
+                <p className="text-2xl font-black text-white leading-none">{item.label}</p>
+                <p className="text-xs text-white/50 font-bold mt-1.5">{item.sub}</p>
+                <p className="text-[10px] text-white/25 mt-0.5 leading-tight">{item.note}</p>
               </div>
             ))}
           </div>
 
-          <p className="text-xs text-white/25 text-center mb-5">Tokens never expire.</p>
+          <p className="text-xs text-white/25 text-center mb-5">Pay-as-you-go · credit never expires.</p>
 
           <button
             onClick={() => setSelected(TOKEN_PRODUCT)}

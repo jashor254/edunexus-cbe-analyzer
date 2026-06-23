@@ -193,24 +193,31 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-3 gap-6">
             {[
               {
-                quote: "My son went from a C to a B in Mathematics this term. The report showed us exactly which strands he was failing — we never knew that before.",
-                name: "Grace Wanjiku",
-                role: "Parent of Grade 8 student, Nairobi",
+                quote: "Brian was always failing Number Patterns. The report pinpointed exactly that strand — not just 'Mathematics is weak'. We focused on it for two weeks and his teacher noticed immediately.",
+                name: "Grace W.",
+                role: "Parent · Grade 8 · Westlands, Nairobi",
+                tag: "Academic Clinic",
+                tagColor: "text-violet-400",
               },
               {
-                quote: "I generated my entire Term 2 scheme of work in one sitting. TSC inspection is no longer something I dread.",
-                name: "Mr. Omondi",
-                role: "CBC Science Teacher, Kisumu",
+                quote: "I used to spend my Sunday planning. Now I generate a complete SOW in under 10 minutes — CBC-aligned, TSC-ready. It's not an exaggeration to say this changed my term.",
+                name: "Mr. Omondi K.",
+                role: "CBC Integrated Science Teacher · Kisumu",
+                tag: "Teacher Tools",
+                tagColor: "text-amber-400",
               },
               {
-                quote: "The report told me things about my Form 3 son that I had been trying to figure out for two years. It was like finally getting a straight answer.",
-                name: "Peter Muthoni",
-                role: "Parent of Form 3 student, Nakuru",
+                quote: "My son is Form 3 and I've never understood why he's passing English but failing every comprehension exam. The strand breakdown showed it was inference — now we know what to fix.",
+                name: "Peter M.",
+                role: "Parent · Form 3 · Nakuru",
+                tag: "Academic Clinic",
+                tagColor: "text-violet-400",
               },
             ].map((t) => (
-              <div key={t.name} className="bg-white/4 border border-white/10 rounded-2xl px-6 py-5">
-                <p className="text-white/70 text-sm leading-relaxed mb-4">&ldquo;{t.quote}&rdquo;</p>
-                <div className="text-xs text-white/40 font-semibold">— {t.name}</div>
+              <div key={t.name} className="bg-white/4 border border-white/10 rounded-2xl px-6 py-5 flex flex-col">
+                <div className={`text-[10px] font-bold uppercase tracking-widest mb-3 ${t.tagColor}`}>{t.tag}</div>
+                <p className="text-white/70 text-sm leading-relaxed mb-4 flex-1">&ldquo;{t.quote}&rdquo;</p>
+                <div className="text-xs text-white/50 font-semibold">{t.name}</div>
                 <div className="text-xs text-white/30">{t.role}</div>
               </div>
             ))}
@@ -322,6 +329,35 @@ export default function LandingPage() {
               </div>
             </div>
 
+          </div>
+        </div>
+      </section>
+
+      {/* ── WORKS BEST WITH TEACHER — transparency section ───────────────────── */}
+      <section className="py-14 md:py-16">
+        <div className="max-w-[820px] mx-auto px-6">
+          <div className="bg-white/4 border border-white/10 rounded-3xl px-8 py-8 flex flex-col md:flex-row items-start md:items-center gap-6">
+            <div className="flex-1">
+              <p className="text-xs font-bold text-teal-400 uppercase tracking-widest mb-2">Honest note</p>
+              <h3 className="text-lg font-extrabold text-white mb-2">
+                EduNexus works best when your child&apos;s teacher is on it too.
+              </h3>
+              <p className="text-white/50 text-sm leading-relaxed">
+                When the teacher is connected, EduNexus sees their assessments, class data, and
+                assignments — making the Compass and Clinic significantly more accurate.
+                If the teacher isn&apos;t on EduNexus yet, you can still use everything — you
+                just enter your child&apos;s scores yourself. It still works. But with the teacher,
+                it&apos;s a different level.
+              </p>
+            </div>
+            <div className="shrink-0">
+              <Link
+                href="/signup?role=teacher"
+                className="inline-flex items-center gap-2 bg-teal-500/20 border border-teal-500/30 text-teal-300 hover:bg-teal-500/30 px-5 py-3 rounded-xl font-bold text-sm transition-all whitespace-nowrap"
+              >
+                Invite your child&apos;s teacher →
+              </Link>
+            </div>
           </div>
         </div>
       </section>
