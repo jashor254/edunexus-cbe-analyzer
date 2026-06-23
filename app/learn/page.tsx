@@ -144,6 +144,43 @@ const LEVEL_COLORS: Record<Level, string> = {
   4: 'text-sky-400',
 }
 
+// Short CBC codes shown on the progress bar
+const CBC_STEPS = ['BE', 'AE', 'ME', 'EE'] as const
+
+// What each next level means — shown on subject cards as a carrot
+const NEXT_LEVEL_HOOK: Record<Level, string> = {
+  1: 'Work toward AE — you\'ll start answering with confidence',
+  2: 'Work toward ME — you\'ll be able to tackle exam questions',
+  3: 'Work toward EE — you\'ll be able to teach this to others',
+  4: 'You\'ve reached the highest level in this subject!',
+}
+
+// Session count milestones — shown on completion screen
+const SESSION_MILESTONES: Array<{ at: number; label: string; color: string }> = [
+  { at:  5, label: '5 sessions — great start!',         color: 'bg-teal-500/20 border-teal-500/30 text-teal-300'    },
+  { at: 10, label: '10 sessions — building real skill',  color: 'bg-violet-500/20 border-violet-500/30 text-violet-300' },
+  { at: 25, label: '25 sessions — seriously dedicated',  color: 'bg-amber-500/20 border-amber-500/30 text-amber-300'   },
+  { at: 50, label: '50 sessions — you are a champion',   color: 'bg-yellow-500/20 border-yellow-500/30 text-yellow-200' },
+]
+
+function LevelBar({ level }: { level: Level }) {
+  const colors = ['bg-red-400', 'bg-amber-400', 'bg-emerald-400', 'bg-sky-400']
+  return (
+    <div className="flex items-center gap-1 mt-1.5">
+      {CBC_STEPS.map((step, i) => (
+        <div key={step} className="flex items-center gap-1">
+          <div className={`h-1.5 w-6 rounded-full transition-all ${
+            i < level ? colors[level - 1] : 'bg-white/10'
+          }`} />
+          <span className={`text-[9px] font-bold ${
+            i + 1 === level ? (LEVEL_COLORS[level] + ' opacity-100') : 'text-white/20'
+          }`}>{step}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 const SESSION_SECS = 30 * 60
 const WARNING_SECS = 5 * 60
 
@@ -738,6 +775,18 @@ function LearnContent() {
           )}
         </div>
 
+        {/* Milestone badge — only on exact milestone sessions */}
+        {(() => {
+          const milestone = SESSION_MILESTONES.find(m => m.at === total)
+          if (!milestone) return null
+          return (
+            <div className={`flex items-center gap-2 px-4 py-2.5 border rounded-2xl mb-4 ${milestone.color}`}>
+              <Trophy className="w-4 h-4 shrink-0" />
+              <span className="font-bold text-sm">{milestone.label}</span>
+            </div>
+          )
+        })()}
+
         {/* Level gained badge */}
         {lvlGained && lvlFrom && lvlTo && (
           <div className="flex items-center gap-3 px-5 py-3 bg-teal-500/15 border border-teal-500/25 rounded-2xl mb-5">
@@ -755,20 +804,23 @@ function LearnContent() {
           </p>
         )}
 
-        {/* Encouragement — celebrates any frequency, no shame for gaps */}
-        {total > 0 && (
-          <div className="px-5 py-3 bg-white/4 border border-white/8 rounded-2xl mb-5 max-w-xs">
-            <p className="text-white/60 text-sm text-center leading-snug">
-              {total === 1
-                ? 'First session done. Every journey starts here.'
-                : weekly >= 2
-                ? `${weekly} sessions this week — you\'re putting in the work.`
-                : total >= 10
-                ? `${total} sessions and counting. Progress is progress.`
-                : `Session ${total} done. Come back whenever you\'re ready.`}
+        {/* Encouragement + what's achievable next — no shame for gaps */}
+        <div className="px-5 py-3 bg-white/4 border border-white/8 rounded-2xl mb-5 max-w-xs">
+          <p className="text-white/60 text-sm text-center leading-snug">
+            {total === 1
+              ? 'First session done. Every journey starts somewhere.'
+              : total === 2
+              ? 'Two sessions in. You\'re further than most.'
+              : weekly >= 2
+              ? `${weekly} sessions this week. Keep learning at your pace.`
+              : `Session ${total} done. Come back when you\'re ready.`}
+          </p>
+          {activeSubject && activeSubject.level < 4 && (
+            <p className="text-white/30 text-xs text-center mt-1.5 leading-snug">
+              {NEXT_LEVEL_HOOK[activeSubject.level]}
             </p>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Pending assignments */}
         {(() => {
@@ -1002,8 +1054,9 @@ function LearnContent() {
                       {card.subtopic && card.teacherSuggested && (
                         <p className="text-xs text-amber-300/70 mb-0.5">{card.subtopic}</p>
                       )}
-                      <p className={`text-xs ${LEVEL_COLORS[card.level]}`}>
-                        Level {card.level}/4 · {LEVEL_LABELS[card.level]}
+                      <LevelBar level={card.level} />
+                      <p className="text-[10px] text-white/30 mt-1 leading-snug max-w-[220px]">
+                        {NEXT_LEVEL_HOOK[card.level]}
                       </p>
                     </div>
                     <ChevronRight className={`w-4 h-4 shrink-0 transition-colors ${card.teacherSuggested ? 'text-amber-400/50 group-hover:text-amber-400' : 'text-white/20 group-hover:text-violet-400'}`} />
