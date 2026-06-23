@@ -55,6 +55,7 @@ export async function POST(req: Request) {
       learningOutcomes: (plan.learning_outcomes as string[]) || [],
       keyInquiryQuestions: (plan.key_inquiry_questions as string[]) || [],
       learningResources: (plan.learning_resources as string[]) || [],
+      learningExperiences: [],
       assessmentMethods: [],
     }
 

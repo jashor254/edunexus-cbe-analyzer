@@ -8,13 +8,14 @@ import {
 } from 'lucide-react'
 
 interface ROWEntry {
-  id:          string
-  week:        number
-  lesson:      number
-  date_taught: string | null
-  strand:      string
-  substrand:   string
-  reflection:  string
+  id:                  string
+  week:                number
+  lesson:              number
+  date_taught:         string | null
+  strand:              string
+  substrand:           string
+  activities_summary?: string[] | null
+  reflection:          string
 }
 
 interface ROWRecord {
@@ -276,21 +277,36 @@ export default function RecordOfWorkEditorPage({ params }: { params: Promise<{ i
   )
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function toTitleCase(s: string): string {
+  if (!s) return s
+  return s.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+}
+
+function fmtTerm(term: string): string {
+  return term.toLowerCase().startsWith('term') ? term : `Term ${term}`
+}
+
 // ─── Print HTML ───────────────────────────────────────────────────────────────
 
 function buildPrintHtml(row: ROWRecord, entries: ROWEntry[]): string {
-  const rows = entries.map((e, i) => {
+  const school      = toTitleCase(row.school || '')
+  const teacherName = toTitleCase(row.teacher_name || '')
+  const term        = fmtTerm(row.term)
+  const done        = entries.filter(e => e.reflection?.trim()).length
+  const total       = entries.length
+
+  const tableRows = entries.map((e, i) => {
     const date = e.date_taught
-      ? new Date(e.date_taught).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })
-      : '—'
+      ? new Date(e.date_taught).toLocaleDateString('en-KE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      : '<span class="placeholder">dd/mm/yyyy</span>'
+    const workDone = e.activities_summary?.[0]?.split(/[.!?\n]/)[0]?.trim() || e.substrand || '—'
     return `
     <tr class="${i % 2 === 1 ? 'alt' : ''}">
       <td class="col-date">${date}</td>
       <td class="col-wk center">Wk ${e.week}<br/><span class="sub">L${e.lesson}</span></td>
-      <td class="col-work">
-        <div class="wd-row"><span class="lbl">Strand:</span> ${e.strand || '—'}</div>
-        <div class="wd-row"><span class="lbl">Sub-Strand:</span> ${e.substrand || '—'}</div>
-      </td>
+      <td class="col-work">${workDone}</td>
       <td class="col-ref">${e.reflection || ''}</td>
       <td class="col-sig"></td>
     </tr>`
@@ -303,7 +319,9 @@ function buildPrintHtml(row: ROWRecord, entries: ROWEntry[]): string {
 <title>Record of Work — ${row.learning_area}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; font-size: 10pt; color: #000; background: #fff; padding: 15mm; }
+  body { font-family: Arial, sans-serif; font-size: 10pt; color: #000; background: #fff; }
+
+  .no-print { text-align: right; padding: 10px 16px 0; }
 
   .doc-title {
     font-size: 13pt; font-weight: 900; text-align: center;
@@ -315,11 +333,11 @@ function buildPrintHtml(row: ROWRecord, entries: ROWEntry[]): string {
   .mv { width: 32%; }
 
   .row-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .col-date  { width: 25mm; }
-  .col-wk    { width: 20mm; }
-  .col-work  { width: 90mm; }
-  .col-ref   { width: 35mm; }
-  .col-sig   { width: 20mm; }
+  .col-date  { width: 22mm; }
+  .col-wk    { width: 18mm; }
+  .col-work  { width: 72mm; }
+  .col-ref   { width: 42mm; }
+  .col-sig   { width: 26mm; }
 
   thead tr {
     background: #1e293b !important; color: #fff !important;
@@ -333,15 +351,19 @@ function buildPrintHtml(row: ROWRecord, entries: ROWEntry[]): string {
     padding: 6px 6px; border: 1px solid #cbd5e1; vertical-align: top;
     font-size: 10pt; line-height: 1.45; min-height: 50px;
   }
-  tr.alt td { background: #f8fafc; }
+  tr.alt td { background: #f8fafc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .center { text-align: center; }
   .sub { font-size: 8pt; color: #64748b; }
-  .lbl { font-weight: 700; }
-  .wd-row { margin-bottom: 3px; }
+  .placeholder { color: #9CA3AF; font-style: italic; }
 
-  .footer { margin-top: 10px; font-size: 8pt; color: #94a3b8; text-align: right; }
+  .row-status {
+    margin-top: 12px; padding-top: 8px; border-top: 1px solid #E5E7EB;
+    font-size: 8pt; color: #9CA3AF; font-style: italic; text-align: center;
+  }
+  .footer { margin-top: 6px; font-size: 8pt; color: #94a3b8; text-align: right; }
 
   @media print {
+    .no-print { display: none !important; }
     body { padding: 0; }
     @page { size: A4 portrait; margin: 15mm; }
     thead tr { background: #1e293b !important; color: #fff !important;
@@ -351,35 +373,48 @@ function buildPrintHtml(row: ROWRecord, entries: ROWEntry[]): string {
 </style>
 </head>
 <body>
-  <div class="doc-title">Record of Work Covered</div>
-  <table class="meta-table">
-    <tr>
-      <td class="ml">School:</td>   <td class="mv">${row.school || '—'}</td>
-      <td class="ml">Subject:</td>  <td class="mv">${row.learning_area}</td>
-    </tr>
-    <tr>
-      <td class="ml">Grade:</td>    <td class="mv">${row.grade}</td>
-      <td class="ml">Teacher:</td>  <td class="mv">${row.teacher_name || '—'}</td>
-    </tr>
-    <tr>
-      <td class="ml">Term:</td>     <td class="mv">${row.term}</td>
-      <td class="ml">Year:</td>     <td class="mv">${row.year}</td>
-    </tr>
-  </table>
-
-  <table class="row-table">
-    <thead>
+  <div class="no-print">
+    <button onclick="window.print()"
+      style="background:#1e293b;color:#fff;border:none;padding:9px 20px;border-radius:6px;
+             font-size:10pt;cursor:pointer;font-weight:700;">
+      Print / Save as PDF
+    </button>
+  </div>
+  <div style="padding:15mm;">
+    <div class="doc-title">Record of Work Covered</div>
+    <table class="meta-table">
       <tr>
-        <th class="col-date">Date</th>
-        <th class="col-wk">Wk / Lesson</th>
-        <th class="col-work">Work Done</th>
-        <th class="col-ref">Reflection</th>
-        <th class="col-sig">Signature</th>
+        <td class="ml">School:</td>   <td class="mv">${school || '—'}</td>
+        <td class="ml">Subject:</td>  <td class="mv">${row.learning_area}</td>
       </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>
-  <div class="footer">EduNexus · edunexus.co.ke</div>
+      <tr>
+        <td class="ml">Grade:</td>    <td class="mv">${row.grade}</td>
+        <td class="ml">Teacher:</td>  <td class="mv">${teacherName || '—'}</td>
+      </tr>
+      <tr>
+        <td class="ml">Term:</td>     <td class="mv">${term}</td>
+        <td class="ml">Year:</td>     <td class="mv">${row.year}</td>
+      </tr>
+    </table>
+
+    <table class="row-table">
+      <thead>
+        <tr>
+          <th class="col-date">Date</th>
+          <th class="col-wk">Wk / Lesson</th>
+          <th class="col-work">Work Done</th>
+          <th class="col-ref">Reflection</th>
+          <th class="col-sig">Signature</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+
+    <div class="row-status">
+      Record continues as lessons are completed — ${done} of ${total} lessons recorded
+    </div>
+    <div class="footer">EduNexus · edunexus.co.ke</div>
+  </div>
 </body>
 </html>`
 }

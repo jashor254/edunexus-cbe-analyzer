@@ -103,7 +103,7 @@ function EditableCell({
         const text = e.clipboardData.getData('text/plain')
         document.execCommand('insertText', false, text)
       }}
-      className={`outline-none focus:bg-amber-50 focus:ring-1 focus:ring-amber-400/60 rounded-sm cursor-text whitespace-pre-wrap leading-snug ${multiline ? 'min-h-[2.5rem]' : ''} ${className}`}
+      className={`outline-none focus:bg-amber-50 focus:ring-1 focus:ring-amber-400 rounded-sm cursor-text whitespace-pre-wrap leading-snug ${multiline ? 'min-h-[2.5rem]' : ''} ${className}`}
     >
       {value}
     </div>
@@ -396,7 +396,7 @@ export default function SOWDetailPage({ params }: { params: Promise<{ id: string
                   <tr
                     key={l.id}
                     style={{ backgroundColor: isEven ? '#ffffff' : '#f8fafc' }}
-                    className="hover:bg-amber-50/30 transition-colors"
+                    className="hover:bg-amber-50 transition-colors"
                   >
                     {/* Week + Lesson — not editable */}
                     <td className="px-3 py-2 text-center font-bold text-slate-500 border-r border-slate-100 align-top" style={{ width: '36px' }}>

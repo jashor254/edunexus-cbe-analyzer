@@ -13,6 +13,19 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://edunexus.co.ke'
 // Template names registered in Meta Business Manager
 const TEMPLATE_ASSIGNMENT_MARKED = 'edunexus_assignment_marked'
 const TEMPLATE_STUDENT_ALERT     = 'edunexus_student_alert'
+// Template: edunexus_academy_reflect  (Category: UTILITY, Language: English)
+// Register in Meta Business Manager with body (must not start or end with a variable):
+//   Hello Mwalimu {{1}}! 👋
+//   You completed a lesson in the EduNexus AI Academy but haven't reflected yet.
+//   Module: *{{2}}*
+//   Take 2 minutes to reflect on what you tried in class and unlock your next XP bonus.
+//   Reflect here: {{3}}
+//   Keep growing — EduNexus AI Academy 🎓
+// Variables: {{1}} = first name, {{2}} = module title, {{3}} = module URL
+const TEMPLATE_ACADEMY_REFLECT   = 'edunexus_academy_reflect'
+
+// Owner phone for internal platform alerts (milestone hits, health issues)
+const OWNER_PHONE = process.env.OWNER_WHATSAPP_NUMBER ?? '254141799322'
 
 const CBC_LEVEL_LABELS: Record<1 | 2 | 3 | 4, string> = {
   1: 'L1 - Below Expectation',
@@ -279,6 +292,132 @@ export async function sendWelcomeMessage(
     })
 
     return { success: true }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// notifyOwnerMilestone — free-form alert to owner when a user count milestone
+// is crossed. Uses the same freeform path as sendWelcomeMessage (no template
+// approval needed since this is owner → owner, not business → customer).
+// ---------------------------------------------------------------------------
+
+export type MilestoneAlertParams = {
+  milestone: number
+  totalTeachers: number
+  activeTeachers: number
+  totalStudents: number
+}
+
+export async function notifyOwnerMilestone(
+  params: MilestoneAlertParams
+): Promise<{ success: boolean; error?: string }> {
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
+  const token         = process.env.WHATSAPP_ACCESS_TOKEN
+
+  if (!phoneNumberId || !token) {
+    return { success: false, error: 'WhatsApp not configured' }
+  }
+
+  const body =
+    `🎉 *EduNexus Milestone Hit!*\n\n` +
+    `You just crossed *${params.milestone} teachers* on the platform!\n\n` +
+    `📊 *Live Stats*\n` +
+    `👩‍🏫 Total teachers: *${params.totalTeachers}*\n` +
+    `✅ Active (30d): *${params.activeTeachers}*\n` +
+    `🎓 Students: *${params.totalStudents}*\n\n` +
+    `Keep pushing mkuu 🇰🇪🚀\n— EduNexus System`
+
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v25.0/${phoneNumberId}/messages`,
+      {
+        method:  'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization:  `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          to:                OWNER_PHONE.replace(/^\+/, ''),
+          type:              'text',
+          text:              { body },
+        }),
+      }
+    )
+
+    const data = (await res.json()) as {
+      messages?: Array<{ id: string }>
+      error?:    { message: string; code: number }
+    }
+
+    if (!res.ok || data.error) {
+      return { success: false, error: data.error?.message ?? `HTTP ${res.status}` }
+    }
+
+    return { success: true }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// sendAcademyReflectionNudge
+// ---------------------------------------------------------------------------
+
+export type AcademyReflectionNudgeParams = {
+  teacherId:   string
+  lessonId:    string
+  phone:       string
+  teacherName: string
+  moduleTitle: string
+  moduleSlug:  string
+  userId?:     string | null
+}
+
+export async function sendAcademyReflectionNudge(
+  params: AcademyReflectionNudgeParams
+): Promise<WhatsAppResult> {
+  const referenceId = `academy_reflect_${params.teacherId}_${params.lessonId}`
+  try {
+    const dup = await isDuplicate('academy_reflection_nudge', referenceId)
+    if (dup) return { success: true }
+
+    const firstName  = params.teacherName.split(' ')[0]
+    const moduleUrl  = `${APP_URL}/teacher/academy/module/${params.moduleSlug}`
+
+    const result = await sendWhatsAppTemplate({
+      to: params.phone,
+      templateName: TEMPLATE_ACADEMY_REFLECT,
+      components: [
+        {
+          type: 'body',
+          parameters: [
+            { type: 'text', text: firstName },
+            { type: 'text', text: params.moduleTitle },
+            { type: 'text', text: moduleUrl },
+          ],
+        },
+      ],
+    })
+
+    await logAttempt({
+      userId:      params.userId ?? null,
+      type:        'academy_reflection_nudge',
+      referenceId,
+      phoneNumber: params.phone,
+      success:     result.success,
+      errorMessage: result.error,
+    })
+
+    return result
   } catch (err) {
     return {
       success: false,

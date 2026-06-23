@@ -2,7 +2,8 @@
 import { createServiceClient } from '@/utils/supabase/service'
 import { streamDeepSeek } from '@/lib/ai/deepseek'
 import { getOrCreateSession, readSession, writeSession, resolveSubject, recordExchange } from '@/lib/compass/session'
-import { buildCompassPrompt, type CompassPromptParams } from '@/lib/compass/prompt'
+import { buildCompassPrompt, type CompassPromptParams, type KnowledgeContextBlock } from '@/lib/compass/prompt'
+import type { RootCauseResult } from '@/lib/knowledgeGraph/types'
 import { getGradeTopics } from '@/lib/compass/topics'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
 import { type FeatureKey } from '@/lib/payments/config'
@@ -105,32 +106,88 @@ export async function POST(req: Request) {
       conversationHistory,
     } = await req.json()
 
-    // ── Auth ──────────────────────────────────────────────────────────────────
-    console.time('[COMPASS] auth')
-    const access = await checkFeatureAccess(FEATURE)
-    console.timeEnd('[COMPASS] auth')
+    if (!learnerId) return apiError('learnerId is required', 400)
+    const db = createServiceClient()
+    const studentId = learnerId as string
+
+    // ── Term mode (pure computation — needed early for getOrCreateSession) ────
+    const { mode, holidayWeek } = detectMode(new Date())
+
+    // Subject is often known from the request params — if so, we can start
+    // getGradeTopics and getOrCreateSession in parallel with auth + DB reads.
+    // When lockedSubject is absent we fall back to deriving it after the first batch.
+    const earlySubject  = (lockedSubject as string | null) ?? null
+    const earlyGrade    = typeof lockedGrade === 'number' ? lockedGrade : null
+
+    const CLOSING_WORDS = ['done', 'goodbye', 'bye', 'kwa heri', 'tutaonana', "that's all", 'stop', 'quit']
+    const isClosing = CLOSING_WORDS.some(w => (message as string).toLowerCase().includes(w))
+
+    // ── Single parallel round: auth + all DB reads + topics + session ─────────
+    console.time('[COMPASS] db-reads')
+    const [
+      access,
+      savedSession,
+      studentResult,
+      contextResult,
+      lastSessionResult,
+      keepaliveRow,
+      earlyTopics,
+      earlySession,
+    ] = await Promise.all([
+      // Auth + token check (was sequential before, now parallel)
+      checkFeatureAccess(FEATURE),
+
+      // Session history (only if resuming)
+      sessionId ? readSession(sessionId, studentId) : Promise.resolve(null),
+
+      // Student profile
+      db.from('students')
+        .select('name, grade, current_pathway')
+        .eq('id', studentId)
+        .maybeSingle(),
+
+      // Learning context (levels, root causes, bridge)
+      db.from('student_learning_context')
+        .select('overall_level, subject_tiers, compass_bridge, session_goal, guided_topics, knowledge_root_causes, subject_action_steps, recommended_pathway, sessions_without_improvement')
+        .eq('student_id', studentId)
+        .maybeSingle(),
+
+      // Last session summary for opener
+      db.from('compass_sessions')
+        .select('one_line_summary')
+        .eq('learner_id', studentId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+
+      // Keepalive check (was a separate sequential await before)
+      sessionId
+        ? db.from('compass_sessions').select('updated_at').eq('id', sessionId as string).maybeSingle()
+        : Promise.resolve(null),
+
+      // KICD topics — start immediately if subject+grade are in the request
+      earlySubject && earlyGrade
+        ? getGradeTopics(earlyGrade, earlySubject, { minGrade: earlyGrade <= 9 ? 7 : earlyGrade })
+        : Promise.resolve(null),
+
+      // Session upsert — start immediately if subject is in the request
+      earlySubject
+        ? getOrCreateSession(studentId, earlySubject, mode)
+        : Promise.resolve(null),
+    ])
+    const lastSessionRow = lastSessionResult.data
+    console.timeEnd('[COMPASS] db-reads')
+
+    // ── Auth result ───────────────────────────────────────────────────────────
     if (access.allowed === false) {
       const status = access.reason === 'unauthenticated' ? 401 : 403
       return apiError(access.reason, status)
     }
 
-    if (!learnerId) return apiError('learnerId is required', 400)
-    const db = createServiceClient()
-    const studentId = learnerId as string
-
-    // ── Keepalive: if session idle > 20 min, return soft nudge without calling DeepSeek
-    if (sessionId) {
-      const { data: sessionRow } = await db
-        .from('compass_sessions')
-        .select('updated_at')
-        .eq('id', sessionId as string)
-        .maybeSingle()
-
-      const CLOSING_WORDS = ['done', 'goodbye', 'bye', 'kwa heri', 'tutaonana', "that's all", 'stop', 'quit']
-      const isClosing = CLOSING_WORDS.some(w => (message as string).toLowerCase().includes(w))
-
-      const lastActive = sessionRow?.updated_at as string | null
-      if (lastActive && !isClosing) {
+    // ── Keepalive: idle session check (no AI call needed) ─────────────────────
+    if (sessionId && !isClosing && keepaliveRow) {
+      const lastActive = (keepaliveRow as { data: { updated_at: string } | null }).data?.updated_at ?? null
+      if (lastActive) {
         const idleMs = Date.now() - new Date(lastActive).getTime()
         if (idleMs > 20 * 60 * 1000) {
           return new Response("Still there? Your session is still active.", {
@@ -142,28 +199,6 @@ export async function POST(req: Request) {
         }
       }
     }
-
-    // ── Parallel DB reads ─────────────────────────────────────────────────────
-    console.time('[COMPASS] db-reads')
-    const [savedSession, studentResult, contextResult, lastSessionResult] = await Promise.all([
-      sessionId ? readSession(sessionId, studentId) : Promise.resolve(null),
-      db.from('students')
-        .select('name, grade, current_pathway')
-        .eq('id', studentId)
-        .maybeSingle(),
-      db.from('student_learning_context')
-        .select('overall_level, subject_tiers, compass_bridge, session_goal, recommended_pathway, sessions_without_improvement')
-        .eq('student_id', studentId)
-        .maybeSingle(),
-      db.from('compass_sessions')
-        .select('one_line_summary')
-        .eq('learner_id', studentId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-    ])
-    const lastSessionRow = lastSessionResult.data
-    console.timeEnd('[COMPASS] db-reads')
 
     // ── Resolve subject ───────────────────────────────────────────────────────
     const subject = resolveSubject(
@@ -227,19 +262,74 @@ export async function POST(req: Request) {
     const holidayFocus: string | undefined =
       (ctx?.session_goal as string | null) ?? undefined
 
-    // Term mode
-    const { mode, holidayWeek } = detectMode(new Date())
+    // ── Knowledge graph context ───────────────────────────────────────────────
+    // Build a concise block for the system prompt when root cause data exists for
+    // the current subject. Only injected when data is fresh and subject-relevant.
+    let knowledgeContext: KnowledgeContextBlock | undefined
 
-    // ── Parallel: topics (4 DB hops, cached after first call) + session upsert ─
-    // Junior (Grade 7–9): include topics from all lower grades so revision sessions have KICD context.
+    const knowledgeRootCauses = (ctx?.knowledge_root_causes as RootCauseResult[] | null) ?? []
+    const guidedTopics        = (ctx?.guided_topics as string[] | null) ?? []
+    const subjectActionStepsAll = (ctx?.subject_action_steps as Record<string, string[]> | null) ?? {}
+
+    // Match action steps to current subject (case-insensitive)
+    const actionStepKey = Object.keys(subjectActionStepsAll).find(
+      k => k.toLowerCase() === subject.toLowerCase()
+    )
+    const subjectActionSteps = actionStepKey ? (subjectActionStepsAll[actionStepKey] ?? []) : []
+
+    // Find root causes for this specific subject
+    const subjectRootCauses = knowledgeRootCauses.filter(
+      r => r.subject.toLowerCase() === subject.toLowerCase()
+    )
+
+    if (subjectRootCauses.length > 0 || guidedTopics.length > 0) {
+      let rootCauseSummary: string | null = null
+      let rootCauseTopic:   string | null = null
+      let failingTopic:     string | null = null
+
+      if (subjectRootCauses.length > 0) {
+        // Sort by worst performance first
+        const top = [...subjectRootCauses].sort((a, b) => (a.performance ?? 0) - (b.performance ?? 0))[0]
+        const deepest = top.root_causes.slice().sort((a, b) => b.depth - a.depth)[0]
+
+        if (deepest) {
+          rootCauseTopic   = deepest.name
+          failingTopic     = top.failing_topic_name
+          rootCauseSummary = `${failingTopic} blocked by: ${rootCauseTopic}${top.root_causes.length > 1 ? ` (${top.root_causes.length}-step chain)` : ''}`
+        }
+      }
+
+      knowledgeContext = {
+        sessionGoal:        (ctx?.session_goal as string | null) ?? null,
+        guidedTopics:       guidedTopics.slice(0, 4),
+        rootCauseSummary,
+        subjectActionSteps: subjectActionSteps.slice(0, 2),
+        graphOpener:        false,   // set to true below once session.isNew is known
+        rootCauseTopic,
+        failingTopic,
+      }
+    }
+
+    // ── Topics + session — use early results if subject/grade matched request params ─
+    // Junior (Grade 7–9): include topics from all lower grades for revision context.
     // Senior (Grade 10+): locked to their own grade.
     console.time('[COMPASS] topics+session')
-    const [gradeTopics, session] = await Promise.all([
-      getGradeTopics(grade, subject, { minGrade: isJunior ? 7 : grade }),
-      getOrCreateSession(studentId, subject, mode),
-    ])
+    const gradeTopicsPromise = (earlySubject === subject && earlyGrade === grade && earlyTopics !== null)
+      ? Promise.resolve(earlyTopics)
+      : getGradeTopics(grade, subject, { minGrade: isJunior ? 7 : grade })
+
+    const sessionPromise = (earlySubject === subject && earlySession !== null)
+      ? Promise.resolve(earlySession)
+      : getOrCreateSession(studentId, subject, mode)
+
+    const [gradeTopics, session] = await Promise.all([gradeTopicsPromise, sessionPromise])
     console.timeEnd('[COMPASS] topics+session')
     const activeSessionId = sessionId ?? session.sessionId
+
+    // Enable graph-driven opener only for brand-new sessions with root cause data
+    if (knowledgeContext && session.isNew && knowledgeContext.rootCauseTopic && knowledgeContext.failingTopic) {
+      knowledgeContext = { ...knowledgeContext, graphOpener: true }
+    }
 
     // Derived from level
     const languageMode: 'mixed' | 'english-only'                  = level <= 2 ? 'mixed'              : 'english-only'
@@ -258,6 +348,7 @@ export async function POST(req: Request) {
       lastSessionSummary:         (lastSessionRow?.one_line_summary as string | null) ?? undefined,
       teacherRecommendation,
       teacherSuggested,
+      knowledgeContext,
       sessionsWithoutImprovement: (ctx?.sessions_without_improvement as number | null) ?? 0,
       mode,
       holidayWeek,

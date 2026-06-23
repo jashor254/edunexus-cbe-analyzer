@@ -1364,13 +1364,14 @@ export function buildSeniorActionPriorities(
 // ─── Main Report Generator ────────────────────────────────────────────────────
 
 export function generateReport(
-  studentProfile: StudentProfile,
-  subjects:        SubjectProgress[],
-  vitals:          Vitals,
-  actionPlan:      ActionPlan,
-  assessments:     Array<{ created_at?: string; dream_career?: string | null; [key: string]: unknown }>,
-  juniorGuidance?: JuniorGuidance,
-  seniorGuidance?: SeniorGuidance
+  studentProfile:      StudentProfile,
+  subjects:            SubjectProgress[],
+  vitals:              Vitals,
+  actionPlan:          ActionPlan,
+  assessments:         Array<{ created_at?: string; dream_career?: string | null; [key: string]: unknown }>,
+  juniorGuidance?:     JuniorGuidance,
+  seniorGuidance?:     SeniorGuidance,
+  knowledgeRootCauses?: import('@/lib/knowledgeGraph/types').RootCauseResult[]
 ): AcademicClinicReport {
   const firstName = studentProfile.name.split(' ')[0]
   const isJunior  = studentProfile.grade >= 7 && studentProfile.grade <= 9
@@ -1522,6 +1523,8 @@ export function generateReport(
     careerInsightCards,
     futureScenario,
     seniorActionPriorities,
+    // knowledge graph root causes (populated when strand_assessments data is available)
+    knowledgeRootCauses: knowledgeRootCauses ?? [],
   }
 }
 

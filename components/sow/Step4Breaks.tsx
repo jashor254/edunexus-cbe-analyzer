@@ -204,7 +204,7 @@ export default function Step4Breaks({
                 value={form.name}
                 onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
                 onKeyDown={e => e.key === 'Enter' && addBreak()}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
               />
 
               <div className="grid grid-cols-[auto_1fr_1fr] items-center gap-2">
@@ -212,7 +212,7 @@ export default function Step4Breaks({
                 <select
                   value={form.startWeek}
                   onChange={e => setForm(p => ({ ...p, startWeek: Number(e.target.value) }))}
-                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
                 >
                   {weekOptions.map(w => (
                     <option key={w} value={w}>Week {w}</option>
@@ -221,7 +221,7 @@ export default function Step4Breaks({
                 <select
                   value={form.startLesson}
                   onChange={e => setForm(p => ({ ...p, startLesson: Number(e.target.value) }))}
-                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
                 >
                   {lessonOptions.map(l => (
                     <option key={l} value={l}>Lesson {l}</option>
@@ -234,7 +234,7 @@ export default function Step4Breaks({
                 <select
                   value={form.endWeek}
                   onChange={e => setForm(p => ({ ...p, endWeek: Number(e.target.value) }))}
-                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
                 >
                   {weekOptions.map(w => (
                     <option key={w} value={w}>Week {w}</option>
@@ -243,7 +243,7 @@ export default function Step4Breaks({
                 <select
                   value={form.endLesson}
                   onChange={e => setForm(p => ({ ...p, endLesson: Number(e.target.value) }))}
-                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
                 >
                   {lessonOptions.map(l => (
                     <option key={l} value={l}>Lesson {l}</option>
@@ -268,7 +268,7 @@ export default function Step4Breaks({
 
               <button
                 onClick={addBreak}
-                className="flex items-center gap-1.5 text-sm font-bold bg-teal-600 text-gray-800 px-4 py-2 rounded-lg hover:bg-teal-700 transition"
+                className="flex items-center gap-1.5 text-sm font-bold bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition"
               >
                 + Add break
               </button>
@@ -426,7 +426,7 @@ export default function Step4Breaks({
         <button
           onClick={handleNext}
           disabled={(noBreaks ? totalSlots : lessonsToGenerate) < 1}
-          className="flex items-center gap-2 bg-teal-600 text-gray-800 px-6 py-3 rounded-xl font-bold hover:bg-teal-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 bg-teal-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-teal-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Next — Generate Preview <ChevronRight className="w-4 h-4" />
         </button>

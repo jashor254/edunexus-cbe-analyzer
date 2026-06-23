@@ -15,12 +15,39 @@ function pickDistinctCounties(n: number): string[] {
   return shuffled.slice(0, n)
 }
 
+function pickTopicCounties(strand: string, learningArea: string): [string, string, string] {
+  const text = (strand + ' ' + learningArea).toLowerCase()
+
+  if (/drought|arid|semi.arid|pastoralist|camel|asal/.test(text)) {
+    return ['Kitui', 'Marsabit', 'Garissa']
+  }
+  if (/flood|rain|river|lake|fishing|nyanza|wetland/.test(text)) {
+    return ["Budalang'i", 'Kisumu', 'Homa Bay']
+  }
+  if (/farm|agricult|crop|soil|maize|wheat|tea|coffee|harvest/.test(text)) {
+    return ['Uasin Gishu', 'Trans Nzoia', 'Nyeri']
+  }
+  if (/coast|ocean|marine|mangrove|beach|port|tourism/.test(text)) {
+    return ['Mombasa', 'Kilifi', 'Kwale']
+  }
+  if (/forest|wildlife|conserv|national park|game|biodiversity/.test(text)) {
+    return ['Narok', 'Laikipia', "Murang'a"]
+  }
+  if (/urban|city|trade|market|industry|manufacturing/.test(text)) {
+    return ['Nairobi', 'Nakuru', 'Kisumu']
+  }
+
+  const [a, b, c] = pickDistinctCounties(3)
+  return [a, b, c]
+}
+
 function sanitizeResource(resource: string): string {
   return resource
     .replace(/\s*,?\s*pages?\s+on\s+[^,;]*/gi, '')
     .replace(/\s*,?\s*pp\.\s*[\d–\-]+\s+on\s+[^,;]*/gi, '')
     .replace(/\s*,?\s*p\.\s*\d+\s+on\s+[^,;]*/gi, '')
     .replace(/,\s*$/, '')
+    .replace(/Grade\s+Grade\s+(\d+)/gi, 'Grade $1')
     .trim()
 }
 
@@ -96,7 +123,7 @@ function buildLessonPlanPrompt(ctx: LessonPlanContext): string {
 
   const location = deriveLocation(ctx.learningArea, ctx.grade)
   const resources = sanitizeResources(ctx.learningResources)
-  const [county1, county2, county3] = pickDistinctCounties(3)
+  const [county1, county2, county3] = pickTopicCounties(ctx.strand, ctx.learningArea)
 
   const languageInstruction = isKiswahiliSubject(ctx.learningArea)
     ? `
@@ -166,7 +193,7 @@ Generate ONLY these sections as JSON:
   "step2": "10 minutes. Learners carry out the SOW activity: '${experiences[1] || ''}'. Write ONLY what LEARNERS do. Keep the same activity type and Kenyan context. Teacher role: circulate and guide only.",
   "step3": "10 minutes. Learners carry out the SOW activity: '${experiences[2] || ''}'. Write ONLY what LEARNERS do. Keep the same activity type and Kenyan context. Teacher role: facilitate sharing only.",
   "conclusion": "5 minutes. Learners summarize the key lesson points. Learners answer 1-2 quick oral questions to check understanding. Teacher previews the next lesson.",
-  "extendedActivities": "2-3 learner-led tasks for fast finishers OR homework activities that extend learning beyond the classroom.",
+  "extendedActivities": "EXACTLY 3 bullet points. Each bullet is one standalone activity a learner can do at home independently. Start each with a verb: Draw, Write, Interview, Research, Observe, Create, Ask, Find. Never use numbered lists. Never write as a paragraph. Format as: '- [verb] [activity]\\n- [verb] [activity]\\n- [verb] [activity]'",
   "reflection": "Were learners able to ${outcomes[0] || '[outcome a]'}? Were learners able to ${outcomes[1] || '[outcome b]'}? Were learners able to ${outcomes[2] || '[outcome c]'}? If not, how will you assist them in the next lesson?"
 }
 
@@ -175,12 +202,15 @@ ADDITIONAL RULES:
 - The reflection field must be output exactly as the guiding questions shown above — do not rewrite it
 - Return ONLY valid JSON, no markdown
 
-KENYAN LOCATION RULE — STRICTLY ENFORCED:
-Each step is pre-assigned a DIFFERENT Kenyan county. Use ONLY these — no swaps, no extras, no repeats:
+KENYAN CONTEXT — MANDATORY:
+Each step is pre-assigned a DIFFERENT specific Kenyan location. Use ONLY these — no swaps, no extras, no repeats:
 - step1: "${county1}"
 - step2: "${county2}"
 - step3: "${county3}"
-Do NOT mention any other Kenyan county or town in any step. Each step uses exactly one location: the one assigned above.
+Reference counties, towns, rivers, forests, or landmarks a Grade 8 Kenyan learner would recognize.
+Match the place to the topic — drought topics use ASAL counties (Kitui, Marsabit, Garissa), flood topics use western Kenya (Budalang'i, Kisumu, Homa Bay), farming topics use highlands (Nyeri, Uasin Gishu, Trans Nzoia).
+Never use generic "a community" or "a county in Kenya" — always use the assigned name above.
+Do NOT mention any other Kenyan location in any step. Each step uses exactly one location: the one assigned above.
 `
 }
 

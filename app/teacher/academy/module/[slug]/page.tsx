@@ -7,7 +7,12 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, Clock, BookOpen, CheckCircle2 } from 'lucide-react'
 import { getModuleWithLessons, getAdjacentModules } from '@/lib/academy/queries'
+import { getReflectionsForModule } from '@/lib/academy/reflections'
+import { getMissionsForModule } from '@/lib/academy/missions'
+import { getEvidenceForModule, getRecentPlans } from '@/lib/academy/evidence'
 import LessonAccordion from '@/components/academy/LessonAccordion'
+import MissionCard from '@/components/academy/MissionCard'
+import type { AcademyReflection } from '@/lib/academy/types'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -29,17 +34,23 @@ export default async function ModulePage({ params }: Props) {
 
   if (!teacher) redirect('/teacher/setup')
 
-  const [module, adjacent] = await Promise.all([
-    getModuleWithLessons(slug, teacher.id),
-    (async () => {
-      // We need the module order — fetch it first (already done above) or grab from module
-      return null // resolved after module loads below
-    })(),
-  ])
-
+  const module = await getModuleWithLessons(slug, teacher.id)
   if (!module) notFound()
 
-  const { prev, next } = await getAdjacentModules(module.order, module.phase)
+  const lessonIds = module.lessons.map(l => l.id)
+
+  const [{ prev, next }, reflectionRows, missions, evidenceMap, recentPlans] = await Promise.all([
+    getAdjacentModules(module.order, module.phase),
+    getReflectionsForModule(teacher.id, module.id),
+    getMissionsForModule(module.id, teacher.id),
+    getEvidenceForModule(teacher.id, lessonIds),
+    getRecentPlans(teacher.id),
+  ])
+
+  const initialReflections = reflectionRows.reduce<Record<string, AcademyReflection>>(
+    (acc, r) => { acc[r.lesson_id] = r; return acc },
+    {}
+  )
 
   const pct = module.lessons.length > 0
     ? Math.round((module.completedCount / module.lessons.length) * 100)
@@ -52,7 +63,7 @@ export default async function ModulePage({ params }: Props) {
 
       {/* Hero */}
       <div className="bg-[#0c1929] relative overflow-hidden">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff06_1px,transparent_1px),linear-gradient(to_bottom,#ffffff06_1px,transparent_1px)] bg-[size:40px_40px]" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff06_1px,transparent_1px),linear-gradient(to_bottom,#ffffff06_1px,transparent_1px)] bg-size-[40px_40px]" />
         <div
           className="absolute top-0 left-1/3 w-64 h-64 rounded-full blur-3xl pointer-events-none opacity-20"
           style={{ background: module.color ?? '#14b8a6' }}
@@ -126,7 +137,32 @@ export default async function ModulePage({ params }: Props) {
         <LessonAccordion
           lessons={module.lessons}
           moduleColor={module.color ?? '#14b8a6'}
+          moduleId={module.id}
+          initialReflections={initialReflections}
+          initialEvidence={evidenceMap}
+          recentPlans={recentPlans}
         />
+
+        {/* Missions section */}
+        {missions.length > 0 && (
+          <div className="mt-10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-1 h-px bg-gray-200" />
+              <span className="text-xs font-black text-gray-400 uppercase tracking-wider shrink-0">
+                Module Missions
+              </span>
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
+            <p className="text-xs text-gray-500 mb-4 text-center">
+              Missions turn theory into practice. Complete them to earn XP and build real AI judgement.
+            </p>
+            <div className="space-y-3">
+              {missions.map(m => (
+                <MissionCard key={m.id} mission={m} moduleColor={module.color ?? '#14b8a6'} />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Module navigation */}
         <div className="mt-10 flex items-center justify-between gap-4">
@@ -136,7 +172,7 @@ export default async function ModulePage({ params }: Props) {
               className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 hover:border-gray-300 hover:shadow-sm px-4 py-2.5 rounded-xl text-sm font-bold transition"
             >
               <ChevronLeft className="w-4 h-4" />
-              <span className="max-w-[140px] truncate">{prev.title}</span>
+              <span className="max-w-35 truncate">{prev.title}</span>
             </Link>
           ) : (
             <Link
@@ -153,13 +189,13 @@ export default async function ModulePage({ params }: Props) {
               className="flex items-center gap-2 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition hover:opacity-90 shadow-sm"
               style={{ background: module.color ?? '#14b8a6' }}
             >
-              <span className="max-w-[140px] truncate">{next.title}</span>
+              <span className="max-w-35 truncate">{next.title}</span>
               <ChevronRight className="w-4 h-4" />
             </Link>
           ) : isComplete ? (
             <Link
               href="/teacher/academy/certificate"
-              className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-yellow-400 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:opacity-90 transition shadow-sm"
+              className="flex items-center gap-2 bg-linear-to-r from-amber-500 to-yellow-400 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:opacity-90 transition shadow-sm"
             >
               Claim Certificate <ChevronRight className="w-4 h-4" />
             </Link>

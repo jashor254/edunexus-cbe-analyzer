@@ -1036,17 +1036,13 @@ function LearnContent() {
         {isLoading && (
           <div className="flex justify-start">
             <div className="w-7 h-7 shrink-0 bg-violet-600/20 border border-violet-500/20 rounded-full flex items-center justify-center mr-2 mt-1">
-              <Compass className="w-3.5 h-3.5 text-violet-400 animate-pulse" />
+              <Compass className="w-3.5 h-3.5 text-violet-400" />
             </div>
-            <div className="bg-white/6 border border-white/8 rounded-2xl rounded-bl-sm px-4 py-3">
-              <div className="flex gap-1.5 items-center h-4">
-                {[0, 0.15, 0.3].map((delay, i) => (
-                  <div
-                    key={i}
-                    className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce"
-                    style={{ animationDelay: `${delay}s` }}
-                  />
-                ))}
+            <div className="bg-white/6 border border-white/8 rounded-2xl rounded-bl-sm px-4 py-3 w-56">
+              <div className="flex flex-col gap-2 animate-pulse">
+                <div className="h-2.5 bg-white/10 rounded-full w-3/4" />
+                <div className="h-2.5 bg-white/10 rounded-full w-full" />
+                <div className="h-2.5 bg-white/10 rounded-full w-1/2" />
               </div>
             </div>
           </div>

@@ -3,6 +3,7 @@
 // Produces: Page 1 = cover page, Page 2+ = A4 landscape SOW table.
 
 import type { SOWPreviewData, GeneratedLesson, BreakItem, CurriculumMode } from './types'
+import { toTitleCase } from '@/lib/utils/formatters'
 
 export interface ColConfig {
   col3: string
@@ -50,9 +51,14 @@ function esc(s: string): string {
     .replace(/"/g, '&quot;')
 }
 
+
+// Strip "By the end of the lesson, the learner should be able to" prefix
+// if AI includes it — each bullet should start directly with the action verb.
+const BTEOTLE_RE = /^(by the end of (the|this) lesson[,:]?\s*)?(the\s+)?learner[s]?\s+(should\s+)?be\s+able\s+to\s+/i
+
 function bullets(items: string[]): string {
   if (!items?.length) return '—'
-  return `<ul>${items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>`
+  return `<ul>${items.map(i => `<li>${esc(i.replace(BTEOTLE_RE, ''))}</li>`).join('')}</ul>`
 }
 
 function breakDetail(b: BreakItem): string {
@@ -63,32 +69,40 @@ function breakDetail(b: BreakItem): string {
 }
 
 function buildCoverPage(meta: SOWPreviewData['meta']): string {
+  const school      = toTitleCase(meta.school)
+  const teacherName = toTitleCase(meta.teacherName || '—')
+
   return `
   <div class="cover-page">
-    <div class="cover-govt">REPUBLIC OF KENYA</div>
-    <div class="cover-ministry">MINISTRY OF EDUCATION</div>
-    <div class="cover-rule"></div>
-    <div class="cover-title">SCHEME OF WORK</div>
-    <div class="cover-rule"></div>
+    <div class="cover-top">
+      <div class="cover-govt">REPUBLIC OF KENYA</div>
+      <div class="cover-ministry">MINISTRY OF EDUCATION</div>
+      <div class="cover-rule"></div>
+      <div class="cover-title">SCHEME OF WORK</div>
+      <div class="cover-rule"></div>
 
-    <table class="cover-table">
-      <tr><td class="cover-label">Teacher Name</td><td class="cover-value">${esc(meta.teacherName || '—')}</td></tr>
-      <tr><td class="cover-label">TSC No.</td><td class="cover-value">${esc(meta.tscNumber || '—')}</td></tr>
-      <tr><td class="cover-label">School</td><td class="cover-value">${esc(meta.school)}</td></tr>
-      <tr><td class="cover-label">Learning Area / Subject</td><td class="cover-value">${esc(meta.learningArea)}</td></tr>
-      <tr><td class="cover-label">Grade</td><td class="cover-value">${esc(meta.grade)}</td></tr>
-      <tr><td class="cover-label">Term</td><td class="cover-value">Term ${esc(meta.term)}</td></tr>
-      <tr><td class="cover-label">Year</td><td class="cover-value">${meta.year}</td></tr>
-    </table>
+      <table class="cover-table">
+        <tr><td class="cover-label">Teacher Name</td><td class="cover-value">${esc(teacherName)}</td></tr>
+        <tr><td class="cover-label">TSC No.</td><td class="cover-value">${esc(meta.tscNumber || '—')}</td></tr>
+        <tr><td class="cover-label">School</td><td class="cover-value">${esc(school)}</td></tr>
+        <tr><td class="cover-label">Learning Area / Subject</td><td class="cover-value">${esc(meta.learningArea)}</td></tr>
+        <tr><td class="cover-label">Grade</td><td class="cover-value">${esc(meta.grade)}</td></tr>
+        <tr><td class="cover-label">Term</td><td class="cover-value">Term ${esc(meta.term)}</td></tr>
+        <tr><td class="cover-label">Year</td><td class="cover-value">${meta.year}</td></tr>
+      </table>
 
-    ${meta.textbook ? `
-    <div class="cover-books">
-      <div class="cover-books-label">Reference Books Used:</div>
-      ${meta.textbook.split(' | ').map(b => `<div class="cover-books-item">• ${esc(b.trim())}</div>`).join('')}
-    </div>` : ''}
+      ${meta.textbook ? `
+      <div class="cover-books">
+        <div class="cover-books-label">Reference Books Used:</div>
+        ${meta.textbook.split(' | ').map(b => `<div class="cover-books-item">• ${esc(b.trim())}</div>`).join('')}
+      </div>` : ''}
+    </div>
 
-    <div class="cover-footer">
-      EduNexus · For Kenyan Teachers · ${esc(meta.generatedDate)}
+    <div class="cover-branding">
+      <div class="cover-tagline">Every child finds their way.</div>
+      <div class="cover-footer">
+        EduNexus · edunexus.co.ke · ${esc(meta.generatedDate)}
+      </div>
     </div>
   </div>
   <div class="page-break"></div>`
@@ -153,8 +167,6 @@ function buildTablePage(
   const numCols = isCBC ? 10 : 9
 
   // Pre-compute rowspans for STRAND and SUB-STRAND columns.
-  // skipStrand[i]=true means this cell is absorbed by a rowspan above — omit it.
-  // strandSpan[i]  = rowspan value for the first cell in a run (1 if no merge needed).
   const skipStrand: boolean[]    = new Array(rows.length).fill(false)
   const strandSpan: number[]     = new Array(rows.length).fill(1)
   const skipSubstrand: boolean[] = new Array(rows.length).fill(false)
@@ -235,7 +247,7 @@ function buildTablePage(
   return `
   <div class="sow-page">
     <div class="sow-header">
-      <strong>${esc(meta.school)}</strong> &nbsp;|&nbsp;
+      <strong>${esc(toTitleCase(meta.school))}</strong> &nbsp;|&nbsp;
       ${esc(meta.learningArea)} &nbsp;|&nbsp;
       ${esc(meta.grade)} &nbsp;|&nbsp;
       Term ${esc(meta.term)} ${meta.year}
@@ -269,30 +281,44 @@ export function generateSOWHTML(
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <title>SOW — ${esc(meta.learningArea)} ${esc(meta.grade)} Term ${esc(meta.term)} ${meta.year}</title>
+  <title>${esc(meta.learningArea)} ${esc(meta.grade)} — SOW Term ${esc(meta.term)} ${meta.year}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; font-size: 9pt; color: #000; background: #fff; }
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 9pt;
+      color: #000;
+      background: #fff;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
 
     /* ── Cover page ─────────────────────────────────────────── */
     .cover-page {
       width: 180mm;
-      margin: 40mm auto;
+      margin: 20mm auto;
       text-align: center;
       padding: 20mm;
       border: 2px solid #1e3a5f;
+      min-height: 220mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
-    .cover-govt   { font-size: 13pt; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; }
+    .cover-top { flex: 1; }
+    .cover-govt    { font-size: 13pt; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; }
     .cover-ministry { font-size: 10pt; margin-top: 4px; }
-    .cover-rule   { border-top: 2px solid #1e3a5f; margin: 12px 0; }
-    .cover-title  { font-size: 18pt; font-weight: bold; letter-spacing: 3px; margin: 8px 0; }
-    .cover-table  { width: 100%; margin: 20px 0; border-collapse: collapse; text-align: left; }
-    .cover-label  { width: 45%; padding: 6px 8px; font-weight: bold; font-size: 9pt; border-bottom: 1px solid #ddd; }
-    .cover-value  { padding: 6px 8px; font-size: 9pt; border-bottom: 1px solid #ddd; }
-    .cover-books  { text-align: left; margin-top: 12px; font-size: 9pt; }
+    .cover-rule    { border-top: 2px solid #1e3a5f; margin: 12px 0; }
+    .cover-title   { font-size: 18pt; font-weight: bold; letter-spacing: 3px; margin: 8px 0; }
+    .cover-table   { width: 100%; margin: 20px 0; border-collapse: collapse; text-align: left; }
+    .cover-label   { width: 45%; padding: 6px 8px; font-weight: bold; font-size: 9pt; border-bottom: 1px solid #ddd; }
+    .cover-value   { padding: 6px 8px; font-size: 9pt; border-bottom: 1px solid #ddd; }
+    .cover-books   { text-align: left; margin-top: 12px; font-size: 9pt; }
     .cover-books-label { font-weight: bold; margin-bottom: 4px; }
     .cover-books-item  { margin-left: 8px; }
-    .cover-footer { margin-top: 24px; font-size: 7.5pt; color: #666; }
+    .cover-branding { margin-top: 16px; }
+    .cover-tagline  { font-size: 10pt; color: #1e3a5f; font-style: italic; margin-bottom: 4px; }
+    .cover-footer  { font-size: 7.5pt; color: #666; }
 
     /* ── Page break ─────────────────────────────────────────── */
     .page-break { page-break-after: always; break-after: page; }
@@ -363,9 +389,24 @@ export function generateSOWHTML(
       text-align: right;
     }
 
+    /* ── Print tip bar ──────────────────────────────────────── */
+    .print-tip {
+      background: #fefce8;
+      border: 1px solid #fde047;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 9pt;
+      color: #713f12;
+      margin-top: 8px;
+    }
+
     /* ── Print ──────────────────────────────────────────────── */
     @media print {
       .no-print { display: none !important; }
+      body {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+      }
       @page {
         size: A4 landscape;
         margin: 10mm;
@@ -375,12 +416,17 @@ export function generateSOWHTML(
   </style>
 </head>
 <body>
-  <div class="no-print" style="text-align:right;padding:12px 16px;">
+  <div class="no-print" style="text-align:right;padding:12px 16px 0;">
     <button onclick="window.print()"
       style="background:#1e3a5f;color:#fff;border:none;padding:10px 22px;border-radius:6px;
              font-size:10pt;cursor:pointer;font-weight:bold;">
       Print / Save as PDF
     </button>
+    <div class="print-tip" style="text-align:left;margin-top:8px;">
+      <strong>Chrome tip:</strong> In the print dialog → <em>More settings</em> → uncheck
+      <em>"Headers and footers"</em> for a clean PDF. Enable <em>"Background graphics"</em>
+      to preserve break row colours.
+    </div>
   </div>
   ${cover}
   ${table}
@@ -394,6 +440,8 @@ export function downloadSOWAsPDF(data: SOWPreviewData, colConfig: ColConfig): vo
   if (!win) return
   win.document.write(html)
   win.document.close()
+  // Clear title so browser doesn't show filename/URL in the print header
+  win.document.title = ''
   win.focus()
   setTimeout(() => {
     win.print()

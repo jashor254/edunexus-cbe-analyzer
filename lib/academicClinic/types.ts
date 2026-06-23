@@ -263,6 +263,7 @@ export interface SeniorActionPriority {
 // ─── Main Report ─────────────────────────────────────────────────────────────
 
 import type { DreamCareerAnalysis } from './careerEngine'
+import type { RootCauseResult } from '@/lib/knowledgeGraph/types'
 
 export interface AcademicClinicReport {
   studentProfile: StudentProfile
@@ -294,4 +295,6 @@ export interface AcademicClinicReport {
   careerInsightCards?: CareerInsightCard[]
   futureScenario?: FutureScenario | null
   seniorActionPriorities?: SeniorActionPriority[]
+  // ── Knowledge graph root cause analysis (when strand_assessments data is available)
+  knowledgeRootCauses?: RootCauseResult[]
 }

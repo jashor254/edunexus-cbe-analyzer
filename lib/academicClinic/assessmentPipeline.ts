@@ -17,6 +17,8 @@ import {
 import { CareerEngine } from '@/lib/academicClinic/careerEngine'
 import { generateAcademicClinicPDF } from '@/lib/academicClinic/pdfGenerator'
 import type { SubjectProgress, StudentProfile } from '@/lib/academicClinic/types'
+import { analyseStudentRootCauses } from '@/lib/knowledgeGraph'
+import type { RootCauseResult } from '@/lib/knowledgeGraph'
 import { sendReportEmail } from '@/lib/email/reportEmail'
 import { sendReportWhatsApp } from '@/lib/whatsapp/reportNotify'
 
@@ -135,6 +137,14 @@ export async function runAssessmentPipeline({
       }
     }
 
+    // Knowledge graph — root cause analysis (non-blocking, requires strand_assessments data)
+    let knowledgeRootCauses: RootCauseResult[] = []
+    try {
+      knowledgeRootCauses = await analyseStudentRootCauses(db, student.id, student.grade)
+    } catch (err) {
+      console.error('[assessmentPipeline] knowledge graph traversal failed (non-fatal):', err)
+    }
+
     // Compass rec
     const compassRec = generateLearningCompassRec(subjects)
 
@@ -162,6 +172,25 @@ export async function runAssessmentPipeline({
       }
     }
 
+    // Derive Compass start topic from deepest knowledge-graph root cause when available
+    const graphDerivedTopic = knowledgeRootCauses.length > 0
+      ? (() => {
+          // Pick the failing topic with the biggest performance gap
+          const topFailing = [...knowledgeRootCauses].sort((a, b) => (b.performance ? 3 - b.performance : 3) - (a.performance ? 3 - a.performance : 3))[0]
+          // Use the deepest root cause (highest depth) so Compass starts at the true foundation
+          const deepestCause = topFailing.root_causes.slice().sort((a, b) => b.depth - a.depth)[0]
+          return deepestCause ?? null
+        })()
+      : null
+
+    const graphGuidedTopics = graphDerivedTopic
+      ? knowledgeRootCauses.flatMap(r => r.root_causes.slice(0, 2).map(c => c.name)).slice(0, 4)
+      : null
+
+    const graphSessionGoal = graphDerivedTopic
+      ? `Resolve foundational gap in "${graphDerivedTopic.name}" (${graphDerivedTopic.strand}) to unblock downstream topics`
+      : null
+
     // Save to student_learning_context
     await db.from('student_learning_context').upsert({
       student_id:          student.id,
@@ -173,13 +202,15 @@ export async function runAssessmentPipeline({
       pathway_confidence:  pathwayConfidence,
       pathway_scores:      pathwayScores,
       first_subject:       compassBridge?.subjectPriorities[0]?.subject ?? compassRec.firstSessionSubject,
-      session_goal:        compassBridge?.sessionGoal ?? compassRec.sessionGoal,
-      guided_topics:       compassBridge?.guidedTopics ?? compassRec.topicsToAsk,
+      session_goal:        graphSessionGoal ?? compassBridge?.sessionGoal ?? compassRec.sessionGoal,
+      guided_topics:       graphGuidedTopics ?? compassBridge?.guidedTopics ?? compassRec.topicsToAsk,
       compass_bridge:      compassBridge,
       overall_level:       Math.round(subjects.reduce((s, sub) => s + sub.level, 0) / Math.max(subjects.length, 1)),
       curriculum_type:     student.curriculum_type ?? 'cbc',
       grade:               student.grade,
       last_assessment_id:  assessment.id,
+      knowledge_root_causes:       knowledgeRootCauses.length > 0 ? knowledgeRootCauses : null,
+      knowledge_graph_computed_at: knowledgeRootCauses.length > 0 ? new Date().toISOString() : null,
     }, { onConflict: 'student_id' })
 
     if (!notify) {
@@ -202,7 +233,7 @@ export async function runAssessmentPipeline({
     const firstName   = student.name.split(' ')[0]
     const jGuidance   = isJunior  ? generateJuniorGuidance(subjects)           : undefined
     const sGuidance   = !isJunior ? generateSeniorGuidance(subjects, firstName, student.grade, (student as { current_pathway?: string | null }).current_pathway ?? undefined) : undefined
-    const report      = generateReport(studentProfile, subjects, vitals, actionPlan, [], jGuidance, sGuidance)
+    const report      = generateReport(studentProfile, subjects, vitals, actionPlan, [], jGuidance, sGuidance, knowledgeRootCauses.length > 0 ? knowledgeRootCauses : undefined)
 
     const pdfBlob   = await generateAcademicClinicPDF(report)
     const pdfBuffer = Buffer.from(await pdfBlob.arrayBuffer())

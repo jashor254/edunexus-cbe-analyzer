@@ -6,13 +6,15 @@ import {
   apiBadRequest,
   apiUnauthorized,
   apiNotFound,
-  getErrorMessage,
   apiError,
+  getErrorMessage,
 } from '@/lib/api/response'
-import { markLessonComplete } from '@/lib/academy/queries'
+import { markLessonComplete, getAcademyStats } from '@/lib/academy/queries'
+import type { ProgressUpdateResponse } from '@/lib/academy/types'
 
 const bodySchema = z.object({
   lesson_id: z.string().uuid(),
+  answer: z.string().trim().optional().default(''),
 })
 
 export async function POST(req: Request) {
@@ -25,8 +27,7 @@ export async function POST(req: Request) {
     const parsed = bodySchema.safeParse(body)
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0].message)
 
-    const { lesson_id } = parsed.data
-
+    const { lesson_id, answer } = parsed.data
     const db = createServiceClient()
 
     const { data: teacher } = await db
@@ -37,43 +38,32 @@ export async function POST(req: Request) {
 
     if (!teacher) return apiNotFound('Teacher profile not found')
 
-    // Verify the lesson exists
     const { data: lesson } = await db
       .from('academy_lessons')
-      .select('id, module_id')
+      .select('id, module_id, practice_prompt')
       .eq('id', lesson_id)
-      .single()
+      .maybeSingle()
 
     if (!lesson) return apiNotFound('Lesson not found')
 
+    if (lesson.practice_prompt?.trim()) {
+      if (answer.length < 15) {
+        return apiBadRequest(
+          'Mwalimu, tafadhali andika angalau herufi 15 za tafakari yako ili kukamilisha somo hili.'
+        )
+      }
+    }
+
     await markLessonComplete(teacher.id, lesson_id)
 
-    // Return updated completion count for the module
-    const { count: moduleTotal } = await db
-      .from('academy_lessons')
-      .select('id', { count: 'exact', head: true })
-      .eq('module_id', lesson.module_id)
+    const updatedStats = await getAcademyStats(teacher.id)
 
-    const { count: moduleCompleted } = await db
-      .from('academy_progress')
-      .select('id', { count: 'exact', head: true })
-      .eq('teacher_id', teacher.id)
-      .in(
-        'lesson_id',
-        (await db
-          .from('academy_lessons')
-          .select('id')
-          .eq('module_id', lesson.module_id)
-        ).data?.map(l => l.id) ?? []
-      )
-
-    return apiSuccess({
-      lesson_id,
-      module_id: lesson.module_id,
-      module_total: moduleTotal ?? 0,
-      module_completed: moduleCompleted ?? 0,
+    return apiSuccess<ProgressUpdateResponse>({
+      success: true,
+      message: 'Lesson progress recorded successfully.',
+      updatedStats,
     })
-  } catch (err) {
+  } catch (err: unknown) {
     return apiError(getErrorMessage(err), 500)
   }
 }

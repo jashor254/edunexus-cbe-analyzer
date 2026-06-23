@@ -24,6 +24,22 @@ import type {
   SOWGenerationResult,
 } from '@/lib/sow/types'
 
+const BREAK_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  default:         { bg: '#FEF3C7', text: '#92400E', border: '#F59E0B' },
+  'Mid-term':      { bg: '#DBEAFE', text: '#1E40AF', border: '#3B82F6' },
+  'Half Term':     { bg: '#DBEAFE', text: '#1E40AF', border: '#3B82F6' },
+  'Holiday':       { bg: '#D1FAE5', text: '#065F46', border: '#10B981' },
+  'Exam Week':     { bg: '#FEE2E2', text: '#991B1B', border: '#EF4444' },
+  'Revision Week': { bg: '#EDE9FE', text: '#5B21B6', border: '#8B5CF6' },
+}
+
+function getBreakStyle(name: string) {
+  const entry = Object.entries(BREAK_COLORS).find(([k]) =>
+    k !== 'default' && name?.toLowerCase().includes(k.toLowerCase())
+  )
+  return entry ? entry[1] : BREAK_COLORS.default
+}
+
 function slotInBreak(week: number, lesson: number, b: BreakItem): boolean {
   const afterStart = week > b.startWeek || (week === b.startWeek && lesson >= b.startLesson)
   const beforeEnd  = week < b.endWeek   || (week === b.endWeek   && lesson <= b.endLesson)
@@ -323,20 +339,27 @@ export default function Step5Preview({
         ? `Wk ${matchBreak.startWeek}`
         : `Wk ${matchBreak.startWeek}–${matchBreak.endWeek}`
       const lessonsLost = timeline.filter(s => s.isBreak && slotInBreak(s.week, s.lesson, matchBreak)).length
+      const bStyle = getBreakStyle(matchBreak.title)
       return (
-        <tr key={`brk-${matchBreak.id}`} className="bg-amber-50 border-b border-amber-200">
-          <td className="px-3 py-2.5 text-center font-bold text-amber-800 text-xs">{matchBreak.startWeek}</td>
-          <td className="px-3 py-2.5 text-center text-amber-500 text-xs">—</td>
+        <tr
+          key={`brk-${matchBreak.id}`}
+          style={{ backgroundColor: bStyle.bg, borderBottom: `1px solid ${bStyle.border}` }}
+        >
+          <td className="px-3 py-2.5 text-center text-xs font-bold" style={{ color: bStyle.text }}>{matchBreak.startWeek}</td>
+          <td className="px-3 py-2.5 text-center text-xs" style={{ color: bStyle.text }}>—</td>
           <td
             colSpan={colConfig.hasInquiryQuestions ? 8 : 7}
             className="px-3 py-2.5"
           >
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900">
+              <span
+                className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                style={{ backgroundColor: bStyle.border, color: '#ffffff' }}
+              >
                 BREAK
               </span>
-              <span className="text-xs font-bold text-amber-900">{matchBreak.title}</span>
-              <span className="text-[11px] text-amber-700">
+              <span className="text-xs font-bold" style={{ color: bStyle.text }}>{matchBreak.title}</span>
+              <span className="text-[11px]" style={{ color: bStyle.text, opacity: 0.8 }}>
                 {wkRange} · {lessonsLost} lesson{lessonsLost !== 1 ? 's' : ''}
               </span>
             </div>
@@ -574,7 +597,7 @@ function LessonRow({
   return (
     <tr
       className={`border-b border-gray-100 cursor-pointer transition ${
-        expanded ? 'bg-teal-50/20' : 'hover:bg-gray-50'
+        expanded ? 'bg-teal-50' : 'hover:bg-gray-50'
       }`}
       onClick={() => setExpanded(e => !e)}
     >

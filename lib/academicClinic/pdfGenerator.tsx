@@ -12,6 +12,7 @@ import type {
   JuniorActionPriority, SeniorActionPriority,
   CareerInsightCard,
 } from './types'
+import type { RootCauseResult } from '@/lib/knowledgeGraph/types'
 import { getLevelLabel, getClinicalObservation } from './reportGenerator'
 
 // ─── Color Palette ────────────────────────────────────────────────────────────
@@ -164,6 +165,17 @@ const S = StyleSheet.create({
   snapshotScoreCircle: { width: 80, height: 80, borderRadius: 40, borderWidth: 5, justifyContent: 'center', alignItems: 'center' },
   snapshotScoreValue:  { fontSize: 26, fontWeight: 700 },
   snapshotScoreLabel:  { fontSize: 8, color: C.muted, marginTop: 4, textAlign: 'center' },
+
+  // Root cause chain section
+  rcBox:        { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 6, padding: 10, marginBottom: 10, backgroundColor: '#f8fafc' },
+  rcHeader:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  rcTitle:      { fontSize: 8, fontWeight: 700, color: C.navy, letterSpacing: 1 },
+  rcBadge:      { fontSize: 7, fontWeight: 700, color: '#6366f1', backgroundColor: '#ede9fe', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 3 },
+  rcChainRow:   { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginBottom: 3 },
+  rcNode:       { fontSize: 8, color: C.text, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: '#e2e8f0', borderRadius: 3, marginRight: 2 },
+  rcNodeRoot:   { fontSize: 8, color: '#ffffff', paddingHorizontal: 6, paddingVertical: 2, backgroundColor: '#dc2626', borderRadius: 3, marginRight: 2 },
+  rcArrow:      { fontSize: 8, color: C.muted, marginRight: 2 },
+  rcRemedy:     { fontSize: 7.5, color: C.muted, marginTop: 3, lineHeight: 1.4 },
 })
 
 // ─── Shared Components ────────────────────────────────────────────────────────
@@ -194,6 +206,55 @@ function PageFooter({ reportId }: { reportId: string }) {
       <Text style={S.pageFooterText}>{reportId}</Text>
       <Text style={S.pageFooterText}>CONFIDENTIAL — For Parent and Teacher Use Only</Text>
       <Text style={S.pageFooterText}>edunexus.co.ke</Text>
+    </View>
+  )
+}
+
+// ─── Root Cause Chain Box ─────────────────────────────────────────────────────
+// Shows the top 2 root cause chains from the knowledge graph when data is available
+
+function RootCauseChainBox({ causes }: { causes: RootCauseResult[] }) {
+  if (!causes || causes.length === 0) return null
+
+  // Take the 2 most critical failing topics (biggest gap = lowest performance)
+  const top2 = [...causes]
+    .sort((a, b) => (3 - a.performance) - (3 - b.performance))
+    .slice(0, 2)
+
+  return (
+    <View style={S.rcBox}>
+      <View style={S.rcHeader}>
+        <Text style={S.rcTitle}>ROOT CAUSE ANALYSIS — KNOWLEDGE GRAPH</Text>
+        <Text style={S.rcBadge}>AI-Free · Graph Traversal</Text>
+      </View>
+      {top2.map((result, i) => {
+        const deepestCause = result.root_causes[0]
+        return (
+          <View key={i} style={{ marginBottom: i < top2.length - 1 ? 8 : 0 }}>
+            <View style={S.rcChainRow}>
+              {/* Root cause node (deepest blocker) */}
+              {deepestCause && (
+                <>
+                  <Text style={S.rcNodeRoot}>{deepestCause.name}</Text>
+                  <Text style={S.rcArrow}>→</Text>
+                </>
+              )}
+              {/* Middle nodes in the chain (up to 2 more) */}
+              {result.root_causes.slice(1, 3).map((c, j) => (
+                <React.Fragment key={j}>
+                  <Text style={S.rcNode}>{c.name}</Text>
+                  <Text style={S.rcArrow}>→</Text>
+                </React.Fragment>
+              ))}
+              {/* Failing topic at the end */}
+              <Text style={[S.rcNode, { backgroundColor: '#fef3c7', color: '#92400e' }]}>{result.failing_topic_name}</Text>
+            </View>
+            {deepestCause?.top_remediation && (
+              <Text style={S.rcRemedy}>Intervention: {deepestCause.top_remediation}</Text>
+            )}
+          </View>
+        )
+      })}
     </View>
   )
 }
@@ -722,6 +783,11 @@ function JuniorActionPlanPage({ report }: { report: AcademicClinicReport }) {
 
         <View style={S.dividerThin} />
 
+        {/* Root Cause Analysis (when strand assessment data is available) */}
+        {(report.knowledgeRootCauses?.length ?? 0) > 0 && (
+          <RootCauseChainBox causes={report.knowledgeRootCauses!} />
+        )}
+
         {/* Junior Career Section */}
         <View style={S.careerDirBox}>
           <Text style={S.careerDirTitle}>POSSIBLE FUTURE DIRECTIONS</Text>
@@ -1066,6 +1132,11 @@ function SeniorActionPage({ report }: { report: AcademicClinicReport }) {
             sessions={top.estimatedSessions}
             timeline={top.timeline}
           />
+        )}
+
+        {/* Root Cause Analysis (when strand assessment data is available) */}
+        {(report.knowledgeRootCauses?.length ?? 0) > 0 && (
+          <RootCauseChainBox causes={report.knowledgeRootCauses!} />
         )}
       </View>
 

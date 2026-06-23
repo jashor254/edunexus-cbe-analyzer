@@ -25,12 +25,22 @@ const BREAK_FALLBACK = [
 function buildBreakColorMap(breaks: BreakItem[]): Record<string, { bg: string; text: string; border: string }> {
   const names = [...new Set(breaks.map(b => b.title))]
   return Object.fromEntries(
-    names.map((name, i) => [
-      name,
-      NAMED_BREAK_COLORS[name] ?? BREAK_FALLBACK[i % BREAK_FALLBACK.length],
-    ])
+    names.map((name, i) => {
+      const matched = Object.entries(NAMED_BREAK_COLORS).find(([k]) =>
+        name.toLowerCase().includes(k.toLowerCase())
+      )
+      return [name, matched ? matched[1] : BREAK_FALLBACK[i % BREAK_FALLBACK.length]]
+    })
   )
 }
+
+function toTitleCase(s: string): string {
+  if (!s) return s
+  return s.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+}
+
+// Strip "By the end of the lesson, the learner should be able to" prefix
+const BTEOTLE_RE = /^(by the end of (the|this) lesson[,:]?\s*)?(the\s+)?learner[s]?\s+(should\s+)?be\s+able\s+to\s+/i
 
 export function generateSOWHtml(data: SOWPreviewData): string {
   const { meta, lessons } = data
@@ -49,6 +59,7 @@ export function generateSOWHtml(data: SOWPreviewData): string {
   const breakColorMap = buildBreakColorMap(sortedBreaks)
   const rowParts: string[] = []
   let bi = 0
+  let prevSubstrand = ''
 
   function breakRowHtml(b: BreakItem): string {
     const wkRange = b.startWeek === b.endWeek
@@ -70,13 +81,22 @@ export function generateSOWHtml(data: SOWPreviewData): string {
   for (const l of lessons) {
     while (bi < sortedBreaks.length && sortedBreaks[bi].endWeek < l.week) {
       rowParts.push(breakRowHtml(sortedBreaks[bi++]))
+      prevSubstrand = '' // reset after a break
     }
+
+    // Fix 7: first occurrence of a substrand is bold dark; repeats are light gray
+    const isNewSubstrand = l.substrand !== prevSubstrand
+    const substrandStyle = isNewSubstrand
+      ? 'color:#111827;font-weight:bold;font-size:10px;'
+      : 'color:#9CA3AF;font-weight:normal;font-size:9px;'
+    prevSubstrand = l.substrand
+
     rowParts.push(`
     <tr>
       <td class="cell-center">${l.week}</td>
       <td class="cell-center">${l.lesson}</td>
       <td>${escHtml(l.strand)}</td>
-      <td>${escHtml(l.substrand)}</td>
+      <td style="${substrandStyle}">${escHtml(l.substrand)}</td>
       <td>${bulletList(l.learningOutcomes)}</td>
       <td>${bulletList(l.learningExperiences)}</td>
       <td>${bulletList(l.keyInquiryQuestions)}</td>
@@ -91,14 +111,24 @@ export function generateSOWHtml(data: SOWPreviewData): string {
 
   const rows = rowParts.join('')
 
+  const school      = toTitleCase(meta.school)
+  const teacherName = toTitleCase(meta.teacherName || '')
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Scheme of Work — ${escHtml(meta.learningArea)}</title>
+  <title>${escHtml(meta.learningArea)} ${escHtml(meta.grade)} — SOW Term ${escHtml(meta.term)} ${meta.year}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; font-size: 9pt; color: #000; background: #fff; }
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 9pt;
+      color: #000;
+      background: #fff;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
     .page { padding: 16mm 12mm; }
 
     /* Cover page */
@@ -144,9 +174,16 @@ export function generateSOWHtml(data: SOWPreviewData): string {
     .cover-value { font-size: 10pt; border-bottom: 1px solid #999; flex: 1; min-height: 5mm; }
     .cover-branding {
       text-align: center;
+    }
+    .cover-tagline {
+      font-size: 10pt;
+      color: #1a3c5e;
+      font-style: italic;
+      margin-bottom: 4px;
+    }
+    .cover-footer-text {
       font-size: 7.5pt;
       color: #888;
-      margin-top: 8mm;
     }
 
     /* Header */
@@ -184,7 +221,7 @@ export function generateSOWHtml(data: SOWPreviewData): string {
     ul { margin: 0; padding-left: 14px; }
     ul li { margin-bottom: 2px; }
 
-    /* Break row colors now applied via inline styles */
+    /* Break row colors applied via inline styles */
 
     /* Summary */
     .summary {
@@ -197,9 +234,24 @@ export function generateSOWHtml(data: SOWPreviewData): string {
       justify-content: space-between;
     }
 
+    /* Print tip bar */
+    .print-tip {
+      background: #fefce8;
+      border: 1px solid #fde047;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 9pt;
+      color: #713f12;
+      margin-top: 8px;
+    }
+
     /* Print */
     @media print {
       .no-print { display: none !important; }
+      body {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+      }
       @page { margin: 10mm; }
     }
   </style>
@@ -212,6 +264,11 @@ export function generateSOWHtml(data: SOWPreviewData): string {
       style="background:#0d7c66;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:10pt;cursor:pointer;font-weight:bold;">
       Print / Save as PDF
     </button>
+    <div class="print-tip" style="text-align:left;margin-top:8px;">
+      <strong>Chrome tip:</strong> In the print dialog → <em>More settings</em> → uncheck
+      <em>"Headers and footers"</em> for a clean PDF. Enable <em>"Background graphics"</em>
+      to preserve break row colours.
+    </div>
   </div>
 
   <!-- ── Cover page ──────────────────────────────────────────────────────── -->
@@ -238,7 +295,7 @@ export function generateSOWHtml(data: SOWPreviewData): string {
           </div>
           <div class="cover-row">
             <span class="cover-label">School</span>
-            <span class="cover-value">${escHtml(meta.school)}</span>
+            <span class="cover-value">${escHtml(school)}</span>
           </div>
         </div>
 
@@ -247,7 +304,7 @@ export function generateSOWHtml(data: SOWPreviewData): string {
         <div class="cover-section">
           <div class="cover-row">
             <span class="cover-label">Teacher's Name</span>
-            <span class="cover-value">${escHtml(meta.teacherName || '')}</span>
+            <span class="cover-value">${escHtml(teacherName)}</span>
           </div>
           <div class="cover-row">
             <span class="cover-label">TSC Number</span>
@@ -266,7 +323,10 @@ export function generateSOWHtml(data: SOWPreviewData): string {
         <hr class="cover-divider" />
       </div>
 
-      <div class="cover-branding">EduNexus &mdash; Built for Kenyan Teachers &mdash; edunexus.co.ke</div>
+      <div class="cover-branding">
+        <div class="cover-tagline">Every child finds their way.</div>
+        <div class="cover-footer-text">EduNexus &mdash; edunexus.co.ke</div>
+      </div>
     </div>
   </div>
 
@@ -279,7 +339,7 @@ export function generateSOWHtml(data: SOWPreviewData): string {
 
     <!-- Meta info -->
     <div class="meta-grid">
-      <div class="meta-item"><strong>School</strong>${escHtml(meta.school)}</div>
+      <div class="meta-item"><strong>School</strong>${escHtml(school)}</div>
       <div class="meta-item"><strong>Subject</strong>${escHtml(meta.learningArea)}</div>
       <div class="meta-item"><strong>Grade / Form</strong>${escHtml(meta.grade)}</div>
       <div class="meta-item"><strong>Term</strong>Term ${escHtml(meta.term)}</div>
@@ -404,5 +464,5 @@ function escHtml(str: string): string {
 
 function bulletList(items: string[]): string {
   if (!items || items.length === 0) return '—'
-  return `<ul>${items.map(i => `<li>${escHtml(i)}</li>`).join('')}</ul>`
+  return `<ul>${items.map(i => `<li>${escHtml(i.replace(BTEOTLE_RE, ''))}</li>`).join('')}</ul>`
 }

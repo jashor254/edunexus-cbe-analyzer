@@ -24,7 +24,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
     const { data: entries } = await db
       .from('row_entries')
-      .select('id, week, lesson, date_taught, strand, substrand, reflection')
+      .select('id, week, lesson, date_taught, strand, substrand, activities_summary, reflection')
       .eq('row_id', id)
       .order('week').order('lesson')
 

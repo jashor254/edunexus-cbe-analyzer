@@ -150,15 +150,16 @@ export default function LessonPlansPage() {
     if (selectedSowId) loadPlans(selectedSowId)
   }, [selectedSowId, loadPlans])
 
-  useEffect(() => {
-    if (!selectedSowId) return
-    setRemedialCards([])
-    setExpandedCheckId(null)
-    fetch(`/api/teaching-intelligence/remedial-bank?sowId=${selectedSowId}`)
-      .then(r => r.json())
-      .then(d => { if (d.success) setRemedialCards(d.data.cards ?? []) })
-      .catch(() => {})
-  }, [selectedSowId])
+  // Remedial intelligence hidden — data capture layer not ready yet
+  // useEffect(() => {
+  //   if (!selectedSowId) return
+  //   setRemedialCards([])
+  //   setExpandedCheckId(null)
+  //   fetch(`/api/teaching-intelligence/remedial-bank?sowId=${selectedSowId}`)
+  //     .then(r => r.json())
+  //     .then(d => { if (d.success) setRemedialCards(d.data.cards ?? []) })
+  //     .catch(() => {})
+  // }, [selectedSowId])
 
   async function handleGenerateQuickCheck(card: RemedialCard) {
     if (!sow || generatingCheckId) return
@@ -319,91 +320,7 @@ export default function LessonPlansPage() {
         )}
       </div>
 
-      {/* This Week's Quick Wins — only shown when the remedial bank has items */}
-      {remedialCards.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-          <div className="flex items-center gap-2 px-5 py-3.5 border-b border-gray-100">
-            <Sparkles className="w-4 h-4 text-teal-600" />
-            <span className="font-bold text-gray-900 text-sm">This Week&apos;s Quick Wins</span>
-            <span className="text-xs text-gray-400 font-medium">
-              {remedialCards.length} sub-strand{remedialCards.length !== 1 ? 's' : ''} to revisit
-            </span>
-          </div>
-
-          <div className="divide-y divide-gray-50">
-            {remedialCards.map(card => {
-              const isExpanded = expandedCheckId === card.substrand_health_id
-              const isGenerating = generatingCheckId === card.substrand_health_id
-              const label = card.root_cause ? ROOT_CAUSE_LABELS[card.root_cause] : null
-
-              return (
-                <div key={card.substrand_health_id}>
-                  <div className="flex items-start gap-3 px-5 py-3.5">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-gray-900 text-sm truncate">{card.sub_strand}</div>
-                      <div className="text-xs text-gray-400 truncate">{card.strand}</div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-gray-500">
-                          {card.struggle_count} follow-up{card.struggle_count !== 1 ? 's' : ''}
-                        </span>
-                        {label && (
-                          <span className="text-xs font-medium bg-sky-50 text-sky-700 border border-sky-200 px-2 py-0.5 rounded-full">
-                            {label}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      {card.quick_check ? (
-                        <button
-                          onClick={() => setExpandedCheckId(isExpanded ? null : card.substrand_health_id)}
-                          className="flex items-center gap-1.5 text-xs font-semibold text-teal-700 border border-teal-200 bg-teal-50 hover:bg-teal-100 px-3 py-1.5 rounded-lg transition"
-                        >
-                          {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                          View Check
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleGenerateQuickCheck(card)}
-                          disabled={!!generatingCheckId}
-                          className="flex items-center gap-1.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-60 px-3 py-1.5 rounded-lg transition"
-                        >
-                          {isGenerating ? (
-                            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</>
-                          ) : (
-                            <><Zap className="w-3.5 h-3.5" /> Quick Check</>
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {isExpanded && card.quick_check && (
-                    <div className="mx-5 mb-4 bg-teal-50 border border-teal-100 rounded-xl p-4 space-y-3">
-                      <div>
-                        <div className="text-xs font-bold text-teal-700 uppercase tracking-wide mb-1">10-Minute Activity</div>
-                        <p className="text-sm text-gray-800 leading-relaxed">{card.quick_check.suggested_activity}</p>
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-teal-700 uppercase tracking-wide mb-1">Check for Understanding</div>
-                        <ol className="space-y-1.5">
-                          {card.quick_check.questions.map((q, i) => (
-                            <li key={i} className="text-sm text-gray-800 flex gap-2">
-                              <span className="text-teal-600 font-bold shrink-0">{i + 1}.</span>
-                              <span>{q}</span>
-                            </li>
-                          ))}
-                        </ol>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
+      {/* Remedial intelligence hidden — data capture layer not ready yet */}
 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-3 text-red-700 text-sm font-medium">

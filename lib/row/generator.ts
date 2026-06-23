@@ -1,11 +1,14 @@
 import { createServiceClient } from '@/utils/supabase/service'
 import type { RecordOfWork, ROWEntry } from './pdfRenderer'
+import { toTitleCase, firstSentence } from '@/lib/utils/formatters'
 
 interface LessonPlanRow {
   week_number:             number
   lesson_number:           number
+  taught_date:             string | null
   strand:                  string
   sub_strand:              string
+  step_1:                  string | null
   teacher_self_evaluation: string | null
 }
 
@@ -17,7 +20,7 @@ export async function buildRecordOfWork(
 
   const { data: plans, error: plansErr } = await db
     .from('lesson_plans')
-    .select('week_number, lesson_number, strand, sub_strand, teacher_self_evaluation')
+    .select('week_number, lesson_number, taught_date, strand, sub_strand, step_1, teacher_self_evaluation')
     .eq('sow_id', sowId)
     .eq('week_number', weekNumber)
     .order('lesson_number', { ascending: true })
@@ -53,15 +56,16 @@ export async function buildRecordOfWork(
   const entries: ROWEntry[] = (plans as LessonPlanRow[]).map(p => ({
     week_number:   p.week_number,
     lesson_number: p.lesson_number,
+    date_taught:   p.taught_date,
     strand:        p.strand,
     sub_strand:    p.sub_strand,
-    work_done:     p.sub_strand,
+    work_done:     firstSentence(p.step_1) || p.sub_strand,
     reflection:    p.teacher_self_evaluation ?? weekFallback,
   }))
 
   return {
-    teacher_name:  teacher?.full_name ?? '',
-    school:        sow.school,
+    teacher_name:  toTitleCase(teacher?.full_name ?? ''),
+    school:        toTitleCase(sow.school),
     grade:         sow.grade,
     learning_area: sow.learning_area,
     term:          sow.term,

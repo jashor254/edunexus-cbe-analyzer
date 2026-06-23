@@ -143,9 +143,7 @@ export default async function TeacherDashboardPage() {
                   }`}>
                     {weeklyIntel.week_health_score ?? '—'}%
                   </span>
-                  {remedialCount > 0 && (
-                    <span className="ml-2">· {remedialCount} substrand{remedialCount !== 1 ? 's' : ''} flagged</span>
-                  )}
+                  {/* remedial badge hidden — data capture layer not ready yet */}
                 </p>
               </div>
             </div>

@@ -14,9 +14,63 @@ const KcseClinicDemo = dynamic(
   { ssr: false }
 )
 
+type SelectedRole = 'teacher' | 'parent' | 'student' | null
+
+const ROLES: { id: Exclude<SelectedRole, null>; label: string }[] = [
+  { id: 'teacher', label: '👨‍🏫 Teacher' },
+  { id: 'parent',  label: '👨‍👩‍👧 Parent'  },
+  { id: 'student', label: '🎒 Student'  },
+]
+
+const TEACHER_TIMELINE = [
+  { icon: '📋', label: 'SOW generated'     },
+  { icon: '📖', label: 'Lesson plans sent' },
+  { icon: '📊', label: 'Insights updated'  },
+  { icon: '💬', label: 'Parents notified'  },
+]
+
 export default function LandingPage() {
   const [demoOpen,     setDemoOpen]     = useState(false)
   const [kcseDemoOpen, setKcseDemoOpen] = useState(false)
+  const [selectedRole, setSelectedRole] = useState<SelectedRole>(null)
+
+  const hero =
+    selectedRole === 'teacher' ? {
+      badge:         '👨‍🏫 For Teachers',
+      badgeClass:    'bg-amber-500/10 border-amber-500/20 text-amber-300',
+      line1:         'Plan your full term.',
+      line2:         'Before the bell rings Monday.',
+      gradientLine:  'EduNexus handles the paperwork.',
+      gradientClass: 'from-amber-400 via-orange-400 to-yellow-400',
+      subtitle:      'Schemes of work, lesson plans, and class insights — ready when you need them, formatted the way TSC expects.',
+      ctaHref:       '/signup?role=teacher',
+      ctaLabel:      'Start Planning for Free',
+      trust:         '✓ TSC-ready formats  ·  ✓ CBC-aligned  ·  ✓ Auto lesson plans',
+    }
+    : selectedRole === 'student' ? {
+      badge:         '🎒 For Students',
+      badgeClass:    'bg-teal-500/10 border-teal-500/20 text-teal-300',
+      line1:         'Finally feel like',
+      line2:         'you actually get it.',
+      gradientLine:  'Start exactly where you are.',
+      gradientClass: 'from-teal-400 via-cyan-400 to-blue-400',
+      subtitle:      'A personal tutor that meets you at your exact CBC/IGCSE level — anytime, on any device.',
+      ctaHref:       '/signup?role=student',
+      ctaLabel:      'Start Learning for Free',
+      trust:         '✓ Free first session  ·  ✓ Works on any phone  ·  ✓ CBC/IGCSE/8-4-4',
+    }
+    : {
+      badge:         '🇰🇪 Built for Kenyan learners',
+      badgeClass:    'bg-violet-500/10 border-violet-500/20 text-violet-300',
+      line1:         'Your child is capable of more',
+      line2:         'than their marks show.',
+      gradientLine:  'EduNexus helps them prove it.',
+      gradientClass: 'from-violet-400 via-purple-400 to-pink-400',
+      subtitle:      "Because every child deserves a teacher who knows exactly where they're stuck.",
+      ctaHref:       '/signup?role=parent',
+      ctaLabel:      'Start Free — No Card Needed',
+      trust:         '✓ Free first report  ·  ✓ M-PESA accepted  ·  ✓ Works on any phone',
+    }
 
   return (
     <>
@@ -24,23 +78,47 @@ export default function LandingPage() {
       <section className="py-24 md:py-32">
         <div className="max-w-[820px] mx-auto px-6 text-center">
 
-          <div className="inline-flex items-center gap-2 bg-violet-500/10 border border-violet-500/20 text-violet-300 px-4 py-1.5 rounded-full text-sm font-semibold mb-8">
-            🇰🇪 Built for Kenyan learners
+          {/* Role selector — horizontal scroll strip on mobile */}
+          <div
+            className="flex justify-center gap-2 mb-6 overflow-x-auto [&::-webkit-scrollbar]:hidden"
+            style={{ scrollbarWidth: 'none' }}
+          >
+            {ROLES.map((r) => (
+              <button
+                key={r.id}
+                onClick={() => setSelectedRole(selectedRole === r.id ? null : r.id)}
+                className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-semibold border transition-all whitespace-nowrap ${
+                  selectedRole === r.id
+                    ? r.id === 'teacher'
+                      ? 'bg-amber-500/15 border-amber-500/35 text-amber-300'
+                      : r.id === 'student'
+                      ? 'bg-teal-500/15 border-teal-500/35 text-teal-300'
+                      : 'bg-violet-500/15 border-violet-500/35 text-violet-300'
+                    : 'bg-white/5 border-white/10 text-white/40 hover:border-white/20 hover:text-white/60'
+                }`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+
+          <div className={`inline-flex items-center gap-2 ${hero.badgeClass} border px-4 py-1.5 rounded-full text-sm font-semibold mb-8 transition-all`}>
+            {hero.badge}
           </div>
 
           <h1
             className="font-extrabold leading-[1.05] tracking-[-0.02em] mb-6"
             style={{ fontSize: 'clamp(44px, 7vw, 72px)' }}
           >
-            <span className="block text-white">Your child is capable of more</span>
-            <span className="block text-white">than their marks show.</span>
-            <span className="block bg-gradient-to-r from-violet-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mt-1">
-              EduNexus helps them prove it.
+            <span className="block text-white">{hero.line1}</span>
+            <span className="block text-white">{hero.line2}</span>
+            <span className={`block bg-gradient-to-r ${hero.gradientClass} bg-clip-text text-transparent mt-1 transition-all`}>
+              {hero.gradientLine}
             </span>
           </h1>
 
           <p className="text-[18px] md:text-[20px] text-white/60 max-w-[560px] mx-auto mb-8 leading-relaxed">
-            Because every child deserves a teacher who knows exactly where they&apos;re stuck.
+            {hero.subtitle}
           </p>
 
           <div className="flex flex-wrap justify-center gap-2 mb-10">
@@ -56,10 +134,10 @@ export default function LandingPage() {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
             <Link
-              href="/signup?role=parent"
+              href={hero.ctaHref}
               className="inline-flex items-center gap-2 bg-gradient-to-r from-violet-600 to-purple-600 text-white px-8 py-4 rounded-xl font-bold hover:scale-105 transition-all shadow-2xl shadow-violet-600/30"
             >
-              Start Free — No Card Needed
+              {hero.ctaLabel}
               <ArrowRight className="w-4 h-4" />
             </Link>
             <button
@@ -71,7 +149,7 @@ export default function LandingPage() {
           </div>
 
           <p className="text-sm text-white/40">
-            ✓ Free first report &nbsp;·&nbsp; ✓ M-PESA accepted &nbsp;·&nbsp; ✓ Works on any phone
+            {hero.trust}
           </p>
 
           {/* Three benefit cards */}
@@ -413,6 +491,31 @@ export default function LandingPage() {
                 <p className="text-sm text-white/45 leading-relaxed">{card.body}</p>
               </div>
             ))}
+          </div>
+
+          {/* Automation timeline */}
+          <div className="mb-10">
+            <p className="text-center text-[10px] font-semibold text-white/25 uppercase tracking-widest mb-4">
+              Your week on autopilot
+            </p>
+            <div
+              className="flex items-center justify-center overflow-x-auto [&::-webkit-scrollbar]:hidden pb-1"
+              style={{ scrollbarWidth: 'none' }}
+            >
+              {TEACHER_TIMELINE.map((step, i) => (
+                <div key={step.label} className="flex items-center shrink-0">
+                  <div className="flex flex-col items-center gap-1.5">
+                    <span className="text-base">{step.icon}</span>
+                    <span className="text-[10px] text-teal-400 font-medium whitespace-nowrap">
+                      {step.label}
+                    </span>
+                  </div>
+                  {i < TEACHER_TIMELINE.length - 1 && (
+                    <div className="w-8 md:w-14 shrink-0 mx-2 border-t border-dashed border-teal-500/30" />
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="text-center">

@@ -17,6 +17,7 @@ import { generateROWHTML } from '@/lib/row/pdfRenderer'
 import type { SOWPreviewData, CurriculumMode } from '@/lib/sow/types'
 import type { LessonPlanRecord } from '@/lib/lessonPlan/types'
 import type { RecordOfWork, ROWEntry } from '@/lib/row/pdfRenderer'
+import { toTitleCase, firstSentence } from '@/lib/utils/formatters'
 import { z } from 'zod'
 
 const BodySchema = z.object({
@@ -150,7 +151,7 @@ export async function POST(req: Request) {
       let rowQuery = db
         .from('lesson_plans')
         .select(
-          'week_number, lesson_number, strand, sub_strand, ' +
+          'week_number, lesson_number, taught_date, strand, sub_strand, ' +
           'learning_outcomes, key_inquiry_questions, learning_resources, ' +
           'step_1, step_2, step_3, status'
         )
@@ -163,7 +164,8 @@ export async function POST(req: Request) {
       const { data: plans } = await rowQuery
 
       type ShortPlanRow = {
-        week_number: number; lesson_number: number; strand: string; sub_strand: string;
+        week_number: number; lesson_number: number; taught_date: string | null;
+        strand: string; sub_strand: string;
         learning_outcomes: string[] | null; key_inquiry_questions: string[] | null;
         learning_resources: string[] | null; step_1: string | null; step_2: string | null;
         step_3: string | null; status: string;
@@ -173,20 +175,18 @@ export async function POST(req: Request) {
       if (rows.length) maxWeekDownloaded = Math.max(...rows.map(p => p.week_number))
 
       const entries: ROWEntry[] = rows.map(p => ({
-        week_number:           p.week_number,
-        lesson_number:         p.lesson_number,
-        strand:                p.strand,
-        sub_strand:            p.sub_strand,
-        learning_outcomes:     p.learning_outcomes ?? [],
-        key_inquiry_questions: p.key_inquiry_questions ?? [],
-        learning_resources:    p.learning_resources ?? [],
-        work_done:             p.sub_strand,
-        reflection:            '',
+        week_number:   p.week_number,
+        lesson_number: p.lesson_number,
+        date_taught:   p.taught_date,
+        strand:        p.strand,
+        sub_strand:    p.sub_strand,
+        work_done:     firstSentence(p.step_1) || p.sub_strand,
+        reflection:    '',
       }))
 
       const rowData: RecordOfWork = {
-        teacher_name:  s.teacher_name || '',
-        school:        s.school || '',
+        teacher_name:  toTitleCase(s.teacher_name || ''),
+        school:        toTitleCase(s.school || ''),
         grade:         s.grade,
         learning_area: s.learning_area,
         term:          s.term,

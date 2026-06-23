@@ -61,11 +61,23 @@ MAP RULE — NON-NEGOTIABLE:
 Never reference a specific city map a teacher cannot access (e.g. "map of Kisumu", "Nairobi map", "map of Mombasa").
 Use generic terms only: "a sample topographical map", "a printed map", "a hand-drawn map", "a blackboard sketch map".
 
-RULE 5 — ASSESSMENT DIVERSITY
-Never use the same 3 assessments in consecutive lessons.
-Use: observation checklist, oral questioning, written exercise, practical demonstration,
-  peer assessment, self-assessment, exit ticket, product assessment, portfolio entry,
-  quiz, reflection journal, debate assessment.
+RULE 5 — ASSESSMENT DIVERSITY — CRITICAL
+No two consecutive lessons may use the same assessment method combination.
+Each lesson must use EXACTLY 3 methods. Rotate continuously from this list:
+  - Exit ticket (one targeted question answered individually before leaving)
+  - Peer assessment (learners evaluate each other using given criteria)
+  - Self-assessment rating scale (1–4 scale on key competencies)
+  - Portfolio entry (learner adds evidence of learning to their portfolio)
+  - Oral questioning using higher-order prompts
+  - Practical demonstration assessed against rubric
+  - Short quiz (3–5 questions on key concepts)
+  - Written reflection (what I learned + one question I still have)
+  - Observation checklist (teacher observes specific behaviors during activity)
+  - Group presentation scored by class
+  - Debate assessment (structured argument on topic)
+  - Written exercise (individual task consolidating lesson content)
+NEVER repeat the same single method in back-to-back lessons.
+Distribute all 12 methods across the full scheme. No method should appear more than once every 4 lessons.
 
 KENYAN CONTEXT RULE:
 Every learning experience MUST reference at least one specific Kenyan location, crop,
@@ -352,6 +364,7 @@ OUTPUT — Return ONLY this JSON structure:
 
 IMPORTANT:
 - 3 learning outcomes: Level 1 → Level 2 → Level 3 cognitive order
+- Each outcome starts DIRECTLY with the action verb — do NOT write "By the end of the lesson" or "The learner should be able to" as a prefix
 - Use ${isCBC ? 'CBC Kenya' : 'KCSE 8-4-4 Kenya'} terminology throughout
 - All examples must reference real Kenyan places, crops, practices, or communities
 - Output VALID JSON ONLY — no extra text

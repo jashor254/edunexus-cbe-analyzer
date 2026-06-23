@@ -5,6 +5,7 @@ import type {
   LessonWithCompletion,
   LessonStub,
   AcademyStats,
+  PhaseStats,
 } from './types'
 
 export async function getModulesWithProgress(teacherId: string): Promise<ModuleWithProgress[]> {
@@ -14,6 +15,7 @@ export async function getModulesWithProgress(teacherId: string): Promise<ModuleW
     .from('academy_modules')
     .select('id, title, slug, phase, order, description, estimated_mins, color, published, created_at')
     .eq('published', true)
+    .order('phase')
     .order('order')
 
   if (modErr) throw new Error(`Failed to fetch academy modules: ${modErr.message}`)
@@ -41,6 +43,43 @@ export async function getModulesWithProgress(teacherId: string): Promise<ModuleW
   })
 }
 
+export async function getPhaseStats(modules: ModuleWithProgress[]): Promise<PhaseStats[]> {
+  const phases = [...new Set(modules.map(m => m.phase))].sort()
+
+  const statsByPhase = new Map<number, { total: number; completed: number }>()
+  for (const m of modules) {
+    const existing = statsByPhase.get(m.phase) ?? { total: 0, completed: 0 }
+    statsByPhase.set(m.phase, {
+      total: existing.total + m.lessons.length,
+      completed: existing.completed + m.completedCount,
+    })
+  }
+
+  return phases.map((phase, idx) => {
+    const { total, completed } = statsByPhase.get(phase) ?? { total: 0, completed: 0 }
+    const pct = total > 0 ? Math.round((completed / total) * 100) : 0
+    const allComplete = total > 0 && completed >= total
+
+    let locked = false
+    let earlyAccess = false
+
+    if (idx === 0) {
+      // Phase 1 always unlocked
+    } else {
+      const prevPhase = phases[idx - 1]
+      const prev = statsByPhase.get(prevPhase) ?? { total: 0, completed: 0 }
+      const prevPct = prev.total > 0 ? Math.round((prev.completed / prev.total) * 100) : 0
+      if (prevPct < 50) {
+        locked = true
+      } else if (prevPct < 100) {
+        earlyAccess = true
+      }
+    }
+
+    return { phase, totalLessons: total, completedLessons: completed, pct, allComplete, earlyAccess, locked }
+  })
+}
+
 export async function getModuleWithLessons(slug: string, teacherId: string): Promise<ModuleWithLessons | null> {
   const db = createServiceClient()
 
@@ -55,7 +94,7 @@ export async function getModuleWithLessons(slug: string, teacherId: string): Pro
 
   const { data: rawLessons, error: lessonErr } = await db
     .from('academy_lessons')
-    .select('id, module_id, title, order, content, practice_prompt, created_at')
+    .select('id, module_id, title, order, content, practice_prompt, practice_link, created_at')
     .eq('module_id', module.id)
     .order('order')
 
@@ -77,6 +116,7 @@ export async function getModuleWithLessons(slug: string, teacherId: string): Pro
 
   const lessons: LessonWithCompletion[] = (rawLessons ?? []).map(l => ({
     ...l,
+    practice_link: l.practice_link ?? null,
     completed: progressMap.has(l.id),
     completed_at: progressMap.get(l.id) ?? null,
   }))
@@ -118,7 +158,6 @@ export async function getAdjacentModules(currentOrder: number, phase: number): P
 export async function getAcademyStats(teacherId: string): Promise<AcademyStats> {
   const db = createServiceClient()
 
-  // Fetch published phase-1 module ids first, then count lessons within them
   const { data: phase1Modules } = await db
     .from('academy_modules')
     .select('id')
@@ -127,24 +166,30 @@ export async function getAcademyStats(teacherId: string): Promise<AcademyStats> 
 
   const phase1ModuleIds = (phase1Modules ?? []).map(m => m.id)
 
-  const [totalRes, completedRes] = await Promise.all([
-    phase1ModuleIds.length
-      ? db.from('academy_lessons')
-          .select('id', { count: 'exact', head: true })
-          .in('module_id', phase1ModuleIds)
-      : Promise.resolve({ count: 0, error: null }),
-    db.from('academy_progress')
-      .select('id', { count: 'exact', head: true })
-      .eq('teacher_id', teacherId),
-  ])
+  if (!phase1ModuleIds.length) {
+    return { totalLessons: 0, completedLessons: 0, allComplete: false }
+  }
 
-  const totalLessons = totalRes.count ?? 0
-  const completedLessons = completedRes.count ?? 0
+  const { data: phase1Lessons } = await db
+    .from('academy_lessons')
+    .select('id')
+    .in('module_id', phase1ModuleIds)
+
+  const phase1LessonIds = (phase1Lessons ?? []).map(l => l.id)
+  const totalLessons = phase1LessonIds.length
+
+  const { count: completedLessons } = phase1LessonIds.length
+    ? await db
+        .from('academy_progress')
+        .select('id', { count: 'exact', head: true })
+        .eq('teacher_id', teacherId)
+        .in('lesson_id', phase1LessonIds)
+    : { count: 0 }
 
   return {
     totalLessons,
-    completedLessons,
-    allComplete: totalLessons > 0 && completedLessons >= totalLessons,
+    completedLessons: completedLessons ?? 0,
+    allComplete: totalLessons > 0 && (completedLessons ?? 0) >= totalLessons,
   }
 }
 

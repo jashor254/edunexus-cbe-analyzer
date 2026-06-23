@@ -2,6 +2,8 @@
 // HTML → browser print renderer for Record of Work.
 // Portrait A4, 6-column: Date | Strand | Sub-Strand | Work Done | Reflection | Signature
 
+import { toTitleCase } from '@/lib/utils/formatters'
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface ROWEntry {
@@ -36,18 +38,30 @@ function esc(s: string | number | undefined | null): string {
 }
 
 function fmtDate(raw: string | null | undefined): string {
-  if (!raw) return '—'
+  if (!raw) return '<span class="placeholder">dd/mm/yyyy</span>'
   const d = new Date(raw)
-  if (isNaN(d.getTime())) return raw
-  return d.toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })
+  if (isNaN(d.getTime())) return esc(raw)
+  return d.toLocaleDateString('en-KE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+function fmtTerm(term: number | string): string {
+  const s = String(term)
+  return s.toLowerCase().startsWith('term') ? s : `Term ${s}`
 }
 
 // ─── HTML builder ─────────────────────────────────────────────────────────────
 
 function buildPage(row: RecordOfWork): string {
+  const school      = toTitleCase(row.school)
+  const teacherName = toTitleCase(row.teacher_name)
+  const term        = fmtTerm(row.term)
+
+  const done  = row.entries.filter(e => e.work_done?.trim()).length
+  const total = row.entries.length
+
   const bodyRows = row.entries.map((e, i) => `
     <tr class="${i % 2 === 1 ? 'alt' : ''}">
-      <td class="col-date">${esc(fmtDate(e.date_taught))}</td>
+      <td class="col-date">${fmtDate(e.date_taught)}</td>
       <td class="col-strand">${esc(e.strand)}</td>
       <td class="col-sub">${esc(e.sub_strand)}</td>
       <td class="col-work">${esc(e.work_done)}</td>
@@ -61,15 +75,15 @@ function buildPage(row: RecordOfWork): string {
     <div class="doc-title">RECORD OF WORK COVERED</div>
     <table class="meta-table">
       <tr>
-        <td class="ml">School:</td>   <td class="mv">${esc(row.school)}</td>
+        <td class="ml">School:</td>   <td class="mv">${esc(school)}</td>
         <td class="ml">Subject:</td>  <td class="mv">${esc(row.learning_area)}</td>
       </tr>
       <tr>
         <td class="ml">Grade:</td>    <td class="mv">${esc(row.grade)}</td>
-        <td class="ml">Teacher:</td>  <td class="mv">${esc(row.teacher_name)}</td>
+        <td class="ml">Teacher:</td>  <td class="mv">${esc(teacherName)}</td>
       </tr>
       <tr>
-        <td class="ml">Term:</td>     <td class="mv">${esc(row.term)}</td>
+        <td class="ml">Term:</td>     <td class="mv">${esc(term)}</td>
         <td class="ml">Year:</td>     <td class="mv">${esc(row.year)}</td>
       </tr>
     </table>
@@ -88,6 +102,10 @@ function buildPage(row: RecordOfWork): string {
     </thead>
     <tbody>${bodyRows}</tbody>
   </table>
+
+  <div class="row-status">
+    Record continues as lessons are completed — ${done} of ${total} lessons recorded
+  </div>
 
   <div class="footer">EduNexus · For Kenyan Teachers</div>`
 }
@@ -111,12 +129,12 @@ const CSS = `
 
   /* ── ROW table ── */
   .row-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .col-date   { width: 22mm; }
-  .col-strand { width: 35mm; }
-  .col-sub    { width: 35mm; }
-  .col-work   { width: 55mm; }
-  .col-ref    { width: 33mm; }
-  .col-sig    { width: 20mm; }
+  .col-date   { width: 20mm; }
+  .col-strand { width: 32mm; }
+  .col-sub    { width: 32mm; }
+  .col-work   { width: 52mm; }
+  .col-ref    { width: 22mm; }
+  .col-sig    { width: 22mm; }
 
   thead tr { background: #1e293b; color: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   th {
@@ -130,9 +148,14 @@ const CSS = `
   tr.alt td { background: #f8fafc; }
   .center { text-align: center; }
   .sub { font-size: 8pt; color: #64748b; }
+  .placeholder { color: #9CA3AF; font-style: italic; }
 
-  /* ── Footer ── */
-  .footer { margin-top: 10px; font-size: 8pt; color: #94a3b8; text-align: right; }
+  /* ── Status + Footer ── */
+  .row-status {
+    margin-top: 12px; padding-top: 8px; border-top: 1px solid #E5E7EB;
+    font-size: 8pt; color: #9CA3AF; font-style: italic; text-align: center;
+  }
+  .footer { margin-top: 6px; font-size: 8pt; color: #94a3b8; text-align: right; }
 
   /* ── Print ── */
   @media print {

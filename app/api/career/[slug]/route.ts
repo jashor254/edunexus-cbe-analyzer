@@ -10,6 +10,8 @@ import {
 } from '@/lib/career/careerEngine'
 import { computeCapabilityMatches } from '@/lib/career/capabilityMatchEngine'
 import type { CapabilityCareerMatch } from '@/lib/career/types'
+import { buildCareerReadinessChains, buildCapabilityReadinessChains } from '@/lib/knowledgeGraph/careerReadiness'
+import type { CareerReadinessReport } from '@/lib/knowledgeGraph/careerReadiness'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,8 +41,9 @@ export async function GET(
     const { searchParams } = new URL(req.url)
     const studentId = searchParams.get('studentId')
 
-    let studentMatch   = null
-    let capabilityMatch: CapabilityCareerMatch | null = null
+    let studentMatch      = null
+    let capabilityMatch:   CapabilityCareerMatch | null = null
+    let readinessReport:   CareerReadinessReport | null = null
 
     if (studentId) {
       const { data: student } = await supabase
@@ -69,10 +72,34 @@ export async function GET(
             capabilityMatch = allMatches.find(m => m.career_slug === slug) ?? null
           }
         }
+
+        // Knowledge graph readiness chains — surface which prerequisite topics block this career
+        try {
+          const { data: ctx } = await supabase
+            .from('student_learning_context')
+            .select('knowledge_root_causes')
+            .eq('student_id', studentId)
+            .maybeSingle()
+
+          const rootCauses = (ctx?.knowledge_root_causes as import('@/lib/knowledgeGraph/types').RootCauseResult[] | null) ?? []
+
+          if (rootCauses.length > 0) {
+            if ((career.required_subjects ?? []).length > 0) {
+              readinessReport = buildCareerReadinessChains(career.title, career.required_subjects, rootCauses)
+            } else if (career.required_capabilities) {
+              const capMap = Object.fromEntries(
+                Object.entries(career.required_capabilities).map(([k, v]) => [k, { minimum: v.minimum, weight: v.weight }])
+              )
+              readinessReport = buildCapabilityReadinessChains(career.title, capMap, rootCauses)
+            }
+          }
+        } catch (e) {
+          console.error('[career/slug] readiness chain computation failed (non-fatal):', e)
+        }
       }
     }
 
-    return apiSuccess({ career, student_match: studentMatch, capability_match: capabilityMatch })
+    return apiSuccess({ career, student_match: studentMatch, capability_match: capabilityMatch, readiness_report: readinessReport })
   } catch (err) {
     console.error('[career/slug]', err)
     return apiError('Failed to load career')

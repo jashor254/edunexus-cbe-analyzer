@@ -1,5 +1,6 @@
 import type { LessonPlanRecord } from './types'
 import { isKiswahiliSubject } from '@/lib/curriculum/subjectUtils'
+import { toTitleCase } from '@/lib/utils/formatters'
 
 function esc(s: string | null | undefined): string {
   if (!s) return ''
@@ -23,6 +24,17 @@ function nl2p(text: string | null | undefined): string {
     .join('')
 }
 
+function extendedBullets(text: string | null | undefined): string {
+  if (!text) return '—'
+  const lines = text
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 0)
+    .map(l => l.replace(/^[-•*\d]+[.)]\s*/, ''))
+  if (!lines.length) return '—'
+  return `<ul>${lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>`
+}
+
 interface LessonPlanMeta {
   teacherName: string
   tscNumber: string
@@ -33,8 +45,10 @@ interface LessonPlanMeta {
   year: number
 }
 
-function buildLessonPlanHTML(plan: LessonPlanRecord, meta: LessonPlanMeta): string {
+function buildLessonPlanHTML(plan: LessonPlanRecord, meta: LessonPlanMeta, nextPlan?: LessonPlanRecord): string {
   const sw = isKiswahiliSubject(meta.learningArea)
+  const school = toTitleCase(meta.school)
+  const teacherName = toTitleCase(meta.teacherName)
 
   const labels = sw ? {
     title:              'MPANGO WA SOMO',
@@ -86,12 +100,12 @@ function buildLessonPlanHTML(plan: LessonPlanRecord, meta: LessonPlanMeta): stri
 
     <table class="header-table">
       <tr>
-        <td class="header-cell"><span class="header-label">${sw ? 'SHULE' : 'SCHOOL'}</span><span class="header-value">${esc(meta.school)}</span></td>
+        <td class="header-cell"><span class="header-label">${sw ? 'SHULE' : 'SCHOOL'}</span><span class="header-value">${esc(school)}</span></td>
         <td class="header-cell"><span class="header-label">${sw ? 'DARASA' : 'GRADE'}</span><span class="header-value">${esc(meta.grade)}</span></td>
         <td class="header-cell"><span class="header-label">${sw ? 'SOMO' : 'SUBJECT'}</span><span class="header-value">${esc(meta.learningArea)}</span></td>
         <td class="header-cell"><span class="header-label">${sw ? 'TAREHE' : 'DATE'}</span><span class="header-value">${esc(plan.taught_date || '')}&nbsp;</span></td>
-        <td class="header-cell"><span class="header-label">${sw ? 'WAKATI' : 'TIME'}</span><span class="header-value">&nbsp;</span></td>
-        <td class="header-cell"><span class="header-label">${sw ? 'WANAFUNZI' : 'ROLL'}</span><span class="header-value">&nbsp;</span></td>
+        <td class="header-cell"><span class="header-label">${sw ? 'WAKATI' : 'TIME'}</span><span class="header-value header-placeholder">_______</span></td>
+        <td class="header-cell"><span class="header-label">${sw ? 'WANAFUNZI' : 'ROLL'}</span><span class="header-value header-placeholder">_______</span></td>
       </tr>
     </table>
 
@@ -156,26 +170,35 @@ function buildLessonPlanHTML(plan: LessonPlanRecord, meta: LessonPlanMeta): stri
 
     <div class="section">
       <div class="section-title">${labels.extended}</div>
-      <div class="section-body">${nl2p(plan.extended_activities)}</div>
+      <div class="section-body">${extendedBullets(plan.extended_activities)}</div>
     </div>
 
     <div class="section reflection-section">
       <div class="section-title">${labels.reflection}</div>
       <div class="section-body reflection-body">
-        ${plan.status !== 'taught' && plan.reflection
-          ? `<p class="reflection-draft-note">${sw ? '(Rasimu — hariri baada ya kufundisha)' : '(Draft — update after teaching)'}</p>`
-          : ''}
-        ${nl2p(plan.reflection)}
-        <div class="reflection-lines">
-          <div class="reflection-line"></div>
-          <div class="reflection-line"></div>
-          <div class="reflection-line"></div>
-        </div>
+        <p class="reflection-draft-note">${sw ? '(Kujaza baada ya kufundisha)' : '(To be completed after teaching)'}</p>
+        <p class="reflection-prompt">${sw ? 'Lengo gani la kujifunza halikufikiwa kikamilifu?' : 'Which learning outcome was not fully achieved?'}</p>
+        <div class="reflection-line"></div>
+        <div class="reflection-line"></div>
+        <div class="reflection-line"></div>
+        <p class="reflection-prompt">${sw ? 'Nitafanya nini tofauti katika somo lijalo?' : 'What will I do differently in the next lesson?'}</p>
+        <div class="reflection-line"></div>
+        <div class="reflection-line"></div>
+        <div class="reflection-line"></div>
       </div>
     </div>
 
+    ${nextPlan ? `
+    <div class="next-lesson-preview">
+      <div class="next-lesson-label">${sw ? 'SOMO LIJALO' : 'NEXT LESSON PREVIEW'}</div>
+      <div class="next-lesson-body">
+        <span><strong>${sw ? 'Mada Ndogo' : 'Sub-strand'}:</strong> ${esc(nextPlan.sub_strand)}</span>
+        <span><strong>${sw ? 'Wiki / Somo' : 'Week / Lesson'}:</strong> ${sw ? 'Wiki' : 'Week'} ${nextPlan.week_number}, ${sw ? 'Somo' : 'Lesson'} ${nextPlan.lesson_number}</span>
+      </div>
+    </div>` : ''}
+
     <div class="plan-footer">
-      <span>${esc(meta.teacherName)} &nbsp;|&nbsp; TSC No: ${esc(meta.tscNumber)} &nbsp;|&nbsp; Term ${meta.term} ${meta.year}</span>
+      <span>${esc(teacherName)} &nbsp;|&nbsp; TSC No: ${esc(meta.tscNumber)} &nbsp;|&nbsp; Term ${meta.term} ${meta.year}</span>
       <span>${labels.footer}</span>
     </div>
   </div>`
@@ -187,7 +210,7 @@ export function generateLessonPlanHTML(
 ): string {
   const pages = plans
     .map((plan, i) => {
-      const page = buildLessonPlanHTML(plan, meta)
+      const page = buildLessonPlanHTML(plan, meta, plans[i + 1])
       return i < plans.length - 1
         ? page + '<div class="page-break"></div>'
         : page
@@ -241,6 +264,11 @@ export function generateLessonPlanHTML(
       font-weight: bold;
       min-height: 16px;
     }
+    .header-placeholder {
+      color: #9CA3AF;
+      font-style: italic;
+      font-weight: normal;
+    }
 
     .meta-table {
       width: 100%;
@@ -288,13 +316,41 @@ export function generateLessonPlanHTML(
     .step-label { font-weight: bold; }
 
     .reflection-section .section-title { background: #374151; }
-    .reflection-draft-note { font-size: 7.5pt; color: #9ca3af; font-style: italic; margin-bottom: 4px; }
-    .reflection-body { min-height: 40px; }
-    .reflection-lines { margin-top: 6px; }
-    .reflection-line {
-      border-bottom: 1px solid #aaa;
-      height: 20px;
+    .reflection-draft-note { font-size: 7.5pt; color: #9ca3af; font-style: italic; margin-bottom: 6px; }
+    .reflection-prompt {
+      font-size: 9px;
+      color: #6B7280;
+      font-style: italic;
       margin-bottom: 4px;
+      margin-top: 6px;
+    }
+    .reflection-body { min-height: 40px; }
+    .reflection-line {
+      border-bottom: 1px solid #D1D5DB;
+      height: 24px;
+      margin-bottom: 8px;
+    }
+
+    .next-lesson-preview {
+      background: #F9FAFB;
+      border: 1px solid #E5E7EB;
+      border-radius: 2px;
+      padding: 8px 10px;
+      margin-top: 8px;
+    }
+    .next-lesson-label {
+      font-size: 7pt;
+      font-weight: bold;
+      color: #6B7280;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .next-lesson-body {
+      font-size: 8pt;
+      color: #374151;
+      display: flex;
+      gap: 20px;
     }
 
     .plan-footer {

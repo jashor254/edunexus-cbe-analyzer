@@ -6,16 +6,18 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, FolderOpen, BookOpen, MoreHorizontal, X,
   FlaskConical, GraduationCap, BarChart3, FileText,
-  AlertTriangle, ClipboardList, Settings, LogOut,
+  AlertTriangle, ClipboardList, Settings, LogOut, BookMarked, Languages,
 } from 'lucide-react'
 import { RoleSwitcher } from '@/components/layout/RoleSwitcher'
 
 const MORE_NAV = [
   { href: '/teacher/classes',     icon: FlaskConical,  label: 'Academic Clinic', sub: 'Diagnostic reports' },
+  { href: '/teacher/booklets',    icon: BookMarked,    label: 'Booklets'                                  },
   { href: '/teacher/academy',     icon: GraduationCap, label: 'AI Academy'                               },
   { href: '/teacher/analytics',   icon: BarChart3,     label: 'Analytics'                                },
-  { href: '/teacher/assignments', icon: FileText,      label: 'Assignments'                              },
-  { href: '/teacher/alerts',      icon: AlertTriangle, label: 'Alerts'                                   },
+  { href: '/teacher/kiswahili/insha', icon: Languages,     label: 'Insha Feedback'                       },
+  { href: '/teacher/assignments',     icon: FileText,      label: 'Assignments'                          },
+  { href: '/teacher/alerts',          icon: AlertTriangle, label: 'Alerts'                               },
   { href: '/teacher/reports',     icon: ClipboardList, label: 'Reports'                                  },
   { href: '/teacher/settings',    icon: Settings,      label: 'Settings'                                 },
 ]
