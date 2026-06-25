@@ -1,273 +1,120 @@
 // lib/payments/config.ts
+// Single source of truth for all pricing, token costs, and feature access.
 
 // ===== USER ACCESS TIERS =====
 export type UserTier = 'teacher' | 'subscriber' | 'token' | 'none'
 
 // ===== TERMLY SUBSCRIPTION PLANS =====
+// Subscribers pay KES 0 per use — committed families save vs pay-as-you-go.
 export const SUBSCRIPTION_PLANS = {
   TERMLY_SINGLE: {
-    id: 'termly_single',
-    name: 'Termly — Single Child',
-    priceKes: 2500,
-    childLimit: 1,
+    id:               'term',
+    name:             'Term Plan',
+    priceKes:         2499,
+    childLimit:       1,
     termDurationDays: 120,
+    tagline:          'Everything your child needs this term.',
+    badge:            'Most popular',
   },
   TERMLY_FAMILY: {
-    id: 'termly_family',
-    name: 'Termly — Family',
-    priceKes: 4000,
-    childLimit: 3,
+    id:               'family',
+    name:             'Family Plan',
+    priceKes:         4499,
+    childLimit:       3,
     termDurationDays: 120,
+    tagline:          'For families with more than one child.',
+    badge:            'Best value',
   },
 } as const
 
-// ===== FEATURE ACCESS MATRIX =====
-// 'free' = no cost, 'full' = unlimited (subscriber perk), 'token' = costs tokens
-export const FEATURE_ACCESS = {
-  sow_generate:         { teacher: 'free',  subscriber: 'full', token: 'token' },
-  lesson_plan_generate: { teacher: 'free',  subscriber: 'full', token: 'token' },
-  row_generate:         { teacher: 'free',  subscriber: 'full', token: 'token' },
-  clinic_report:        { teacher: 'token', subscriber: 'full', token: 'token' },
-  learning_compass:     { teacher: 'token', subscriber: 'full', token: 'token' },
-  career_guidance:      { teacher: 'token', subscriber: 'full', token: 'token' },
+// ===== TOKEN PACK =====
+// Pay-as-you-go — higher per-unit cost than subscribing, maximum flexibility.
+export const TOKEN_PACK = {
+  id:       'starter',
+  priceKes: 500,
+  tokens:   10,          // KES 50 per token
 } as const
 
-export type FeatureKey = keyof typeof FEATURE_ACCESS
-
-// ===== TOKEN COSTS (per action) =====
-// Legacy keys: used by existing per-action routes
-// Feature keys: used by checkFeatureAccess — must cover every FeatureKey
+// ===== TOKEN COSTS PER FEATURE (for pay-as-you-go users) =====
+// career_guidance is now embedded in clinic_report — no separate gate.
 export const TOKEN_COSTS = {
-  // Legacy per-action costs
-  add_assessment_basic:    1,
-  add_assessment_detailed: 2,
-  generate_pdf:            3,
-  ai_career_analysis:      5,
-  ai_chat_session:         2,
-  download_clinic:         3,
-  // Feature gate costs (aligned with FEATURE_ACCESS keys)
-  sow_generate:            5,
-  lesson_plan_generate:    3,
-  row_generate:            2,
-  clinic_report:           3,
-  learning_compass:        1,  // 1 token per compass chat message
-  career_guidance:         5,
+  // Teacher tools (free for teachers, token for non-subscribers)
+  sow_generate:         5,
+  lesson_plan_generate: 3,
+  row_generate:         2,
+  // Slide generator — 2 tokens = KES 100 per deck
+  slides_generate:      2,
+
+  // Parent / student features
+  // Academic Clinic includes career guidance — 5 tokens = KES 250 per report
+  clinic_report:        5,
+  // Learning Compass — 1 token = KES 50 per session
+  learning_compass:     1,
 } as const
 
 export type TokenFeature = keyof typeof TOKEN_COSTS
 
+// ===== FEATURE ACCESS MATRIX =====
+// 'free'  = no cost ever
+// 'full'  = unlimited (subscriber perk, KES 0 marginal cost)
+// 'token' = deducted from token balance
+export const FEATURE_ACCESS = {
+  sow_generate:         { teacher: 'free',  subscriber: 'full',  token: 'token' },
+  lesson_plan_generate: { teacher: 'free',  subscriber: 'full',  token: 'token' },
+  row_generate:         { teacher: 'free',  subscriber: 'full',  token: 'token' },
+  slides_generate:      { teacher: 'free',  subscriber: 'full',  token: 'token' },
+  // clinic_report now covers career guidance — one gate, one cost
+  clinic_report:        { teacher: 'token', subscriber: 'full',  token: 'token' },
+  learning_compass:     { teacher: 'token', subscriber: 'full',  token: 'token' },
+} as const
+
+export type FeatureKey = keyof typeof FEATURE_ACCESS
+
+// ===== PER-USE COST IN KES (for display and comparisons) =====
+// Derived from TOKEN_PACK price and TOKEN_COSTS — single source of truth.
+const KES_PER_TOKEN = TOKEN_PACK.priceKes / TOKEN_PACK.tokens  // 50
+
+export const PER_USE_COST_KES = {
+  clinic_report:    TOKEN_COSTS.clinic_report    * KES_PER_TOKEN,   // 250
+  learning_compass: TOKEN_COSTS.learning_compass * KES_PER_TOKEN,   // 50
+} as const
+
 // ===== PLAN TYPES =====
-export type PlanType = 'termly' | 'annual' | 'none';
-export type TokenBundleType = 'starter' | 'popular' | 'pro';
-export type PaymentMethod = 'mpesa_stk' | 'mpesa_b2c' | 'card' | 'bank';
+export type PlanType = 'termly' | 'none'
+export type PaymentMethod = 'mpesa_stk' | 'mpesa_b2c' | 'card' | 'bank'
 
-// ===== PAYMENT PLANS =====
-export const PAYMENT_PLANS = {
-  termly: {
-    id: 'termly',
-    name: 'Termly Subscription',
-    price: 1500,
-    currency: 'KES',
-    period: 'term',
-    features: [
-      'Unlimited Academic Clinic reports',
-      'Unlimited Learning Compass sessions',
-      'All subjects (Junior & Senior)',
-      'Parent insights dashboard',
-      'Progress tracking over time',
-      'Downloadable PDF reports',
-      'Priority email support'
-    ],
-    limits: {
-      reportsPerMonth: 'unlimited',
-      studentsPerAccount: 3,
-      aiSessionsPerDay: 'unlimited'
-    }
-  },
-  annual: {
-    id: 'annual',
-    name: 'Annual Subscription',
-    price: 4000,
-    currency: 'KES',
-    period: 'year',
-    features: [
-      'Everything in Termly, PLUS:',
-      '2 months FREE (save KES 500)',
-      'Advanced career predictions',
-      'Comparison with CBC benchmarks',
-      'WhatsApp support group access',
-      'Early access to new features'
-    ],
-    limits: {
-      reportsPerMonth: 'unlimited',
-      studentsPerAccount: 5,
-      aiSessionsPerDay: 'unlimited'
-    }
-  }
-} as const;
-
-// ===== TOKEN BUNDLES =====
-export const TOKEN_BUNDLES = {
-  starter: {
-    id: 'starter',
-    name: 'Starter Pack',
-    tokens: 3,
-    price: 300,
-    currency: 'KES',
-    pricePerToken: 100,
-    popular: false,
-    features: [
-      '3 full Academic Clinic reports',
-      'Valid forever (no expiry)',
-      'All subjects included',
-      'Downloadable PDFs',
-      'Perfect for trying it out'
-    ]
-  },
-  popular: {
-    id: 'popular',
-    name: 'Popular Pack',
-    tokens: 10,
-    price: 850,
-    currency: 'KES',
-    pricePerToken: 85,
-    popular: true,
-    features: [
-      '10 full Academic Clinic reports',
-      'Save 15% vs Starter Pack',
-      'Valid forever (no expiry)',
-      'All subjects included',
-      'Most popular choice'
-    ]
-  },
-  pro: {
-    id: 'pro',
-    name: 'Pro Pack',
-    tokens: 25,
-    price: 1875,
-    currency: 'KES',
-    pricePerToken: 75,
-    popular: false,
-    features: [
-      '25 full Academic Clinic reports',
-      'Save 25% vs Starter Pack',
-      'Valid forever (no expiry)',
-      'All subjects included',
-      'Best value for schools'
-    ]
-  }
-} as const;
-
-// ===== COMBINED PRODUCTS =====
-export const ALL_PRODUCTS = {
-  // Subscriptions
-  ...PAYMENT_PLANS,
-  // Token Bundles
-  ...TOKEN_BUNDLES
-} as const;
-
-// ===== TYPES =====
-export type ProductId = keyof typeof ALL_PRODUCTS;
-export type Product = typeof ALL_PRODUCTS[ProductId];
-
-// ===== HELPER FUNCTIONS =====
-
+// ===== LEGACY ALIASES (unused components — kept for build compatibility) =====
+export type TokenBundleType = 'starter'
+export const PAYMENT_PLANS  = SUBSCRIPTION_PLANS
+export const TOKEN_BUNDLES  = { starter: TOKEN_PACK } as const
 export function getPlanDetails(planType: PlanType) {
-  if (planType === 'none') {
-    return {
-      name: 'Free Tier',
-      price: 0,
-      features: ['1 free analysis', 'Basic subject tracking'],
-      limits: { reportsPerMonth: 1, studentsPerAccount: 1 }
-    };
-  }
-  return PAYMENT_PLANS[planType];
+  if (planType === 'none') return { name: 'Free', price: 0, features: [], limits: {} }
+  return SUBSCRIPTION_PLANS.TERMLY_SINGLE
 }
+export function getTokenBundleDetails(_: TokenBundleType) { return TOKEN_PACK }
 
-export function getTokenBundleDetails(bundleType: TokenBundleType) {
-  return TOKEN_BUNDLES[bundleType];
-}
+// ===== HELPERS =====
 
 export function formatCurrency(amount: number, currency: string = 'KES'): string {
   return new Intl.NumberFormat('en-KE', {
-    style: 'currency',
+    style:                 'currency',
     currency,
     minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(amount);
+    maximumFractionDigits: 0,
+  }).format(amount)
 }
 
 export function formatPhoneNumber(phone: string): string {
-  // Convert 0712345678 to 254712345678
-  const cleaned = phone.replace(/\D/g, '');
-  if (cleaned.startsWith('0')) {
-    return '254' + cleaned.slice(1);
-  }
-  if (cleaned.startsWith('7')) {
-    return '254' + cleaned;
-  }
-  return cleaned;
-}
-
-export function calculateTokensNeeded(reportCount: number): TokenBundleType | null {
-  if (reportCount <= 3) return 'starter';
-  if (reportCount <= 10) return 'popular';
-  if (reportCount <= 25) return 'pro';
-  return null; // Recommend subscription instead
+  const cleaned = phone.replace(/\D/g, '')
+  if (cleaned.startsWith('0'))  return '254' + cleaned.slice(1)
+  if (cleaned.startsWith('7'))  return '254' + cleaned
+  return cleaned
 }
 
 type SubscriptionRecord = { status: string; end_date: string }
 
-export function isSubscriptionActive(subscription: SubscriptionRecord | null | undefined): boolean {
-  if (!subscription) return false;
-  if (subscription.status !== 'active') return false;
-  return new Date(subscription.end_date) > new Date();
-}
-
-export function getPaymentRecommendation(
-  hasSubscription: boolean,
-  tokenBalance: number,
-  neededReports: number
-): {
-  recommendation: 'subscribe' | 'buy_tokens' | 'use_tokens' | 'free_trial';
-  message: string;
-} {
-  if (!hasSubscription && tokenBalance < neededReports) {
-    const tokensNeeded = neededReports - tokenBalance;
-    if (tokensNeeded <= 3) {
-      return {
-        recommendation: 'buy_tokens',
-        message: `Buy a Starter Pack (${tokensNeeded} tokens) to continue`
-      };
-    } else if (tokensNeeded <= 10) {
-      return {
-        recommendation: 'buy_tokens',
-        message: 'Buy the Popular Pack for best value'
-      };
-    } else {
-      return {
-        recommendation: 'subscribe',
-        message: 'Subscribe termly for unlimited reports (cheaper than tokens)'
-      };
-    }
-  }
-  
-  if (hasSubscription) {
-    return {
-      recommendation: 'use_tokens',
-      message: 'You have unlimited access!'
-    };
-  }
-  
-  if (tokenBalance >= neededReports) {
-    return {
-      recommendation: 'use_tokens',
-      message: `You have ${tokenBalance} tokens remaining`
-    };
-  }
-  
-  return {
-    recommendation: 'free_trial',
-    message: 'Use your free analysis first!'
-  };
+export function isSubscriptionActive(sub: SubscriptionRecord | null | undefined): boolean {
+  if (!sub) return false
+  if (sub.status !== 'active') return false
+  return new Date(sub.end_date) > new Date()
 }

@@ -3,6 +3,7 @@
 // Portrait A4, 6-column: Date | Strand | Sub-Strand | Work Done | Reflection | Signature
 
 import { toTitleCase } from '@/lib/utils/formatters'
+import type { CurriculumMode } from '@/lib/sow/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -17,13 +18,14 @@ export interface ROWEntry {
 }
 
 export interface RecordOfWork {
-  teacher_name:  string
-  school:        string
-  grade:         string
-  learning_area: string
-  term:          number | string
-  year:          number | string
-  entries:       ROWEntry[]
+  teacher_name:    string
+  school:          string
+  grade:           string
+  learning_area:   string
+  term:            number | string
+  year:            number | string
+  entries:         ROWEntry[]
+  curriculumMode?: CurriculumMode
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -55,6 +57,7 @@ function buildPage(row: RecordOfWork): string {
   const school      = toTitleCase(row.school)
   const teacherName = toTitleCase(row.teacher_name)
   const term        = fmtTerm(row.term)
+  const is844       = row.curriculumMode === '844_form3' || row.curriculumMode === '844_form4'
 
   const done  = row.entries.filter(e => e.work_done?.trim()).length
   const total = row.entries.length
@@ -79,7 +82,7 @@ function buildPage(row: RecordOfWork): string {
         <td class="ml">Subject:</td>  <td class="mv">${esc(row.learning_area)}</td>
       </tr>
       <tr>
-        <td class="ml">Grade:</td>    <td class="mv">${esc(row.grade)}</td>
+        <td class="ml">${is844 ? 'Form:' : 'Grade:'}</td> <td class="mv">${esc(row.grade)}</td>
         <td class="ml">Teacher:</td>  <td class="mv">${esc(teacherName)}</td>
       </tr>
       <tr>
@@ -93,8 +96,8 @@ function buildPage(row: RecordOfWork): string {
     <thead>
       <tr>
         <th class="col-date">Date</th>
-        <th class="col-strand">Strand</th>
-        <th class="col-sub">Sub-Strand</th>
+        <th class="col-strand">${is844 ? 'Topic' : 'Strand'}</th>
+        <th class="col-sub">${is844 ? 'Sub-Topic' : 'Sub-Strand'}</th>
         <th class="col-work">Work Done</th>
         <th class="col-ref">Reflection</th>
         <th class="col-sig">Signature</th>

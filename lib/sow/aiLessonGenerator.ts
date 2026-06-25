@@ -3,6 +3,7 @@
 // Diversity at 5 levels is enforced by injecting DiversitySeed per call.
 
 import { validateLesson } from './validators'
+import { isKiswahiliSubject } from '@/lib/curriculum/subjectUtils'
 import type { CurriculumMode } from './types'
 import type { DiversitySeed } from './diversityEngine'
 
@@ -11,9 +12,19 @@ const MAX_CONFIDENCE = 0.92
 const TEMPERATURE   = 0.65  // raised from 0.2 — low temp was the primary driver of repetition
 
 // ─── Diversity system instruction ─────────────────────────────────────────────
-// Injected into the SYSTEM role so it primes the model's full behavior.
 
-const DIVERSITY_SYSTEM_RULES = `You are a Kenya curriculum expert producing ONE lesson for a Scheme of Work.
+const KISWAHILI_LANGUAGE_RULE = `
+LUGHA YA LAZIMA — KISWAHILI SANIFU:
+Andika maudhui YOTE ya somo hili kwa Kiswahili Sanifu tu.
+Hii inajumuisha: matokeo ya kujifunza, uzoefu wa kujifunza, maswali ya uchunguzi,
+mbinu za tathmini, maadili, uwezo wa msingi, na viungo vya PCI.
+USITUMIE Kingereza katika sehemu yoyote ya JSON isipokuwa majina ya vitabu.
+Maneno ya kitaalamu ya sarufi, fasihi, au lugha yaandikwe kwa Kiswahili.
+`
+
+function getDiversitySystemRules(isKiswahili: boolean): string {
+  return `You are a Kenya curriculum expert producing ONE lesson for a Scheme of Work.
+${isKiswahili ? KISWAHILI_LANGUAGE_RULE : ''}
 Return ONLY valid JSON. No markdown. No explanation. No code blocks. Pure JSON only.
 
 DIVERSITY RULES — NON-NEGOTIABLE:
@@ -90,14 +101,15 @@ RESOURCE RULE — NON-NEGOTIABLE:
 Output EXACTLY 3 resources. No more, no fewer.
 Format: clean name only — no page numbers, no descriptions, no dashes, no extra text.
 1. "[Textbook name]"
-2. "Teacher's Guide for [Subject] [Grade]"
+2. "Teacher's Guide for [Subject] [Grade number only — e.g. 8, not Grade 8]"
 3. "[One classroom item: chart / blackboard diagram / newspaper cutout / real object]"
 NEVER: page numbers, "pp.", descriptions after the name, community resource persons,
   farm visits, radio recordings, government maps, purchased materials, internet resources.`
+}
 
 // ─── DeepSeek API call ───────────────────────────────────────────────────────
 
-async function callDeepSeek(prompt: string): Promise<string> {
+async function callDeepSeek(prompt: string, isKiswahili = false): Promise<string> {
   const response = await fetch('https://api.deepseek.com/chat/completions', {
     method: 'POST',
     headers: {
@@ -107,7 +119,7 @@ async function callDeepSeek(prompt: string): Promise<string> {
     body: JSON.stringify({
       model: 'deepseek-chat',
       messages: [
-        { role: 'system', content: DIVERSITY_SYSTEM_RULES },
+        { role: 'system', content: getDiversitySystemRules(isKiswahili) },
         { role: 'user',   content: prompt },
       ],
       temperature: TEMPERATURE,
@@ -157,8 +169,11 @@ function buildLessonPrompt({
   }
 }, retryNote = ''): string {
 
-  const isCBC   = curriculumMode.startsWith('cbc')
-  const isMaths = subjectType === 'mathematics' || subjectType === 'cbc_senior_mathematics' || subjectType === 'kcse_mathematics'
+  const isCBC       = curriculumMode.startsWith('cbc')
+  const isKiswahili = isKiswahiliSubject(learningArea)
+  const isMaths     = subjectType === 'mathematics' || subjectType === 'cbc_senior_mathematics' || subjectType === 'kcse_mathematics'
+  // Strip "Grade " / "Form " prefix from grade if it's already there, to avoid "Grade Grade 8"
+  const gradeNum = grade.replace(/^(?:Grade|Form)\s+/i, '')
 
 
   // KICD context sections
@@ -188,7 +203,24 @@ function buildLessonPrompt({
 
   let outcomeBlock: string
 
-  if (isMaths) {
+  if (isKiswahili) {
+    const l1 = seed?.outcomePattern.l1 ?? 'taja'
+    const l2 = seed?.outcomePattern.l2 ?? 'eleza'
+    const l3 = seed?.outcomePattern.l3 ?? 'tathmini'
+    outcomeBlock = `
+MATOKEO YA KUJIFUNZA — KISWAHILI:
+Andika matokeo MATATU kwa Kiswahili Sanifu katika mpangilio huu wa utambuzi:
+a) KIWANGO 1 (maarifa/ufahamu) — anza na: "${l1}" au kitenzi kingine sawa cha kiwango 1
+   mfano: "${l1} sifa za ${substrand} katika muktadha wa Kenya"
+b) KIWANGO 2 (ufahamu/matumizi) — anza na: "${l2}" au kitenzi kingine sawa cha kiwango 2
+   mfano: "${l2} jinsi ${substrand} inavyotumika katika hali halisi ya Kenya"
+c) KIWANGO 3 (maadili/utetezi) — anza na: "${l3}" au kitenzi kingine sawa cha kiwango 3
+   mfano: "${l3} umuhimu wa ${substrand} katika jamii au taifa"
+
+Muundo wa sentensi kwa somo hili: ${seed?.outcomePattern.structure ?? 'A'} — tofautisha miundo katika matokeo matatu.
+${verbAvoidLine}
+`
+  } else if (isMaths) {
     const l1 = seed?.outcomePattern.l1 ?? 'identify'
     const l2 = seed?.outcomePattern.l2 ?? 'calculate'
     const l3 = seed?.outcomePattern.l3 ?? 'appreciate'
@@ -316,8 +348,8 @@ ${questionInstruction}
 ${assessmentInstruction}
 
 RESOURCES — EXACTLY 3 ITEMS, CLEAN NAMES ONLY:
-1. "${textbook || `${learningArea} ${isCBC ? 'Grade' : 'Form'} ${grade} Textbook`}"
-2. "Teacher's Guide for ${learningArea} ${isCBC ? 'Grade' : 'Form'} ${grade}"
+1. "${textbook || `${learningArea} ${isCBC ? 'Grade' : 'Form'} ${gradeNum} Textbook`}"
+2. "Teacher's Guide for ${learningArea} ${isCBC ? 'Grade' : 'Form'} ${gradeNum}"
 3. "[One classroom item: chart / blackboard diagram / newspaper cutout / real object]"
 No page numbers. No descriptions. No dashes after the name. Clean names only.
 NEVER: community resource persons, farm visits, radio recordings, government maps, purchased materials.
@@ -353,7 +385,7 @@ OUTPUT — Return ONLY this JSON structure:
     "${seed?.assessmentMethods[2] ?? 'Written exercise: [specific task]'}"
   ],
   "learning_resources": [
-    "${textbook || `${learningArea} ${isCBC ? 'Grade' : 'Form'} ${grade} Textbook`}",
+    "${textbook || `${learningArea} ${isCBC ? 'Grade' : 'Form'} ${gradeNum} Textbook`}",
     "Teacher's Guide for ${learningArea} ${isCBC ? 'Grade' : 'Form'} ${grade}",
     "[chart / blackboard diagram / newspaper cutout / real object]"
   ],
@@ -438,10 +470,11 @@ ${isMathsRetry && lastError.includes('progress') ? 'MATHS REMINDER: a)=recall/id
     }
 
     const prompt = buildLessonPrompt({ ...context }, retryNote)
+    const isKiswahiliCtx = isKiswahiliSubject(context.learningArea)
 
     let aiResponse: string
     try {
-      aiResponse = await callDeepSeek(prompt)
+      aiResponse = await callDeepSeek(prompt, isKiswahiliCtx)
     } catch (err: unknown) {
       lastError = `AI request failed: ${err instanceof Error ? err.message : String(err)}`
       continue

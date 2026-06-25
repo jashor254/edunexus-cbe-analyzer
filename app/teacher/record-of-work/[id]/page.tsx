@@ -47,15 +47,18 @@ export default function RecordOfWorkEditorPage({ params }: { params: Promise<{ i
       }).catch(() => setLoading(false))
   }, [id])
 
-  const updateReflection = useCallback((entryId: string, value: string) => {
-    setEntries(prev => prev.map(e => e.id === entryId ? { ...e, reflection: value } : e))
+  const updateReflection = useCallback((
+    entryId: string,
+    reflection: string,
+    extra: Record<string, string> = {}
+  ) => {
     setSaveState('editing')
     clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(async () => {
       await fetch(`/api/teacher/records-of-work/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entryId, reflection: value }),
+        body: JSON.stringify({ entryId, reflection, ...extra }),
       })
       setSaveState('saved')
       setTimeout(() => setSaveState('idle'), 2000)
@@ -200,11 +203,20 @@ export default function RecordOfWorkEditorPage({ params }: { params: Promise<{ i
                     const hasDone = entry.reflection?.trim().length > 0
                     return (
                       <tr key={entry.id} className={idx % 2 === 1 ? 'bg-slate-50' : 'bg-white'}>
-                        {/* Date */}
-                        <td className="px-3 py-3 border-r border-slate-100 align-top text-slate-600 text-xs">
-                          {entry.date_taught
-                            ? new Date(entry.date_taught).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })
-                            : <span className="text-slate-300 italic">not set</span>}
+                        {/* Date — editable */}
+                        <td className="px-3 py-3 border-r border-slate-100 align-top">
+                          <input
+                            type="date"
+                            defaultValue={entry.date_taught ?? ''}
+                            onBlur={e => {
+                              const v = e.target.value
+                              if (v !== (entry.date_taught ?? '')) {
+                                setEntries(prev => prev.map(en => en.id === entry.id ? { ...en, date_taught: v } : en))
+                                updateReflection(entry.id, entry.reflection, { date_taught: v })
+                              }
+                            }}
+                            className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-100 bg-white w-full transition"
+                          />
                         </td>
 
                         {/* Wk / Lesson */}
@@ -213,21 +225,43 @@ export default function RecordOfWorkEditorPage({ params }: { params: Promise<{ i
                           <div className="text-xs text-slate-400 mt-0.5">L{entry.lesson}</div>
                         </td>
 
-                        {/* Work Done */}
+                        {/* Work Done — strand + substrand editable */}
                         <td className="px-3 py-3 border-r border-slate-100 align-top">
-                          <div className="text-xs">
-                            <div className="mb-1">
-                              <span className="font-semibold text-slate-500">Strand: </span>
-                              <span className="text-slate-800">{entry.strand || '—'}</span>
+                          <div className="text-xs space-y-1.5">
+                            <div>
+                              <div className="font-semibold text-slate-400 text-[10px] uppercase mb-0.5">Strand</div>
+                              <div
+                                contentEditable
+                                suppressContentEditableWarning
+                                onBlur={e => {
+                                  const v = e.currentTarget.textContent ?? ''
+                                  if (v !== entry.strand) {
+                                    setEntries(prev => prev.map(en => en.id === entry.id ? { ...en, strand: v } : en))
+                                    updateReflection(entry.id, entry.reflection, { strand: v })
+                                  }
+                                }}
+                                className="outline-none text-slate-800 cursor-text rounded px-1 -mx-1 focus:bg-amber-50 focus:ring-1 focus:ring-amber-300 min-w-[80px] leading-snug"
+                              >{entry.strand || ''}</div>
                             </div>
                             <div>
-                              <span className="font-semibold text-slate-500">Sub-Strand: </span>
-                              <span className="text-slate-800">{entry.substrand || '—'}</span>
+                              <div className="font-semibold text-slate-400 text-[10px] uppercase mb-0.5">Sub-Strand</div>
+                              <div
+                                contentEditable
+                                suppressContentEditableWarning
+                                onBlur={e => {
+                                  const v = e.currentTarget.textContent ?? ''
+                                  if (v !== entry.substrand) {
+                                    setEntries(prev => prev.map(en => en.id === entry.id ? { ...en, substrand: v } : en))
+                                    updateReflection(entry.id, entry.reflection, { substrand: v })
+                                  }
+                                }}
+                                className="outline-none text-slate-800 cursor-text rounded px-1 -mx-1 focus:bg-amber-50 focus:ring-1 focus:ring-amber-300 min-w-[80px] leading-snug"
+                              >{entry.substrand || ''}</div>
                             </div>
                           </div>
                         </td>
 
-                        {/* Reflection — only editable cell */}
+                        {/* Reflection — editable */}
                         <td className="px-3 py-3 border-r border-slate-100 align-top">
                           <div className="relative">
                             <textarea

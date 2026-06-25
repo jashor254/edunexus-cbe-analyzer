@@ -1,5 +1,7 @@
 // Vercel Cron: Monday 06:00 EAT (03:00 UTC) — "0 3 * * 1"
-// Converts completed lesson plans from previous weeks into Record of Work entries.
+// Converts lesson plans from completed weeks into Record of Work entries.
+// A week is considered complete once a newer week's plans have been generated
+// (teachers often teach offline and never mark lessons as "taught").
 
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
@@ -30,11 +32,12 @@ export async function GET(request: Request) {
   try {
     const db = createServiceClient()
 
-    // Fetch all generated (not yet reflected as ROW) lesson plans
+    // Fetch all lesson plans regardless of taught status — teachers often teach offline
+    // and never mark lessons as taught, so we can't gate on that
     const { data: candidates, error } = await db
       .from('lesson_plans')
       .select('id, sow_id, teacher_id, week_number, lesson_number, strand, sub_strand, learning_outcomes, key_inquiry_questions, learning_resources, step_1, step_2, step_3')
-      .eq('status', 'generated')
+      .in('status', ['generated', 'edited', 'taught'])
 
     if (error) {
       return NextResponse.json({ error: 'Failed to fetch lesson plans' }, { status: 500 })

@@ -135,13 +135,14 @@ export async function POST(req: Request) {
       maxWeekDownloaded = Math.max(...rows.map(p => p.week_number))
 
       html = generateLessonPlanHTML(rows as unknown as LessonPlanRecord[], {
-        teacherName:  s.teacher_name || '',
-        tscNumber:    s.tsc_number || '',
-        school:       s.school || '',
-        learningArea: s.learning_area,
-        grade:        s.grade,
-        term:         s.term,
-        year:         s.year,
+        teacherName:    s.teacher_name || '',
+        tscNumber:      s.tsc_number || '',
+        school:         s.school || '',
+        learningArea:   s.learning_area,
+        grade:          s.grade,
+        term:           s.term,
+        year:           s.year,
+        curriculumMode: s.curriculum_mode as CurriculumMode,
       })
     }
 
@@ -185,13 +186,14 @@ export async function POST(req: Request) {
       }))
 
       const rowData: RecordOfWork = {
-        teacher_name:  toTitleCase(s.teacher_name || ''),
-        school:        toTitleCase(s.school || ''),
-        grade:         s.grade,
-        learning_area: s.learning_area,
-        term:          s.term,
-        year:          s.year,
+        teacher_name:   toTitleCase(s.teacher_name || ''),
+        school:         toTitleCase(s.school || ''),
+        grade:          s.grade,
+        learning_area:  s.learning_area,
+        term:           s.term,
+        year:           s.year,
         entries,
+        curriculumMode: s.curriculum_mode as CurriculumMode,
       }
 
       html = generateROWHTML(rowData)

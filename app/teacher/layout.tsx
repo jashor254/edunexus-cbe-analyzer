@@ -2,7 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { redirect } from 'next/navigation'
 import TeacherSidebar from '@/components/teacher/TeacherSidebar'
-import { TeacherOnboardingTutorial } from '@/components/teacher/TeacherOnboardingTutorial'
+import { VideoOnboardingModal } from '@/components/video-onboarding-modal'
 
 export default async function TeacherLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -48,7 +48,7 @@ export default async function TeacherLayout({ children }: { children: React.Reac
           {children}
         </main>
       </div>
-      <TeacherOnboardingTutorial userId={user.id} />
+      <VideoOnboardingModal userId={user.id} role="teacher" />
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import type { LessonPlanContext, GeneratedLessonPlan } from './types'
-import { isKiswahiliSubject, isSocialStudies } from '@/lib/curriculum/subjectUtils'
+import { isKiswahiliSubject, isPlaceBasedSubject, getSubjectContextHint } from '@/lib/curriculum/subjectUtils'
 
 const KENYAN_COUNTIES = [
   'Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Kisii', 'Machakos',
@@ -95,24 +95,44 @@ async function callDeepSeek(prompt: string): Promise<string> {
   return data.choices[0].message.content
 }
 
-function deriveLocation(learningArea: string, grade: string): string {
-  const area = learningArea.toLowerCase()
+function deriveLocation(learningArea: string, grade: string, strand = ''): string {
+  const area  = learningArea.toLowerCase()
+  const topic = strand.toLowerCase()
   const gradeNum = parseInt(grade.replace(/\D/g, ''), 10)
   const isSenior = gradeNum >= 10 && gradeNum <= 12
 
   if (area.includes('physical education') || area.includes(' pe ') || area === 'pe') {
-    return 'School grounds/field'
+    return 'School grounds / playing field'
   }
+
   if (area.includes('agriculture')) {
-    return 'School farm or compound'
+    const practical = /farm|soil|planting|crop|harvest|compost|irrigation|nursery|garden|pruning|weeding/.test(topic)
+    return practical ? 'School farm / garden' : 'Classroom'
   }
+
+  if (area.includes('home science') || area.includes('home economics')) {
+    return 'Home Science room'
+  }
+
+  if (area.includes('music')) {
+    return 'Music room / classroom'
+  }
+
+  if (area.includes('art') || area.includes('craft') || area.includes('creative arts')) {
+    return 'Art room / classroom'
+  }
+
   if (
     isSenior &&
-    (area.includes('science') || area.includes('biology') ||
-      area.includes('chemistry') || area.includes('physics'))
+    (area.includes('biology') || area.includes('chemistry') || area.includes('physics'))
   ) {
     return 'Laboratory'
   }
+
+  if (area.includes('integrated science') && /experiment|practical|lab|dissect|observe|test/.test(topic)) {
+    return 'Laboratory / classroom'
+  }
+
   return 'Classroom'
 }
 
@@ -121,9 +141,12 @@ function buildLessonPlanPrompt(ctx: LessonPlanContext): string {
   const questions = ctx.keyInquiryQuestions
   const experiences = ctx.learningExperiences ?? []
 
-  const location = deriveLocation(ctx.learningArea, ctx.grade)
+  const location = deriveLocation(ctx.learningArea, ctx.grade, ctx.strand)
   const resources = sanitizeResources(ctx.learningResources)
-  const [county1, county2, county3] = pickTopicCounties(ctx.strand, ctx.learningArea)
+  const placeBased = isPlaceBasedSubject(ctx.learningArea)
+  const [county1, county2, county3] = placeBased
+    ? pickTopicCounties(ctx.strand, ctx.learningArea)
+    : ['', '', '']
 
   const languageInstruction = isKiswahiliSubject(ctx.learningArea)
     ? `
@@ -202,15 +225,17 @@ ADDITIONAL RULES:
 - The reflection field must be output exactly as the guiding questions shown above — do not rewrite it
 - Return ONLY valid JSON, no markdown
 
-KENYAN CONTEXT — MANDATORY:
+${placeBased ? `KENYAN CONTEXT — MANDATORY:
 Each step is pre-assigned a DIFFERENT specific Kenyan location. Use ONLY these — no swaps, no extras, no repeats:
 - step1: "${county1}"
 - step2: "${county2}"
 - step3: "${county3}"
-Reference counties, towns, rivers, forests, or landmarks a Grade 8 Kenyan learner would recognize.
+Reference counties, towns, rivers, forests, or landmarks a Kenyan learner would recognize.
 Match the place to the topic — drought topics use ASAL counties (Kitui, Marsabit, Garissa), flood topics use western Kenya (Budalang'i, Kisumu, Homa Bay), farming topics use highlands (Nyeri, Uasin Gishu, Trans Nzoia).
 Never use generic "a community" or "a county in Kenya" — always use the assigned name above.
-Do NOT mention any other Kenyan location in any step. Each step uses exactly one location: the one assigned above.
+Do NOT mention any other Kenyan location in any step. Each step uses exactly one location: the one assigned above.` : `CONTEXT GUIDANCE:
+${getSubjectContextHint(ctx.learningArea)}
+Do NOT force place names or county references into this subject — use subject-relevant real-world examples instead.`}
 `
 }
 

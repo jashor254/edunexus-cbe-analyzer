@@ -187,7 +187,7 @@ function PageHeader({ name, grade, pageNum, totalPages, reportId }: {
     <View>
       <View style={S.pageHeader}>
         <View>
-          <Text style={S.pageHeaderBrand}>EDUNEXUS ACADEMIC CLINIC</Text>
+          <Text style={S.pageHeaderBrand}>EDUNEXUS LEARNER BLUEPRINT</Text>
           <Text style={S.pageHeaderName}>{name} · Grade {grade}</Text>
         </View>
         <View style={S.pageHeaderRight}>
@@ -457,7 +457,7 @@ function JuniorCurrentPositionPage({ report }: { report: AcademicClinicReport })
     <Page size="A4" style={S.page}>
       <PageHeader name={sp.name} grade={sp.grade} pageNum={1} totalPages={3} reportId={report.reportId} />
       <View style={S.content}>
-        <Text style={S.sectionLabel}>JUNIOR SCHOOL ACADEMIC CLINIC · GRADES 7–9</Text>
+        <Text style={S.sectionLabel}>JUNIOR SCHOOL LEARNER BLUEPRINT · GRADES 7–9</Text>
         <Text style={S.sectionTitle}>Current Position</Text>
 
         {/* Identity + overall */}
@@ -800,18 +800,23 @@ function JuniorActionPlanPage({ report }: { report: AcademicClinicReport }) {
               <Text style={S.careerDirText}>{dir}</Text>
             </View>
           ))}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: C.border }}>
-            <Text style={{ fontSize: 8, color: C.muted, flex: 1 }}>
-              Explore detailed career analysis in EduNexus Career Explorer
+          <View style={{ backgroundColor: C.navy + '12', borderRadius: 4, padding: 7, marginTop: 8 }}>
+            <Text style={{ fontSize: 8, color: C.navy, fontWeight: 700, marginBottom: 2 }}>
+              For your child's full Career Intelligence profile:
             </Text>
-            <Text style={{ fontSize: 8, fontWeight: 700, color: C.navy }}>edunexus.co.ke/career</Text>
+            <Text style={{ fontSize: 8, color: C.muted }}>
+              Visit Career Intelligence in your EduNexus parent dashboard — or go to{' '}
+            </Text>
+            <Text style={{ fontSize: 8, fontWeight: 700, color: C.navy }}>
+              edunexus.co.ke/parent/career-intelligence
+            </Text>
           </View>
         </View>
       </View>
 
       <View style={[S.pageFooter, { flexDirection: 'column', alignItems: 'center' }]}>
         <Text style={[S.pageFooterText, { marginBottom: 2 }]}>
-          EduNexus Academic Clinic · {dateStr} · Report ID: {report.reportId}
+          EduNexus Learner Blueprint · {dateStr} · Report ID: {report.reportId}
         </Text>
         <Text style={S.pageFooterText}>
           This report is an academic readiness guide. Results reflect current performance and will change with consistent effort.
@@ -853,7 +858,7 @@ function SeniorSnapshotPage({ report }: { report: AcademicClinicReport }) {
               <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
                 <Text style={{ fontSize: 16, fontWeight: 700, color: C.white }}>Edu</Text>
                 <Text style={{ fontSize: 16, fontWeight: 700, color: C.gold }}>Nexus</Text>
-                <Text style={{ fontSize: 9, color: '#94a3b8', marginLeft: 8, letterSpacing: 1 }}>ACADEMIC CLINIC</Text>
+                <Text style={{ fontSize: 9, color: '#94a3b8', marginLeft: 8, letterSpacing: 1 }}>LEARNER BLUEPRINT</Text>
               </View>
               <Text style={{ fontSize: 8, color: '#475569', marginTop: 2 }}>SENIOR SCHOOL · GRADES 10–12</Text>
             </View>
@@ -1021,40 +1026,37 @@ function SeniorFutureReadinessPage({ report }: { report: AcademicClinicReport })
 
         <View style={S.dividerThin} />
 
-        {/* Career Insight Section */}
+        {/* Career Snapshot — brief, full analysis at career-intelligence page */}
         {careers.length > 0 && (
           <>
-            <Text style={{ fontSize: 9, fontWeight: 700, color: C.text, letterSpacing: 1, marginBottom: 8 }}>
-              CAREER INSIGHT — TOP 3 DIRECTIONS
+            <Text style={{ fontSize: 9, fontWeight: 700, color: C.text, letterSpacing: 1, marginBottom: 6 }}>
+              CAREER DIRECTION SNAPSHOT
             </Text>
-            {careers.map((c, i) => (
-              <View key={i} style={S.insightCard}>
-                <View style={S.insightHeader}>
-                  <Text style={S.insightName}>{i + 1}. {c.name}</Text>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={[S.insightAlignment, { color: alignmentColor(c.alignment) }]}>{c.alignment}%</Text>
-                    <Text style={{ fontSize: 7, color: C.muted }}>alignment</Text>
-                  </View>
+            {/* Top 2 careers as compact rows only */}
+            {careers.slice(0, 2).map((c, i) => (
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: C.offWhite, borderRadius: 5, padding: 8, marginBottom: 5 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 9, fontWeight: 700, color: C.text }}>{i + 1}. {c.name}</Text>
+                  <Text style={{ fontSize: 8, color: C.muted, marginTop: 1 }}>Outlook: {c.futureOutlook} · AI Impact: {c.aiImpact}</Text>
                 </View>
-                <View style={S.insightMetaRow}>
-                  <View style={S.insightMetaChip}>
-                    <Text style={S.insightMetaKey}>Future Outlook:</Text>
-                    <Text style={S.insightMetaVal}>{c.futureOutlook}</Text>
-                  </View>
-                  <View style={S.insightMetaChip}>
-                    <Text style={S.insightMetaKey}>AI Impact:</Text>
-                    <Text style={S.insightMetaVal}>{c.aiImpact}</Text>
-                  </View>
-                  <View style={S.insightMetaChip}>
-                    <Text style={S.insightMetaKey}>Self-Employment:</Text>
-                    <Text style={S.insightMetaVal}>{c.selfEmploymentPotential}</Text>
-                  </View>
+                <View style={{ alignItems: 'center', marginLeft: 10 }}>
+                  <Text style={{ fontSize: 13, fontWeight: 700, color: alignmentColor(c.alignment) }}>{c.alignment}%</Text>
+                  <Text style={{ fontSize: 7, color: C.muted }}>match</Text>
                 </View>
-                <Text style={S.insightExamples}>
-                  Examples: {c.selfEmploymentExamples.join(' · ')}
-                </Text>
               </View>
             ))}
+            {/* Deep-dive callout */}
+            <View style={{ backgroundColor: C.navy + '12', borderRadius: 5, padding: 9, marginTop: 4 }}>
+              <Text style={{ fontSize: 8.5, fontWeight: 700, color: C.navy, marginBottom: 2 }}>
+                See the full Career Intelligence profile:
+              </Text>
+              <Text style={{ fontSize: 8, color: C.muted, lineHeight: 1.5 }}>
+                Full match analysis, future outlook, AI impact ratings, salary data, and self-employment pathways are available in your parent dashboard.
+              </Text>
+              <Text style={{ fontSize: 8, fontWeight: 700, color: C.navy, marginTop: 3 }}>
+                edunexus.co.ke/parent/career-intelligence
+              </Text>
+            </View>
           </>
         )}
 
@@ -1142,7 +1144,7 @@ function SeniorActionPage({ report }: { report: AcademicClinicReport }) {
 
       <View style={[S.pageFooter, { flexDirection: 'column', alignItems: 'center' }]}>
         <Text style={[S.pageFooterText, { marginBottom: 2 }]}>
-          EduNexus Academic Clinic · {dateStr} · Report ID: {report.reportId}
+          EduNexus Learner Blueprint · {dateStr} · Report ID: {report.reportId}
         </Text>
         <Text style={S.pageFooterText}>CONFIDENTIAL — For Parent and Teacher Use Only · edunexus.co.ke</Text>
       </View>
@@ -1158,8 +1160,8 @@ export const AcademicClinicPDF = ({ report }: { report: AcademicClinicReport }) 
   if (isJunior) {
     return (
       <Document
-        title={`EduNexus Academic Clinic — ${report.studentProfile.name}`}
-        author="EduNexus Academic Clinic"
+        title={`EduNexus Learner Blueprint — ${report.studentProfile.name}`}
+        author="EduNexus"
         subject="Junior School Parent Decision-Support Report"
       >
         <JuniorCurrentPositionPage report={report} />
@@ -1171,8 +1173,8 @@ export const AcademicClinicPDF = ({ report }: { report: AcademicClinicReport }) 
 
   return (
     <Document
-      title={`EduNexus Academic Clinic — ${report.studentProfile.name}`}
-      author="EduNexus Academic Clinic"
+      title={`EduNexus Learner Blueprint — ${report.studentProfile.name}`}
+      author="EduNexus"
       subject="Senior School Parent Decision-Support Report"
     >
       <SeniorSnapshotPage       report={report} />

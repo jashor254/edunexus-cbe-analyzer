@@ -42,9 +42,9 @@ export async function sendReportWhatsApp(params: ReportWhatsAppParams): Promise<
       : `${APP_URL}/dashboard`
 
     const messageSnip =
-      `${params.studentName}'s Grade ${params.grade} Academic Clinic Report is ready. ` +
-      `Your child's personalised 7-page report covers subject performance, pathway analysis, ` +
-      `and a 3-week holiday action plan. Full report sent to your email. ` +
+      `${params.studentName}'s Grade ${params.grade} Learner Blueprint is ready. ` +
+      `Your child's personalised report covers who they are becoming, how they learn, ` +
+      `and which future opportunities are opening up. Full report sent to your email. ` +
       `${params.signupToken ? 'Create your EduNexus parent account to access the Learning Compass for your child.' : 'View on your dashboard.'}`
 
     const result = await sendWhatsAppTemplate({
@@ -57,7 +57,7 @@ export async function sendReportWhatsApp(params: ReportWhatsAppParams): Promise<
             { type: 'text', text: params.parentName },
             { type: 'text', text: params.studentName },
             { type: 'text', text: params.teacherName },
-            { type: 'text', text: 'Academic Report Ready' },
+            { type: 'text', text: 'Learner Blueprint Ready' },
             { type: 'text', text: messageSnip.substring(0, 200) },
             { type: 'text', text: link },
           ],

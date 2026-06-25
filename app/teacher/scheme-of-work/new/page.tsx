@@ -865,13 +865,41 @@ export default function SchemeOfWorkPage() {
                     <span className="mr-1.5">⏱</span>Double lessons
                   </label>
                   <select value={lessonStructure.doubleLessonOption}
-                    onChange={e => setLessonStructure(prev => ({ ...prev, doubleLessonOption: e.target.value as 'single' | 'double' }))}
+                    onChange={e => {
+                      const opt = e.target.value as 'single' | 'double'
+                      setLessonStructure(prev => ({
+                        ...prev,
+                        doubleLessonOption: opt,
+                        doubleLessonCombination: opt === 'single' ? undefined : prev.doubleLessonCombination,
+                      }))
+                    }}
                     className={inputCls}>
                     <option value="single">Single lessons only</option>
                     <option value="double">Double lessons enabled</option>
                   </select>
                 </div>
+
               </div>
+
+              {/* Double lesson slot picker — full width, shown only when double is on */}
+              {lessonStructure.doubleLessonOption === 'double' && (
+                <div className="px-6 pb-4">
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                    Which lessons form the double?
+                  </label>
+                  <select
+                    value={lessonStructure.doubleLessonCombination ?? ''}
+                    onChange={e => setLessonStructure(prev => ({ ...prev, doubleLessonCombination: e.target.value }))}
+                    className={inputCls}
+                  >
+                    <option value="">Select lesson pair</option>
+                    {Array.from({ length: lessonStructure.lessonsPerWeek - 1 }, (_, i) => {
+                      const combo = `${i + 1}-${i + 2}`
+                      return <option key={combo} value={combo}>Lessons {combo} (double)</option>
+                    })}
+                  </select>
+                </div>
+              )}
 
               {/* Slot summary */}
               <div className="mx-6 mb-6 rounded-2xl overflow-hidden border border-slate-100">
@@ -887,7 +915,11 @@ export default function SchemeOfWorkPage() {
                   </div>
                   <div className="flex justify-between items-center px-5 py-3 text-sm">
                     <span className="text-gray-500">Lessons per week</span>
-                    <span className="font-black text-gray-900 bg-slate-100 px-3 py-0.5 rounded-full">{lessonStructure.lessonsPerWeek}</span>
+                    <span className="font-black text-gray-900 bg-slate-100 px-3 py-0.5 rounded-full">
+                      {lessonStructure.doubleLessonOption === 'double'
+                        ? `${lessonStructure.lessonsPerWeek - 2} single + 1 double`
+                        : `${lessonStructure.lessonsPerWeek} single`}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center px-5 py-3 text-sm">
                     <span className="font-bold text-gray-800">Lessons to generate</span>
@@ -1030,7 +1062,7 @@ export default function SchemeOfWorkPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gradient-to-r from-slate-800 to-[#0c1929]">
-                      {['WK', 'LSN', 'Strand', 'Substrand', 'Learning Outcomes', 'Experiences', 'Inquiry Questions', 'Resources', 'Assessment', 'Reflection'].map(h => (
+                      {['WK', 'LSN', 'Strand', 'Substrand', 'Lesson Learning Outcomes', 'Experiences', 'Inquiry Questions', 'Resources', 'Assessment', 'Reflection'].map(h => (
                         <th key={h} className="text-left px-3 py-3.5 text-xs font-black text-slate-300 whitespace-nowrap">
                           {h}
                         </th>

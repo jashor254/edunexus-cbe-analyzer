@@ -4,6 +4,16 @@
 
 import type { SOWPreviewData, GeneratedLesson, BreakItem, CurriculumMode } from './types'
 import { toTitleCase } from '@/lib/utils/formatters'
+import { isKiswahiliSubject } from '@/lib/curriculum/subjectUtils'
+
+function localizeGrade(grade: string, isKiswahili: boolean): string {
+  if (!isKiswahili) return grade
+  const cbcMatch = grade.match(/^Grade\s+(\d+)$/i)
+  if (cbcMatch) return `Gredi ya ${cbcMatch[1]}`
+  const formMatch = grade.match(/^Form\s+(\d+)$/i)
+  if (formMatch) return `Kidato cha ${formMatch[1]}`
+  return grade
+}
 
 export interface ColConfig {
   col3: string
@@ -52,13 +62,41 @@ function esc(s: string): string {
 }
 
 
-// Strip "By the end of the lesson, the learner should be able to" prefix
-// if AI includes it — each bullet should start directly with the action verb.
+// Strip "By the end of the lesson, the learner should be able to" prefix.
 const BTEOTLE_RE = /^(by the end of (the|this) lesson[,:]?\s*)?(the\s+)?learner[s]?\s+(should\s+)?be\s+able\s+to\s+/i
+
+// Fix bad CBC Bloom's verb-noun pairings that slip through the AI:
+//   "create the importance/significance" → "explain the importance/significance"
+//   "implement the significance/importance" → "demonstrate the significance/importance"
+//   "design the significance" → "explain the significance"
+const BAD_VERB_NOUN: [RegExp, string][] = [
+  [/^(create|design|build|construct)\s+(the\s+)?(importance|significance|value|role|meaning)\b/i,    'explain the $3'],
+  [/^(implement|execute|deploy)\s+(the\s+)?(significance|importance|value|role)\b/i,                 'demonstrate the $3'],
+  [/^(create|design)\s+(the\s+)?(concept|idea|notion|understanding)\s+of\b/i,                        'explain the $3 of'],
+  [/^implement\s+(a\s+)?(lesson|activity|strategy)\b/i,                                              'carry out a $2'],
+]
+
+function fixVerbNoun(text: string): string {
+  let t = text
+  for (const [re, replacement] of BAD_VERB_NOUN) {
+    t = t.replace(re, replacement)
+    if (t !== text) break
+  }
+  return t
+}
+
+function cleanBullet(raw: string): string {
+  return fixVerbNoun(
+    raw
+      .replace(BTEOTLE_RE, '')
+      .replace(/^[,;\s]+/, '')   // strip leading commas/semicolons (AI sometimes adds these)
+      .trim()
+  )
+}
 
 function bullets(items: string[]): string {
   if (!items?.length) return '—'
-  return `<ul>${items.map(i => `<li>${esc(i.replace(BTEOTLE_RE, ''))}</li>`).join('')}</ul>`
+  return `<ul>${items.map(i => `<li>${esc(cleanBullet(i))}</li>`).join('')}</ul>`
 }
 
 function breakDetail(b: BreakItem): string {
@@ -71,6 +109,33 @@ function breakDetail(b: BreakItem): string {
 function buildCoverPage(meta: SOWPreviewData['meta']): string {
   const school      = toTitleCase(meta.school)
   const teacherName = toTitleCase(meta.teacherName || '—')
+  const is844       = meta.curriculumMode === '844_form3' || meta.curriculumMode === '844_form4'
+  const sw          = isKiswahiliSubject(meta.learningArea)
+  const gradeDisplay = localizeGrade(meta.grade, sw)
+
+  const labels = sw ? {
+    title:       'MPANGO WA KAZI',
+    teacherName: 'Jina la Mwalimu',
+    tsc:         'Nambari ya TSC',
+    school:      'Shule',
+    subject:     'Somo',
+    grade:       is844 ? 'Kidato' : 'Gredi',
+    term:        'Muhula',
+    termPrefix:  'Muhula wa',
+    year:        'Mwaka',
+    books:       'Vitabu vya Rejea:',
+  } : {
+    title:       'SCHEME OF WORK',
+    teacherName: 'Teacher Name',
+    tsc:         'TSC No.',
+    school:      'School',
+    subject:     is844 ? 'Subject' : 'Learning Area / Subject',
+    grade:       is844 ? 'Form' : 'Grade',
+    term:        'Term',
+    termPrefix:  'Term',
+    year:        'Year',
+    books:       'Reference Books Used:',
+  }
 
   return `
   <div class="cover-page">
@@ -78,22 +143,22 @@ function buildCoverPage(meta: SOWPreviewData['meta']): string {
       <div class="cover-govt">REPUBLIC OF KENYA</div>
       <div class="cover-ministry">MINISTRY OF EDUCATION</div>
       <div class="cover-rule"></div>
-      <div class="cover-title">SCHEME OF WORK</div>
+      <div class="cover-title">${labels.title}</div>
       <div class="cover-rule"></div>
 
       <table class="cover-table">
-        <tr><td class="cover-label">Teacher Name</td><td class="cover-value">${esc(teacherName)}</td></tr>
-        <tr><td class="cover-label">TSC No.</td><td class="cover-value">${esc(meta.tscNumber || '—')}</td></tr>
-        <tr><td class="cover-label">School</td><td class="cover-value">${esc(school)}</td></tr>
-        <tr><td class="cover-label">Learning Area / Subject</td><td class="cover-value">${esc(meta.learningArea)}</td></tr>
-        <tr><td class="cover-label">Grade</td><td class="cover-value">${esc(meta.grade)}</td></tr>
-        <tr><td class="cover-label">Term</td><td class="cover-value">Term ${esc(meta.term)}</td></tr>
-        <tr><td class="cover-label">Year</td><td class="cover-value">${meta.year}</td></tr>
+        <tr><td class="cover-label">${labels.teacherName}</td><td class="cover-value">${esc(teacherName)}</td></tr>
+        <tr><td class="cover-label">${labels.tsc}</td><td class="cover-value">${esc(meta.tscNumber || '—')}</td></tr>
+        <tr><td class="cover-label">${labels.school}</td><td class="cover-value">${esc(school)}</td></tr>
+        <tr><td class="cover-label">${labels.subject}</td><td class="cover-value">${esc(meta.learningArea)}</td></tr>
+        <tr><td class="cover-label">${labels.grade}</td><td class="cover-value">${esc(gradeDisplay)}</td></tr>
+        <tr><td class="cover-label">${labels.term}</td><td class="cover-value">${labels.termPrefix} ${esc(meta.term)}</td></tr>
+        <tr><td class="cover-label">${labels.year}</td><td class="cover-value">${meta.year}</td></tr>
       </table>
 
       ${meta.textbook ? `
       <div class="cover-books">
-        <div class="cover-books-label">Reference Books Used:</div>
+        <div class="cover-books-label">${labels.books}</div>
         ${meta.textbook.split(' | ').map(b => `<div class="cover-books-item">• ${esc(b.trim())}</div>`).join('')}
       </div>` : ''}
     </div>
@@ -127,17 +192,25 @@ function buildTablePage(
     a.startWeek !== b.startWeek ? a.startWeek - b.startWeek : a.startLesson - b.startLesson
   )
   let bi = 0
+  const seenBreaks = new Set<number>()
 
   for (const lesson of lessons) {
-    // Inject any breaks whose end week falls before this lesson's week
-    while (bi < sortedBreaks.length && sortedBreaks[bi].endWeek < lesson.week) {
-      const b = sortedBreaks[bi++]
+    // Inject breaks that START at or before this lesson's week — before the first
+    // lesson of that week so they appear as a visible divider, not a trailer.
+    while (
+      bi < sortedBreaks.length &&
+      !seenBreaks.has(bi) &&
+      sortedBreaks[bi].startWeek <= lesson.week
+    ) {
+      const b = sortedBreaks[bi]
+      seenBreaks.add(bi)
+      bi++
       rows.push({ kind: 'break', week: b.startWeek, title: b.title, detail: breakDetail(b) })
     }
     rows.push({ kind: 'lesson', lesson })
   }
 
-  // Inject any breaks that come after the last lesson
+  // Inject any remaining breaks that come after the last lesson
   while (bi < sortedBreaks.length) {
     const b = sortedBreaks[bi++]
     rows.push({ kind: 'break', week: b.startWeek, title: b.title, detail: breakDetail(b) })
@@ -436,15 +509,24 @@ export function generateSOWHTML(
 
 export function downloadSOWAsPDF(data: SOWPreviewData, colConfig: ColConfig): void {
   const html = generateSOWHTML(data, colConfig)
-  const win = window.open('', '_blank')
-  if (!win) return
-  win.document.write(html)
-  win.document.close()
-  // Clear title so browser doesn't show filename/URL in the print header
-  win.document.title = ''
-  win.focus()
+
+  // Use a hidden iframe so the print header shows the current page URL,
+  // not "about:blank". Chrome uses the parent window's URL/title for headers.
+  const iframe = document.createElement('iframe')
+  iframe.style.cssText = 'position:absolute;width:0;height:0;border:0;top:-9999px;left:-9999px;'
+  document.body.appendChild(iframe)
+
+  const doc = iframe.contentDocument || iframe.contentWindow?.document
+  if (!doc) { document.body.removeChild(iframe); return }
+
+  doc.open()
+  doc.write(html)
+  doc.close()
+
+  // Give the iframe's resources time to settle before printing
   setTimeout(() => {
-    win.print()
-    win.close()
-  }, 800)
+    iframe.contentWindow?.print()
+    // Remove after a short delay to let the print dialog open fully
+    setTimeout(() => document.body.removeChild(iframe), 1000)
+  }, 600)
 }

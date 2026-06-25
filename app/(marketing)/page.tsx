@@ -196,7 +196,7 @@ export default function LandingPage() {
                 quote: "Brian was always failing Number Patterns. The report pinpointed exactly that strand — not just 'Mathematics is weak'. We focused on it for two weeks and his teacher noticed immediately.",
                 name: "Grace W.",
                 role: "Parent · Grade 8 · Westlands, Nairobi",
-                tag: "Academic Clinic",
+                tag: "Learner Blueprint",
                 tagColor: "text-violet-400",
               },
               {
@@ -210,7 +210,7 @@ export default function LandingPage() {
                 quote: "My son is Form 3 and I've never understood why he's passing English but failing every comprehension exam. The strand breakdown showed it was inference — now we know what to fix.",
                 name: "Peter M.",
                 role: "Parent · Form 3 · Nakuru",
-                tag: "Academic Clinic",
+                tag: "Learner Blueprint",
                 tagColor: "text-violet-400",
               },
             ].map((t) => (
@@ -377,8 +377,8 @@ export default function LandingPage() {
                   <div className="text-[10px] font-bold text-teal-400 tracking-[0.15em] uppercase mb-1">
                     EDUNEXUS
                   </div>
-                  <div className="text-xl font-extrabold text-white mb-0.5">Academic Clinic</div>
-                  <div className="text-xs text-white/60 mb-5">Personalised Clinical Learning Report</div>
+                  <div className="text-xl font-extrabold text-white mb-0.5">Learner Blueprint</div>
+                  <div className="text-xs text-white/60 mb-5">Personalised Learner Intelligence Report</div>
 
                   <div className="border-t border-white/15 mb-4" />
 
@@ -411,7 +411,7 @@ export default function LandingPage() {
             {/* Text — right */}
             <div className="order-1 md:order-2">
               <span className="text-xs font-bold text-amber-400 uppercase tracking-widest mb-3 block">
-                Academic Clinic
+                Learner Blueprint
               </span>
               <h2 className="text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5">
                 A diagnosis, not just a grade.
@@ -616,6 +616,102 @@ export default function LandingPage() {
                 <p className="text-sm text-white/45 leading-relaxed">{step.body}</p>
               </div>
             ))}
+          </div>
+
+        </div>
+      </section>
+
+      {/* ── 5 TUTORS SECTION ──────────────────────────────────────────────────── */}
+      <section className="py-20 md:py-28">
+        <div className="max-w-[860px] mx-auto px-6">
+
+          {/* Label */}
+          <p className="text-[11px] font-black text-amber-400 uppercase tracking-widest text-center mb-5">
+            The honest maths
+          </p>
+
+          {/* Headline */}
+          <h2 className="text-3xl md:text-5xl font-extrabold text-white leading-tight tracking-[-0.02em] text-center mb-5">
+            You don&apos;t need 5 remedial teachers.
+          </h2>
+          <p className="text-lg text-white/50 text-center max-w-xl mx-auto leading-relaxed mb-14">
+            Your child&apos;s school teacher already knows the CBC curriculum. EduNexus makes sure they know your child too — and fills every gap in between.
+          </p>
+
+          {/* Side-by-side comparison */}
+          <div className="grid md:grid-cols-2 gap-5 mb-10">
+
+            {/* Old way */}
+            <div className="bg-white/3 border border-white/8 rounded-3xl p-8">
+              <p className="text-[11px] font-black text-white/25 uppercase tracking-widest mb-6">
+                The old way
+              </p>
+              <ul className="space-y-4">
+                {[
+                  { subject: 'Mathematics',  cost: 'KES 2,000/session' },
+                  { subject: 'English',      cost: 'KES 1,500/session' },
+                  { subject: 'Kiswahili',    cost: 'KES 1,500/session' },
+                  { subject: 'Sciences',     cost: 'KES 2,000/session' },
+                  { subject: 'Humanities',   cost: 'KES 1,500/session' },
+                ].map(({ subject, cost }) => (
+                  <li key={subject} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-white/20 shrink-0" />
+                      <span className="text-sm text-white/50">Remedial teacher — {subject}</span>
+                    </div>
+                    <span className="text-sm font-bold text-white/30 shrink-0">{cost}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-6 pt-5 border-t border-white/8 flex items-center justify-between">
+                <span className="text-sm text-white/30">Monthly total</span>
+                <span className="text-2xl font-black text-white/30">KES 17,000<span className="text-sm font-bold text-white/20">+</span></span>
+              </div>
+              <p className="text-xs text-white/20 mt-2">
+                5 strangers · 5 different teaching styles · no shared picture of your child
+              </p>
+            </div>
+
+            {/* EduNexus way */}
+            <div className="bg-teal-500/6 border-2 border-teal-500/25 rounded-3xl p-8 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-teal-500/5 rounded-full blur-2xl" />
+              <p className="text-[11px] font-black text-teal-400 uppercase tracking-widest mb-6">
+                The EduNexus way
+              </p>
+              <ul className="space-y-4">
+                {[
+                  { who: "Your child's school teacher",   role: 'Teaches · marks · knows the child' },
+                  { who: 'Learning Compass (AI tutor)',    role: 'Personalised sessions · every subject' },
+                  { who: 'Learner Blueprint',               role: 'Who your child is becoming — and what comes next' },
+                  { who: 'Parent dashboard',               role: 'You see everything in real time' },
+                  { who: 'Career intelligence',            role: 'Where it all points — from day one' },
+                ].map(({ who, role }) => (
+                  <li key={who} className="flex items-start gap-3">
+                    <div className="w-4 h-4 rounded-full bg-teal-500/20 border border-teal-500/40 flex items-center justify-center shrink-0 mt-0.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-teal-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-white/80">{who}</p>
+                      <p className="text-xs text-white/35 mt-0.5">{role}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-6 pt-5 border-t border-teal-500/15 flex items-center justify-between">
+                <span className="text-sm text-teal-400/60">Per term</span>
+                <span className="text-2xl font-black text-teal-300">KES 2,499</span>
+              </div>
+              <p className="text-xs text-teal-400/40 mt-2">
+                One platform · one teacher relationship · five subjects covered
+              </p>
+            </div>
+          </div>
+
+          {/* Bottom line */}
+          <div className="bg-white/3 border border-white/8 rounded-2xl px-8 py-6 text-center">
+            <p className="text-white/70 leading-relaxed max-w-2xl mx-auto">
+              Remedial teachers solve last term&apos;s problems. EduNexus closes the gap while the term is still running — so by results day, you&apos;re not surprised.
+            </p>
           </div>
 
         </div>

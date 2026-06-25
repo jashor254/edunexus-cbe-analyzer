@@ -4,7 +4,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import DashboardNavbar from './components/DashboardNavbar'
-import { OnboardingTutorial } from '@/components/onboarding-tutorial'
+import { VideoOnboardingModal } from '@/components/video-onboarding-modal'
 
 export default async function DashboardLayout({
   children,
@@ -27,10 +27,8 @@ export default async function DashboardLayout({
   const isTeacher        = profile?.role === 'teacher'
   const isDualRoleTeacher = isTeacher && profile?.secondary_role === 'parent'
 
-  if (isTeacher && !isDualRoleTeacher) {
-    // Pure teacher — send to teacher dashboard
-    redirect('/teacher/dashboard')
-  }
+  if (isTeacher && !isDualRoleTeacher) redirect('/teacher/dashboard')
+  if (profile?.role === 'student')     redirect('/student')
 
   // Legacy: profile row missing but has a teachers record
   if (!profile?.role) {
@@ -63,7 +61,7 @@ export default async function DashboardLayout({
       <main className="pb-16 md:pb-0">
         {children}
       </main>
-      <OnboardingTutorial userId={user.id} />
+      <VideoOnboardingModal userId={user.id} role={profile?.role as 'parent' | 'teacher' | 'student' | 'school_admin' | 'admin' ?? 'parent'} secondaryRole={profile?.secondary_role} />
     </div>
   )
 }

@@ -6,19 +6,20 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiForbidden, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
 import { ADMIN_CONFIG } from '@/lib/config/api'
+import { SUBSCRIPTION_PLANS, TOKEN_PACK } from '@/lib/payments/config'
 
-type Plan = 'starter' | 'term' | 'premium'
+type Plan = 'starter' | 'term' | 'family'
 
 const PLAN_AMOUNTS: Record<Plan, number> = {
-  starter: 500,
-  term:    3200,
-  premium: 7000,
+  starter: TOKEN_PACK.priceKes,
+  term:    SUBSCRIPTION_PLANS.TERMLY_SINGLE.priceKes,
+  family:  SUBSCRIPTION_PLANS.TERMLY_FAMILY.priceKes,
 }
 
 const PLAN_BONUS_TOKENS: Record<Plan, number> = {
-  starter: 15,
-  term:    10,
-  premium: 20,
+  starter: TOKEN_PACK.tokens,
+  term:    5,
+  family:  10,
 }
 
 export async function POST(request: NextRequest) {
@@ -44,8 +45,8 @@ export async function POST(request: NextRequest) {
     }
 
     if (!email) return apiBadRequest('Missing email')
-    if (!plan || !['starter', 'term', 'premium'].includes(plan)) {
-      return apiBadRequest('plan must be starter | term | premium')
+    if (!plan || !['starter', 'term', 'family'].includes(plan)) {
+      return apiBadRequest('plan must be starter | term | family')
     }
 
     const typedPlan = plan as Plan
@@ -69,6 +70,7 @@ export async function POST(request: NextRequest) {
     let expiresAt: Date | null = null
 
     if (typedPlan === 'starter') {
+      // Add tokens only — no subscription
       // Add 15 tokens (starter pack — token-based, no subscription)
       const { data: existing } = await service
         .from('token_balances')
@@ -89,7 +91,7 @@ export async function POST(request: NextRequest) {
       )
 
     } else {
-      // term / premium → subscription + bonus tokens
+      // term / family → subscription (120 days) + bonus tokens
       expiresAt = new Date(now)
       expiresAt.setDate(expiresAt.getDate() + 120)
 

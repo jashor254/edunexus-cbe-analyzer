@@ -102,6 +102,13 @@ export async function POST(req: Request): Promise<Response> {
     const newWeekly      = isSameWeek ? prevWeekly + 1 : 1
     const newTotal       = prevTotal + 1
 
+    // Resolve subject for group-points bonus
+    const { data: sessionRow } = await db
+      .from('compass_sessions')
+      .select('subject')
+      .eq('id', sessionId)
+      .maybeSingle()
+
     await Promise.all([
       endSession(sessionId, studentId, status, durationSeconds),
       db.from('compass_sessions').update({ xp_earned: xpEarned }).eq('id', sessionId),
@@ -113,6 +120,41 @@ export async function POST(req: Request): Promise<Response> {
         })
         .eq('student_id', studentId),
     ])
+
+    // Award group bonus points if student is in a group for this subject
+    if (sessionRow?.subject && status === 'completed') {
+      const subjectFormatted = (sessionRow.subject as string)
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (c: string) => c.toUpperCase())
+
+      const { data: memberships } = await db
+        .from('study_group_members')
+        .select('id, points, group_id, study_groups!inner(subject)')
+        .eq('student_id', studentId)
+        .filter('study_groups.subject', 'ilike', `%${subjectFormatted.split(' ')[0]}%`)
+
+      if (memberships && memberships.length > 0) {
+        const today = new Date().toISOString().slice(0, 10)
+        for (const m of memberships) {
+          // Check if already earned group bonus from Compass today (to prevent farming)
+          const { data: alreadyBonused } = await db
+            .from('study_group_answers')
+            .select('id')
+            .eq('group_id', m.group_id)
+            .eq('user_id', access.userId)
+            .gte('created_at', `${today}T00:00:00`)
+            .limit(1)
+            .maybeSingle()
+
+          if (!alreadyBonused) {
+            await db
+              .from('study_group_members')
+              .update({ points: ((m.points as number) ?? 0) + 5 })
+              .eq('id', m.id)
+          }
+        }
+      }
+    }
 
     return apiSuccess<EndSessionResult>({
       ended:            true,

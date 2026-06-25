@@ -32,18 +32,18 @@ type Product = {
 type FAQItem = { q: string; a: string }
 
 // ─── Products ─────────────────────────────────────────────────────────────────
-// Paystack integration depends on these exact id values.
+// Paystack integration depends on these exact id values matching SUBSCRIPTION_PLANS.
 
 const TOKEN_PRODUCT: Product = {
   id:        'starter',
-  name:      'Token Pack',
+  name:      'Pay-As-You-Go',
   price:     500,
-  billing:   'one-time',
-  tagline:   'Try before committing',
+  billing:   'one-time · never expires',
+  tagline:   'Not ready to commit? Pay only for what you use.',
   badge:     '',
   highlight: false,
   features:  [],
-  cta:       'Buy Tokens — KES 500',
+  cta:       'Buy KES 500 Credit',
   note:      '',
 }
 
@@ -51,27 +51,26 @@ const PLAN_PRODUCTS: Product[] = [
   {
     id:        'term',
     name:      'Term Plan',
-    price:     3200,
+    price:     2499,
     billing:   'per term',
-    tagline:   'Everything your child needs this term.',
+    tagline:   'Everything your child needs this term — unlimited.',
     badge:     'Most popular',
     highlight: true,
     features: [
-      'Unlimited Learning Compass sessions\n(Personalised tutoring, adapts to your child\'s level)',
-      'Unlimited Academic Clinic reports\n(7-page clinical PDF, any time)',
-      'Covers 1 child, all subjects',
-      'CBC + Cambridge IGCSE',
+      'Unlimited Learning Compass sessions\n(KES 0 per session — subscribers pay nothing per use)',
+      'Unlimited Learner Blueprint reports\n(includes career intelligence — KES 0 per report)',
+      '1 child · all subjects · CBC + IGCSE + 8-4-4',
+      'Weekly parent activity summary',
+      'Teacher connection + instant alerts',
       'PDF report downloads',
-      'Parent notification when teacher marks work',
-      'Pathway + career guidance included',
     ],
-    cta:  'Start Term Plan — KES 3,200',
-    note: 'No card commitment to try — start free, upgrade when ready.',
+    cta:  'Start Term Plan — KES 2,499',
+    note: 'Start free, no card needed — upgrade when ready.',
   },
   {
     id:        'family',
     name:      'Family Plan',
-    price:     5500,
+    price:     4499,
     billing:   'per term',
     tagline:   'For families with more than one child.',
     badge:     'Best value',
@@ -82,8 +81,8 @@ const PLAN_PRODUCTS: Product[] = [
       'Family performance overview',
       'Priority WhatsApp support',
     ],
-    cta:  'Start Family Plan — KES 5,500',
-    note: 'Save KES 1,100 vs two separate Term Plans.',
+    cta:  'Start Family Plan — KES 4,499',
+    note: 'Save KES 1,000 vs two separate Term Plans.',
   },
 ]
 
@@ -102,15 +101,19 @@ const FAQ_ITEMS: FAQItem[] = [
   },
   {
     q: 'Can I track more than one child?',
-    a: 'Yes — the Family Plan covers up to 3 children at KES 5,500 per term.',
+    a: 'Yes — the Family Plan covers up to 3 children at KES 4,499 per term.',
   },
   {
-    q: 'What if I want to try before committing?',
-    a: 'Sign up free — you get 1 Academic Clinic report and 1 Learning Compass session, no card needed. Or buy tokens (KES 500) to explore further.',
+    q: 'What\'s the difference between pay-as-you-go and the term plan?',
+    a: 'Pay-as-you-go costs KES 250 per Learner Blueprint and KES 50 per Compass session — you pay only for what you use. The Term Plan at KES 2,499 is unlimited: every session and every report is included at no extra cost. Committed families who use EduNexus regularly save significantly with the term plan.',
   },
   {
     q: 'How does payment work?',
     a: 'M-PESA via Paystack. You\'ll receive a payment prompt on your phone. Simple.',
+  },
+  {
+    q: 'Does career guidance cost extra?',
+    a: 'No. Career intelligence is built into every Learner Blueprint — it\'s the same product. You get the full picture in one report: learning behaviour, pathway readiness, and career directions.',
   },
 ]
 
@@ -380,19 +383,19 @@ function PricingContent() {
             Simple pricing.
           </h1>
           <p className="text-xl md:text-2xl text-white/50 leading-relaxed font-medium max-w-lg mx-auto">
-            Less than one tuition session.<br />
-            For an entire term.
+            Less than the cost of one remedial teacher.<br />
+            For every subject, the whole term.
           </p>
 
-          {/* Value comparison */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-12 max-w-md mx-auto">
-            {/* Tutor cost */}
-            <div className="w-full sm:flex-1 bg-white/4 border border-white/10 rounded-2xl px-6 py-5 text-center">
-              <p className="text-[11px] font-black text-white/25 uppercase tracking-widest mb-2">
-                1 tuition session
+          {/* Value comparison — 5 tutors vs EduNexus */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-12 max-w-lg mx-auto">
+            {/* 5 tutors cost */}
+            <div className="w-full sm:flex-1 bg-white/4 border border-white/10 rounded-2xl px-6 py-6 text-center">
+              <p className="text-[11px] font-black text-white/25 uppercase tracking-widest mb-3">
+                5 remedial teachers
               </p>
-              <p className="text-3xl font-black text-white/40">KES 1,500</p>
-              <p className="text-xs text-white/20 mt-1.5">one subject · one hour</p>
+              <p className="text-3xl font-black text-white/40">KES 15,000<span className="text-base font-bold text-white/20">+</span></p>
+              <p className="text-xs text-white/20 mt-2 leading-relaxed">per month · one subject each<br/>a different stranger per gap</p>
             </div>
 
             {/* vs chip */}
@@ -401,14 +404,19 @@ function PricingContent() {
             </div>
 
             {/* EduNexus */}
-            <div className="w-full sm:flex-1 bg-teal-500/8 border-2 border-teal-500/35 rounded-2xl px-6 py-5 text-center">
-              <p className="text-[11px] font-black text-teal-400 uppercase tracking-widest mb-2">
-                Full term — unlimited
+            <div className="w-full sm:flex-1 bg-teal-500/8 border-2 border-teal-500/35 rounded-2xl px-6 py-6 text-center">
+              <p className="text-[11px] font-black text-teal-400 uppercase tracking-widest mb-3">
+                EduNexus term plan
               </p>
-              <p className="text-3xl font-black text-teal-300">KES 3,200</p>
-              <p className="text-xs text-teal-400/50 mt-1.5">every subject · every day</p>
+              <p className="text-3xl font-black text-teal-300">KES 2,499</p>
+              <p className="text-xs text-teal-400/60 mt-2 leading-relaxed">per term · every subject covered<br/>works with your child's own teacher</p>
             </div>
           </div>
+
+          {/* One-liner below the comparison */}
+          <p className="text-sm text-white/30 mt-6 max-w-sm mx-auto leading-relaxed">
+            The teacher who already knows your child + an AI tutor that meets them at their exact level — no strangers needed.
+          </p>
         </div>
 
         {/* ── SECTION 2: PLAN CARDS ─────────────────────────────────────────── */}
@@ -452,19 +460,22 @@ function PricingContent() {
               </ul>
             </div>
 
-            {/* Academic Clinic */}
+            {/* Learner Blueprint + Career Intelligence */}
             <div className="bg-white/4 border border-white/8 rounded-2xl p-6">
-              <h3 className="text-sm font-black text-violet-400 uppercase tracking-wider mb-5">
-                Academic Clinic
+              <h3 className="text-sm font-black text-violet-400 uppercase tracking-wider mb-1">
+                Learner Blueprint
               </h3>
+              <p className="text-[10px] text-violet-400/50 font-bold uppercase tracking-widest mb-4">
+                Career intelligence included
+              </p>
               <ul className="space-y-3.5">
                 {[
-                  'Clinical assessment per subject (not just a grade)',
-                  '7-page professional PDF — printable',
-                  '3-week holiday study plan built for your child\'s gaps',
-                  'Pathway guidance: STEM vs Social Sciences vs Arts',
-                  'Career intelligence — Kenya market reality',
-                  'Teacher collaboration page included',
+                  'Who your child is becoming — not just what they scored',
+                  '3-page premium PDF — printable, shareable, parent-friendly',
+                  'Learning behaviour profile: consistency, engagement & persistence',
+                  'Pathway readiness: STEM, Social Sciences & Arts explained clearly',
+                  'Top 3 career directions with real Kenya market context',
+                  'Parent Action Plan: this week, this month, this term',
                 ].map((item, i) => (
                   <li key={i} className="flex items-start gap-2.5 text-sm text-white/55 leading-snug">
                     <span className="text-violet-500/70 shrink-0 mt-0.5 font-bold">—</span>
@@ -508,7 +519,7 @@ function PricingContent() {
 
           <div className="grid grid-cols-2 gap-3 mb-5">
             {[
-              { label: 'KES 250',  sub: 'Academic Clinic report', note: '(strand diagnosis + study plan PDF)' },
+              { label: 'KES 250',  sub: 'Learner Blueprint', note: '(learner intelligence + career directions PDF)' },
               { label: 'KES 50',   sub: 'Compass session',        note: '(personalised tutoring, any subject)' },
             ].map((item, i) => (
               <div key={i} className="bg-white/5 rounded-xl p-4 text-center">

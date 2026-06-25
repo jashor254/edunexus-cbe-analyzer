@@ -46,7 +46,7 @@ export async function sendReportEmail(params: ReportEmailParams): Promise<SendRe
     const { error } = await resend.emails.send({
       from:    getEmailFrom(),
       to:      params.parentEmail,
-      subject: `${params.studentName}'s Academic Clinic Report — Term ${params.term}, ${params.year}`,
+      subject: `${params.studentName}'s Learner Blueprint — Term ${params.term}, ${params.year}`,
       html: `
 <!DOCTYPE html>
 <html>
@@ -55,24 +55,24 @@ export async function sendReportEmail(params: ReportEmailParams): Promise<SendRe
   <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
     <div style="background:#1a2744;padding:32px 40px;text-align:center">
       <p style="color:#f59e0b;font-size:11px;letter-spacing:3px;margin:0 0 8px">EDUNEXUS</p>
-      <h1 style="color:#fff;margin:0;font-size:24px">Academic Clinic Report</h1>
-      <p style="color:#94a3b8;margin:8px 0 0;font-size:14px">Personalised Clinical Learning Report</p>
+      <h1 style="color:#fff;margin:0;font-size:24px">Learner Blueprint</h1>
+      <p style="color:#94a3b8;margin:8px 0 0;font-size:14px">Personalised Learner Intelligence Report</p>
     </div>
     <div style="padding:40px">
       <p style="color:#1e293b;font-size:16px;margin:0 0 16px">Dear ${params.parentName},</p>
       <p style="color:#475569;line-height:1.7;margin:0 0 24px">
-        <strong>${params.studentName}</strong>'s Grade ${params.grade} Academic Clinic Report for
-        Term ${params.term}, ${params.year} is ready. The full 7-page report is attached to this email.
+        <strong>${params.studentName}</strong>'s Grade ${params.grade} Learner Blueprint for
+        Term ${params.term}, ${params.year} is ready. The full report is attached to this email.
       </p>
       <div style="background:#f0f7ff;border-radius:12px;padding:20px;margin-bottom:24px">
-        <p style="color:#1a2744;font-weight:bold;margin:0 0 8px">What's inside the report:</p>
+        <p style="color:#1a2744;font-weight:bold;margin:0 0 8px">What's inside the Learner Blueprint:</p>
         <ul style="color:#475569;margin:0;padding-left:20px;line-height:2">
-          <li>Clinical Overview — overall competency & trajectory</li>
-          <li>Subject Performance Matrix — every subject scored</li>
-          <li>Pathway / Career Analysis</li>
-          <li>3-Week Holiday Action Plan</li>
-          <li>Learning Compass starter guide</li>
-          <li>Teacher Reference Page</li>
+          <li>Learner Snapshot — growth stage, strengths & Future Readiness Score</li>
+          <li>Learning Intelligence — how your child learns, not just what they scored</li>
+          <li>Behaviour Profile — consistency, engagement, persistence & confidence</li>
+          <li>Parent Action Plan — this week, this month, this term</li>
+          <li>Pathway Readiness — STEM, Social Sciences & Arts explained in plain language</li>
+          <li>Career Intelligence — top 3 emerging directions with why they fit</li>
         </ul>
       </div>
       <div style="text-align:center;margin:32px 0">
@@ -87,7 +87,7 @@ export async function sendReportEmail(params: ReportEmailParams): Promise<SendRe
       </p>` : ''}
     </div>
     <div style="background:#f8fafc;padding:24px 40px;border-top:1px solid #e2e8f0;text-align:center">
-      <p style="color:#94a3b8;font-size:12px;margin:0">EduNexus Academic Clinic · edunexus.co.ke · Made in Kenya 🇰🇪</p>
+      <p style="color:#94a3b8;font-size:12px;margin:0">EduNexus Learner Blueprint · edunexus.co.ke · Made in Kenya 🇰🇪</p>
     </div>
   </div>
 </body>

@@ -1,401 +1,805 @@
 import Link from 'next/link'
-import { ArrowLeft, Shield, Users, Baby, Brain, Share2, Lock, Scale, Cookie, Bell, Mail } from 'lucide-react'
+import {
+  ArrowLeft, Shield, Users, Baby, Brain, Share2,
+  Lock, Scale, Cookie, Bell, Mail, Clock, FileText,
+  Globe, AlertTriangle, CheckCircle, Gavel,
+} from 'lucide-react'
 
 export const metadata = {
   title: 'Privacy Policy | EduNexus',
-  description: 'How EduNexus by Jashor Technologies collects, uses, and protects your data — Kenya Data Protection Act 2019 compliant.',
+  description:
+    'How EduNexus by Jashor Technologies collects, uses, and protects your data — fully compliant with the Kenya Data Protection Act 2019.',
+}
+
+const SECTIONS = [
+  { id: 'who-we-are',       label: 'Who We Are' },
+  { id: 'data-collected',   label: 'Data We Collect' },
+  { id: 'legal-basis',      label: 'Legal Basis' },
+  { id: 'how-we-use',       label: 'How We Use It' },
+  { id: 'childrens-data',   label: "Children's Data" },
+  { id: 'ai-data',          label: 'AI & Your Data' },
+  { id: 'data-sharing',     label: 'Data Sharing' },
+  { id: 'cross-border',     label: 'International Transfers' },
+  { id: 'retention',        label: 'How Long We Keep It' },
+  { id: 'security',         label: 'Security' },
+  { id: 'your-rights',      label: 'Your Rights' },
+  { id: 'automated',        label: 'Automated Decisions' },
+  { id: 'cookies',          label: 'Cookies' },
+  { id: 'changes',          label: 'Policy Changes' },
+  { id: 'contact',          label: 'Contact & Complaints' },
+]
+
+function SectionHead({
+  id, icon, number, title, badge,
+}: { id: string; icon: React.ReactNode; number?: string; title: string; badge?: string }) {
+  return (
+    <div id={id} className="flex items-center gap-3 mb-5 scroll-mt-24">
+      <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
+        {number
+          ? <span className="text-sm font-black text-slate-500">{number}</span>
+          : icon}
+      </div>
+      <h2 className="text-xl font-black text-slate-900">{title}</h2>
+      {badge && (
+        <span className="text-xs font-bold bg-amber-100 text-amber-700 px-2.5 py-1 rounded-lg">
+          {badge}
+        </span>
+      )}
+    </div>
+  )
 }
 
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-white">
 
-      {/* Dark navy header */}
-      <div className="bg-slate-900 text-white py-10">
-        <div className="max-w-4xl mx-auto px-6">
-          <nav className="flex items-center gap-2 text-xs text-slate-400 mb-4">
+      {/* ── HERO HEADER ───────────────────────────────────────────────── */}
+      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white py-12">
+        <div className="max-w-5xl mx-auto px-6">
+          <nav className="flex items-center gap-2 text-xs text-slate-400 mb-5">
             <Link href="/" className="hover:text-white transition">Home</Link>
             <span>/</span>
             <Link href="/legal" className="hover:text-white transition">Legal</Link>
             <span>/</span>
             <span className="text-white">Privacy Policy</span>
           </nav>
-          <div className="flex items-center gap-3 mb-2">
-            <Shield className="w-7 h-7 text-teal-400" />
+
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-12 h-12 bg-teal-500/20 rounded-2xl flex items-center justify-center">
+              <Shield className="w-6 h-6 text-teal-400" />
+            </div>
             <h1 className="text-3xl sm:text-4xl font-black">Privacy Policy</h1>
           </div>
-          <p className="text-slate-400 text-sm font-medium mt-2">
-            Last updated: June 4, 2026 · Developed by{' '}
-            <span className="text-teal-400 font-semibold">Jashor Technologies</span>
-          </p>
-          <p className="text-slate-300 text-sm mt-1">edunexus.co.ke</p>
+
+          <div className="flex flex-wrap items-center gap-3 mt-4">
+            <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30">
+              Last updated: 25 June 2026
+            </span>
+            <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-white/10 text-slate-300 border border-white/15">
+              Kenya Data Protection Act 2019
+            </span>
+            <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-white/10 text-slate-300 border border-white/15">
+              Jashor Technologies · edunexus.co.ke
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="max-w-4xl mx-auto px-6 py-12 space-y-10">
+      <div className="max-w-5xl mx-auto px-6 py-12">
+        <div className="lg:grid lg:grid-cols-[220px_1fr] lg:gap-12">
 
-        {/* Intro callout */}
-        <div className="bg-teal-50 border border-teal-200 rounded-2xl p-5">
-          <p className="text-teal-800 text-base leading-relaxed">
-            We wrote this policy in plain language so every Kenyan parent, teacher, and student can understand
-            exactly what data we collect and why. If you have questions, email us at{' '}
-            <a href="mailto:support@edunexus.co.ke" className="font-bold underline">support@edunexus.co.ke</a>.
-          </p>
-        </div>
-
-        {/* 1. WHO WE ARE */}
-        <section>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
-              <span className="text-sm font-black text-slate-600">1</span>
-            </div>
-            <h2 className="text-xl font-black text-slate-900">Who We Are</h2>
-          </div>
-          <div className="space-y-3 text-slate-700 text-base leading-relaxed ml-11">
-            <p>
-              <strong>EduNexus</strong> is an education platform developed by{' '}
-              <strong>Jashor Technologies</strong>, based in Kenya. We serve Kenyan students, parents, and teachers
-              navigating the CBC, 8-4-4, and IGCSE curricula — from Grade 7 through Grade 12.
-            </p>
-            <div className="bg-slate-50 rounded-xl p-4 text-sm space-y-1">
-              <p><strong>Company:</strong> Jashor Technologies</p>
-              <p><strong>Product:</strong> EduNexus Platform</p>
-              <p><strong>Email:</strong>{' '}
-                <a href="mailto:support@edunexus.co.ke" className="text-teal-600 font-semibold">support@edunexus.co.ke</a>
-              </p>
-              <p><strong>Website:</strong> edunexus.co.ke</p>
-              <p><strong>Country:</strong> Kenya</p>
-            </div>
-          </div>
-        </section>
-
-        {/* 2. WHAT DATA WE COLLECT */}
-        <section>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
-              <Users className="w-4 h-4 text-slate-600" />
-            </div>
-            <h2 className="text-xl font-black text-slate-900">What Data We Collect</h2>
-          </div>
-          <div className="space-y-5 ml-11">
-            <div className="grid sm:grid-cols-3 gap-4">
-              <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
-                <h3 className="font-black text-blue-800 mb-2 text-sm uppercase tracking-wide">Student Data</h3>
-                <ul className="space-y-1 text-sm text-blue-700">
-                  <li>• Name, grade, school</li>
-                  <li>• Assessment scores (uploaded by teacher)</li>
-                  <li>• Learning session data (Compass)</li>
-                  <li>• Career interests</li>
-                </ul>
-              </div>
-              <div className="bg-violet-50 border border-violet-100 rounded-2xl p-4">
-                <h3 className="font-black text-violet-800 mb-2 text-sm uppercase tracking-wide">Parent Data</h3>
-                <ul className="space-y-1 text-sm text-violet-700">
-                  <li>• Name, phone number (WhatsApp)</li>
-                  <li>• Email (optional)</li>
-                  <li>• Child&apos;s academic reports</li>
-                </ul>
-              </div>
-              <div className="bg-teal-50 border border-teal-100 rounded-2xl p-4">
-                <h3 className="font-black text-teal-800 mb-2 text-sm uppercase tracking-wide">Teacher Data</h3>
-                <ul className="space-y-1 text-sm text-teal-700">
-                  <li>• Name, school, subjects taught</li>
-                  <li>• Class lists</li>
-                  <li>• Assessment records</li>
-                </ul>
-              </div>
-            </div>
-            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
-              <h3 className="font-black text-slate-700 mb-2 text-sm uppercase tracking-wide">Usage Data (Automatic)</h3>
-              <p className="text-sm text-slate-600">
-                Pages visited, features used, learning session duration, and device type (mobile/desktop).
-                We collect this to improve the platform.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* 3. HOW WE USE YOUR DATA */}
-        <section>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
-              <span className="text-sm font-black text-slate-600">3</span>
-            </div>
-            <h2 className="text-xl font-black text-slate-900">How We Use Your Data</h2>
-          </div>
-          <div className="ml-11 grid sm:grid-cols-2 gap-3">
-            {[
-              'Generate personalised Academic Clinic Reports',
-              'Power the Learning Compass for each student',
-              'Send academic reports to parents via WhatsApp & email',
-              'Help teachers track class performance',
-              'Improve our platform and fix bugs',
-            ].map(item => (
-              <div key={item} className="flex items-start gap-2 bg-green-50 border border-green-100 rounded-xl p-3 text-sm text-green-800">
-                <span className="text-green-500 font-black shrink-0 mt-0.5">✓</span>
-                {item}
-              </div>
-            ))}
-          </div>
-          <div className="ml-11 mt-4 bg-red-50 border border-red-200 rounded-xl p-4">
-            <p className="font-black text-red-800 mb-2">We do NOT:</p>
-            <ul className="space-y-1 text-sm text-red-700">
-              <li>• Sell your data to third parties</li>
-              <li>• Use student data for advertising</li>
-              <li>• Share data with unauthorized parties</li>
-            </ul>
-          </div>
-        </section>
-
-        {/* 4. CHILDREN'S DATA */}
-        <section>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
-              <Baby className="w-4 h-4 text-amber-700" />
-            </div>
-            <h2 className="text-xl font-black text-slate-900">
-              Children&apos;s Data{' '}
-              <span className="text-sm font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg ml-1">Important</span>
-            </h2>
-          </div>
-          <div className="ml-11 space-y-4">
-            <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-5">
-              <p className="text-amber-900 text-base leading-relaxed mb-4">
-                EduNexus serves students including minors under 18. We take children&apos;s privacy very seriously.
-              </p>
-              <ul className="space-y-2 text-sm text-amber-800">
-                <li className="flex items-start gap-2">
-                  <span className="text-amber-600 font-black shrink-0">•</span>
-                  Student accounts are created by <strong>parents or teachers</strong> — not children directly
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-amber-600 font-black shrink-0">•</span>
-                  We collect only data <strong>necessary for educational purposes</strong>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-amber-600 font-black shrink-0">•</span>
-                  Parents can request <strong>deletion of their child&apos;s data</strong> at any time
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-amber-600 font-black shrink-0">•</span>
-                  We comply with <strong>Kenya&apos;s Data Protection Act 2019</strong>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-amber-600 font-black shrink-0">•</span>
-                  Student data is <strong>never used for advertising</strong> or profiling outside education
-                </li>
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        {/* 5. AI AND YOUR DATA */}
-        <section>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
-              <Brain className="w-4 h-4 text-slate-600" />
-            </div>
-            <h2 className="text-xl font-black text-slate-900">AI and Your Data</h2>
-          </div>
-          <div className="ml-11 space-y-4">
-            <p className="text-slate-700 text-base leading-relaxed">
-              EduNexus uses AI (DeepSeek via Together AI) to power three features:
-            </p>
-            <div className="grid sm:grid-cols-3 gap-3">
-              {[
-                { label: 'Personalised learning tasks', icon: '📚' },
-                { label: 'Academic Clinic Reports', icon: '🔬' },
-                { label: 'Career pathway recommendations', icon: '🎯' },
-              ].map(item => (
-                <div key={item.label} className="bg-slate-50 rounded-xl p-3 text-center text-sm font-semibold text-slate-700">
-                  <div className="text-2xl mb-1">{item.icon}</div>
-                  {item.label}
-                </div>
-              ))}
-            </div>
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-green-800 space-y-1">
-              <p className="font-black text-green-900">Personalised content is always:</p>
-              <p>• Reviewed against real KICD curriculum data</p>
-              <p>• Labeled as AI-assisted</p>
-              <p>• Subject to human oversight</p>
-            </div>
-            <div className="bg-slate-900 rounded-xl p-4 text-sm text-white font-semibold">
-              Your data is <span className="text-teal-400">NOT used to train external AI models.</span>
-            </div>
-          </div>
-        </section>
-
-        {/* 6. DATA SHARING */}
-        <section>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
-              <Share2 className="w-4 h-4 text-slate-600" />
-            </div>
-            <h2 className="text-xl font-black text-slate-900">Data Sharing</h2>
-          </div>
-          <div className="ml-11">
-            <p className="text-slate-700 mb-4">We share data <strong>only with these providers</strong>, all bound by data processing agreements:</p>
-            <div className="space-y-2">
-              {[
-                { name: 'Supabase', role: 'Database hosting', note: 'EU servers', color: 'bg-green-50 border-green-100 text-green-800' },
-                { name: 'Together AI', role: 'AI processing', note: 'Anonymised data only', color: 'bg-blue-50 border-blue-100 text-blue-800' },
-                { name: 'Vercel', role: 'Platform hosting', note: 'Global CDN', color: 'bg-slate-50 border-slate-100 text-slate-800' },
-                { name: 'Paystack', role: 'Payment processing', note: 'No academic data shared', color: 'bg-violet-50 border-violet-100 text-violet-800' },
-              ].map(p => (
-                <div key={p.name} className={`flex items-center justify-between rounded-xl border px-4 py-3 text-sm ${p.color}`}>
-                  <div>
-                    <span className="font-black">{p.name}</span>
-                    <span className="ml-2 opacity-80">— {p.role}</span>
-                  </div>
-                  <span className="text-xs opacity-70">{p.note}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* 7. DATA SECURITY */}
-        <section>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
-              <Lock className="w-4 h-4 text-slate-600" />
-            </div>
-            <h2 className="text-xl font-black text-slate-900">Data Security</h2>
-          </div>
-          <div className="ml-11 grid sm:grid-cols-2 gap-3">
-            {[
-              { title: 'Encrypted in transit', desc: 'HTTPS everywhere — no plain HTTP', icon: '🔐' },
-              { title: 'Row Level Security', desc: 'Database access restricted per user', icon: '🛡️' },
-              { title: 'No plain-text passwords', desc: 'All passwords securely hashed', icon: '🔑' },
-              { title: 'Regular security audits', desc: 'We review security practices regularly', icon: '🔍' },
-            ].map(item => (
-              <div key={item.title} className="flex items-start gap-3 bg-slate-50 rounded-xl p-4">
-                <span className="text-xl shrink-0">{item.icon}</span>
-                <div>
-                  <p className="font-bold text-slate-900 text-sm">{item.title}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">{item.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* 8. YOUR RIGHTS */}
-        <section>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
-              <Scale className="w-4 h-4 text-slate-600" />
-            </div>
-            <h2 className="text-xl font-black text-slate-900">Your Rights Under Kenya Data Protection Act 2019</h2>
-          </div>
-          <div className="ml-11 space-y-4">
-            <div className="grid sm:grid-cols-2 gap-2">
-              {[
-                { right: 'Access your personal data', desc: 'Request a copy of everything we hold about you' },
-                { right: 'Correct inaccurate data', desc: 'Update wrong or outdated information' },
-                { right: 'Delete your data', desc: 'Right to be forgotten — we will erase your records' },
-                { right: 'Object to processing', desc: 'Opt out of certain uses of your data' },
-                { right: 'Data portability', desc: 'Get your data in a machine-readable format' },
-                { right: 'Withdraw consent', desc: 'Change your mind about what we can process' },
-              ].map(item => (
-                <div key={item.right} className="bg-white border border-slate-200 rounded-xl p-3">
-                  <p className="font-bold text-slate-900 text-sm">{item.right}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">{item.desc}</p>
-                </div>
-              ))}
-            </div>
-            <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 text-sm text-teal-800">
-              <p className="font-black mb-1">To exercise any of these rights:</p>
-              <p>
-                Email us at{' '}
-                <a href="mailto:support@edunexus.co.ke" className="font-bold underline">support@edunexus.co.ke</a>
-                {' '}— we will respond within 7 business days.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* 9. COOKIES */}
-        <section>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
-              <Cookie className="w-4 h-4 text-slate-600" />
-            </div>
-            <h2 className="text-xl font-black text-slate-900">Cookies</h2>
-          </div>
-          <div className="ml-11 space-y-2">
-            <p className="text-slate-700 text-base">We use <strong>essential cookies only</strong> — no advertising cookies.</p>
-            <div className="flex gap-3">
-              <div className="flex-1 bg-green-50 border border-green-100 rounded-xl p-3 text-sm text-green-800">
-                <p className="font-bold">Authentication cookie</p>
-                <p className="opacity-80">Keeps you logged in safely</p>
-              </div>
-              <div className="flex-1 bg-green-50 border border-green-100 rounded-xl p-3 text-sm text-green-800">
-                <p className="font-bold">Session cookie</p>
-                <p className="opacity-80">Manages your active session</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* 10. POLICY CHANGES */}
-        <section>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
-              <Bell className="w-4 h-4 text-slate-600" />
-            </div>
-            <h2 className="text-xl font-black text-slate-900">Changes to This Policy</h2>
-          </div>
-          <div className="ml-11">
-            <p className="text-slate-700 leading-relaxed">
-              We will notify users of significant changes via <strong>email</strong> or an <strong>in-app notification</strong>.
-              Minor updates (like fixing typos) will not be separately announced.
-              This policy was last updated on <strong>June 4, 2026</strong>.
-            </p>
-          </div>
-        </section>
-
-        {/* 11. CONTACT */}
-        <section>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
-              <Mail className="w-4 h-4 text-slate-600" />
-            </div>
-            <h2 className="text-xl font-black text-slate-900">Contact Us</h2>
-          </div>
-          <div className="ml-11">
-            <div className="bg-slate-900 text-white rounded-2xl p-6 space-y-2">
-              <p className="font-black text-lg text-white">Jashor Technologies</p>
-              <p className="text-slate-300 text-sm">EduNexus Platform</p>
-              <div className="pt-2 space-y-1 text-sm text-slate-300">
-                <p>
-                  <span className="text-slate-500">Email: </span>
-                  <a href="mailto:support@edunexus.co.ke" className="text-teal-400 font-semibold hover:text-teal-300">
-                    support@edunexus.co.ke
+          {/* ── STICKY TABLE OF CONTENTS (desktop only) ─────────────── */}
+          <aside className="hidden lg:block">
+            <div className="sticky top-8 bg-slate-50 border border-slate-200 rounded-2xl p-5">
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Contents</p>
+              <nav className="space-y-1">
+                {SECTIONS.map(s => (
+                  <a
+                    key={s.id}
+                    href={`#${s.id}`}
+                    className="block text-sm text-slate-500 hover:text-teal-600 hover:translate-x-1 transition-all py-0.5"
+                  >
+                    {s.label}
                   </a>
+                ))}
+              </nav>
+            </div>
+          </aside>
+
+          {/* ── MAIN CONTENT ────────────────────────────────────────── */}
+          <div className="space-y-12">
+
+            {/* Plain-language callout */}
+            <div className="bg-teal-50 border border-teal-200 rounded-2xl p-5">
+              <p className="text-teal-800 text-base leading-relaxed">
+                We wrote this in plain language so every Kenyan parent, teacher, and student understands exactly what
+                data we collect and why. If anything is unclear, email us at{' '}
+                <a href="mailto:support@edunexus.co.ke" className="font-bold underline">
+                  support@edunexus.co.ke
+                </a>{' '}
+                — we will respond within 7 business days.
+              </p>
+            </div>
+
+            {/* ── 1. WHO WE ARE ──────────────────────────────────────── */}
+            <section>
+              <SectionHead id="who-we-are" icon={<FileText className="w-4 h-4 text-slate-500" />} number="1" title="Who We Are" />
+              <div className="space-y-4 text-slate-700 text-base leading-relaxed">
+                <p>
+                  <strong>EduNexus</strong> is an AI-powered education platform developed and operated by{' '}
+                  <strong>Jashor Technologies</strong>, incorporated in Kenya. We serve students, parents, and teachers
+                  navigating the CBC Junior (Grade 7–9), CBC Senior (Grade 10–12), and 8-4-4 (Form 3–4) curricula.
                 </p>
-                <p><span className="text-slate-500">Website: </span> edunexus.co.ke</p>
-                <p><span className="text-slate-500">Country: </span> Kenya 🇰🇪</p>
+                <p>
+                  Under the Kenya Data Protection Act 2019, Jashor Technologies is the <strong>Data Controller</strong>{' '}
+                  for all personal data processed through the EduNexus platform.
+                </p>
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 grid sm:grid-cols-2 gap-3 text-sm">
+                  {[
+                    ['Data Controller', 'Jashor Technologies'],
+                    ['Product', 'EduNexus Platform'],
+                    ['Registration', 'Kenya'],
+                    ['Website', 'edunexus.co.ke'],
+                    ['Email', 'support@edunexus.co.ke'],
+                    ['Support line', '+254 710 798 030 (WhatsApp)'],
+                  ].map(([k, v]) => (
+                    <div key={k} className="flex gap-2">
+                      <span className="text-slate-400 shrink-0">{k}:</span>
+                      <span className="font-semibold text-slate-800">{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {/* ── 2. DATA COLLECTED ───────────────────────────────────── */}
+            <section>
+              <SectionHead id="data-collected" icon={<Users className="w-4 h-4 text-slate-500" />} number="2" title="What Data We Collect" />
+              <div className="space-y-4">
+                <div className="grid sm:grid-cols-3 gap-4">
+                  <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
+                    <h3 className="font-black text-blue-800 mb-3 text-sm uppercase tracking-wide">Student Data</h3>
+                    <ul className="space-y-1.5 text-sm text-blue-700">
+                      <li>• Full name, grade level, school</li>
+                      <li>• Term assessment scores (CBC levels 1–4)</li>
+                      <li>• Learning Compass session history</li>
+                      <li>• Career interests & pathway</li>
+                      <li>• XP points, streaks, milestones</li>
+                      <li>• Study group membership & answers</li>
+                    </ul>
+                  </div>
+                  <div className="bg-violet-50 border border-violet-100 rounded-2xl p-4">
+                    <h3 className="font-black text-violet-800 mb-3 text-sm uppercase tracking-wide">Parent Data</h3>
+                    <ul className="space-y-1.5 text-sm text-violet-700">
+                      <li>• Full name</li>
+                      <li>• Phone number (WhatsApp)</li>
+                      <li>• Email address</li>
+                      <li>• Child's academic reports received</li>
+                      <li>• Payment records (Paystack)</li>
+                    </ul>
+                  </div>
+                  <div className="bg-teal-50 border border-teal-100 rounded-2xl p-4">
+                    <h3 className="font-black text-teal-800 mb-3 text-sm uppercase tracking-wide">Teacher Data</h3>
+                    <ul className="space-y-1.5 text-sm text-teal-700">
+                      <li>• Full name, school</li>
+                      <li>• Subjects & grades taught</li>
+                      <li>• Class lists & student records</li>
+                      <li>• Scheme of work content</li>
+                      <li>• Lesson plan content</li>
+                      <li>• Token balance & usage</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
+                    <h3 className="font-black text-amber-800 mb-3 text-sm uppercase tracking-wide">Study Group Data</h3>
+                    <ul className="space-y-1.5 text-sm text-amber-700">
+                      <li>• Group name, subject, grade</li>
+                      <li>• Member list (names, points, streaks)</li>
+                      <li>• Daily challenge answers (with correctness)</li>
+                      <li>• Leaderboard positions</li>
+                    </ul>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                    <h3 className="font-black text-slate-600 mb-3 text-sm uppercase tracking-wide">Usage Data (Automatic)</h3>
+                    <ul className="space-y-1.5 text-sm text-slate-600">
+                      <li>• Pages visited, features used</li>
+                      <li>• Session duration and frequency</li>
+                      <li>• Device type (mobile/desktop)</li>
+                      <li>• Browser type and OS</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* ── 3. LEGAL BASIS ─────────────────────────────────────── */}
+            <section>
+              <SectionHead id="legal-basis" icon={<Gavel className="w-4 h-4 text-slate-500" />} number="3" title="Legal Basis for Processing" />
+              <p className="text-slate-700 text-base leading-relaxed mb-4">
+                Under Section 30 of the Kenya Data Protection Act 2019, we must have a lawful basis for processing
+                each category of personal data. The table below sets out the basis for each type.
+              </p>
+              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-900 text-white">
+                      <th className="text-left px-4 py-3 font-black rounded-tl-2xl">Data Category</th>
+                      <th className="text-left px-4 py-3 font-black">Legal Basis</th>
+                      <th className="text-left px-4 py-3 font-black rounded-tr-2xl">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {[
+                      ['Student academic data', 'Consent', 'Provided by parent/guardian at registration'],
+                      ['Student learning sessions', 'Consent + Legitimate Interest', 'To deliver personalised education'],
+                      ['Parent contact details', 'Consent', 'Provided at signup; used to send reports'],
+                      ['Teacher account data', 'Contractual Necessity', 'Required to provide the subscribed service'],
+                      ['Payment records', 'Legal Obligation', 'Financial record-keeping under Kenya tax law'],
+                      ['Usage analytics', 'Legitimate Interest', 'To improve platform performance and fix bugs'],
+                      ['Study group data', 'Consent', 'Student or parent chooses to join a group'],
+                    ].map(([cat, basis, detail], i) => (
+                      <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                        <td className="px-4 py-3 font-semibold text-slate-800">{cat}</td>
+                        <td className="px-4 py-3">
+                          <span className="inline-block text-xs font-bold px-2.5 py-1 rounded-full bg-teal-100 text-teal-800">
+                            {basis}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-500">{detail}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            {/* ── 4. HOW WE USE IT ──────────────────────────────────── */}
+            <section>
+              <SectionHead id="how-we-use" icon={<Brain className="w-4 h-4 text-slate-500" />} number="4" title="How We Use Your Data" />
+              <div className="grid sm:grid-cols-2 gap-3 mb-4">
+                {[
+                  ['📋', 'Generate Learner Blueprint reports for parents'],
+                  ['🧭', 'Power the Learning Compass for each student'],
+                  ['📱', 'Send academic reports via WhatsApp & email'],
+                  ['📊', 'Help teachers track class performance trends'],
+                  ['🏆', 'Manage study group leaderboards and challenges'],
+                  ['🎯', 'Provide CBC pathway and career recommendations'],
+                  ['🔧', 'Diagnose bugs and improve platform reliability'],
+                  ['🛡️', 'Detect and prevent fraudulent activity'],
+                ].map(([icon, text]) => (
+                  <div key={text} className="flex items-start gap-3 bg-green-50 border border-green-100 rounded-xl p-3.5 text-sm text-green-800">
+                    <span className="shrink-0 text-base">{icon}</span>
+                    <span>{text}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-5">
+                <p className="font-black text-red-800 text-sm uppercase tracking-wide mb-3">We will NEVER:</p>
+                <ul className="space-y-2 text-sm text-red-700">
+                  {[
+                    'Sell your personal data to any third party',
+                    'Use student data for commercial advertising or profiling',
+                    'Share data with parties not listed in this policy',
+                    'Process data beyond the purposes stated above without fresh consent',
+                    'Use your data to train external AI models',
+                  ].map(item => (
+                    <li key={item} className="flex items-start gap-2">
+                      <span className="font-black text-red-500 shrink-0">✕</span> {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+
+            {/* ── 5. CHILDREN'S DATA ────────────────────────────────── */}
+            <section>
+              <SectionHead
+                id="childrens-data"
+                icon={<Baby className="w-4 h-4 text-amber-600" />}
+                title="Children's Data"
+                badge="Critical"
+              />
+              <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-6 space-y-4">
+                <p className="text-amber-900 text-base leading-relaxed">
+                  EduNexus serves students including minors under 18. We apply heightened protections to all student data
+                  in accordance with Section 44 of the Kenya Data Protection Act 2019.
+                </p>
+                <div className="space-y-3">
+                  {[
+                    {
+                      title: 'Parental consent required',
+                      desc: 'Student profiles are created by a parent or guardian who agrees to this policy on the child\'s behalf. Students under 18 may not create their own accounts independently.',
+                    },
+                    {
+                      title: 'Student self-login',
+                      desc: 'Once a parent creates a profile, students may be given their own login to access the Learning Compass, study groups, and their personal dashboard. This login is still linked to and governed by parental consent.',
+                    },
+                    {
+                      title: 'Minimum data principle',
+                      desc: 'We collect only the data strictly necessary for educational purposes — name, grade, school, assessment scores, and learning session data.',
+                    },
+                    {
+                      title: 'No advertising to minors',
+                      desc: 'Student data is never used for advertising, commercial profiling, or any purpose outside direct educational support.',
+                    },
+                    {
+                      title: 'Parental access and deletion',
+                      desc: 'Parents may request access to, correction of, or deletion of their child\'s data at any time by emailing support@edunexus.co.ke.',
+                    },
+                  ].map(item => (
+                    <div key={item.title} className="flex items-start gap-3 bg-white/60 rounded-xl p-4">
+                      <CheckCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-bold text-amber-900 text-sm">{item.title}</p>
+                        <p className="text-sm text-amber-700 mt-0.5 leading-relaxed">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {/* ── 6. AI & YOUR DATA ─────────────────────────────────── */}
+            <section>
+              <SectionHead id="ai-data" icon={<Brain className="w-4 h-4 text-slate-500" />} number="6" title="AI and Your Data" />
+              <div className="space-y-4">
+                <p className="text-slate-700 text-base leading-relaxed">
+                  EduNexus uses DeepSeek AI (accessed via Together AI) to power the following features:
+                </p>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {[
+                    { icon: '🧭', label: 'Learning Compass', desc: 'Real-time personalised tutoring sessions' },
+                    { icon: '📋', label: 'Learner Blueprints', desc: 'Personalised learning intelligence reports' },
+                    { icon: '🎯', label: 'Career Recommendations', desc: 'Pathway suggestions based on student strengths' },
+                    { icon: '🏆', label: 'Study Group Challenges', desc: 'Daily AI-generated subject questions' },
+                    { icon: '📝', label: 'Scheme of Work', desc: 'AI-assisted lesson content for teachers' },
+                  ].map(item => (
+                    <div key={item.label} className="flex items-start gap-3 bg-slate-50 border border-slate-200 rounded-xl p-4">
+                      <span className="text-xl shrink-0">{item.icon}</span>
+                      <div>
+                        <p className="font-bold text-slate-800 text-sm">{item.label}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-slate-900 rounded-2xl p-5 space-y-3">
+                  <p className="text-white font-black text-sm uppercase tracking-wide">AI Data Commitments</p>
+                  {[
+                    'Student data sent to AI is minimised — only what is needed for that specific task',
+                    'Together AI processes data under a Data Processing Agreement — they may not retain or reuse it',
+                    'Your data is NOT used to train DeepSeek or any external AI model',
+                    'AI outputs are reviewed against KICD curriculum data before being shown to students',
+                    'AI-generated content is always clearly labelled as AI-assisted',
+                  ].map(item => (
+                    <div key={item} className="flex items-start gap-2 text-sm text-slate-300">
+                      <span className="text-teal-400 font-black shrink-0">✓</span> {item}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {/* ── 7. DATA SHARING ──────────────────────────────────── */}
+            <section>
+              <SectionHead id="data-sharing" icon={<Share2 className="w-4 h-4 text-slate-500" />} number="7" title="Data Sharing — Our Processors" />
+              <p className="text-slate-700 text-base mb-4">
+                We share data <strong>only</strong> with the following service providers, each bound by a Data Processing
+                Agreement and prohibited from using your data for their own commercial purposes:
+              </p>
+              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-900 text-white">
+                      <th className="text-left px-4 py-3 font-black rounded-tl-2xl">Provider</th>
+                      <th className="text-left px-4 py-3 font-black">Purpose</th>
+                      <th className="text-left px-4 py-3 font-black">Data Shared</th>
+                      <th className="text-left px-4 py-3 font-black rounded-tr-2xl">Location</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {[
+                      {
+                        name: 'Supabase',
+                        purpose: 'Database & authentication',
+                        data: 'All user data',
+                        location: 'EU (Frankfurt)',
+                        color: 'bg-green-50',
+                      },
+                      {
+                        name: 'Together AI',
+                        purpose: 'AI processing',
+                        data: 'Minimised, anonymised data',
+                        location: 'United States',
+                        color: 'bg-blue-50',
+                      },
+                      {
+                        name: 'Vercel',
+                        purpose: 'Platform hosting & CDN',
+                        data: 'Static assets only — no personal data',
+                        location: 'Global CDN',
+                        color: 'bg-slate-50',
+                      },
+                      {
+                        name: 'Paystack',
+                        purpose: 'Payment processing',
+                        data: 'Name, email, payment details only',
+                        location: 'Nigeria / Kenya',
+                        color: 'bg-violet-50',
+                      },
+                      {
+                        name: 'WhatsApp (Meta)',
+                        purpose: 'Report delivery to parents',
+                        data: "Parent's phone number + report content",
+                        location: 'United States',
+                        color: 'bg-green-50',
+                      },
+                    ].map(p => (
+                      <tr key={p.name} className={p.color}>
+                        <td className="px-4 py-3 font-black text-slate-800">{p.name}</td>
+                        <td className="px-4 py-3 text-slate-600">{p.purpose}</td>
+                        <td className="px-4 py-3 text-slate-500 text-xs">{p.data}</td>
+                        <td className="px-4 py-3 text-xs font-semibold text-slate-500">{p.location}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+                <strong>WhatsApp note:</strong> When we send a report to a parent via WhatsApp, Meta Platforms (WhatsApp's
+                owner) receives the parent's phone number and the message content as part of delivering that message. Meta
+                operates under its own Privacy Policy. You can opt out of WhatsApp report delivery by emailing us.
+              </div>
+            </section>
+
+            {/* ── 8. CROSS-BORDER TRANSFERS ────────────────────────── */}
+            <section>
+              <SectionHead id="cross-border" icon={<Globe className="w-4 h-4 text-slate-500" />} number="8" title="International Data Transfers" />
+              <div className="space-y-4 text-slate-700">
+                <p className="text-base leading-relaxed">
+                  Some of our service providers are located outside Kenya. Under Section 48 of the Kenya Data Protection
+                  Act 2019, we are required to disclose these transfers and the safeguards in place.
+                </p>
+                <div className="space-y-3">
+                  {[
+                    {
+                      dest: 'European Union (Supabase — Germany)',
+                      color: 'border-green-200 bg-green-50',
+                      badge: 'bg-green-100 text-green-700',
+                      badgeText: 'GDPR Protected',
+                      detail:
+                        'The EU has the GDPR, which provides protections at least equivalent to the Kenya DPA 2019. Your data stored with Supabase benefits from these stronger protections.',
+                    },
+                    {
+                      dest: 'United States (Together AI, Meta/WhatsApp, Vercel)',
+                      color: 'border-amber-200 bg-amber-50',
+                      badge: 'bg-amber-100 text-amber-700',
+                      badgeText: 'Contractual Safeguards',
+                      detail:
+                        'No adequacy decision exists between Kenya and the US. We rely on Data Processing Agreements and Standard Contractual Clauses to safeguard your data with US-based processors.',
+                    },
+                    {
+                      dest: 'Nigeria (Paystack)',
+                      color: 'border-blue-200 bg-blue-50',
+                      badge: 'bg-blue-100 text-blue-700',
+                      badgeText: 'CBK Regulated',
+                      detail:
+                        'Paystack is licensed to operate in Kenya by the Central Bank of Kenya and is subject to Nigerian data protection law (NDPR 2019), which has similar requirements to the Kenya DPA.',
+                    },
+                  ].map(item => (
+                    <div key={item.dest} className={`border rounded-2xl p-4 ${item.color}`}>
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <p className="font-bold text-slate-800 text-sm">{item.dest}</p>
+                        <span className={`text-[11px] font-black px-2 py-0.5 rounded-full shrink-0 ${item.badge}`}>
+                          {item.badgeText}
+                        </span>
+                      </div>
+                      <p className="text-sm text-slate-600 leading-relaxed">{item.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {/* ── 9. RETENTION ─────────────────────────────────────── */}
+            <section>
+              <SectionHead id="retention" icon={<Clock className="w-4 h-4 text-slate-500" />} number="9" title="How Long We Keep Your Data" />
+              <p className="text-slate-700 text-base mb-4">
+                We retain personal data only as long as necessary for the purpose it was collected, or as required by
+                Kenyan law. The schedule below applies to all categories.
+              </p>
+              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-900 text-white">
+                      <th className="text-left px-4 py-3 font-black rounded-tl-2xl">Data Type</th>
+                      <th className="text-left px-4 py-3 font-black">Retention Period</th>
+                      <th className="text-left px-4 py-3 font-black rounded-tr-2xl">Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {[
+                      ['Account & profile data', 'While account is active, then deleted within 30 days of a verified deletion request', 'Necessary to provide the service'],
+                      ['Student assessment scores', 'While account is active + 30 days after deletion', 'Forms core of the educational record'],
+                      ['Learning Compass sessions', 'While account is active + 30 days after deletion', 'Powers progress tracking'],
+                      ['Study group data', 'While account is active + 30 days after deletion', 'Community feature'],
+                      ['Payment records', '7 years from date of transaction', 'Kenya VAT Act & Income Tax Act obligation'],
+                      ['Learner Blueprint PDFs', 'While account is active + 30 days after deletion', 'Parent record'],
+                      ['AI conversation logs', 'Anonymised after 90 days, then retained for debugging', 'Platform improvement; personal data removed'],
+                      ['Database backups', '30-day rolling backup window', 'Disaster recovery'],
+                      ['Usage analytics', '24 months rolling', 'Platform performance monitoring'],
+                    ].map(([type, period, reason], i) => (
+                      <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                        <td className="px-4 py-3 font-semibold text-slate-800 align-top">{type}</td>
+                        <td className="px-4 py-3 text-slate-700 align-top">{period}</td>
+                        <td className="px-4 py-3 text-slate-500 text-xs align-top">{reason}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-600">
+                After an account deletion request is verified, all personal data is purged from live systems within
+                30 days. Payment records are the only exception due to statutory legal obligations and cannot be deleted
+                within the 7-year window.
+              </div>
+            </section>
+
+            {/* ── 10. SECURITY ─────────────────────────────────────── */}
+            <section>
+              <SectionHead id="security" icon={<Lock className="w-4 h-4 text-slate-500" />} number="10" title="Data Security" />
+              <div className="grid sm:grid-cols-2 gap-3">
+                {[
+                  { icon: '🔐', title: 'Encrypted in transit', desc: 'All connections use TLS 1.2+. No unencrypted HTTP.' },
+                  { icon: '🛡️', title: 'Row Level Security (RLS)', desc: 'Every database table enforces per-user access policies at the database layer.' },
+                  { icon: '🔑', title: 'Hashed passwords', desc: 'Passwords are never stored in plain text. Supabase uses bcrypt hashing.' },
+                  { icon: '🔒', title: 'Service role isolation', desc: 'The database service key is never exposed to client code. All elevated access goes through server-side routes only.' },
+                  { icon: '🔍', title: 'Access logging', desc: 'All API access is logged. Suspicious patterns trigger alerts.' },
+                  { icon: '♻️', title: 'Regular reviews', desc: 'We review security practices and audit data access controls on a quarterly basis.' },
+                ].map(item => (
+                  <div key={item.title} className="flex items-start gap-3 bg-slate-50 border border-slate-200 rounded-xl p-4">
+                    <span className="text-xl shrink-0">{item.icon}</span>
+                    <div>
+                      <p className="font-bold text-slate-900 text-sm">{item.title}</p>
+                      <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+                <AlertTriangle className="w-4 h-4 inline mr-2" />
+                <strong>Data breach notification:</strong> If a breach occurs that is likely to result in a risk to your
+                rights and freedoms, we will notify the Office of the Data Protection Commissioner (ODPC) within 72 hours
+                and notify affected users without undue delay, as required by Section 43 of the Kenya DPA 2019.
+              </div>
+            </section>
+
+            {/* ── 11. YOUR RIGHTS ──────────────────────────────────── */}
+            <section>
+              <SectionHead id="your-rights" icon={<Scale className="w-4 h-4 text-slate-500" />} number="11" title="Your Rights Under the Kenya Data Protection Act 2019" />
+              <div className="grid sm:grid-cols-2 gap-3 mb-5">
+                {[
+                  { right: 'Right to Access (S.26)', desc: 'Request a copy of all personal data we hold about you.' },
+                  { right: 'Right to Rectification (S.27)', desc: 'Require us to correct inaccurate or incomplete data.' },
+                  { right: 'Right to Erasure (S.28)', desc: 'Request deletion of your data (the "right to be forgotten").' },
+                  { right: 'Right to Restriction (S.29)', desc: 'Ask us to limit how we process your data in certain circumstances.' },
+                  { right: 'Right to Portability (S.30)', desc: 'Receive your data in a structured, machine-readable format.' },
+                  { right: 'Right to Object (S.31)', desc: 'Object to processing based on legitimate interest, including profiling.' },
+                  { right: 'Withdraw Consent (S.30)', desc: 'Where processing is based on consent, you may withdraw it at any time without affecting past processing.' },
+                  { right: 'Automated Decisions (S.32)', desc: 'Not be subject to decisions based solely on automated processing that significantly affects you.' },
+                ].map(item => (
+                  <div key={item.right} className="bg-white border border-slate-200 rounded-xl p-4">
+                    <p className="font-bold text-slate-900 text-sm">{item.right}</p>
+                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-teal-50 border border-teal-200 rounded-2xl p-5">
+                <p className="font-black text-teal-900 mb-2">How to exercise your rights</p>
+                <p className="text-sm text-teal-800 leading-relaxed">
+                  Email{' '}
+                  <a href="mailto:support@edunexus.co.ke" className="font-bold underline">
+                    support@edunexus.co.ke
+                  </a>{' '}
+                  with the subject line <strong>"Data Rights Request"</strong> and your name. We will acknowledge within
+                  48 hours and respond fully within <strong>21 days</strong> (the maximum allowed under the Kenya DPA 2019,
+                  extendable by a further 21 days for complex requests with notice).
+                </p>
+              </div>
+            </section>
+
+            {/* ── 12. AUTOMATED DECISIONS ──────────────────────────── */}
+            <section>
+              <SectionHead id="automated" icon={<Brain className="w-4 h-4 text-slate-500" />} number="12" title="Automated Decision-Making & Profiling" />
+              <div className="space-y-4 text-slate-700 text-base">
+                <p className="leading-relaxed">
+                  EduNexus uses automated processing (AI) to generate several outputs. Under Section 32 of the Kenya DPA 2019,
+                  we must disclose where automated decisions have a significant effect on you.
+                </p>
+                <div className="space-y-3">
+                  {[
+                    {
+                      feature: 'Learner Blueprint reports',
+                      automated: 'AI analyses assessment scores and generates a personalised report',
+                      human: 'Parents and teachers review the report; it does not make any formal academic decision',
+                      significant: false,
+                    },
+                    {
+                      feature: 'CBC pathway recommendations',
+                      automated: 'AI suggests STEM, Social Sciences, or Arts & Sports based on scores',
+                      human: 'Advisory only — the student and parent choose the actual pathway',
+                      significant: false,
+                    },
+                    {
+                      feature: 'Learning Compass sessions',
+                      automated: 'AI adapts question difficulty based on student responses in real time',
+                      human: 'Students can end a session at any time; no grades are produced',
+                      significant: false,
+                    },
+                    {
+                      feature: 'Career recommendations',
+                      automated: 'AI matches student strengths to career paths from a curated KICD-aligned list',
+                      human: 'Informational only — no institutional decision is made',
+                      significant: false,
+                    },
+                  ].map(item => (
+                    <div key={item.feature} className="border border-slate-200 rounded-2xl overflow-hidden">
+                      <div className="bg-slate-50 px-4 py-3 flex items-center justify-between">
+                        <p className="font-bold text-slate-800 text-sm">{item.feature}</p>
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-green-100 text-green-700">
+                          No significant legal effect
+                        </span>
+                      </div>
+                      <div className="px-4 py-3 grid sm:grid-cols-2 gap-3 text-xs text-slate-600">
+                        <div>
+                          <p className="font-bold text-slate-700 mb-1">What the AI does</p>
+                          <p>{item.automated}</p>
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-700 mb-1">Human oversight</p>
+                          <p>{item.human}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-sm text-slate-500">
+                  None of our automated systems produce legally binding or significant decisions (such as grade allocation,
+                  school placement, or financial decisions). All AI outputs are advisory.
+                </p>
+              </div>
+            </section>
+
+            {/* ── 13. COOKIES ──────────────────────────────────────── */}
+            <section>
+              <SectionHead id="cookies" icon={<Cookie className="w-4 h-4 text-slate-500" />} number="13" title="Cookies & Local Storage" />
+              <p className="text-slate-700 text-base mb-4">
+                We use <strong>essential cookies only</strong> — no advertising, tracking, or third-party analytics cookies.
+              </p>
+              <div className="grid sm:grid-cols-3 gap-3">
+                {[
+                  { name: 'sb-auth-token', type: 'Authentication', desc: 'Keeps you securely logged in. Expires on logout or 7 days.', required: true },
+                  { name: 'sb-session', type: 'Session', desc: 'Manages your active session state. Cleared when you close the browser.', required: true },
+                  { name: 'theme', type: 'Preference', desc: 'Remembers your display preference (dark/light mode).', required: false },
+                ].map(c => (
+                  <div key={c.name} className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="font-mono font-bold text-slate-800 text-xs">{c.name}</p>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${c.required ? 'bg-red-100 text-red-700' : 'bg-slate-200 text-slate-500'}`}>
+                        {c.required ? 'Required' : 'Optional'}
+                      </span>
+                    </div>
+                    <p className="text-xs font-bold text-slate-500 mb-1">{c.type}</p>
+                    <p className="text-xs text-slate-500 leading-relaxed">{c.desc}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-4 text-sm text-slate-500">
+                You may disable cookies in your browser settings. Disabling the authentication cookie will log you out
+                and prevent access to authenticated features.
+              </p>
+            </section>
+
+            {/* ── 14. CHANGES ──────────────────────────────────────── */}
+            <section>
+              <SectionHead id="changes" icon={<Bell className="w-4 h-4 text-slate-500" />} number="14" title="Changes to This Policy" />
+              <div className="space-y-3 text-slate-700 text-base leading-relaxed">
+                <p>
+                  We will notify users of <strong>material changes</strong> — such as new data categories, new processors,
+                  or changes to your rights — via in-app notification and email at least 14 days before the change takes effect.
+                </p>
+                <p>
+                  Minor updates (typo fixes, clarifications) will be made without advance notice but with an updated
+                  "Last updated" date at the top of this page.
+                </p>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm">
+                  <p className="font-bold text-slate-700">Version history</p>
+                  <div className="mt-2 space-y-1 text-slate-500">
+                    <p>25 Jun 2026 — Added: student self-login, study groups, WhatsApp processor, retention schedule, legal basis table, automated decisions disclosure, cross-border transfer details</p>
+                    <p>4 Jun 2026 — Initial publication</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* ── 15. CONTACT & COMPLAINTS ─────────────────────────── */}
+            <section>
+              <SectionHead id="contact" icon={<Mail className="w-4 h-4 text-slate-500" />} number="15" title="Contact Us & How to Complain" />
+              <div className="space-y-4">
+                <div className="bg-slate-900 text-white rounded-2xl p-6">
+                  <p className="font-black text-lg mb-4">Jashor Technologies — EduNexus</p>
+                  <div className="grid sm:grid-cols-2 gap-3 text-sm text-slate-300">
+                    <div>
+                      <p className="text-slate-500 text-xs mb-1">Email</p>
+                      <a href="mailto:support@edunexus.co.ke" className="text-teal-400 font-semibold hover:text-teal-300">
+                        support@edunexus.co.ke
+                      </a>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-xs mb-1">WhatsApp</p>
+                      <a href="https://wa.me/254710798030" className="text-green-400 font-semibold hover:text-green-300">
+                        +254 710 798 030
+                      </a>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-xs mb-1">Website</p>
+                      <span>edunexus.co.ke</span>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-xs mb-1">Country</p>
+                      <span>Kenya 🇰🇪</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ODPC */}
+                <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Gavel className="w-5 h-5 text-red-600" />
+                    <h3 className="font-black text-red-800">Right to Lodge a Complaint</h3>
+                  </div>
+                  <p className="text-red-800 text-sm leading-relaxed mb-4">
+                    If you believe we have processed your personal data in a manner inconsistent with the Kenya Data
+                    Protection Act 2019, you have the right to lodge a complaint with the{' '}
+                    <strong>Office of the Data Protection Commissioner (ODPC)</strong> — Kenya's data protection regulator.
+                  </p>
+                  <div className="bg-white/70 rounded-xl p-4 text-sm text-red-700 space-y-1">
+                    <p><strong>Office:</strong> Office of the Data Protection Commissioner</p>
+                    <p><strong>Website:</strong>{' '}
+                      <a href="https://www.odpc.go.ke" target="_blank" rel="noopener noreferrer" className="underline font-semibold">
+                        www.odpc.go.ke
+                      </a>
+                    </p>
+                    <p><strong>Address:</strong> Teleposta Towers, Kenyatta Avenue, Nairobi</p>
+                    <p><strong>Email:</strong> info@odpc.go.ke</p>
+                    <p><strong>Phone:</strong> +254 20 428 5000</p>
+                  </div>
+                  <p className="text-xs text-red-600 mt-3">
+                    We encourage you to contact us first at support@edunexus.co.ke so we can try to resolve your concern
+                    before escalating to the ODPC.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            {/* ── FOOTER NAV ─────────────────────────────────────────── */}
+            <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
+              <Link
+                href="/"
+                className="inline-flex items-center gap-2 text-sm text-teal-600 font-bold hover:text-teal-700"
+              >
+                <ArrowLeft className="w-4 h-4" /> Back to Home
+              </Link>
+              <div className="flex gap-4 text-xs text-slate-400">
+                <Link href="/legal/terms"  className="hover:text-slate-700">Terms of Use</Link>
+                <Link href="/legal/refund" className="hover:text-slate-700">Refund Policy</Link>
               </div>
             </div>
-          </div>
-        </section>
 
-        {/* Back link */}
-        <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-sm text-teal-600 font-bold hover:text-teal-700"
-          >
-            <ArrowLeft className="w-4 h-4" /> Back to Home
-          </Link>
-          <div className="flex gap-4 text-xs text-slate-400">
-            <Link href="/legal/terms" className="hover:text-slate-700">Terms of Use</Link>
-            <Link href="/legal/refund" className="hover:text-slate-700">Refund Policy</Link>
           </div>
         </div>
-
       </div>
     </div>
   )

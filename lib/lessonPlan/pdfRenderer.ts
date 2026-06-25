@@ -1,4 +1,5 @@
 import type { LessonPlanRecord } from './types'
+import type { CurriculumMode } from '@/lib/sow/types'
 import { isKiswahiliSubject } from '@/lib/curriculum/subjectUtils'
 import { toTitleCase } from '@/lib/utils/formatters'
 
@@ -35,6 +36,15 @@ function extendedBullets(text: string | null | undefined): string {
   return `<ul>${lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>`
 }
 
+function localizeGrade(grade: string, isKiswahili: boolean): string {
+  if (!isKiswahili) return grade
+  const cbcMatch = grade.match(/^Grade\s+(\d+)$/i)
+  if (cbcMatch) return `Gredi ya ${cbcMatch[1]}`
+  const formMatch = grade.match(/^Form\s+(\d+)$/i)
+  if (formMatch) return `Kidato cha ${formMatch[1]}`
+  return grade
+}
+
 interface LessonPlanMeta {
   teacherName: string
   tscNumber: string
@@ -43,12 +53,15 @@ interface LessonPlanMeta {
   grade: string
   term: string | number
   year: number
+  curriculumMode?: CurriculumMode
 }
 
 function buildLessonPlanHTML(plan: LessonPlanRecord, meta: LessonPlanMeta, nextPlan?: LessonPlanRecord): string {
-  const sw = isKiswahiliSubject(meta.learningArea)
-  const school = toTitleCase(meta.school)
-  const teacherName = toTitleCase(meta.teacherName)
+  const sw           = isKiswahiliSubject(meta.learningArea)
+  const is844        = meta.curriculumMode === '844_form3' || meta.curriculumMode === '844_form4'
+  const school       = toTitleCase(meta.school)
+  const teacherName  = toTitleCase(meta.teacherName)
+  const gradeDisplay = localizeGrade(meta.grade, sw)
 
   const labels = sw ? {
     title:              'MPANGO WA SOMO',
@@ -70,6 +83,27 @@ function buildLessonPlanHTML(plan: LessonPlanRecord, meta: LessonPlanMeta, nextP
     weekLesson:         'Wiki / Somo:',
     weekLabel:          'Wiki',
     lessonLabel:        'Somo',
+    footer:             'EduNexus · For Kenyan Teachers',
+  } : is844 ? {
+    title:              'LESSON PLAN',
+    outcomes:           'Specific Objectives',
+    outcomesIntro:      'By the end of the lesson, the learner should be able to:',
+    keyInquiry:         'Key Questions',
+    resources:          'Teaching / Learning Resources',
+    organisation:       'Organisation of Learning',
+    introduction:       'Introduction / Getting Started (5 mins)',
+    development:        'Lesson Development',
+    step1:              'Step 1 (10 mins):',
+    step2:              'Step 2 (10 mins):',
+    step3:              'Step 3 (10 mins):',
+    conclusion:         'Conclusion (5 mins)',
+    extended:           'Extended Activities',
+    reflection:         'Reflection of the Lesson',
+    strand:             'Topic:',
+    subStrand:          'Sub-Topic:',
+    weekLesson:         'Week / Lesson:',
+    weekLabel:          'Week',
+    lessonLabel:        'Lesson',
     footer:             'EduNexus · For Kenyan Teachers',
   } : {
     title:              'LESSON PLAN',
@@ -101,7 +135,7 @@ function buildLessonPlanHTML(plan: LessonPlanRecord, meta: LessonPlanMeta, nextP
     <table class="header-table">
       <tr>
         <td class="header-cell"><span class="header-label">${sw ? 'SHULE' : 'SCHOOL'}</span><span class="header-value">${esc(school)}</span></td>
-        <td class="header-cell"><span class="header-label">${sw ? 'DARASA' : 'GRADE'}</span><span class="header-value">${esc(meta.grade)}</span></td>
+        <td class="header-cell"><span class="header-label">${sw ? (is844 ? 'KIDATO' : 'GREDI') : is844 ? 'FORM' : 'GRADE'}</span><span class="header-value">${esc(gradeDisplay)}</span></td>
         <td class="header-cell"><span class="header-label">${sw ? 'SOMO' : 'SUBJECT'}</span><span class="header-value">${esc(meta.learningArea)}</span></td>
         <td class="header-cell"><span class="header-label">${sw ? 'TAREHE' : 'DATE'}</span><span class="header-value">${esc(plan.taught_date || '')}&nbsp;</span></td>
         <td class="header-cell"><span class="header-label">${sw ? 'WAKATI' : 'TIME'}</span><span class="header-value header-placeholder">_______</span></td>

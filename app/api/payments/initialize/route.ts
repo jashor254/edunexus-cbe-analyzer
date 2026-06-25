@@ -1,12 +1,13 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
+import { SUBSCRIPTION_PLANS, TOKEN_PACK } from '@/lib/payments/config'
 
-// 🔒 Single source of truth — backend only, never trust frontend
+// Backend product map — prices pulled from config, never hardcoded here
 const PRODUCTS: Record<string, { price: number; type: string; label: string; tokens?: number }> = {
-  starter: { price: 500,  type: 'token',       label: 'Try It',    tokens: 15 },
-  term:    { price: 3200, type: 'subscription', label: 'Term Plan'             },
-  premium: { price: 7000, type: 'subscription', label: 'Premium'               },
+  starter: { price: TOKEN_PACK.priceKes,                        type: 'token',        label: 'Pay-As-You-Go', tokens: TOKEN_PACK.tokens },
+  term:    { price: SUBSCRIPTION_PLANS.TERMLY_SINGLE.priceKes, type: 'subscription', label: 'Term Plan'      },
+  family:  { price: SUBSCRIPTION_PLANS.TERMLY_FAMILY.priceKes, type: 'subscription', label: 'Family Plan'    },
 }
 
 export async function POST(req: Request) {

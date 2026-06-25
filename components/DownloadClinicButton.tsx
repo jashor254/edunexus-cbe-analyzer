@@ -48,7 +48,7 @@ export default function DownloadClinicButton({
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Academic_Clinic_${studentName.replace(/\s+/g, '_')}.pdf`;
+      a.download = `Learner_Blueprint_${studentName.replace(/\s+/g, '_')}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -64,9 +64,9 @@ export default function DownloadClinicButton({
 
   return (
     <div className="p-6 bg-white border-2 border-dashed border-blue-100 rounded-2xl text-center">
-      <h3 className="text-lg font-bold text-gray-800 mb-2">🏥 Full Academic Clinic Diagnosis</h3>
+      <h3 className="text-lg font-bold text-gray-800 mb-2">📋 Learner Blueprint</h3>
       <p className="text-sm text-gray-500 mb-6">
-        Get the 8-page analysis, 20-year career outlook, and 90-day action plan.
+        Who your child is becoming — strengths, learning behaviour, pathway readiness, and emerging career directions.
       </p>
 
       {!hasPaid ? (

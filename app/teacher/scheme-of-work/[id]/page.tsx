@@ -359,7 +359,7 @@ export default function SOWDetailPage({ params }: { params: Promise<{ id: string
           <table className="w-full text-xs border-collapse" style={{ minWidth: '900px' }}>
             <thead>
               <tr style={{ background: '#1e293b' }}>
-                {['Wk', 'Ls', 'Strand', 'Sub-Strand', 'Learning Outcomes', 'Learning Experiences', 'Key Inquiry Qs', 'Resources', 'Assessment'].map((h, i) => (
+                {['Wk', 'Ls', 'Strand', 'Sub-Strand', 'Lesson Learning Outcomes', 'Learning Experiences', 'Key Inquiry Qs', 'Resources', 'Assessment'].map((h, i) => (
                   <th
                     key={i}
                     className="px-3 py-3 text-left font-black uppercase tracking-wide text-slate-300"

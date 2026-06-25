@@ -39,7 +39,7 @@ function detectSubjectType(name: string, curriculumMode: string): string {
   if (s.includes('kiswahili') || s.includes('fasihi'))
     return isKcse ? 'kcse_kiswahili'
          : isCbcSenior ? 'cbc_senior_kiswahili'
-         : 'default'
+         : 'kiswahili'
 
   if (s.includes('biology'))
     return isKcse ? 'kcse_biology'

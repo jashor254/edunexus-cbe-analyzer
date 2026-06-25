@@ -1,4 +1,4 @@
-import { createClient } from '@/utils/supabase/server'
+import { createClient }        from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
 
@@ -10,29 +10,32 @@ export async function POST(req: Request) {
   try {
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return apiUnauthorized()
-    }
+    if (authError || !user) return apiUnauthorized()
 
-    const { name, subject, grade, studentName } = await req.json()
-    if (!name || !subject || !grade || !studentName) {
-      return apiBadRequest('Missing required fields')
-    }
+    const { name, subject, grade } = await req.json()
+    if (!name || !subject || !grade) return apiBadRequest('Missing required fields')
 
     const db = createServiceClient()
 
-    // Generate unique invite code (retry if taken)
+    // Resolve the student record for this user account
+    const { data: student } = await db
+      .from('students')
+      .select('id, name')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (!student) return apiBadRequest('No student profile found. Ask your parent to set up your account first.')
+
+    // Unique invite code
     let inviteCode = generateInviteCode()
-    let attempts = 0
-    while (attempts < 5) {
+    for (let i = 0; i < 5; i++) {
       const { data: existing } = await db
         .from('study_groups')
         .select('id')
         .eq('invite_code', inviteCode)
-        .single()
+        .maybeSingle()
       if (!existing) break
       inviteCode = generateInviteCode()
-      attempts++
     }
 
     const groundRules = [
@@ -47,32 +50,22 @@ export async function POST(req: Request) {
 
     const { data: group, error: groupError } = await db
       .from('study_groups')
-      .insert({
-        name,
-        subject,
-        grade,
-        invite_code: inviteCode,
-        created_by:  user.id,
-        ground_rules: groundRules,
-      })
+      .insert({ name, subject, grade, invite_code: inviteCode, created_by: user.id, ground_rules: groundRules })
       .select()
       .single()
 
-    if (groupError || !group) {
-      console.error('[groups/create] error:', groupError)
-      return apiError('Failed to create group')
-    }
+    if (groupError || !group) return apiError('Failed to create group')
 
-    // Auto-add creator as first member
+    // Auto-add creator as first member — name comes from their student profile
     await db.from('study_group_members').insert({
       group_id:     group.id,
       user_id:      user.id,
-      student_name: studentName,
+      student_id:   student.id,
+      student_name: student.name,
     })
 
     return apiSuccess({ groupId: group.id, inviteCode })
   } catch (error: unknown) {
-    console.error('[groups/create] error:', error instanceof Error ? error.message : String(error))
-    return apiError('Internal server error')
+    return apiError(error instanceof Error ? error.message : 'Internal server error')
   }
 }

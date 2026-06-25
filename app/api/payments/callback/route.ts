@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { createHmac } from 'crypto'
+import { TOKEN_PACK } from '@/lib/payments/config'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL!
 
@@ -58,7 +59,7 @@ async function processPayment(
   // 5. Fulfill based on product ─────────────────────────────────────────────
 
   if (productId === 'starter') {
-    // Add 15 tokens to balance
+    const tokensToAdd = TOKEN_PACK.tokens
     const { data: existing } = await db
       .from('token_balances')
       .select('balance, total_ever')
@@ -69,17 +70,17 @@ async function processPayment(
       await db
         .from('token_balances')
         .update({
-          balance:    existing.balance + 15,
-          total_ever: existing.total_ever + 15,
+          balance:    existing.balance    + tokensToAdd,
+          total_ever: existing.total_ever + tokensToAdd,
         })
         .eq('user_id', userId)
     } else {
       await db
         .from('token_balances')
-        .insert({ user_id: userId, balance: 15, total_ever: 15 })
+        .insert({ user_id: userId, balance: tokensToAdd, total_ever: tokensToAdd })
     }
 
-  } else if (productId === 'term' || productId === 'premium') {
+  } else if (productId === 'term' || productId === 'family' || productId === 'premium') {
     // Create or extend subscription by 3 months
     const { data: existingSub } = await db
       .from('subscriptions')
