@@ -4,7 +4,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
-import { apiSuccess, apiError, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
+import { apiSuccess, apiError, apiUnauthorized, apiBadRequest, apiForbidden } from '@/lib/api/response'
 
 const MODE_TO_CURRICULUM_TYPE: Record<string, string> = {
   cbc_senior: 'cbc_senior',
@@ -28,6 +28,14 @@ export async function GET(req: Request) {
 
     const db = createServiceClient()
 
+    // Curriculum data is teacher-only — students and parents have no access
+    const { data: teacher } = await db
+      .from('teachers')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (!teacher) return apiForbidden()
+
     const { data: levels, error: lvlErr } = await db
       .from('sow_levels')
       .select('id')
@@ -47,7 +55,7 @@ export async function GET(req: Request) {
     if (grErr) return apiError('Failed to load grades')
 
     const response = apiSuccess({ grades: grades || [] })
-    response.headers.set('Cache-Control', 'public, max-age=600, stale-while-revalidate=120')
+    response.headers.set('Cache-Control', 'private, max-age=600, stale-while-revalidate=120')
     return response
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to load grades'

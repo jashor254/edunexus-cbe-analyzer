@@ -6,6 +6,7 @@ import { buildCompassPrompt, type CompassPromptParams, type KnowledgeContextBloc
 import type { RootCauseResult } from '@/lib/knowledgeGraph/types'
 import { getGradeTopics } from '@/lib/compass/topics'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
+import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
 import { type FeatureKey } from '@/lib/payments/config'
 import { apiError } from '@/lib/api/response'
 
@@ -182,6 +183,12 @@ export async function POST(req: Request) {
     if (access.allowed === false) {
       const status = access.reason === 'unauthenticated' ? 401 : 403
       return apiError(access.reason, status)
+    }
+
+    // ── Daily abuse-prevention cap ────────────────────────────────────────────
+    const rateLimit = await checkDailyCallLimit(access.userId, FEATURE)
+    if (rateLimit.allowed === false) {
+      return apiError(`Daily limit of ${rateLimit.limit} sessions reached. Resets at ${rateLimit.resetAt}`, 429)
     }
 
     // ── Keepalive: idle session check (no AI call needed) ─────────────────────

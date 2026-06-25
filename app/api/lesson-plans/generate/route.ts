@@ -4,6 +4,7 @@
 import { z } from 'zod'
 import { createServiceClient } from '@/utils/supabase/service'
 import { checkFeatureAccess } from '@/lib/payments/access'
+import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
 import { type FeatureKey } from '@/lib/payments/config'
 import {
   apiSuccess,
@@ -27,6 +28,11 @@ export async function POST(req: Request) {
     if (access.allowed === false) {
       const status = access.reason === 'unauthenticated' ? 401 : 403
       return apiError(access.reason, status)
+    }
+
+    const rateLimit = await checkDailyCallLimit(access.userId, FEATURE)
+    if (rateLimit.allowed === false) {
+      return apiError(`Daily limit of ${rateLimit.limit} lesson plan generations reached. Resets at ${rateLimit.resetAt}`, 429)
     }
 
     const db = createServiceClient()

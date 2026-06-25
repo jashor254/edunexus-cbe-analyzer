@@ -1,46 +1,22 @@
-// app/api/ai/usage/route.ts
-import { NextRequest } from 'next/server'
-import { checkRateLimit } from '@/lib/ai/rateLimit'
-import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
-import type { UsageTier } from '@/lib/ai/rateLimit'
+import { createClient } from '@/utils/supabase/server'
+import { getDailyUsage } from '@/lib/ai/rateLimit'
+import { apiSuccess, apiUnauthorized, apiError } from '@/lib/api/response'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
-    const tier = (searchParams.get('tier') as UsageTier) || 'free'
+    const supabase = await createClient()
+    const { data: { user }, error } = await supabase.auth.getUser()
+    if (!user || error) return apiUnauthorized()
 
-    if (!userId) {
-      return apiUnauthorized()
-    }
+    const usage = await getDailyUsage(user.id)
 
-    // Hapa tunacheki kama amefika kikomo (Rate Limits)
-    const [careerAnalysis, learningPlans, chatMessages] = await Promise.all([
-      checkRateLimit(userId, 'careerAnalysis', tier),
-      checkRateLimit(userId, 'learningPlans', tier),
-      checkRateLimit(userId, 'chatMessages', tier)
-    ])
+    const resetAt = new Date()
+    resetAt.setUTCDate(resetAt.getUTCDate() + 1)
+    resetAt.setUTCHours(0, 0, 0, 0)
 
-    return apiSuccess({
-      tier,
-      usage: {
-        careerAnalysis, // Hii itarudisha { allowed: boolean, remaining: number }
-        learningPlans,
-        chatMessages
-      },
-      resetDate: getNextMonthStart()
-    })
-
-  } catch (error) {
-    console.error('Usage check API error:', error)
+    return apiSuccess({ usage, resetAt: resetAt.toISOString() })
+  } catch (err) {
+    console.error('[ai/usage]', err)
     return apiError('Internal Server Error', 500)
   }
-}
-
-function getNextMonthStart(): string {
-  const date = new Date()
-  date.setMonth(date.getMonth() + 1)
-  date.setDate(1)
-  date.setHours(0, 0, 0, 0)
-  return date.toISOString()
 }

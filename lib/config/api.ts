@@ -4,8 +4,6 @@
 // ✅ Never prefix these with NEXT_PUBLIC_
 // ============================================================
 
-import type { UsageTier } from '@/lib/ai/rateLimit'
-
 // ============================================================
 // AI PROVIDER CONFIG
 // ============================================================
@@ -122,21 +120,6 @@ export const RESEND_CONFIG = {
 }
 
 // ============================================================
-// RATE LIMITING
-// ============================================================
-
-export const RATE_LIMITS = {
-  // AI calls per user per day
-  AI_CALLS_PER_DAY: 10,
-
-  // Assessment entries per user per day
-  ASSESSMENTS_PER_DAY: 50,
-
-  // Auth attempts per IP
-  AUTH_ATTEMPTS_PER_HOUR: 10,
-}
-
-// ============================================================
 // TOKEN CONFIG
 // ============================================================
 
@@ -172,8 +155,4 @@ export const ADMIN_CONFIG = {
   isAdmin(email: string) {
     return this.adminEmails.includes(email.toLowerCase().trim())
   },
-
-  getAdminTier(): UsageTier {
-    return 'admin'
-  }
 }

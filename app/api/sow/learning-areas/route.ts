@@ -9,6 +9,7 @@ import {
   apiError,
   apiUnauthorized,
   apiBadRequest,
+  apiForbidden,
 } from '@/lib/api/response'
 import type { CurriculumMode } from '@/lib/sow/types'
 
@@ -37,6 +38,14 @@ export async function GET(req: Request) {
     if (!curriculumType) return apiBadRequest(`Unknown mode: ${mode}`)
 
     const db = createServiceClient()
+
+    // Curriculum data is teacher-only — students and parents have no access
+    const { data: teacher } = await db
+      .from('teachers')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (!teacher) return apiForbidden()
 
     // 1. Find the primary level for this curriculum type
     const { data: levels, error: lvlErr } = await db
@@ -80,7 +89,7 @@ export async function GET(req: Request) {
     }
 
     const response = apiSuccess({ areas: areas || [] })
-    response.headers.set('Cache-Control', 'public, max-age=600, stale-while-revalidate=120')
+    response.headers.set('Cache-Control', 'private, max-age=600, stale-while-revalidate=120')
     return response
   } catch (err: unknown) {
     console.error('[sow/learning-areas]', err)
