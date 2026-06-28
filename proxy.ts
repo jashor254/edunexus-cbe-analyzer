@@ -11,6 +11,7 @@ const PUBLIC_PREFIXES = [
   '/auth',
   '/join',
   '/shared',
+  '/preview',
   '/payment',
   '/_next',
   '/favicon',

@@ -17,12 +17,13 @@ export async function GET(req: Request) {
       .single()
     if (!teacher) return apiForbidden()
 
-    const url    = new URL(req.url)
-    const term   = url.searchParams.get('term')   ?? undefined
-    const yearRaw = url.searchParams.get('year')
-    const year   = yearRaw ? parseInt(yearRaw, 10) : undefined
+    const url            = new URL(req.url)
+    const term           = url.searchParams.get('term')   ?? undefined
+    const yearRaw        = url.searchParams.get('year')
+    const year           = yearRaw ? parseInt(yearRaw, 10) : undefined
+    const assessmentType = url.searchParams.get('type')   ?? undefined
 
-    const analytics = await getAssessmentAnalytics(teacher.id, { term, year })
+    const analytics = await getAssessmentAnalytics(teacher.id, { term, year, assessmentType })
     return apiSuccess({ analytics })
   } catch (e: unknown) {
     console.error('[teacher/analytics GET]', e instanceof Error ? e.message : String(e))

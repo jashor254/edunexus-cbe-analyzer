@@ -61,6 +61,41 @@ async function callOnce(
   return data.choices[0].message.content
 }
 
+async function callGeminiNonStreaming(
+  prompt: string,
+  systemPrompt: string,
+  temperature: number,
+  maxTokens: number
+): Promise<string> {
+  const key = process.env.GOOGLE_GEMINI_API_KEY
+  if (!key) throw new Error('Missing GOOGLE_GEMINI_API_KEY — cannot fall back to Gemini')
+
+  const genAI = new GoogleGenerativeAI(key)
+  const model = genAI.getGenerativeModel({
+    model: GEMINI_PRIMARY,
+    systemInstruction: systemPrompt,
+    generationConfig: {
+      temperature,
+      maxOutputTokens: maxTokens,
+      thinkingConfig: { thinkingBudget: 0 },
+    } as GeminiGenerationConfig,
+  })
+
+  const GEMINI_TIMEOUT_MS = 20_000
+  const result = await new Promise<string>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error('Gemini non-streaming timeout after 20s')),
+      GEMINI_TIMEOUT_MS
+    )
+    model.generateContent(prompt).then(
+      r => { clearTimeout(timer); resolve(r.response.text()) },
+      e => { clearTimeout(timer); reject(e) }
+    )
+  })
+
+  return result
+}
+
 export async function callDeepSeek(
   prompt: string,
   systemPrompt?: string,
@@ -85,7 +120,12 @@ export async function callDeepSeek(
     const isRetryable = msg === 'DeepSeek timeout after 25s' || msg === 'fetch failed'
     if (isRetryable) {
       console.warn(`[deepseek] retryable error on first attempt (${msg}) — retrying once`)
-      return await callOnce(prompt, resolved.systemPrompt, resolved)
+      try {
+        return await callOnce(prompt, resolved.systemPrompt, resolved)
+      } catch (retryErr) {
+        console.warn(`[deepseek] retry also failed — falling back to Gemini:`, (retryErr as Error).message)
+        return await callGeminiNonStreaming(prompt, resolved.systemPrompt, resolved.temperature, resolved.maxTokens)
+      }
     }
     throw err
   }

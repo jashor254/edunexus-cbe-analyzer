@@ -507,6 +507,133 @@ export type ParentIntelligenceReport = {
   disclaimer:            string
 }
 
+// ── Career Intelligence Engine (13-section framework) ────────────────────────
+
+export type HiddenStrength = {
+  strength:         string
+  evidence:         string
+  career_relevance: string
+}
+
+export type GrowthBarrier = {
+  barrier:                 string
+  explanation:             string
+  opportunity_if_improved: string
+}
+
+export type OpportunityEntry = {
+  career: string
+  reason: string
+}
+
+export type StretchOpportunityEntry = {
+  career:          string
+  what_to_improve: string
+}
+
+export type UnlikelyOpportunityEntry = {
+  career:                    string
+  what_would_make_realistic: string
+}
+
+export type CIEAIRealityCheck = {
+  career_title:                  string
+  tasks_ai_will_automate:        string[]
+  tasks_humans_still_do:         string[]
+  skills_becoming_valuable:      string[]
+  skills_becoming_less_valuable: string[]
+  how_to_prepare:                string
+}
+
+export type CIEFourDoors = {
+  employment:       string
+  self_employment:  string
+  business_creation: string
+  ai_augmented:     string
+}
+
+export type EducationChain = {
+  subject: string
+  chain:   string[]
+}
+
+export type CIETeacherInsight = {
+  subjects_requiring_intervention:    string[]
+  hidden_strengths:                   string[]
+  suggested_classroom_opportunities:  string[]
+  suggested_responsibilities:         string[]
+  how_to_nurture_confidence:          string
+}
+
+export type LearnerChallenge = {
+  challenge:   string
+  why:         string
+  how_to_do_it: string
+}
+
+export type CareerIntelligenceReport = {
+  student_id:   string
+  student_name: string
+  grade:        number
+  age:          number
+  pathway:      string | null
+  dream_career: string | null
+  generated_at: string
+
+  // S1: Career Readiness Snapshot
+  readiness_score:      number
+  readiness_label:      string
+  readiness_summary:    string
+  current_strengths:    string[]
+  current_challenges:   string[]
+  learning_habits_note: string
+
+  // S2: Hidden Strengths
+  hidden_strengths: HiddenStrength[]
+
+  // S3: Growth Barriers
+  growth_barriers: GrowthBarrier[]
+
+  // S4: Future Opportunity Landscape
+  strong_fit_now:        OpportunityEntry[]
+  fit_after_improvement: StretchOpportunityEntry[]
+  unlikely_today:        UnlikelyOpportunityEntry[]
+
+  // S5: AI Reality Check (from top career's ai_impact)
+  ai_reality_check: CIEAIRealityCheck | null
+
+  // S6: Four Career Doors (from top career's doors)
+  four_doors: CIEFourDoors | null
+
+  // S7: Education → Opportunity Map
+  education_chains: EducationChain[]
+
+  // S8: Domain Expertise (AI-generated)
+  domain_expertise: string
+
+  // S9: Career Flexibility (AI-generated)
+  career_flexibility: string
+
+  // S10: Parent Guidance
+  parent_this_week:       string[]
+  parent_this_month:      string[]
+  parent_long_term_habit: string
+
+  // S11: Teacher Insight (AI-generated)
+  teacher_insight: CIETeacherInsight
+
+  // S12: Learner Challenge (AI-generated)
+  learner_challenge: LearnerChallenge
+
+  // S13: Career Intelligence Summary (AI-generated)
+  intelligence_summary: string
+
+  // Signature section
+  if_learning_continues: string
+
+  disclaimer: string
+}
+
 // ── Phase 7: Student Growth Engine ───────────────────────────────────────────
 
 export type GrowthDirection = 'improved' | 'stable' | 'declined'

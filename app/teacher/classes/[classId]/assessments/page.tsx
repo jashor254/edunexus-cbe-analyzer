@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, useRef, use } from 'react'
 import Link from 'next/link'
 import {
   ClipboardList, PlusCircle, Users, BarChart2, ChevronRight,
@@ -15,6 +15,19 @@ import {
 } from '@/lib/curriculum/subjects'
 import type { DbGradeScale } from '@/lib/assessments/gradeScales'
 import { BUILTIN_CBC_SCALE, BUILTIN_844_SCALE } from '@/lib/assessments/gradeCalculator'
+
+const TYPE_LABEL: Record<AssessmentType, string> = {
+  opener:     'Opener',
+  cat:        'CAT',
+  midterm:    'Mid-Term',
+  endterm:    'End-Term',
+  exam:       'Exam',
+  assignment: 'Assignment',
+}
+
+function buildTitle(type: AssessmentType, term: string, year: number): string {
+  return `Term ${term} ${TYPE_LABEL[type]} ${year}`
+}
 
 const TYPE_META: Record<AssessmentType, { label: string; cls: string }> = {
   opener:     { label: 'Opener',     cls: 'bg-teal-100 text-teal-700'     },
@@ -82,6 +95,17 @@ export default function ClassAssessmentsPage({
   const classGrade: number = cls?.grade ?? 7
   const isCbcSenior = form.curriculum === 'cbc' && classGrade >= 10
 
+  // Auto-generate title when type / term / year changes unless user edited it manually
+  const lastAutoTitle = useRef('')
+  useEffect(() => {
+    const auto = buildTitle(form.assessmentType, form.term, form.year)
+    if (form.title === '' || form.title === lastAutoTitle.current) {
+      lastAutoTitle.current = auto
+      setForm(f => ({ ...f, title: auto }))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.assessmentType, form.term, form.year])
+
   useEffect(() => {
     Promise.all([
       fetch(`/api/teacher/classes/${classId}`).then((r) => r.json()),
@@ -123,6 +147,8 @@ export default function ClassAssessmentsPage({
 
   function openModal() {
     setModalError('')
+    lastAutoTitle.current = ''
+    setForm(f => ({ ...f, title: '' })) // trigger auto-fill
     setShowModal(true)
   }
 
@@ -153,6 +179,7 @@ export default function ClassAssessmentsPage({
 
       setAssessments((prev) => [{ ...data.data.assessment, learner_count: 0, class_average: null }, ...prev])
       setShowModal(false)
+      lastAutoTitle.current = ''
       setForm({
         title: '', assessmentType: 'opener',
         term: CURRENT_TERM as '1' | '2' | '3', year: CURRENT_YEAR,

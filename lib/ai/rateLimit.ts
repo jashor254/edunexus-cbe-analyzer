@@ -9,12 +9,15 @@ import type { TokenFeature } from '@/lib/payments/config'
 // Per-user per-feature daily call caps, reset at UTC midnight.
 // Hard safety limits against runaway costs from bugs or compromised accounts.
 export const DAILY_CALL_LIMITS: Record<TokenFeature, number> = {
-  sow_generate:         10,
-  lesson_plan_generate: 20,
-  row_generate:         20,
-  slides_generate:      10,
-  clinic_report:        5,
-  learning_compass:     30,
+  sow_generate:               10,
+  lesson_plan_generate:       20,
+  row_generate:               20,
+  slides_generate:            10,
+  remedial_planner:           10,
+  holiday_plan:               30,
+  clinic_report:              5,
+  learning_compass:           30,
+  career_intelligence_report: 2,
 }
 
 export type RateLimitResult =

@@ -42,14 +42,16 @@ export const TOKEN_COSTS = {
   sow_generate:         5,
   lesson_plan_generate: 3,
   row_generate:         2,
-  // Slide generator — 2 tokens = KES 100 per deck
   slides_generate:      2,
+  // Remedial Planner — differentiated class plan — 2 tokens = KES 100
+  remedial_planner:     2,
+  // Holiday Plan — per-student personalised plan — 1 token = KES 50
+  holiday_plan:         1,
 
   // Parent / student features
-  // Academic Clinic includes career guidance — 5 tokens = KES 250 per report
   clinic_report:        5,
-  // Learning Compass — 1 token = KES 50 per session
   learning_compass:     1,
+  career_intelligence_report: 3,
 } as const
 
 export type TokenFeature = keyof typeof TOKEN_COSTS
@@ -63,9 +65,11 @@ export const FEATURE_ACCESS = {
   lesson_plan_generate: { teacher: 'free',  subscriber: 'full',  token: 'token' },
   row_generate:         { teacher: 'free',  subscriber: 'full',  token: 'token' },
   slides_generate:      { teacher: 'free',  subscriber: 'full',  token: 'token' },
-  // clinic_report now covers career guidance — one gate, one cost
-  clinic_report:        { teacher: 'token', subscriber: 'full',  token: 'token' },
-  learning_compass:     { teacher: 'token', subscriber: 'full',  token: 'token' },
+  remedial_planner:     { teacher: 'free',  subscriber: 'full',  token: 'token' },
+  holiday_plan:         { teacher: 'free',  subscriber: 'full',  token: 'token' },
+  clinic_report:              { teacher: 'token', subscriber: 'full',  token: 'token' },
+  learning_compass:           { teacher: 'token', subscriber: 'full',  token: 'token' },
+  career_intelligence_report: { teacher: 'token', subscriber: 'full',  token: 'token' },
 } as const
 
 export type FeatureKey = keyof typeof FEATURE_ACCESS

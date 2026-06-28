@@ -8,6 +8,7 @@ export type ClassOverview = {
   className: string
   grade: number
   stream: string | null
+  gradeCohort: string
   assessmentId: string
   studentCount: number
   meanScore: number
@@ -27,10 +28,12 @@ export type LearnerRow = {
   studentName: string
   classId: string
   className: string
+  stream: string | null
   totalMarks: number
   meanScore: number
   meanGrade: string
   position: number | null
+  subjectScores: Record<string, number>
 }
 
 export type SubjectDistributionEntry = {
@@ -73,18 +76,19 @@ function average(nums: number[]): number {
 
 export async function getAssessmentAnalytics(
   teacherId: string,
-  filters: { term?: string; year?: number } = {}
+  filters: { term?: string; year?: number; assessmentType?: string } = {}
 ): Promise<AnalyticsData | null> {
   const db = createServiceClient()
 
   // 1. Fetch assessments
   let q = db
     .from('class_assessments')
-    .select('id, title, term, year, class_id')
+    .select('id, title, assessment_type, term, year, class_id')
     .eq('teacher_id', teacherId)
 
-  if (filters.term) q = q.eq('term', filters.term)
-  if (filters.year) q = q.eq('year', filters.year)
+  if (filters.term)           q = q.eq('term', filters.term)
+  if (filters.year)           q = q.eq('year', filters.year)
+  if (filters.assessmentType) q = q.eq('assessment_type', filters.assessmentType)
 
   const { data: assessments, error: aErr } = await q
   if (aErr || !assessments?.length) return null
@@ -95,13 +99,13 @@ export async function getAssessmentAnalytics(
   // 2. Fetch class metadata (separate query — avoids join type complexity)
   const { data: classRows } = await db
     .from('teacher_classes')
-    .select('id, name, grade, stream')
+    .select('id, name, grade, stream, grade_cohort')
     .in('id', classIds)
 
   const classMap = new Map(
     (classRows ?? []).map(c => [
       c.id as string,
-      c as { id: string; name: string; grade: number; stream: string | null },
+      c as { id: string; name: string; grade: number; stream: string | null; grade_cohort: string | null },
     ])
   )
 
@@ -143,7 +147,12 @@ export async function getAssessmentAnalytics(
     byClass.set(classId, bucket)
   }
 
-  const { title, term, year } = assessments[0]
+  const { assessment_type, term, year } = assessments[0]
+  const TYPE_LABEL: Record<string, string> = {
+    opener: 'Opener', cat: 'CAT', midterm: 'Mid-Term',
+    endterm: 'End-Term', exam: 'Exam', assignment: 'Assignment',
+  }
+  const title = `Term ${term} ${TYPE_LABEL[assessment_type as string] ?? assessment_type} ${year}`
 
   // 5. Class overviews
   const classOverviews: ClassOverview[] = []
@@ -170,6 +179,7 @@ export async function getAssessmentAnalytics(
       className:         info.name,
       grade:             info.grade,
       stream:            info.stream,
+      gradeCohort:       info.grade_cohort ?? `Grade ${info.grade}`,
       assessmentId,
       studentCount:      marks.length,
       meanScore:         average(marks.map(m => m.meanScore)),
@@ -233,13 +243,15 @@ export async function getAssessmentAnalytics(
     if (!info) continue
     for (const m of marks) {
       learnerRows.push({
-        studentName: m.studentName,
+        studentName:   m.studentName,
         classId,
-        className:   info.name,
-        totalMarks:  m.totalMarks,
-        meanScore:   m.meanScore,
-        meanGrade:   m.meanGrade,
-        position:    m.position,
+        className:     info.name,
+        stream:        info.stream,
+        totalMarks:    m.totalMarks,
+        meanScore:     m.meanScore,
+        meanGrade:     m.meanGrade,
+        position:      m.position,
+        subjectScores: m.subjectScores,
       })
     }
   }

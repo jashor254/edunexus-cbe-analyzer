@@ -6,6 +6,16 @@
 // See docs/whatsapp-setup.md for exact template content to submit.
 
 import { sendWhatsAppTemplate, type WhatsAppResult } from './client'
+
+// Generic text message via the parent_update template (must be registered in Meta BM)
+// Template: edunexus_parent_update — single body variable {{1}} = full message text
+export async function sendWhatsApp(phone: string, message: string): Promise<WhatsAppResult> {
+  return sendWhatsAppTemplate({
+    to:           phone,
+    templateName: 'edunexus_parent_update',
+    components:   [{ type: 'body', parameters: [{ type: 'text', text: message.slice(0, 1024) }] }],
+  })
+}
 import { createServiceClient } from '@/utils/supabase/service'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://edunexus.co.ke'

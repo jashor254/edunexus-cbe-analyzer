@@ -4,7 +4,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import {
   apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest, apiNotFound,
 } from '@/lib/api/response'
-import { getAssessmentById, getLearnerMarks, bulkSaveMarks } from '@/lib/assessments/queries'
+import { getAssessmentById, getLearnerMarks, bulkSaveMarks, triggerLearnerModelUpdates } from '@/lib/assessments/queries'
 
 const BulkSaveSchema = z.object({
   marks: z.array(z.object({
@@ -118,6 +118,9 @@ export async function POST(
         }
       }
     }
+
+    // Update Learner Model for linked students — fire and forget
+    triggerLearnerModelUpdates(assessmentId, teacher.id).catch(() => {})
 
     return apiSuccess({ marks, saved: marks.length })
   } catch (e: unknown) {

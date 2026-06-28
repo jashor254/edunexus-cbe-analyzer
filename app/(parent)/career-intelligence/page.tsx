@@ -289,6 +289,24 @@ export default function CareerIntelligencePage() {
               </Section>
             )}
 
+            {/* Career Intelligence Report CTA */}
+            <div className="bg-gradient-to-br from-violet-900/30 to-indigo-900/30 border border-violet-500/25 rounded-2xl p-5 text-center space-y-3">
+              <div className="text-white font-bold text-base">Want the full picture?</div>
+              <p className="text-white/50 text-sm">
+                The Career Intelligence Report combines this profile with a 13-section analysis —
+                including hidden strengths, growth barriers, AI reality check, teacher insights,
+                and the "If Learning Continues Like This…" narrative.
+              </p>
+              <Link
+                href="/career-intelligence-report"
+                className="inline-flex items-center gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold px-5 py-3 rounded-xl transition-all text-sm shadow-lg hover:shadow-violet-500/20"
+              >
+                <BookOpen className="w-4 h-4" />
+                Generate Career Intelligence Report
+                <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
+
             {/* Disclaimer */}
             <div className="flex items-start gap-2 text-white/30 text-xs leading-relaxed border-t border-white/10 pt-6">
               <Lightbulb className="w-3.5 h-3.5 shrink-0 mt-0.5 text-white/20" />

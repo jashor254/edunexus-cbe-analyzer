@@ -44,8 +44,9 @@ export default function TeacherClassesPage() {
   const [creating, setCreating] = useState(false)
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
   const [newClass, setNewClass] = useState({
-    name: '', grade: 7, subject: 'Mathematics', academic_year: '2025',
+    name: '', grade: 7, subject: 'Mathematics', academic_year: '2025', stream: '',
   })
+  const [hasStream, setHasStream] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -63,13 +64,14 @@ export default function TeacherClassesPage() {
       const res = await fetch('/api/teacher/classes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newClass),
+        body: JSON.stringify({ ...newClass, stream: hasStream ? newClass.stream : undefined }),
       })
       const data = await res.json()
       if (!data.success) { setError(data.error || 'Failed to create class'); return }
       setClasses(prev => [{ ...data.data.class, student_count: 0, avg_level: null }, ...prev])
       setShowModal(false)
-      setNewClass({ name: '', grade: 7, subject: 'Mathematics', academic_year: '2025' })
+      setHasStream(false)
+      setNewClass({ name: '', grade: 7, subject: 'Mathematics', academic_year: '2025', stream: '' })
     } catch {
       setError('Something went wrong.')
     } finally {
@@ -237,6 +239,34 @@ export default function TeacherClassesPage() {
                   {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
+
+              {/* Stream toggle */}
+              <div className="flex items-center gap-3 py-1">
+                <button
+                  type="button"
+                  onClick={() => { setHasStream(v => !v); setNewClass(p => ({ ...p, stream: '' })) }}
+                  className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none ${hasStream ? 'bg-teal-600' : 'bg-gray-200'}`}
+                >
+                  <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${hasStream ? 'translate-x-4' : 'translate-x-0'}`} />
+                </button>
+                <span className="text-sm font-medium text-gray-700">This class has a stream (e.g. 9Y, 9G)</span>
+              </div>
+
+              {hasStream && (
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Stream Name *</label>
+                  <input
+                    value={newClass.stream}
+                    onChange={e => setNewClass(p => ({ ...p, stream: e.target.value }))}
+                    placeholder="e.g. Y, G, A, North, South"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-100 outline-none text-gray-900"
+                    required={hasStream}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Grade {newClass.grade}{newClass.stream ? newClass.stream : '?'} will be grouped with other Grade {newClass.grade} streams in analytics
+                  </p>
+                </div>
+              )}
 
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">

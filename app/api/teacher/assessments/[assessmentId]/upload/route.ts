@@ -3,7 +3,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import {
   apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest, apiNotFound,
 } from '@/lib/api/response'
-import { getAssessmentById, upsertMarksCSV } from '@/lib/assessments/queries'
+import { getAssessmentById, upsertMarksCSV, triggerLearnerModelUpdates } from '@/lib/assessments/queries'
 import type { MarkInput } from '@/lib/assessments/types'
 
 type UploadError = { row: number; field: string; message: string }
@@ -96,6 +96,9 @@ export async function POST(
       assessment.curriculum_type ?? 'cbc',
       assessment.max_score
     )
+
+    // Update Learner Model for linked students — fire and forget
+    triggerLearnerModelUpdates(assessmentId, teacher.id).catch(() => {})
 
     return apiSuccess({
       imported: result.inserted,

@@ -27,15 +27,15 @@ const GRADE_BAR_COLOR: Record<GradeLevel, string> = {
 }
 
 const SUBJECT_SHORT: Record<string, string> = {
-  'Mathematics':              'Maths',
-  'English':                  'Eng',
-  'Kiswahili':                'Kisw',
-  'Integrated Science':       'Science',
-  'Pre-Technical Studies':    'Pre-Tech',
-  'Creative Arts':            'Creative',
-  'Social Studies':           'Social',
-  'CRE':                      'CRE',
-  'Agriculture & Nutrition':  'Agri',
+  'Mathematics':             'Maths',
+  'English':                 'Eng',
+  'Kiswahili':               'Kisw',
+  'Integrated Science':      'Science',
+  'Pre-Technical Studies':   'Pre-Tech',
+  'Creative Arts':           'Creative',
+  'Social Studies':          'Social',
+  'CRE':                     'CRE',
+  'Agriculture & Nutrition': 'Agri',
 }
 
 function gradeBadge(grade: string, large = false) {
@@ -78,7 +78,9 @@ function ClassCard({ cls }: { cls: ClassOverview }) {
       <div className="flex items-start justify-between mb-4">
         <div>
           <h2 className="text-xl font-black text-gray-900">{cls.className}</h2>
-          <p className="text-sm text-gray-400 mt-0.5">Grade {cls.grade}{cls.stream ? ` · ${cls.stream}` : ''}</p>
+          <p className="text-sm text-gray-400 mt-0.5">
+            Grade {cls.grade}{cls.stream ? ` · Stream ${cls.stream}` : ''} · {cls.gradeCohort}
+          </p>
         </div>
         {gradeBadge(overallGrade, true)}
       </div>
@@ -100,7 +102,6 @@ function ClassCard({ cls }: { cls: ClassOverview }) {
         </div>
       </div>
 
-      {/* Grade distribution pills */}
       <div className="flex gap-2 flex-wrap">
         {(['EE', 'ME', 'AE', 'BE'] as GradeLevel[]).map(g => {
           const count = dist[g]
@@ -117,13 +118,28 @@ function ClassCard({ cls }: { cls: ClassOverview }) {
   )
 }
 
-// ── VIEW 2 — Subject performance table ───────────────────────────────────────
+// ── VIEW 2 — Subject performance table ────────────────────────────────────────
 function SubjectTable({
   subjects, classes,
 }: {
   subjects: SubjectRow[]
   classes: ClassOverview[]
 }) {
+  // Group classes by grade_cohort for combined columns
+  const cohortMap = useMemo(() => {
+    const map = new Map<string, ClassOverview[]>()
+    for (const c of classes) {
+      const key = c.gradeCohort
+      map.set(key, [...(map.get(key) ?? []), c])
+    }
+    return map
+  }, [classes])
+
+  const multiStream = useMemo(
+    () => [...cohortMap.entries()].some(([, cls]) => cls.length > 1),
+    [cohortMap]
+  )
+
   function combinedBg(mean: number) {
     if (mean < 25) return 'bg-red-100 text-red-700 font-bold'
     if (mean < 50) return 'bg-amber-50 text-amber-700'
@@ -148,10 +164,19 @@ function SubjectTable({
               <th className="px-6 py-3 font-bold text-gray-600 text-xs uppercase tracking-wide">Subject</th>
               {classes.map(c => (
                 <th key={c.classId} className="px-4 py-3 font-bold text-gray-600 text-xs uppercase tracking-wide text-center">
-                  {c.className} Mean
+                  {c.className}
                 </th>
               ))}
-              <th className="px-4 py-3 font-bold text-gray-600 text-xs uppercase tracking-wide text-center">Combined</th>
+              {/* Grade-combined columns when multiple streams in same grade */}
+              {multiStream && [...cohortMap.entries()]
+                .filter(([, cls]) => cls.length > 1)
+                .map(([cohort]) => (
+                  <th key={`combined-${cohort}`} className="px-4 py-3 font-bold text-teal-700 text-xs uppercase tracking-wide text-center bg-teal-50">
+                    {cohort} Combined
+                  </th>
+                ))
+              }
+              <th className="px-4 py-3 font-bold text-gray-600 text-xs uppercase tracking-wide text-center">Overall</th>
               <th className="px-4 py-3 font-bold text-gray-600 text-xs uppercase tracking-wide text-center">Grade</th>
             </tr>
           </thead>
@@ -166,7 +191,23 @@ function SubjectTable({
                       : '—'}
                   </td>
                 ))}
-                <td className={`px-4 py-3 text-center rounded-none ${combinedBg(row.combinedMean)}`}>
+                {multiStream && [...cohortMap.entries()]
+                  .filter(([, cls]) => cls.length > 1)
+                  .map(([cohort, cls]) => {
+                    const scores = cls.flatMap(c =>
+                      row.classMeans[c.classId] != null ? [row.classMeans[c.classId]] : []
+                    )
+                    const mean = scores.length
+                      ? scores.reduce((a, b) => a + b, 0) / scores.length
+                      : null
+                    return (
+                      <td key={`combined-${cohort}`} className={`px-4 py-3 text-center bg-teal-50 ${mean !== null ? combinedBg(mean) : 'text-gray-400'}`}>
+                        {mean !== null ? mean.toFixed(1) : '—'}
+                      </td>
+                    )
+                  })
+                }
+                <td className={`px-4 py-3 text-center ${combinedBg(row.combinedMean)}`}>
                   {row.combinedMean.toFixed(1)}
                 </td>
                 <td className="px-4 py-3 text-center">
@@ -181,32 +222,43 @@ function SubjectTable({
   )
 }
 
-// ── VIEW 3 — Learner ranking table ────────────────────────────────────────────
+// ── VIEW 3 — Learner results table (ranked, with subject breakdown) ────────────
 function LearnerTable({
-  learners, classes,
+  learners, classes, subjects,
 }: {
   learners: LearnerRow[]
   classes: ClassOverview[]
+  subjects: SubjectRow[]
 }) {
   const [filter, setFilter] = useState<string>('all')
   const [showAll, setShowAll] = useState(false)
 
-  const filtered = useMemo(() => {
+  const ranked = useMemo(() => {
     const base = filter === 'all'
       ? learners
       : learners.filter(l => l.classId === filter)
-    return [...base].sort((a, b) => b.totalMarks - a.totalMarks)
+
+    const sorted = [...base].sort((a, b) => b.totalMarks - a.totalMarks)
+
+    // Use DB position when filtering by a single class; recalculate for combined
+    return sorted.map((l, i) => ({
+      ...l,
+      rank: filter !== 'all' && l.position != null ? l.position : i + 1,
+    }))
   }, [learners, filter])
 
-  const displayed = showAll ? filtered : filtered.slice(0, 10)
+  const displayed = showAll ? ranked : ranked.slice(0, 15)
+
+  // Subject list in order for column headers
+  const subjectList = subjects.map(s => s.subject)
 
   return (
     <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
-        <h2 className="text-lg font-black text-gray-900">Learner Rankings</h2>
-        <div className="flex gap-1.5">
+        <h2 className="text-lg font-black text-gray-900">Learner Results</h2>
+        <div className="flex gap-1.5 flex-wrap">
           <button
-            onClick={() => setFilter('all')}
+            onClick={() => { setFilter('all'); setShowAll(false) }}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${filter === 'all' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
           >
             All ({learners.length})
@@ -214,7 +266,7 @@ function LearnerTable({
           {classes.map(c => (
             <button
               key={c.classId}
-              onClick={() => setFilter(c.classId)}
+              onClick={() => { setFilter(c.classId); setShowAll(false) }}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${filter === c.classId ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
             >
               {c.className}
@@ -227,36 +279,58 @@ function LearnerTable({
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 text-left">
-              <th className="px-4 py-3 font-bold text-gray-600 text-xs uppercase tracking-wide text-center w-10">#</th>
-              <th className="px-4 py-3 font-bold text-gray-600 text-xs uppercase tracking-wide">Name</th>
-              <th className="px-4 py-3 font-bold text-gray-600 text-xs uppercase tracking-wide">Class</th>
-              <th className="px-4 py-3 font-bold text-gray-600 text-xs uppercase tracking-wide text-center">Total</th>
-              <th className="px-4 py-3 font-bold text-gray-600 text-xs uppercase tracking-wide text-center">Mean</th>
-              <th className="px-4 py-3 font-bold text-gray-600 text-xs uppercase tracking-wide text-center">Grade</th>
+              <th className="px-3 py-3 font-bold text-gray-600 text-xs uppercase tracking-wide text-center w-10 sticky left-0 bg-gray-50">#</th>
+              <th className="px-4 py-3 font-bold text-gray-600 text-xs uppercase tracking-wide sticky left-8 bg-gray-50">Name</th>
+              {filter === 'all' && (
+                <th className="px-3 py-3 font-bold text-gray-600 text-xs uppercase tracking-wide">Class</th>
+              )}
+              {subjectList.map(s => (
+                <th key={s} className="px-3 py-3 font-bold text-gray-600 text-xs uppercase tracking-wide text-center whitespace-nowrap">
+                  {SUBJECT_SHORT[s] ?? s}
+                </th>
+              ))}
+              <th className="px-3 py-3 font-bold text-gray-900 text-xs uppercase tracking-wide text-center bg-gray-100">Total</th>
+              <th className="px-3 py-3 font-bold text-gray-600 text-xs uppercase tracking-wide text-center">Mean</th>
+              <th className="px-3 py-3 font-bold text-gray-600 text-xs uppercase tracking-wide text-center">Grade</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {displayed.map((l, i) => (
+            {displayed.map((l) => (
               <tr key={`${l.classId}-${l.studentName}`} className="hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3 text-center text-gray-400 font-mono text-xs">{i + 1}</td>
-                <td className="px-4 py-3 font-semibold text-gray-900">{l.studentName}</td>
-                <td className="px-4 py-3 text-gray-500 text-xs">{l.className}</td>
-                <td className="px-4 py-3 text-center font-bold text-gray-900">{l.totalMarks}</td>
-                <td className="px-4 py-3 text-center text-gray-600">{l.meanScore.toFixed(1)}</td>
-                <td className="px-4 py-3 text-center">{gradeBadge(l.meanGrade)}</td>
+                <td className="px-3 py-2.5 text-center font-black text-gray-500 text-sm sticky left-0 bg-white">{l.rank}</td>
+                <td className="px-4 py-2.5 font-semibold text-gray-900 sticky left-8 bg-white whitespace-nowrap">{l.studentName}</td>
+                {filter === 'all' && (
+                  <td className="px-3 py-2.5 text-gray-400 text-xs whitespace-nowrap">
+                    {l.className}{l.stream ? ` (${l.stream})` : ''}
+                  </td>
+                )}
+                {subjectList.map(s => {
+                  const score = l.subjectScores[s] ?? l.subjectScores[s.toLowerCase()] ?? null
+                  return (
+                    <td key={s} className="px-3 py-2.5 text-center text-gray-700">
+                      {score != null ? score : <span className="text-gray-300">—</span>}
+                    </td>
+                  )
+                })}
+                <td className="px-3 py-2.5 text-center font-black text-gray-900 bg-gray-50">{l.totalMarks}</td>
+                <td className="px-3 py-2.5 text-center text-gray-600">{l.meanScore.toFixed(1)}</td>
+                <td className="px-3 py-2.5 text-center">{gradeBadge(l.meanGrade)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      {filtered.length > 10 && (
+      {ranked.length > 15 && (
         <div className="px-6 py-3 border-t border-gray-100 text-center">
           <button
             onClick={() => setShowAll(v => !v)}
             className="inline-flex items-center gap-1.5 text-sm font-bold text-teal-600 hover:text-teal-700 transition-colors"
           >
-            {showAll ? <><ChevronUp className="w-4 h-4" />Show less</> : <><ChevronDown className="w-4 h-4" />Show all {filtered.length} students</>}
+            {showAll
+              ? <><ChevronUp className="w-4 h-4" />Show top 15</>
+              : <><ChevronDown className="w-4 h-4" />Show all {ranked.length} students</>
+            }
           </button>
         </div>
       )}
@@ -306,7 +380,7 @@ function DistributionChart({
           <h2 className="text-lg font-black text-gray-900">CBC Distribution by Subject</h2>
           <p className="text-sm text-gray-400 mt-0.5">Student count per performance level</p>
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 flex-wrap">
           <button
             onClick={() => setFilter('all')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${filter === 'all' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
@@ -335,7 +409,7 @@ function DistributionChart({
               contentStyle={{ borderRadius: 12, border: '1px solid #e5e7eb', fontSize: 12 }}
             />
             <Legend iconType="square" iconSize={10} wrapperStyle={{ fontSize: 12, fontWeight: 700 }} />
-            <Bar dataKey="BE" stackId="a" fill={GRADE_BAR_COLOR.BE} name="BE" radius={[0, 0, 0, 0]}>
+            <Bar dataKey="BE" stackId="a" fill={GRADE_BAR_COLOR.BE} name="BE">
               {chartData.map((_, i) => <Cell key={i} fill={GRADE_BAR_COLOR.BE} />)}
             </Bar>
             <Bar dataKey="AE" stackId="a" fill={GRADE_BAR_COLOR.AE} name="AE">
@@ -354,14 +428,95 @@ function DistributionChart({
   )
 }
 
+const ATYPE_LABEL: Record<string, string> = {
+  opener: 'Opener', cat: 'CAT', midterm: 'Mid-Term',
+  endterm: 'End-Term', exam: 'Exam', assignment: 'Assignment',
+}
+
+const ATYPE_ORDER = ['opener', 'cat', 'midterm', 'endterm', 'exam', 'assignment']
+
+function aTypeSort(a: string, b: string) {
+  return (ATYPE_ORDER.indexOf(a) ?? 99) - (ATYPE_ORDER.indexOf(b) ?? 99)
+}
+
+// ── Term / Year + Assessment Type selector ─────────────────────────────────────
+function TermSelector({
+  term, year, onChange,
+}: {
+  term: string
+  year: number
+  onChange: (term: string, year: number) => void
+}) {
+  return (
+    <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-2">
+        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Term</label>
+        <div className="flex gap-1">
+          {['1', '2', '3'].map(t => (
+            <button
+              key={t}
+              onClick={() => onChange(t, year)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-colors ${term === t ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Year</label>
+        <select
+          value={year}
+          onChange={e => onChange(term, Number(e.target.value))}
+          className="border border-gray-200 rounded-xl px-3 py-1.5 text-sm font-bold bg-white text-gray-900 focus:outline-none focus:border-teal-500"
+        >
+          {[2024, 2025, 2026, 2027].map(y => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function AnalyticsPage() {
+  const currentYear = new Date().getFullYear()
+  const [term, setTerm] = useState('1')
+  const [year, setYear] = useState(currentYear)
+  const [availableTypes, setAvailableTypes] = useState<string[]>([])
+  const [selectedType, setSelectedType] = useState<string>('')
+  const [typesLoading, setTypesLoading] = useState(false)
   const [data, setData] = useState<AnalyticsData | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Step 1: when term/year changes, fetch available assessment types
   useEffect(() => {
-    fetch('/api/teacher/analytics?term=1&year=2026')
+    setTypesLoading(true)
+    setAvailableTypes([])
+    setSelectedType('')
+    setData(null)
+    fetch(`/api/teacher/assessments?term=${term}&year=${year}`)
+      .then(r => r.json())
+      .then(res => {
+        if (!res.success) return
+        const types: string[] = [
+          ...new Set((res.data.assessments as { assessment_type: string }[]).map(a => a.assessment_type))
+        ].sort(aTypeSort)
+        setAvailableTypes(types)
+        if (types.length > 0) setSelectedType(types[0])
+      })
+      .finally(() => setTypesLoading(false))
+  }, [term, year])
+
+  // Step 2: when type is selected, fetch analytics
+  useEffect(() => {
+    if (!selectedType) return
+    setLoading(true)
+    setError(null)
+    setData(null)
+    fetch(`/api/teacher/analytics?term=${term}&year=${year}&type=${selectedType}`)
       .then(r => r.json())
       .then(res => {
         if (!res.success) throw new Error(res.error ?? 'Failed to load')
@@ -369,59 +524,104 @@ export default function AnalyticsPage() {
       })
       .catch(e => setError(e instanceof Error ? e.message : 'Failed to load analytics'))
       .finally(() => setLoading(false))
-  }, [])
-
-  if (loading) return <PageSkeleton />
-
-  if (error) {
-    return (
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
-          <BarChart3 className="w-10 h-10 text-red-300 mx-auto mb-3" />
-          <p className="text-red-700 font-bold">{error}</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!data) {
-    return (
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        <div className="bg-white border-2 border-dashed border-gray-200 rounded-2xl p-12 text-center">
-          <BarChart3 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 font-semibold">No assessment data found for Term 1 2026.</p>
-        </div>
-      </div>
-    )
-  }
+  }, [term, year, selectedType])
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
 
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-black text-gray-900">{data.title}</h1>
-        <p className="text-gray-400 mt-1 font-medium">Term {data.term} · {data.year} · CBC Assessment Analytics</p>
+      <div className="flex flex-col sm:flex-row sm:items-end gap-4 justify-between">
+        <div>
+          <h1 className="text-3xl font-black text-gray-900">Class Analytics</h1>
+          <p className="text-gray-400 mt-1 font-medium">CBC Assessment Performance</p>
+        </div>
+        <TermSelector
+          term={term}
+          year={year}
+          onChange={(t, y) => { setTerm(t); setYear(y) }}
+        />
       </div>
 
-      {/* VIEW 1 — Class cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {data.classes.map(cls => (
-          <ClassCard key={cls.classId} cls={cls} />
-        ))}
-      </div>
+      {/* Assessment type picker */}
+      {typesLoading && (
+        <div className="flex gap-2">
+          {[1,2,3].map(i => <div key={i} className="h-9 w-24 animate-pulse bg-gray-200 rounded-xl" />)}
+        </div>
+      )}
+      {!typesLoading && availableTypes.length === 0 && (
+        <div className="bg-white border-2 border-dashed border-gray-200 rounded-2xl p-12 text-center">
+          <BarChart3 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500 font-semibold">No assessments for Term {term} · {year}.</p>
+          <p className="text-gray-400 text-sm mt-1">Create and upload marks from a class page first.</p>
+        </div>
+      )}
+      {!typesLoading && availableTypes.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-bold text-gray-400 uppercase tracking-wide mr-1">Assessment</span>
+          {availableTypes.map(t => (
+            <button
+              key={t}
+              onClick={() => setSelectedType(t)}
+              className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors border ${
+                selectedType === t
+                  ? 'bg-teal-600 text-white border-teal-600'
+                  : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              {ATYPE_LABEL[t] ?? t}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {/* VIEW 2 — Subject table */}
-      <SubjectTable subjects={data.subjects} classes={data.classes} />
+      {loading && <PageSkeleton />}
 
-      {/* VIEW 3 — Learner ranking */}
-      <LearnerTable learners={data.learners} classes={data.classes} />
+      {!loading && error && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
+          <BarChart3 className="w-10 h-10 text-red-300 mx-auto mb-3" />
+          <p className="text-red-700 font-bold">{error}</p>
+        </div>
+      )}
 
-      {/* VIEW 4 — Distribution chart */}
-      <DistributionChart
-        subjectDistribution={data.subjectDistribution}
-        classes={data.classes}
-      />
+      {!loading && !error && selectedType && !data && (
+        <div className="bg-white border-2 border-dashed border-gray-200 rounded-2xl p-12 text-center">
+          <BarChart3 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500 font-semibold">No marks entered yet for {ATYPE_LABEL[selectedType] ?? selectedType} · Term {term} · {year}.</p>
+          <p className="text-gray-400 text-sm mt-1">Open the class → Enter Marks to add learner scores.</p>
+        </div>
+      )}
+
+      {!loading && !error && data && (
+        <>
+          {/* Assessment label */}
+          <p className="text-sm text-gray-500 font-medium -mb-4">
+            {data.title}
+          </p>
+
+          {/* VIEW 1 — Class cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {data.classes.map(cls => (
+              <ClassCard key={cls.classId} cls={cls} />
+            ))}
+          </div>
+
+          {/* VIEW 2 — Subject table */}
+          <SubjectTable subjects={data.subjects} classes={data.classes} />
+
+          {/* VIEW 3 — Learner results with subject breakdown */}
+          <LearnerTable
+            learners={data.learners}
+            classes={data.classes}
+            subjects={data.subjects}
+          />
+
+          {/* VIEW 4 — Distribution chart */}
+          <DistributionChart
+            subjectDistribution={data.subjectDistribution}
+            classes={data.classes}
+          />
+        </>
+      )}
 
     </div>
   )

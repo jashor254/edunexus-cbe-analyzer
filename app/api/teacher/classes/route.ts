@@ -99,7 +99,7 @@ export async function POST(req: Request) {
     if (!teacher) return apiForbidden()
 
     const body = await req.json()
-    const { name, grade, subject, academic_year } = body
+    const { name, grade, subject, academic_year, stream } = body
 
     if (!name || !grade || !subject || !academic_year) {
       return apiError('name, grade, subject, academic_year are required', 400)
@@ -128,6 +128,8 @@ export async function POST(req: Request) {
         subject,
         academic_year,
         class_code,
+        grade_cohort: `Grade ${grade}`,
+        ...(stream ? { stream: stream.trim() } : {}),
       })
       .select()
       .single()

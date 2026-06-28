@@ -8,7 +8,8 @@ import {
   TrendingUp, Compass, Brain,
   Loader2, X, UserPlus, Mail, Phone, FileText, CheckCircle2,
   FlaskConical, ChevronDown, ChevronRight,
-  Upload, Sparkles, Target,
+  Upload, Sparkles, Target, Zap, ClipboardList, Layers,
+  MessageSquare, CalendarDays, ThumbsUp, HelpCircle, AlertCircle,
 } from 'lucide-react'
 import {
   SENIOR_PATHWAYS,
@@ -18,7 +19,7 @@ import {
   type SeniorPathway,
 } from '@/lib/curriculum/subjects'
 
-type Tab = 'students' | 'gaps' | 'assignments' | 'holiday' | 'compass' | 'clinic' | 'upload' | 'analytics'
+type Tab = 'students' | 'gaps' | 'assignments' | 'holiday' | 'remedial' | 'compass' | 'clinic' | 'upload' | 'analytics'
 
 // ─── Add Student Modal ────────────────────────────────────────────────────────
 
@@ -431,7 +432,7 @@ function UploadAssessmentTab({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          classId, title: `${atype} Term ${term} ${year}`,
+          classId, title: `Term ${term} ${{ midterm: 'Mid-Term', endterm: 'End-Term', opener: 'Opener', cat: 'CAT', exam: 'Exam', assignment: 'Assignment' }[atype] ?? atype} ${year}`,
           assessmentType: atype, term: String(term), year,
           maxScore: 4, subjects: CBC_SUBJECTS, curriculumType: 'cbc',
         }),
@@ -557,10 +558,11 @@ function UploadAssessmentTab({
           <label className="block text-xs font-bold text-gray-500 mb-1">Type</label>
           <select value={atype} onChange={e => setAtype(e.target.value)}
             className="border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium bg-white">
-            <option value="midterm">Mid-term</option>
-            <option value="endterm">End-term</option>
             <option value="opener">Opener</option>
+            <option value="midterm">Mid-Term</option>
+            <option value="endterm">End-Term</option>
             <option value="cat">CAT</option>
+            <option value="exam">Exam</option>
           </select>
         </div>
       </div>
@@ -771,12 +773,23 @@ function CompassTopicPicker({
   )
 }
 
+type AnalyticsStudent = {
+  id:              string
+  name:            string
+  grade:           number
+  curriculum_type: string
+  current_pathway: string | null
+  assessment: {
+    subject_scores: Record<string, number>
+  } | null
+}
+
 function ClassAnalyticsTab({
   students,
   className,
   grade,
 }: {
-  students:  any[]
+  students:  AnalyticsStudent[]
   className: string
   grade:     number
 }) {
@@ -801,7 +814,7 @@ function ClassAnalyticsTab({
 
   for (const s of withAssessment) {
     const scores: Record<string, number> = s.assessment?.subject_scores ?? {}
-    const vals = Object.values(scores).filter(v => typeof v === 'number') as number[]
+    const vals = Object.values(scores).filter(v => typeof v === 'number')
     if (!vals.length) continue
 
     const avg = vals.reduce((a, b) => a + b, 0) / vals.length
@@ -814,20 +827,19 @@ function ClassAnalyticsTab({
 
     for (const [subj, score] of Object.entries(scores)) {
       if (!subjectTotals[subj]) subjectTotals[subj] = { sum: 0, count: 0 }
-      subjectTotals[subj].sum   += score as number
+      subjectTotals[subj].sum   += score
       subjectTotals[subj].count += 1
     }
 
-    // Needs attention: 2+ subjects below expectations (< 1.5)
     const rawWeak = Object.entries(scores)
-      .filter(([, v]) => (v as number) < 1.5)
+      .filter(([, v]) => v < 1.5)
       .map(([k]) => k)
     if (rawWeak.length >= 2) {
       needsAttention.push({
-        id:              s.id as string,
-        name:            s.name as string,
-        grade:           (s.grade as number) ?? grade,
-        curriculumType:  (s.curriculum_type as string) ?? 'cbc',
+        id:              s.id,
+        name:            s.name,
+        grade:           s.grade ?? grade,
+        curriculumType:  s.curriculum_type ?? 'cbc',
         weakSubjects:    rawWeak.map(k => k.replace(/_/g, ' ')),
         rawWeakSubjects: rawWeak,
       })
@@ -1372,6 +1384,1011 @@ function ClinicReportsTab({
   )
 }
 
+// ─── Monday Intelligence Panel ───────────────────────────────────────────────
+
+// ── Monday Panel types (match ClassIntelligencePanel from lib/learnerModel/types.ts) ──
+
+type MondayStudent = {
+  student_id:         string
+  student_name:       string
+  risk_level:         string
+  top_flags:          Array<{ type: string; detail: string }>
+  action:             string
+  compass_suggestion: string | null
+  peer_pairing:       string | null
+  weeks_at_risk?:     number
+}
+
+type TeachingPattern = {
+  pattern:    string
+  count:      number
+  suggestion: string
+  substrands: string[]
+}
+
+type PrerequisiteAlert = {
+  lesson_substrand:  string
+  missing_prereq:    string
+  students_affected: number
+  pct_affected:      number
+  suggested_warmup:  string
+  student_names:     string[]
+}
+
+type InterventionCheckin = {
+  intervention_id:   string
+  student_name:      string
+  student_id:        string
+  substrand:         string
+  intervention_type: string
+  days_since:        number
+  due_date:          string
+}
+
+type CareerMoment = {
+  student_id:   string
+  student_name: string
+  moment_type:  string
+  message:      string
+  parent_note:  string
+}
+
+type MondayPanel = {
+  class_id:                   string
+  class_name:                 string
+  week_of:                    string
+  students_needing_attention: MondayStudent[]
+  class_trajectory:           string
+  teaching_patterns:          TeachingPattern[]
+  prerequisite_alerts:        PrerequisiteAlert[]
+  pending_checkins:           InterventionCheckin[]
+  career_moments:             CareerMoment[]
+  total_students:             number
+  normal_count:               number
+  watch_count:                number
+  at_risk_count:              number
+  critical_count:             number
+  generated_at:               string
+}
+
+function MondayIntelligencePanel({ classId }: { classId: string }) {
+  const [panel, setPanel]         = useState<MondayPanel | null>(null)
+  const [loading, setLoading]     = useState(false)
+  const [dismissed, setDismissed] = useState(false)
+  const [loaded, setLoaded]       = useState(false)
+  const [activeTab, setActiveTab] = useState<'students' | 'patterns' | 'prereqs' | 'checkins' | 'moments'>('students')
+
+  async function load() {
+    setLoading(true)
+    try {
+      const res  = await fetch(`/api/teacher/monday-panel?classId=${classId}`)
+      const data = await res.json()
+      if (data.success) setPanel(data.data.panel)
+    } finally {
+      setLoading(false)
+      setLoaded(true)
+    }
+  }
+
+  if (dismissed) return null
+
+  if (!loaded) {
+    return (
+      <div className="mb-5 border border-violet-200 bg-gradient-to-r from-violet-50 to-purple-50 rounded-2xl p-4 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center">
+            <Brain className="w-5 h-5 text-violet-600" />
+          </div>
+          <div>
+            <div className="font-black text-violet-900 text-sm">Intelligence Panel</div>
+            <div className="text-xs text-violet-600">Who needs your attention? What patterns? What's due?</div>
+          </div>
+        </div>
+        <button
+          onClick={load}
+          className="shrink-0 flex items-center gap-2 bg-violet-600 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-violet-700 transition"
+        >
+          <Zap className="w-3.5 h-3.5" /> Load Panel
+        </button>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="mb-5 border border-violet-200 bg-violet-50 rounded-2xl p-5 flex items-center justify-center gap-3 text-violet-600">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        <span className="text-sm font-semibold">Reading learner profiles…</span>
+      </div>
+    )
+  }
+
+  if (!panel) return null
+
+  const hasStudents  = panel.students_needing_attention.length > 0
+  const hasPatterns  = panel.teaching_patterns.length > 0
+  const hasPrereqs   = panel.prerequisite_alerts.length > 0
+  const hasCheckins  = panel.pending_checkins.length > 0
+  const hasMoments   = panel.career_moments.length > 0
+  const hasAnything  = hasStudents || hasPatterns || hasPrereqs || hasCheckins || hasMoments
+
+  if (!hasAnything) {
+    return (
+      <div className="mb-5 border border-gray-200 bg-gray-50 rounded-2xl p-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 text-gray-500">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm font-semibold">All clear — no students need urgent attention right now.</span>
+        </div>
+        <button onClick={() => setDismissed(true)} className="text-gray-300 hover:text-gray-500">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    )
+  }
+
+  const riskColors: Record<string, string> = {
+    critical: 'border-l-red-500 bg-red-50',
+    at_risk:  'border-l-orange-400 bg-orange-50',
+    watch:    'border-l-amber-400 bg-amber-50',
+  }
+
+  type PanelTab = typeof activeTab
+  const tabs: Array<{ key: PanelTab; label: string; count: number; show: boolean }> = [
+    { key: 'students' as PanelTab, label: 'Students',  count: panel.students_needing_attention.length, show: true },
+    { key: 'patterns' as PanelTab, label: 'Patterns',  count: panel.teaching_patterns.length,          show: hasPatterns },
+    { key: 'prereqs'  as PanelTab, label: 'Pre-check', count: panel.prerequisite_alerts.length,        show: hasPrereqs },
+    { key: 'checkins' as PanelTab, label: 'Check-ins', count: panel.pending_checkins.length,           show: hasCheckins },
+    { key: 'moments'  as PanelTab, label: 'Moments',   count: panel.career_moments.length,             show: hasMoments },
+  ].filter(t => t.show)
+
+  return (
+    <div className="mb-5 border border-violet-200 rounded-2xl overflow-hidden shadow-sm">
+
+      {/* Header */}
+      <div className="bg-gradient-to-r from-violet-600 to-purple-600 px-5 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Brain className="w-5 h-5 text-white" />
+          <div>
+            <div className="font-black text-white text-sm">{panel.class_trajectory}</div>
+            <div className="text-xs text-violet-200">
+              {panel.total_students} students · {panel.critical_count > 0 ? `${panel.critical_count} critical · ` : ''}{panel.at_risk_count} at risk · {panel.watch_count} watch · {panel.normal_count} on track
+            </div>
+          </div>
+        </div>
+        <button onClick={() => setDismissed(true)} className="text-violet-200 hover:text-white">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Tab bar */}
+      {tabs.length > 1 && (
+        <div className="flex border-b border-gray-100 bg-white overflow-x-auto">
+          {tabs.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold whitespace-nowrap border-b-2 transition ${
+                activeTab === tab.key
+                  ? 'border-violet-600 text-violet-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {tab.label}
+              {tab.count > 0 && (
+                <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-black ${
+                  activeTab === tab.key ? 'bg-violet-100 text-violet-700' : 'bg-gray-100 text-gray-500'
+                }`}>
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Students needing attention */}
+      {activeTab === 'students' && (
+        <div className="divide-y divide-gray-100 bg-white">
+          {!hasStudents ? (
+            <div className="px-5 py-4 flex items-center gap-3 text-gray-500">
+              <CheckCircle2 className="w-4 h-4 text-green-500" />
+              <span className="text-sm">No students flagged for attention this week.</span>
+            </div>
+          ) : (
+            panel.students_needing_attention.map(s => (
+              <div key={s.student_id} className={`border-l-4 px-5 py-4 ${riskColors[s.risk_level] ?? 'border-l-gray-300 bg-white'}`}>
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-black text-gray-900 text-sm">{s.student_name}</span>
+                      {s.weeks_at_risk && s.weeks_at_risk >= 4 && (
+                        <span className="text-[10px] font-bold bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">
+                          {s.weeks_at_risk}wks at risk
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-700 mt-1 leading-snug">{s.action}</p>
+                    {s.compass_suggestion && (
+                      <div className="mt-1.5 flex items-center gap-1.5 text-xs text-teal-700">
+                        <Compass className="w-3 h-3 shrink-0" />
+                        <span>{s.compass_suggestion}</span>
+                      </div>
+                    )}
+                    {s.peer_pairing && (
+                      <div className="mt-1.5 flex items-center gap-1.5 text-xs text-blue-700">
+                        <Users className="w-3 h-3 shrink-0" />
+                        <span>{s.peer_pairing}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Teaching patterns */}
+      {activeTab === 'patterns' && (
+        <div className="divide-y divide-gray-100 bg-white">
+          {panel.teaching_patterns.map((p, i) => (
+            <div key={i} className="px-5 py-4">
+              <div className="flex items-start gap-3">
+                <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">{p.pattern}</p>
+                  <p className="text-xs text-amber-700 mt-1 leading-snug">{p.suggestion}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Prerequisite alerts */}
+      {activeTab === 'prereqs' && (
+        <div className="divide-y divide-gray-100 bg-white">
+          {panel.prerequisite_alerts.map((a, i) => (
+            <div key={i} className="px-5 py-4">
+              <div className="flex items-start gap-3">
+                <div className="w-7 h-7 rounded-lg bg-orange-100 flex items-center justify-center shrink-0 mt-0.5">
+                  <BookOpen className="w-3.5 h-3.5 text-orange-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-black text-gray-900">Before teaching "{a.lesson_substrand}"</span>
+                    <span className="text-[10px] font-bold bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full">
+                      {a.pct_affected}% not ready
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    {a.students_affected} students missing prerequisite: <strong>{a.missing_prereq}</strong>
+                    {a.student_names.length > 0 && ` (${a.student_names.join(', ')}${a.students_affected > 5 ? '…' : ''})`}
+                  </p>
+                  <p className="text-xs text-orange-700 mt-1 leading-snug">Warmup: {a.suggested_warmup}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Intervention check-ins */}
+      {activeTab === 'checkins' && (
+        <div className="divide-y divide-gray-100 bg-white">
+          {panel.pending_checkins.map(c => (
+            <div key={c.intervention_id} className="px-5 py-4">
+              <div className="flex items-start gap-3">
+                <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
+                  <ClipboardList className="w-3.5 h-3.5 text-blue-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-black text-gray-900">{c.student_name}</span>
+                    {c.days_since >= 14 && (
+                      <span className="text-[10px] font-bold bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">Overdue</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    {c.intervention_type.replace(/_/g, ' ')} on <strong>{c.substrand}</strong> — {c.days_since} days ago
+                  </p>
+                  <p className="text-xs text-blue-700 mt-1">Has their performance improved? Check in today.</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Career micro-moments */}
+      {activeTab === 'moments' && (
+        <div className="divide-y divide-gray-100 bg-white">
+          {panel.career_moments.map((m, i) => (
+            <div key={i} className="px-5 py-4">
+              <div className="flex items-start gap-3">
+                <div className="w-7 h-7 rounded-lg bg-green-100 flex items-center justify-center shrink-0 mt-0.5">
+                  <Sparkles className="w-3.5 h-3.5 text-green-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-black text-gray-900">{m.student_name}</span>
+                  <p className="text-xs text-gray-700 mt-0.5 leading-snug">{m.message}</p>
+                  {m.parent_note && (
+                    <div className="mt-1.5 flex items-start gap-1.5 text-xs text-green-700">
+                      <MessageSquare className="w-3 h-3 shrink-0 mt-0.5" />
+                      <span>Tell their parent: "{m.parent_note}"</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Formative Signal Modal ───────────────────────────────────────────────────
+
+const CBC_SUBJECTS_SHORT = [
+  'Mathematics', 'English', 'Kiswahili', 'Science & Technology',
+  'Social Studies', 'Creative Arts', 'Physical Education', 'CRE',
+]
+
+function FormativeSignalModal({
+  classId,
+  students,
+  onClose,
+}: {
+  classId:  string
+  students: Array<{ id: string; name: string }>
+  onClose:  () => void
+}) {
+  const [subject,  setSubject]  = useState(CBC_SUBJECTS_SHORT[0])
+  const [topic,    setTopic]    = useState('')
+  const [gotIt,    setGotIt]    = useState<Set<string>>(new Set())
+  const [confused, setConfused] = useState<Set<string>>(new Set())
+  const [lost,     setLost]     = useState<Set<string>>(new Set())
+  const [note,     setNote]     = useState('')
+  const [saving,   setSaving]   = useState(false)
+  const [saved,    setSaved]    = useState(false)
+
+  function toggle(studentId: string, bucket: 'got_it' | 'confused' | 'lost') {
+    const sets = { got_it: gotIt, confused, lost }
+    const setters: Record<string, React.Dispatch<React.SetStateAction<Set<string>>>> = {
+      got_it:   setGotIt,
+      confused: setConfused,
+      lost:     setLost,
+    }
+    // Remove from all first
+    setGotIt(prev    => { const n = new Set(prev); n.delete(studentId); return n })
+    setConfused(prev => { const n = new Set(prev); n.delete(studentId); return n })
+    setLost(prev     => { const n = new Set(prev); n.delete(studentId); return n })
+    // Add to target if not already there
+    if (!sets[bucket].has(studentId)) {
+      setters[bucket](prev => new Set([...prev, studentId]))
+    }
+  }
+
+  async function handleSubmit() {
+    setSaving(true)
+    try {
+      await fetch('/api/formative/signal', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          classId,
+          subject:       subject.toLowerCase().replace(/ & /g, '_').replace(/ /g, '_'),
+          subStrand:     topic || undefined,
+          gotItIds:      [...gotIt],
+          confusedIds:   [...confused],
+          lostIds:       [...lost],
+          teacherNote:   note || undefined,
+        }),
+      })
+      setSaved(true)
+      setTimeout(onClose, 1200)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (saved) {
+    return (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl p-8 text-center shadow-2xl">
+          <CheckCircle2 className="w-14 h-14 text-green-500 mx-auto mb-3" />
+          <div className="font-black text-gray-900 text-lg">Signal recorded</div>
+          <div className="text-sm text-gray-500 mt-1">Learner profiles are updating in the background.</div>
+        </div>
+      </div>
+    )
+  }
+
+  const bucketConfig = [
+    { id: 'got_it'  as const, label: 'Got It',   icon: ThumbsUp,     color: 'bg-green-100 border-green-300 text-green-800',  active: 'bg-green-500 text-white border-green-500',  set: gotIt    },
+    { id: 'confused'as const, label: 'Confused', icon: HelpCircle,   color: 'bg-amber-100 border-amber-300 text-amber-800',  active: 'bg-amber-500 text-white border-amber-500',  set: confused },
+    { id: 'lost'    as const, label: 'Lost',      icon: AlertCircle, color: 'bg-red-100 border-red-300 text-red-800',        active: 'bg-red-500 text-white border-red-500',      set: lost     },
+  ] as const
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-lg overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-teal-100 rounded-xl flex items-center justify-center">
+              <MessageSquare className="w-4.5 h-4.5 text-teal-600" />
+            </div>
+            <div>
+              <div className="font-black text-gray-900 text-sm">How did the lesson go?</div>
+              <div className="text-xs text-gray-400">30 seconds. Tap each student.</div>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-xl">
+            <X className="w-4 h-4 text-gray-400" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+          {/* Subject + topic */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wide">Subject</label>
+              <select
+                value={subject}
+                onChange={e => setSubject(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm font-medium focus:border-teal-400 focus:outline-none bg-white"
+              >
+                {CBC_SUBJECTS_SHORT.map(s => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wide">Topic (optional)</label>
+              <input
+                value={topic}
+                onChange={e => setTopic(e.target.value)}
+                placeholder="e.g. Fractions"
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:border-teal-400 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Bucket headers */}
+          <div className="grid grid-cols-3 gap-2">
+            {bucketConfig.map(b => (
+              <div key={b.id} className={`text-center text-xs font-black py-2 rounded-xl border ${b.color}`}>
+                {b.label}
+                <div className="font-normal text-[10px] opacity-70">{b.set.size} selected</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Student chips */}
+          {students.length === 0 ? (
+            <p className="text-sm text-center text-gray-400 py-4">No students in this class yet.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {students.map(s => {
+                const current = gotIt.has(s.id) ? 'got_it' : confused.has(s.id) ? 'confused' : lost.has(s.id) ? 'lost' : null
+                return (
+                  <div key={s.id} className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-gray-800 flex-1 min-w-0 truncate">{s.name}</span>
+                    <div className="flex gap-1">
+                      {bucketConfig.map(b => (
+                        <button
+                          key={b.id}
+                          onClick={() => toggle(s.id, b.id)}
+                          className={`w-9 h-9 rounded-xl border-2 flex items-center justify-center transition-all text-sm ${
+                            current === b.id ? b.active : 'border-gray-200 text-gray-300 hover:border-gray-300'
+                          }`}
+                        >
+                          <b.icon className="w-4 h-4" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Teacher note */}
+          <textarea
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            placeholder="Quick note (optional)…"
+            rows={2}
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:border-teal-400 focus:outline-none resize-none"
+          />
+        </div>
+
+        <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border-2 border-gray-200 font-bold text-gray-600 hover:bg-gray-50 text-sm">
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={saving || (gotIt.size + confused.size + lost.size === 0)}
+            className="flex-1 flex items-center justify-center gap-2 bg-teal-600 text-white py-2.5 rounded-xl font-bold text-sm hover:bg-teal-700 disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+            {saving ? 'Saving…' : 'Record Signal'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Holiday Planner Tab ──────────────────────────────────────────────────────
+
+type HolidayStudentPlan = {
+  studentId:   string
+  studentName: string
+  message:     string
+  weeks:       Array<{ week: number; label: string; student_task: string; parent_action: string; is_rest_week: boolean }>
+  parent_summary: string
+}
+
+function HolidayPlannerTab({
+  classId,
+  students,
+  className,
+  existingHolidayRisk,
+}: {
+  classId:              string
+  students:             Array<{ id: string; name: string }>
+  className:            string
+  existingHolidayRisk?: Array<{ id: string; name: string; grade: number; riskLevel: string; isActive: boolean }>
+}) {
+  const [period,        setPeriod]        = useState('August Holiday')
+  const [days,          setDays]          = useState(21)
+  const [generating,    setGenerating]    = useState(false)
+  const [plans,         setPlans]         = useState<HolidayStudentPlan[]>([])
+  const [error,         setError]         = useState<string | null>(null)
+  const [expandedId,    setExpandedId]    = useState<string | null>(null)
+  const [copiedId,      setCopiedId]      = useState<string | null>(null)
+
+  async function generate() {
+    setGenerating(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/holiday/generate', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ classId, holidayPeriod: period, holidayDays: days }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) throw new Error(json.error ?? 'Generation failed')
+
+      // Normalise response — batch returns an array
+      const rawPlans = Array.isArray(json.data) ? json.data : [json.data]
+      setPlans(rawPlans.map((p: Record<string, unknown>) => ({
+        studentId:      p.studentId    as string,
+        studentName:    p.student_name as string ?? p.studentName as string,
+        message:        (p.whatsapp_message as string) ?? '',
+        weeks:          (p.weeks as HolidayStudentPlan['weeks']) ?? [],
+        parent_summary: (p.parent_summary as string) ?? '',
+      })))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error generating plans')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  function copyWhatsApp(plan: HolidayStudentPlan) {
+    navigator.clipboard.writeText(plan.message)
+    setCopiedId(plan.studentId)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-5">
+        <h3 className="font-black text-amber-800 mb-1 flex items-center gap-2 text-base">
+          <CalendarDays className="w-5 h-5" /> Holiday Assignment Planner — {className}
+        </h3>
+        <p className="text-sm text-amber-700">
+          Generates a personalised holiday plan per student based on their actual learning gaps. Plans are WhatsApp-ready for parents.
+        </p>
+      </div>
+
+      {/* Config + Generate */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-5 flex flex-wrap gap-4 items-end">
+        <div>
+          <label className="block text-xs font-black text-gray-500 uppercase tracking-wide mb-1">Holiday Period</label>
+          <input
+            value={period}
+            onChange={e => setPeriod(e.target.value)}
+            className="px-3 py-2 rounded-xl border border-gray-200 text-sm font-medium focus:border-amber-400 focus:outline-none"
+            placeholder="e.g. August 2026"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-black text-gray-500 uppercase tracking-wide mb-1">Days</label>
+          <select
+            value={days}
+            onChange={e => setDays(Number(e.target.value))}
+            className="px-3 py-2 rounded-xl border border-gray-200 text-sm font-medium bg-white focus:border-amber-400 focus:outline-none"
+          >
+            <option value={7}>1 week (7 days)</option>
+            <option value={14}>2 weeks (14 days)</option>
+            <option value={21}>3 weeks (21 days)</option>
+            <option value={28}>4 weeks (28 days)</option>
+          </select>
+        </div>
+        <button
+          onClick={generate}
+          disabled={generating || students.length === 0}
+          className="flex items-center gap-2 bg-amber-500 text-white px-6 py-2.5 rounded-xl font-black hover:bg-amber-600 disabled:opacity-50 transition"
+        >
+          {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+          {generating ? `Generating ${students.length} plans…` : `Generate Plans for ${students.length} Students`}
+        </button>
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+          <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
+        </div>
+      )}
+
+      {/* Plans */}
+      {plans.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <CheckCircle2 className="w-4 h-4 text-green-500" />
+            <span>{plans.length} personalised plans generated</span>
+          </div>
+          {plans.map(plan => (
+            <div key={plan.studentId} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+              <div
+                className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-gray-50"
+                onClick={() => setExpandedId(expandedId === plan.studentId ? null : plan.studentId)}
+              >
+                <div className="flex items-center gap-3">
+                  {expandedId === plan.studentId
+                    ? <ChevronDown className="w-4 h-4 text-gray-400" />
+                    : <ChevronRight className="w-4 h-4 text-gray-400" />
+                  }
+                  <div className="font-bold text-gray-900">{plan.studentName}</div>
+                  {plan.weeks.length > 0 && (
+                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold">
+                      {plan.weeks.length}-week plan
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {plan.message && (
+                    <button
+                      onClick={e => { e.stopPropagation(); copyWhatsApp(plan) }}
+                      className="flex items-center gap-1.5 text-xs bg-green-100 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg font-bold hover:bg-green-200 transition"
+                    >
+                      {copiedId === plan.studentId ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
+                      {copiedId === plan.studentId ? 'Copied!' : 'Copy WhatsApp'}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {expandedId === plan.studentId && (
+                <div className="border-t border-gray-100 p-5 space-y-4">
+                  {/* Week-by-week */}
+                  {plan.weeks.length > 0 && (
+                    <div className="space-y-2">
+                      {plan.weeks.map(w => (
+                        <div key={w.week} className={`rounded-xl p-3 border ${w.is_rest_week ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}`}>
+                          <div className="font-black text-sm text-gray-800">Week {w.week}: {w.label}</div>
+                          {w.student_task && <p className="text-xs text-gray-600 mt-1">📚 {w.student_task}</p>}
+                          {w.parent_action && <p className="text-xs text-gray-500 mt-0.5">👩 {w.parent_action}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Parent summary */}
+                  {plan.parent_summary && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800">
+                      {plan.parent_summary}
+                    </div>
+                  )}
+
+                  {/* WhatsApp message */}
+                  {plan.message && (
+                    <div>
+                      <div className="text-xs font-black text-gray-400 uppercase tracking-wide mb-1.5">WhatsApp Message Preview</div>
+                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-700 whitespace-pre-wrap font-mono leading-relaxed">
+                        {plan.message}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Existing at-risk list (holiday risk from insights) */}
+      {plans.length === 0 && existingHolidayRisk && existingHolidayRisk.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="font-black text-gray-900">Holiday Risk Radar</h3>
+            <span className="text-xs bg-red-100 text-red-700 px-3 py-1 rounded-full font-bold">
+              {existingHolidayRisk.length} students
+            </span>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {existingHolidayRisk.map((s) => {
+              const msg = encodeURIComponent(
+`Habari! 👋
+
+Mimi ni mwalimu wa ${s.name}.
+
+Nataka kukuarifa kwamba ${s.name} anahitaji usaidizi wakati wa likizo.
+
+Tafadhali wasiliana nami ili tujadili mpango wa masomo.
+
+Asante! 🙏`
+              )
+              return (
+                <div key={s.id} className="px-5 py-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span>{s.riskLevel === 'high' ? '🔴' : '🟡'}</span>
+                    <div>
+                      <div className="font-bold text-gray-900">{s.name}</div>
+                      <div className="text-xs text-gray-400">Grade {s.grade} · {s.isActive ? 'Active recently' : 'Inactive'}</div>
+                    </div>
+                  </div>
+                  <a
+                    href={`https://wa.me/?text=${msg}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs bg-green-500 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-green-600 transition"
+                  >
+                    📱 Remind Parent
+                  </a>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {plans.length === 0 && (!existingHolidayRisk || existingHolidayRisk.length === 0) && (
+        <div className="bg-green-50 border border-green-200 rounded-2xl p-8 text-center">
+          <TrendingUp className="w-10 h-10 text-green-400 mx-auto mb-3" />
+          <p className="text-green-700 font-bold">No high-risk students identified.</p>
+          <p className="text-sm text-green-600 mt-1">Generate personalised holiday plans above to keep everyone on track.</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Remedial Planner Tab ─────────────────────────────────────────────────────
+
+type RemedialGroup = {
+  type:              string
+  label:             string
+  students:          Array<{ student_id: string; student_name: string; gap_detail: string }>
+  teaching_action:   string
+  suggested_activity: string
+  lessons_needed:    number
+}
+
+type RemedialPlanData = {
+  groups:     RemedialGroup[]
+  allocation: {
+    total_remedial_weeks: number
+    week_by_week:         Array<{ week: number; focus: string; activity: string }>
+    check_in_week:        number
+  }
+  sub_strand: string
+  subject:    string
+}
+
+function RemedialPlannerTab({
+  classId,
+  className,
+}: {
+  classId:   string
+  className: string
+}) {
+  const [subject,    setSubject]    = useState('Mathematics')
+  const [strand,     setStrand]     = useState('')
+  const [subStrand,  setSubStrand]  = useState('')
+  const [term,       setTerm]       = useState(2)
+  const [year,       setYear]       = useState(new Date().getFullYear())
+  const [generating, setGenerating] = useState(false)
+  const [plan,       setPlan]       = useState<RemedialPlanData | null>(null)
+  const [error,      setError]      = useState<string | null>(null)
+
+  const groupColors: Record<string, { bg: string; border: string; text: string; dot: string }> = {
+    critical_gap:      { bg: 'bg-red-50',    border: 'border-red-200',    text: 'text-red-800',    dot: 'bg-red-500'    },
+    prerequisite_gap:  { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-800', dot: 'bg-orange-500' },
+    concept_confusion: { bg: 'bg-amber-50',  border: 'border-amber-200',  text: 'text-amber-800',  dot: 'bg-amber-500'  },
+    on_track:          { bg: 'bg-green-50',  border: 'border-green-200',  text: 'text-green-800',  dot: 'bg-green-500'  },
+  }
+
+  async function generate() {
+    if (!subStrand.trim()) { setError('Enter a sub-strand or topic to analyse'); return }
+    setGenerating(true)
+    setError(null)
+    setPlan(null)
+    try {
+      const res = await fetch('/api/remedial/generate', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ classId, subject, strand, subStrand, term, year }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) throw new Error(json.error ?? 'Generation failed')
+      setPlan(json.data)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error generating plan')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-2xl p-5">
+        <h3 className="font-black text-teal-800 mb-1 flex items-center gap-2 text-base">
+          <Layers className="w-5 h-5" /> Remedial Planner — {className}
+        </h3>
+        <p className="text-sm text-teal-700">
+          Enter the topic you just taught. The AI groups your students by gap type and tells you exactly what to do with each group.
+        </p>
+      </div>
+
+      {/* Config */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div>
+            <label className="block text-xs font-black text-gray-500 uppercase tracking-wide mb-1">Subject</label>
+            <select
+              value={subject}
+              onChange={e => setSubject(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm font-medium bg-white focus:border-teal-400 focus:outline-none"
+            >
+              {CBC_SUBJECTS_SHORT.map(s => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-black text-gray-500 uppercase tracking-wide mb-1">Strand</label>
+            <input
+              value={strand}
+              onChange={e => setStrand(e.target.value)}
+              placeholder="e.g. Numbers"
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:border-teal-400 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-black text-gray-500 uppercase tracking-wide mb-1">Sub-Strand / Topic *</label>
+            <input
+              value={subStrand}
+              onChange={e => setSubStrand(e.target.value)}
+              placeholder="e.g. Fractions"
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:border-teal-400 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-black text-gray-500 uppercase tracking-wide mb-1">Term</label>
+            <select
+              value={term}
+              onChange={e => setTerm(Number(e.target.value))}
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm font-medium bg-white focus:border-teal-400 focus:outline-none"
+            >
+              <option value={1}>Term 1</option>
+              <option value={2}>Term 2</option>
+              <option value={3}>Term 3</option>
+            </select>
+          </div>
+        </div>
+
+        {error && (
+          <div className="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+            <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
+          </div>
+        )}
+
+        <button
+          onClick={generate}
+          disabled={generating}
+          className="w-full flex items-center justify-center gap-2 bg-teal-600 text-white py-3 rounded-xl font-black hover:bg-teal-700 disabled:opacity-50 transition"
+        >
+          {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+          {generating ? 'Analysing learner data…' : 'Generate Remedial Plan'}
+        </button>
+      </div>
+
+      {/* Plan output */}
+      {plan && (
+        <div className="space-y-4">
+          {/* Groups */}
+          <div className="text-sm font-black text-gray-500 uppercase tracking-wide">
+            Student Groups — {plan.sub_strand}
+          </div>
+          {plan.groups.map(group => {
+            const cfg = groupColors[group.type] ?? { bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-800', dot: 'bg-gray-400' }
+            return (
+              <div key={group.type} className={`rounded-2xl border p-5 ${cfg.bg} ${cfg.border}`}>
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-3 h-3 rounded-full ${cfg.dot}`} />
+                    <div className={`font-black text-sm ${cfg.text}`}>{group.label}</div>
+                    <span className="text-xs bg-white/70 px-2 py-0.5 rounded-full font-semibold text-gray-600">
+                      {group.students.length} students · {group.lessons_needed} lesson{group.lessons_needed !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Students */}
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {group.students.map(s => (
+                    <div key={s.student_id} className="text-xs bg-white/80 border border-white rounded-lg px-2.5 py-1 text-gray-700">
+                      <span className="font-semibold">{s.student_name}</span>
+                      {s.gap_detail && <span className="text-gray-400"> · {s.gap_detail}</span>}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Actions */}
+                <div className="space-y-1.5">
+                  {group.teaching_action && (
+                    <p className={`text-sm ${cfg.text} leading-snug`}>
+                      <span className="font-black">Teacher: </span>{group.teaching_action}
+                    </p>
+                  )}
+                  {group.suggested_activity && (
+                    <p className={`text-sm ${cfg.text} leading-snug opacity-80`}>
+                      <span className="font-black">Activity: </span>{group.suggested_activity}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+
+          {/* Week allocation */}
+          {plan.allocation?.week_by_week?.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100 font-black text-gray-800 text-sm flex items-center gap-2">
+                <ClipboardList className="w-4 h-4 text-teal-600" />
+                {plan.allocation.total_remedial_weeks}-Week Allocation Plan
+              </div>
+              <div className="divide-y divide-gray-100">
+                {plan.allocation.week_by_week.map(w => (
+                  <div key={w.week} className="px-5 py-3 flex items-start gap-4">
+                    <div className="w-16 shrink-0 text-xs font-black text-gray-400">Week {w.week}</div>
+                    <div>
+                      <div className="text-sm font-semibold text-gray-800">{w.focus}</div>
+                      {w.activity && <div className="text-xs text-gray-500 mt-0.5">{w.activity}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {plan.allocation.check_in_week && (
+                <div className="px-5 py-3 bg-teal-50 border-t border-teal-100 text-xs text-teal-700 font-semibold">
+                  Check-in assessment: Week {plan.allocation.check_in_week}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function getParentStatus(student: {
   parent_phone?: string | null
   parent_user_id?: string | null
@@ -1440,6 +2457,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ classId:
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [selectedStudentName, setSelectedStudentName] = useState('')
   const [expandedStudentId, setExpandedStudentId]     = useState<string | null>(null)
+  const [showFormative, setShowFormative]             = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -1540,14 +2558,32 @@ na kuwasaidia vizuri zaidi darasani.
   }
 
   const cls = data.class
-  const students: any[] = data.students || []
-  const subjectInsights: any[] = data.insights || []
+  const rawStudents: Record<string, unknown>[] = data.students || []
+  const students: AnalyticsStudent[] = rawStudents.map(s => ({
+    id:              s.id as string,
+    name:            s.name as string,
+    grade:           s.grade as number,
+    curriculum_type: (s.curriculum_type as string) ?? 'cbc',
+    current_pathway: (s.current_pathway as string | null) ?? null,
+    assessment:      s.assessment as AnalyticsStudent['assessment'],
+  }))
+  const clinicStudents: ClinicStudent[] = rawStudents.map(s => ({
+    id:                 s.id as string,
+    name:               s.name as string,
+    grade:              s.grade as number,
+    latestAssessmentId: (s.latestAssessmentId as string | null) ?? null,
+    parent_email:       (s.parent_email as string | null) ?? null,
+    parent_phone:       (s.parent_phone as string | null) ?? null,
+    assessment:         s.assessment as ClinicStudent['assessment'],
+  }))
+  const subjectInsights: Record<string, unknown>[] = data.insights || []
 
   const tabs: { key: Tab; label: string; icon: any }[] = [
     { key: 'students',    label: 'Students',        icon: Users         },
     { key: 'gaps',        label: 'Gap Radar',       icon: BarChart3     },
     { key: 'assignments', label: 'Assignments',     icon: BookOpen      },
-    { key: 'holiday',     label: 'Holiday Bridge',  icon: Sun           },
+    { key: 'holiday',     label: 'Holiday Planner', icon: Sun           },
+    { key: 'remedial',    label: 'Remedial Plan',   icon: Layers        },
     { key: 'compass',     label: 'Compass',         icon: Compass       },
     { key: 'clinic',      label: 'Clinic Reports',  icon: FlaskConical  },
     { key: 'upload',      label: 'Upload Scores',   icon: Upload        },
@@ -1585,6 +2621,12 @@ na kuwasaidia vizuri zaidi darasani.
             >
               <Share2 className="w-4 h-4" /> Send to Parents
             </a>
+            <button
+              onClick={() => setShowFormative(true)}
+              className="flex items-center gap-2 bg-gray-800 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-gray-900 transition"
+            >
+              <MessageSquare className="w-4 h-4" /> After Lesson
+            </button>
             <Link
               href={`/teacher/assignments/new?classId=${cls.id}`}
               className="flex items-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-teal-700 transition"
@@ -1614,6 +2656,9 @@ na kuwasaidia vizuri zaidi darasani.
           <div className="text-sm text-gray-500">High Risk</div>
         </div>
       </div>
+
+      {/* Monday Intelligence Panel */}
+      <MondayIntelligencePanel classId={classId} />
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl mb-6 overflow-x-auto">
@@ -2082,7 +3127,7 @@ na kuwasaidia vizuri zaidi darasani.
       {tab === 'clinic' && (
         <ClinicReportsTab
           classId={classId}
-          students={students as ClinicStudent[]}
+          students={clinicStudents}
           className={cls.name}
         />
       )}
@@ -2176,72 +3221,19 @@ na kuwasaidia vizuri zaidi darasani.
         </div>
       )}
 
-      {/* TAB: Holiday Bridge */}
+      {/* TAB: Holiday Planner */}
       {tab === 'holiday' && (
-        <div className="space-y-5">
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
-            <h3 className="font-black text-amber-800 mb-1 flex items-center gap-2">
-              <Sun className="w-5 h-5" /> Holiday Bridge — {cls.name}
-            </h3>
-            <p className="text-sm text-amber-700">
-              Unique to EduNexus — track which students are at risk going into the holiday, and send targeted reminders.
-            </p>
-          </div>
+        <HolidayPlannerTab
+          classId={classId}
+          students={students.map((s: any) => ({ id: s.id, name: s.name }))}
+          className={cls.name}
+          existingHolidayRisk={insights?.holidayRisk}
+        />
+      )}
 
-          {/* At-risk students */}
-          {insights?.holidayRisk && insights.holidayRisk.length > 0 ? (
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                <h3 className="font-black text-gray-900">At-Risk Students</h3>
-                <span className="text-xs bg-red-100 text-red-700 px-3 py-1 rounded-full font-bold">
-                  {insights.holidayRisk.length} students
-                </span>
-              </div>
-              <div className="divide-y divide-gray-100">
-                {insights.holidayRisk.map((s: any) => {
-                  const msg = encodeURIComponent(
-`Habari! 👋
-
-Mimi ni mwalimu wa ${s.name}.
-
-Nataka kukuarifa kwamba ${s.name} hajatumia EduNexus hivi karibuni.
-
-Tafadhali mhimize atumie Learning Compass wakati wa likizo ili asibaki nyuma.
-
-Asante! 🙏`
-                  )
-                  return (
-                    <div key={s.id} className="px-5 py-4 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span>{s.riskLevel === 'high' ? '🔴' : '🟡'}</span>
-                        <div>
-                          <div className="font-bold text-gray-900">{s.name}</div>
-                          <div className="text-xs text-gray-400">
-                            Grade {s.grade} · {s.isActive ? 'Active recently' : 'Inactive'}
-                          </div>
-                        </div>
-                      </div>
-                      <a
-                        href={`https://wa.me/?text=${msg}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs bg-green-500 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-green-600 transition"
-                      >
-                        📱 Remind Parent
-                      </a>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          ) : (
-            <div className="bg-green-50 border border-green-200 rounded-2xl p-8 text-center">
-              <TrendingUp className="w-10 h-10 text-green-400 mx-auto mb-3" />
-              <p className="text-green-700 font-bold">Great news — no high-risk students identified.</p>
-              <p className="text-sm text-green-600 mt-1">All students appear active or have solid performance.</p>
-            </div>
-          )}
-        </div>
+      {/* TAB: Remedial Planner */}
+      {tab === 'remedial' && (
+        <RemedialPlannerTab classId={classId} className={cls.name} />
       )}
 
       {/* TAB: Upload Assessment */}
@@ -2259,6 +3251,15 @@ Asante! 🙏`
           students={students}
           className={cls.name}
           grade={cls.grade}
+        />
+      )}
+
+      {/* Formative Signal Modal */}
+      {showFormative && (
+        <FormativeSignalModal
+          classId={classId}
+          students={students.map((s: any) => ({ id: s.id, name: s.name }))}
+          onClose={() => setShowFormative(false)}
         />
       )}
     </div>

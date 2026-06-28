@@ -28,10 +28,15 @@ export async function GET(req: Request) {
     const { data: teacher } = await db.from('teachers').select('id').eq('user_id', user.id).single()
     if (!teacher) return apiForbidden()
 
-    const classId = new URL(req.url).searchParams.get('classId')
+    const url     = new URL(req.url)
+    const classId = url.searchParams.get('classId')
+    const term    = url.searchParams.get('term') ?? undefined
+    const yearRaw = url.searchParams.get('year')
+    const year    = yearRaw ? parseInt(yearRaw, 10) : undefined
+
     const assessments = classId
       ? await getClassAssessments(classId, teacher.id)
-      : await getTeacherAssessments(teacher.id)
+      : await getTeacherAssessments(teacher.id, { term, year })
 
     return apiSuccess({ assessments })
   } catch (e: unknown) {

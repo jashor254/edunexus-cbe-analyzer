@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/utils/supabase/service'
 import { calculateMeanScore, calculateMeanGrade } from './gradeCalculator'
+import { updateFromAssessment } from '@/lib/learnerModel/updater'
 import type {
   ClassAssessment,
   LearnerMark,
@@ -78,14 +79,21 @@ export async function getClassAssessments(
   return attachStats(data || [], db)
 }
 
-export async function getTeacherAssessments(teacherId: string): Promise<AssessmentWithStats[]> {
+export async function getTeacherAssessments(
+  teacherId: string,
+  filters: { term?: string; year?: number } = {}
+): Promise<AssessmentWithStats[]> {
   const db = createServiceClient()
-  const { data, error } = await db
+  let q = db
     .from('class_assessments')
     .select(ASSESSMENT_COLS)
     .eq('teacher_id', teacherId)
     .order('created_at', { ascending: false })
 
+  if (filters.term) q = q.eq('term', filters.term)
+  if (filters.year) q = q.eq('year', filters.year)
+
+  const { data, error } = await q
   if (error) throw new Error('Failed to fetch assessments')
   return attachStats(data || [], db)
 }
@@ -402,6 +410,62 @@ export async function upsertMarksCSV(
     .order('position', { ascending: true, nullsFirst: false })
 
   return { inserted, updated, marks: final || [] }
+}
+
+// Fires after marks are saved — updates Learner Model for all linked students.
+// Fire-and-forget: called without await so it doesn't delay the API response.
+export async function triggerLearnerModelUpdates(
+  assessmentId: string,
+  teacherId:    string,
+): Promise<void> {
+  const db = createServiceClient()
+
+  const [{ data: assessment }, { data: marks }] = await Promise.all([
+    db
+      .from('class_assessments')
+      .select('term, year, subjects, assessment_type')
+      .eq('id', assessmentId)
+      .eq('teacher_id', teacherId)
+      .single(),
+    db
+      .from('learner_marks')
+      .select('student_id, student_name, subject_scores, mean_score')
+      .eq('assessment_id', assessmentId)
+      .eq('teacher_id', teacherId)
+      .not('student_id', 'is', null),
+  ])
+
+  if (!assessment || !marks?.length) return
+
+  const now = new Date().toISOString()
+
+  // Upsert to strand_assessments (the history table capability engine reads)
+  await db.from('strand_assessments').upsert(
+    marks.map(m => ({
+      assessment_id:  assessmentId,
+      student_id:     m.student_id,
+      subject_scores: m.subject_scores,
+    })),
+    { onConflict: 'assessment_id,student_id' }
+  )
+
+  // Update Learner Model for each linked student
+  await Promise.allSettled(
+    marks.map(m =>
+      updateFromAssessment({
+        studentId:     m.student_id as string,
+        studentName:   m.student_name as string,
+        subjectScores: m.subject_scores as Record<string, number>,
+        subjectMarks:  m.subject_scores as Record<string, number>,
+        strand:        '',
+        subStrand:     '',
+        subject:       (assessment.subjects as string[])?.[0] ?? '',
+        term:          Number(assessment.term),
+        year:          Number(assessment.year),
+        assessedAt:    now,
+      })
+    )
+  )
 }
 
 export function analyzeSubjects(
