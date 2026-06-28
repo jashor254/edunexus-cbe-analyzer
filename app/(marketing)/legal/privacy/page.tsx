@@ -12,21 +12,22 @@ export const metadata = {
 }
 
 const SECTIONS = [
-  { id: 'who-we-are',       label: 'Who We Are' },
-  { id: 'data-collected',   label: 'Data We Collect' },
-  { id: 'legal-basis',      label: 'Legal Basis' },
-  { id: 'how-we-use',       label: 'How We Use It' },
-  { id: 'childrens-data',   label: "Children's Data" },
-  { id: 'ai-data',          label: 'AI & Your Data' },
-  { id: 'data-sharing',     label: 'Data Sharing' },
-  { id: 'cross-border',     label: 'International Transfers' },
-  { id: 'retention',        label: 'How Long We Keep It' },
-  { id: 'security',         label: 'Security' },
-  { id: 'your-rights',      label: 'Your Rights' },
-  { id: 'automated',        label: 'Automated Decisions' },
-  { id: 'cookies',          label: 'Cookies' },
-  { id: 'changes',          label: 'Policy Changes' },
-  { id: 'contact',          label: 'Contact & Complaints' },
+  { id: 'who-we-are',             label: 'Who We Are' },
+  { id: 'data-collected',         label: 'Data We Collect' },
+  { id: 'legal-basis',            label: 'Legal Basis' },
+  { id: 'how-we-use',             label: 'How We Use It' },
+  { id: 'childrens-data',         label: "Children's Data" },
+  { id: 'school-data-controller', label: 'Schools & EduNexus Core' },
+  { id: 'ai-data',                label: 'AI & Your Data' },
+  { id: 'data-sharing',           label: 'Data Sharing' },
+  { id: 'cross-border',           label: 'International Transfers' },
+  { id: 'retention',              label: 'How Long We Keep It' },
+  { id: 'security',               label: 'Security' },
+  { id: 'your-rights',            label: 'Your Rights' },
+  { id: 'automated',              label: 'Automated Decisions' },
+  { id: 'cookies',                label: 'Cookies' },
+  { id: 'changes',                label: 'Policy Changes' },
+  { id: 'contact',                label: 'Contact & Complaints' },
 ]
 
 function SectionHead({
@@ -73,7 +74,7 @@ export default function PrivacyPage() {
 
           <div className="flex flex-wrap items-center gap-3 mt-4">
             <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30">
-              Last updated: 25 June 2026
+              Last updated: 29 June 2026
             </span>
             <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-white/10 text-slate-300 border border-white/15">
               Kenya Data Protection Act 2019
@@ -131,6 +132,13 @@ export default function PrivacyPage() {
                   navigating the CBC Junior (Grade 7–9), CBC Senior (Grade 10–12), and 8-4-4 (Form 3–4) curricula.
                 </p>
                 <p>
+                  Through <strong>EduNexus Core</strong>, we also provide school management services to Kenyan
+                  registered schools (PP1–Grade 9), enabling headteachers, deputy headteachers, school administrators,
+                  and teachers to manage learner admissions, class enrolments, assessments, report cards, and
+                  transfers. In this context the school is the Data Controller for learner records it creates; see
+                  Section 6 for the full explanation of that relationship.
+                </p>
+                <p>
                   Under the Kenya Data Protection Act 2019, Jashor Technologies is the <strong>Data Controller</strong>{' '}
                   for all personal data processed through the EduNexus platform.
                 </p>
@@ -158,7 +166,7 @@ export default function PrivacyPage() {
               <div className="space-y-4">
                 <div className="grid sm:grid-cols-3 gap-4">
                   <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
-                    <h3 className="font-black text-blue-800 mb-3 text-sm uppercase tracking-wide">Student Data</h3>
+                    <h3 className="font-black text-blue-800 mb-3 text-sm uppercase tracking-wide">Student / Consumer Data</h3>
                     <ul className="space-y-1.5 text-sm text-blue-700">
                       <li>• Full name, grade level, school</li>
                       <li>• Term assessment scores (CBC levels 1–4)</li>
@@ -169,17 +177,19 @@ export default function PrivacyPage() {
                     </ul>
                   </div>
                   <div className="bg-violet-50 border border-violet-100 rounded-2xl p-4">
-                    <h3 className="font-black text-violet-800 mb-3 text-sm uppercase tracking-wide">Parent Data</h3>
+                    <h3 className="font-black text-violet-800 mb-3 text-sm uppercase tracking-wide">Parent / Guardian Data</h3>
                     <ul className="space-y-1.5 text-sm text-violet-700">
                       <li>• Full name</li>
                       <li>• Phone number (WhatsApp)</li>
                       <li>• Email address</li>
                       <li>• Child's academic reports received</li>
                       <li>• Payment records (Paystack)</li>
+                      <li>• National ID number <em>(Core schools only — for guardian verification)</em></li>
+                      <li>• Relationship to learner</li>
                     </ul>
                   </div>
                   <div className="bg-teal-50 border border-teal-100 rounded-2xl p-4">
-                    <h3 className="font-black text-teal-800 mb-3 text-sm uppercase tracking-wide">Teacher Data</h3>
+                    <h3 className="font-black text-teal-800 mb-3 text-sm uppercase tracking-wide">Teacher / School Staff Data</h3>
                     <ul className="space-y-1.5 text-sm text-teal-700">
                       <li>• Full name, school</li>
                       <li>• Subjects & grades taught</li>
@@ -187,8 +197,69 @@ export default function PrivacyPage() {
                       <li>• Scheme of work content</li>
                       <li>• Lesson plan content</li>
                       <li>• Token balance & usage</li>
+                      <li>• School role (headteacher, deputy, admin, teacher)</li>
                     </ul>
                   </div>
+                </div>
+
+                {/* EduNexus Core learner data */}
+                <div className="bg-rose-50 border-2 border-rose-200 rounded-2xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-xs font-black bg-rose-200 text-rose-800 px-2.5 py-1 rounded-lg uppercase tracking-wide">EduNexus Core — School Learner Registry</span>
+                  </div>
+                  <p className="text-sm text-rose-800 mb-4 leading-relaxed">
+                    When a school onboards to EduNexus Core, its administrators create official learner records on behalf
+                    of the school. This data is collected under the school's authority as Data Controller (see Section 6).
+                    The following data categories are collected:
+                  </p>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div>
+                      <p className="font-bold text-rose-900 text-xs uppercase tracking-wide mb-2">Learner Identity</p>
+                      <ul className="space-y-1 text-sm text-rose-700">
+                        <li>• Full name, date of birth, gender</li>
+                        <li>• Admission number (school-assigned)</li>
+                        <li>• UPI / NEMIS pupil number <em>(government identifier)</em></li>
+                        <li>• Nationality, county of origin</li>
+                        <li>• Passport photo URL <em>(optional)</em></li>
+                        <li>• Special educational needs <em>(see below — sensitive data)</em></li>
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="font-bold text-rose-900 text-xs uppercase tracking-wide mb-2">Academic Records</p>
+                      <ul className="space-y-1 text-sm text-rose-700">
+                        <li>• Enrolment history (class, term, academic year)</li>
+                        <li>• Assessment scores and CBC performance levels</li>
+                        <li>• Term subject summaries & class position</li>
+                        <li>• Teacher and headteacher comments</li>
+                        <li>• Attendance (days present / absent)</li>
+                        <li>• Promotion decisions (promoted/repeated/graduated)</li>
+                        <li>• Transfer records and reason for transfer</li>
+                        <li>• Official school report card PDFs</li>
+                      </ul>
+                    </div>
+                  </div>
+                  <div className="mt-4 bg-red-100 border border-red-300 rounded-xl p-4">
+                    <p className="font-black text-red-800 text-sm mb-1">⚠ Special Category Data — Special Educational Needs</p>
+                    <p className="text-sm text-red-700 leading-relaxed">
+                      The <code className="bg-red-200 px-1 rounded text-xs">special_needs</code> field may contain information about a learner's
+                      disabilities, learning difficulties, or medical conditions. Under Section 46 of the Kenya Data Protection Act 2019,
+                      this is <strong>sensitive personal data</strong> that may only be processed with <strong>explicit written consent</strong>{' '}
+                      from a parent or guardian, or where processing is necessary for the provision of educational support services.
+                      Schools must obtain this consent before entering special needs information into EduNexus Core.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                  <h3 className="font-black text-slate-600 mb-3 text-sm uppercase tracking-wide">School Institution Data</h3>
+                  <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-600">
+                    <li>• School name, type, NEMIS school code</li>
+                    <li>• County, sub-county, ward, physical address</li>
+                    <li>• Contact phone & email</li>
+                    <li>• School logo, motto</li>
+                    <li>• Curriculum type (CBC, 8-4-4, IGCSE)</li>
+                    <li>• Academic year and term configuration</li>
+                  </ul>
                 </div>
 
                 <div className="grid sm:grid-cols-2 gap-4">
@@ -232,13 +303,19 @@ export default function PrivacyPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {[
-                      ['Student academic data', 'Consent', 'Provided by parent/guardian at registration'],
+                      ['Student academic data (consumer app)', 'Consent', 'Provided by parent/guardian at registration'],
                       ['Student learning sessions', 'Consent + Legitimate Interest', 'To deliver personalised education'],
-                      ['Parent contact details', 'Consent', 'Provided at signup; used to send reports'],
+                      ['Parent contact details (consumer app)', 'Consent', 'Provided at signup; used to send reports'],
                       ['Teacher account data', 'Contractual Necessity', 'Required to provide the subscribed service'],
                       ['Payment records', 'Legal Obligation', 'Financial record-keeping under Kenya tax law'],
                       ['Usage analytics', 'Legitimate Interest', 'To improve platform performance and fix bugs'],
                       ['Study group data', 'Consent', 'Student or parent chooses to join a group'],
+                      ['School institution data', 'Contractual Necessity', 'Required to set up and operate EduNexus Core for the school'],
+                      ['School staff roles & access', 'Contractual Necessity', 'Required to provide Core services; school is responsible for staff notice'],
+                      ['Learner registry data (Core)', 'Legal Obligation + Contractual Necessity', 'Schools are required under the Kenya Education Act to maintain learner records; EduNexus processes these on the school\'s instruction'],
+                      ['Guardian contact data (Core)', 'Contractual Necessity + Consent', 'Collected by school for communication; guardian consent is the school\'s responsibility'],
+                      ['Formal academic records (Core)', 'Legal Obligation', 'Schools must maintain assessment and report records under MoE regulations'],
+                      ['Special educational needs data', 'Explicit Consent', 'Sensitive data under DPA S.46; requires explicit written consent from parent/guardian before processing'],
                     ].map(([cat, basis, detail], i) => (
                       <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                         <td className="px-4 py-3 font-semibold text-slate-800">{cat}</td>
@@ -266,6 +343,10 @@ export default function PrivacyPage() {
                   ['📊', 'Help teachers track class performance trends'],
                   ['🏆', 'Manage study group leaderboards and challenges'],
                   ['🎯', 'Provide CBC pathway and career recommendations'],
+                  ['🏫', 'Manage school learner admissions, enrolments, and transfers (Core)'],
+                  ['📄', 'Generate and publish official school report cards (Core)'],
+                  ['📈', 'Compute term summaries, positions, and CBC performance levels (Core)'],
+                  ['🔑', 'Manage school staff roles and access permissions (Core)'],
                   ['🔧', 'Diagnose bugs and improve platform reliability'],
                   ['🛡️', 'Detect and prevent fraudulent activity'],
                 ].map(([icon, text]) => (
@@ -309,24 +390,28 @@ export default function PrivacyPage() {
                 <div className="space-y-3">
                   {[
                     {
-                      title: 'Parental consent required',
-                      desc: 'Student profiles are created by a parent or guardian who agrees to this policy on the child\'s behalf. Students under 18 may not create their own accounts independently.',
+                      title: 'Consumer app — parental consent required',
+                      desc: 'On the EduNexus consumer app, student profiles are created by a parent or guardian who agrees to this policy on the child\'s behalf. Students under 18 may not create their own accounts independently.',
+                    },
+                    {
+                      title: 'EduNexus Core — school-created learner records',
+                      desc: 'When a school uses EduNexus Core, the school (as Data Controller) creates learner records during the admission process. The school is responsible for obtaining the necessary parental consent or providing notice to guardians under the Kenya Education Act and DPA 2019. EduNexus processes these records on the school\'s instruction.',
                     },
                     {
                       title: 'Student self-login',
-                      desc: 'Once a parent creates a profile, students may be given their own login to access the Learning Compass, study groups, and their personal dashboard. This login is still linked to and governed by parental consent.',
+                      desc: 'Once a parent creates a consumer profile, students may be given their own login to access the Learning Compass, study groups, and their personal dashboard. This login is still governed by parental consent.',
                     },
                     {
                       title: 'Minimum data principle',
-                      desc: 'We collect only the data strictly necessary for educational purposes — name, grade, school, assessment scores, and learning session data.',
+                      desc: 'We collect only the data strictly necessary for educational purposes. For Core learner records, admission number, UPI, and date of birth are collected to satisfy MoE/NEMIS requirements; special needs data is collected only with explicit parental consent.',
                     },
                     {
                       title: 'No advertising to minors',
-                      desc: 'Student data is never used for advertising, commercial profiling, or any purpose outside direct educational support.',
+                      desc: 'Student and learner data is never used for advertising, commercial profiling, or any purpose outside direct educational support.',
                     },
                     {
                       title: 'Parental access and deletion',
-                      desc: 'Parents may request access to, correction of, or deletion of their child\'s data at any time by emailing support@edunexus.co.ke.',
+                      desc: 'Parents may request access to, correction of, or deletion of their child\'s data at any time by emailing support@edunexus.co.ke. For Core learner records, deletion requests that affect official school records will be processed in coordination with the school.',
                     },
                   ].map(item => (
                     <div key={item.title} className="flex items-start gap-3 bg-white/60 rounded-xl p-4">
@@ -341,9 +426,74 @@ export default function PrivacyPage() {
               </div>
             </section>
 
-            {/* ── 6. AI & YOUR DATA ─────────────────────────────────── */}
+            {/* ── 6. SCHOOLS & EDUNEXUS CORE ──────────────────────────── */}
             <section>
-              <SectionHead id="ai-data" icon={<Brain className="w-4 h-4 text-slate-500" />} number="6" title="AI and Your Data" />
+              <SectionHead
+                id="school-data-controller"
+                icon={<FileText className="w-4 h-4 text-slate-500" />}
+                number="6"
+                title="Schools & EduNexus Core — Data Controller Relationship"
+                badge="Important"
+              />
+              <div className="space-y-4">
+                <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-6 space-y-4">
+                  <p className="text-blue-900 text-base leading-relaxed">
+                    EduNexus Core is a school management platform. When a Kenyan school subscribes to Core, it acts as
+                    an <strong>independent Data Controller</strong> for all learner records it creates within the system.
+                    Jashor Technologies (EduNexus) acts as a <strong>Data Processor</strong> — processing that data only
+                    on the school's documented instructions.
+                  </p>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="bg-white/70 rounded-xl p-4">
+                      <p className="font-bold text-blue-900 text-sm mb-2">The School (Data Controller) is responsible for:</p>
+                      <ul className="space-y-1.5 text-sm text-blue-700">
+                        <li>• Obtaining parental/guardian consent or notice before admitting learners</li>
+                        <li>• Obtaining explicit consent before entering special needs data</li>
+                        <li>• Ensuring the accuracy of learner records</li>
+                        <li>• Responding to data subject rights requests from parents</li>
+                        <li>• Retaining records for the period required under MoE regulations</li>
+                        <li>• Notifying guardians about how their child's data is managed</li>
+                      </ul>
+                    </div>
+                    <div className="bg-white/70 rounded-xl p-4">
+                      <p className="font-bold text-blue-900 text-sm mb-2">EduNexus (Data Processor) is responsible for:</p>
+                      <ul className="space-y-1.5 text-sm text-blue-700">
+                        <li>• Storing and securing learner data to DPA 2019 standards</li>
+                        <li>• Enforcing Row Level Security so only authorised school staff can access records</li>
+                        <li>• Processing data only as instructed by the school</li>
+                        <li>• Notifying the school of any data breach within 72 hours</li>
+                        <li>• Deleting learner data on written instruction from the school</li>
+                        <li>• Never selling or sharing Core learner data with any third party</li>
+                      </ul>
+                    </div>
+                  </div>
+                  <p className="text-sm text-blue-800 leading-relaxed">
+                    A Data Processing Agreement (DPA) governs this relationship. Schools that subscribe to EduNexus Core
+                    are bound by that agreement. If you are a parent whose child's school uses EduNexus Core, please
+                    contact your school administration regarding how your child's data is managed at school level. You
+                    may also contact us at{' '}
+                    <a href="mailto:support@edunexus.co.ke" className="font-bold underline">support@edunexus.co.ke</a>{' '}
+                    and we will direct your request to the appropriate school.
+                  </p>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <p className="font-bold text-amber-900 text-sm mb-1">Intelligence Bridge (Optional)</p>
+                  <p className="text-sm text-amber-700 leading-relaxed">
+                    Schools may optionally enable the <strong>EduNexus Intelligence Bridge</strong> — a paid feature
+                    that connects Core learner records to EduNexus OS AI modules (learning risk analysis, growth
+                    milestones, remedial planning). When enabled, Core enrolment and academic performance data is
+                    analysed by DeepSeek AI to produce school-level intelligence reports. This feature is off by
+                    default and can only be activated by the school's headteacher or administrator. The same AI data
+                    commitments listed in Section 7 apply to all Intelligence Bridge processing.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            {/* ── 7. AI & YOUR DATA ─────────────────────────────────── */}
+            <section>
+              <SectionHead id="ai-data" icon={<Brain className="w-4 h-4 text-slate-500" />} number="7" title="AI and Your Data" />
               <div className="space-y-4">
                 <p className="text-slate-700 text-base leading-relaxed">
                   EduNexus uses DeepSeek AI (accessed via Together AI) to power the following features:
@@ -384,7 +534,7 @@ export default function PrivacyPage() {
 
             {/* ── 7. DATA SHARING ──────────────────────────────────── */}
             <section>
-              <SectionHead id="data-sharing" icon={<Share2 className="w-4 h-4 text-slate-500" />} number="7" title="Data Sharing — Our Processors" />
+              <SectionHead id="data-sharing" icon={<Share2 className="w-4 h-4 text-slate-500" />} number="8" title="Data Sharing — Our Processors" />
               <p className="text-slate-700 text-base mb-4">
                 We share data <strong>only</strong> with the following service providers, each bound by a Data Processing
                 Agreement and prohibited from using your data for their own commercial purposes:
@@ -456,7 +606,7 @@ export default function PrivacyPage() {
 
             {/* ── 8. CROSS-BORDER TRANSFERS ────────────────────────── */}
             <section>
-              <SectionHead id="cross-border" icon={<Globe className="w-4 h-4 text-slate-500" />} number="8" title="International Data Transfers" />
+              <SectionHead id="cross-border" icon={<Globe className="w-4 h-4 text-slate-500" />} number="9" title="International Data Transfers" />
               <div className="space-y-4 text-slate-700">
                 <p className="text-base leading-relaxed">
                   Some of our service providers are located outside Kenya. Under Section 48 of the Kenya Data Protection
@@ -505,7 +655,7 @@ export default function PrivacyPage() {
 
             {/* ── 9. RETENTION ─────────────────────────────────────── */}
             <section>
-              <SectionHead id="retention" icon={<Clock className="w-4 h-4 text-slate-500" />} number="9" title="How Long We Keep Your Data" />
+              <SectionHead id="retention" icon={<Clock className="w-4 h-4 text-slate-500" />} number="10" title="How Long We Keep Your Data" />
               <p className="text-slate-700 text-base mb-4">
                 We retain personal data only as long as necessary for the purpose it was collected, or as required by
                 Kenyan law. The schedule below applies to all categories.
@@ -522,7 +672,7 @@ export default function PrivacyPage() {
                   <tbody className="divide-y divide-slate-100">
                     {[
                       ['Account & profile data', 'While account is active, then deleted within 30 days of a verified deletion request', 'Necessary to provide the service'],
-                      ['Student assessment scores', 'While account is active + 30 days after deletion', 'Forms core of the educational record'],
+                      ['Student assessment scores (consumer app)', 'While account is active + 30 days after deletion', 'Forms core of the educational record'],
                       ['Learning Compass sessions', 'While account is active + 30 days after deletion', 'Powers progress tracking'],
                       ['Study group data', 'While account is active + 30 days after deletion', 'Community feature'],
                       ['Payment records', '7 years from date of transaction', 'Kenya VAT Act & Income Tax Act obligation'],
@@ -530,6 +680,11 @@ export default function PrivacyPage() {
                       ['AI conversation logs', 'Anonymised after 90 days, then retained for debugging', 'Platform improvement; personal data removed'],
                       ['Database backups', '30-day rolling backup window', 'Disaster recovery'],
                       ['Usage analytics', '24 months rolling', 'Platform performance monitoring'],
+                      ['Core learner identity records', 'For the duration of the school\'s active subscription, then transferred to the school or deleted on instruction — minimum 3 years recommended by MoE', 'Schools have a legal duty to maintain learner records under the Kenya Education Act'],
+                      ['Official school report cards', 'For the duration of the school\'s active subscription; school may request export before closing their account', 'Formal academic records — schools are responsible for long-term archiving per MoE requirements'],
+                      ['Learner promotion & transfer records', 'For the duration of the school\'s active subscription + 1 year, or as instructed by the school', 'Required for school administration continuity and potential MoE audits'],
+                      ['Special educational needs data', 'Deleted immediately upon written request from parent/guardian or the school; otherwise retained for duration of learner enrolment only', 'Sensitive data — minimum retention, explicit consent-based'],
+                      ['Guardian national ID numbers', 'Retained while the learner is actively enrolled; deleted 30 days after learner status changes to transferred/graduated/archived', 'Collected for school verification purposes only'],
                     ].map(([type, period, reason], i) => (
                       <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                         <td className="px-4 py-3 font-semibold text-slate-800 align-top">{type}</td>
@@ -549,7 +704,7 @@ export default function PrivacyPage() {
 
             {/* ── 10. SECURITY ─────────────────────────────────────── */}
             <section>
-              <SectionHead id="security" icon={<Lock className="w-4 h-4 text-slate-500" />} number="10" title="Data Security" />
+              <SectionHead id="security" icon={<Lock className="w-4 h-4 text-slate-500" />} number="11" title="Data Security" />
               <div className="grid sm:grid-cols-2 gap-3">
                 {[
                   { icon: '🔐', title: 'Encrypted in transit', desc: 'All connections use TLS 1.2+. No unencrypted HTTP.' },
@@ -578,7 +733,7 @@ export default function PrivacyPage() {
 
             {/* ── 11. YOUR RIGHTS ──────────────────────────────────── */}
             <section>
-              <SectionHead id="your-rights" icon={<Scale className="w-4 h-4 text-slate-500" />} number="11" title="Your Rights Under the Kenya Data Protection Act 2019" />
+              <SectionHead id="your-rights" icon={<Scale className="w-4 h-4 text-slate-500" />} number="12" title="Your Rights Under the Kenya Data Protection Act 2019" />
               <div className="grid sm:grid-cols-2 gap-3 mb-5">
                 {[
                   { right: 'Right to Access (S.26)', desc: 'Request a copy of all personal data we hold about you.' },
@@ -612,7 +767,7 @@ export default function PrivacyPage() {
 
             {/* ── 12. AUTOMATED DECISIONS ──────────────────────────── */}
             <section>
-              <SectionHead id="automated" icon={<Brain className="w-4 h-4 text-slate-500" />} number="12" title="Automated Decision-Making & Profiling" />
+              <SectionHead id="automated" icon={<Brain className="w-4 h-4 text-slate-500" />} number="13" title="Automated Decision-Making & Profiling" />
               <div className="space-y-4 text-slate-700 text-base">
                 <p className="leading-relaxed">
                   EduNexus uses automated processing (AI) to generate several outputs. Under Section 32 of the Kenya DPA 2019,
@@ -674,7 +829,7 @@ export default function PrivacyPage() {
 
             {/* ── 13. COOKIES ──────────────────────────────────────── */}
             <section>
-              <SectionHead id="cookies" icon={<Cookie className="w-4 h-4 text-slate-500" />} number="13" title="Cookies & Local Storage" />
+              <SectionHead id="cookies" icon={<Cookie className="w-4 h-4 text-slate-500" />} number="14" title="Cookies & Local Storage" />
               <p className="text-slate-700 text-base mb-4">
                 We use <strong>essential cookies only</strong> — no advertising, tracking, or third-party analytics cookies.
               </p>
@@ -704,7 +859,7 @@ export default function PrivacyPage() {
 
             {/* ── 14. CHANGES ──────────────────────────────────────── */}
             <section>
-              <SectionHead id="changes" icon={<Bell className="w-4 h-4 text-slate-500" />} number="14" title="Changes to This Policy" />
+              <SectionHead id="changes" icon={<Bell className="w-4 h-4 text-slate-500" />} number="15" title="Changes to This Policy" />
               <div className="space-y-3 text-slate-700 text-base leading-relaxed">
                 <p>
                   We will notify users of <strong>material changes</strong> — such as new data categories, new processors,
@@ -717,6 +872,7 @@ export default function PrivacyPage() {
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm">
                   <p className="font-bold text-slate-700">Version history</p>
                   <div className="mt-2 space-y-1 text-slate-500">
+                    <p>29 Jun 2026 — Added: EduNexus Core section (school learner registry, guardian national ID, UPI/NEMIS pupil number, special needs as sensitive data, school as data controller, intelligence bridge disclosure, report card and transfer data, expanded retention table and legal basis table)</p>
                     <p>25 Jun 2026 — Added: student self-login, study groups, WhatsApp processor, retention schedule, legal basis table, automated decisions disclosure, cross-border transfer details</p>
                     <p>4 Jun 2026 — Initial publication</p>
                   </div>
@@ -726,7 +882,7 @@ export default function PrivacyPage() {
 
             {/* ── 15. CONTACT & COMPLAINTS ─────────────────────────── */}
             <section>
-              <SectionHead id="contact" icon={<Mail className="w-4 h-4 text-slate-500" />} number="15" title="Contact Us & How to Complain" />
+              <SectionHead id="contact" icon={<Mail className="w-4 h-4 text-slate-500" />} number="16" title="Contact Us & How to Complain" />
               <div className="space-y-4">
                 <div className="bg-slate-900 text-white rounded-2xl p-6">
                   <p className="font-black text-lg mb-4">Jashor Technologies — EduNexus</p>
