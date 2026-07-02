@@ -7,8 +7,8 @@
 //   WhatsApp inbound webhook → processInboundReply → updateFromParentObservation
 //                                                   → whatsapp_inbound_log
 
-import { createServiceClient } from '@/utils/supabase/service'
-import { updateFromParentObservation } from '@/lib/learnerModel/updater'
+import { repos } from '@/lib/repositories'
+import { afterParentObservation } from '@/lib/eils'
 import type { ParentObservationOutcome } from '@/lib/learnerModel/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -95,39 +95,23 @@ export function parseReplyBody(rawBody: string): ReplyOutcome {
 export async function resolveParentFromPhone(
   phone: string
 ): Promise<PhoneContext | null> {
-  const db = createServiceClient()
-
   // 1. Find the opt-in record for this phone
-  const { data: optIn } = await db
-    .from('whatsapp_opt_ins')
-    .select('student_id, students(parent_user_id)')
-    .eq('phone', phone)
-    .eq('active', true)
-    .limit(1)
-    .maybeSingle()
+  const optIn = await repos.notifications.getOptInByPhone(phone)
 
   if (!optIn) return null
 
-  const studentId = optIn.student_id as string
-  const studentRow = optIn.students as unknown as { parent_user_id: string } | null
-  const parentId   = studentRow?.parent_user_id ?? ''
+  const studentId = optIn.student_id
+  const parentId   = optIn.students?.parent_user_id ?? ''
 
   if (!studentId || !parentId) return null
 
   // 2. Pull learner profile to resolve substrand context
-  const { data: profile } = await db
-    .from('learner_profiles')
-    .select('parent_observations, confirmed_gaps')
-    .eq('student_id', studentId)
-    .maybeSingle()
+  const profile = await repos.learnerModel.getLearnerProfile(studentId)
 
   const weekOf = currentWeekOf()
 
   // Most recent parent observation gives us the last substrand sent
-  const observations = (profile?.parent_observations ?? []) as Array<{
-    substrand: string
-    week_of:   string
-  }>
+  const observations = profile?.parent_observations ?? []
 
   if (observations.length > 0) {
     const latest = observations[observations.length - 1]
@@ -140,7 +124,7 @@ export async function resolveParentFromPhone(
   }
 
   // 3. Fallback: first confirmed gap as substrand context
-  const confirmedGaps = (profile?.confirmed_gaps ?? []) as string[]
+  const confirmedGaps = profile?.confirmed_gaps ?? []
   const gapKey = confirmedGaps[0] ?? ''
   // Keys are stored as "subject:substrand" — extract substrand part
   const substrand = gapKey.includes(':') ? gapKey.split(':')[1] : gapKey
@@ -160,8 +144,6 @@ export async function resolveParentFromPhone(
 export async function processInboundReply(
   inbound: InboundReply
 ): Promise<ProcessResult> {
-  const db = createServiceClient()
-
   try {
     const outcome = parseReplyBody(inbound.rawBody)
 
@@ -169,7 +151,7 @@ export async function processInboundReply(
 
     if (!context) {
       // Unknown phone — log and exit cleanly
-      await logInbound(db, {
+      await logInbound({
         phone:        inbound.fromPhone,
         rawBody:      inbound.rawBody,
         receivedAt:   inbound.receivedAt,
@@ -184,7 +166,7 @@ export async function processInboundReply(
 
     // Free-form replies — log and skip model update (needs human review)
     if (outcome === 'free_form') {
-      await logInbound(db, {
+      await logInbound({
         phone:       inbound.fromPhone,
         rawBody:     inbound.rawBody,
         receivedAt:  inbound.receivedAt,
@@ -196,8 +178,8 @@ export async function processInboundReply(
       return { processed: true, outcome: 'free_form' }
     }
 
-    // Structured outcome — update the Learner Model
-    await updateFromParentObservation({
+    // Structured outcome — update EILS + Learner Model
+    await afterParentObservation({
       studentId:  parsed.studentId,
       substrand:  parsed.substrand,
       outcome:    outcome as ParentObservationOutcome,
@@ -205,7 +187,7 @@ export async function processInboundReply(
       recordedAt: inbound.receivedAt,
     })
 
-    await logInbound(db, {
+    await logInbound({
       phone:       inbound.fromPhone,
       rawBody:     inbound.rawBody,
       receivedAt:  inbound.receivedAt,
@@ -222,7 +204,7 @@ export async function processInboundReply(
 
     // Best-effort log — don't let a log failure surface as a processing error
     try {
-      await logInbound(db, {
+      await logInbound({
         phone:        inbound.fromPhone,
         rawBody:      inbound.rawBody,
         receivedAt:   inbound.receivedAt,
@@ -278,13 +260,8 @@ type InboundLogParams = {
   errorMessage?: string
 }
 
-// Writes a row to whatsapp_inbound_log.
-// Failures are swallowed — logging must never block the pipeline.
-async function logInbound(
-  db:     ReturnType<typeof createServiceClient>,
-  params: InboundLogParams
-): Promise<void> {
-  await db.from('whatsapp_inbound_log').insert({
+async function logInbound(params: InboundLogParams): Promise<void> {
+  await repos.notifications.insertWhatsAppInboundLog({
     phone:         params.phone,
     raw_body:      params.rawBody,
     received_at:   params.receivedAt,

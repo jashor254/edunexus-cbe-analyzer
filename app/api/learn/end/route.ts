@@ -3,7 +3,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { checkFeatureAccess } from '@/lib/payments/access'
 import { type FeatureKey } from '@/lib/payments/config'
 import { endSession } from '@/lib/compass/session'
-import { updateFromCompass } from '@/lib/learnerModel/updater'
+import { afterCompassSession } from '@/lib/eils'
 import { apiSuccess, apiError, apiForbidden, getErrorMessage } from '@/lib/api/response'
 
 const FEATURE: FeatureKey = 'learning_compass'
@@ -157,15 +157,16 @@ export async function POST(req: Request): Promise<Response> {
       }
     }
 
-    // Update Learner Model — fire and forget
-    if (status === 'completed' && sessionRow?.subject) {
-      updateFromCompass({
+    // Update EILS + Learner Model — fire and forget
+    if (sessionRow?.subject) {
+      afterCompassSession({
         studentId,
-        topic:            sessionRow.subject as string,
-        subject:          sessionRow.subject as string,
-        masteredConcepts: [],
-        sessionMins:      Math.round(durationSeconds / 60),
-        completedAt:      new Date().toISOString(),
+        topic:             sessionRow.subject as string,
+        subject:           sessionRow.subject as string,
+        masteredConcepts:  [],
+        sessionMins:       Math.round(durationSeconds / 60),
+        completedAt:       new Date().toISOString(),
+        sessionAbandoned:  status === 'abandoned',
       }).catch(() => {})
     }
 

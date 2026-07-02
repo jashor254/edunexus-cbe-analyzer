@@ -11,6 +11,7 @@ import {
 import { runAssessmentPipeline, type AssessmentPipelineResult } from '@/lib/academicClinic/assessmentPipeline'
 import { extractCapabilityProfile } from '@/lib/career/capabilityExtractor'
 import { saveCapabilityProfile } from '@/lib/career/careerEngine'
+import { afterAssessment } from '@/lib/eils'
 
 const BodySchema = z.union([
   z.object({
@@ -84,7 +85,6 @@ export async function POST(req: Request) {
     const results: AssessmentPipelineResult[] = []
     for (const sid of studentIds) {
       const result = await runAssessmentPipeline({
-        db,
         studentId:    sid,
         assessmentId: assessment_id,
         actorName:    teacherName,
@@ -95,11 +95,13 @@ export async function POST(req: Request) {
       })
       results.push(result)
 
-      // Fire-and-forget: recompute capability profile after a successful pipeline run.
-      // This keeps the growth engine up-to-date without blocking the response.
+      // Fire-and-forget: update capability profile and EILS learner model.
       if (result.status === 'ok') {
         recomputeCapabilityProfile(db, sid).catch(err =>
           console.error('[assessments/process] capability recompute failed', sid, err)
+        )
+        triggerEILSUpdate(db, sid, result.student_name, assessment_id).catch(err =>
+          console.error('[assessments/process] EILS update failed', sid, err)
         )
       }
     }
@@ -113,6 +115,49 @@ export async function POST(req: Request) {
     console.error('[teacher/assessments/process POST]', msg)
     return apiError('Internal server error')
   }
+}
+
+// Trigger EILS continuous learning update after a successful assessment pipeline run.
+async function triggerEILSUpdate(
+  db:           ReturnType<typeof import('@/utils/supabase/service').createServiceClient>,
+  studentId:    string,
+  studentName:  string,
+  assessmentId: string,
+): Promise<void> {
+  // Load assessment for EILS — strand, substrand, subject, term, year
+  const { data: assessment } = await db
+    .from('student_assessments')
+    .select('id, subject_scores, strand, sub_strand, subject, term, year, created_at')
+    .eq('id', assessmentId)
+    .eq('student_id', studentId)
+    .single()
+
+  if (!assessment) return
+
+  const scores     = (assessment.subject_scores as Record<string, number>) ?? {}
+  const subject    = (assessment.subject as string) || Object.keys(scores)[0] || 'unknown'
+  const subStrand  = (assessment.sub_strand as string) || 'general'
+  const strand     = (assessment.strand as string) || subStrand
+
+  // Approximate raw marks from CBC levels (level × 25 gives midpoint)
+  const marks: Record<string, number> = {}
+  for (const [subj, level] of Object.entries(scores)) {
+    marks[subj] = Math.min(100, level * 25)
+  }
+
+  await afterAssessment({
+    studentId,
+    studentName,
+    assessmentId,
+    subjectScores: scores,
+    subjectMarks:  marks,
+    strand,
+    subStrand,
+    subject,
+    term:          (assessment.term as number) ?? 1,
+    year:          (assessment.year as number) ?? new Date().getFullYear(),
+    assessedAt:    (assessment.created_at as string) ?? new Date().toISOString(),
+  })
 }
 
 // Fetch latest assessment scores for a student and recompute their capability profile.
