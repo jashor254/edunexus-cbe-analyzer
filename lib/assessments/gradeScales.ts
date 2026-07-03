@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 import type { GradeBand, CurriculumType } from './gradeCalculator'
 
 export type DbGradeScale = {
@@ -12,16 +12,8 @@ export type DbGradeScale = {
   updated_at:      string
 }
 
-const SCALE_COLS = 'id, teacher_id, name, curriculum_hint, bands, is_default, created_at, updated_at'
-
 export async function getTeacherGradeScales(teacherId: string): Promise<DbGradeScale[]> {
-  const db = createServiceClient()
-  const { data } = await db
-    .from('teacher_grade_scales')
-    .select(SCALE_COLS)
-    .eq('teacher_id', teacherId)
-    .order('created_at', { ascending: true })
-  return data || []
+  return repos.assessments.findGradeScalesByTeacher(teacherId)
 }
 
 export async function createGradeScale(
@@ -33,26 +25,7 @@ export async function createGradeScale(
     isDefault?:     boolean
   }
 ): Promise<DbGradeScale> {
-  const db = createServiceClient()
-
-  if (input.isDefault) {
-    await db.from('teacher_grade_scales').update({ is_default: false }).eq('teacher_id', teacherId)
-  }
-
-  const { data, error } = await db
-    .from('teacher_grade_scales')
-    .insert({
-      teacher_id:      teacherId,
-      name:            input.name,
-      curriculum_hint: input.curriculumHint,
-      bands:           input.bands,
-      is_default:      input.isDefault ?? false,
-    })
-    .select(SCALE_COLS)
-    .single()
-
-  if (error) throw new Error('Failed to create grade scale')
-  return data
+  return repos.assessments.upsertGradeScale(teacherId, input)
 }
 
 export async function updateGradeScale(
@@ -65,36 +38,9 @@ export async function updateGradeScale(
     isDefault?:      boolean
   }
 ): Promise<DbGradeScale> {
-  const db = createServiceClient()
-
-  if (input.isDefault) {
-    await db.from('teacher_grade_scales').update({ is_default: false }).eq('teacher_id', teacherId)
-  }
-
-  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
-  if (input.name !== undefined)           updates.name = input.name
-  if (input.curriculumHint !== undefined) updates.curriculum_hint = input.curriculumHint
-  if (input.bands !== undefined)          updates.bands = input.bands
-  if (input.isDefault !== undefined)      updates.is_default = input.isDefault
-
-  const { data, error } = await db
-    .from('teacher_grade_scales')
-    .update(updates)
-    .eq('id', id)
-    .eq('teacher_id', teacherId)
-    .select(SCALE_COLS)
-    .single()
-
-  if (error) throw new Error('Failed to update grade scale')
-  return data
+  return repos.assessments.updateGradeScaleRecord(id, teacherId, input)
 }
 
 export async function deleteGradeScale(id: string, teacherId: string): Promise<void> {
-  const db = createServiceClient()
-  const { error } = await db
-    .from('teacher_grade_scales')
-    .delete()
-    .eq('id', id)
-    .eq('teacher_id', teacherId)
-  if (error) throw new Error('Failed to delete grade scale')
+  return repos.assessments.deleteGradeScale(id, teacherId)
 }

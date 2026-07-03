@@ -1,13 +1,6 @@
+import { esc } from '@/lib/pdf/utils'
 import type { ClassAssessment, LearnerMark } from './types'
 
-function esc(s: string | null | undefined): string {
-  if (!s) return ''
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
 
 export interface MarksheetMeta {
   teacherName: string
