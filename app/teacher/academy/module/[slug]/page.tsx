@@ -34,15 +34,15 @@ export default async function ModulePage({ params }: Props) {
 
   if (!teacher) redirect('/teacher/setup')
 
-  const module = await getModuleWithLessons(slug, teacher.id)
-  if (!module) notFound()
+  const mod = await getModuleWithLessons(slug, teacher.id)
+  if (!mod) notFound()
 
-  const lessonIds = module.lessons.map(l => l.id)
+  const lessonIds = mod.lessons.map(l => l.id)
 
   const [{ prev, next }, reflectionRows, missions, evidenceMap, recentPlans] = await Promise.all([
-    getAdjacentModules(module.order, module.phase),
-    getReflectionsForModule(teacher.id, module.id),
-    getMissionsForModule(module.id, teacher.id),
+    getAdjacentModules(mod.order, mod.phase),
+    getReflectionsForModule(teacher.id, mod.id),
+    getMissionsForModule(mod.id, teacher.id),
     getEvidenceForModule(teacher.id, lessonIds),
     getRecentPlans(teacher.id),
   ])
@@ -52,11 +52,11 @@ export default async function ModulePage({ params }: Props) {
     {}
   )
 
-  const pct = module.lessons.length > 0
-    ? Math.round((module.completedCount / module.lessons.length) * 100)
+  const pct = mod.lessons.length > 0
+    ? Math.round((mod.completedCount / mod.lessons.length) * 100)
     : 0
 
-  const isComplete = module.completedCount === module.lessons.length && module.lessons.length > 0
+  const isComplete = mod.completedCount === mod.lessons.length && mod.lessons.length > 0
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -66,7 +66,7 @@ export default async function ModulePage({ params }: Props) {
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff06_1px,transparent_1px),linear-gradient(to_bottom,#ffffff06_1px,transparent_1px)] bg-size-[40px_40px]" />
         <div
           className="absolute top-0 left-1/3 w-64 h-64 rounded-full blur-3xl pointer-events-none opacity-20"
-          style={{ background: module.color ?? '#14b8a6' }}
+          style={{ background: mod.color ?? '#14b8a6' }}
         />
 
         <div className="relative max-w-3xl mx-auto px-4 sm:px-6 py-10">
@@ -83,11 +83,11 @@ export default async function ModulePage({ params }: Props) {
             <span
               className="text-xs font-black px-3 py-1.5 rounded-lg"
               style={{
-                background: `${module.color ?? '#14b8a6'}25`,
-                color: module.color ?? '#14b8a6',
+                background: `${mod.color ?? '#14b8a6'}25`,
+                color: mod.color ?? '#14b8a6',
               }}
             >
-              Module {module.order} · Phase {module.phase}
+              Module {mod.order} · Phase {mod.phase}
             </span>
             {isComplete && (
               <span className="flex items-center gap-1 text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
@@ -96,35 +96,35 @@ export default async function ModulePage({ params }: Props) {
             )}
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-black text-white leading-tight">{module.title}</h1>
-          {module.description && (
-            <p className="text-slate-400 mt-2 text-sm leading-relaxed max-w-xl">{module.description}</p>
+          <h1 className="text-2xl sm:text-3xl font-black text-white leading-tight">{mod.title}</h1>
+          {mod.description && (
+            <p className="text-slate-400 mt-2 text-sm leading-relaxed max-w-xl">{mod.description}</p>
           )}
 
           {/* Meta */}
           <div className="flex items-center gap-4 mt-4 text-xs text-slate-400">
-            {module.estimated_mins && (
+            {mod.estimated_mins && (
               <span className="flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5" /> {module.estimated_mins} min
+                <Clock className="w-3.5 h-3.5" /> {mod.estimated_mins} min
               </span>
             )}
             <span className="flex items-center gap-1.5">
-              <BookOpen className="w-3.5 h-3.5" /> {module.lessons.length} lessons
+              <BookOpen className="w-3.5 h-3.5" /> {mod.lessons.length} lessons
             </span>
           </div>
 
           {/* Progress bar */}
           <div className="mt-6">
             <div className="flex justify-between text-xs text-slate-400 mb-2">
-              <span>{module.completedCount}/{module.lessons.length} lessons completed</span>
-              <span className="font-bold" style={{ color: module.color ?? '#14b8a6' }}>{pct}%</span>
+              <span>{mod.completedCount}/{mod.lessons.length} lessons completed</span>
+              <span className="font-bold" style={{ color: mod.color ?? '#14b8a6' }}>{pct}%</span>
             </div>
             <div className="w-full bg-white/10 rounded-full h-2">
               <div
                 className="h-2 rounded-full transition-all duration-500"
                 style={{
                   width: `${pct}%`,
-                  background: module.color ?? '#14b8a6',
+                  background: mod.color ?? '#14b8a6',
                 }}
               />
             </div>
@@ -135,9 +135,9 @@ export default async function ModulePage({ params }: Props) {
       {/* Lessons */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
         <LessonAccordion
-          lessons={module.lessons}
-          moduleColor={module.color ?? '#14b8a6'}
-          moduleId={module.id}
+          lessons={mod.lessons}
+          moduleColor={mod.color ?? '#14b8a6'}
+          moduleId={mod.id}
           initialReflections={initialReflections}
           initialEvidence={evidenceMap}
           recentPlans={recentPlans}
@@ -158,7 +158,7 @@ export default async function ModulePage({ params }: Props) {
             </p>
             <div className="space-y-3">
               {missions.map(m => (
-                <MissionCard key={m.id} mission={m} moduleColor={module.color ?? '#14b8a6'} />
+                <MissionCard key={m.id} mission={m} moduleColor={mod.color ?? '#14b8a6'} />
               ))}
             </div>
           </div>
@@ -168,7 +168,7 @@ export default async function ModulePage({ params }: Props) {
         <div className="mt-10 flex items-center justify-between gap-4">
           {prev ? (
             <Link
-              href={`/teacher/academy/module/${prev.slug}`}
+              href={`/teacher/academy/mod/${prev.slug}`}
               className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 hover:border-gray-300 hover:shadow-sm px-4 py-2.5 rounded-xl text-sm font-bold transition"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -185,9 +185,9 @@ export default async function ModulePage({ params }: Props) {
 
           {next ? (
             <Link
-              href={`/teacher/academy/module/${next.slug}`}
+              href={`/teacher/academy/mod/${next.slug}`}
               className="flex items-center gap-2 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition hover:opacity-90 shadow-sm"
-              style={{ background: module.color ?? '#14b8a6' }}
+              style={{ background: mod.color ?? '#14b8a6' }}
             >
               <span className="max-w-35 truncate">{next.title}</span>
               <ChevronRight className="w-4 h-4" />
@@ -203,7 +203,7 @@ export default async function ModulePage({ params }: Props) {
             <Link
               href="/teacher/academy"
               className="flex items-center gap-2 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:opacity-90 transition shadow-sm"
-              style={{ background: module.color ?? '#14b8a6' }}
+              style={{ background: mod.color ?? '#14b8a6' }}
             >
               All Modules <ChevronRight className="w-4 h-4" />
             </Link>

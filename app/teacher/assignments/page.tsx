@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { FileText, PlusCircle, ChevronRight, Clock, CheckCircle2, XCircle } from 'lucide-react'
 
@@ -33,8 +33,10 @@ export default function AssignmentsPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'active' | 'closed' | 'draft'>('all')
+  const [now, setNow] = useState(0)
 
   useEffect(() => {
+    setNow(Date.now())
     fetch('/api/teacher/assignments')
       .then(r => r.json())
       .then(d => { if (d.success) setAssignments(d.data.assignments) })
@@ -106,7 +108,7 @@ export default function AssignmentsPage() {
           <div className="sm:hidden divide-y divide-gray-100">
             {filtered.map((a) => {
               const due = new Date(a.due_date)
-              const daysLeft = Math.ceil((due.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+              const daysLeft = Math.ceil((due.getTime() - now) / (1000 * 60 * 60 * 24))
               const submissionPct = a.total_students > 0
                 ? Math.round((a.submitted_count / a.total_students) * 100)
                 : 0
@@ -167,7 +169,7 @@ export default function AssignmentsPage() {
             <tbody className="divide-y divide-gray-100">
               {filtered.map((a) => {
                 const due = new Date(a.due_date)
-                const daysLeft = Math.ceil((due.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                const daysLeft = Math.ceil((due.getTime() - now) / (1000 * 60 * 60 * 24))
                 const submissionPct = a.total_students > 0
                   ? Math.round((a.submitted_count / a.total_students) * 100)
                   : 0

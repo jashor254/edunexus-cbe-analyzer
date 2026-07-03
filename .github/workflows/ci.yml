@@ -1,0 +1,120 @@
+# .github/workflows/ci.yml
+# EduNexus CI Pipeline
+# Runs on every push and PR: type-check → lint → build → tests
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop, 'feat/**', 'fix/**', 'refactor/**']
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  # Minimal env vars required for build — real secrets not needed for type-check
+  NEXT_PUBLIC_SUPABASE_URL: 'https://placeholder.supabase.co'
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: 'placeholder-anon-key'
+  SUPABASE_SERVICE_ROLE_KEY: 'placeholder-service-key'
+  DEEPSEEK_API_KEY: 'placeholder-deepseek-key'
+  NEXT_PUBLIC_APP_VERSION: ${{ github.sha }}
+
+jobs:
+  # ── Type check ────────────────────────────────────────────────────────────────
+  typecheck:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+  # ── Lint ──────────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint --if-present
+
+  # ── Build ─────────────────────────────────────────────────────────────────────
+  build:
+    name: Production Build
+    runs-on: ubuntu-latest
+    needs: [typecheck]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          # Turbopack build cache
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          TURBO_TEAM:  ${{ secrets.TURBO_TEAM }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          name: nextjs-build-${{ github.sha }}
+          path: .next/
+          retention-days: 3
+
+  # ── Environment validation ────────────────────────────────────────────────────
+  env-check:
+    name: Environment Check
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate production env
+        run: npx tsx scripts/check-env.ts
+        env:
+          NEXT_PUBLIC_SUPABASE_URL:      ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY:     ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DEEPSEEK_API_KEY:              ${{ secrets.DEEPSEEK_API_KEY }}
+          GOOGLE_GEMINI_API_KEY:         ${{ secrets.GOOGLE_GEMINI_API_KEY }}
+          PAYSTACK_SECRET_KEY:           ${{ secrets.PAYSTACK_SECRET_KEY }}
+          PAYSTACK_PUBLIC_KEY:           ${{ secrets.PAYSTACK_PUBLIC_KEY }}
