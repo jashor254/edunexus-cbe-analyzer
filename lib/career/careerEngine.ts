@@ -1,6 +1,6 @@
 // lib/career/careerEngine.ts
 
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 import { callDeepSeek } from '@/lib/ai/deepseek'
 import { STANDARD_DISCLAIMER } from './types'
 import type {
@@ -13,92 +13,10 @@ import type {
   CareerMatchWithDetail,
   SkillTimelineItem,
   ParentCareerSummary,
+  CapabilityProfile,
 } from './types'
 
-// Column lists — always explicit, never select('*')
-const CAREER_FULL_COLS = [
-  'id', 'slug', 'title', 'category', 'description',
-  'doors', 'ai_impact', 'subject_importance',
-  'kenya_market_outlook', 'salary_range_kes',
-  'required_subjects', 'skill_timeline', 'future_skills',
-  'kenya_examples', 'pathway', 'disclaimer',
-  'created_at', 'updated_at',
-].join(', ')
-
-const CAREER_SUMMARY_COLS = [
-  'id', 'slug', 'title', 'category', 'description',
-  'ai_impact', 'kenya_market_outlook',
-  'salary_range_kes', 'required_subjects', 'pathway',
-].join(', ')
-
-// COS-enriched columns — includes all Phase 1 capability intelligence fields
-const CAREER_COS_COLS = [
-  'id', 'slug', 'title', 'category', 'pathway', 'description',
-  'doors', 'ai_impact', 'kenya_market_outlook', 'salary_range_kes',
-  'required_subjects', 'disclaimer',
-  // Phase 1 COS fields
-  'required_capabilities', 'capability_cluster', 'difficulty', 'kenya_demand',
-  'saturation_note', 'kcse_minimum', 'time_to_income_years', 'cost_to_qualify',
-  'risk_level', 'prestige_level', 'social_reality',
-  'alternative_career_slugs', 'complementary_career_slugs',
-].join(', ')
-
-// ── READ ──────────────────────────────────────────────────────────────────────
-
-export async function getCareerBySlug(slug: string): Promise<Career | null> {
-  const supabase = createServiceClient()
-  const { data, error } = await supabase
-    .from('careers')
-    .select(CAREER_FULL_COLS)
-    .eq('slug', slug)
-    .single()
-
-  if (error || !data) return null
-  return data as unknown as Career
-}
-
-// Full career with all COS Phase 1 intelligence fields — used by the detail page.
-export async function getCareerBySlugWithCOS(slug: string): Promise<Career | null> {
-  const supabase = createServiceClient()
-  const { data, error } = await supabase
-    .from('careers')
-    .select(CAREER_COS_COLS)
-    .eq('slug', slug)
-    .single()
-
-  if (error || !data) return null
-  return data as unknown as Career
-}
-
-export async function searchCareers(filters: CareerSearchFilters): Promise<CareerSummary[]> {
-  const supabase = createServiceClient()
-
-  let query = supabase.from('careers').select(CAREER_SUMMARY_COLS)
-
-  if (filters.q) {
-    query = query.or(`title.ilike.%${filters.q}%,description.ilike.%${filters.q}%`)
-  }
-  if (filters.category) {
-    query = query.eq('category', filters.category)
-  }
-  if (filters.pathway) {
-    query = query.eq('pathway', filters.pathway)
-  }
-
-  const { data, error } = await query.order('title').limit(20)
-  if (error) throw new Error(`Career search failed: ${error.message}`)
-
-  return (data ?? []).map(d => ({
-    ...(d as object),
-    ai_impact: { level: ((d as { ai_impact?: { level?: string } }).ai_impact?.level) ?? 'medium' },
-  })) as unknown as CareerSummary[]
-}
-
 // ── SEARCH-OR-GENERATE (unlimited career database) ───────────────────────────
-// Every learner search resolves to a real career: we check the table first,
-// and on a miss we generate a full profile via DeepSeek and persist it —
-// so the database keeps growing with the careers students actually ask about,
-// including new AI-era roles that don't exist in any seed list yet.
 
 const VALID_CATEGORIES: CareerCategory[] = [
   'technology', 'health', 'agriculture', 'creative', 'business',
@@ -240,8 +158,22 @@ Rules for capability weights: all 6 weights must sum to exactly 1.0. Minimum val
   } as unknown as Omit<Career, 'id' | 'created_at' | 'updated_at'>
 }
 
+// ── READ ──────────────────────────────────────────────────────────────────────
+
+export async function getCareerBySlug(slug: string): Promise<Career | null> {
+  return repos.careers.findCareerBySlug(slug)
+}
+
+// Full career with all COS Phase 1 intelligence fields — used by the detail page.
+export async function getCareerBySlugWithCOS(slug: string): Promise<Career | null> {
+  return repos.careers.findCareerBySlugWithCOS(slug)
+}
+
+export async function searchCareers(filters: CareerSearchFilters): Promise<CareerSummary[]> {
+  return repos.careers.searchCareers(filters)
+}
+
 export async function searchOrGenerateCareer(query: string): Promise<Career> {
-  const supabase = createServiceClient()
   const trimmed = query.trim()
   if (!trimmed) throw new Error('Career search query cannot be empty')
 
@@ -249,52 +181,21 @@ export async function searchOrGenerateCareer(query: string): Promise<Career> {
   const existing = await getCareerBySlug(slug)
   if (existing) return existing
 
-  const { data: titleMatch } = await supabase
-    .from('careers')
-    .select(CAREER_FULL_COLS)
-    .ilike('title', `%${trimmed}%`)
-    .limit(1)
-    .maybeSingle()
-
-  if (titleMatch) return titleMatch as unknown as Career
+  const titleMatch = await repos.careers.findCareerByTitleLike(trimmed)
+  if (titleMatch) return titleMatch
 
   const generated = await generateCareerProfile(trimmed)
-  const { data: saved, error } = await supabase
-    .from('careers')
-    .upsert(generated, { onConflict: 'slug' })
-    .select(CAREER_COS_COLS)
-    .single()
-
-  if (error) throw new Error(`Failed to save generated career: ${error.message}`)
-  return saved as unknown as Career
+  return repos.careers.upsertCareer(generated)
 }
 
 export async function getAllCareers(): Promise<CareerSummary[]> {
-  const supabase = createServiceClient()
-  const { data, error } = await supabase
-    .from('careers')
-    .select(CAREER_SUMMARY_COLS)
-    .order('title')
-
-  if (error) throw new Error(`Failed to load careers: ${error.message}`)
-
-  return (data ?? []).map(d => ({
-    ...(d as object),
-    ai_impact: { level: ((d as { ai_impact?: { level?: string } }).ai_impact?.level) ?? 'medium' },
-  })) as unknown as CareerSummary[]
+  return repos.careers.getAllCareers()
 }
 
 // Returns full Career objects including all COS Phase 1 intelligence columns.
 // Used by the capability match engine — not for summary lists.
 export async function getAllCareersWithCOS(): Promise<Career[]> {
-  const supabase = createServiceClient()
-  const { data, error } = await supabase
-    .from('careers')
-    .select(CAREER_COS_COLS)
-    .order('title')
-
-  if (error) throw new Error(`Failed to load careers with COS data: ${error.message}`)
-  return (data ?? []) as unknown as Career[]
+  return repos.careers.getAllCareersWithCOS()
 }
 
 // ── SKILL TIMELINE HELPERS ────────────────────────────────────────────────────
@@ -322,26 +223,7 @@ export function getNextSkillsForAge(timeline: SkillTimelineItem[], age: number):
 // ── STUDENT MATCHES ───────────────────────────────────────────────────────────
 
 export async function getMatchesForStudent(studentId: string): Promise<CareerMatchWithDetail[]> {
-  const supabase = createServiceClient()
-  const { data, error } = await supabase
-    .from('student_career_matches')
-    .select(
-      `id, student_id, career_id, match_score, match_reasoning, subject_gaps, skill_gaps, generated_at,
-       career:careers(id, slug, title, category, description, ai_impact, kenya_market_outlook, salary_range_kes, required_subjects, pathway)`
-    )
-    .eq('student_id', studentId)
-    .order('match_score', { ascending: false })
-    .limit(5)
-
-  if (error) throw new Error(`Failed to load matches: ${error.message}`)
-
-  return (data ?? []).map(d => ({
-    ...(d as object),
-    career: {
-      ...((d as { career: object }).career as object),
-      ai_impact: { level: ((d as { career: { ai_impact?: { level?: string } } }).career?.ai_impact?.level) ?? 'medium' },
-    },
-  })) as unknown as CareerMatchWithDetail[]
+  return repos.careers.findMatchesForStudent(studentId)
 }
 
 export async function saveCareerMatches(
@@ -354,49 +236,30 @@ export async function saveCareerMatches(
     skill_gaps: unknown
   }>
 ): Promise<void> {
-  const supabase = createServiceClient()
-
   const slugs = matches.map(m => m.career_slug)
-  const { data: careers, error: lookupError } = await supabase
-    .from('careers')
-    .select('id, slug')
-    .in('slug', slugs)
+  const careerIds = await repos.careers.findCareerIdsBySlug(slugs)
 
-  if (lookupError) throw new Error(`Failed to look up career IDs: ${lookupError.message}`)
-
-  const slugToId = Object.fromEntries((careers ?? []).map(c => [c.slug, c.id]))
+  const slugToId = Object.fromEntries(careerIds.map(c => [c.slug, c.id]))
 
   const rows = matches
     .filter(m => slugToId[m.career_slug])
     .map(m => ({
-      student_id: studentId,
-      career_id: slugToId[m.career_slug],
-      match_score: m.match_score,
+      student_id:      studentId,
+      career_id:       slugToId[m.career_slug],
+      match_score:     m.match_score,
       match_reasoning: m.match_reasoning,
-      subject_gaps: m.subject_gaps,
-      skill_gaps: m.skill_gaps,
-      generated_at: new Date().toISOString(),
+      subject_gaps:    m.subject_gaps,
+      skill_gaps:      m.skill_gaps,
+      generated_at:    new Date().toISOString(),
     }))
 
-  const { error } = await supabase
-    .from('student_career_matches')
-    .upsert(rows, { onConflict: 'student_id,career_id' })
-
-  if (error) throw new Error(`Failed to save matches: ${error.message}`)
+  await repos.careers.upsertCareerMatches(rows)
 }
 
 // ── STUDENT INTERESTS ─────────────────────────────────────────────────────────
 
 export async function getInterestsForStudent(studentId: string): Promise<StudentCareerInterest[]> {
-  const supabase = createServiceClient()
-  const { data, error } = await supabase
-    .from('student_career_interests')
-    .select('id, student_id, career_id, career_slug, interest_level, notes, explored_at, created_at')
-    .eq('student_id', studentId)
-    .order('explored_at', { ascending: false })
-
-  if (error) throw new Error(`Failed to load interests: ${error.message}`)
-  return (data ?? []) as StudentCareerInterest[]
+  return repos.careers.findInterestsForStudent(studentId)
 }
 
 export async function saveCareerInterest(
@@ -405,46 +268,26 @@ export async function saveCareerInterest(
   interestLevel: number,
   notes?: string
 ): Promise<StudentCareerInterest> {
-  const supabase = createServiceClient()
+  const career = await repos.careers.findCareerIdBySlug(careerSlug)
 
-  const { data: career } = await supabase
-    .from('careers')
-    .select('id')
-    .eq('slug', careerSlug)
-    .maybeSingle()
-
-  const { data, error } = await supabase
-    .from('student_career_interests')
-    .insert({
-      student_id: studentId,
-      career_id: career?.id ?? null,
-      career_slug: careerSlug,
-      interest_level: interestLevel,
-      notes: notes ?? null,
-      explored_at: new Date().toISOString(),
-    })
-    .select('id, student_id, career_id, career_slug, interest_level, notes, explored_at, created_at')
-    .single()
-
-  if (error) throw new Error(`Failed to save interest: ${error.message}`)
-  return data as StudentCareerInterest
+  return repos.careers.insertCareerInterest({
+    student_id:     studentId,
+    career_id:      career?.id ?? null,
+    career_slug:    careerSlug,
+    interest_level: interestLevel,
+    notes:          notes ?? null,
+    explored_at:    new Date().toISOString(),
+  })
 }
 
 // ── PARENT SUMMARY ────────────────────────────────────────────────────────────
 
 export async function generateParentSummary(studentId: string): Promise<ParentCareerSummary> {
-  const supabase = createServiceClient()
-
-  const { data: student, error: studentError } = await supabase
-    .from('students')
-    .select('id, name, date_of_birth')
-    .eq('id', studentId)
-    .single()
-
-  if (studentError || !student) throw new Error('Student not found')
+  const student = await repos.careers.findStudentBasicInfo(studentId)
+  if (!student) throw new Error('Student not found')
 
   const studentAge = student.date_of_birth
-    ? Math.floor((Date.now() - new Date(student.date_of_birth as string).getTime()) / (365.25 * 24 * 3600 * 1000))
+    ? Math.floor((Date.now() - new Date(student.date_of_birth).getTime()) / (365.25 * 24 * 3600 * 1000))
     : 14
 
   const topCareers = await getMatchesForStudent(studentId)
@@ -474,7 +317,7 @@ export async function generateParentSummary(studentId: string): Promise<ParentCa
   ]
 
   return {
-    student_name: student.name as string,
+    student_name: student.name,
     student_age: studentAge,
     top_careers: topCareers,
     current_age_skills: currentAgeSkills,
@@ -516,68 +359,28 @@ export async function runSeed(): Promise<{ inserted: number; errors: string[] }>
 
 // ── CAPABILITY PROFILE DB LAYER ───────────────────────────────────────────────
 
-import type { CapabilityProfile } from './types'
-
 export async function saveCapabilityProfile(
   studentId: string,
   profile: CapabilityProfile
 ): Promise<void> {
-  const supabase = createServiceClient()
-
-  const { error: updateErr } = await supabase
-    .from('students')
-    .update({
-      capability_profile:     profile,
-      capability_computed_at: profile.computed_at,
-    })
-    .eq('id', studentId)
-
-  if (updateErr) throw new Error(`saveCapabilityProfile update failed: ${updateErr.message}`)
-
-  const { error: histErr } = await supabase
-    .from('capability_history')
-    .insert({
-      student_id:         studentId,
-      capability_profile: profile,
-      assessment_count:   profile.assessment_count,
-      computed_at:        profile.computed_at,
-    })
-
-  if (histErr) throw new Error(`saveCapabilityProfile history insert failed: ${histErr.message}`)
+  await repos.careers.updateStudentCapabilityProfile(studentId, profile)
+  await repos.careers.insertCapabilityHistory({
+    student_id:         studentId,
+    capability_profile: profile,
+    assessment_count:   profile.assessment_count,
+    computed_at:        profile.computed_at,
+  })
 }
 
 export async function getCapabilityProfile(
   studentId: string
 ): Promise<CapabilityProfile | null> {
-  const supabase = createServiceClient()
-
-  const { data, error } = await supabase
-    .from('students')
-    .select('capability_profile')
-    .eq('id', studentId)
-    .single()
-
-  if (error) throw new Error(`getCapabilityProfile failed: ${error.message}`)
-  return (data?.capability_profile as CapabilityProfile) ?? null
+  return repos.careers.findStudentCapabilityProfile(studentId)
 }
 
 export async function getCapabilityHistory(
   studentId: string,
   limit = 10
 ): Promise<Array<{ computed_at: string; profile: CapabilityProfile }>> {
-  const supabase = createServiceClient()
-
-  const { data, error } = await supabase
-    .from('capability_history')
-    .select('computed_at, capability_profile')
-    .eq('student_id', studentId)
-    .order('computed_at', { ascending: false })
-    .limit(limit)
-
-  if (error) throw new Error(`getCapabilityHistory failed: ${error.message}`)
-
-  return (data ?? []).map(row => ({
-    computed_at: row.computed_at as string,
-    profile:     row.capability_profile as CapabilityProfile,
-  }))
+  return repos.careers.findCapabilityHistory(studentId, limit)
 }

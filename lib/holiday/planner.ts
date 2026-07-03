@@ -3,7 +3,7 @@
 // Based on: learner model gaps + career signals + holiday duration.
 // Light, focused, parent-friendly — not a worksheet mountain.
 
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 import { callDeepSeek } from '@/lib/ai/deepseek'
 import { getOrCreateLearnerProfile } from '@/lib/learnerModel/queries'
 import type { HolidayPlanData, HolidayWeek } from './types'
@@ -19,14 +19,9 @@ type PlanInput = {
 }
 
 export async function generateHolidayPlan(input: PlanInput): Promise<HolidayPlanData> {
-  const db = createServiceClient()
-
   // 1. Load student profile
-  const [{ data: student }, profile] = await Promise.all([
-    db.from('students')
-      .select('first_name, last_name, grade, dream_career')
-      .eq('id', input.studentId)
-      .maybeSingle(),
+  const [student, profile] = await Promise.all([
+    repos.learnerIntelligence.getStudentHolidayData(input.studentId),
     getOrCreateLearnerProfile(input.studentId),
   ])
 
@@ -61,14 +56,10 @@ export async function generateHolidayPlan(input: PlanInput): Promise<HolidayPlan
   // Also check student's career interests directly
   let careerNote: string | null = null
   if (careerSlugs?.length) {
-    const { data: career } = await db
-      .from('careers')
-      .select('title, required_subjects')
-      .eq('slug', careerSlugs[0])
-      .maybeSingle()
+    const career = await repos.learnerIntelligence.getCareerBySlug(careerSlugs[0])
 
     if (career) {
-      const requiredSubjects = career.required_subjects as string[] | null
+      const requiredSubjects = (career as unknown as { required_subjects?: string[] }).required_subjects ?? null
       const weakRequiredSubject = requiredSubjects?.find(s =>
         weakestSubjects?.some(w => w.toLowerCase().includes(s.toLowerCase()))
       )
@@ -173,7 +164,7 @@ export async function generateHolidayPlan(input: PlanInput): Promise<HolidayPlan
   }
 
   // 7. Persist
-  await db.from('holiday_plans').upsert({
+  await repos.learnerIntelligence.upsertHolidayPlan({
     student_id:     input.studentId,
     teacher_id:     input.teacherId,
     school_id:      input.schoolId ?? null,
@@ -182,7 +173,7 @@ export async function generateHolidayPlan(input: PlanInput): Promise<HolidayPlan
     holiday_period: input.holidayPeriod,
     holiday_days:   input.holidayDays,
     plan_data:      planData,
-  }, { onConflict: 'student_id,term,year' })
+  })
 
   return planData
 }
@@ -196,34 +187,23 @@ export async function generateClassHolidayPlans(
   classId:  string,
   input:    BatchInput,
 ): Promise<BatchResult[]> {
-  const db = createServiceClient()
-
-  const { data: enrollment } = await db
-    .from('class_students')
-    .select('student_id')
-    .eq('class_id', classId)
-
-  if (!enrollment?.length) return []
+  const enrollment = await repos.learnerIntelligence.getClassEnrollment(classId)
+  if (!enrollment.length) return []
 
   const results = await Promise.allSettled(
-    enrollment.map(async (e) => {
-      const studentId = e.student_id as string
+    enrollment.map(async (studentId) => {
       const plan = await generateHolidayPlan({ studentId, ...input })
-      const { data: s } = await db
-        .from('students')
-        .select('first_name, last_name')
-        .eq('id', studentId)
-        .maybeSingle()
+      const s = await repos.learnerIntelligence.getStudentNameById(studentId)
       return {
         studentId,
-        studentName: s ? `${s.first_name} ${s.last_name}`.trim() : studentId,
+        studentName: s ? `${s.first_name ?? ''} ${s.last_name ?? ''}`.trim() : studentId,
         plan,
       }
     })
   )
 
   return results.map((r, i) => {
-    const id = enrollment[i].student_id as string
+    const id = enrollment[i]
     if (r.status === 'fulfilled') return r.value as BatchResult
     return { studentId: id, studentName: id, plan: null, error: String((r as PromiseRejectedResult).reason) }
   })

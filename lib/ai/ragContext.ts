@@ -2,7 +2,7 @@
 // Student context builder for Academic Clinic reports and Career matching.
 // NOT used by Compass — Compass is self-contained in lib/compass/.
 
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 import { type CurriculumType } from '@/lib/curriculum'
 
 export interface StudentRAGContext {
@@ -22,24 +22,13 @@ export interface StudentRAGContext {
 export async function buildStudentRAGContext(
   learnerId: string
 ): Promise<StudentRAGContext> {
-  const db = createServiceClient()
-
-  const [studentResult, assessmentsResult] = await Promise.all([
-    db.from('students')
-      .select('name, grade, curriculum_type')
-      .eq('id', learnerId)
-      .maybeSingle(),
-
-    db.from('assessments')
-      .select('subject_scores, term, year, curriculum_type')
-      .eq('student_id', learnerId)
-      .order('created_at', { ascending: false })
-      .limit(1),
+  const [student, assessments] = await Promise.all([
+    repos.teachers.findLegacyStudentById(learnerId),
+    repos.teachers.findLegacyAssessmentsByStudent(learnerId),
   ])
 
-  const student    = studentResult.data
-  const latest     = assessmentsResult.data?.[0]
-  const curriculum = (student?.curriculum_type ?? 'cbc') as CurriculumType
+  const latest = assessments[0]
+  const curriculum = ((student?.curriculum_type ?? 'cbc') as CurriculumType)
   const isIGCSE    = curriculum === 'igcse'
 
   let latestAssessment: StudentRAGContext['latestAssessment'] = null

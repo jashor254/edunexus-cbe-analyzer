@@ -7,7 +7,7 @@ import {
   ClipboardList, Loader2, AlertCircle, CheckCircle2, Printer, X,
 } from 'lucide-react'
 import type { ClassAssessment, LearnerMark, SubjectAnalysis } from '@/lib/assessments/types'
-import { analyzeSubjects } from '@/lib/assessments/queries'
+import { analyzeSubjects } from '@/lib/assessments/subjectAnalytics'
 import { openMarksheetPDF } from '@/lib/assessments/pdfRenderer'
 import { calculateMeanScore, calculateMeanGrade, GRADE_META } from '@/lib/assessments/gradeCalculator'
 import type { MeanGrade } from '@/lib/assessments/gradeCalculator'

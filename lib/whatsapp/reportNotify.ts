@@ -3,7 +3,7 @@
 // Uses the approved edunexus_student_alert template (type: "Academic Report Ready").
 
 import { sendWhatsAppTemplate } from './client'
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://edunexus.co.ke'
 
@@ -22,18 +22,9 @@ export type ReportWhatsAppParams = {
 
 export async function sendReportWhatsApp(params: ReportWhatsAppParams): Promise<{ success: boolean; error?: string }> {
   try {
-    const db = createServiceClient()
-
     const dedupKey = `report_${params.studentId}_${params.term}_${params.year}`
-    const { data: existing } = await db
-      .from('notification_log')
-      .select('id')
-      .eq('type', 'report_ready')
-      .eq('reference_id', dedupKey)
-      .eq('channel', 'whatsapp')
-      .eq('success', true)
-      .limit(1)
-      .maybeSingle()
+
+    const existing = await repos.notifications.isDuplicate('report_ready', dedupKey, 'whatsapp')
 
     if (existing) return { success: true }
 
@@ -65,7 +56,7 @@ export async function sendReportWhatsApp(params: ReportWhatsAppParams): Promise<
       ],
     })
 
-    await db.from('notification_log').insert({
+    await repos.notifications.insertNotificationLog({
       user_id:       params.userId ?? null,
       type:          'report_ready',
       reference_id:  dedupKey,

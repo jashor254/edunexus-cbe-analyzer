@@ -61,13 +61,22 @@ export async function POST(request: NextRequest) {
       return apiError('Failed to grant subscription', 500)
     }
 
-    // Give 50 tokens
-    const { error: tokenError } = await service
+    // Add 50 tokens — increment existing balance rather than overwrite
+    const GRANT_TOKENS = 50
+    const { data: existingBalance } = await service
       .from('token_balances')
-      .upsert(
-        { user_id: target.id, balance: 50, total_ever: 50 },
-        { onConflict: 'user_id' }
-      )
+      .select('balance, total_ever')
+      .eq('user_id', target.id)
+      .maybeSingle()
+
+    const { error: tokenError } = await service.from('token_balances').upsert(
+      {
+        user_id:    target.id,
+        balance:    (existingBalance?.balance    ?? 0) + GRANT_TOKENS,
+        total_ever: (existingBalance?.total_ever ?? 0) + GRANT_TOKENS,
+      },
+      { onConflict: 'user_id' }
+    )
 
     if (tokenError) {
       console.error('Token upsert error:', tokenError)

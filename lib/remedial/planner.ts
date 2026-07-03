@@ -4,7 +4,7 @@
 // Output: 3-4 student groups with specific actions per group, teacher allocation,
 //         Compass assignments, peer pairings — based on real data, not guesses.
 
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 import { callDeepSeek } from '@/lib/ai/deepseek'
 import { getClassLearnerProfiles } from '@/lib/learnerModel/queries'
 import type { RemedialGroup, RemedialPlan, RemedialStudent, TeacherAllocation } from './types'
@@ -23,36 +23,15 @@ type PlannerInput = {
 }
 
 export async function generateRemedialPlan(input: PlannerInput): Promise<RemedialPlan> {
-  const db = createServiceClient()
-
   // 1. Get substrand health record
-  const { data: health } = await db
-    .from('substrand_health')
-    .select('struggle_count, assessment_level, root_cause, risk_score, lessons_covered')
-    .eq('sow_id', input.sowId)
-    .eq('strand', input.strand)
-    .eq('sub_strand', input.subStrand)
-    .maybeSingle()
+  const health = await repos.learnerIntelligence.getSubstrandHealthSingle(input.sowId, input.strand, input.subStrand)
 
   // 2. Get all learner marks for this class — latest assessment for this subject
-  const { data: latestAssessment } = await db
-    .from('class_assessments')
-    .select('id, max_score')
-    .eq('teacher_id', input.teacherId)
-    .eq('class_id', input.classId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const latestAssessment = await repos.assessments.findLatestAssessmentForClass(input.teacherId, input.classId)
 
   let marks: Array<{ student_name: string; student_id: string | null; subject_scores: Record<string, number> }> = []
   if (latestAssessment?.id) {
-    const { data: markRows } = await db
-      .from('learner_marks')
-      .select('student_name, student_id, subject_scores')
-      .eq('assessment_id', latestAssessment.id)
-      .eq('teacher_id', input.teacherId)
-
-    marks = (markRows ?? []) as typeof marks
+    marks = await repos.assessments.findMarksByAssessmentForRemedial(latestAssessment.id, input.teacherId)
   }
 
   // 3. Get learner profiles for this class
@@ -60,37 +39,21 @@ export async function generateRemedialPlan(input: PlannerInput): Promise<Remedia
   const profileMap = new Map(profiles.map(p => [p.student_id, p]))
 
   // 4. Get prerequisite concepts from knowledge graph
-  const { data: currentNode } = await db
-    .from('knowledge_nodes')
-    .select('id, concept')
-    .ilike('concept', `%${input.subStrand}%`)
-    .maybeSingle()
+  const currentNode = await repos.knowledgeGraph.findNodeByConceptLike(input.subStrand)
 
   let prerequisiteConcepts: string[] = []
   if (currentNode?.id) {
-    const { data: prereqEdges } = await db
-      .from('knowledge_edges')
-      .select('prerequisite_node_id')
-      .eq('dependent_node_id', currentNode.id)
-
-    if (prereqEdges?.length) {
+    const prereqEdges = await repos.knowledgeGraph.getPrerequisiteEdges(currentNode.id)
+    if (prereqEdges.length) {
       const prereqIds = prereqEdges.map(e => e.prerequisite_node_id as string)
-      const { data: prereqNodes } = await db
-        .from('knowledge_nodes')
-        .select('concept')
-        .in('id', prereqIds)
-
-      prerequisiteConcepts = (prereqNodes ?? []).map(n => n.concept as string)
+      const prereqNodes = await repos.knowledgeGraph.getNodesByIds(prereqIds)
+      prerequisiteConcepts = prereqNodes.map(n => n.name)
     }
   }
 
   // 5. Get enrolled students (even without linked accounts)
-  const { data: enrollment } = await db
-    .from('class_students')
-    .select('student_id')
-    .eq('class_id', input.classId)
-
-  const enrolledIds = new Set((enrollment ?? []).map(e => e.student_id as string))
+  const enrollmentIds = await repos.learnerIntelligence.getClassEnrollment(input.classId)
+  const enrolledIds = new Set(enrollmentIds)
 
   // 6. Classify each student by their gap severity
   const maxScore = latestAssessment?.max_score ?? 100
@@ -244,27 +207,23 @@ export async function generateRemedialPlan(input: PlannerInput): Promise<Remedia
   }
 
   // 10. Persist
-  const { data: saved } = await db
-    .from('remedial_plans')
-    .upsert({
-      sow_id:     plan.sow_id,
-      teacher_id: plan.teacher_id,
-      class_id:   plan.class_id,
-      term:       plan.term,
-      year:       plan.year,
-      week_start: plan.week_start,
-      week_end:   plan.week_end,
-      subject:    plan.subject,
-      strand:     plan.strand,
-      sub_strand: plan.sub_strand,
-      groups:     plan.groups,
-      allocation: plan.allocation,
-      check_in_week: allocation.check_in_week,
-    }, { onConflict: 'sow_id,teacher_id,sub_strand,term,year' })
-    .select('id')
-    .single()
+  const savedId = await repos.learnerIntelligence.upsertRemedialPlan({
+    sow_id:     plan.sow_id,
+    teacher_id: plan.teacher_id,
+    class_id:   plan.class_id,
+    term:       plan.term,
+    year:       plan.year,
+    week_start: plan.week_start,
+    week_end:   plan.week_end,
+    subject:    plan.subject,
+    strand:     plan.strand,
+    sub_strand: plan.sub_strand,
+    groups:     plan.groups,
+    allocation: plan.allocation,
+    check_in_week: allocation.check_in_week,
+  })
 
-  if (saved?.id) plan.id = saved.id
+  if (savedId) plan.id = savedId
 
   return plan
 }

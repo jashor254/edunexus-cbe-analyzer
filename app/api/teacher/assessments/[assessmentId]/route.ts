@@ -4,7 +4,8 @@ import { createServiceClient } from '@/utils/supabase/service'
 import {
   apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest, apiNotFound,
 } from '@/lib/api/response'
-import { getAssessmentContext, updateAssessment } from '@/lib/assessments/queries'
+import { getAssessmentContext } from '@/lib/assessments/getters'
+import { updateAssessment } from '@/lib/assessments/mutations'
 
 export async function GET(
   _req: Request,

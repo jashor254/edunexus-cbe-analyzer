@@ -10,7 +10,6 @@ export async function POST(request: Request) {
     if (authError || !user) return apiUnauthorized()
 
     const body = await request.json()
-    console.log('[assessments/create] payload:', JSON.stringify(body, null, 2))
 
     const {
       student_id,

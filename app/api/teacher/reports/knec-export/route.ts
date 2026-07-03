@@ -74,7 +74,7 @@ export async function GET(req: Request) {
       .select('student_id')
       .eq('class_id', classId)
 
-    const studentIds = (studentLinks || []).map((s: any) => s.student_id)
+    const studentIds = (studentLinks || []).map((s: { student_id: string }) => s.student_id)
 
     if (studentIds.length === 0) {
       return apiError('No students in this class', 400)
@@ -98,9 +98,12 @@ export async function GET(req: Request) {
 
     const { data: assessments } = await assessmentQuery
 
+    type AssessmentRow = { student_id: string; subject_scores: Record<string, number>; term: number | null; year: number | null }
+    type StudentRow = { id: string; name: string; grade: number }
+
     // Build latest per student
-    const latestAssessment: Record<string, any> = {}
-    ;(assessments || []).forEach((a: any) => {
+    const latestAssessment: Record<string, AssessmentRow> = {}
+    ;(assessments || []).forEach((a: AssessmentRow) => {
       if (!latestAssessment[a.student_id]) {
         latestAssessment[a.student_id] = a
       }
@@ -124,9 +127,9 @@ export async function GET(req: Request) {
 
     const rows: string[][] = [headers]
 
-    ;(students || []).forEach((student: any, idx: number) => {
+    ;(students || []).forEach((student: StudentRow, idx: number) => {
       const assessment = latestAssessment[student.id]
-      const scores = assessment?.subject_scores as Record<string, number> | undefined
+      const scores = assessment?.subject_scores
 
       if (scores) {
         Object.entries(scores).forEach(([subject, score]) => {

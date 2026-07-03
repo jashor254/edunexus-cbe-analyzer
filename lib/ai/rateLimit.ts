@@ -3,7 +3,7 @@
 // Primary access control lives in lib/payments/access.ts.
 // Reads from ai_call_logs (the table lib/ai/logger.ts already writes to — no extra table).
 
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 import type { TokenFeature } from '@/lib/payments/config'
 
 // Per-user per-feature daily call caps, reset at UTC midnight.
@@ -54,28 +54,17 @@ export async function checkDailyCallLimit(
   userId: string,
   feature: TokenFeature
 ): Promise<RateLimitResult> {
-  const db = createServiceClient()
   const limit = DAILY_CALL_LIMITS[feature]
 
-  const { count, error } = await db
-    .from('ai_call_logs')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('feature', feature)
-    .eq('success', true)
-    .gte('created_at', utcMidnightToday())
-
-  if (error) {
+  try {
+    const callsToday = await repos.analytics.countAICallsByFeature(userId, feature, utcMidnightToday())
+    if (callsToday >= limit) {
+      return { allowed: false, callsToday, limit, resetAt: utcMidnightTomorrow() }
+    }
+    return { allowed: true, callsToday, limit }
+  } catch {
     return { allowed: true, callsToday: 0, limit }
   }
-
-  const callsToday = count ?? 0
-
-  if (callsToday >= limit) {
-    return { allowed: false, callsToday, limit, resetAt: utcMidnightTomorrow() }
-  }
-
-  return { allowed: true, callsToday, limit }
 }
 
 /**
@@ -84,21 +73,14 @@ export async function checkDailyCallLimit(
  * Used by the /api/ai/usage endpoint.
  */
 export async function getDailyUsage(userId: string): Promise<DailyUsage> {
-  const db = createServiceClient()
   const since = utcMidnightToday()
   const features = Object.keys(DAILY_CALL_LIMITS) as TokenFeature[]
 
   const results = await Promise.all(
-    features.map(feature =>
-      db
-        .from('ai_call_logs')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('feature', feature)
-        .eq('success', true)
-        .gte('created_at', since)
-        .then(({ count }) => ({ feature, callsToday: count ?? 0 }))
-    )
+    features.map(async feature => ({
+      feature,
+      callsToday: await repos.analytics.countAICallsByFeature(userId, feature, since),
+    }))
   )
 
   return Object.fromEntries(

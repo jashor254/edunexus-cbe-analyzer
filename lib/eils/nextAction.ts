@@ -12,6 +12,7 @@
 
 import { createServiceClient } from '@/utils/supabase/service'
 import { getOrCreateLearnerProfile } from '@/lib/learnerModel/queries'
+import { afterRecommendationCreated } from '@/lib/eir/engine'
 import type { LearnerProfile, RiskFlag } from '@/lib/learnerModel/types'
 import type { EILSRecommendation, ActionType, RecommendationEvidence } from './types'
 
@@ -61,7 +62,14 @@ export async function computeNextBestActions(
     .insert(rows)
     .select('id, student_id, action_type, priority, confidence, reasoning, evidence, expected_impact, subject, substrand, source_system, status, actioned_at, outcome, outcome_note, expires_at, created_at, updated_at')
 
-  return (data ?? []) as EILSRecommendation[]
+  const recommendations = (data ?? []) as EILSRecommendation[]
+
+  // EIR: generate explainability record for each new recommendation
+  for (const rec of recommendations) {
+    void afterRecommendationCreated(rec).catch(() => {})
+  }
+
+  return recommendations
 }
 
 // ── Candidate builders ────────────────────────────────────────────────────────

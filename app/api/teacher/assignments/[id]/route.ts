@@ -46,7 +46,7 @@ export async function GET(
     const dueDate = new Date(assignment.due_date)
     const isOverdue = now > dueDate
 
-    const enriched = (submissions || []).map((sub: any) => ({
+    const enriched = (submissions || []).map((sub: { status: string; [key: string]: unknown }) => ({
       ...sub,
       isOverdue: isOverdue && sub.status === 'pending',
     }))

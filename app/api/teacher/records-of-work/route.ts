@@ -76,7 +76,7 @@ export async function POST(req: Request) {
         .order('week').order('lesson')
 
       if (lessons && lessons.length > 0) {
-        const entries = lessons.map((l: any) => ({
+        const entries = lessons.map((l: { week: number; lesson: number; strand: string | null; substrand: string | null }) => ({
           row_id:    row.id,
           week:      l.week,
           lesson:    l.lesson,

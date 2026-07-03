@@ -769,11 +769,9 @@ export async function buildClinicReport(
 
     if (matches.length === 0 && Object.keys(subjectMap).length > 0) {
       // No match on file — generate one now via AI
-      console.log('  No career matches found — generating via AI...')
       try {
         const cluster = detectSubjectCluster(subjectMap)
         const candidateSlugs = CLUSTER_CAREER_CANDIDATES[cluster]
-        console.log(`  Subject cluster: ${cluster} → candidates: ${candidateSlugs.join(', ')}`)
         await generateCareerMatches({
           student_id:      studentId,
           student_name:    student.name as string,
@@ -785,9 +783,8 @@ export async function buildClinicReport(
           candidate_slugs: candidateSlugs,
         })
         matches = await getMatchesForStudent(studentId)
-        console.log(`  ✓ Generated ${matches.length} career matches`)
       } catch (err) {
-        console.warn('  ⚠ Career match generation failed:', (err as Error).message)
+        console.error('[clinicReportBuilder] Career match generation failed:', (err as Error).message)
       }
     }
 
@@ -914,7 +911,7 @@ export async function buildClinicReport(
   parent_actions.push({
     title:  'Start a Learning Compass Session',
     why:    `The Learning Compass already knows ${student.name as string}'s exact level and will start precisely where they are — no wasted time.`,
-    action: `Open the Learning Compass in ${firstSubject}. It will greet them by name, explain what they\'re working on, and adapt in real time. First session takes 10 minutes.`,
+    action: `Open the Learning Compass in ${firstSubject}. It will greet them by name, explain what they're working on, and adapt in real time. First session takes 10 minutes.`,
     link:   '/learn',
   })
 

@@ -13,7 +13,6 @@ import {
   BookOpen,
   Zap,
 } from 'lucide-react'
-import { createClient } from '@/utils/supabase/client'
 import { downloadSOWAsPDF, getColumnConfig } from '@/lib/sow/pdfRenderer'
 import type {
   SOWContext,
@@ -63,8 +62,6 @@ export default function Step5Preview({
   onBack,
   onReset,
 }: Props) {
-  const supabase = createClient()
-
   const [generating, setGenerating] = useState(false)
   const [progress, setProgress] = useState('')
   const [progressPct, setProgressPct] = useState(0)
@@ -87,27 +84,26 @@ export default function Step5Preview({
     setProgressPct(0)
     setProgress('Fetching KICD curriculum data…')
 
-    // Step A: Fetch KICD enrichment
+    // Step A: Fetch KICD enrichment via API (no direct DB calls in components)
     const subjectName = context.learningAreaName.toLowerCase()
 
-    const [{ data: kicdArea }, { data: kicdStrands }] = await Promise.all([
-      supabase
-        .from('sow_learning_areas')
-        .select('kicd_subject_data')
-        .ilike('name', `%${subjectName}%`)
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from('sow_strands')
-        .select('title, kicd_data')
-        .ilike('title', `%${subjectName}%`),
-    ])
+    let kicdArea: { kicd_subject_data?: unknown } | null = null
+    let kicdStrands: Array<{ title: string; kicd_data?: unknown }> = []
+
+    try {
+      const kicdRes = await fetch(`/api/sow/kicd-context?subject=${encodeURIComponent(subjectName)}`)
+      if (kicdRes.ok) {
+        const kicdJson = await kicdRes.json() as { data?: { kicdArea?: { kicd_subject_data?: unknown }; kicdStrands?: Array<{ title: string; kicd_data?: unknown }> } }
+        kicdArea = kicdJson.data?.kicdArea ?? null
+        kicdStrands = kicdJson.data?.kicdStrands ?? []
+      }
+    } catch { /* KICD enrichment is optional — proceed without it */ }
 
     const enrichedContext: SOWContext = {
       ...context,
       kicdContext: {
-        subjectData: (kicdArea as any)?.kicd_subject_data || {},
-        strandData: (kicdStrands as any[]) || [],
+        subjectData: (kicdArea?.kicd_subject_data ?? {}) as Record<string, Record<string, unknown>>,
+        strandData:  kicdStrands as { title: string; kicd_data: Record<string, unknown>[] }[],
         subtopicMap: Object.fromEntries(
           selectedSubstrands
             .filter(s => s.subtopics?.length)
@@ -149,12 +145,12 @@ export default function Step5Preview({
       setResult(data.data.result)
       setProgressPct(100)
       setProgress('')
-    } catch (err: any) {
-      setGenError(`Network error: ${err.message}`)
+    } catch (err: unknown) {
+      setGenError(`Network error: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {
       setGenerating(false)
     }
-  }, [context, selectedSubstrands, timeline, breaks, teachingSlots, supabase])
+  }, [context, selectedSubstrands, timeline, breaks, teachingSlots])
 
   async function handleSave() {
     if (!result) return

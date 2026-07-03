@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
     else skipped++
   }
 
-  console.log(`📱 Academy nudge cron: ${sent} sent, ${skipped} skipped`)
+  console.info(`[cron/academy-nudge] ${sent} sent, ${skipped} skipped`)
 
   return NextResponse.json({ sent, skipped, total: perTeacher.size })
 }

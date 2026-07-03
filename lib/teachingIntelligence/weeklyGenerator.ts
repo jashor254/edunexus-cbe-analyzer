@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 import { callGemini } from '@/lib/ai/gemini'
 import { logAICall } from '@/lib/ai/logger'
 import { GEMINI_PRIMARY } from '@/lib/ai/models'
@@ -124,30 +124,10 @@ export async function runTIEForSOW(
   context: { grade: string; learningArea: string },
   opts?: { overrideWeek?: number }
 ): Promise<TIEWeekResult> {
-  const db = createServiceClient()
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
   // ── Step 1: find evaluated plans ─────────────────────────────────────────
-  // Normal mode: past 7 days (Friday cron cadence).
-  // overrideWeek: process a specific week regardless of date — used by seed scripts
-  // to backfill weekly_intelligence history without touching system clock.
-  let planQuery = db
-    .from('lesson_plans')
-    .select('id, week_number, lesson_number, strand, sub_strand, taught_date, updated_at, teacher_flagged_followup, reflection_source, teacher_self_evaluation')
-    .eq('sow_id', sowId)
-    .not('teacher_flagged_followup', 'is', null)
-
-  if (opts?.overrideWeek !== undefined) {
-    planQuery = planQuery.eq('week_number', opts.overrideWeek) as typeof planQuery
-  } else {
-    planQuery = planQuery.gte('updated_at', sevenDaysAgo) as typeof planQuery
-  }
-
-  planQuery = planQuery.order('week_number').order('lesson_number') as typeof planQuery
-
-  const { data: rawPlans } = await planQuery
-
-  const plans = (rawPlans ?? []) as EvaluatedPlan[]
+  const plans = await repos.learnerIntelligence.getEvaluatedPlansForSOW(sowId, sevenDaysAgo, opts?.overrideWeek)
 
   if (!plans.length) {
     return { processed: false, weekNumber: 0, lessonsAnalyzed: 0, skipped: 'no_evaluated_plans' }
@@ -159,12 +139,7 @@ export async function runTIEForSOW(
   const weekPlans = plans.filter(p => p.week_number === weekNumber)
 
   // ── Step 2: load substrand_health for this SOW ───────────────────────────
-  const { data: healthRows } = await db
-    .from('substrand_health')
-    .select('id, sow_id, teacher_id, strand, sub_strand, struggle_count, lessons_covered, assessment_level, remediated, root_cause, risk_score, last_flagged, resolved_at')
-    .eq('sow_id', sowId)
-
-  const health = (healthRows ?? []) as SubstrandHealthRow[]
+  const health = await repos.learnerIntelligence.getSubstrandHealth(sowId)
   const healthBySubStrand = new Map(health.map(h => [h.sub_strand, h]))
 
   // ── Step 3: compute per-lesson health, apply staleness ───────────────────
@@ -233,36 +208,19 @@ export async function runTIEForSOW(
     teacher_note: teacherNote,
   }
 
-  await db
-    .from('weekly_intelligence')
-    .upsert(payload, { onConflict: 'sow_id,week_number' })
+  await repos.learnerIntelligence.upsertWeeklyIntelligence(payload)
 
   // ── Step 7: populate ROW entries reflection field ─────────────────────────
-  // Each taught lesson gets its own teacher_self_evaluation as reflection.
-  // Lessons without an evaluation get the week-level teacher_note as fallback.
-  const rowEntryUpdates = weekPlans.map(plan => ({
-    sub_strand: plan.sub_strand,
-    reflection: plan.teacher_self_evaluation ?? teacherNote,
-  }))
-
-  // row_entries are matched by their week + lesson via the records_of_work join.
-  // We bulk-update each row_entry that belongs to this SOW's ROW for this week.
-  if (rowEntryUpdates.length > 0) {
-    const { data: rowRecord } = await db
-      .from('records_of_work')
-      .select('id')
-      .eq('scheme_id', sowId)
-      .maybeSingle()
-
+  if (weekPlans.length > 0) {
+    const rowRecord = await repos.learnerIntelligence.getRowRecordForSOW(sowId)
     if (rowRecord) {
-      // Update reflection on each matching row_entry
       for (const plan of weekPlans) {
-        await db
-          .from('row_entries')
-          .update({ reflection: plan.teacher_self_evaluation ?? teacherNote })
-          .eq('row_id', rowRecord.id)
-          .eq('week', weekNumber)
-          .eq('substrand', plan.sub_strand)
+        await repos.learnerIntelligence.updateRowEntryReflection(
+          rowRecord.id,
+          weekNumber,
+          plan.sub_strand,
+          plan.teacher_self_evaluation ?? teacherNote,
+        )
       }
     }
   }

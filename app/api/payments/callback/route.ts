@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
-import { createHmac } from 'crypto'
+import { createHmac, timingSafeEqual } from 'crypto'
 import { TOKEN_PACK } from '@/lib/payments/config'
+import { publishEvent } from '@/lib/events'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL!
 
@@ -44,6 +45,16 @@ async function processPayment(
       .from('payments')
       .update({ status: 'failed' })
       .eq('transaction_id', reference)
+
+    void publishEvent({
+      event_type:      'billing.payment.failed',
+      resource_type:   'payment',
+      resource_id:     reference,
+      actor_id:        payment.user_id,
+      payload:         { reference, reason: 'verification_failed' },
+      idempotency_key: `billing.payment.failed:${reference}`,
+    }).catch(err => console.error('[events] billing.payment.failed:', err instanceof Error ? err.message : String(err)))
+
     return 'failed'
   }
 
@@ -120,6 +131,22 @@ async function processPayment(
     }
   }
 
+  // Emit billing event — fire and forget, never block the redirect
+  const verifiedData = verification.data
+  void publishEvent({
+    event_type:      'billing.payment.succeeded',
+    resource_type:   'payment',
+    resource_id:     reference,
+    actor_id:        userId,
+    payload: {
+      reference,
+      amount_kobo: verifiedData?.amount ?? 0,
+      currency:    verifiedData?.currency ?? 'NGN',
+      plan:        productId,
+    },
+    idempotency_key: `billing.payment.succeeded:${reference}`,
+  }).catch(err => console.error('[events] billing.payment.succeeded:', err instanceof Error ? err.message : String(err)))
+
   return 'success'
 }
 
@@ -164,16 +191,21 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const rawBody   = await req.text()
-    const signature = req.headers.get('x-paystack-signature') || ''
-    const secret    = process.env.PAYSTACK_WEBHOOK_SECRET || process.env.PAYSTACK_SECRET_KEY || ''
+    const signature = req.headers.get('x-paystack-signature') ?? ''
 
-    // 🔒 Reject anything not signed by Paystack
-    const expectedSig = createHmac('sha512', secret)
-      .update(rawBody)
-      .digest('hex')
+    // Require a dedicated webhook secret — fail hard if not configured
+    const secret = process.env.PAYSTACK_WEBHOOK_SECRET
+    if (!secret) {
+      return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 })
+    }
 
-    if (signature !== expectedSig) {
-      console.error('[webhook] invalid signature — rejected')
+    // 🔒 Timing-safe HMAC comparison — prevents timing-attack signature bypass
+    const expectedSig = createHmac('sha512', secret).update(rawBody).digest('hex')
+    const sigMatch =
+      signature.length === expectedSig.length &&
+      timingSafeEqual(Buffer.from(signature, 'utf8'), Buffer.from(expectedSig, 'utf8'))
+
+    if (!sigMatch) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
 

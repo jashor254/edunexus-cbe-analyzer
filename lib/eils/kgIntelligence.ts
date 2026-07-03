@@ -236,7 +236,8 @@ async function analyseStudentRootCausesGracefully(
 ): Promise<RootCauseResult[]> {
   try {
     return await analyseStudentRootCauses(studentId, grade)
-  } catch {
+  } catch (e: unknown) {
+    console.error('[kgIntelligence:analyseStudentRootCausesGracefully]', e instanceof Error ? e.message : String(e))
     return []
   }
 }

@@ -127,7 +127,8 @@ export async function scoreReflection(
       }
     }
     return fallbackFeedback(wordCount)
-  } catch {
+  } catch (e: unknown) {
+    console.error('[aiJudge:judgeReflection] JSON parse failed:', e instanceof Error ? e.message : String(e))
     return fallbackFeedback(wordCount)
   }
 }
@@ -267,7 +268,8 @@ export async function scoreMissionComparison(
       }
     }
     return fallbackVerdict(totalWords >= 100 ? 3 : 2)
-  } catch {
+  } catch (e: unknown) {
+    console.error('[aiJudge:judgeMission] JSON parse failed:', e instanceof Error ? e.message : String(e))
     return fallbackVerdict(totalWords >= 100 ? 3 : 2)
   }
 }

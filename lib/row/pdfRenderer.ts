@@ -1,3 +1,4 @@
+import { esc } from '@/lib/pdf/utils'
 // lib/row/pdfRenderer.ts
 // HTML → browser print renderer for Record of Work.
 // Portrait A4, 6-column: Date | Strand | Sub-Strand | Work Done | Reflection | Signature
@@ -30,14 +31,6 @@ export interface RecordOfWork {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function esc(s: string | number | undefined | null): string {
-  if (s == null) return ''
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
 
 function fmtDate(raw: string | null | undefined): string {
   if (!raw) return '<span class="placeholder">dd/mm/yyyy</span>'

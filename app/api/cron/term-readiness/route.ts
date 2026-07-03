@@ -318,7 +318,7 @@ export async function GET(req: Request): Promise<Response> {
     const totalHolidayEngagers = briefs.reduce((acc, b) => acc + b.engagers, 0)
     const totalAtRiskEngagers  = briefs.reduce((acc, b) => acc + b.at_risk_engagers, 0)
 
-    console.log(
+    console.info(
       `[cron/term-readiness] classes=${briefs.length} engagers=${totalHolidayEngagers}` +
       ` at_risk_engagers=${totalAtRiskEngagers} whatsapp_sent=${whatsappSent}`
     )

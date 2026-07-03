@@ -17,13 +17,13 @@ export async function POST(request: NextRequest) {
     const snapshot = await recordMetrics()
 
     if (snapshot.milestone_hit) {
-      console.log(
-        `🎉 MILESTONE: EduNexus reached ${snapshot.milestone_hit} teachers! ` +
+      console.info(
+        `[cron/snapshot-metrics] MILESTONE: reached ${snapshot.milestone_hit} teachers! ` +
         `Total: ${snapshot.total_teachers}, Active (30d): ${snapshot.active_teachers}, Students: ${snapshot.total_students}`
       )
     } else {
-      console.log(
-        `📊 Daily snapshot — Teachers: ${snapshot.total_teachers}, ` +
+      console.info(
+        `[cron/snapshot-metrics] Teachers: ${snapshot.total_teachers}, ` +
         `Active (30d): ${snapshot.active_teachers}, Students: ${snapshot.total_students}`
       )
     }

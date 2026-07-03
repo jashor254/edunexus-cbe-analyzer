@@ -65,7 +65,7 @@ export async function POST(req: Request) {
       return apiError('Failed to join class')
     }
 
-    const teacher = (cls as any).teachers
+    const teacher = (cls as unknown as { teachers: { full_name: string; school: string } | null }).teachers
 
     return apiSuccess({
       class: {

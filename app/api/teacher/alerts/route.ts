@@ -32,13 +32,14 @@ export async function GET() {
     if (error) return apiError('Failed to fetch alerts')
 
     // Categorize
-    const critical = (alerts || []).filter((a: any) =>
+    type Alert = { alert_type: string }
+    const critical = (alerts || []).filter((a: Alert) =>
       a.alert_type === 'inactive' || a.alert_type === 'holiday_inactive'
     )
-    const warning = (alerts || []).filter((a: any) =>
+    const warning = (alerts || []).filter((a: Alert) =>
       a.alert_type === 'declining_scores' || a.alert_type === 'repeated_struggles'
     )
-    const overdue = (alerts || []).filter((a: any) =>
+    const overdue = (alerts || []).filter((a: Alert) =>
       a.alert_type === 'assignment_overdue'
     )
 

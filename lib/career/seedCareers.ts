@@ -1,6 +1,6 @@
 // lib/career/seedCareers.ts
 
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 import { STANDARD_DISCLAIMER } from './types'
 import type { Career } from './types'
 
@@ -2657,20 +2657,15 @@ const CAREER_COS_META: Record<string, COSMeta> = {
 }
 
 export async function seedCareersCOS(): Promise<{ updated: number; errors: string[] }> {
-  const supabase = createServiceClient()
   const errors: string[] = []
   let updated = 0
 
   for (const [slug, meta] of Object.entries(CAREER_COS_META)) {
-    const { error } = await supabase
-      .from('careers')
-      .update(meta)
-      .eq('slug', slug)
-
-    if (error) {
-      errors.push(`${slug}: ${error.message}`)
-    } else {
+    try {
+      await repos.careers.updateCareerBySlug(slug, meta as Record<string, unknown>)
       updated++
+    } catch (err) {
+      errors.push(`${slug}: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -2678,19 +2673,15 @@ export async function seedCareersCOS(): Promise<{ updated: number; errors: strin
 }
 
 export async function seedCareers(): Promise<{ inserted: number; errors: string[] }> {
-  const supabase = createServiceClient()
   const errors: string[] = []
   let inserted = 0
 
   for (const career of SEED_CAREERS) {
-    const { error } = await supabase
-      .from('careers')
-      .upsert(career, { onConflict: 'slug' })
-
-    if (error) {
-      errors.push(`${career.slug}: ${error.message}`)
-    } else {
+    try {
+      await repos.careers.upsertCareer(career)
       inserted++
+    } catch (err) {
+      errors.push(`${career.slug}: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 

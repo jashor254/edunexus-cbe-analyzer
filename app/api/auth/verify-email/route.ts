@@ -1,48 +1,35 @@
 // app/api/auth/verify-email/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { createServiceClient } from '@/utils/supabase/service';
+// Marks the authenticated user's email as verified.
+// Uses getUser() — email is always derived from the auth token, never trusted from body.
+import { NextResponse } from 'next/server'
+import { createServiceClient } from '@/utils/supabase/service'
+import { requireAuth } from '@/lib/api/middleware'
 
-const supabase = createServiceClient();
+export async function POST() {
+  const auth = await requireAuth()
+  if ('response' in auth) return auth.response
 
-export async function POST(request: NextRequest) {
+  const email = auth.user.email
+  if (!email) {
+    return NextResponse.json({ success: false, error: 'No email on account' }, { status: 400 })
+  }
+
   try {
-    const { email } = await request.json();
-
-    if (!email) {
-      return NextResponse.json(
-        { success: false, error: 'Email required' },
-        { status: 400 }
-      );
-    }
-
-    // Mark user as verified
-    const { error } = await supabase
+    const db = createServiceClient()
+    const { error } = await db
       .from('users')
-      .update({ 
-        email_verified: true,
-        last_active_at: new Date().toISOString(),
-      })
-      .eq('email', email);
+      .update({ email_verified: true, last_active_at: new Date().toISOString() })
+      .eq('id', auth.user.id)
 
-    if (error) {
-      console.error('Verify email error:', error);
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
-      );
-    }
+    if (error) throw error
 
-    return NextResponse.json({
-      success: true,
-      message: 'Email verified successfully',
-    });
-  } catch (error: unknown) {
-    console.error('Email verification error:', error);
+    return NextResponse.json({ success: true, message: 'Email verified successfully' })
+  } catch (err: unknown) {
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Internal error' },
+      { success: false, error: err instanceof Error ? err.message : 'Internal error' },
       { status: 500 }
-    );
+    )
   }
 }
 
-export const dynamic = 'force-dynamic';
+export const dynamic = 'force-dynamic'

@@ -11,6 +11,29 @@ import {
   apiBadRequest,
 } from '@/lib/api/response'
 import type { SOWPreviewData } from '@/lib/sow/types'
+import { z } from 'zod'
+
+const SaveSOWSchema = z.object({
+  schemeData: z.object({
+    meta: z.object({
+      school:          z.string().min(1),
+      grade:           z.number().int().min(1).max(12),
+      learningArea:    z.string().min(1),
+      term:            z.number().int().min(1).max(3),
+      year:            z.number().int().min(2020).max(2100),
+      totalLessons:    z.number().int().min(1),
+      totalWeeks:      z.number().int().min(1),
+      curriculumMode:  z.string().min(1),
+      textbook:        z.string().optional(),
+      lessonsPerWeek:  z.number().int().min(1).max(10).optional(),
+      averageConfidence: z.number().optional(),
+      teacherName:     z.string().optional(),
+      tscNumber:       z.string().optional(),
+    }),
+    lessons: z.array(z.record(z.string(), z.unknown())),
+    breaks:  z.array(z.record(z.string(), z.unknown())),
+  }),
+})
 
 export async function POST(req: Request) {
   try {
@@ -33,9 +56,13 @@ export async function POST(req: Request) {
     if (!teacher) return apiForbidden()
 
     // ── Parse body ────────────────────────────────────────────────────────────
-    const { schemeData }: { schemeData: SOWPreviewData } = await req.json()
-
-    if (!schemeData?.meta) return apiBadRequest('Missing schemeData')
+    const rawBody: unknown = await req.json()
+    const parsed = SaveSOWSchema.safeParse(rawBody)
+    if (!parsed.success) {
+      return apiBadRequest(parsed.error.message ?? 'Invalid request body')
+    }
+    // Cast through unknown — Zod validates structure, SOWPreviewData adds domain-specific types
+    const { schemeData } = parsed.data as unknown as { schemeData: SOWPreviewData }
 
     const { meta, lessons, breaks } = schemeData
 

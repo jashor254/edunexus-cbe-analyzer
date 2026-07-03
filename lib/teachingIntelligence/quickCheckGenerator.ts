@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 import { callGeminiJSON } from '@/lib/ai/gemini'
 import { logAICall } from '@/lib/ai/logger'
 import { GEMINI_PRIMARY } from '@/lib/ai/models'
@@ -33,8 +33,6 @@ type GeminiResponse = {
 }
 
 export async function generateQuickCheck(input: GenerateInput): Promise<QuickCheckContent> {
-  const db = createServiceClient()
-
   const causeContext =
     ROOT_CAUSE_CONTEXT[input.rootCause as RootCauseCode] ?? ROOT_CAUSE_CONTEXT.UNKNOWN
 
@@ -110,29 +108,21 @@ Respond ONLY with valid JSON, exactly this shape:
 
   const generatedAt = new Date().toISOString()
 
-  const { data: inserted, error: insertErr } = await db
-    .from('remedial_actions')
-    .insert({
-      sow_id:               input.sowId,
-      teacher_id:           input.authUserId,
-      substrand_health_id:  input.substrandHealthId,
-      week_of:              new Date().toISOString().slice(0, 10),
-      strand:               input.strand,
-      sub_strand:           input.subStrand,
-      root_cause:           input.rootCause,
-      suggested_activity:   parsed.activity,
-      questions:            parsed.questions.slice(0, 3),
-      generated_at:         generatedAt,
-    })
-    .select('id')
-    .single()
-
-  if (insertErr || !inserted) {
-    throw new Error(`Failed to save quick check: ${insertErr?.message ?? 'unknown error'}`)
-  }
+  const inserted = await repos.assessments.insertRemedialAction({
+    sow_id:              input.sowId,
+    teacher_id:          input.authUserId,
+    substrand_health_id: input.substrandHealthId,
+    week_of:             new Date().toISOString().slice(0, 10),
+    strand:              input.strand,
+    sub_strand:          input.subStrand,
+    root_cause:          input.rootCause,
+    suggested_activity:  parsed.activity,
+    questions:           parsed.questions.slice(0, 3),
+    generated_at:        generatedAt,
+  })
 
   return {
-    id:                (inserted as { id: string }).id,
+    id:                 inserted.id,
     suggested_activity: parsed.activity,
     questions:          parsed.questions.slice(0, 3),
     generated_at:       generatedAt,

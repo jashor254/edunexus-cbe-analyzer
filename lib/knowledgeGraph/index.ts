@@ -35,21 +35,17 @@ export type { CareerReadinessChain, CareerReadinessReport } from './careerReadin
 // Takes a student's grade + strand_assessments and returns root causes for every
 // weak subject topic in one call. This is the function the clinic calls.
 
-import { createServiceClient } from '@/utils/supabase/service'
 import { buildStudentNodeData } from './queries'
 import { findAllRootCauses }    from './traversal'
 import type { RootCauseResult } from './types'
 
-type DB = ReturnType<typeof createServiceClient>
-
 // Analyses ALL subjects for the given grade — strand_assessments covers every subject
 export async function analyseStudentRootCauses(
-  db:        DB,
   studentId: string,
   grade:     number
 ): Promise<RootCauseResult[]> {
   // Build the student's performance map from strand_assessments (all subjects at this grade)
-  const studentData = await buildStudentNodeData(db, studentId, grade)
+  const studentData = await buildStudentNodeData(studentId, grade)
 
   if (Object.keys(studentData).length === 0) return []
 
@@ -60,5 +56,5 @@ export async function analyseStudentRootCauses(
 
   if (weakNodeIds.length === 0) return []
 
-  return findAllRootCauses(db, weakNodeIds, studentData)
+  return findAllRootCauses(weakNodeIds, studentData)
 }

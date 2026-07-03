@@ -382,7 +382,7 @@ export function generateJuniorGuidance(subjects: SubjectProgress[]): JuniorGuida
   const avg     = vitals.overallAverage
   const rec     = avg >= 3.0 ? 'STEM' : avg >= 2.0 ? 'Social Sciences' : 'Arts & Sports Science'
   return {
-    recommendedPathway: rec as any,
+    recommendedPathway: rec as 'STEM' | 'Social Sciences' | 'Arts & Sports Science',
     reasoning: `With an average of ${avg}/4.0, the ${rec} pathway is recommended based on current performance.`,
     strengths:       subjects.filter(s => s.level >= 3).map(s => s.displayName).slice(0, 3),
     areasToImprove:  subjects.filter(s => s.level <= 2).map(s => s.displayName).slice(0, 3),

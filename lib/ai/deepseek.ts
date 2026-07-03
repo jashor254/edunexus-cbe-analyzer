@@ -4,6 +4,7 @@
 import { GoogleGenerativeAI, type GenerationConfig } from '@google/generative-ai'
 import { DEEPSEEK_CONFIG } from '@/lib/config/api'
 import { GEMINI_PRIMARY } from '@/lib/ai/models'
+import { logger } from '@/lib/observability/logger'
 
 const TIMEOUT_MS = 25_000
 const MAX_HISTORY = 20  // last 10 turns — keeps tokens bounded as session grows
@@ -119,11 +120,11 @@ export async function callDeepSeek(
     const msg = (err as Error).message
     const isRetryable = msg === 'DeepSeek timeout after 25s' || msg === 'fetch failed'
     if (isRetryable) {
-      console.warn(`[deepseek] retryable error on first attempt (${msg}) — retrying once`)
+      logger.warn('DeepSeek retryable error — retrying once', { service: 'deepseek', error: msg })
       try {
         return await callOnce(prompt, resolved.systemPrompt, resolved)
       } catch (retryErr) {
-        console.warn(`[deepseek] retry also failed — falling back to Gemini:`, (retryErr as Error).message)
+        logger.warn('DeepSeek retry failed — falling back to Gemini', { service: 'deepseek' }, retryErr)
         return await callGeminiNonStreaming(prompt, resolved.systemPrompt, resolved.temperature, resolved.maxTokens)
       }
     }
@@ -171,7 +172,7 @@ async function fetchDeepSeekStream(
       : (err as Error).message
     const isRetryable = (err as Error).name === 'AbortError' || msg === 'fetch failed'
     if (isRetryable) {
-      console.warn(`[deepseek] stream retryable error (${msg}) — retrying once`)
+      logger.warn('DeepSeek stream retryable error — retrying once', { service: 'deepseek.stream', error: msg })
       const controller2 = new AbortController()
       const timer2 = setTimeout(() => controller2.abort(), TIMEOUT_MS)
       try {
@@ -275,10 +276,10 @@ export async function streamDeepSeek(
   const temperature = options?.temperature ?? 0.7
   const trimmedHistory = history.slice(-MAX_HISTORY)
   try {
-    console.log('[ai] trying Gemini first')
+    logger.info('Attempting Gemini stream', { service: 'ai.stream' })
     return await streamGeminiFallback(systemPrompt, userMessage, trimmedHistory, temperature)
   } catch (geminiErr) {
-    console.warn('[ai] Gemini failed — falling back to DeepSeek:', (geminiErr as Error).message)
+    logger.warn('Gemini stream failed — falling back to DeepSeek', { service: 'ai.stream' }, geminiErr)
     return fetchDeepSeekStream(systemPrompt, userMessage, trimmedHistory, options)
   }
 }

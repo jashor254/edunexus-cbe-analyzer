@@ -1,4 +1,6 @@
 // lib/access.ts
+import { ADMIN_CONFIG } from '@/lib/config/api'
+
 export type UserRole = 'parent' | 'school_admin';
 export type PlanType = 'free' | 'token' | 'term';
 
@@ -13,7 +15,7 @@ export function canAccessPremiumFeatures(config: AccessConfig): boolean {
   const { email, role, planType, tokens } = config;
 
   // 1. Founder/Admin Always has access
-  if (role === 'school_admin' || email === 'kariukidennis092@gmail.com') {
+  if (role === 'school_admin' || (email && ADMIN_CONFIG.isAdmin(email))) {
     return true;
   }
 

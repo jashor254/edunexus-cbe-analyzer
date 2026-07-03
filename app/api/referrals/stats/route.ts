@@ -1,61 +1,48 @@
 // app/api/referrals/stats/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { createServiceClient } from '@/utils/supabase/service';
+import { NextResponse } from 'next/server'
+import { createServiceClient } from '@/utils/supabase/service'
+import { requireAuth } from '@/lib/api/middleware'
 
-const supabase = createServiceClient();
+export async function GET() {
+  const auth = await requireAuth()
+  if ('response' in auth) return auth.response
 
-export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
-
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, error: 'User ID required' },
-        { status: 400 }
-      );
-    }
-
-    const { data, error } = await supabase
-      .rpc('get_referral_stats', {
-        p_user_id: userId,
-      });
+    const db = createServiceClient()
+    const { data, error } = await db.rpc('get_referral_stats', {
+      p_user_id: auth.user.id,
+    })
 
     if (error) {
-      console.error('Referral stats error:', error);
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
-      );
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
-    const stats = data[0] || {
+    const stats = data[0] ?? {
       referral_code: null,
       total_referrals: 0,
       total_tokens_earned: 0,
       pending_referrals: 0,
       completed_referrals: 0,
       recent_referrals: [],
-    };
+    }
 
     return NextResponse.json({
       success: true,
       stats: {
-        referralCode: stats.referral_code,
-        totalReferrals: stats.total_referrals,
-        tokensEarned: stats.total_tokens_earned,
-        pendingReferrals: stats.pending_referrals,
+        referralCode:       stats.referral_code,
+        totalReferrals:     stats.total_referrals,
+        tokensEarned:       stats.total_tokens_earned,
+        pendingReferrals:   stats.pending_referrals,
         completedReferrals: stats.completed_referrals,
-        recentReferrals: stats.recent_referrals || [],
+        recentReferrals:    stats.recent_referrals ?? [],
       },
-    });
-  } catch (error: unknown) {
-    console.error('Referral stats API error:', error);
+    })
+  } catch (err: unknown) {
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Internal error' },
+      { success: false, error: err instanceof Error ? err.message : 'Internal error' },
       { status: 500 }
-    );
+    )
   }
 }
 
-export const dynamic = 'force-dynamic';
+export const dynamic = 'force-dynamic'
