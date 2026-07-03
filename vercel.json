@@ -23,6 +23,34 @@
     {
       "path": "/api/cron/generate-record-of-work",
       "schedule": "0 3 * * 1"
+    },
+    {
+      "path": "/api/cron/events/dispatch",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/jobs/process",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/parent-pulse",
+      "schedule": "0 6 * * 0"
+    },
+    {
+      "path": "/api/cron/term-readiness",
+      "schedule": "0 4 * * 1"
+    },
+    {
+      "path": "/api/cron/billing-renewals",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/cron/quota-alerts",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/dlq-requeue",
+      "schedule": "30 3 * * *"
     }
   ]
 }

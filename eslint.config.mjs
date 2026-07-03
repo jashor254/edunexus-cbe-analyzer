@@ -3,8 +3,11 @@ import globals from "globals";
 import next from "eslint-config-next";
 
 const config = [
+  {
+    ignores: [".claude/**", "node_modules/**", ".next/**"],
+  },
   js.configs.recommended,
-  next,
+  ...next,
   {
     languageOptions: {
       globals: {
