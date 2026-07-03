@@ -84,6 +84,9 @@ export const metadata: Metadata = {
   },
   verification: {
     google: process.env.NEXT_PUBLIC_GOOGLE_VERIFICATION || '',
+    other: {
+      'facebook-domain-verification': '9ovxw660f1q5gfj851qbdo7qiizybx',
+    },
   },
 
   // ✅ Canonical URL
