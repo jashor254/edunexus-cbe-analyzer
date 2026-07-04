@@ -5,10 +5,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { logger } from '@/lib/observability/logger'
+import { timingSafeEqualString } from '@/lib/api/secretCompare'
+import { publishEvent } from '@/lib/events'
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const secret = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (secret !== process.env.CRON_SECRET) {
+  if (!timingSafeEqualString(secret, process.env.CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -23,7 +25,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       .from('organization_subscriptions')
       .select('id, organization_id, plan_id')
       .eq('status', 'trialing')
-      .lt('trial_ends_at', now)
+      .lt('trial_end', now)
 
     if (expiredTrials?.length) {
       const { data: freePlan } = await db
@@ -51,6 +53,21 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         ])
 
         downgrades = expiredTrials.length
+
+        for (const trial of expiredTrials) {
+          void publishEvent({
+            event_type:      'organization.subscription.canceled',
+            resource_type:   'subscription',
+            resource_id:     trial.id,
+            organization_id: trial.organization_id,
+            payload: {
+              subscription_id: trial.id,
+              reason:          'trial_expired',
+              new_plan:        'free',
+            },
+            idempotency_key: `organization.subscription.canceled:${trial.id}:${now.slice(0, 10)}`,
+          }).catch(err => console.error('[events] organization.subscription.canceled:', err instanceof Error ? err.message : String(err)))
+        }
       }
     }
 

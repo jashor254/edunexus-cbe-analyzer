@@ -45,7 +45,21 @@ export async function updateSchoolUserRole(
   schoolUserId: string,
   role: SchoolUserRole
 ): Promise<SchoolUser> {
-  return repos.teachers.updateSchoolUserRole(schoolUserId, role)
+  const schoolUser = await repos.teachers.updateSchoolUserRole(schoolUserId, role)
+
+  void publishEvent({
+    event_type:      'organization.member.role_changed',
+    resource_type:   'school_user',
+    resource_id:      schoolUserId,
+    payload: {
+      school_user_id: schoolUserId,
+      user_id:        schoolUser.user_id,
+      school_id:      schoolUser.school_id,
+      new_role:       role,
+    },
+  }).catch(err => console.error('[events] organization.member.role_changed:', err instanceof Error ? err.message : String(err)))
+
+  return schoolUser
 }
 
 export async function deactivateSchoolUser(schoolUserId: string): Promise<void> {

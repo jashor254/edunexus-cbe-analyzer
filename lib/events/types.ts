@@ -24,9 +24,6 @@ export type PublishEventInput = {
   resource_id: string
   payload?: EventPayload
   idempotency_key?: string
-  correlation_id?: string
-  trace_id?: string
-  environment?: string
 }
 
 // Well-known event types — extend as the platform grows
@@ -37,11 +34,13 @@ export type WellKnownEventType =
   | 'teacher.row.submitted'
   | 'teacher.assessment.created'
   | 'teacher.assessment.published'
+  | 'teacher.assessment.graded'
   | 'teacher.assignment.created'
   | 'teacher.assignment.graded'
   // Student events
   | 'student.session.completed'
   | 'student.assessment.submitted'
+  | 'student.assignment.submitted'
   | 'student.milestone.achieved'
   | 'student.knowledge_graph.updated'
   | 'student.career_recommendation.updated'
@@ -54,6 +53,7 @@ export type WellKnownEventType =
   | 'organization.member.invited'
   | 'organization.member.joined'
   | 'organization.member.removed'
+  | 'organization.member.role_changed'
   | 'organization.subscription.upgraded'
   | 'organization.subscription.canceled'
   // API events
@@ -114,6 +114,12 @@ export type TeacherAssessmentPublishedPayload = {
   title?: string
 }
 
+export type TeacherAssessmentGradedPayload = {
+  assessment_id: string
+  class_id: string
+  marks_count: number
+}
+
 export type TeacherAssignmentCreatedPayload = {
   assignment_id: string
   class_id: string
@@ -141,6 +147,12 @@ export type StudentAssessmentSubmittedPayload = {
   student_id: string
   class_id: string
   mean_score?: number
+}
+
+export type StudentAssignmentSubmittedPayload = {
+  assignment_id: string
+  student_id: string
+  class_id: string
 }
 
 export type StudentMilestoneAchievedPayload = {
@@ -175,6 +187,24 @@ export type OrganizationMemberInvitedPayload = {
   user_id: string
   role: string
   school_id: string
+}
+
+export type OrganizationMemberJoinedPayload = {
+  organization_id: string
+  user_id: string
+  role: string
+}
+
+export type OrganizationMemberRoleChangedPayload = {
+  organization_id: string
+  user_id: string
+  old_role: string
+  new_role: string
+}
+
+export type OrganizationMemberRemovedPayload = {
+  organization_id: string
+  user_id: string
 }
 
 export type SystemIntelligenceUpdatedPayload = {

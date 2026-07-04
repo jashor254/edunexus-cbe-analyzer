@@ -2,6 +2,7 @@
 import { createServiceClient } from '@/utils/supabase/service'
 import { repos } from '@/lib/repositories'
 import { writeAuditLog } from '@/lib/iam/audit'
+import { publishEvent } from '@/lib/events'
 import type { CreateInvitationInput, OrganizationInvitation } from './types'
 
 /**
@@ -106,6 +107,20 @@ export async function acceptInvitation(
     resource_id:     invitation.id,
     new_values:      { role: invitation.role },
   })
+
+  void publishEvent({
+    event_type:      'organization.member.joined',
+    resource_type:   'member',
+    resource_id:     acceptingUserId,
+    actor_id:        acceptingUserId,
+    organization_id: invitation.organization_id,
+    payload: {
+      organization_id: invitation.organization_id,
+      user_id:         acceptingUserId,
+      role:            invitation.role,
+    },
+    idempotency_key: `organization.member.joined:${invitation.organization_id}:${acceptingUserId}`,
+  }).catch(err => console.error('[events] organization.member.joined:', err instanceof Error ? err.message : String(err)))
 
   return {
     organization_id: invitation.organization_id,

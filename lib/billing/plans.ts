@@ -1,4 +1,5 @@
 import { repos } from '@/lib/repositories'
+import { publishEvent } from '@/lib/events'
 import type { SubscriptionPlan } from './types'
 
 export async function listPlans(): Promise<SubscriptionPlan[]> {
@@ -15,10 +16,9 @@ export async function getOrgSubscription(organizationId: string): Promise<{
     status: string
     current_period_start: string
     current_period_end: string | null
-    trial_ends_at: string | null
+    trial_end: string | null
     canceled_at: string | null
-    paystack_subscription_code: string | null
-    paystack_customer_code: string | null
+    external_id: string | null
     metadata: Record<string, unknown>
     created_at: string
     updated_at: string
@@ -56,6 +56,18 @@ export async function upgradePlan(
     api_quota_monthly: plan.api_quota_monthly,
     updated_at:        now.toISOString(),
   })
+
+  void publishEvent({
+    event_type:      'organization.subscription.upgraded',
+    resource_type:   'subscription',
+    resource_id:     updated.id,
+    organization_id: organizationId,
+    payload: {
+      subscription_id: updated.id,
+      plan:            plan.name,
+    },
+    idempotency_key: `organization.subscription.upgraded:${updated.id}:${plan.id}:${now.toISOString().slice(0, 10)}`,
+  }).catch(err => console.error('[events] organization.subscription.upgraded:', err instanceof Error ? err.message : String(err)))
 
   return { subscription_id: updated.id, plan }
 }

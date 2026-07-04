@@ -120,6 +120,18 @@ export async function bulkSaveMarks(
     )
   )
 
+  void publishEvent({
+    event_type:    'teacher.assessment.graded',
+    resource_type: 'assessment',
+    resource_id:   assessmentId,
+    actor_id:      teacherId,
+    payload: {
+      assessment_id: assessmentId,
+      class_id:      classId,
+      marks_count:   inserted.length,
+    },
+  }).catch(err => console.error('[events] teacher.assessment.graded:', err instanceof Error ? err.message : String(err)))
+
   return repos.assessments.findMarksByAssessment(assessmentId, teacherId)
 }
 
@@ -169,6 +181,18 @@ export async function upsertMarksCSV(
   )
 
   const final = await repos.assessments.findMarksByAssessment(assessmentId, teacherId)
+
+  void publishEvent({
+    event_type:    'teacher.assessment.graded',
+    resource_type: 'assessment',
+    resource_id:   assessmentId,
+    actor_id:      teacherId,
+    payload: {
+      assessment_id: assessmentId,
+      class_id:      classId,
+      marks_count:   inserted + updated,
+    },
+  }).catch(err => console.error('[events] teacher.assessment.graded:', err instanceof Error ? err.message : String(err)))
 
   return { inserted, updated, marks: final }
 }

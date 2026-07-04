@@ -1,6 +1,7 @@
 // lib/organizations/update.ts
 import { repos } from '@/lib/repositories'
 import { writeAuditLog } from '@/lib/iam/audit'
+import { publishEvent } from '@/lib/events'
 import type { Organization, UpdateOrganizationInput } from './types'
 
 /**
@@ -108,6 +109,20 @@ export async function updateMemberRole(
     old_values:      { role: target.role },
     new_values:      { role: newRole },
   })
+
+  void publishEvent({
+    event_type:      'organization.member.role_changed',
+    resource_type:   'member',
+    resource_id:     targetUserId,
+    actor_id:        callerId,
+    organization_id: orgId,
+    payload: {
+      organization_id: orgId,
+      user_id:         targetUserId,
+      old_role:        target.role,
+      new_role:        newRole,
+    },
+  }).catch(err => console.error('[events] organization.member.role_changed:', err instanceof Error ? err.message : String(err)))
 }
 
 /**
@@ -138,4 +153,16 @@ export async function removeMember(
     old_values:      { role: target.role, status: 'active' },
     new_values:      { status: 'removed' },
   })
+
+  void publishEvent({
+    event_type:      'organization.member.removed',
+    resource_type:   'member',
+    resource_id:     targetUserId,
+    actor_id:        callerId,
+    organization_id: orgId,
+    payload: {
+      organization_id: orgId,
+      user_id:         targetUserId,
+    },
+  }).catch(err => console.error('[events] organization.member.removed:', err instanceof Error ? err.message : String(err)))
 }

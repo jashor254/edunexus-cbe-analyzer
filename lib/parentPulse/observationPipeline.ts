@@ -9,6 +9,7 @@
 
 import { repos } from '@/lib/repositories'
 import { afterParentObservation } from '@/lib/eils'
+import { publishEvent } from '@/lib/events'
 import type { ParentObservationOutcome } from '@/lib/learnerModel/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -196,6 +197,19 @@ export async function processInboundReply(
       parentId:    context.parentId,
       processed:   true,
     })
+
+    void publishEvent({
+      event_type:    'parent.observation.submitted',
+      resource_type: 'student',
+      resource_id:   parsed.studentId,
+      actor_id:      parsed.parentId,
+      payload: {
+        student_id: parsed.studentId,
+        substrand:  parsed.substrand,
+        outcome,
+        week_of:    parsed.weekOf,
+      },
+    }).catch(err => console.error('[events] parent.observation.submitted:', err instanceof Error ? err.message : String(err)))
 
     return { processed: true, outcome }
   } catch (err) {
