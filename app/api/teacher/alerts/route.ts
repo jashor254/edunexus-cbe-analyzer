@@ -1,7 +1,21 @@
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
-import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
+import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
 import { notifyAlertCreated } from '@/lib/notifications/notify'
+
+const AlertActionSchema = z.union([
+  z.object({
+    action:    z.literal('create'),
+    studentId: z.string().uuid(),
+    alertType: z.string().min(1),
+    message:   z.string().min(1),
+  }),
+  z.object({
+    action:  z.literal('resolve'),
+    alertId: z.string().uuid(),
+  }),
+])
 
 export async function GET() {
   try {
@@ -66,14 +80,11 @@ export async function POST(req: Request) {
 
     if (!teacher) return apiForbidden()
 
-    const body = await req.json()
-    const { alertId, action } = body
+    const parsed = AlertActionSchema.safeParse(await req.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
 
-    if (action === 'create') {
-      const { studentId, alertType, message } = body
-      if (!studentId || !alertType || !message) {
-        return apiError('studentId, alertType, and message are required', 400)
-      }
+    if (parsed.data.action === 'create') {
+      const { studentId, alertType, message } = parsed.data
 
       const { data: alert, error } = await db
         .from('student_alerts')
@@ -95,20 +106,14 @@ export async function POST(req: Request) {
       return apiSuccess({ alert })
     }
 
-    if (!alertId) return apiError('alertId is required', 400)
+    const { error } = await db
+      .from('student_alerts')
+      .update({ is_resolved: true })
+      .eq('id', parsed.data.alertId)
+      .eq('teacher_id', teacher.id)
 
-    if (action === 'resolve') {
-      const { error } = await db
-        .from('student_alerts')
-        .update({ is_resolved: true })
-        .eq('id', alertId)
-        .eq('teacher_id', teacher.id)
-
-      if (error) return apiError('Failed to resolve alert')
-      return apiSuccess({ resolved: true })
-    }
-
-    return apiError('Unknown action', 400)
+    if (error) return apiError('Failed to resolve alert')
+    return apiSuccess({ resolved: true })
   } catch (e: unknown) {
     console.error('[teacher/alerts POST]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')

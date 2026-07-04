@@ -1,7 +1,18 @@
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
-import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound } from '@/lib/api/response'
+import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound, apiBadRequest } from '@/lib/api/response'
 import { notifyAssignmentMarked } from '@/lib/notifications/notify'
+
+const MarkSubmissionSchema = z.object({
+  submissionId: z.string().uuid().optional(),
+  studentId:    z.string().uuid().optional(),
+  score:        z.number().optional(),
+  feedback:     z.string().optional(),
+  status:       z.string().optional(),
+}).refine(d => d.submissionId || d.studentId, {
+  message: 'submissionId or studentId is required',
+})
 
 export async function POST(
   req: Request,
@@ -34,12 +45,9 @@ export async function POST(
 
     if (!assignment) return apiNotFound('Assignment not found')
 
-    const body = await req.json()
-    const { submissionId, studentId, score, feedback, status } = body
-
-    if (!submissionId && !studentId) {
-      return apiError('submissionId or studentId is required', 400)
-    }
+    const parsed = MarkSubmissionSchema.safeParse(await req.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
+    const { submissionId, studentId, score, feedback, status } = parsed.data
 
     // Validate score range
     const maxScore = assignment.max_score ?? 100

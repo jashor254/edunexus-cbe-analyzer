@@ -22,13 +22,14 @@ import {
   evaluatePastPredictions,
   expireStalePendingOutcomes,
 } from '@/lib/eir'
+import { timingSafeEqualString } from '@/lib/api/secretCompare'
 
 export async function GET(req: Request): Promise<Response> {
   try {
     // ── Auth: CRON_SECRET only ────────────────────────────────────────────────
     const authHeader = req.headers.get('authorization') ?? ''
     const cronSecret = process.env.CRON_SECRET
-    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    if (!cronSecret || !timingSafeEqualString(authHeader, `Bearer ${cronSecret}`)) {
       return apiUnauthorized()
     }
 

@@ -1,6 +1,7 @@
 // app/api/sow/generate/route.ts
 // POST: Generate a full Scheme of Work via DeepSeek AI
 
+import { z } from 'zod'
 import { createServiceClient } from '@/utils/supabase/service'
 import { checkFeatureAccess } from '@/lib/payments/access'
 import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
@@ -13,6 +14,20 @@ import {
 } from '@/lib/api/response'
 
 const FEATURE: FeatureKey = 'sow_generate'
+
+const GenerateSOWSchema = z.object({
+  context: z.object({
+    learningArea:   z.string().min(1),
+    grade:          z.union([z.string(), z.number()]),
+    curriculumMode: z.string().min(1),
+  }).passthrough(),
+  lessonStructure: z.object({
+    lessonsPerWeek: z.number().int().min(1).optional(),
+  }).passthrough().optional(),
+  selectedSubstrands: z.array(z.unknown()).min(1),
+  breaks: z.array(z.unknown()).optional().default([]),
+  timeline: z.array(z.unknown()).optional(),
+})
 import { buildTermSchedule } from '@/lib/sow/termSchedule'
 import { applyBreaksToSchedule } from '@/lib/sow/breakEngine'
 import { generateSchemePipeline } from '@/lib/sow/lessonPipeline'
@@ -51,26 +66,22 @@ export async function POST(req: Request) {
     if (!teacher) return apiForbidden()
 
     // ── Parse body ────────────────────────────────────────────────────────────
-    const body = await req.json()
+    const parsed = GenerateSOWSchema.safeParse(await req.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
+
     const {
       context,
       lessonStructure,
       selectedSubstrands,
-      breaks = [],
+      breaks,
       timeline: prebuiltTimeline,
-    }: {
+    } = parsed.data as unknown as {
       context: SOWContext
       lessonStructure?: LessonStructure
       selectedSubstrands: SelectedSubstrand[]
       breaks?: BreakItem[]
       timeline?: TimelineSlot[]
-    } = body
-
-    // ── Validate required fields ──────────────────────────────────────────────
-    if (!context?.learningArea) return apiBadRequest('Missing context.learningArea')
-    if (!context?.grade) return apiBadRequest('Missing context.grade')
-    if (!context?.curriculumMode) return apiBadRequest('Missing context.curriculumMode')
-    if (!selectedSubstrands?.length) return apiBadRequest('No substrands selected')
+    }
 
     // ── Build or use pre-built timeline ───────────────────────────────────────
     let timeline: TimelineSlot[]

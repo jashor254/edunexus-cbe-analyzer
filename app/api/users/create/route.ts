@@ -1,19 +1,28 @@
 // app/api/users/create/route.ts
 // Called post-signup to create the application-layer user record.
 // Auth is required — the caller must already have a valid Supabase session.
+import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { requireAuth } from '@/lib/api/middleware'
+
+const CreateUserSchema = z.object({
+  name:         z.string().trim().min(1).optional(),
+  referralCode: z.string().trim().min(1).optional(),
+})
 
 export async function POST(request: NextRequest) {
   const auth = await requireAuth()
   if ('response' in auth) return auth.response
 
   try {
-    const body = await request.json()
+    const parsed = CreateUserSchema.safeParse(await request.json())
+    if (!parsed.success) {
+      return NextResponse.json({ success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 })
+    }
     // name and referralCode are user-supplied metadata — not identity claims.
     // email is always derived from the verified auth token, never trusted from body.
-    const { name, referralCode } = body as { name?: string; referralCode?: string }
+    const { name, referralCode } = parsed.data
 
     const email = auth.user.email
     if (!email) {

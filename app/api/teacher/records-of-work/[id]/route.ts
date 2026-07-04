@@ -1,6 +1,15 @@
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
+
+const UpdateRowEntrySchema = z.object({
+  entryId:     z.string().uuid(),
+  date_taught: z.string().optional(),
+  strand:      z.string().optional(),
+  substrand:   z.string().optional(),
+  reflection:  z.string().optional(),
+})
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -49,14 +58,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const { data: row } = await db.from('records_of_work').select('id').eq('id', id).eq('teacher_id', teacher.id).single()
     if (!row) return apiForbidden()
 
-    const body = await req.json()
-    const { entryId, ...fields } = body
-    if (!entryId) return apiBadRequest('entryId required')
+    const parsed = UpdateRowEntrySchema.safeParse(await req.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'entryId required')
+    const { entryId, ...fields } = parsed.data
 
-    const allowed = ['date_taught', 'strand', 'substrand', 'reflection']
-    const update: Record<string, any> = { updated_at: new Date().toISOString() }
+    const allowed = ['date_taught', 'strand', 'substrand', 'reflection'] as const
+    const update: Record<string, unknown> = { updated_at: new Date().toISOString() }
     for (const key of allowed) {
-      if (key in fields) update[key] = fields[key]
+      if (key in fields && fields[key] !== undefined) update[key] = fields[key]
     }
 
     const { error } = await db.from('row_entries').update(update).eq('id', entryId).eq('row_id', id)

@@ -1,6 +1,11 @@
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound } from '@/lib/api/response'
+
+const UpdateAssignmentSchema = z.object({
+  status: z.enum(['draft', 'active', 'closed']),
+})
 
 export async function GET(
   _req: Request,
@@ -78,12 +83,9 @@ export async function PATCH(
 
     if (!teacher) return apiForbidden()
 
-    const body = await req.json()
-    const { status } = body
-
-    if (!status || !['draft', 'active', 'closed'].includes(status)) {
-      return apiError('Invalid status', 400)
-    }
+    const parsed = UpdateAssignmentSchema.safeParse(await req.json())
+    if (!parsed.success) return apiError('Invalid status', 400)
+    const { status } = parsed.data
 
     const { data: assignment, error } = await db
       .from('assignments')

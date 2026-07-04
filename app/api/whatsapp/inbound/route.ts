@@ -58,29 +58,30 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const webhookSecret = process.env.WHATSAPP_WEBHOOK_SECRET
 
     if (!webhookSecret) {
-      console.warn('[whatsapp/inbound] WHATSAPP_WEBHOOK_SECRET not set — skipping signature check')
-    } else {
-      const signature = req.headers.get('x-hub-signature-256') ?? ''
+      console.error('[whatsapp/inbound] WHATSAPP_WEBHOOK_SECRET not set — rejecting payload')
+      return NextResponse.json({ ok: false, error: 'webhook_not_configured' }, { status: 401 })
+    }
 
-      const expectedSig =
-        'sha256=' +
-        createHmac('sha256', webhookSecret)
-          .update(rawBody)
-          .digest('hex')
+    const signature = req.headers.get('x-hub-signature-256') ?? ''
 
-      const sigBuffer  = Buffer.from(signature)
-      const expectedBuffer = Buffer.from(expectedSig)
+    const expectedSig =
+      'sha256=' +
+      createHmac('sha256', webhookSecret)
+        .update(rawBody)
+        .digest('hex')
 
-      // timingSafeEqual requires equal-length buffers
-      const mismatch =
-        sigBuffer.length !== expectedBuffer.length ||
-        !timingSafeEqual(sigBuffer, expectedBuffer)
+    const sigBuffer  = Buffer.from(signature)
+    const expectedBuffer = Buffer.from(expectedSig)
 
-      if (mismatch) {
-        console.error('[whatsapp/inbound] Signature mismatch — rejecting payload')
-        // Return 200 anyway; a 403 would cause Meta to retry
-        return NextResponse.json({ ok: false, error: 'signature_mismatch' }, { status: 200 })
-      }
+    // timingSafeEqual requires equal-length buffers
+    const mismatch =
+      sigBuffer.length !== expectedBuffer.length ||
+      !timingSafeEqual(sigBuffer, expectedBuffer)
+
+    if (mismatch) {
+      console.error('[whatsapp/inbound] Signature mismatch — rejecting payload')
+      // Return 200 anyway; a 403 would cause Meta to retry
+      return NextResponse.json({ ok: false, error: 'signature_mismatch' }, { status: 200 })
     }
 
     // ── Parse payload ───────────────────────────────────────────────────────

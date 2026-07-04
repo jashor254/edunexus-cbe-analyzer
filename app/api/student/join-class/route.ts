@@ -1,6 +1,12 @@
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
-import { apiSuccess, apiError, apiUnauthorized, apiNotFound } from '@/lib/api/response'
+import { apiSuccess, apiError, apiUnauthorized, apiNotFound, apiBadRequest } from '@/lib/api/response'
+
+const JoinClassSchema = z.object({
+  classCode: z.string().min(1),
+  studentId: z.string().uuid(),
+})
 
 export async function POST(req: Request) {
   try {
@@ -8,12 +14,9 @@ export async function POST(req: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return apiUnauthorized()
 
-    const body = await req.json()
-    const { classCode, studentId } = body
-
-    if (!classCode || !studentId) {
-      return apiError('classCode and studentId are required', 400)
-    }
+    const parsed = JoinClassSchema.safeParse(await req.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'classCode and studentId are required')
+    const { classCode, studentId } = parsed.data
 
     const db = createServiceClient()
 

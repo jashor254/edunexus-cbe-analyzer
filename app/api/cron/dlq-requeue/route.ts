@@ -4,13 +4,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requeueDeadLetterJob, getDeadLetterJobs } from '@/lib/jobs/monitor'
 import { logger } from '@/lib/observability/logger'
+import { timingSafeEqualString } from '@/lib/api/secretCompare'
 
 const MAX_REQUEUE  = 50
 const MAX_AGE_DAYS = 7
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const secret = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (secret !== process.env.CRON_SECRET) {
+  if (!timingSafeEqualString(secret, process.env.CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

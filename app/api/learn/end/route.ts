@@ -1,4 +1,5 @@
 // app/api/learn/end/route.ts
+import { z } from 'zod'
 import { createServiceClient } from '@/utils/supabase/service'
 import { checkFeatureAccess } from '@/lib/payments/access'
 import { type FeatureKey } from '@/lib/payments/config'
@@ -7,6 +8,14 @@ import { afterCompassSession } from '@/lib/eils'
 import { apiSuccess, apiError, apiForbidden, getErrorMessage } from '@/lib/api/response'
 
 const FEATURE: FeatureKey = 'learning_compass'
+
+const EndSessionSchema = z.object({
+  sessionId:       z.string().uuid(),
+  studentId:       z.string().uuid(),
+  status:          z.enum(['completed', 'abandoned']),
+  durationSeconds: z.number().min(0),
+  genuineProgress: z.boolean().optional().default(false),
+})
 
 function calcXp(exchanges: number, completed: boolean, genuineProgress: boolean): number {
   const base     = Math.min(exchanges, 15) * 10
@@ -24,14 +33,6 @@ function getMondayOf(date: Date): string {
   return d.toISOString().slice(0, 10)
 }
 
-type EndSessionBody = {
-  sessionId:       string
-  studentId:       string
-  status:          'completed' | 'abandoned'
-  durationSeconds: number
-  genuineProgress?: boolean
-}
-
 export type EndSessionResult = {
   ended:            boolean
   xpEarned:         number
@@ -44,20 +45,16 @@ export type EndSessionResult = {
 
 export async function POST(req: Request): Promise<Response> {
   try {
+    const parsed = EndSessionSchema.safeParse(await req.json())
+    if (!parsed.success) return apiError(parsed.error.issues[0]?.message ?? 'Invalid input', 400)
+
     const {
       sessionId,
       studentId,
       status,
       durationSeconds,
-      genuineProgress = false,
-    } = await req.json() as EndSessionBody
-
-    if (!sessionId || !studentId)
-      return apiError('sessionId and studentId are required', 400)
-    if (status !== 'completed' && status !== 'abandoned')
-      return apiError('Invalid status', 400)
-    if (typeof durationSeconds !== 'number' || durationSeconds < 0)
-      return apiError('Invalid durationSeconds', 400)
+      genuineProgress,
+    } = parsed.data
 
     const access = await checkFeatureAccess(FEATURE)
     if (access.allowed === false)

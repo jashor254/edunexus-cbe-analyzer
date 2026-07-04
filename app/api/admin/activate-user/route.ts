@@ -1,6 +1,7 @@
 // app/api/admin/activate-user/route.ts
 // Manually activates a user after M-PESA payment confirmation
 
+import { z } from 'zod'
 import { NextRequest } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
@@ -9,6 +10,12 @@ import { ADMIN_CONFIG } from '@/lib/config/api'
 import { SUBSCRIPTION_PLANS, TOKEN_PACK } from '@/lib/payments/config'
 
 type Plan = 'starter' | 'term' | 'family'
+
+const ActivateUserSchema = z.object({
+  email:  z.string().email(),
+  plan:   z.enum(['starter', 'term', 'family']),
+  leadId: z.string().uuid().optional(),
+})
 
 const PLAN_AMOUNTS: Record<Plan, number> = {
   starter: TOKEN_PACK.priceKes,
@@ -37,17 +44,9 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Parse body ────────────────────────────────────────────────────────────
-    const body = await request.json()
-    const { email, plan, leadId } = body as {
-      email: string
-      plan: string
-      leadId?: string
-    }
-
-    if (!email) return apiBadRequest('Missing email')
-    if (!plan || !['starter', 'term', 'family'].includes(plan)) {
-      return apiBadRequest('plan must be starter | term | family')
-    }
+    const parsed = ActivateUserSchema.safeParse(await request.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
+    const { email, plan, leadId } = parsed.data
 
     const typedPlan = plan as Plan
     const service   = createServiceClient()

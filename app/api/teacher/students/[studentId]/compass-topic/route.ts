@@ -32,6 +32,13 @@ export async function PATCH(
 
     const db = createServiceClient()
 
+    const { data: teacher } = await db
+      .from('teachers')
+      .select('id')
+      .eq('user_id', user.id)
+      .single()
+    if (!teacher) return apiForbidden()
+
     // Verify this student belongs to the authenticated teacher
     const { data: student } = await db
       .from('students')
@@ -40,7 +47,7 @@ export async function PATCH(
       .maybeSingle()
 
     if (!student) return apiBadRequest('Student not found')
-    if (student.teacher_id !== user.id) return apiForbidden()
+    if (student.teacher_id !== teacher.id) return apiForbidden()
 
     // Upsert student_learning_context with updated compass_bridge
     const { data: existing } = await db

@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { paystackClient } from '@/lib/payments/paystack'
@@ -5,14 +6,22 @@ import { requireAuth } from '@/lib/api/middleware'
 
 export const dynamic = 'force-dynamic'
 
+const VerifyPaymentSchema = z.object({
+  transactionId: z.string().min(1).optional(),
+  reference:     z.string().min(1).optional(),
+})
+
 export async function POST(request: NextRequest) {
   // 🔐 Auth — always first, always getUser()
   const auth = await requireAuth()
   if ('response' in auth) return auth.response
 
   try {
-    const body = await request.json()
-    const transactionId: string | undefined = body.transactionId ?? body.reference
+    const parsed = VerifyPaymentSchema.safeParse(await request.json())
+    if (!parsed.success) {
+      return NextResponse.json({ success: false, error: 'Transaction ID required' }, { status: 400 })
+    }
+    const transactionId = parsed.data.transactionId ?? parsed.data.reference
 
     if (!transactionId) {
       return NextResponse.json({ success: false, error: 'Transaction ID required' }, { status: 400 })

@@ -1,28 +1,26 @@
 // app/api/early-access/register/route.ts
 // Logs early access interest — no auth required (pre-signup funnel)
 
+import { z } from 'zod'
 import { NextRequest } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiBadRequest } from '@/lib/api/response'
 
 type Plan = 'starter' | 'term' | 'premium'
 
-const VALID_PLANS: Plan[] = ['starter', 'term', 'premium']
+const RegisterSchema = z.object({
+  plan:         z.enum(['starter', 'term', 'premium']),
+  name:         z.string().trim().min(1).optional(),
+  email:        z.string().email().optional(),
+  phone:        z.string().trim().min(1).optional(),
+  studentGrade: z.number().int().optional(),
+})
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { plan, name, email, phone, studentGrade } = body as {
-      plan: string
-      name?: string
-      email?: string
-      phone?: string
-      studentGrade?: number
-    }
-
-    if (!plan || !VALID_PLANS.includes(plan as Plan)) {
-      return apiBadRequest(`plan must be one of: ${VALID_PLANS.join(', ')}`)
-    }
+    const parsed = RegisterSchema.safeParse(await request.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
+    const { plan, name, email, phone, studentGrade } = parsed.data
 
     const service = createServiceClient()
 

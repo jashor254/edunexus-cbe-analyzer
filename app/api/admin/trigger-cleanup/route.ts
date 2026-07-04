@@ -2,11 +2,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { apiUnauthorized } from '@/lib/api/response';
 import { ADMIN_CONFIG } from '@/lib/config/api';
+import { timingSafeEqualString } from '@/lib/api/secretCompare';
 
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   const secret = ADMIN_CONFIG.adminSecret;
-  if (!secret || authHeader !== `Bearer ${secret}`) return apiUnauthorized();
+  if (!secret || !timingSafeEqualString(authHeader, `Bearer ${secret}`)) return apiUnauthorized();
 
   try {
     // Call the cron endpoint manually

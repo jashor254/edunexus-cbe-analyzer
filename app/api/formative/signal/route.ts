@@ -43,6 +43,26 @@ export async function POST(req: Request): Promise<Response> {
     const d   = parsed.data
     const now = new Date().toISOString()
 
+    // Verify this teacher owns the class
+    const { data: cls } = await db
+      .from('teacher_classes')
+      .select('id')
+      .eq('id', d.classId)
+      .eq('teacher_id', teacher.id)
+      .maybeSingle()
+    if (!cls) return apiForbidden()
+
+    // Verify every referenced student belongs to this class
+    const { data: classStudents } = await db
+      .from('class_students')
+      .select('student_id')
+      .eq('class_id', d.classId)
+    const validStudentIds = new Set((classStudents ?? []).map(cs => cs.student_id as string))
+    const allStudentIds = [...d.gotItIds, ...d.confusedIds, ...d.lostIds]
+    if (allStudentIds.some(id => !validStudentIds.has(id))) {
+      return apiForbidden()
+    }
+
     // Save the signal record
     await db.from('formative_signals').insert({
       teacher_id:    teacher.id,

@@ -1,24 +1,30 @@
 // app/api/feedback/route.ts
+import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { requireAuth } from '@/lib/api/middleware'
 import { ADMIN_CONFIG } from '@/lib/config/api'
+import { timingSafeEqualString } from '@/lib/api/secretCompare'
+
+const FeedbackSchema = z.object({
+  trigger:        z.string().optional(),
+  rating:         z.string().optional(),
+  npsScore:       z.number().min(0).max(10).optional(),
+  category:       z.string().optional(),
+  message:        z.string().optional(),
+  wouldRecommend: z.boolean().optional(),
+})
 
 export async function POST(request: NextRequest) {
   const auth = await requireAuth()
   if ('response' in auth) return auth.response
 
   try {
-    const body = await request.json()
-    const { trigger, rating, npsScore, category, message, wouldRecommend } =
-      body as {
-        trigger?: string
-        rating?: string
-        npsScore?: number
-        category?: string
-        message?: string
-        wouldRecommend?: boolean
-      }
+    const parsed = FeedbackSchema.safeParse(await request.json())
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 })
+    }
+    const { trigger, rating, npsScore, category, message, wouldRecommend } = parsed.data
 
     const db = createServiceClient()
 
@@ -55,7 +61,7 @@ export async function POST(request: NextRequest) {
 // GET — admin-only feedback stats dashboard
 export async function GET(request: NextRequest) {
   const adminSecret = request.headers.get('x-admin-secret')
-  if (!adminSecret || adminSecret !== ADMIN_CONFIG.adminSecret) {
+  if (!ADMIN_CONFIG.adminSecret || !timingSafeEqualString(adminSecret, ADMIN_CONFIG.adminSecret)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

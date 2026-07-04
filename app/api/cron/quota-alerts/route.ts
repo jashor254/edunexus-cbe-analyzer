@@ -5,13 +5,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { publishEvent } from '@/lib/events/publish'
 import { logger } from '@/lib/observability/logger'
+import { timingSafeEqualString } from '@/lib/api/secretCompare'
 
 const DAILY_WARN_PCT  = 80   // warn at 80% of daily quota
 const MONTHLY_WARN_PCT = 85  // warn at 85% of monthly quota
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const secret = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (secret !== process.env.CRON_SECRET) {
+  if (!timingSafeEqualString(secret, process.env.CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

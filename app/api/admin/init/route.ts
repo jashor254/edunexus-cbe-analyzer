@@ -4,13 +4,14 @@ import { NextRequest } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
 import { ADMIN_CONFIG } from '@/lib/config/api'
+import { timingSafeEqualString } from '@/lib/api/secretCompare'
 
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')
     const secret = ADMIN_CONFIG.adminSecret
 
-    if (!secret || authHeader !== `Bearer ${secret}`) {
+    if (!secret || !timingSafeEqualString(authHeader, `Bearer ${secret}`)) {
       return apiUnauthorized()
     }
 

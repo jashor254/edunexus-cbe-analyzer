@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { processQueue } from '@/lib/jobs/process'
 import { logger } from '@/lib/observability/logger'
+import { timingSafeEqualString } from '@/lib/api/secretCompare'
 
 // Active queues to process in this cron tick
 const QUEUES = [
@@ -19,7 +20,7 @@ const QUEUES = [
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!timingSafeEqualString(authHeader, `Bearer ${process.env.CRON_SECRET}`)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

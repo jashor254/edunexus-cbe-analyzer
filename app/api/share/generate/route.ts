@@ -1,6 +1,12 @@
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
+
+const ShareGenerateSchema = z.object({
+  studentId:  z.string().uuid(),
+  reportData: z.record(z.string(), z.unknown()),
+})
 
 export async function POST(req: Request) {
   try {
@@ -10,10 +16,9 @@ export async function POST(req: Request) {
       return apiUnauthorized()
     }
 
-    const { studentId, reportData } = await req.json()
-    if (!studentId || !reportData) {
-      return apiBadRequest('Missing studentId or reportData')
-    }
+    const parsed = ShareGenerateSchema.safeParse(await req.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Missing studentId or reportData')
+    const { studentId, reportData } = parsed.data
 
     const db = createServiceClient()
 

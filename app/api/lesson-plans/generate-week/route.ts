@@ -1,4 +1,5 @@
 // POST: Manually trigger lesson plan generation for a specific week
+import { z } from 'zod'
 import { createServiceClient } from '@/utils/supabase/service'
 import { checkFeatureAccess } from '@/lib/payments/access'
 import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
@@ -12,6 +13,11 @@ import {
 import { generateSpecificWeekPlans } from '@/lib/lessonPlan/weeklyGenerator'
 
 const FEATURE: FeatureKey = 'lesson_plan_generate'
+
+const GenerateWeekSchema = z.object({
+  sowId:      z.string().uuid(),
+  weekNumber: z.number().int().min(1).max(52),
+})
 
 export async function POST(req: Request) {
   try {
@@ -34,8 +40,9 @@ export async function POST(req: Request) {
       .single()
     if (!teacher) return apiForbidden()
 
-    const { sowId, weekNumber } = await req.json()
-    if (!sowId || !weekNumber) return apiBadRequest('sowId and weekNumber required')
+    const parsed = GenerateWeekSchema.safeParse(await req.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'sowId and weekNumber required')
+    const { sowId, weekNumber } = parsed.data
 
     // Verify teacher owns this SOW
     const { data: sow } = await db

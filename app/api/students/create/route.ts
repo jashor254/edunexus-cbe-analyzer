@@ -1,7 +1,17 @@
 // app/api/students/create/route.ts
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
+
+const CreateStudentSchema = z.object({
+  name:              z.string().trim().min(1),
+  grade:             z.coerce.number().int().min(7).max(12),
+  school:            z.string().trim().optional(),
+  curriculum_type:   z.enum(['cbc', 'igcse', 'ib', 'other']).optional(),
+  current_pathway:   z.enum(['STEM', 'Social Sciences', 'Arts & Sports Science']).optional(),
+  selected_subjects: z.array(z.string()).optional(),
+})
 
 const PLAN_LIMITS: Record<string, number> = {
   free:    1,
@@ -18,15 +28,12 @@ export async function POST(request: Request) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) return apiUnauthorized()
 
-    const body = await request.json()
-    const { name, grade, school, curriculum_type, current_pathway, selected_subjects } = body
+    const parsed = CreateStudentSchema.safeParse(await request.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
+    const { name, grade, school, curriculum_type, current_pathway, selected_subjects } = parsed.data
 
-    if (!name?.trim()) return apiBadRequest('Name is required')
-    const gradeNum = Number(grade)
-    if (!gradeNum || gradeNum < 7 || gradeNum > 12) return apiBadRequest('Grade must be between 7 and 12')
-
-    const validCurriculumTypes = ['cbc', 'igcse', 'ib', 'other']
-    const curriculumType = validCurriculumTypes.includes(curriculum_type) ? curriculum_type : 'cbc'
+    const gradeNum = grade
+    const curriculumType = curriculum_type ?? 'cbc'
 
     const service = createServiceClient()
 

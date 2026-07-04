@@ -1,11 +1,17 @@
 // app/api/payments/mobile-init/route.ts
 // Mobile (M-PESA) Paystack transaction initializer.
 // Amount is ALWAYS derived server-side from productId — never trusted from client.
+import { z } from 'zod'
 import { NextRequest } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiBadRequest } from '@/lib/api/response'
 import { requireAuth } from '@/lib/api/middleware'
 import { SUBSCRIPTION_PLANS, TOKEN_PACK } from '@/lib/payments/config'
+
+const MobileInitSchema = z.object({
+  phone:     z.string().min(1),
+  productId: z.string().min(1),
+})
 
 const PRODUCTS: Record<string, { price: number; type: string; label: string; tokens?: number }> = {
   starter: { price: TOKEN_PACK.priceKes,                        type: 'token',        label: 'Pay-As-You-Go', tokens: TOKEN_PACK.tokens },
@@ -18,11 +24,9 @@ export async function POST(req: NextRequest) {
   if ('response' in auth) return auth.response
 
   try {
-    const body = await req.json()
-    const { phone, productId } = body as { phone?: string; productId?: string }
-
-    if (!productId) return apiBadRequest('productId is required')
-    if (!phone)     return apiBadRequest('phone is required')
+    const parsed = MobileInitSchema.safeParse(await req.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'phone and productId are required')
+    const { phone, productId } = parsed.data
 
     // 🔒 Server-side price lookup — client-supplied amount is never used
     const product = PRODUCTS[productId]
