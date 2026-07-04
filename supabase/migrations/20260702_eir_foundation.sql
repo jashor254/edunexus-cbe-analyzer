@@ -141,6 +141,8 @@ CREATE INDEX IF NOT EXISTS idx_eir_intervention_subject_grade
   ON eir_intervention_effectiveness (subject, grade, intervention_type);
 CREATE INDEX IF NOT EXISTS idx_eir_intervention_school
   ON eir_intervention_effectiveness (school_id);
+CREATE INDEX IF NOT EXISTS idx_eir_intervention_teacher
+  ON eir_intervention_effectiveness (teacher_id);
 
 ALTER TABLE eir_intervention_effectiveness ENABLE ROW LEVEL SECURITY;
 CREATE POLICY eir_intervention_effectiveness_service ON eir_intervention_effectiveness

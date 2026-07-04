@@ -27,7 +27,7 @@ export async function discoverKGImprovements(
   // ── 1. Learning Bottlenecks ────────────────────────────────────────────────
   // Substrands where 40%+ of students are stuck at level 1 or 2.
   const { data: knowledgeRows } = await db
-    .from('learner_model_profiles')
+    .from('learner_profiles')
     .select('knowledge_state, student_id')
     .not('knowledge_state', 'is', null)
     .limit(500)
@@ -89,7 +89,7 @@ export async function discoverKGImprovements(
   // Simplified: look for substrands that co-occur in confirmed_gaps lists.
 
   const { data: gapRows } = await db
-    .from('learner_model_profiles')
+    .from('learner_profiles')
     .select('confirmed_gaps, student_id')
     .not('confirmed_gaps', 'is', null)
     .limit(500)

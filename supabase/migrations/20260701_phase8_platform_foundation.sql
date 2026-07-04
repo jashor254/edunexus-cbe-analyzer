@@ -39,14 +39,20 @@
 -- PHASE 8.1 — MULTI-TENANCY
 -- ─────────────────────────────────────────────────────────────────────────────
 
-CREATE TYPE org_type AS ENUM (
-  'school', 'district', 'county', 'ministry',
-  'publisher', 'university', 'ngo', 'developer'
-);
+DO $$ BEGIN
+  CREATE TYPE org_type AS ENUM (
+    'school', 'district', 'county', 'ministry',
+    'publisher', 'university', 'ngo', 'developer'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE TYPE org_status AS ENUM (
-  'active', 'trial', 'suspended', 'churned', 'pending_verification'
-);
+DO $$ BEGIN
+  CREATE TYPE org_status AS ENUM (
+    'active', 'trial', 'suspended', 'churned', 'pending_verification'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS organizations (
   id                  uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -80,32 +86,126 @@ CREATE INDEX IF NOT EXISTS idx_organizations_parent_id ON organizations (parent_
 CREATE INDEX IF NOT EXISTS idx_organizations_status    ON organizations (status);
 CREATE INDEX IF NOT EXISTS idx_organizations_slug      ON organizations (slug);
 
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- PHASE 8.2 — ORGANIZATION IAM
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- ── 8.2.2  MEMBERS ───────────────────────────────────────────────────────────
+-- Created before organizations'/organization_roles' RLS policies below, since
+-- those policies query organization_members in an EXISTS(...) subquery —
+-- Postgres resolves those table references at CREATE POLICY time, so the
+-- table must already exist.
+
+DO $$ BEGIN
+  CREATE TYPE member_status AS ENUM ('active', 'suspended', 'removed');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS organization_members (
+  id              uuid          PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id uuid          NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  user_id         uuid          NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  role            text          NOT NULL DEFAULT 'member',
+  status          member_status NOT NULL DEFAULT 'active',
+  invited_by      uuid          REFERENCES auth.users(id),
+  joined_at       timestamptz,
+  last_active_at  timestamptz,
+  metadata        jsonb         NOT NULL DEFAULT '{}',
+  created_at      timestamptz   NOT NULL DEFAULT now(),
+  updated_at      timestamptz   NOT NULL DEFAULT now(),
+  UNIQUE (organization_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_org_members_organization_id ON organization_members (organization_id);
+CREATE INDEX IF NOT EXISTS idx_org_members_user_id         ON organization_members (user_id);
+CREATE INDEX IF NOT EXISTS idx_org_members_role            ON organization_members (role);
+CREATE INDEX IF NOT EXISTS idx_org_members_status          ON organization_members (status);
+
+-- ── Membership-check helper functions ────────────────────────────────────────
+-- SECURITY DEFINER + owned by the migration-executing role (postgres, which
+-- has BYPASSRLS in Supabase) so the internal query against
+-- organization_members skips RLS entirely. Without this, any policy that
+-- checks membership via a subquery on organization_members recurses into
+-- organization_members' own RLS policies infinitely — including policies
+-- defined on OTHER tables, since resolving their subquery still requires
+-- evaluating organization_members' RLS.
+CREATE OR REPLACE FUNCTION public.is_org_member(check_org_id uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM organization_members
+    WHERE organization_id = check_org_id
+      AND user_id = auth.uid()
+      AND status = 'active'
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_org_role(check_org_id uuid, allowed_roles text[])
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM organization_members
+    WHERE organization_id = check_org_id
+      AND user_id = auth.uid()
+      AND status = 'active'
+      AND role = ANY(allowed_roles)
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_org_admin(check_org_id uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
+  SELECT is_org_role(check_org_id, ARRAY['owner', 'admin']);
+$$;
+
+ALTER TABLE organization_members ENABLE ROW LEVEL SECURITY;
+
+-- Members see their own record + fellow members in the same org
+DROP POLICY IF EXISTS "org_members_self_read" ON organization_members;
+CREATE POLICY "org_members_self_read"
+  ON organization_members FOR SELECT
+  USING (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "org_members_peer_read" ON organization_members;
+CREATE POLICY "org_members_peer_read"
+  ON organization_members FOR SELECT
+  USING (is_org_member(organization_id));
+
+-- Owners/admins can manage members
+DROP POLICY IF EXISTS "org_members_admin_manage" ON organization_members;
+CREATE POLICY "org_members_admin_manage"
+  ON organization_members FOR ALL
+  USING (is_org_admin(organization_id));
+
+
+-- ── organizations RLS (needs organization_members, created above) ───────────
+
 ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
 
 -- Members can see their own org(s)
+DROP POLICY IF EXISTS "organizations_member_read" ON organizations;
 CREATE POLICY "organizations_member_read"
   ON organizations FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM organization_members om
-      WHERE om.organization_id = organizations.id
-        AND om.user_id = auth.uid()
-        AND om.status = 'active'
-    )
-  );
+  USING (is_org_member(id));
 
 -- Only owners/admins can update
+DROP POLICY IF EXISTS "organizations_admin_update" ON organizations;
 CREATE POLICY "organizations_admin_update"
   ON organizations FOR UPDATE
-  USING (
-    EXISTS (
-      SELECT 1 FROM organization_members om
-      WHERE om.organization_id = organizations.id
-        AND om.user_id = auth.uid()
-        AND om.role IN ('owner', 'admin')
-        AND om.status = 'active'
-    )
-  );
+  USING (is_org_admin(id));
 
 -- Link existing schools to organizations
 ALTER TABLE schools
@@ -113,10 +213,6 @@ ALTER TABLE schools
 
 CREATE INDEX IF NOT EXISTS idx_schools_organization_id ON schools (organization_id);
 
-
--- ─────────────────────────────────────────────────────────────────────────────
--- PHASE 8.2 — ORGANIZATION IAM
--- ─────────────────────────────────────────────────────────────────────────────
 
 -- ── 8.2.1  CUSTOM ROLES ──────────────────────────────────────────────────────
 -- organization_id = NULL means it's a system-defined role available to all orgs.
@@ -139,29 +235,18 @@ CREATE INDEX IF NOT EXISTS idx_org_roles_is_system       ON organization_roles (
 
 ALTER TABLE organization_roles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "org_roles_member_read" ON organization_roles;
 CREATE POLICY "org_roles_member_read"
   ON organization_roles FOR SELECT
   USING (
-    is_system = true OR
-    EXISTS (
-      SELECT 1 FROM organization_members om
-      WHERE om.organization_id = organization_roles.organization_id
-        AND om.user_id = auth.uid()
-        AND om.status = 'active'
-    )
+    is_system = true OR is_org_member(organization_id)
   );
 
+DROP POLICY IF EXISTS "org_roles_admin_manage" ON organization_roles;
 CREATE POLICY "org_roles_admin_manage"
   ON organization_roles FOR ALL
   USING (
-    NOT is_system AND
-    EXISTS (
-      SELECT 1 FROM organization_members om
-      WHERE om.organization_id = organization_roles.organization_id
-        AND om.user_id = auth.uid()
-        AND om.role IN ('owner', 'admin')
-        AND om.status = 'active'
-    )
+    NOT is_system AND is_org_admin(organization_id)
   );
 
 -- Seed system roles (runs once; UNIQUE constraint prevents duplicates)
@@ -195,65 +280,12 @@ INSERT INTO organization_roles (organization_id, name, description, is_system, p
 ON CONFLICT (organization_id, name) DO NOTHING;
 
 
--- ── 8.2.2  MEMBERS ───────────────────────────────────────────────────────────
-
-CREATE TYPE member_status AS ENUM ('active', 'suspended', 'removed');
-
-CREATE TABLE IF NOT EXISTS organization_members (
-  id              uuid          PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id uuid          NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  user_id         uuid          NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  role            text          NOT NULL DEFAULT 'member',
-  status          member_status NOT NULL DEFAULT 'active',
-  invited_by      uuid          REFERENCES auth.users(id),
-  joined_at       timestamptz,
-  last_active_at  timestamptz,
-  metadata        jsonb         NOT NULL DEFAULT '{}',
-  created_at      timestamptz   NOT NULL DEFAULT now(),
-  updated_at      timestamptz   NOT NULL DEFAULT now(),
-  UNIQUE (organization_id, user_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_org_members_organization_id ON organization_members (organization_id);
-CREATE INDEX IF NOT EXISTS idx_org_members_user_id         ON organization_members (user_id);
-CREATE INDEX IF NOT EXISTS idx_org_members_role            ON organization_members (role);
-CREATE INDEX IF NOT EXISTS idx_org_members_status          ON organization_members (status);
-
-ALTER TABLE organization_members ENABLE ROW LEVEL SECURITY;
-
--- Members see their own record + fellow members in the same org
-CREATE POLICY "org_members_self_read"
-  ON organization_members FOR SELECT
-  USING (user_id = auth.uid());
-
-CREATE POLICY "org_members_peer_read"
-  ON organization_members FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM organization_members om
-      WHERE om.organization_id = organization_members.organization_id
-        AND om.user_id = auth.uid()
-        AND om.status = 'active'
-    )
-  );
-
--- Owners/admins can manage members
-CREATE POLICY "org_members_admin_manage"
-  ON organization_members FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM organization_members om
-      WHERE om.organization_id = organization_members.organization_id
-        AND om.user_id = auth.uid()
-        AND om.role IN ('owner', 'admin')
-        AND om.status = 'active'
-    )
-  );
-
-
 -- ── 8.2.3  INVITATIONS ───────────────────────────────────────────────────────
 
-CREATE TYPE invitation_status AS ENUM ('pending', 'accepted', 'expired', 'revoked');
+DO $$ BEGIN
+  CREATE TYPE invitation_status AS ENUM ('pending', 'accepted', 'expired', 'revoked');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS organization_invitations (
   id              uuid              PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -279,29 +311,15 @@ CREATE INDEX IF NOT EXISTS idx_invitations_status          ON organization_invit
 ALTER TABLE organization_invitations ENABLE ROW LEVEL SECURITY;
 
 -- Admins see all invitations for their org
+DROP POLICY IF EXISTS "invitations_admin_read" ON organization_invitations;
 CREATE POLICY "invitations_admin_read"
   ON organization_invitations FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM organization_members om
-      WHERE om.organization_id = organization_invitations.organization_id
-        AND om.user_id = auth.uid()
-        AND om.role IN ('owner', 'admin')
-        AND om.status = 'active'
-    )
-  );
+  USING (is_org_admin(organization_id));
 
+DROP POLICY IF EXISTS "invitations_admin_manage" ON organization_invitations;
 CREATE POLICY "invitations_admin_manage"
   ON organization_invitations FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM organization_members om
-      WHERE om.organization_id = organization_invitations.organization_id
-        AND om.user_id = auth.uid()
-        AND om.role IN ('owner', 'admin')
-        AND om.status = 'active'
-    )
-  );
+  USING (is_org_admin(organization_id));
 
 
 -- ── 8.2.4  AUDIT LOGS ────────────────────────────────────────────────────────
@@ -331,17 +349,10 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at      ON audit_logs (created
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- Members with audit:read permission can view (enforced in app layer via role check)
+DROP POLICY IF EXISTS "audit_logs_admin_read" ON audit_logs;
 CREATE POLICY "audit_logs_admin_read"
   ON audit_logs FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM organization_members om
-      WHERE om.organization_id = audit_logs.organization_id
-        AND om.user_id = auth.uid()
-        AND om.role IN ('owner', 'admin')
-        AND om.status = 'active'
-    )
-  );
+  USING (is_org_admin(organization_id));
 
 -- Only service role can insert (app layer writes audit entries)
 -- No DELETE policy — audit logs are immutable
@@ -349,7 +360,10 @@ CREATE POLICY "audit_logs_admin_read"
 
 -- ── 8.2.5  API KEYS ──────────────────────────────────────────────────────────
 
-CREATE TYPE api_key_status AS ENUM ('active', 'revoked', 'expired');
+DO $$ BEGIN
+  CREATE TYPE api_key_status AS ENUM ('active', 'revoked', 'expired');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS api_keys (
   id              uuid           PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -375,28 +389,15 @@ CREATE INDEX IF NOT EXISTS idx_api_keys_status          ON api_keys (status);
 
 ALTER TABLE api_keys ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "api_keys_member_read" ON api_keys;
 CREATE POLICY "api_keys_member_read"
   ON api_keys FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM organization_members om
-      WHERE om.organization_id = api_keys.organization_id
-        AND om.user_id = auth.uid()
-        AND om.status = 'active'
-    )
-  );
+  USING (is_org_member(organization_id));
 
+DROP POLICY IF EXISTS "api_keys_developer_manage" ON api_keys;
 CREATE POLICY "api_keys_developer_manage"
   ON api_keys FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM organization_members om
-      WHERE om.organization_id = api_keys.organization_id
-        AND om.user_id = auth.uid()
-        AND om.role IN ('owner', 'admin', 'developer')
-        AND om.status = 'active'
-    )
-  );
+  USING (is_org_role(organization_id, ARRAY['owner', 'admin', 'developer']));
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -452,21 +453,32 @@ VALUES
 ON CONFLICT (name) DO NOTHING;
 
 ALTER TABLE subscription_plans ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "subscription_plans_public_read" ON subscription_plans;
 CREATE POLICY "subscription_plans_public_read"
   ON subscription_plans FOR SELECT USING (is_active = true);
 
 
 -- ── 8.3.2  ORGANIZATION SUBSCRIPTIONS ────────────────────────────────────────
+-- Named org_subscription_status, NOT subscription_status — production already
+-- has an orphaned "subscription_status" enum (different values: active/expired/
+-- cancelled, from an earlier, unrelated refactor; zero columns reference it
+-- today, but the type object itself still exists and CREATE TYPE has no
+-- IF NOT EXISTS in any Postgres version, so reusing the name would abort
+-- this migration). Renaming avoids the collision without touching the
+-- orphaned type or anything that might reference it.
 
-CREATE TYPE subscription_status AS ENUM (
-  'trialing', 'active', 'past_due', 'canceled', 'unpaid'
-);
+DO $$ BEGIN
+  CREATE TYPE org_subscription_status AS ENUM (
+    'trialing', 'active', 'past_due', 'canceled', 'unpaid'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS organization_subscriptions (
   id                  uuid                PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id     uuid                NOT NULL UNIQUE REFERENCES organizations(id) ON DELETE CASCADE,
   plan_id             uuid                NOT NULL REFERENCES subscription_plans(id),
-  status              subscription_status NOT NULL DEFAULT 'trialing',
+  status              org_subscription_status NOT NULL DEFAULT 'trialing',
   current_period_start timestamptz        NOT NULL DEFAULT now(),
   current_period_end  timestamptz         NOT NULL DEFAULT (now() + interval '30 days'),
   trial_end           timestamptz,
@@ -484,16 +496,10 @@ CREATE INDEX IF NOT EXISTS idx_org_subs_status          ON organization_subscrip
 
 ALTER TABLE organization_subscriptions ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "org_subs_admin_read" ON organization_subscriptions;
 CREATE POLICY "org_subs_admin_read"
   ON organization_subscriptions FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM organization_members om
-      WHERE om.organization_id = organization_subscriptions.organization_id
-        AND om.user_id = auth.uid()
-        AND om.status = 'active'
-    )
-  );
+  USING (is_org_member(organization_id));
 
 
 -- ── 8.3.3  USAGE EVENTS (metering) ───────────────────────────────────────────
@@ -518,22 +524,18 @@ CREATE INDEX IF NOT EXISTS idx_usage_events_recorded_at     ON usage_events (rec
 
 -- Usage events are write-only for users; reads via aggregation views
 ALTER TABLE usage_events ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "usage_events_admin_read" ON usage_events;
 CREATE POLICY "usage_events_admin_read"
   ON usage_events FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM organization_members om
-      WHERE om.organization_id = usage_events.organization_id
-        AND om.user_id = auth.uid()
-        AND om.role IN ('owner', 'admin', 'billing_admin')
-        AND om.status = 'active'
-    )
-  );
+  USING (is_org_role(organization_id, ARRAY['owner', 'admin', 'billing_admin']));
 
 
 -- ── 8.3.4  INVOICES ──────────────────────────────────────────────────────────
 
-CREATE TYPE invoice_status AS ENUM ('draft', 'open', 'paid', 'void', 'uncollectible');
+DO $$ BEGIN
+  CREATE TYPE invoice_status AS ENUM ('draft', 'open', 'paid', 'void', 'uncollectible');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS invoices (
   id                  uuid           PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -560,17 +562,10 @@ CREATE INDEX IF NOT EXISTS idx_invoices_status          ON invoices (status);
 CREATE INDEX IF NOT EXISTS idx_invoices_created_at      ON invoices (created_at DESC);
 
 ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "invoices_billing_read" ON invoices;
 CREATE POLICY "invoices_billing_read"
   ON invoices FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM organization_members om
-      WHERE om.organization_id = invoices.organization_id
-        AND om.user_id = auth.uid()
-        AND om.role IN ('owner', 'admin', 'billing_admin')
-        AND om.status = 'active'
-    )
-  );
+  USING (is_org_role(organization_id, ARRAY['owner', 'admin', 'billing_admin']));
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -602,22 +597,18 @@ CREATE INDEX IF NOT EXISTS idx_platform_events_published_at    ON platform_event
 COMMENT ON TABLE platform_events IS 'append-only; candidate for pg_partman time partitioning at scale';
 
 ALTER TABLE platform_events ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "platform_events_admin_read" ON platform_events;
 CREATE POLICY "platform_events_admin_read"
   ON platform_events FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM organization_members om
-      WHERE om.organization_id = platform_events.organization_id
-        AND om.user_id = auth.uid()
-        AND om.role IN ('owner', 'admin')
-        AND om.status = 'active'
-    )
-  );
+  USING (is_org_admin(organization_id));
 
 
 -- ── 8.4.2  EVENT SUBSCRIPTIONS ───────────────────────────────────────────────
 
-CREATE TYPE sub_delivery_method AS ENUM ('webhook', 'internal', 'email', 'whatsapp');
+DO $$ BEGIN
+  CREATE TYPE sub_delivery_method AS ENUM ('webhook', 'internal', 'email', 'whatsapp');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS event_subscriptions (
   id              uuid                PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -626,6 +617,8 @@ CREATE TABLE IF NOT EXISTS event_subscriptions (
   delivery_method sub_delivery_method NOT NULL DEFAULT 'webhook',
   endpoint_url    text,               -- for webhook delivery
   handler_name    text,               -- for internal delivery (maps to lib/events/handlers/)
+  signing_secret  text,               -- HMAC-SHA256 key for webhook deliveries; generated at
+                                      -- subscription-creation time, never displayed again after
   is_active       boolean             NOT NULL DEFAULT true,
   -- Retry policy
   max_retries     int                 NOT NULL DEFAULT 3,
@@ -641,24 +634,20 @@ CREATE INDEX IF NOT EXISTS idx_event_subs_event_pattern   ON event_subscriptions
 CREATE INDEX IF NOT EXISTS idx_event_subs_is_active       ON event_subscriptions (is_active) WHERE is_active = true;
 
 ALTER TABLE event_subscriptions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "event_subs_admin_manage" ON event_subscriptions;
 CREATE POLICY "event_subs_admin_manage"
   ON event_subscriptions FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM organization_members om
-      WHERE om.organization_id = event_subscriptions.organization_id
-        AND om.user_id = auth.uid()
-        AND om.role IN ('owner', 'admin', 'developer')
-        AND om.status = 'active'
-    )
-  );
+  USING (is_org_role(organization_id, ARRAY['owner', 'admin', 'developer']));
 
 
 -- ── 8.4.3  EVENT DELIVERIES (DLQ + retries) ──────────────────────────────────
 
-CREATE TYPE delivery_status AS ENUM (
-  'pending', 'processing', 'delivered', 'failed', 'dead_letter'
-);
+DO $$ BEGIN
+  CREATE TYPE delivery_status AS ENUM (
+    'pending', 'processing', 'delivered', 'failed', 'dead_letter'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS event_deliveries (
   id                  uuid            PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -684,18 +673,58 @@ CREATE INDEX IF NOT EXISTS idx_event_deliveries_next_attempt    ON event_deliver
 
 ALTER TABLE event_deliveries ENABLE ROW LEVEL SECURITY;
 -- Only service role processes deliveries; admins can read for debugging
+DROP POLICY IF EXISTS "event_deliveries_admin_read" ON event_deliveries;
 CREATE POLICY "event_deliveries_admin_read"
   ON event_deliveries FOR SELECT
   USING (
     EXISTS (
       SELECT 1 FROM event_subscriptions es
-      JOIN organization_members om ON om.organization_id = es.organization_id
       WHERE es.id = event_deliveries.subscription_id
-        AND om.user_id = auth.uid()
-        AND om.role IN ('owner', 'admin', 'developer')
-        AND om.status = 'active'
+        AND is_org_role(es.organization_id, ARRAY['owner', 'admin', 'developer'])
     )
   );
+
+-- Atomically claims a batch of due deliveries by marking them 'processing'
+-- and returning exactly the rows this call claimed. SELECT ... FOR UPDATE
+-- SKIP LOCKED means two concurrent callers (e.g. overlapping cron
+-- invocations) can never claim the same row — the loser skips locked rows
+-- and simply claims fewer or none, instead of both processing the same
+-- delivery. This replaces a separate SELECT-then-UPDATE pair, which left a
+-- window where both could read the same 'pending' rows before either had
+-- committed its status update.
+CREATE OR REPLACE FUNCTION public.claim_pending_deliveries(batch_size int DEFAULT 50)
+RETURNS SETOF event_deliveries
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  UPDATE event_deliveries
+  SET status = 'processing', last_attempted_at = now()
+  WHERE id IN (
+    SELECT id FROM event_deliveries
+    WHERE status IN ('pending', 'failed') AND next_attempt_at <= now()
+    ORDER BY next_attempt_at
+    LIMIT batch_size
+    FOR UPDATE SKIP LOCKED
+  )
+  RETURNING *;
+$$;
+
+-- CRITICAL: without this, the function inherits Postgres/Supabase's default
+-- EXECUTE grant to anon AND authenticated (confirmed via pg_default_acl —
+-- every new function gets this by default). Since this function is
+-- SECURITY DEFINER and mutates event_deliveries with no tenant-scoping
+-- parameter, an unauthenticated caller with only the public anon key could
+-- call it directly via POST /rest/v1/rpc/claim_pending_deliveries and claim
+-- (lock into 'processing') every pending webhook delivery platform-wide —
+-- a trivial, repeatable, zero-auth denial-of-service against webhook
+-- delivery for every organization, plus incidental disclosure of
+-- event_id/subscription_id UUIDs. Proven via an actual anonymous HTTP call
+-- against a local instance before this fix, and confirmed blocked after it.
+-- The only legitimate caller is dispatch.ts's cron route, which always uses
+-- the service-role client — never exposed to any browser/client context.
+REVOKE EXECUTE ON FUNCTION public.claim_pending_deliveries(int) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_pending_deliveries(int) TO service_role;
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -727,12 +756,22 @@ INSERT INTO job_queues (name, description, concurrency, max_retries, timeout_ms)
   ('webhook.deliver',     'Outbound webhook delivery',                         10, 5, 10000)
 ON CONFLICT (name) DO NOTHING;
 
+-- Operational config, not tenant data — read/managed only by backend job
+-- processing via the service-role client, which bypasses RLS regardless.
+-- No policies: default-deny for anon/authenticated (Supabase grants full
+-- CRUD to those roles on every new table by default, so RLS must be
+-- enabled even with zero end-user access needed).
+ALTER TABLE job_queues ENABLE ROW LEVEL SECURITY;
+
 
 -- ── 8.5.2  JOBS ──────────────────────────────────────────────────────────────
 
-CREATE TYPE job_status AS ENUM (
-  'queued', 'processing', 'completed', 'failed', 'canceled', 'dead_letter'
-);
+DO $$ BEGIN
+  CREATE TYPE job_status AS ENUM (
+    'queued', 'processing', 'completed', 'failed', 'canceled', 'dead_letter'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS jobs (
   id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -765,21 +804,15 @@ CREATE INDEX IF NOT EXISTS idx_jobs_scheduled_at    ON jobs (scheduled_at) WHERE
 
 ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "jobs_user_read" ON jobs;
 CREATE POLICY "jobs_user_read"
   ON jobs FOR SELECT
   USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "jobs_admin_read" ON jobs;
 CREATE POLICY "jobs_admin_read"
   ON jobs FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM organization_members om
-      WHERE om.organization_id = jobs.organization_id
-        AND om.user_id = auth.uid()
-        AND om.role IN ('owner', 'admin')
-        AND om.status = 'active'
-    )
-  );
+  USING (is_org_admin(organization_id));
 
 
 -- ── 8.5.3  JOB LOGS ──────────────────────────────────────────────────────────
@@ -798,6 +831,7 @@ CREATE INDEX IF NOT EXISTS idx_job_logs_job_id     ON job_logs (job_id);
 CREATE INDEX IF NOT EXISTS idx_job_logs_created_at ON job_logs (created_at DESC);
 
 ALTER TABLE job_logs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "job_logs_user_read" ON job_logs;
 CREATE POLICY "job_logs_user_read"
   ON job_logs FOR SELECT
   USING (
@@ -813,8 +847,15 @@ CREATE POLICY "job_logs_user_read"
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- Auto-update updated_at on all new tables
-CREATE OR REPLACE FUNCTION set_updated_at()
-RETURNS trigger LANGUAGE plpgsql AS $$
+-- NOTE: public.set_updated_at() already exists in production (added by the
+-- 2026-07-02 security hardening migrations) with SET search_path TO 'public',
+-- and 5 live Developer Portal tables (developer_api_keys, developer_profiles,
+-- developer_projects, developer_usage_daily, developer_webhooks) depend on it
+-- via trigger. This definition must match that hardened version exactly —
+-- omitting SET search_path here would silently strip that hardening from
+-- those 5 unrelated tables the moment this CREATE OR REPLACE runs.
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS trigger LANGUAGE plpgsql SET search_path TO 'public' AS $$
 BEGIN
   NEW.updated_at = now();
   RETURN NEW;

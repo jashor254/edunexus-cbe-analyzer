@@ -3,6 +3,7 @@
 // Auth session logic (createClient / cookie reads) stays in lib/payments/access.ts.
 
 import { BaseRepository } from './base'
+import { timedQuery } from '@/lib/observability/queryTiming'
 import type { SubscriptionPlan, OrganizationSubscription, Invoice, UsageSummary } from '@/lib/billing/types'
 
 // ── Column constants ──────────────────────────────────────────────────────────
@@ -11,10 +12,10 @@ const PLAN_COLS =
   'id, name, display_name, description, price_monthly_kes, price_annual_kes, api_quota_daily, api_quota_monthly, ai_token_quota, max_members, max_schools, features, paystack_plan_code, is_active, sort_order, created_at, updated_at'
 
 const SUBSCRIPTION_COLS =
-  'id, organization_id, plan_id, status, current_period_start, current_period_end, trial_ends_at, canceled_at, paystack_subscription_code, paystack_customer_code, metadata, created_at, updated_at'
+  'id, organization_id, plan_id, status, current_period_start, current_period_end, trial_end, canceled_at, external_id, metadata, created_at, updated_at'
 
 const INVOICE_COLS =
-  'id, organization_id, subscription_id, invoice_number, status, amount_kes, currency, period_start, period_end, paid_at, paystack_reference, line_items, metadata, created_at, updated_at'
+  'id, organization_id, subscription_id, status, amount_kes, tax_kes, total_kes, currency, period_start, period_end, due_date, paid_at, external_id, line_items, metadata, created_at, updated_at'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -34,10 +35,9 @@ type SubscriptionWithPlan = {
     status: string
     current_period_start: string
     current_period_end: string | null
-    trial_ends_at: string | null
+    trial_end: string | null
     canceled_at: string | null
-    paystack_subscription_code: string | null
-    paystack_customer_code: string | null
+    external_id: string | null
     metadata: Record<string, unknown>
     created_at: string
     updated_at: string
@@ -53,13 +53,15 @@ export class BillingRepository extends BaseRepository {
    * Used by access.ts to determine teacher/admin tier without a full profile load.
    */
   async findProfileRole(userId: string): Promise<ProfileRole | null> {
-    const { data } = await this.db
-      .from('profiles')
-      .select('role, secondary_role')
-      .eq('id', userId)
-      .maybeSingle()
+    return timedQuery('profiles', 'findProfileRole', async () => {
+      const { data } = await this.db
+        .from('profiles')
+        .select('role, secondary_role')
+        .eq('id', userId)
+        .maybeSingle()
 
-    return data ?? null
+      return data ?? null
+    })
   }
 
   /**
@@ -67,28 +69,32 @@ export class BillingRepository extends BaseRepository {
    * Used by the legacy subscriptions table (cookie-auth path in access.ts).
    */
   async findActiveSubscription(userId: string): Promise<{ id: string } | null> {
-    const { data } = await this.db
-      .from('subscriptions')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('status', 'active')
-      .gt('expires_at', new Date().toISOString())
-      .maybeSingle()
+    return timedQuery('subscriptions', 'findActiveSubscription', async () => {
+      const { data } = await this.db
+        .from('subscriptions')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle()
 
-    return data ?? null
+      return data ?? null
+    })
   }
 
   /**
    * Fetch a user's token balance.
    */
   async findTokenBalance(userId: string): Promise<{ balance: number } | null> {
-    const { data } = await this.db
-      .from('token_balances')
-      .select('balance')
-      .eq('user_id', userId)
-      .maybeSingle()
+    return timedQuery('token_balances', 'findTokenBalance', async () => {
+      const { data } = await this.db
+        .from('token_balances')
+        .select('balance')
+        .eq('user_id', userId)
+        .maybeSingle()
 
-    return data ?? null
+      return data ?? null
+    })
   }
 
   /**
@@ -101,13 +107,15 @@ export class BillingRepository extends BaseRepository {
     tokens: number,
     metadata: Record<string, unknown>
   ): Promise<void> {
-    const { error } = await this.db.rpc('deduct_tokens', {
-      p_user_id:  userId,
-      p_action:   action,
-      p_tokens:   tokens,
-      p_metadata: metadata,
+    return timedQuery('token_balances', 'deductTokens', async () => {
+      const { error } = await this.db.rpc('deduct_tokens', {
+        p_user_id:  userId,
+        p_action:   action,
+        p_tokens:   tokens,
+        p_metadata: metadata,
+      })
+      if (error) throw new Error(`Token deduction failed: ${error.message}`)
     })
-    if (error) throw new Error(`Token deduction failed: ${error.message}`)
   }
 
   /**
@@ -214,8 +222,8 @@ export class BillingRepository extends BaseRepository {
       .from('organization_subscriptions')
       .select(`
         id, status, current_period_start, current_period_end,
-        trial_ends_at, canceled_at, paystack_subscription_code,
-        paystack_customer_code, metadata, created_at, updated_at,
+        trial_end, canceled_at, external_id,
+        metadata, created_at, updated_at,
         subscription_plans!inner (${PLAN_COLS})
       `)
       .eq('organization_id', organizationId)
@@ -228,17 +236,16 @@ export class BillingRepository extends BaseRepository {
 
     return {
       subscription: {
-        id:                         data.id,
-        status:                     data.status,
-        current_period_start:       data.current_period_start,
-        current_period_end:         data.current_period_end,
-        trial_ends_at:              data.trial_ends_at,
-        canceled_at:                data.canceled_at,
-        paystack_subscription_code: data.paystack_subscription_code,
-        paystack_customer_code:     data.paystack_customer_code,
-        metadata:                   (data.metadata as Record<string, unknown>) ?? {},
-        created_at:                 data.created_at,
-        updated_at:                 data.updated_at,
+        id:                   data.id,
+        status:               data.status,
+        current_period_start: data.current_period_start,
+        current_period_end:   data.current_period_end,
+        trial_end:            data.trial_end,
+        canceled_at:          data.canceled_at,
+        external_id:          data.external_id,
+        metadata:             (data.metadata as Record<string, unknown>) ?? {},
+        created_at:           data.created_at,
+        updated_at:           data.updated_at,
       },
       plan,
     }
@@ -298,6 +305,14 @@ export class BillingRepository extends BaseRepository {
     return data ?? null
   }
 
+  // NOTE: token_balances has no organization_id column — it is a per-user
+  // table (id, user_id, balance, total_ever). There is no org-scoped token
+  // balance concept in the schema today. These two methods will fail at
+  // query time until a real design decision is made (org-level balances
+  // table? a view over per-member balances? something else?). Left
+  // unmodified rather than guessing at a schema change; only caller today
+  // is lib/infrastructure/billing.ts::deductTokens, which itself is not
+  // yet wired into any live request path (see Phase 3 recommendations).
   async findOrgTokenBalance(orgId: string): Promise<{ balance: number } | null> {
     const { data } = await this.db
       .from('token_balances')

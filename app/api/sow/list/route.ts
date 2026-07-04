@@ -9,6 +9,7 @@ import {
   apiUnauthorized,
   apiForbidden,
 } from '@/lib/api/response'
+import { timedQuery } from '@/lib/observability/queryTiming'
 
 export interface SchemeWithProgress {
   id:                 string
@@ -43,7 +44,7 @@ export async function GET() {
       .single()
     if (!teacher) return apiForbidden()
 
-    const { data: schemes, error } = await db
+    const { data: schemes, error } = await timedQuery('schemes_of_work', 'listByTeacher', async () => db
       .from('schemes_of_work')
       .select(
         'id, school, grade, learning_area, term, year, curriculum_mode, total_lessons, total_weeks, lessons_per_week, created_at, status'
@@ -52,7 +53,7 @@ export async function GET() {
       .in('status', ['active', 'saved'])
       .order('term', { ascending: false })
       .order('created_at', { ascending: false })
-      .limit(50)
+      .limit(50))
 
     if (error) {
       console.error('[sow/list]', error)

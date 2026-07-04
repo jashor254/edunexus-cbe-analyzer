@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "db:types": "supabase gen types typescript --linked > lib/database.types.ts",
     "test:report": "tsx scripts/test-report.ts",
     "sow:grade10-bio-t1": "tsx scripts/generateGrade10BiologyTerm1.ts",
     "seed:grade10": "tsx scripts/seedGrade10Subjects.ts",

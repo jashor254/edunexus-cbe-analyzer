@@ -6,6 +6,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
+import { isTeacherOfLearner } from '@/lib/api/middleware'
 import { getPersonalizationModel, buildPersonalizationModel } from '@/lib/eir'
 
 export async function GET(
@@ -20,22 +21,15 @@ export async function GET(
     const { studentId } = await params
     const db = createServiceClient()
 
-    const [teacherRes, parentRes] = await Promise.all([
-      db.from('class_enrollments')
-        .select('class_id, teacher_classes!inner(teacher_id, teachers!inner(user_id))')
-        .eq('student_id', studentId)
-        .limit(1),
+    const [isTeacher, parentRes] = await Promise.all([
+      isTeacherOfLearner(studentId, user.id),
       db.from('learners')
         .select('parent_user_id')
         .eq('id', studentId)
         .single(),
     ])
 
-    const isParent  = parentRes.data?.parent_user_id === user.id
-    const isTeacher = (teacherRes.data ?? []).some(row => {
-      const tc = row.teacher_classes as { teachers?: { user_id?: string } } | null
-      return tc?.teachers?.user_id === user.id
-    })
+    const isParent = parentRes.data?.parent_user_id === user.id
 
     if (!isParent && !isTeacher) return apiForbidden()
 
@@ -56,18 +50,8 @@ export async function POST(
     if (!user) return apiUnauthorized()
 
     const { studentId } = await params
-    const db = createServiceClient()
 
-    const teacherRes = await db
-      .from('class_enrollments')
-      .select('class_id, teacher_classes!inner(teacher_id, teachers!inner(user_id))')
-      .eq('student_id', studentId)
-      .limit(1)
-
-    const isTeacher = (teacherRes.data ?? []).some(row => {
-      const tc = row.teacher_classes as { teachers?: { user_id?: string } } | null
-      return tc?.teachers?.user_id === user.id
-    })
+    const isTeacher = await isTeacherOfLearner(studentId, user.id)
 
     if (!isTeacher) return apiForbidden()
 

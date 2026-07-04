@@ -5,12 +5,21 @@ import { GoogleGenerativeAI, type GenerationConfig } from '@google/generative-ai
 import { DEEPSEEK_CONFIG } from '@/lib/config/api'
 import { GEMINI_PRIMARY } from '@/lib/ai/models'
 import { logger } from '@/lib/observability/logger'
+import { repos } from '@/lib/repositories'
+import { recordSuccess, recordError } from '@/lib/ai-orchestration/registry'
+
+export type AICostContext = {
+  organizationId: string
+  feature:        string
+}
 
 const TIMEOUT_MS = 25_000
 const MAX_HISTORY = 20  // last 10 turns — keeps tokens bounded as session grows
 
 // thinkingConfig is supported by gemini-2.5-flash but not yet in the SDK types
 type GeminiGenerationConfig = GenerationConfig & { thinkingConfig?: { thinkingBudget: number } }
+
+type CallOnceResult = { content: string; usageTokens: number | null }
 
 async function callOnce(
   prompt: string,
@@ -20,7 +29,7 @@ async function callOnce(
     maxTokens:   number
     history:     { role: 'user' | 'assistant'; content: string }[]
   }
-): Promise<string> {
+): Promise<CallOnceResult> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
 
@@ -58,8 +67,15 @@ async function callOnce(
     throw new Error(`DeepSeek API error ${response.status}: ${text}`)
   }
 
-  const data = await response.json() as { choices: { message: { content: string } }[] }
-  return data.choices[0].message.content
+  const data = await response.json() as {
+    choices: { message: { content: string } }[]
+    usage?: { total_tokens?: number }
+  }
+  return {
+    content:     data.choices[0].message.content,
+    // Previously discarded entirely — the response already carries this.
+    usageTokens: data.usage?.total_tokens ?? null,
+  }
 }
 
 async function callGeminiNonStreaming(
@@ -97,6 +113,24 @@ async function callGeminiNonStreaming(
   return result
 }
 
+/**
+ * costContext is optional and additive — existing callers that don't pass it
+ * see zero behavior change (same return type, same signature otherwise).
+ * Callers that DO have an organization_id available (e.g. org-scoped
+ * features) can opt in to recording real AI token usage into usage_events,
+ * which is what the billing/quota system reads. Token usage from DeepSeek's
+ * response was previously read and silently discarded; this is now captured
+ * and logged unconditionally (for observability) and additionally recorded
+ * per-org when costContext is supplied.
+ *
+ * Deliberately NOT threaded through all 24 existing call sites at once —
+ * that would require passing organization context through every feature
+ * that generates AI content today, a much larger change than this fix
+ * warrants. Threading it through streamDeepSeek() is also out of scope:
+ * DeepSeek's streaming response doesn't reliably include a final usage
+ * object with stream_options unset, and capturing Gemini SDK usage metadata
+ * for the fallback path is a separate, smaller follow-up.
+ */
 export async function callDeepSeek(
   prompt: string,
   systemPrompt?: string,
@@ -104,6 +138,7 @@ export async function callDeepSeek(
     temperature?: number
     maxTokens?:  number
     history?:    { role: 'user' | 'assistant'; content: string }[]
+    costContext?: AICostContext
   }
 ): Promise<string> {
   const resolved = {
@@ -114,18 +149,58 @@ export async function callDeepSeek(
       'You are a helpful Kenyan CBC tutor. Always respond with valid JSON only — no markdown, no explanation, just the raw JSON.',
   }
 
+  async function recordUsage(usageTokens: number | null, provider: string, latencyMs?: number): Promise<void> {
+    logger.info('AI call completed', { service: 'deepseek', provider, usage_tokens: usageTokens, latency_ms: latencyMs })
+    if (options?.costContext && usageTokens !== null) {
+      try {
+        await repos.developers.insertAICostEvent({
+          organization_id: options.costContext.organizationId,
+          event_type:       'ai.completion',
+          resource:         options.costContext.feature,
+          quantity:         1,
+          cost_tokens:      usageTokens,
+        })
+      } catch (err) {
+        // Never let cost-recording failure break the AI response itself.
+        logger.error('Failed to record AI cost event', { service: 'deepseek' }, err)
+      }
+    }
+  }
+
   try {
-    return await callOnce(prompt, resolved.systemPrompt, resolved)
+    const start = Date.now()
+    const result = await callOnce(prompt, resolved.systemPrompt, resolved)
+    const latencyMs = Date.now() - start
+    recordSuccess('deepseek', latencyMs)
+    await recordUsage(result.usageTokens, 'deepseek', latencyMs)
+    return result.content
   } catch (err) {
     const msg = (err as Error).message
+    recordError('deepseek', msg)
     const isRetryable = msg === 'DeepSeek timeout after 25s' || msg === 'fetch failed'
     if (isRetryable) {
       logger.warn('DeepSeek retryable error — retrying once', { service: 'deepseek', error: msg })
       try {
-        return await callOnce(prompt, resolved.systemPrompt, resolved)
+        const start = Date.now()
+        const result = await callOnce(prompt, resolved.systemPrompt, resolved)
+        const latencyMs = Date.now() - start
+        recordSuccess('deepseek', latencyMs)
+        await recordUsage(result.usageTokens, 'deepseek', latencyMs)
+        return result.content
       } catch (retryErr) {
+        recordError('deepseek', (retryErr as Error).message)
         logger.warn('DeepSeek retry failed — falling back to Gemini', { service: 'deepseek' }, retryErr)
-        return await callGeminiNonStreaming(prompt, resolved.systemPrompt, resolved.temperature, resolved.maxTokens)
+        try {
+          const start = Date.now()
+          const content = await callGeminiNonStreaming(prompt, resolved.systemPrompt, resolved.temperature, resolved.maxTokens)
+          const latencyMs = Date.now() - start
+          recordSuccess('gemini', latencyMs)
+          await recordUsage(null, 'gemini', latencyMs) // Gemini usage metadata capture is a separate follow-up
+          return content
+        } catch (geminiErr) {
+          recordError('gemini', (geminiErr as Error).message)
+          throw geminiErr
+        }
       }
     }
     throw err

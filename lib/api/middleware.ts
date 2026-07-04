@@ -75,6 +75,46 @@ export async function assertStudentOwnership(
 }
 
 /**
+ * Checks whether userId is a teacher assigned to any class the given
+ * learner is enrolled in, via learner_enrollments -> class_teachers -> teachers.
+ *
+ * Implemented as three plain selects rather than a single PostgREST embed:
+ * learner_enrollments has no FK to class_teachers (they only share the
+ * `classes` table as a common parent), and class_teachers.teacher_id has
+ * no enforced FK to teachers.id either — so PostgREST cannot resolve a
+ * nested embed across either hop.
+ */
+export async function isTeacherOfLearner(
+  learnerId: string,
+  userId: string
+): Promise<boolean> {
+  const db = createServiceClient()
+
+  const { data: enrollments } = await db
+    .from('learner_enrollments')
+    .select('class_id')
+    .eq('learner_id', learnerId)
+
+  const classIds = (enrollments ?? []).map(e => e.class_id as string)
+  if (!classIds.length) return false
+
+  const { data: classTeachers } = await db
+    .from('class_teachers')
+    .select('teacher_id')
+    .in('class_id', classIds)
+
+  const teacherIds = (classTeachers ?? []).map(ct => ct.teacher_id as string)
+  if (!teacherIds.length) return false
+
+  const { data: teachers } = await db
+    .from('teachers')
+    .select('user_id')
+    .in('id', teacherIds)
+
+  return (teachers ?? []).some(t => t.user_id === userId)
+}
+
+/**
  * Verifies that a payment record belongs to the authenticated user.
  * Returns null on success, 403 response on failure.
  */

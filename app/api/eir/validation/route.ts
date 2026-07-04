@@ -6,9 +6,9 @@
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
+import { isTeacherOfLearner } from '@/lib/api/middleware'
 import { buildValidationSummary, markRecommendationAccepted, markRecommendationDismissed } from '@/lib/eir'
 import { getUserRole } from '@/lib/auth/getRole'
-import { createServiceClient } from '@/utils/supabase/service'
 
 const QuerySchema = z.object({
   studentId: z.string().uuid().optional(),
@@ -63,17 +63,7 @@ export async function POST(req: Request) {
       if (!parsed.success) return apiError(parsed.error.message, 400)
 
       // Verify teacher access
-      const db         = createServiceClient()
-      const teacherRes = await db
-        .from('class_enrollments')
-        .select('class_id, teacher_classes!inner(teacher_id, teachers!inner(user_id))')
-        .eq('student_id', parsed.data.studentId)
-        .limit(1)
-
-      const isTeacher = (teacherRes.data ?? []).some(row => {
-        const tc = row.teacher_classes as { teachers?: { user_id?: string } } | null
-        return tc?.teachers?.user_id === user.id
-      })
+      const isTeacher = await isTeacherOfLearner(parsed.data.studentId, user.id)
       if (!isTeacher) return apiForbidden()
 
       await markRecommendationAccepted(parsed.data.recommendationId, parsed.data.studentId)

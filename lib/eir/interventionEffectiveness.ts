@@ -206,23 +206,38 @@ function classifyLearnerProfileType(
 
 function aggregateByType(records: EIRInterventionRecord[]): InterventionTypeStats[] {
   const map = new Map<string, {
-    total: number; effective: number; deltas: number[]; days: number[]
+    total: number; pending: number; effective: number; assessed: number
+    deltas: number[]; days: number[]
     profilesEffective: string[]; profilesIneffective: string[]
   }>()
 
   for (const r of records) {
     const type = r.intervention_type
     const entry = map.get(type) ?? {
-      total: 0, effective: 0, deltas: [], days: [],
+      total: 0, pending: 0, effective: 0, assessed: 0, deltas: [], days: [],
       profilesEffective: [], profilesIneffective: [],
     }
     entry.total += 1
-    if (r.was_effective) {
+
+    // was_effective is a generated column: outcome IN ('effective','partial').
+    // outcome is nullable, and NULL IN (...) evaluates to NULL under SQL's
+    // three-valued logic — so was_effective is null (not false) for any
+    // intervention still awaiting assessment. Treating null the same as
+    // false here would silently count every pending intervention as a
+    // confirmed failure, deflating effectiveness_rate and polluting
+    // worst_for_profile with students whose interventions simply haven't
+    // concluded yet. Three explicit branches instead of a truthy check:
+    if (r.was_effective === null) {
+      entry.pending += 1
+    } else if (r.was_effective === true) {
+      entry.assessed += 1
       entry.effective += 1
       if (r.learner_profile_type) entry.profilesEffective.push(r.learner_profile_type)
     } else {
+      entry.assessed += 1
       if (r.learner_profile_type) entry.profilesIneffective.push(r.learner_profile_type)
     }
+
     if (r.mastery_delta !== null) entry.deltas.push(r.mastery_delta)
     if (r.days_to_resolution !== null) entry.days.push(r.days_to_resolution)
     map.set(type, entry)
@@ -231,7 +246,8 @@ function aggregateByType(records: EIRInterventionRecord[]): InterventionTypeStat
   return Array.from(map.entries()).map(([type, s]) => ({
     intervention_type:   type as EIRInterventionType,
     total_records:       s.total,
-    effectiveness_rate:  s.total > 0 ? s.effective / s.total : 0,
+    pending_records:     s.pending,
+    effectiveness_rate:  s.assessed > 0 ? s.effective / s.assessed : 0,
     avg_mastery_delta:   s.deltas.length ? s.deltas.reduce((a, b) => a + b, 0) / s.deltas.length : 0,
     avg_days_to_resolve: s.days.length  ? s.days.reduce((a, b) => a + b, 0)  / s.days.length   : 0,
     best_for_profile:    [...new Set(s.profilesEffective)].slice(0, 3),

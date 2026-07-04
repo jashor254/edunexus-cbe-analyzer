@@ -1,5 +1,21 @@
 // lib/repositories/developer.repository.ts
 // All DB queries for API keys and usage event tracking.
+//
+// NAMING NOTE: this repository is named `DeveloperRepository` (accessed as
+// `repos.developers`), but it queries `api_keys` / `usage_events` — the
+// ORGANIZATION-scoped API key system (Phase 8 platform foundation), keyed
+// by organization_id, created via lib/organizations/api-keys.ts.
+//
+// This is a DIFFERENT system from `developer_api_keys` / `developer_profiles`
+// / `developer_projects` (the Developer Portal's own API key system, keyed
+// by developer_id/project_id, added by the devportal_* migrations). Neither
+// system references or depends on the other. If you're looking for the
+// Developer Portal's API keys, they are not queried anywhere in this
+// repository — check the separate devportal application instead.
+//
+// The name `DeveloperRepository` predates this distinction becoming clear;
+// it was not renamed here to avoid an unrelated refactor across its call
+// sites, but new code should not assume it relates to the Developer Portal.
 
 import { BaseRepository } from './base'
 import type { ApiKey } from '@/lib/organizations/types'

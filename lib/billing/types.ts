@@ -29,10 +29,9 @@ export type OrganizationSubscription = {
   status: SubscriptionStatus
   current_period_start: string
   current_period_end: string | null
-  trial_ends_at: string | null
+  trial_end: string | null
   canceled_at: string | null
-  paystack_subscription_code: string | null
-  paystack_customer_code: string | null
+  external_id: string | null
   metadata: Record<string, unknown>
   created_at: string
   updated_at: string
@@ -42,14 +41,16 @@ export type Invoice = {
   id: string
   organization_id: string
   subscription_id: string | null
-  invoice_number: string
   status: InvoiceStatus
   amount_kes: number
+  tax_kes: number
+  total_kes: number
   currency: string
   period_start: string | null
   period_end: string | null
+  due_date: string | null
   paid_at: string | null
-  paystack_reference: string | null
+  external_id: string | null
   line_items: InvoiceLineItem[]
   metadata: Record<string, unknown>
   created_at: string

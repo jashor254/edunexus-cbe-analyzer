@@ -1,7 +1,24 @@
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
-import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
+import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
 import { publishEvent } from '@/lib/events'
+import { timedQuery } from '@/lib/observability/queryTiming'
+
+const CreateAssignmentSchema = z.object({
+  class_id:              z.string().uuid(),
+  title:                 z.string().min(1),
+  subject:               z.string().min(1),
+  topic:                 z.string().min(1),
+  instructions:          z.string().min(1),
+  due_date:              z.string().min(1),
+  type:                  z.string().optional(),
+  max_score:             z.number().int().positive().optional(),
+  is_compass_guided:     z.boolean().optional(),
+  is_holiday_assignment: z.boolean().optional(),
+  holiday_period:        z.string().optional(),
+  lesson_plan_id:        z.string().uuid().optional(),
+})
 
 export async function GET() {
   try {
@@ -19,7 +36,7 @@ export async function GET() {
 
     if (!teacher) return apiForbidden()
 
-    const { data: assignments, error } = await db
+    const { data: assignments, error } = await timedQuery('assignments', 'listByTeacher', async () => db
       .from('assignments')
       .select(`
         id, class_id, teacher_id, title, subject, topic, type, status,
@@ -28,7 +45,7 @@ export async function GET() {
         teacher_classes(name, grade)
       `)
       .eq('teacher_id', teacher.id)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: false }))
 
     if (error) return apiError('Failed to fetch assignments')
     if (!assignments?.length) return apiSuccess({ assignments: [] })
@@ -84,12 +101,9 @@ export async function POST(req: Request) {
 
     if (!teacher) return apiForbidden()
 
-    const body = await req.json()
-    const { class_id, title, subject, topic, instructions, due_date, type, max_score, is_compass_guided, is_holiday_assignment, holiday_period, lesson_plan_id } = body
-
-    if (!class_id || !title || !subject || !topic || !instructions || !due_date) {
-      return apiError('Missing required fields', 400)
-    }
+    const parsed = CreateAssignmentSchema.safeParse(await req.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
+    const { class_id, title, subject, topic, instructions, due_date, type, max_score, is_compass_guided, is_holiday_assignment, holiday_period, lesson_plan_id } = parsed.data
 
     // Verify class belongs to teacher
     const { data: cls } = await db

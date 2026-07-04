@@ -1,6 +1,7 @@
 // lib/events/dispatch.ts
 // Process pending event deliveries — called from cron or a background worker.
 import { repos } from '@/lib/repositories'
+import { signWebhookPayload } from './utils'
 import type { DeliveryStatus } from './types'
 
 type DeliveryRow = {
@@ -14,6 +15,7 @@ type DeliveryRow = {
     endpoint_url: string | null
     handler_name: string | null
     retry_delay_ms: number
+    signing_secret: string | null
   }
   platform_events: {
     event_type: string
@@ -34,13 +36,9 @@ export async function dispatchPendingEvents(batchSize = 50): Promise<{
   succeeded: number
   failed: number
 }> {
-  const deliveries = await repos.webhooks.findPendingDeliveries(batchSize)
+  const deliveries = await repos.webhooks.claimPendingDeliveries(batchSize)
 
   if (!deliveries.length) return { processed: 0, succeeded: 0, failed: 0 }
-
-  // Mark them as processing to prevent double-processing
-  const ids = deliveries.map(d => d.id)
-  await repos.webhooks.markDeliveriesProcessing(ids)
 
   let succeeded = 0
   let failed = 0
@@ -53,7 +51,7 @@ export async function dispatchPendingEvents(batchSize = 50): Promise<{
 
       try {
         if (sub.delivery_method === 'webhook' && sub.endpoint_url) {
-          await deliverWebhook(sub.endpoint_url, event, delivery.id)
+          await deliverWebhook(sub.endpoint_url, event, delivery.id, sub.signing_secret)
         } else if (sub.delivery_method === 'internal' && sub.handler_name) {
           await deliverInternal(sub.handler_name, event)
         }
@@ -91,26 +89,39 @@ export async function dispatchPendingEvents(batchSize = 50): Promise<{
 async function deliverWebhook(
   url: string,
   event: DeliveryRow['platform_events'],
-  deliveryId: string
+  deliveryId: string,
+  signingSecret: string | null
 ): Promise<void> {
+  const body = JSON.stringify({
+    id:              deliveryId,
+    event_type:      event.event_type,
+    event_version:   event.event_version,
+    resource_type:   event.resource_type,
+    resource_id:     event.resource_id,
+    organization_id: event.organization_id,
+    payload:         event.payload,
+    delivered_at:    new Date().toISOString(),
+  })
+
+  const headers: Record<string, string> = {
+    'Content-Type':        'application/json',
+    'X-EduNexus-Event':    event.event_type,
+    'X-EduNexus-Delivery': deliveryId,
+    'X-EduNexus-Version':  event.event_version,
+  }
+
+  // Subscriptions created before signing secrets existed (or created for
+  // delivery_method !== 'webhook') have no secret — deliver unsigned rather
+  // than failing the whole delivery. See lib/events/utils.ts for the
+  // verification steps a receiver should perform against this header.
+  if (signingSecret) {
+    headers['X-EduNexus-Signature'] = `sha256=${await signWebhookPayload(signingSecret, body)}`
+  }
+
   const response = await fetch(url, {
     method:  'POST',
-    headers: {
-      'Content-Type':         'application/json',
-      'X-EduNexus-Event':    event.event_type,
-      'X-EduNexus-Delivery': deliveryId,
-      'X-EduNexus-Version':  event.event_version,
-    },
-    body: JSON.stringify({
-      id:              deliveryId,
-      event_type:      event.event_type,
-      event_version:   event.event_version,
-      resource_type:   event.resource_type,
-      resource_id:     event.resource_id,
-      organization_id: event.organization_id,
-      payload:         event.payload,
-      delivered_at:    new Date().toISOString(),
-    }),
+    headers,
+    body,
     signal: AbortSignal.timeout(10_000),
   })
 

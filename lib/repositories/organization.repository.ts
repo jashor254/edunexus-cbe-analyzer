@@ -92,6 +92,24 @@ export class OrganizationRepository extends BaseRepository {
     return data
   }
 
+  // Hard delete. Only ever called today from create.ts as internal
+  // rollback-on-failure (org creation failed right after the row was
+  // inserted, before any billing/member data existed for it) — not exposed
+  // via any user-facing "delete my organization" route.
+  //
+  // FUTURE-SAFE NOTE (do not implement until an org-deletion feature is
+  // actually built): `invoices`, `api_keys`, `organization_members`, and
+  // `usage_events` all have ON DELETE CASCADE to organizations.id. A
+  // user-facing deletion feature built naively on top of this method would
+  // permanently destroy billing/audit history the moment an org is deleted
+  // — likely wrong for a paying SaaS tenant (invoices in particular may
+  // need retention for accounting/tax reasons regardless of tenant status).
+  // Before building that feature: add a `deleted_at timestamptz` (soft
+  // delete) to `organizations`, update RLS policies to exclude
+  // soft-deleted rows from normal reads, and leave the CASCADE relations
+  // as-is (a soft-deleted org's children remain intact and are simply
+  // unreachable through the normal org lookup path). Do not repurpose this
+  // hard-delete method for that feature.
   async deleteById(orgId: string): Promise<void> {
     await this.db.from('organizations').delete().eq('id', orgId)
   }

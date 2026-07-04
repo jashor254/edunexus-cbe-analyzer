@@ -3,6 +3,8 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { getAllProviders } from '@/lib/ai-orchestration/registry'
+import { getQueueDepths } from '@/lib/jobs/monitor'
+import { repos } from '@/lib/repositories'
 
 type HealthStatus = 'healthy' | 'degraded' | 'down'
 
@@ -36,7 +38,31 @@ export async function GET(): Promise<NextResponse> {
     detail:  aiProviders.map(p => `${p.name}:${p.health}`).join(', '),
   }
 
-  // 3. Overall platform status
+  // 3. Job queues
+  try {
+    const depths = await getQueueDepths()
+    const totalDeadLetter = depths.reduce((sum, q) => sum + q.dead_letter, 0)
+    const totalFailed     = depths.reduce((sum, q) => sum + q.failed, 0)
+    checks.jobs = {
+      status:  totalDeadLetter > 0 ? 'degraded' : totalFailed > 0 ? 'degraded' : 'healthy',
+      detail:  `queued=${depths.reduce((s, q) => s + q.queued, 0)}, processing=${depths.reduce((s, q) => s + q.processing, 0)}, failed=${totalFailed}, dead_letter=${totalDeadLetter}`,
+    }
+  } catch (err) {
+    checks.jobs = { status: 'down', detail: (err as Error).message }
+  }
+
+  // 4. Event/webhook deliveries
+  try {
+    const counts = await repos.webhooks.findDeliveryStatusCounts()
+    checks.events = {
+      status: counts.dead_letter > 0 ? 'degraded' : counts.failed > 0 ? 'degraded' : 'healthy',
+      detail: `pending=${counts.pending}, failed=${counts.failed}, dead_letter=${counts.dead_letter}`,
+    }
+  } catch (err) {
+    checks.events = { status: 'down', detail: (err as Error).message }
+  }
+
+  // 5. Overall platform status
   const allStatuses = Object.values(checks).map(c => c.status)
   const overall: HealthStatus =
     allStatuses.every(s => s === 'healthy') ? 'healthy' :

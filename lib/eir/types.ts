@@ -158,8 +158,12 @@ export type EIRInterventionRecord = {
   started_at:           string
   completed_at:         string | null
   days_to_resolution:   number | null
-  outcome:              'effective' | 'partial' | 'ineffective' | 'unknown'
-  was_effective:        boolean
+  // null = intervention still pending assessment (outcome not yet recorded)
+  outcome:              'effective' | 'partial' | 'ineffective' | 'unknown' | null
+  // Generated column: outcome IN ('effective','partial'). Postgres three-valued
+  // logic means this is NULL (not false) when outcome is NULL — a pending
+  // intervention is neither effective nor ineffective yet.
+  was_effective:        boolean | null
   evidence:             Record<string, unknown>
   created_at:           string
   updated_at:           string
@@ -177,7 +181,11 @@ export type InterventionEffectivenessReport = {
 export type InterventionTypeStats = {
   intervention_type:   EIRInterventionType
   total_records:       number
-  effectiveness_rate:  number    // 0–1
+  // Interventions with outcome still NULL — not yet assessed. Excluded from
+  // effectiveness_rate and best/worst_for_profile; reported here so callers
+  // can see how much of total_records is actually decided vs. still pending.
+  pending_records:     number
+  effectiveness_rate:  number    // 0–1, over ASSESSED records only (excludes pending_records)
   avg_mastery_delta:   number
   avg_days_to_resolve: number
   best_for_profile:    string[]  // learner profile types where it works best
