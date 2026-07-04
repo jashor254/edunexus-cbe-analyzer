@@ -249,7 +249,7 @@ export async function GET(req: Request): Promise<Response> {
         db.from('learner_profiles')
           .update({ growth_milestones: updatedMilestones })
           .eq('student_id', profile.student_id)
-          .then(() => {}).catch(() => {})
+          .then(() => {}, () => {})
       }
     }
 
@@ -281,19 +281,22 @@ export async function GET(req: Request): Promise<Response> {
       generated_at:              new Date().toISOString(),
     }
 
-    // Cache the result
-    await db.from('monday_panel_cache').upsert({
-      class_id:           classId,
-      teacher_id:         user.id,
-      panel_data:         panel,
-      teaching_patterns:  teachingPatterns,
-      prerequisite_alerts: prerequisiteAlerts,
-      pending_checkins:   pendingCheckins,
-      career_moments:     careerMoments,
-      generated_at:       new Date().toISOString(),
-      valid_until:        new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    }, { onConflict: 'class_id' })
-    .catch(() => {})
+    // Cache the result (best-effort — a failed cache write shouldn't fail the request)
+    try {
+      await db.from('monday_panel_cache').upsert({
+        class_id:           classId,
+        teacher_id:         user.id,
+        panel_data:         panel,
+        teaching_patterns:  teachingPatterns,
+        prerequisite_alerts: prerequisiteAlerts,
+        pending_checkins:   pendingCheckins,
+        career_moments:     careerMoments,
+        generated_at:       new Date().toISOString(),
+        valid_until:        new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      }, { onConflict: 'class_id' })
+    } catch {
+      // Non-fatal — panel is still returned to the caller below
+    }
 
     return apiSuccess({ panel })
   } catch (e: unknown) {

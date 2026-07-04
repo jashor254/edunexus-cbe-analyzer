@@ -93,7 +93,7 @@ export async function updateFromAssessment(signal: AssessmentSignal): Promise<vo
 
   if (scoreHistory.length > 0) {
     try {
-      const prevDimensions = profile.capability_dimensions as Record<string, { level?: string; raw_score?: number }>
+      const prevDimensions = profile.capability_dimensions as Record<string, { level?: CapabilityLevel; raw_score?: number }>
       const capabilityProfile = extractCapabilityProfile(scoreHistory)
 
       const newDimensions = {
@@ -487,7 +487,7 @@ async function recomputeConfirmedGaps(studentId: string): Promise<void> {
     .maybeSingle()
 
   if (classEnrollment) {
-    const cls = classEnrollment.teacher_classes as Record<string, unknown> | null
+    const cls = classEnrollment.teacher_classes as unknown as Record<string, unknown> | null
     if (!cls) return
 
     // Find active SOW for this class
@@ -506,14 +506,18 @@ async function recomputeConfirmedGaps(studentId: string): Promise<void> {
       for (const gapKey of confirmedGaps.slice(0, 5)) {
         const [subject, subStrand] = gapKey.split(':')
         if (!subject || !subStrand) continue
-        await db.rpc('compute_substrand_health', {
-          p_sow_id:     sow.id,
-          p_teacher_id: cls.teacher_id,
-          p_class_id:   classEnrollment.class_id,
-          p_subject:    subject,
-          p_strand:     subStrand,    // approximation — strand = substrand for initial population
-          p_sub_strand: subStrand,
-        }).catch(() => {})  // non-fatal
+        try {
+          await db.rpc('compute_substrand_health', {
+            p_sow_id:     sow.id,
+            p_teacher_id: cls.teacher_id,
+            p_class_id:   classEnrollment.class_id,
+            p_subject:    subject,
+            p_strand:     subStrand,    // approximation — strand = substrand for initial population
+            p_sub_strand: subStrand,
+          })
+        } catch {
+          // non-fatal
+        }
       }
     }
   }

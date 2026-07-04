@@ -188,24 +188,27 @@ export async function computeSchoolIntelligence(
     generated_at: new Date().toISOString(),
   }
 
-  // Persist snapshot for trend analysis
-  await db.from('school_intelligence_snapshots').upsert({
-    school_id:                   schoolId,
-    week_of:                     now,
-    grade:                       null,
-    subject:                     null,
-    total_students:              total,
-    normal_count:                riskDist.normal,
-    watch_count:                 riskDist.watch,
-    at_risk_count:               riskDist.at_risk,
-    critical_count:              riskDist.critical,
-    top_struggling_substrands:   topStrugglingStrands,
-    interventions_run:           interventionCount,
-    interventions_effective:     effectiveCount,
-    avg_capability_dimensions:   avgCapability,
-    risk_trend:                  riskTrend,
-  }, { onConflict: 'school_id,week_of,grade,subject', ignoreDuplicates: false })
-  .catch(() => {})  // non-fatal
+  // Persist snapshot for trend analysis (best-effort — non-fatal)
+  try {
+    await db.from('school_intelligence_snapshots').upsert({
+      school_id:                   schoolId,
+      week_of:                     now,
+      grade:                       null,
+      subject:                     null,
+      total_students:              total,
+      normal_count:                riskDist.normal,
+      watch_count:                 riskDist.watch,
+      at_risk_count:               riskDist.at_risk,
+      critical_count:              riskDist.critical,
+      top_struggling_substrands:   topStrugglingStrands,
+      interventions_run:           interventionCount,
+      interventions_effective:     effectiveCount,
+      avg_capability_dimensions:   avgCapability,
+      risk_trend:                  riskTrend,
+    }, { onConflict: 'school_id,week_of,grade,subject', ignoreDuplicates: false })
+  } catch {
+    // non-fatal
+  }
 
   return summary
 }

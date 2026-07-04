@@ -89,7 +89,7 @@ export async function getLearnerProfile(studentId: string): Promise<LearnerProfi
 
   if (error) throw new Error(`getLearnerProfile: ${error.message}`)
   if (!data) return null
-  return hydrateProfile(data as Record<string, unknown>)
+  return hydrateProfile(data as unknown as Record<string, unknown>)
 }
 
 export async function getOrCreateLearnerProfile(studentId: string): Promise<LearnerProfile> {
@@ -104,7 +104,7 @@ export async function getOrCreateLearnerProfile(studentId: string): Promise<Lear
     .single()
 
   if (error) throw new Error(`getOrCreateLearnerProfile: ${error.message}`)
-  return hydrateProfile(data as Record<string, unknown>)
+  return hydrateProfile(data as unknown as Record<string, unknown>)
 }
 
 export async function getClassLearnerProfiles(classId: string): Promise<LearnerProfile[]> {
@@ -128,7 +128,7 @@ export async function getClassLearnerProfiles(classId: string): Promise<LearnerP
 
   const profileMap = new Map(
     (data ?? []).map(p => {
-      const hydrated = hydrateProfile(p as Record<string, unknown>)
+      const hydrated = hydrateProfile(p as unknown as Record<string, unknown>)
       return [hydrated.student_id, hydrated]
     })
   )
@@ -141,7 +141,7 @@ export async function getClassLearnerProfiles(classId: string): Promise<LearnerP
       .insert(missing.map(id => ({ student_id: id })))
       .select(COLUMNS)
     for (const p of created ?? []) {
-      const hydrated = hydrateProfile(p as Record<string, unknown>)
+      const hydrated = hydrateProfile(p as unknown as Record<string, unknown>)
       profileMap.set(hydrated.student_id, hydrated)
     }
   }
