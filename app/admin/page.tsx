@@ -33,6 +33,18 @@ export default function AdminPage() {
   const [grantStatus, setGrantStatus] = useState<string | null>(null)
   const [grantLoading, setGrantLoading] = useState(false)
 
+  async function fetchStats() {
+    const res = await fetch('/api/admin/stats')
+    const json = await res.json()
+    if (json.success) setStats(json.data.stats)
+  }
+
+  async function fetchRecentUsers() {
+    const res = await fetch('/api/admin/recent-users')
+    const json = await res.json()
+    if (json.success) setRecentUsers(json.data.users)
+  }
+
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -45,18 +57,6 @@ export default function AdminPage() {
       fetchRecentUsers()
     })
   }, [router])
-
-  const fetchStats = async () => {
-    const res = await fetch('/api/admin/stats')
-    const json = await res.json()
-    if (json.success) setStats(json.data.stats)
-  }
-
-  const fetchRecentUsers = async () => {
-    const res = await fetch('/api/admin/recent-users')
-    const json = await res.json()
-    if (json.success) setRecentUsers(json.data.users)
-  }
 
   const handleGrantAccess = async () => {
     if (!grantEmail.trim()) return

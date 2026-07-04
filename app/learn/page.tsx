@@ -813,7 +813,7 @@ function LearnContent() {
               ? 'Two sessions in. You\'re further than most.'
               : weekly >= 2
               ? `${weekly} sessions this week. Keep learning at your pace.`
-              : `Session ${total} done. Come back when you\'re ready.`}
+              : `Session ${total} done. Come back when you're ready.`}
           </p>
           {activeSubject && activeSubject.level < 4 && (
             <p className="text-white/30 text-xs text-center mt-1.5 leading-snug">

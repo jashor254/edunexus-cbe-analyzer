@@ -357,7 +357,7 @@ NEVER: community resource persons, farm visits, radio recordings, government map
 KEYWORD REQUIREMENT:
 Your lesson is about: ${substrand}
 Use at least ONE word from this set somewhere in outcomes or experiences:
-${substrand.split(/[\s\-:,\/()]+/).filter(w => w.length >= 4).slice(0, 3).join(', ')}
+${substrand.split(/[\s\-:,/()]+/).filter(w => w.length >= 4).slice(0, 3).join(', ')}
 
 ${kicdSection}${subtopicsSection}
 ${seed?.contextBlock ? `\nPER-LESSON DIVERSITY CONTEXT:\n${seed.contextBlock}` : ''}
@@ -449,7 +449,7 @@ export async function generateValidatedLesson(
   let lastError: string | null = null
 
   const skillWords = context.substrand
-    .split(/[\s\-:,\/()]+/)
+    .split(/[\s\-:,/()]+/)
     .filter(w => w.length >= 4)
     .slice(0, 3)
     .join(', ')

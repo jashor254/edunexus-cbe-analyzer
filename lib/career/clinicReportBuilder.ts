@@ -914,7 +914,7 @@ export async function buildClinicReport(
   parent_actions.push({
     title:  'Start a Learning Compass Session',
     why:    `The Learning Compass already knows ${student.name as string}'s exact level and will start precisely where they are — no wasted time.`,
-    action: `Open the Learning Compass in ${firstSubject}. It will greet them by name, explain what they\'re working on, and adapt in real time. First session takes 10 minutes.`,
+    action: `Open the Learning Compass in ${firstSubject}. It will greet them by name, explain what they're working on, and adapt in real time. First session takes 10 minutes.`,
     link:   '/learn',
   })
 

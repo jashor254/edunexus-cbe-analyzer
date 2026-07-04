@@ -254,7 +254,7 @@ const PRESENTATION_HTML = `
     if(e.changedTouches[0].clientX-tx<-40)advance()
     tx=null
   },{passive:true})
-<\/script>
+</script>
 </body>
 </html>
 `

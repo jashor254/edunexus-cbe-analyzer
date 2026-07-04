@@ -1,6 +1,6 @@
-import { createServerClient } from '@supabase/ssr'
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
+import { createClient } from '@/utils/supabase/server'
+import { createServiceClient } from '@/utils/supabase/service'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
 // ─── Role-aware path resolver ─────────────────────────────────────────────────
@@ -45,23 +45,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL('/login?error=no-code', requestUrl.origin))
   }
 
-  const cookieStore = await cookies()
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) { return cookieStore.get(name)?.value },
-        set(name: string, value: string, options: any) {
-          try { cookieStore.set(name, value, options) } catch {}
-        },
-        remove(name: string, options: any) {
-          try { cookieStore.set(name, '', options) } catch {}
-        },
-      },
-    }
-  )
+  const supabase = await createClient()
 
   const { error } = await supabase.auth.exchangeCodeForSession(code)
   if (error) {
@@ -72,11 +56,7 @@ export async function GET(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
 
   // Service-role client for DB writes — bypasses RLS
-  const db = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+  const db = createServiceClient()
 
   if (role === 'teacher') {
     resolvedPath = '/teacher/dashboard'

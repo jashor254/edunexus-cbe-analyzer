@@ -66,19 +66,7 @@ export default function PilotPage() {
   const [savingFeedback, setSavingFeedback] = useState<Set<string>>(new Set())
   const [markingSent, setMarkingSent] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
-    const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user || user.email?.toLowerCase().trim() !== ADMIN_EMAIL) {
-        router.replace('/dashboard')
-        return
-      }
-      setReady(true)
-      fetchStudents()
-    })
-  }, [router])
-
-  const fetchStudents = async () => {
+  async function fetchStudents() {
     setLoading(true)
     const res = await fetch('/api/admin/pilot/students')
     const json = await res.json()
@@ -92,6 +80,18 @@ export default function PilotPage() {
     }
     setLoading(false)
   }
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user || user.email?.toLowerCase().trim() !== ADMIN_EMAIL) {
+        router.replace('/dashboard')
+        return
+      }
+      setReady(true)
+      fetchStudents()
+    })
+  }, [router])
 
   const fetchAllStudents = async () => {
     const supabase = createClient()

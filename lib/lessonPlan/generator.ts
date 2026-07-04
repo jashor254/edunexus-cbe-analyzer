@@ -44,7 +44,7 @@ function pickTopicCounties(strand: string, learningArea: string): [string, strin
 function sanitizeResource(resource: string): string {
   return resource
     .replace(/\s*,?\s*pages?\s+on\s+[^,;]*/gi, '')
-    .replace(/\s*,?\s*pp\.\s*[\d–\-]+\s+on\s+[^,;]*/gi, '')
+    .replace(/\s*,?\s*pp\.\s*[\d–-]+\s+on\s+[^,;]*/gi, '')
     .replace(/\s*,?\s*p\.\s*\d+\s+on\s+[^,;]*/gi, '')
     .replace(/,\s*$/, '')
     .replace(/Grade\s+Grade\s+(\d+)/gi, 'Grade $1')

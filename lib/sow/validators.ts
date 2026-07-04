@@ -1107,7 +1107,7 @@ function validateSubstrandAlignment(
   // Extract words from the substrand title itself
   const titleWords = substrandTitle
     .toLowerCase()
-    .split(/[\s\-:,\/()]+/)
+    .split(/[\s\-:,/()]+/)
     .filter(w => w.length >= 3 && !stopWords.has(w))
 
   // Also flatten any " - " separated parts (e.g. "Reading - Fluency - Scanning and Skimming")
@@ -1115,7 +1115,7 @@ function validateSubstrandAlignment(
     .split(' - ')
     .join(' ')
     .toLowerCase()
-    .split(/[\s\-:,\/()]+/)
+    .split(/[\s\-:,/()]+/)
     .filter(w => w.length >= 3 && !stopWords.has(w))
 
   const keywords = [...new Set([...titleWords, ...partWords])]

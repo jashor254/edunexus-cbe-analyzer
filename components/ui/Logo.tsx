@@ -7,17 +7,8 @@ interface LogoProps {
   iconOnly?: boolean
 }
 
-export function Logo({
-  variant = 'dark',
-  size = 'md',
-  showTagline = false,
-  iconOnly = false,
-}: LogoProps) {
-  const iconSizes = { sm: 28, md: 40, lg: 56 }
-  const textSizes = { sm: 'text-xl', md: 'text-2xl', lg: 'text-4xl' }
-  const iconSize = iconSizes[size]
-
-  const CompassIcon = ({ s }: { s: number }) => (
+function CompassIcon({ s, variant }: { s: number; variant: 'dark' | 'light' }) {
+  return (
     <svg
       width={s}
       height={s}
@@ -80,12 +71,23 @@ export function Logo({
       </text>
     </svg>
   )
+}
 
-  if (iconOnly) return <CompassIcon s={iconSize} />
+export function Logo({
+  variant = 'dark',
+  size = 'md',
+  showTagline = false,
+  iconOnly = false,
+}: LogoProps) {
+  const iconSizes = { sm: 28, md: 40, lg: 56 }
+  const textSizes = { sm: 'text-xl', md: 'text-2xl', lg: 'text-4xl' }
+  const iconSize = iconSizes[size]
+
+  if (iconOnly) return <CompassIcon s={iconSize} variant={variant} />
 
   return (
     <div className="flex items-center gap-3">
-      <CompassIcon s={iconSize} />
+      <CompassIcon s={iconSize} variant={variant} />
       <div className="flex flex-col gap-0.5">
         <span
           className={`${textSizes[size]} font-extrabold tracking-tight leading-none
