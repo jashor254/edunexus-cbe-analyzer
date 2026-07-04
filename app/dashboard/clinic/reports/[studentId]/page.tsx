@@ -55,7 +55,7 @@ export default async function StudentReportPage({
   const db = createServiceClient()
   const { data: student, error: studentError } = await db
     .from('students')
-    .select('*')
+    .select('id, name, grade, current_pathway, school, date_of_birth')
     .eq('id', studentId)
     .eq('user_id', user.id)
     .single()
@@ -67,7 +67,7 @@ export default async function StudentReportPage({
   // 3. Fetch assessments
   const { data: assessments, error: assessmentsError } = await db
     .from('assessments')
-    .select('*')
+    .select('subject_scores, term, year')
     .eq('student_id', studentId)
     .order('created_at', { ascending: true })
 

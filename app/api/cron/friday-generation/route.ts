@@ -12,12 +12,13 @@ import { generateWeeklyPlans } from '@/lib/lessonPlan/weeklyGenerator'
 import { classifyRootCause } from '@/lib/teachingIntelligence/rootCauseClassifier'
 import { runTIEForSOW } from '@/lib/teachingIntelligence/weeklyGenerator'
 import type { SubstrandHealthRow } from '@/lib/teachingIntelligence/types'
+import { timingSafeEqualString } from '@/lib/api/secretCompare'
 
 export const maxDuration = 300
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!timingSafeEqualString(authHeader, `Bearer ${process.env.CRON_SECRET}`)) {
     return new Response('Unauthorized', { status: 401 })
   }
 
@@ -48,6 +49,27 @@ export async function GET(req: Request) {
 
     if (error) return apiError('Failed to fetch active SOWs')
 
+    const sowIds = (activeSows || []).map(s => s.id)
+
+    // ── Pre-fetch per-SOW data used inside the loop — 2 batched queries
+    // instead of 2 queries per SOW ────────────────────────────────────────────
+    const { data: timelineRows } = sowIds.length
+      ? await db.from('schemes_of_work').select('id, timeline').in('id', sowIds)
+      : { data: [] as { id: string; timeline: unknown }[] }
+    const timelineBySow: Record<string, unknown[]> = {}
+    for (const row of timelineRows ?? []) {
+      timelineBySow[row.id] = (row.timeline as unknown[]) || []
+    }
+
+    const { data: allLatestPlans } = sowIds.length
+      ? await db.from('lesson_plans').select('sow_id, week_number').in('sow_id', sowIds)
+      : { data: [] as { sow_id: string; week_number: number }[] }
+    const latestWeekBySow: Record<string, number> = {}
+    for (const plan of allLatestPlans ?? []) {
+      const cur = latestWeekBySow[plan.sow_id] ?? 0
+      if (plan.week_number > cur) latestWeekBySow[plan.sow_id] = plan.week_number
+    }
+
     const lpResults:  Array<{ sowId: string; result: Awaited<ReturnType<typeof generateWeeklyPlans>> }> = []
     const lpErrors:   Array<{ sowId: string; error: string }> = []
     const tieResults: Array<{ sowId: string; result: Awaited<ReturnType<typeof runTIEForSOW>> }> = []
@@ -56,24 +78,10 @@ export async function GET(req: Request) {
     for (const sow of activeSows || []) {
 
       // ── 1. Lesson plan generation (unchanged logic) ─────────────────────
-      const { data: sowFull } = await db
-        .from('schemes_of_work')
-        .select('timeline')
-        .eq('id', sow.id)
-        .single()
-
-      const timeline = sowFull?.timeline || []
+      const timeline = timelineBySow[sow.id] || []
       if (!timeline.length) continue
 
-      const { data: latestPlan } = await db
-        .from('lesson_plans')
-        .select('week_number')
-        .eq('sow_id', sow.id)
-        .order('week_number', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      const latestWeek    = latestPlan?.week_number ?? 0
+      const latestWeek    = latestWeekBySow[sow.id] ?? 0
       const sowCurrentWeek = latestWeek > 0 ? latestWeek : 0
 
       try {
@@ -112,15 +120,17 @@ export async function GET(req: Request) {
           .gte('struggle_count', 1)
           .is('root_cause', null)
 
+        const rootCauseUpdates: { id: string; root_cause: string; updated_at: string }[] = []
         for (const row of (pendingRows ?? []) as SubstrandHealthRow[]) {
           const code = await classifyRootCause(row, {
             grade: sow.grade,
             learningArea: sow.learning_area,
           })
-          await db
-            .from('substrand_health')
-            .update({ root_cause: code, updated_at: new Date().toISOString() })
-            .eq('id', row.id)
+          rootCauseUpdates.push({ id: row.id, root_cause: code, updated_at: new Date().toISOString() })
+        }
+
+        if (rootCauseUpdates.length > 0) {
+          await db.from('substrand_health').upsert(rootCauseUpdates, { onConflict: 'id' })
         }
 
         if ((pendingRows ?? []).length > 0) {

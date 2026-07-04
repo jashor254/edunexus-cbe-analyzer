@@ -7,6 +7,7 @@
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
 import { sendWhatsApp } from '@/lib/whatsapp/sender'
+import { timingSafeEqualString } from '@/lib/api/secretCompare'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -69,7 +70,7 @@ export async function GET(req: Request): Promise<Response> {
     // ── 1. Auth: CRON_SECRET only ────────────────────────────────────────────
     const authHeader = req.headers.get('authorization') ?? ''
     const cronSecret = process.env.CRON_SECRET
-    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    if (!cronSecret || !timingSafeEqualString(authHeader, `Bearer ${cronSecret}`)) {
       return apiUnauthorized()
     }
 
@@ -278,16 +279,18 @@ export async function GET(req: Request): Promise<Response> {
       }
 
       briefs.push(brief)
+    }
 
-      // ── 7. Upsert into monday_panel_cache ─────────────────────────────────
-      // Store the brief as panel_data so teachers see it on their Monday Panel.
+    // ── 7. Upsert all class briefs into monday_panel_cache in one call ────────
+    // Store each brief as panel_data so teachers see it on their Monday Panel.
+    if (briefs.length > 0) {
       await db.from('monday_panel_cache').upsert(
-        {
-          class_id:     classId,
-          teacher_id:   teacherId,
+        briefs.map(brief => ({
+          class_id:     brief.class_id,
+          teacher_id:   brief.teacher_id,
           panel_data:   { holiday_brief: brief },
           generated_at: new Date().toISOString(),
-        },
+        })),
         { onConflict: 'class_id' }
       )
     }

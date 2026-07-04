@@ -30,7 +30,7 @@ export default async function SharedReportPage({ params }: { params: { token: st
 
   const { data: shared, error } = await db
     .from('shared_reports')
-    .select('*')
+    .select('expires_at, report_data, created_at, student_name, grade')
     .eq('token', params.token)
     .single()
 

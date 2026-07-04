@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
+import { timingSafeEqualString } from '@/lib/api/secretCompare'
 
 export const maxDuration = 300
 
@@ -25,7 +26,7 @@ interface LessonPlanCandidate {
 }
 
 export async function GET(request: Request) {
-  if (request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!timingSafeEqualString(request.headers.get('authorization'), `Bearer ${process.env.CRON_SECRET}`)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -75,71 +76,94 @@ export async function GET(request: Request) {
     const results: Array<{ sowId: string; entriesCreated: number }> = []
     const errors: Array<{ sowId: string; error: string }> = []
 
-    for (const [sowId, plans] of Object.entries(bySow)) {
-      try {
-        const { data: sow } = await db
-          .from('schemes_of_work')
-          .select('teacher_id, school, grade, learning_area, term, year, curriculum_mode')
-          .eq('id', sowId)
-          .single()
+    const sowIds     = Object.keys(bySow)
+    const teacherIds = [...new Set(Object.values(bySow).map(plans => plans[0].teacher_id))]
 
-        if (!sow) continue
+    // ── Pre-fetch SOW + teacher metadata for all SOWs — 2 batched queries
+    // instead of 2 queries per SOW ────────────────────────────────────────────
+    const [{ data: sowRows }, { data: teacherRows }] = await Promise.all([
+      db.from('schemes_of_work')
+        .select('id, teacher_id, school, grade, learning_area, term, year, curriculum_mode')
+        .in('id', sowIds),
+      db.from('teachers').select('id, full_name').in('id', teacherIds),
+    ])
 
-        const { data: teacher } = await db
-          .from('teachers')
-          .select('full_name')
-          .eq('id', sow.teacher_id)
-          .maybeSingle()
+    const sowById     = new Map((sowRows ?? []).map(s => [s.id, s]))
+    const teacherById = new Map((teacherRows ?? []).map(t => [t.id, t]))
 
-        // Upsert the ROW header document (one per SOW)
-        const { data: rowHeader, error: headerErr } = await db
-          .from('records_of_work')
-          .upsert(
-            {
-              scheme_id: sowId,
-              teacher_id: plans[0].teacher_id,
-              school: sow.school,
-              grade: sow.grade,
-              learning_area: sow.learning_area,
-              term: String(sow.term),
-              year: sow.year,
-              curriculum_mode: sow.curriculum_mode,
-              teacher_name: teacher?.full_name ?? '',
-            },
-            { onConflict: 'scheme_id' }
-          )
-          .select('id')
-          .single()
-
-        if (headerErr || !rowHeader) {
-          throw new Error(headerErr?.message ?? 'Failed to upsert ROW header')
+    // ── Upsert all ROW headers in one call, then map scheme_id -> row id ──────
+    const headerRows = sowIds
+      .map(sowId => {
+        const sow = sowById.get(sowId)
+        if (!sow) return null
+        return {
+          scheme_id: sowId,
+          teacher_id: bySow[sowId][0].teacher_id,
+          school: sow.school,
+          grade: sow.grade,
+          learning_area: sow.learning_area,
+          term: String(sow.term),
+          year: sow.year,
+          curriculum_mode: sow.curriculum_mode,
+          teacher_name: teacherById.get(sow.teacher_id)?.full_name ?? '',
         }
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null)
 
-        // Upsert per-lesson entries — idempotent via unique constraint (row_id, week, lesson)
-        const entries = plans.map(p => ({
-          row_id: rowHeader.id,
-          week: p.week_number,
-          lesson: p.lesson_number,
-          strand: p.strand,
-          substrand: p.sub_strand,
-          learning_outcomes: p.learning_outcomes ?? [],
-          key_inquiry_questions: p.key_inquiry_questions ?? [],
-          learning_resources: p.learning_resources ?? [],
-          activities_summary: [p.step_1, p.step_2, p.step_3].filter((s): s is string => !!s),
-          status: 'completed',
-          remarks: '',
-        }))
+    const missingSowIds = sowIds.filter(id => !sowById.has(id))
+    for (const sowId of missingSowIds) errors.push({ sowId, error: 'SOW not found' })
 
-        const { error: entriesErr } = await db
-          .from('row_entries')
-          .upsert(entries, { onConflict: 'row_id,week,lesson' })
+    let rowIdBySow = new Map<string, string>()
+    if (headerRows.length > 0) {
+      const { data: upsertedHeaders, error: headerErr } = await db
+        .from('records_of_work')
+        .upsert(headerRows, { onConflict: 'scheme_id' })
+        .select('id, scheme_id')
 
-        if (entriesErr) throw new Error(entriesErr.message)
+      if (headerErr) {
+        for (const row of headerRows) errors.push({ sowId: row.scheme_id, error: headerErr.message })
+      } else {
+        rowIdBySow = new Map((upsertedHeaders ?? []).map(h => [h.scheme_id, h.id]))
+      }
+    }
 
-        results.push({ sowId, entriesCreated: entries.length })
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Unknown error'
-        errors.push({ sowId, error: message })
+    // ── Build and upsert all per-lesson entries across every SOW in one call ──
+    const allEntries: Array<{
+      row_id: string; week: number; lesson: number; strand: string; substrand: string
+      learning_outcomes: string[]; key_inquiry_questions: string[]; learning_resources: string[]
+      activities_summary: string[]; status: string; remarks: string
+    }> = []
+
+    for (const sowId of sowIds) {
+      const rowId = rowIdBySow.get(sowId)
+      if (!rowId) continue
+
+      const plans = bySow[sowId]
+      const entries = plans.map(p => ({
+        row_id: rowId,
+        week: p.week_number,
+        lesson: p.lesson_number,
+        strand: p.strand,
+        substrand: p.sub_strand,
+        learning_outcomes: p.learning_outcomes ?? [],
+        key_inquiry_questions: p.key_inquiry_questions ?? [],
+        learning_resources: p.learning_resources ?? [],
+        activities_summary: [p.step_1, p.step_2, p.step_3].filter((s): s is string => !!s),
+        status: 'completed',
+        remarks: '',
+      }))
+      allEntries.push(...entries)
+      results.push({ sowId, entriesCreated: entries.length })
+    }
+
+    if (allEntries.length > 0) {
+      const { error: entriesErr } = await db
+        .from('row_entries')
+        .upsert(allEntries, { onConflict: 'row_id,week,lesson' })
+
+      if (entriesErr) {
+        for (const r of results) errors.push({ sowId: r.sowId, error: entriesErr.message })
+        results.length = 0
       }
     }
 

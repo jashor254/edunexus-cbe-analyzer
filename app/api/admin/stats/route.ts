@@ -28,13 +28,13 @@ export async function GET() {
       { data: revenueData },
       { count: subsCount },
     ] = await Promise.all([
-      service.from('profiles').select('*', { count: 'exact', head: true }),
-      service.from('students').select('*', { count: 'exact', head: true }),
-      service.from('assessments').select('*', { count: 'exact', head: true }),
-      service.from('compass_sessions').select('*', { count: 'exact', head: true }),
-      service.from('payments').select('*', { count: 'exact', head: true }),
+      service.from('profiles').select('id', { count: 'exact', head: true }),
+      service.from('students').select('id', { count: 'exact', head: true }),
+      service.from('assessments').select('id', { count: 'exact', head: true }),
+      service.from('compass_sessions').select('id', { count: 'exact', head: true }),
+      service.from('payments').select('id', { count: 'exact', head: true }),
       service.from('payments').select('amount').eq('status', 'success'),
-      service.from('subscriptions').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+      service.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'active'),
     ])
 
     const totalRevenue = (revenueData ?? []).reduce(

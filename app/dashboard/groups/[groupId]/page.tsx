@@ -70,9 +70,9 @@ export default function GroupPage() {
     const today = new Date().toISOString().split('T')[0]
 
     const [{ data: grp }, { data: mems }, { data: todayChallenge }] = await Promise.all([
-      supabase.from('study_groups').select('*').eq('id', groupId).single(),
-      supabase.from('study_group_members').select('*').eq('group_id', groupId).order('points', { ascending: false }),
-      supabase.from('study_group_challenges').select('*').eq('group_id', groupId).eq('date', today).single(),
+      supabase.from('study_groups').select('id, name, subject, grade, invite_code, ground_rules').eq('id', groupId).single(),
+      supabase.from('study_group_members').select('id, user_id, student_name, points, streak_days').eq('group_id', groupId).order('points', { ascending: false }),
+      supabase.from('study_group_challenges').select('id, question, correct_answer, hint, subject, difficulty, kenyan_context, date').eq('group_id', groupId).eq('date', today).single(),
     ])
 
     setGroup(grp)
@@ -117,7 +117,7 @@ export default function GroupPage() {
       setAlreadyAnswered(true)
       // Refresh members for updated points
       const { data: mems } = await supabase
-        .from('study_group_members').select('*').eq('group_id', groupId).order('points', { ascending: false })
+        .from('study_group_members').select('id, user_id, student_name, points, streak_days').eq('group_id', groupId).order('points', { ascending: false })
       if (mems) setMembers(mems)
     } catch (err: any) {
       alert(err.message)

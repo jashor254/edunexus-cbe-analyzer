@@ -317,7 +317,7 @@ function AddAssessmentContent() {
 
     const { data } = await supabase
       .from('students')
-      .select('*')
+      .select('id, name, grade, current_pathway, curriculum_type, year_level, user_id')
       .eq('user_id', user.id)
       .order('name')
 

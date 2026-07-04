@@ -1,6 +1,17 @@
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
+
+const CreateRowSchema = z.object({
+  schemeId:       z.string().uuid().optional(),
+  school:         z.string().optional(),
+  grade:          z.union([z.string(), z.number()]),
+  learningArea:   z.string().min(1),
+  term:           z.union([z.string(), z.number()]),
+  year:           z.union([z.string(), z.number()]),
+  curriculumMode: z.string().optional(),
+})
 
 export async function GET() {
   try {
@@ -21,11 +32,23 @@ export async function GET() {
 
     if (error) return apiError('Failed to fetch records')
 
-    // Attach entry counts
-    const withStats = await Promise.all((rows || []).map(async (row) => {
-      const { count: total } = await db.from('row_entries').select('*', { count: 'exact', head: true }).eq('row_id', row.id)
-      const { count: done }  = await db.from('row_entries').select('*', { count: 'exact', head: true }).eq('row_id', row.id).not('reflection', 'is', null).neq('reflection', '')
-      return { ...row, total_entries: total || 0, completed_entries: done || 0 }
+    // Attach entry counts — one batched query instead of 2 per row
+    const rowIds = (rows || []).map(row => row.id)
+    const { data: entries } = rowIds.length
+      ? await db.from('row_entries').select('row_id, reflection').in('row_id', rowIds)
+      : { data: [] as { row_id: string; reflection: string | null }[] }
+
+    const totalByRow: Record<string, number> = {}
+    const doneByRow: Record<string, number> = {}
+    for (const entry of entries ?? []) {
+      totalByRow[entry.row_id] = (totalByRow[entry.row_id] ?? 0) + 1
+      if (entry.reflection) doneByRow[entry.row_id] = (doneByRow[entry.row_id] ?? 0) + 1
+    }
+
+    const withStats = (rows || []).map(row => ({
+      ...row,
+      total_entries:     totalByRow[row.id] ?? 0,
+      completed_entries: doneByRow[row.id]  ?? 0,
     }))
 
     return apiSuccess({ records: withStats })
@@ -44,10 +67,9 @@ export async function POST(req: Request) {
     const { data: teacher } = await db.from('teachers').select('id, full_name').eq('user_id', user.id).single()
     if (!teacher) return apiForbidden()
 
-    const body = await req.json()
-    const { schemeId, school, grade, learningArea, term, year, curriculumMode } = body
-
-    if (!grade || !learningArea || !term || !year) return apiBadRequest('Missing required fields')
+    const parsed = CreateRowSchema.safeParse(await req.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Missing required fields')
+    const { schemeId, school, grade, learningArea, term, year, curriculumMode } = parsed.data
 
     const { data: row, error: rowErr } = await db
       .from('records_of_work')
