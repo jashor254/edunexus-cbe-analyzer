@@ -36,7 +36,7 @@ const RULES: EnvRule[] = [
 
   // ── AI providers ────────────────────────────────────────────────────────────
   {
-    key:         'DEEPSEEK_API_KEY',
+    key:         'DEEPSEEK_AI_API_KEY',
     required:    true,
     description: 'DeepSeek API key for AI generation',
     validate:    v => v.length >= 20 ? null : 'Key seems too short',

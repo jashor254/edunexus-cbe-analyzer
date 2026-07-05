@@ -29,7 +29,7 @@ env:
   NEXT_PUBLIC_SUPABASE_URL: 'https://placeholder.supabase.co'
   NEXT_PUBLIC_SUPABASE_ANON_KEY: 'placeholder-anon-key'
   SUPABASE_SERVICE_ROLE_KEY: 'placeholder-service-key'
-  DEEPSEEK_API_KEY: 'placeholder-deepseek-key'
+  DEEPSEEK_AI_API_KEY: 'placeholder-deepseek-key'
   NEXT_PUBLIC_APP_VERSION: ${{ github.sha }}
 
 jobs:
@@ -139,7 +139,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL:      ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY:     ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          DEEPSEEK_API_KEY:              ${{ secrets.DEEPSEEK_API_KEY }}
+          DEEPSEEK_AI_API_KEY:           ${{ secrets.DEEPSEEK_API_KEY }}
           GOOGLE_GEMINI_API_KEY:         ${{ secrets.GOOGLE_GEMINI_API_KEY }}
           PAYSTACK_SECRET_KEY:           ${{ secrets.PAYSTACK_SECRET_KEY }}
           PAYSTACK_PUBLIC_KEY:           ${{ secrets.PAYSTACK_PUBLIC_KEY }}
