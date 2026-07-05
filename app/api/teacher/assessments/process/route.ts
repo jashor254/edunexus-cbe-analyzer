@@ -85,7 +85,6 @@ export async function POST(req: Request) {
     const results: AssessmentPipelineResult[] = []
     for (const sid of studentIds) {
       const result = await runAssessmentPipeline({
-        db,
         studentId:    sid,
         assessmentId: assessment_id,
         actorName:    teacherName,
