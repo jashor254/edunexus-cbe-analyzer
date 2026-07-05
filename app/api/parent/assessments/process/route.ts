@@ -38,7 +38,6 @@ export async function POST(req: Request) {
     if (!owned) return apiForbidden()
 
     const result = await runAssessmentPipeline({
-      db,
       studentId:    student_id,
       assessmentId: assessment_id,
       actorName:    'Parent',

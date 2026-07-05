@@ -62,3 +62,8 @@ next-env.d.ts
 # MCP config — contains service role key, never commit
 .mcp.json
 e2e-edunexus.mjs
+
+# generated test/debug artifacts — not source
+generated-reports/*.pdf
+!generated-reports/.gitkeep
+/*-test.pdf

@@ -1,5 +1,10 @@
 import type { LessonPlanContext, GeneratedLessonPlan } from './types'
 import { isKiswahiliSubject, isPlaceBasedSubject, getSubjectContextHint } from '@/lib/curriculum/subjectUtils'
+import { callDeepSeek as callAI } from '@/lib/ai/deepseek'
+
+const LESSON_PLAN_SYSTEM =
+  'You are an experienced Kenyan CBC teacher. ' +
+  'Return ONLY valid JSON. No markdown. No explanation. No code blocks. Pure JSON only.'
 
 const KENYAN_COUNTIES = [
   'Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Kisii', 'Machakos',
@@ -64,36 +69,6 @@ function parseDeepSeekJSON(raw: string): Record<string, unknown> {
   return JSON.parse(cleaned) as Record<string, unknown>
 }
 
-async function callDeepSeek(prompt: string): Promise<string> {
-  const response = await fetch('https://api.deepseek.com/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: 'deepseek-chat',
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are an experienced Kenyan CBC teacher. ' +
-            'Return ONLY valid JSON. No markdown. No explanation. No code blocks. Pure JSON only.',
-        },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.3,
-      max_tokens: 2000,
-    }),
-  })
-
-  if (!response.ok) {
-    throw new Error(`DeepSeek API error: ${response.status} ${response.statusText}`)
-  }
-
-  const data = await response.json()
-  return data.choices[0].message.content
-}
 
 function deriveLocation(learningArea: string, grade: string, strand = ''): string {
   const area  = learningArea.toLowerCase()
@@ -248,7 +223,7 @@ export async function generateLessonPlan(
   for (let attempt = 0; attempt < 3; attempt++) {
     let raw: string
     try {
-      raw = await callDeepSeek(prompt)
+      raw = await callAI(prompt, LESSON_PLAN_SYSTEM, { temperature: 0.3, maxTokens: 2000 })
     } catch (err: unknown) {
       lastError = err instanceof Error ? err.message : 'Unknown AI error'
       continue
@@ -412,7 +387,7 @@ Return JSON only:
 
   let raw: string
   try {
-    raw = await callDeepSeek(prompt)
+    raw = await callAI(prompt, LESSON_PLAN_SYSTEM, { temperature: 0.3, maxTokens: 2000 })
   } catch {
     return fallback
   }

@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 
 export type Cohort = {
   id: string
@@ -35,123 +35,69 @@ export async function createCohort(
   name: string,
   school: string | null,
 ): Promise<Cohort> {
-  const db = createServiceClient()
-
   let join_code = generateJoinCode()
 
   // Re-roll on collision (astronomically unlikely with 6-char alphanumeric)
-  const { data: existing } = await db
-    .from('academy_cohorts')
-    .select('id')
-    .eq('join_code', join_code)
-    .maybeSingle()
-
+  const existing = await repos.academy.findCohortByJoinCode(join_code)
   if (existing) join_code = generateJoinCode()
 
-  const { data, error } = await db
-    .from('academy_cohorts')
-    .insert({ name, school, join_code, lead_teacher_id: teacherId })
-    .select('id, name, school, join_code, lead_teacher_id, created_at')
-    .single()
-
-  if (error || !data) throw new Error(error?.message ?? 'Failed to create cohort')
+  const data = await repos.academy.insertCohort({ name, school, join_code, lead_teacher_id: teacherId })
 
   // Lead teacher is automatically a member
-  await db.from('academy_cohort_members').insert({ cohort_id: data.id, teacher_id: teacherId })
+  await repos.academy.upsertCohortMember(data.id, teacherId)
 
   return data as Cohort
 }
 
 export async function joinCohortByCode(teacherId: string, code: string): Promise<Cohort> {
-  const db = createServiceClient()
+  const cohort = await repos.academy.findCohortByCode(code.toUpperCase().trim())
+  if (!cohort) throw new Error('Invalid join code — no cohort found')
 
-  const { data: cohort, error: findErr } = await db
-    .from('academy_cohorts')
-    .select('id, name, school, join_code, lead_teacher_id, created_at')
-    .eq('join_code', code.toUpperCase().trim())
-    .maybeSingle()
-
-  if (findErr || !cohort) throw new Error('Invalid join code — no cohort found')
-
-  const { error: joinErr } = await db
-    .from('academy_cohort_members')
-    .upsert({ cohort_id: cohort.id, teacher_id: teacherId }, { onConflict: 'cohort_id,teacher_id' })
-
-  if (joinErr) throw new Error(joinErr.message)
+  await repos.academy.upsertCohortMember(cohort.id, teacherId)
 
   return cohort as Cohort
 }
 
 export async function getTeacherCohorts(teacherId: string): Promise<Cohort[]> {
-  const db = createServiceClient()
+  const cohortIds = await repos.academy.findCohortIdsByTeacher(teacherId)
+  if (!cohortIds.length) return []
 
-  const { data: memberships } = await db
-    .from('academy_cohort_members')
-    .select('cohort_id')
-    .eq('teacher_id', teacherId)
-
-  if (!memberships?.length) return []
-
-  const cohortIds = memberships.map(m => m.cohort_id)
-
-  const { data } = await db
-    .from('academy_cohorts')
-    .select('id, name, school, join_code, lead_teacher_id, created_at')
-    .in('id', cohortIds)
-    .order('created_at', { ascending: false })
-
-  return (data ?? []) as Cohort[]
+  const data = await repos.academy.findCohortsByIds(cohortIds)
+  return data as Cohort[]
 }
 
 export async function getCohortDetail(cohortId: string, teacherId: string): Promise<CohortDetail | null> {
-  const db = createServiceClient()
-
   // Verify requestor is a member or lead
-  const { data: membership } = await db
-    .from('academy_cohort_members')
-    .select('id')
-    .eq('cohort_id', cohortId)
-    .eq('teacher_id', teacherId)
-    .maybeSingle()
-
+  const membership = await repos.academy.findCohortMembership(cohortId, teacherId)
   if (!membership) return null
 
-  const { data: cohort } = await db
-    .from('academy_cohorts')
-    .select('id, name, school, join_code, lead_teacher_id, created_at')
-    .eq('id', cohortId)
-    .single()
-
+  const cohort = await repos.academy.findCohortById(cohortId)
   if (!cohort) return null
 
   // Get all members
-  const { data: members } = await db
-    .from('academy_cohort_members')
-    .select('teacher_id, joined_at')
-    .eq('cohort_id', cohortId)
-
-  if (!members?.length) return { ...(cohort as Cohort), members: [], totalMembers: 0 }
+  const members = await repos.academy.findCohortMembers(cohortId)
+  if (!members.length) return { ...(cohort as Cohort), members: [], totalMembers: 0 }
 
   const memberTeacherIds = members.map(m => m.teacher_id)
 
   // Batch-fetch teacher profiles + XP + lesson progress in parallel
-  const [teacherRes, xpRes, progressRes] = await Promise.all([
-    db.from('teachers').select('id, full_name, school').in('id', memberTeacherIds),
-    db.from('academy_xp_events').select('teacher_id, xp').in('teacher_id', memberTeacherIds),
-    db.from('academy_progress').select('teacher_id').in('teacher_id', memberTeacherIds),
+  const [teachers, xpRows, progressRows] = await Promise.all([
+    repos.academy.findTeacherProfiles(memberTeacherIds),
+    repos.academy.findXpByTeacherIds(memberTeacherIds),
+    repos.academy.findProgressByTeacherIds(memberTeacherIds),
   ])
 
-  const teacherMap = new Map((teacherRes.data ?? []).map(t => [t.id, t]))
+  const teacherMap = new Map(teachers.map(t => [t.id, t]))
 
   // Sum XP per teacher
   const xpByTeacher = new Map<string, number>()
-  for (const row of (xpRes.data ?? [])) {
+  for (const row of xpRows) {
     xpByTeacher.set(row.teacher_id, (xpByTeacher.get(row.teacher_id) ?? 0) + row.xp)
   }
 
   // Count completed lessons per teacher
   const lessonsBy = new Map<string, number>()
-  for (const row of (progressRes.data ?? [])) {
+  for (const row of progressRows) {
     lessonsBy.set(row.teacher_id, (lessonsBy.get(row.teacher_id) ?? 0) + 1)
   }
 
@@ -178,21 +124,11 @@ export async function getCohortDetail(cohortId: string, teacherId: string): Prom
 }
 
 export async function leaveCohort(cohortId: string, teacherId: string): Promise<void> {
-  const db = createServiceClient()
-
-  const { data: cohort } = await db
-    .from('academy_cohorts')
-    .select('lead_teacher_id')
-    .eq('id', cohortId)
-    .single()
+  const cohort = await repos.academy.findCohortById(cohortId)
 
   if (cohort?.lead_teacher_id === teacherId) {
     throw new Error('Lead teacher cannot leave their own cohort — delete it instead')
   }
 
-  await db
-    .from('academy_cohort_members')
-    .delete()
-    .eq('cohort_id', cohortId)
-    .eq('teacher_id', teacherId)
+  await repos.academy.deleteCohortMember(cohortId, teacherId)
 }

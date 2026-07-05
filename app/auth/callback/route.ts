@@ -1,9 +1,25 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-// ─── Role-aware path resolver ─────────────────────────────────────────────────
+// ── Redirect safety ───────────────────────────────────────────────────────────
+
+/**
+ * Validates that a returnTo value is a safe relative path.
+ * Rejects anything with a protocol, double-slash, or non-path characters.
+ */
+function sanitizeReturnTo(raw: string | null): string {
+  const fallback = '/dashboard'
+  if (!raw) return fallback
+  // Must start with / and must not contain protocol separators or double slashes
+  if (!raw.startsWith('/') || raw.startsWith('//') || /[^a-zA-Z0-9/_\-?=&%#.]/.test(raw)) {
+    return fallback
+  }
+  return raw
+}
+
+// ── Role-aware path resolver ──────────────────────────────────────────────────
 
 const PUBLIC_PATHS = ['/pricing', '/legal', '/join', '/shared', '/payment']
 
@@ -21,7 +37,7 @@ async function resolveRoleDestination(
     .eq('id', userId)
     .single()
 
-  const role = profile?.role
+  const role = profile?.role as string | undefined
 
   if (requestedPath.startsWith('/teacher')) {
     if (role === 'teacher') return requestedPath
@@ -32,13 +48,14 @@ async function resolveRoleDestination(
   return '/dashboard'
 }
 
-export async function GET(request: Request) {
-  const requestUrl = new URL(request.url)
+// ── Auth callback ─────────────────────────────────────────────────────────────
 
-  const code          = requestUrl.searchParams.get('code')
-  const returnTo      = requestUrl.searchParams.get('returnTo') || '/dashboard'
-  const role          = requestUrl.searchParams.get('role')
-  const product       = requestUrl.searchParams.get('product')
+export async function GET(request: Request) {
+  const requestUrl  = new URL(request.url)
+  const code        = requestUrl.searchParams.get('code')
+  const returnTo    = sanitizeReturnTo(requestUrl.searchParams.get('returnTo'))
+  const role        = requestUrl.searchParams.get('role')
+  const product     = requestUrl.searchParams.get('product')
   const secondaryRole = requestUrl.searchParams.get('secondary_role')
 
   if (!code) {
@@ -52,21 +69,22 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL('/login?error=exchange-failed', requestUrl.origin))
   }
 
-  let resolvedPath = returnTo
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Service-role client for DB writes — bypasses RLS
+  // Service-role client for DB writes — bypasses RLS (appropriate here: post-auth role upsert)
   const db = createServiceClient()
+
+  let resolvedPath = returnTo
 
   if (role === 'teacher') {
     resolvedPath = '/teacher/dashboard'
     if (user) {
       await db.from('profiles').upsert(
         {
-          id: user.id, // profiles.id = auth user UUID
-          role: 'teacher',
+          id:           user.id,
+          role:         'teacher',
           ...(secondaryRole ? { secondary_role: secondaryRole } : {}),
-          updated_at: new Date().toISOString(),
+          updated_at:   new Date().toISOString(),
         },
         { onConflict: 'id' }
       )
@@ -77,27 +95,22 @@ export async function GET(request: Request) {
     if (user) {
       await db.from('profiles').upsert(
         {
-          id: user.id,
+          id:           user.id,
           role,
           ...(secondaryRole ? { secondary_role: secondaryRole } : {}),
-          updated_at: new Date().toISOString(),
+          updated_at:   new Date().toISOString(),
         },
         { onConflict: 'id' }
       )
-      // If secondary role is teacher, create a stub teachers record
       if (secondaryRole === 'teacher') {
         await db
           .from('teachers')
-          .upsert({ user_id: user.id }, { onConflict: 'user_id', ignoreDuplicates: true } as any)
+          .upsert({ user_id: user.id }, { onConflict: 'user_id', ignoreDuplicates: true })
       }
     }
-
   }
 
-  const safePath = user
-    ? await resolveRoleDestination(db, user.id, resolvedPath)
-    : resolvedPath
-
+  const safePath  = user ? await resolveRoleDestination(db, user.id, resolvedPath) : resolvedPath
   const finalPath = product ? `${safePath}?product=${product}` : safePath
   return NextResponse.redirect(new URL(finalPath, requestUrl.origin))
 }

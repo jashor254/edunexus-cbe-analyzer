@@ -1,6 +1,15 @@
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
-import { apiSuccess, apiError, apiUnauthorized, apiNotFound } from '@/lib/api/response'
+import { apiSuccess, apiError, apiUnauthorized, apiNotFound, apiBadRequest } from '@/lib/api/response'
+import { publishEvent } from '@/lib/events'
+
+const SubmitSchema = z.object({
+  assignmentId:        z.string().uuid(),
+  studentId:           z.string().uuid(),
+  work_text:           z.string().optional(),
+  compass_session_id:  z.string().uuid().optional(),
+})
 
 export async function POST(req: Request) {
   try {
@@ -10,12 +19,9 @@ export async function POST(req: Request) {
 
     const db = createServiceClient()
 
-    const body = await req.json()
-    const { assignmentId, studentId, work_text, compass_session_id } = body
-
-    if (!assignmentId || !studentId) {
-      return apiError('assignmentId and studentId are required', 400)
-    }
+    const parsed = SubmitSchema.safeParse(await req.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'assignmentId and studentId are required')
+    const { assignmentId, studentId, work_text, compass_session_id } = parsed.data
 
     // Verify student belongs to this user
     const { data: student } = await db
@@ -100,6 +106,19 @@ export async function POST(req: Request) {
       console.error('[student/submit POST]', opError)
       return apiError('Failed to submit assignment')
     }
+
+    void publishEvent({
+      event_type:      'student.assignment.submitted',
+      resource_type:   'assignment_submission',
+      resource_id:     submission.id as string,
+      actor_id:        studentId,
+      payload: {
+        assignment_id: assignmentId,
+        student_id:    studentId,
+        class_id:      submission.class_id as string,
+      },
+      idempotency_key: `student.assignment.submitted:${submission.id}`,
+    }).catch(err => console.error('[events] student.assignment.submitted:', err instanceof Error ? err.message : String(err)))
 
     return apiSuccess({ submission })
   } catch (e: unknown) {

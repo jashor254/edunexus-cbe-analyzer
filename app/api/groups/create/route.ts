@@ -1,6 +1,13 @@
+import { z } from 'zod'
 import { createClient }        from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
+
+const CreateGroupSchema = z.object({
+  name:    z.string().trim().min(1),
+  subject: z.string().trim().min(1),
+  grade:   z.union([z.string(), z.number()]),
+})
 
 function generateInviteCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase()
@@ -12,8 +19,9 @@ export async function POST(req: Request) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) return apiUnauthorized()
 
-    const { name, subject, grade } = await req.json()
-    if (!name || !subject || !grade) return apiBadRequest('Missing required fields')
+    const parsed = CreateGroupSchema.safeParse(await req.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Missing required fields')
+    const { name, subject, grade } = parsed.data
 
     const db = createServiceClient()
 

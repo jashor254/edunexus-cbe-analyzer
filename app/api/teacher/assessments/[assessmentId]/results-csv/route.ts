@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiUnauthorized, apiForbidden, apiNotFound, apiError } from '@/lib/api/response'
-import { getAssessmentById, getLearnerMarks } from '@/lib/assessments/queries'
+import { getAssessmentById, getLearnerMarks } from '@/lib/assessments/getters'
 
 export async function GET(
   _req: Request,

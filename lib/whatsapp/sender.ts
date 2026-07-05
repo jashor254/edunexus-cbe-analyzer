@@ -16,7 +16,7 @@ export async function sendWhatsApp(phone: string, message: string): Promise<What
     components:   [{ type: 'body', parameters: [{ type: 'text', text: message.slice(0, 1024) }] }],
   })
 }
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://edunexus.co.ke'
 
@@ -57,17 +57,7 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 async function isDuplicate(type: string, referenceId: string): Promise<boolean> {
-  const db = createServiceClient()
-  const { data } = await db
-    .from('notification_log')
-    .select('id')
-    .eq('type', type)
-    .eq('reference_id', referenceId)
-    .eq('channel', 'whatsapp')
-    .eq('success', true)
-    .limit(1)
-    .maybeSingle()
-  return data !== null
+  return repos.notifications.isDuplicate(type, referenceId, 'whatsapp')
 }
 
 async function logAttempt(params: {
@@ -78,8 +68,7 @@ async function logAttempt(params: {
   success:     boolean
   errorMessage?: string
 }): Promise<void> {
-  const db = createServiceClient()
-  await db.from('notification_log').insert({
+  await repos.notifications.insertNotificationLog({
     user_id:       params.userId,
     type:          params.type,
     reference_id:  params.referenceId,
@@ -291,14 +280,14 @@ export async function sendWelcomeMessage(
       return { success: false, error: data.error?.message ?? `HTTP ${res.status}` }
     }
 
-    const db = createServiceClient()
-    await db.from('notification_log').insert({
-      channel:             'whatsapp',
-      type:                'welcome',
-      reference_id:        studentId,
-      phone_number:        phone,
-      whatsapp_message_id: data.messages?.[0]?.id ?? null,
-      success:             true,
+    await repos.notifications.insertNotificationLog({
+      user_id:              null,
+      channel:              'whatsapp',
+      type:                 'welcome',
+      reference_id:         studentId,
+      phone_number:         phone,
+      whatsapp_message_id:  data.messages?.[0]?.id ?? null,
+      success:              true,
     })
 
     return { success: true }

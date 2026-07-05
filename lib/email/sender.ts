@@ -3,7 +3,7 @@
 // Never throws — always returns { success, error? }.
 
 import { resend, getEmailFrom } from '@/lib/resend-client'
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 import {
   assignmentMarkedEmail,
   alertCreatedEmail,
@@ -19,17 +19,7 @@ type SendResult = { success: boolean; error?: string }
 // ---------------------------------------------------------------------------
 
 async function isDuplicate(type: string, referenceId: string): Promise<boolean> {
-  const db = createServiceClient()
-  const { data } = await db
-    .from('notification_log')
-    .select('id')
-    .eq('type', type)
-    .eq('reference_id', referenceId)
-    .eq('channel', 'email')
-    .eq('success', true)
-    .limit(1)
-    .maybeSingle()
-  return data !== null
+  return repos.notifications.isDuplicate(type, referenceId, 'email')
 }
 
 async function logAttempt(params: {
@@ -40,8 +30,7 @@ async function logAttempt(params: {
   success: boolean
   errorMessage?: string
 }): Promise<void> {
-  const db = createServiceClient()
-  await db.from('notification_log').insert({
+  await repos.notifications.insertNotificationLog({
     user_id:       params.userId,
     type:          params.type,
     reference_id:  params.referenceId,

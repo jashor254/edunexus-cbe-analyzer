@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 import { getModulesWithProgress, getPhaseStats } from './queries'
 import { getReflectionStats } from './reflections'
 import { getEvidenceStats } from './evidence'
@@ -39,13 +39,8 @@ export type PortfolioData = {
 }
 
 async function getMissionStats(teacherId: string): Promise<{ completed: number; avgAiScore: number | null }> {
-  const db = createServiceClient()
-  const { data } = await db
-    .from('academy_mission_completions')
-    .select('ai_score')
-    .eq('teacher_id', teacherId)
+  const rows = await repos.academy.findMissionCompletionScores(teacherId)
 
-  const rows = data ?? []
   const scored = rows.filter(r => r.ai_score !== null)
   const avgAiScore =
     scored.length > 0
@@ -56,19 +51,7 @@ async function getMissionStats(teacherId: string): Promise<{ completed: number; 
 }
 
 async function getToolUsage(teacherId: string): Promise<PortfolioData['toolUsage']> {
-  const db = createServiceClient()
-
-  const [lpRes, sowRes, rowRes] = await Promise.all([
-    db.from('lesson_plans').select('id', { count: 'exact', head: true }).eq('teacher_id', teacherId),
-    db.from('schemes_of_work').select('id', { count: 'exact', head: true }).eq('teacher_id', teacherId),
-    db.from('records_of_work').select('id', { count: 'exact', head: true }).eq('teacher_id', teacherId),
-  ])
-
-  return {
-    lessonPlans:   lpRes.count  ?? 0,
-    schemesOfWork: sowRes.count ?? 0,
-    recordsOfWork: rowRes.count ?? 0,
-  }
+  return repos.academy.findToolUsageCounts(teacherId)
 }
 
 function buildBadges(
@@ -148,14 +131,7 @@ function buildBadges(
 }
 
 export async function getPortfolioData(teacherId: string): Promise<PortfolioData> {
-  const db = createServiceClient()
-
-  const { data: teacher } = await db
-    .from('teachers')
-    .select('id, full_name, school, created_at')
-    .eq('id', teacherId)
-    .single()
-
+  const teacher = await repos.academy.findTeacher(teacherId)
   if (!teacher) throw new Error('Teacher not found')
 
   // All data fetched in parallel — no waterfalls

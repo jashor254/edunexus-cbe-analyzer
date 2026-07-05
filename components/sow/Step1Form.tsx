@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { ChevronRight, Loader2, GraduationCap, Clock, BookOpen, X, Plus } from 'lucide-react'
-import { createClient } from '@/utils/supabase/client'
 import type { SOWContext, CurriculumMode } from '@/lib/sow/types'
 import { getSetBooksForSubject } from '@/lib/sow/setBooks'
 
@@ -66,8 +65,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function Step1Form({ onComplete }: { onComplete: (ctx: SOWContext) => void }) {
-  const supabase = createClient()
-
   // ── A: Curriculum mode
   const [curriculumMode, setCurriculumMode] = useState<CurriculumMode>('cbc_senior')
 
@@ -96,29 +93,25 @@ export default function Step1Form({ onComplete }: { onComplete: (ctx: SOWContext
   const [term, setTerm] = useState<1 | 2 | 3>(1)
   const [year, setYear] = useState(CURRENT_YEAR)
 
-  // ── Pre-fill teacher info on mount
+  // ── Pre-fill teacher info on mount via API (no direct DB calls in components)
   useEffect(() => {
     async function prefill() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data: teacher } = await supabase
-        .from('teachers')
-        .select('full_name, school')
-        .eq('user_id', user.id)
-        .single()
-
-      if (teacher) {
-        setTeacherName(t => t || teacher.full_name || '')
-        setSchool(s => s || teacher.school || '')
-      }
+      try {
+        const res = await fetch('/api/teacher/profile')
+        if (!res.ok) return
+        const json = await res.json() as { data?: { teacher?: { full_name?: string; school?: string } } }
+        const teacher = json.data?.teacher
+        if (teacher) {
+          setTeacherName(t => t || teacher.full_name || '')
+          setSchool(s => s || teacher.school || '')
+        }
+      } catch { /* silently skip prefill on network error */ }
 
       // TSC saved locally during setup
-      const savedTsc = typeof window !== 'undefined' ? localStorage.getItem('teacher_tsc') || '' : ''
+      const savedTsc = typeof window !== 'undefined' ? localStorage.getItem('teacher_tsc') ?? '' : ''
       setTscNumber(t => t || savedTsc)
     }
     prefill()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ── Load grades when curriculum mode changes
@@ -135,30 +128,18 @@ export default function Step1Form({ onComplete }: { onComplete: (ctx: SOWContext
 
     async function loadGrades() {
       try {
-        // Use only the first (primary) level per curriculum type.
-        // For cbc_senior there are multiple levels; only "Senior School"
-        // (order_index 0) has the full seeded dataset.
-        const { data: levels, error: lvlErr } = await supabase
-          .from('sow_levels')
-          .select('id')
-          .eq('curriculum_type', dbType)
-          .order('order_index')
-          .limit(1)
-
-        if (lvlErr || !levels?.length) {
-          setLevelError(`No "${dbType}" level found. Run the seed script first.`)
+        const res = await fetch(`/api/sow/grades?mode=${encodeURIComponent(curriculumMode)}`)
+        if (!res.ok) {
+          setLevelError('Failed to load grades.')
           return
         }
-
-        const { data: gradesData, error: grErr } = await supabase
-          .from('sow_grades')
-          .select('id, level_id, name, numeric_grade, order_index')
-          .eq('level_id', levels[0].id)
-          .eq('is_active', true)
-          .order('numeric_grade')
-
-        if (grErr) { setLevelError('Failed to load grades.'); return }
-        setGrades(gradesData || [])
+        const json = await res.json() as { data?: { grades?: SowGrade[] } }
+        const gradesData = json.data?.grades ?? []
+        if (!gradesData.length) {
+          setLevelError(`No "${dbType}" grades found. Run the seed script first.`)
+          return
+        }
+        setGrades(gradesData)
       } catch {
         setLevelError('Failed to load grades.')
       } finally {
@@ -180,12 +161,14 @@ export default function Step1Form({ onComplete }: { onComplete: (ctx: SOWContext
 
     async function loadAreas() {
       try {
-        const { data } = await supabase
-          .from('sow_learning_areas')
-          .select('id, grade_id, name, order_index')
-          .eq('grade_id', selectedGradeId)
-          .order('order_index')
-        setLearningAreas(data || [])
+        const grade = grades.find(g => g.id === selectedGradeId)
+        if (!grade) { setLoadingAreas(false); return }
+        const res = await fetch(
+          `/api/sow/learning-areas?grade=${encodeURIComponent(grade.name)}&mode=${encodeURIComponent(curriculumMode)}`
+        )
+        if (!res.ok) { setLoadingAreas(false); return }
+        const json = await res.json() as { data?: { areas?: SowLearningArea[] } }
+        setLearningAreas(json.data?.areas ?? [])
       } finally {
         setLoadingAreas(false)
       }

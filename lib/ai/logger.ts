@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 import { env } from '@/lib/config/env'
 
 export interface AICallLog {
@@ -28,19 +28,7 @@ export async function logAICall(log: AICallLog): Promise<void> {
   }
 
   try {
-    const db = createServiceClient()
-    await db.from('ai_call_logs').insert({
-      feature:     log.feature,
-      model:       log.model,
-      prompt:      log.prompt.substring(0, 500),
-      response:    log.response?.substring(0, 500),
-      latency_ms:  log.latencyMs,
-      token_count: log.tokenCount,
-      success:     log.success,
-      error:       log.error,
-      user_id:     log.userId,
-      created_at:  new Date().toISOString(),
-    })
+    await repos.analytics.insertAICallLog(log)
   } catch {
     // Logging must never crash the caller — silently drop the failure.
   }

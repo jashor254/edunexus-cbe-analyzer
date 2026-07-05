@@ -1,6 +1,7 @@
 // POST: Generate PDF HTML for one or multiple lesson plans
 // Body: { planIds: string[] }
 // Returns: HTML string to open in print dialog
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import {
@@ -13,14 +14,19 @@ import {
 import { generateLessonPlanHTML } from '@/lib/lessonPlan/pdfRenderer'
 import type { LessonPlanRecord } from '@/lib/lessonPlan/types'
 
+const DownloadSchema = z.object({
+  planIds: z.array(z.string().uuid()).min(1),
+})
+
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return apiUnauthorized()
 
-    const { planIds } = await req.json()
-    if (!planIds?.length) return apiBadRequest('planIds required')
+    const parsed = DownloadSchema.safeParse(await req.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'planIds required')
+    const { planIds } = parsed.data
 
     const db = createServiceClient()
 

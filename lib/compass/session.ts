@@ -2,7 +2,8 @@
 // Session lifecycle: create, rotate, expire, record.
 // No AI logic — no prompts, no DeepSeek calls here.
 
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
+import { publishEvent } from '@/lib/events'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -58,82 +59,53 @@ export async function getOrCreateSession(
   subject:   string,
   mode:      'school' | 'holiday'
 ): Promise<SessionHandle> {
-  const db = createServiceClient()
-
   // School sessions: resume any active session touched in the last 3 h AND started today.
   // Holiday sessions: 30-minute window (shorter, focused bursts).
   const resumeMs      = mode === 'school' ? SCHOOL_RESUME_MS : SESSION_TTL_MS
   const resumeCutoff  = new Date(Date.now() - resumeMs).toISOString()
   const todayStart    = new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
 
-  const { data: existing } = await db
-    .from('compass_sessions')
-    .select('id, created_at')
-    .eq('learner_id', studentId)
-    .eq('subject', subject)
-    .eq('status', 'active')
-    .gte('updated_at', resumeCutoff)   // last exchange was recent
-    .gte('created_at', todayStart)     // started today — don't bleed across days
-    .order('updated_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const existing = await repos.compass.findResumableSession(studentId, subject, resumeCutoff, todayStart)
 
   if (existing) {
     return {
-      sessionId: existing.id as string,
+      sessionId: existing.id,
       isNew:     false,
-      startedAt: existing.created_at as string,
+      startedAt: existing.created_at,
     }
   }
 
   // No resumable session — close out any stale 'active' rows left behind by a
-  // tab close/crash so they don't sit open forever (catches what an explicit
-  // end-session call would otherwise miss).
-  const { data: stale } = await db
-    .from('compass_sessions')
-    .select('id, created_at, updated_at')
-    .eq('learner_id', studentId)
-    .eq('subject', subject)
-    .eq('status', 'active')
+  // tab close/crash so they don't sit open forever.
+  const stale = await repos.compass.findStaleActiveSessions(studentId, subject)
 
-  if (stale && stale.length > 0) {
+  if (stale.length > 0) {
     await Promise.all(
       stale.map(row => {
         const durationSeconds = Math.max(
           0,
           Math.round(
-            (new Date(row.updated_at as string).getTime() - new Date(row.created_at as string).getTime()) / 1000
+            (new Date(row.updated_at).getTime() - new Date(row.created_at).getTime()) / 1000
           )
         )
-        return db
-          .from('compass_sessions')
-          .update({ status: 'abandoned', completed_at: new Date().toISOString(), duration_seconds: durationSeconds })
-          .eq('id', row.id as string)
+        return repos.compass.abandonSession(row.id, durationSeconds)
       })
     )
   }
 
-  const { data: created, error } = await db
-    .from('compass_sessions')
-    .insert({
-      learner_id:     studentId,
-      subject,
-      mode,
-      status:         'active',
-      exchange_count: 0,
-      session_state:  {},
-    })
-    .select('id, created_at')
-    .single()
-
-  if (error || !created) {
-    throw new Error(`[compass/session] Failed to create session: ${error?.message ?? 'unknown'}`)
-  }
+  const created = await repos.compass.createSession({
+    learner_id:     studentId,
+    subject,
+    mode,
+    status:         'active',
+    exchange_count: 0,
+    session_state:  {},
+  })
 
   return {
-    sessionId: created.id as string,
+    sessionId: created.id,
     isNew:     true,
-    startedAt: created.created_at as string,
+    startedAt: created.created_at,
   }
 }
 
@@ -146,46 +118,24 @@ export async function shouldRestSubject(
   studentId: string,
   _subject:  string
 ): Promise<boolean> {
-  const db = createServiceClient()
-
-  const { data } = await db
-    .from('student_learning_context')
-    .select('subject_rest_until')
-    .eq('student_id', studentId)
-    .maybeSingle()
-
-  const restUntil = data?.subject_rest_until as string | null
+  const restUntil = await repos.compass.getSubjectRestUntil(studentId)
   if (!restUntil) return false
-
   return new Date(restUntil) > new Date()
 }
 
 // ── 3. getNextSubject ──────────────────────────────────────────────────────────
 
 export async function getNextSubject(studentId: string): Promise<NextSubject> {
-  const db = createServiceClient()
-
-  const [contextResult, lastSessionResult] = await Promise.all([
-    db.from('student_learning_context')
-      .select('subject_tiers, compass_bridge, recommended_pathway, grade, session_goal')
-      .eq('student_id', studentId)
-      .maybeSingle(),
-    db.from('compass_sessions')
-      .select('subject')
-      .eq('learner_id', studentId)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+  const [ctx, lastSubject] = await Promise.all([
+    repos.compass.getStudentLearningContext(studentId),
+    repos.compass.getLastActiveSessionSubject(studentId),
   ])
 
-  const ctx           = contextResult.data
-  const subjectTiers  = (ctx?.subject_tiers   ?? {}) as Record<string, string>
-  const compassBridge = (ctx?.compass_bridge  ?? {}) as Record<string, unknown>
-  const pathway       = ctx?.recommended_pathway as string | null
-  const grade         = (ctx?.grade as number | null) ?? 7
+  const subjectTiers  = ctx?.subject_tiers  ?? {}
+  const compassBridge = ctx?.compass_bridge ?? {}
+  const pathway       = ctx?.recommended_pathway ?? null
+  const grade         = ctx?.grade ?? 7
   const isSenior      = grade >= 10
-  const lastSubject   = lastSessionResult.data?.subject as string | null
 
   // a) Teacher recommendation — highest priority
   if (compassBridge.teacherSuggested && compassBridge.firstSubject) {
@@ -227,7 +177,7 @@ export async function getNextSubject(studentId: string): Promise<NextSubject> {
   }
 
   // Holiday plan: use session_goal as the subtopic hint when set
-  const sessionGoal = (ctx?.session_goal as string | null) ?? null
+  const sessionGoal = ctx?.session_goal ?? null
   const reason: NextSubject['reason'] = sessionGoal
     ? 'holiday_plan'
     : pick.level <= 2
@@ -244,21 +194,9 @@ export async function getNextSubject(studentId: string): Promise<NextSubject> {
 // ── 4. recordExchange ─────────────────────────────────────────────────────────
 
 export async function recordExchange(sessionId: string): Promise<number> {
-  const db = createServiceClient()
-
-  const { data } = await db
-    .from('compass_sessions')
-    .select('exchange_count')
-    .eq('id', sessionId)
-    .maybeSingle()
-
-  const next = ((data?.exchange_count as number | null) ?? 0) + 1
-
-  await db
-    .from('compass_sessions')
-    .update({ exchange_count: next })
-    .eq('id', sessionId)
-
+  const current = await repos.compass.getExchangeCount(sessionId)
+  const next = current + 1
+  await repos.compass.updateExchangeCount(sessionId, next)
   return next
 }
 
@@ -274,23 +212,27 @@ export async function endSession(
   sessionId:       string,
   learnerId:       string,
   status:          'completed' | 'abandoned',
-  durationSeconds: number
+  durationSeconds: number,
+  subject?:        string,
 ): Promise<void> {
-  const db = createServiceClient()
+  const exchangeCount = await repos.compass.getExchangeCount(sessionId)
+  await repos.compass.endSession(sessionId, learnerId, status, durationSeconds)
 
-  const { error } = await db
-    .from('compass_sessions')
-    .update({
-      status,
-      completed_at:     new Date().toISOString(),
-      duration_seconds: Math.max(0, Math.round(durationSeconds)),
-    })
-    .eq('id', sessionId)
-    .eq('learner_id', learnerId)
-    .eq('status', 'active')
-
-  if (error) {
-    throw new Error(`[compass/session] Failed to end session: ${error.message}`)
+  if (status === 'completed') {
+    void publishEvent({
+      event_type:      'student.session.completed',
+      resource_type:   'compass_session',
+      resource_id:     sessionId,
+      actor_id:        learnerId,
+      payload: {
+        session_id:       sessionId,
+        student_id:       learnerId,
+        subject:          subject ?? 'unknown',
+        exchanges:        exchangeCount,
+        duration_seconds: durationSeconds,
+      },
+      idempotency_key: `student.session.completed:${sessionId}`,
+    }).catch(err => console.error('[events] student.session.completed:', err instanceof Error ? err.message : String(err)))
   }
 }
 
@@ -300,19 +242,10 @@ export async function readSession(
   sessionId: string,
   userId:    string
 ): Promise<CompassSession | null> {
-  const db = createServiceClient()
+  const state = await repos.compass.findSessionState(sessionId, userId)
+  if (!state) return null
 
-  const { data } = await db
-    .from('compass_sessions')
-    .select('session_state')
-    .eq('id', sessionId)
-    .eq('learner_id', userId)
-    .eq('status', 'active')
-    .maybeSingle()
-
-  if (!data?.session_state) return null
-
-  const s = data.session_state as Record<string, unknown>
+  const s = state
 
   return {
     sessionId,
@@ -332,25 +265,16 @@ export async function writeSession(
   sessionId: string,
   update:    Partial<CompassSession>
 ): Promise<void> {
-  const db = createServiceClient()
-
   // The only caller (app/api/learn/route.ts) passes all CompassSession fields,
   // so the previous SELECT-then-merge pattern was reading back what was just written.
   // Build the new state directly from the update and write in one round-trip.
   const newState = { ...update, initialized: true }
 
-  const { error } = await db
-    .from('compass_sessions')
-    .update({
-      session_state: newState,
-      last_subject:  (update.lockedSubject as string | null) ?? null,
-      updated_at:    new Date().toISOString(),
-    })
-    .eq('id', sessionId)
-
-  if (error) {
-    console.error('[writeSession] FAILED:', error)
-  }
+  await repos.compass.updateSessionState(
+    sessionId,
+    newState,
+    (update.lockedSubject as string | null) ?? null,
+  )
 }
 
 export function resolveSubject(

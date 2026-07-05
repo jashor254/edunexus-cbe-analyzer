@@ -6,7 +6,7 @@
 // No business logic lives in routes — only here.
 
 import { createClient } from '@/utils/supabase/server'
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 import {
   TOKEN_COSTS,
   FEATURE_ACCESS,
@@ -27,20 +27,19 @@ const CACHE_TTL_MS = 60_000
  * Resolution order: admin → teacher-free → subscriber → token balance.
  * Always returns userId in the allowed result to avoid double auth calls in routes.
  *
- * getSession() reads the JWT from the cookie (no network round-trip). Safe here
- * because this is an access-check, not a security-critical write path.
- * The DB queries that follow are cached per user+feature for 60 seconds.
+ * getUser() validates the JWT with the Supabase server — revoked or tampered
+ * tokens are rejected. The DB queries that follow are cached per user+feature
+ * for 60 seconds.
  */
 export async function checkFeatureAccess(
   feature: FeatureKey
 ): Promise<AccessResult> {
-  // 1. Auth — getSession() reads the local JWT cookie, no Supabase network call
+  // 1. Auth — getUser() performs server-side token validation (no cookie-only trust)
   const supabase = await createClient()
-  const { data: { session }, error: authError } = await supabase.auth.getSession()
-  if (!session?.user || authError) {
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (!user || authError) {
     return { allowed: false, reason: 'unauthenticated' }
   }
-  const user = session.user
 
   // 2. Cache check — short-circuits all DB queries after the first call
   const cacheKey = `${user.id}-${feature}`
@@ -59,15 +58,9 @@ export async function checkFeatureAccess(
     return cacheAndReturn({ allowed: true, tier: 'subscriber', deductTokens: false, userId: user.id })
   }
 
-  const db = createServiceClient()
-
   // 4. Single profiles query — covers admin role, teacher role, and secondary_role
   //    Replaces the separate isAdmin() DB call + profiles query that ran sequentially
-  const { data: profile } = await db
-    .from('profiles')
-    .select('role, secondary_role')
-    .eq('id', user.id)
-    .maybeSingle()
+  const profile = await repos.billing.findProfileRole(user.id)
 
   const primaryRole   = profile?.role         ?? 'parent'
   const secondaryRole = profile?.secondary_role ?? null
@@ -91,26 +84,18 @@ export async function checkFeatureAccess(
 
   // 6. Subscription + token balance — fetched in parallel since both are needed
   //    to make a final decision when there's no subscription
-  const [subscriptionRes, balanceRes] = await Promise.all([
-    db.from('subscriptions')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .gt('expires_at', new Date().toISOString())
-      .maybeSingle(),
-    db.from('token_balances')
-      .select('balance')
-      .eq('user_id', user.id)
-      .maybeSingle(),
+  const [subscription, balance] = await Promise.all([
+    repos.billing.findActiveSubscription(user.id),
+    repos.billing.findTokenBalance(user.id),
   ])
 
-  if (subscriptionRes.data) {
+  if (subscription) {
     return cacheAndReturn({ allowed: true, tier: 'subscriber', deductTokens: false, userId: user.id })
   }
 
   // 7. Token balance — last resort
   const cost      = TOKEN_COSTS[feature]
-  const available = balanceRes.data?.balance ?? 0
+  const available = balance?.balance ?? 0
   if (available < cost) {
     return cacheAndReturn({ allowed: false, reason: 'insufficient_tokens' })
   }
@@ -128,12 +113,8 @@ export async function deductFeatureTokens(
   feature: FeatureKey,
   cost: number
 ): Promise<void> {
-  const db = createServiceClient()
-  const { error } = await db.rpc('deduct_tokens', {
-    p_user_id: userId,
-    p_action:  feature,
-    p_tokens:  cost,
-    p_metadata: { feature, timestamp: new Date().toISOString() },
+  await repos.billing.deductTokens(userId, feature, cost, {
+    feature,
+    timestamp: new Date().toISOString(),
   })
-  if (error) throw new Error(`Token deduction failed: ${error.message}`)
 }

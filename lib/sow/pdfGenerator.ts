@@ -1,3 +1,4 @@
+import { esc } from '@/lib/pdf/utils'
 // lib/sow/pdfGenerator.ts
 // Generates HTML for printing/downloading as PDF.
 // Follows KNEC SOW template format.
@@ -72,8 +73,8 @@ export function generateSOWHtml(data: SOWPreviewData): string {
       <td class="cell-center" style="color:${c.text};">—</td>
       <td colspan="8" style="padding:5px 8px;">
         <span style="display:inline-block;background:${c.border};color:#fff;font-size:7pt;font-weight:900;padding:1px 6px;border-radius:3px;letter-spacing:0.5px;">BREAK</span>
-        <strong style="color:${c.text};margin-left:6px;">${escHtml(b.title)}</strong>
-        <span style="color:${c.text};font-size:7pt;margin-left:6px;opacity:0.7;">${escHtml(wkRange)}</span>
+        <strong style="color:${c.text};margin-left:6px;">${esc(b.title)}</strong>
+        <span style="color:${c.text};font-size:7pt;margin-left:6px;opacity:0.7;">${esc(wkRange)}</span>
       </td>
     </tr>`
   }
@@ -95,14 +96,14 @@ export function generateSOWHtml(data: SOWPreviewData): string {
     <tr>
       <td class="cell-center">${l.week}</td>
       <td class="cell-center">${l.lesson}</td>
-      <td>${escHtml(l.strand)}</td>
-      <td style="${substrandStyle}">${escHtml(l.substrand)}</td>
+      <td>${esc(l.strand)}</td>
+      <td style="${substrandStyle}">${esc(l.substrand)}</td>
       <td>${bulletList(l.learningOutcomes)}</td>
       <td>${bulletList(l.learningExperiences)}</td>
       <td>${bulletList(l.keyInquiryQuestions)}</td>
       <td>${bulletList(l.learningResources)}</td>
       <td>${bulletList(l.assessmentMethods)}</td>
-      <td>${escHtml(l.reflection || '')}</td>
+      <td>${esc(l.reflection || '')}</td>
     </tr>`)
   }
   while (bi < sortedBreaks.length) {
@@ -118,7 +119,7 @@ export function generateSOWHtml(data: SOWPreviewData): string {
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>${escHtml(meta.learningArea)} ${escHtml(meta.grade)} — SOW Term ${escHtml(meta.term)} ${meta.year}</title>
+  <title>${esc(meta.learningArea)} ${esc(meta.grade)} — SOW Term ${esc(meta.term)} ${meta.year}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -283,19 +284,19 @@ export function generateSOWHtml(data: SOWPreviewData): string {
         <div class="cover-section">
           <div class="cover-row">
             <span class="cover-label">Subject</span>
-            <span class="cover-value">${escHtml(meta.learningArea)}</span>
+            <span class="cover-value">${esc(meta.learningArea)}</span>
           </div>
           <div class="cover-row">
             <span class="cover-label">Grade / Form</span>
-            <span class="cover-value">${escHtml(meta.grade)}</span>
+            <span class="cover-value">${esc(meta.grade)}</span>
           </div>
           <div class="cover-row">
             <span class="cover-label">Term</span>
-            <span class="cover-value">Term ${escHtml(meta.term)} · ${meta.year}</span>
+            <span class="cover-value">Term ${esc(meta.term)} · ${meta.year}</span>
           </div>
           <div class="cover-row">
             <span class="cover-label">School</span>
-            <span class="cover-value">${escHtml(school)}</span>
+            <span class="cover-value">${esc(school)}</span>
           </div>
         </div>
 
@@ -304,11 +305,11 @@ export function generateSOWHtml(data: SOWPreviewData): string {
         <div class="cover-section">
           <div class="cover-row">
             <span class="cover-label">Teacher's Name</span>
-            <span class="cover-value">${escHtml(teacherName)}</span>
+            <span class="cover-value">${esc(teacherName)}</span>
           </div>
           <div class="cover-row">
             <span class="cover-label">TSC Number</span>
-            <span class="cover-value">${escHtml(meta.tscNumber || '')}</span>
+            <span class="cover-value">${esc(meta.tscNumber || '')}</span>
           </div>
           <div class="cover-row">
             <span class="cover-label">Signature</span>
@@ -335,19 +336,19 @@ export function generateSOWHtml(data: SOWPreviewData): string {
 
     <!-- Header -->
     <div class="header-title">SCHEME OF WORK</div>
-    <div class="header-sub">${escHtml(meta.learningArea)} · ${escHtml(meta.grade)} · Term ${escHtml(meta.term)} ${meta.year}</div>
+    <div class="header-sub">${esc(meta.learningArea)} · ${esc(meta.grade)} · Term ${esc(meta.term)} ${meta.year}</div>
 
     <!-- Meta info -->
     <div class="meta-grid">
-      <div class="meta-item"><strong>School</strong>${escHtml(school)}</div>
-      <div class="meta-item"><strong>Subject</strong>${escHtml(meta.learningArea)}</div>
-      <div class="meta-item"><strong>Grade / Form</strong>${escHtml(meta.grade)}</div>
-      <div class="meta-item"><strong>Term</strong>Term ${escHtml(meta.term)}</div>
+      <div class="meta-item"><strong>School</strong>${esc(school)}</div>
+      <div class="meta-item"><strong>Subject</strong>${esc(meta.learningArea)}</div>
+      <div class="meta-item"><strong>Grade / Form</strong>${esc(meta.grade)}</div>
+      <div class="meta-item"><strong>Term</strong>Term ${esc(meta.term)}</div>
       <div class="meta-item"><strong>Year</strong>${meta.year}</div>
-      <div class="meta-item"><strong>Textbook</strong>${escHtml(meta.textbook || '—')}</div>
+      <div class="meta-item"><strong>Textbook</strong>${esc(meta.textbook || '—')}</div>
       <div class="meta-item"><strong>Total Lessons</strong>${meta.totalLessons}</div>
       <div class="meta-item"><strong>Total Weeks</strong>${meta.totalWeeks}</div>
-      <div class="meta-item"><strong>Date</strong>${escHtml(meta.generatedDate)}</div>
+      <div class="meta-item"><strong>Date</strong>${esc(meta.generatedDate)}</div>
     </div>
 
     <!-- SOW Table -->
@@ -374,7 +375,7 @@ export function generateSOWHtml(data: SOWPreviewData): string {
     <!-- Summary footer -->
     <div class="summary">
       <span>Total Lessons: <strong>${meta.totalLessons}</strong></span>
-      <span>EduNexus · For Kenyan Teachers · ${escHtml(meta.generatedDate)}</span>
+      <span>EduNexus · For Kenyan Teachers · ${esc(meta.generatedDate)}</span>
     </div>
   </div>
 
@@ -454,15 +455,7 @@ export function downloadSOWAsText(data: SOWPreviewData): string {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function escHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
-
 function bulletList(items: string[]): string {
   if (!items || items.length === 0) return '—'
-  return `<ul>${items.map(i => `<li>${escHtml(i.replace(BTEOTLE_RE, ''))}</li>`).join('')}</ul>`
+  return `<ul>${items.map(i => `<li>${esc(i.replace(BTEOTLE_RE, ''))}</li>`).join('')}</ul>`
 }

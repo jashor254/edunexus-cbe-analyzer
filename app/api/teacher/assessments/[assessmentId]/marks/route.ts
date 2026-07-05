@@ -4,7 +4,8 @@ import { createServiceClient } from '@/utils/supabase/service'
 import {
   apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest, apiNotFound,
 } from '@/lib/api/response'
-import { getAssessmentById, getLearnerMarks, bulkSaveMarks, triggerLearnerModelUpdates } from '@/lib/assessments/queries'
+import { getAssessmentById, getLearnerMarks } from '@/lib/assessments/getters'
+import { bulkSaveMarks, triggerLearnerModelUpdates } from '@/lib/assessments/mutations'
 
 const BulkSaveSchema = z.object({
   marks: z.array(z.object({

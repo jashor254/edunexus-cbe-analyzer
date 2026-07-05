@@ -2,14 +2,22 @@
 // Thin route — all logic lives in lib/payments/access.ts
 // Call this AFTER the AI response succeeds — never before.
 
+import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
 import { type FeatureKey, FEATURE_ACCESS } from '@/lib/payments/config'
 
+const TokenDeductSchema = z.object({
+  feature: z.string().optional(),
+})
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const feature = body?.feature as FeatureKey | undefined
+    const parsed = TokenDeductSchema.safeParse(await request.json())
+    if (!parsed.success) {
+      return NextResponse.json({ success: false, error: 'Invalid or missing feature' }, { status: 400 })
+    }
+    const feature = parsed.data.feature as FeatureKey | undefined
 
     if (!feature || !(feature in FEATURE_ACCESS)) {
       return NextResponse.json(

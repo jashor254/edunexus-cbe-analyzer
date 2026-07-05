@@ -2,6 +2,12 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
 import { SUBSCRIPTION_PLANS, TOKEN_PACK } from '@/lib/payments/config'
+import { z } from 'zod'
+
+const InitializeSchema = z.object({
+  productId:   z.string().min(1),
+  phoneNumber: z.string().min(1),
+})
 
 // Backend product map — prices pulled from config, never hardcoded here
 const PRODUCTS: Record<string, { price: number; type: string; label: string; tokens?: number }> = {
@@ -12,8 +18,12 @@ const PRODUCTS: Record<string, { price: number; type: string; label: string; tok
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
-    const { productId, phoneNumber } = body
+    const rawBody: unknown = await req.json()
+    const parsed = InitializeSchema.safeParse(rawBody)
+    if (!parsed.success) {
+      return apiBadRequest(parsed.error.message ?? 'Invalid request body')
+    }
+    const { productId, phoneNumber } = parsed.data
 
     // 🔐 1. Auth — anon client reads session cookie
     const supabase = await createClient()

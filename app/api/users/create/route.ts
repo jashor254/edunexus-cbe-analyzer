@@ -1,72 +1,80 @@
 // app/api/users/create/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { createServiceClient } from '@/utils/supabase/service';
+// Called post-signup to create the application-layer user record.
+// Auth is required — the caller must already have a valid Supabase session.
+import { z } from 'zod'
+import { NextRequest, NextResponse } from 'next/server'
+import { createServiceClient } from '@/utils/supabase/service'
+import { requireAuth } from '@/lib/api/middleware'
 
-const supabase = createServiceClient();
+const CreateUserSchema = z.object({
+  name:         z.string().trim().min(1).optional(),
+  referralCode: z.string().trim().min(1).optional(),
+})
 
 export async function POST(request: NextRequest) {
-  try {
-    const { email, name, referralCode } = await request.json();
+  const auth = await requireAuth()
+  if ('response' in auth) return auth.response
 
+  try {
+    const parsed = CreateUserSchema.safeParse(await request.json())
+    if (!parsed.success) {
+      return NextResponse.json({ success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 })
+    }
+    // name and referralCode are user-supplied metadata — not identity claims.
+    // email is always derived from the verified auth token, never trusted from body.
+    const { name, referralCode } = parsed.data
+
+    const email = auth.user.email
     if (!email) {
       return NextResponse.json(
-        { success: false, error: 'Email required' },
+        { success: false, error: 'No email on authenticated account' },
         { status: 400 }
-      );
+      )
     }
 
-    // Check if user already exists
-    const { data: existing } = await supabase
+    const db = createServiceClient()
+
+    // Check if user record already exists
+    const { data: existing } = await db
       .from('users')
       .select('id, email, referral_code')
-      .eq('email', email)
-      .single();
+      .eq('id', auth.user.id)
+      .single()
 
     if (existing) {
-      return NextResponse.json({
-        success: true,
-        user: existing,
-        message: 'User already exists',
-      });
+      return NextResponse.json({ success: true, user: existing, message: 'User already exists' })
     }
 
-    // Create user with referral
-    const { data, error } = await supabase
-      .rpc('create_user_with_referral', {
-        p_email: email,
-        p_name: name || null,
-        p_referred_by_code: referralCode || null,
-      });
+    const { data, error } = await db.rpc('create_user_with_referral', {
+      p_email:              email,
+      p_name:               name ?? null,
+      p_referred_by_code:   referralCode ?? null,
+    })
 
     if (error) {
-      console.error('User creation error:', error);
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
-      );
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
-    const userData = data[0];
+    const userData = data[0]
 
     return NextResponse.json({
       success: true,
       user: {
-        id: userData.user_id,
-        email: email,
+        id:           auth.user.id,
+        email,
         referralCode: userData.referral_code,
         freeAnalyses: userData.free_analyses,
       },
-      message: referralCode 
-        ? 'Account created! You and your referrer got bonus tokens!' 
+      message: referralCode
+        ? 'Account created! You and your referrer got bonus tokens!'
         : 'Account created! You have 1 free analysis!',
-    });
-  } catch (error: unknown) {
-    console.error('User creation API error:', error);
+    })
+  } catch (err: unknown) {
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Internal error' },
+      { success: false, error: err instanceof Error ? err.message : 'Internal error' },
       { status: 500 }
-    );
+    )
   }
 }
 
-export const dynamic = 'force-dynamic';
+export const dynamic = 'force-dynamic'

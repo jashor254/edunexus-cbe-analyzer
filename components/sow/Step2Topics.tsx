@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Loader2, AlertTriangle } from 'lucide-react'
-import { createClient } from '@/utils/supabase/client'
 import type { SOWContext, SelectedSubstrand } from '@/lib/sow/types'
 
 interface SowStrand {
@@ -34,8 +33,6 @@ export default function Step2Topics({
   onComplete: (subs: SelectedSubstrand[]) => void
   onBack: () => void
 }) {
-  const supabase = createClient()
-
   const is844 = context.curriculumMode === '844_form3' || context.curriculumMode === '844_form4'
   const strandLabel    = is844 ? 'Topic'     : 'Strand'
   const substrandLabel = is844 ? 'Sub-topic' : 'Sub-strand'
@@ -59,50 +56,42 @@ export default function Step2Topics({
       setHasNoData(false)
 
       try {
-        const { data: strandsData, error: stErr } = await supabase
-          .from('sow_strands')
-          .select('id, learning_area_id, title, order_index')
-          .eq('learning_area_id', context.learningArea)
-          .order('order_index')
-          .limit(500)
-
-        if (stErr) {
-          setError(`Failed to load ${strandLabel.toLowerCase()}s: ${stErr.message}`)
+        const res = await fetch(
+          `/api/sow/strands?learningAreaId=${encodeURIComponent(context.learningArea)}`
+        )
+        if (!res.ok) {
+          setError(`Failed to load ${strandLabel.toLowerCase()}s`)
           return
         }
+        type StrandWithSubs = { id: string; title: string; substrands: SowSubstrand[] }
+        const json = await res.json() as { data?: { strands?: StrandWithSubs[] } }
+        const strandsWithSubs = json.data?.strands ?? []
 
-        if (!strandsData || strandsData.length === 0) {
+        if (!strandsWithSubs.length) {
           setHasNoData(true)
           return
         }
 
-        const strandIds = strandsData.map(s => s.id)
+        // Flatten for backward-compatible state shape (strands + substrands separate)
+        const flatStrands: SowStrand[] = strandsWithSubs.map((s, i) => ({
+          id: s.id,
+          learning_area_id: context.learningArea,
+          title: s.title,
+          order_index: i,
+        }))
+        const flatSubstrands: SowSubstrand[] = strandsWithSubs.flatMap((s, si) =>
+          s.substrands.map((sub, i) => ({
+            id: sub.id,
+            strand_id: s.id,
+            title: sub.title,
+            suggested_lessons: sub.suggested_lessons,
+            order_index: i,
+          }))
+        )
 
-        // Fetch substrands in pages to avoid the PostgREST 1000-row default cap
-        const allSubstrands: SowSubstrand[] = []
-        const PAGE = 1000
-        let from = 0
-        while (true) {
-          const { data: page, error: subErr } = await supabase
-            .from('sow_substrands')
-            .select('id, strand_id, title, suggested_lessons, order_index')
-            .in('strand_id', strandIds)
-            .order('order_index')
-            .range(from, from + PAGE - 1)
-
-          if (subErr) {
-            setError(`Failed to load ${substrandLabel.toLowerCase()}s: ${subErr.message}`)
-            return
-          }
-
-          if (page) allSubstrands.push(...page)
-          if (!page || page.length < PAGE) break
-          from += PAGE
-        }
-
-        setStrands(strandsData)
-        setSubstrands(allSubstrands)
-        setExpanded(new Set(strandsData.map(s => s.id)))
+        setStrands(flatStrands)
+        setSubstrands(flatSubstrands)
+        setExpanded(new Set(flatStrands.map(s => s.id)))
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         setError(`Unexpected error loading curriculum data: ${msg}`)

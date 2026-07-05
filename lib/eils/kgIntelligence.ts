@@ -13,7 +13,6 @@
 import { analyseStudentRootCauses, buildStudentNodeData, getNodesForSubjectGrade } from '@/lib/knowledgeGraph'
 import type { RootCauseResult, KnowledgeNode } from '@/lib/knowledgeGraph/types'
 import type { LearnerProfile } from '@/lib/learnerModel/types'
-import { createServiceClient } from '@/utils/supabase/service'
 
 // ── Personalised Learning Path ────────────────────────────────────────────────
 
@@ -58,11 +57,10 @@ export async function buildPersonalisedLearningPath(
   profile:   LearnerProfile,
 ): Promise<PersonalisedLearningPath> {
   const now = new Date().toISOString()
-  const db = createServiceClient()
 
   const [rootCauses, studentNodeData] = await Promise.all([
-    analyseStudentRootCausesGracefully(db, studentId, grade),
-    buildStudentNodeData(db, studentId, grade),
+    analyseStudentRootCausesGracefully(studentId, grade),
+    buildStudentNodeData(studentId, grade),
   ])
 
   const steps: LearningPathStep[] = []
@@ -233,13 +231,13 @@ function buildFutureReadiness(
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function analyseStudentRootCausesGracefully(
-  db:        ReturnType<typeof createServiceClient>,
   studentId: string,
   grade:     number,
 ): Promise<RootCauseResult[]> {
   try {
-    return await analyseStudentRootCauses(db, studentId, grade)
-  } catch {
+    return await analyseStudentRootCauses(studentId, grade)
+  } catch (e: unknown) {
+    console.error('[kgIntelligence:analyseStudentRootCausesGracefully]', e instanceof Error ? e.message : String(e))
     return []
   }
 }

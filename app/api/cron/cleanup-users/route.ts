@@ -6,34 +6,33 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { getErrorMessage } from '@/lib/api/response'
-
-const supabase = createServiceClient()
+import { timingSafeEqualString } from '@/lib/api/secretCompare'
 
 export async function POST(request: NextRequest) {
+  // Create service client per-request to avoid shared state across serverless invocations
+  const supabase = createServiceClient()
   try {
     // ✅ Double-check auth (middleware handles first layer)
     const authHeader = request.headers.get('authorization')
     const cronSecret = process.env.CRON_SECRET
     const isVercelCron = request.headers.get('x-vercel-cron') === '1'
 
-    if (!isVercelCron && (!cronSecret || authHeader !== `Bearer ${cronSecret}`)) {
+    if (!isVercelCron && (!cronSecret || !timingSafeEqualString(authHeader, `Bearer ${cronSecret}`))) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       )
     }
 
-    console.log('🧹 Starting cleanup job...')
+    console.info('[cron/cleanup-users] Starting cleanup job')
 
     // ============================================================
     // 1. Expire free analyses
     // ============================================================
     const { error: expireError } = await supabase.rpc('expire_free_analyses')
     if (expireError) {
-      console.error('❌ expire_free_analyses error:', expireError.message)
+      console.error('[cron/cleanup-users] expire_free_analyses error:', expireError.message)
       // Non-fatal - continue
-    } else {
-      console.log('✅ Free analyses expired')
     }
 
     // ============================================================
@@ -41,10 +40,8 @@ export async function POST(request: NextRequest) {
     // ============================================================
     const { error: markError } = await supabase.rpc('mark_users_for_deletion')
     if (markError) {
-      console.error('❌ mark_users_for_deletion error:', markError.message)
+      console.error('[cron/cleanup-users] mark_users_for_deletion error:', markError.message)
       // Non-fatal - continue
-    } else {
-      console.log('✅ Users marked for deletion')
     }
 
     // ============================================================
@@ -52,7 +49,7 @@ export async function POST(request: NextRequest) {
     // ============================================================
     const { data: cleanupResults, error: cleanupError } = await supabase.rpc('cleanup_marked_users')
     if (cleanupError) {
-      console.error('❌ cleanup_marked_users error:', cleanupError.message)
+      console.error('[cron/cleanup-users] cleanup_marked_users error:', cleanupError.message)
       throw cleanupError // Fatal - report this
     }
 
@@ -62,7 +59,7 @@ export async function POST(request: NextRequest) {
       unverified_deleted: 0
     }
 
-    console.log('✅ Cleanup complete:', stats)
+    console.info('[cron/cleanup-users] Complete:', stats)
 
     return NextResponse.json({
       success: true,

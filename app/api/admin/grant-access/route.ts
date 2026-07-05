@@ -1,9 +1,15 @@
 // app/api/admin/grant-access/route.ts
+import { z } from 'zod'
 import { NextRequest } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
-import { apiSuccess, apiError, apiForbidden, apiUnauthorized } from '@/lib/api/response'
+import { apiSuccess, apiError, apiForbidden, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
 import { ADMIN_CONFIG } from '@/lib/config/api'
+
+const GrantAccessSchema = z.object({
+  email: z.string().email(),
+  days:  z.number().int().positive().optional().default(90),
+})
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,12 +24,9 @@ export async function POST(request: NextRequest) {
       return apiForbidden()
     }
 
-    const body = await request.json()
-    const { email, days = 90 } = body as { email: string; days?: number }
-
-    if (!email) {
-      return apiError('Missing email', 400)
-    }
+    const parsed = GrantAccessSchema.safeParse(await request.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
+    const { email, days } = parsed.data
 
     const service = createServiceClient()
 
@@ -61,13 +64,22 @@ export async function POST(request: NextRequest) {
       return apiError('Failed to grant subscription', 500)
     }
 
-    // Give 50 tokens
-    const { error: tokenError } = await service
+    // Add 50 tokens — increment existing balance rather than overwrite
+    const GRANT_TOKENS = 50
+    const { data: existingBalance } = await service
       .from('token_balances')
-      .upsert(
-        { user_id: target.id, balance: 50, total_ever: 50 },
-        { onConflict: 'user_id' }
-      )
+      .select('balance, total_ever')
+      .eq('user_id', target.id)
+      .maybeSingle()
+
+    const { error: tokenError } = await service.from('token_balances').upsert(
+      {
+        user_id:    target.id,
+        balance:    (existingBalance?.balance    ?? 0) + GRANT_TOKENS,
+        total_ever: (existingBalance?.total_ever ?? 0) + GRANT_TOKENS,
+      },
+      { onConflict: 'user_id' }
+    )
 
     if (tokenError) {
       console.error('Token upsert error:', tokenError)

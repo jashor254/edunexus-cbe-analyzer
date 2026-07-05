@@ -44,7 +44,7 @@ export async function GET() {
           .select('student_id')
           .eq('class_id', cls.id)
 
-        const studentIds = (studentLinks || []).map((s: any) => s.student_id)
+        const studentIds = (studentLinks || []).map((s: { student_id: string }) => s.student_id)
         let avgLevel = null
 
         if (studentIds.length > 0) {
@@ -56,8 +56,8 @@ export async function GET() {
             .limit(studentIds.length)
 
           if (assessments && assessments.length > 0) {
-            const allAvgs = assessments.map((a: any) => {
-              const scores = a.subject_scores as Record<string, number>
+            const allAvgs = assessments.map((a: { subject_scores: Record<string, number> }) => {
+              const scores = a.subject_scores
               const vals = Object.values(scores)
               return vals.reduce((s, v) => s + v, 0) / vals.length
             })

@@ -1,6 +1,7 @@
 // POST: Generate 3 reflection suggestion options for a lesson plan
 // Body: { planId: string }
 // Returns: { suggestions: string[] }
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import {
@@ -13,14 +14,19 @@ import {
 import { generateReflectionSuggestions } from '@/lib/lessonPlan/generator'
 import type { LessonPlanContext } from '@/lib/lessonPlan/types'
 
+const ReflectionSuggestionsSchema = z.object({
+  planId: z.string().uuid(),
+})
+
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return apiUnauthorized()
 
-    const { planId } = await req.json()
-    if (!planId) return apiBadRequest('planId required')
+    const parsed = ReflectionSuggestionsSchema.safeParse(await req.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'planId required')
+    const { planId } = parsed.data
 
     const db = createServiceClient()
 

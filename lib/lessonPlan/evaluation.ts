@@ -1,23 +1,10 @@
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 import type { FollowUp, ReflectionSource } from '@/lib/teachingIntelligence/types'
 
 export type EvaluationInput = {
   evaluation: string
   followUp: FollowUp
   reflectionSource?: ReflectionSource
-}
-
-type ExistingPlan = {
-  status: string
-  sow_id: string
-  strand: string
-  sub_strand: string
-}
-
-type HealthRow = {
-  id: string
-  struggle_count: number
-  lessons_covered: number
 }
 
 // Shared evaluation logic called by both the API route and seed/testing scripts.
@@ -27,64 +14,40 @@ export async function submitEvaluation(
   userId: string,
   input: EvaluationInput
 ): Promise<Record<string, unknown>> {
-  const db = createServiceClient()
+  const plan = await repos.curriculum.findLessonPlanStatus(planId, userId)
 
-  const { data: existing } = await db
-    .from('lesson_plans')
-    .select('status, sow_id, strand, sub_strand')
-    .eq('id', planId)
-    .eq('teacher_id', userId)
-    .single()
-
-  if (!existing) throw new Error(`Plan ${planId} not found or not owned by user`)
-  const plan = existing as ExistingPlan
+  if (!plan) throw new Error(`Plan ${planId} not found or not owned by user`)
 
   if (plan.status !== 'taught') {
     throw new Error('Plan must be marked as taught before evaluation can be saved')
   }
 
-  const { data: updated, error } = await db
-    .from('lesson_plans')
-    .update({
-      teacher_self_evaluation: input.evaluation,
-      teacher_flagged_followup: input.followUp,
-      ...(input.reflectionSource ? { reflection_source: input.reflectionSource } : {}),
-    })
-    .eq('id', planId)
-    .eq('teacher_id', userId)
-    .select()
-    .single()
-
-  if (error || !updated) throw new Error(`Failed to save evaluation: ${error?.message ?? 'unknown'}`)
+  const updated = await repos.curriculum.updateLessonPlanEvaluation(
+    planId,
+    userId,
+    input.evaluation,
+    input.followUp,
+    input.reflectionSource,
+  )
 
   // Synchronous substrand_health upsert — mirrors the behaviour of the evaluation API route.
   // lessons_covered always increments; struggle_count increments only on minor/major follow-up.
   if (plan.sow_id && plan.strand && plan.sub_strand) {
     const needsFlag = input.followUp !== 'none'
 
-    const { data: healthRow } = await db
-      .from('substrand_health')
-      .select('id, struggle_count, lessons_covered')
-      .eq('sow_id', plan.sow_id)
-      .eq('strand', plan.strand)
-      .eq('sub_strand', plan.sub_strand)
-      .maybeSingle()
+    const healthRow = await repos.curriculum.findSubstrandHealth(plan.sow_id, plan.strand, plan.sub_strand)
 
     if (healthRow) {
-      const h = healthRow as HealthRow
-      await db
-        .from('substrand_health')
-        .update({
-          lessons_covered: h.lessons_covered + 1,
-          ...(needsFlag ? {
-            struggle_count: h.struggle_count + 1,
-            last_flagged: new Date().toISOString(),
-          } : {}),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', h.id)
+      await repos.curriculum.updateSubstrandHealth(healthRow.id, {
+        lessons_covered: healthRow.lessons_covered + 1,
+        ...(needsFlag ? {
+          struggle_count: healthRow.struggle_count + 1,
+          last_flagged: new Date().toISOString(),
+        } : {}),
+        updated_at: new Date().toISOString(),
+      })
     } else {
-      await db.from('substrand_health').insert({
+      await repos.curriculum.insertSubstrandHealth({
         sow_id: plan.sow_id,
         teacher_id: userId,
         strand: plan.strand,
@@ -96,5 +59,5 @@ export async function submitEvaluation(
     }
   }
 
-  return updated as Record<string, unknown>
+  return updated
 }

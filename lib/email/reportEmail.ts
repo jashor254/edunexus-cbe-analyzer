@@ -2,7 +2,7 @@
 // Sends parent report email with PDF attachment via Resend.
 
 import { resend, getEmailFrom } from '@/lib/resend-client'
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://edunexus.co.ke'
 
@@ -23,19 +23,10 @@ export type ReportEmailParams = {
 
 export async function sendReportEmail(params: ReportEmailParams): Promise<SendResult> {
   try {
-    const db = createServiceClient()
-
     // Deduplicate: one report email per student per term/year
     const dedupKey = `report_${params.studentId}_${params.term}_${params.year}`
-    const { data: existing } = await db
-      .from('notification_log')
-      .select('id')
-      .eq('type', 'report_ready')
-      .eq('reference_id', dedupKey)
-      .eq('channel', 'email')
-      .eq('success', true)
-      .limit(1)
-      .maybeSingle()
+
+    const existing = await repos.notifications.isDuplicate('report_ready', dedupKey, 'email')
 
     if (existing) return { success: true }
 
@@ -99,7 +90,7 @@ export async function sendReportEmail(params: ReportEmailParams): Promise<SendRe
     })
 
     const success = !error
-    await db.from('notification_log').insert({
+    await repos.notifications.insertNotificationLog({
       user_id:       params.userId ?? null,
       type:          'report_ready',
       reference_id:  dedupKey,

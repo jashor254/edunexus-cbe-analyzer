@@ -1,6 +1,11 @@
+import { z } from 'zod'
 import { createClient }        from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiBadRequest, apiNotFound } from '@/lib/api/response'
+
+const JoinGroupSchema = z.object({
+  inviteCode: z.string().min(1),
+})
 
 export async function POST(req: Request) {
   try {
@@ -8,8 +13,9 @@ export async function POST(req: Request) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) return apiUnauthorized()
 
-    const { inviteCode } = await req.json()
-    if (!inviteCode) return apiBadRequest('Missing inviteCode')
+    const parsed = JoinGroupSchema.safeParse(await req.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Missing inviteCode')
+    const { inviteCode } = parsed.data
 
     const db = createServiceClient()
 

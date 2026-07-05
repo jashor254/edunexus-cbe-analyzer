@@ -1,5 +1,5 @@
 import { callGeminiJSON } from '@/lib/ai/gemini'
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 
 type GeneratedChallenge = {
   question:        string
@@ -11,26 +11,12 @@ type GeneratedChallenge = {
 }
 
 export async function generateChallengeForGroup(groupId: string): Promise<void> {
-  const db = createServiceClient()
-
-  const { data: group } = await db
-    .from('study_groups')
-    .select('id, subject, grade')
-    .eq('id', groupId)
-    .single()
-
+  const group = await repos.teachers.findStudyGroupById(groupId)
   if (!group) throw new Error(`Group ${groupId} not found`)
 
   const today = new Date().toISOString().split('T')[0]
-
-  const { data: existing } = await db
-    .from('study_group_challenges')
-    .select('id')
-    .eq('group_id', groupId)
-    .eq('date', today)
-    .maybeSingle()
-
-  if (existing) return
+  const covered = await repos.teachers.findCoveredChallenges([groupId], today)
+  if (covered.length > 0) return
 
   const prompt = `Generate a single CBC Kenya curriculum question for Grade ${group.grade} ${group.subject}.
 
@@ -64,7 +50,7 @@ Rules:
     throw new Error('Gemini returned incomplete challenge data')
   }
 
-  await db.from('study_group_challenges').insert({
+  await repos.teachers.insertStudyGroupChallenge({
     group_id:       groupId,
     date:           today,
     subject:        group.subject,
@@ -82,25 +68,14 @@ export async function generateChallengesForAllGroups(): Promise<{
   skipped:   number
   errors:    number
 }> {
-  const db = createServiceClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const { data: groups } = await db
-    .from('study_groups')
-    .select('id')
-    .eq('status', 'active')
-
-  if (!groups?.length) return { generated: 0, skipped: 0, errors: 0 }
+  const groups = await repos.teachers.findActiveStudyGroups()
+  if (!groups.length) return { generated: 0, skipped: 0, errors: 0 }
 
   const groupIds = groups.map(g => g.id)
-
-  const { data: covered } = await db
-    .from('study_group_challenges')
-    .select('group_id')
-    .eq('date', today)
-    .in('group_id', groupIds)
-
-  const coveredIds = new Set((covered || []).map(c => c.group_id))
+  const covered  = await repos.teachers.findCoveredChallenges(groupIds, today)
+  const coveredIds = new Set(covered.map(c => c.group_id))
   const pending    = groups.filter(g => !coveredIds.has(g.id))
 
   let generated = 0

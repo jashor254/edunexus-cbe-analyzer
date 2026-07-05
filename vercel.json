@@ -1,24 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/cron/cleanup-users",
-      "schedule": "0 0 * * *"
-    },
-    {
       "path": "/api/cron/friday-generation",
       "schedule": "0 15 * * 5"
-    },
-    {
-      "path": "/api/cron/study-group-challenges",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/snapshot-metrics",
-      "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api/cron/academy-nudge",
-      "schedule": "0 5 * * *"
     },
     {
       "path": "/api/cron/generate-record-of-work",

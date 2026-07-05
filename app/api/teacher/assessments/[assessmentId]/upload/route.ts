@@ -3,7 +3,8 @@ import { createServiceClient } from '@/utils/supabase/service'
 import {
   apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest, apiNotFound,
 } from '@/lib/api/response'
-import { getAssessmentById, upsertMarksCSV, triggerLearnerModelUpdates } from '@/lib/assessments/queries'
+import { getAssessmentById } from '@/lib/assessments/getters'
+import { upsertMarksCSV, triggerLearnerModelUpdates } from '@/lib/assessments/mutations'
 import type { MarkInput } from '@/lib/assessments/types'
 
 type UploadError = { row: number; field: string; message: string }
@@ -38,7 +39,15 @@ export async function POST(
     const file = formData.get('file')
     if (!file || typeof file === 'string') return apiBadRequest('CSV file required')
 
-    const text = await (file as Blob).text()
+    const fileBlob = file as File
+    const MAX_CSV_SIZE = 5 * 1024 * 1024 // 5 MB
+    if (fileBlob.size > MAX_CSV_SIZE) return apiBadRequest('File too large — CSV must be under 5 MB')
+    const mimeType = fileBlob.type
+    if (mimeType && mimeType !== 'text/csv' && mimeType !== 'application/csv' && mimeType !== 'application/vnd.ms-excel' && !mimeType.startsWith('text/')) {
+      return apiBadRequest('Invalid file type — only CSV files are accepted')
+    }
+
+    const text = await fileBlob.text()
     const rows = parseCSV(text)
     if (rows.length < 2) return apiBadRequest('CSV must have a header row and at least one data row')
 
@@ -98,7 +107,7 @@ export async function POST(
     )
 
     // Update Learner Model for linked students — fire and forget
-    triggerLearnerModelUpdates(assessmentId, teacher.id).catch(() => {})
+    triggerLearnerModelUpdates(assessmentId, teacher.id).catch((e: unknown) => console.error('[marks upload] triggerLearnerModelUpdates failed:', e instanceof Error ? e.message : String(e)))
 
     return apiSuccess({
       imported: result.inserted,

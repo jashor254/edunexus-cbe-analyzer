@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiUnauthorized, apiForbidden, apiNotFound, apiError } from '@/lib/api/response'
-import { getAssessmentById } from '@/lib/assessments/queries'
+import { getAssessmentById } from '@/lib/assessments/getters'
 
 export async function GET(
   _req: Request,
@@ -28,7 +28,7 @@ export async function GET(
       .eq('class_id', assessment.class_id)
 
     const studentNames: string[] = (classStudents || [])
-      .map((cs: any) => cs.students?.name as string)
+      .map(cs => (cs.students as unknown as { name: string } | null)?.name as string)
       .filter(Boolean)
 
     const headers = ['No', 'Name', 'Adm No', ...assessment.subjects, 'Total', 'Mean Score', 'Mean Grade', 'Position']

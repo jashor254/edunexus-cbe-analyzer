@@ -47,9 +47,14 @@ export class PaystackClient {
         .createHmac('sha512', this.secretKey)
         .update(body)
         .digest('hex');
-      
-      // Compare the hash with Paystack's signature
-      return hash === signature;
+
+      // Timing-safe comparison with Paystack's signature
+      const hashBuffer = Buffer.from(hash, 'utf8');
+      const sigBuffer = Buffer.from(signature, 'utf8');
+      return (
+        hashBuffer.length === sigBuffer.length &&
+        crypto.timingSafeEqual(hashBuffer, sigBuffer)
+      );
     } catch (error) {
       console.error('Webhook signature verification error:', error);
       return false;

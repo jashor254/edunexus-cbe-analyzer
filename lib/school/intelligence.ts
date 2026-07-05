@@ -7,7 +7,7 @@
 // Privacy contract enforced here: no student PII leaves this module
 // in the school-level output. Only anonymised counts and percentages.
 
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 import type {
   SchoolIntelligenceSummary, StrandHealthRecord, GradeHealthRecord,
   InterventionEfficacyRecord, TeacherActivitySignal, PrincipalDashboard,
@@ -19,17 +19,12 @@ export async function computeSchoolIntelligence(
   schoolId: string,
   weekOf?:  string,
 ): Promise<SchoolIntelligenceSummary> {
-  const db  = createServiceClient()
   const now = weekOf ?? new Date().toISOString().slice(0, 10)
 
   // 1. Find all teachers belonging to this school
-  const { data: teachers } = await db
-    .from('teachers')
-    .select('id, user_id, grade_levels, subjects')
-    .eq('school_name', schoolId)
-    .eq('is_verified', true)
+  const teachers = await repos.schools.findVerifiedTeachers(schoolId)
 
-  if (!teachers?.length) {
+  if (!teachers.length) {
     return buildEmptySummary(schoolId, now)
   }
 
@@ -37,38 +32,25 @@ export async function computeSchoolIntelligence(
   const teacherIds     = teachers.map(t => t.id as string)
 
   // 2. Find all classes taught by these teachers
-  const { data: classes } = await db
-    .from('teacher_classes')
-    .select('id, grade, subject, teacher_id')
-    .in('teacher_id', teacherIds)
+  const classes = await repos.schools.findTeacherClasses(teacherIds)
 
-  if (!classes?.length) {
+  if (!classes.length) {
     return buildEmptySummary(schoolId, now)
   }
 
   const classIds = classes.map(c => c.id as string)
 
   // 3. Find all enrolled students across all classes
-  const { data: enrollments } = await db
-    .from('class_students')
-    .select('student_id, class_id')
-    .in('class_id', classIds)
+  const enrollments = await repos.schools.findClassStudents(classIds)
 
-  if (!enrollments?.length) {
+  if (!enrollments.length) {
     return buildEmptySummary(schoolId, now)
   }
 
   const studentIds = [...new Set(enrollments.map(e => e.student_id as string))]
 
   // 4. Load learner profiles (only the fields we need — no PII beyond student_id)
-  const { data: profiles } = await db
-    .from('learner_profiles')
-    .select(
-      'student_id, overall_risk_level, capability_dimensions, risk_history, knowledge_state'
-    )
-    .in('student_id', studentIds)
-
-  const profileList = profiles ?? []
+  const profileList = await repos.schools.findLearnerProfiles(studentIds)
 
   // 5. Risk distribution
   const riskDist = { normal: 0, watch: 0, at_risk: 0, critical: 0 }
@@ -119,15 +101,9 @@ export async function computeSchoolIntelligence(
   }
 
   // 8. Top struggling substrands from substrand_health table
-  const { data: healthRows } = await db
-    .from('substrand_health')
-    .select('subject, sub_strand, strand, struggle_count, total_students, assessment_level, trend, risk_score')
-    .in('class_id', classIds)
-    .gt('risk_score', 30)   // only meaningful struggle (30%+ below ME)
-    .order('risk_score', { ascending: false })
-    .limit(5)
+  const healthRows = await repos.schools.findTopStrugglingSubstrands(classIds)
 
-  const topStrugglingStrands: StrandHealthRecord[] = (healthRows ?? []).map(row => ({
+  const topStrugglingStrands: StrandHealthRecord[] = healthRows.map(row => ({
     subject:        row.subject as string,
     substrand:      row.sub_strand as string,
     grade:          0,   // aggregated — grade breakdown in grade_health
@@ -141,34 +117,34 @@ export async function computeSchoolIntelligence(
   }))
 
   // 9. Intervention efficacy
-  const { data: interventions } = await db
-    .from('intervention_log')
-    .select('intervention_type, was_effective, checkin_completed_at')
-    .in('teacher_id', teacherUserIds)
+  const interventions = await repos.schools.findAllInterventions(teacherUserIds)
 
-  const interventionCount = interventions?.length ?? 0
-  const effectiveCount    = interventions?.filter(i => i.was_effective === true).length ?? 0
+  const interventionCount = interventions.length
+  const effectiveCount    = interventions.filter(i => i.was_effective === true).length
   const efficacyRate      = interventionCount > 0 ? effectiveCount / interventionCount : 0
 
   // 10. Risk trend (compare to previous snapshot)
-  const { data: prevSnapshot } = await db
-    .from('school_intelligence_snapshots')
-    .select('at_risk_count, critical_count, total_students')
-    .eq('school_id', schoolId)
-    .is('grade', null)
-    .is('subject', null)
-    .order('week_of', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const prevSnapshot = await repos.schools.findLatestIntelligenceSnapshot(schoolId)
 
   let riskTrend: 'improving' | 'stable' | 'declining' = 'stable'
   if (prevSnapshot) {
-    const prevAtRiskPct = ((prevSnapshot.at_risk_count as number) + (prevSnapshot.critical_count as number))
-                         / ((prevSnapshot.total_students as number) || 1) * 100
+    const prevAtRiskPct = (prevSnapshot.at_risk_count + prevSnapshot.critical_count)
+                         / (prevSnapshot.total_students || 1) * 100
     const currAtRiskPct = riskPcts.at_risk + riskPcts.critical
     if (currAtRiskPct < prevAtRiskPct - 2) riskTrend = 'improving'
     else if (currAtRiskPct > prevAtRiskPct + 2) riskTrend = 'declining'
   }
+
+  const typedProfileList = profileList as Array<{
+    student_id: string
+    overall_risk_level: unknown
+    capability_dimensions: unknown
+    risk_history: unknown
+    knowledge_state: unknown
+  }>
+
+  const typedClasses = classes as Array<{ id: string; grade: unknown; subject: unknown; teacher_id: unknown }>
+  const typedEnrollments = enrollments as Array<{ student_id: string; class_id: string }>
 
   const summary: SchoolIntelligenceSummary = {
     school_id:         schoolId,
@@ -180,7 +156,7 @@ export async function computeSchoolIntelligence(
     risk_pcts:         riskPcts,
     risk_trend:        riskTrend,
     top_struggling_strands: topStrugglingStrands,
-    grade_health:      await computeGradeHealth(db, classes, profileList, enrollments),
+    grade_health:      computeGradeHealth(typedClasses, typedProfileList, typedEnrollments),
     persistent_risk_count: persistentRiskCount,
     interventions_this_term: interventionCount,
     intervention_efficacy:   Math.round(efficacyRate * 100) / 100,
@@ -188,39 +164,34 @@ export async function computeSchoolIntelligence(
     generated_at: new Date().toISOString(),
   }
 
-  // Persist snapshot for trend analysis (best-effort — non-fatal)
-  try {
-    await db.from('school_intelligence_snapshots').upsert({
-      school_id:                   schoolId,
-      week_of:                     now,
-      grade:                       null,
-      subject:                     null,
-      total_students:              total,
-      normal_count:                riskDist.normal,
-      watch_count:                 riskDist.watch,
-      at_risk_count:               riskDist.at_risk,
-      critical_count:              riskDist.critical,
-      top_struggling_substrands:   topStrugglingStrands,
-      interventions_run:           interventionCount,
-      interventions_effective:     effectiveCount,
-      avg_capability_dimensions:   avgCapability,
-      risk_trend:                  riskTrend,
-    }, { onConflict: 'school_id,week_of,grade,subject', ignoreDuplicates: false })
-  } catch {
-    // non-fatal
-  }
+  // Persist snapshot for trend analysis
+  void repos.schools.upsertIntelligenceSnapshot({
+    school_id:                   schoolId,
+    week_of:                     now,
+    grade:                       null,
+    subject:                     null,
+    total_students:              total,
+    normal_count:                riskDist.normal,
+    watch_count:                 riskDist.watch,
+    at_risk_count:               riskDist.at_risk,
+    critical_count:              riskDist.critical,
+    top_struggling_substrands:   topStrugglingStrands,
+    interventions_run:           interventionCount,
+    interventions_effective:     effectiveCount,
+    avg_capability_dimensions:   avgCapability,
+    risk_trend:                  riskTrend,
+  }).catch(() => {})  // non-fatal
 
   return summary
 }
 
 // ── Grade-level health breakdown ──────────────────────────────────────────────
 
-async function computeGradeHealth(
-  db:          ReturnType<typeof createServiceClient>,
+function computeGradeHealth(
   classes:     Array<{ id: string; grade: unknown; subject: unknown; teacher_id: unknown }>,
   profileList: Array<{ student_id: string; overall_risk_level: unknown; capability_dimensions: unknown }>,
   enrollments: Array<{ student_id: string; class_id: string }>,
-): Promise<GradeHealthRecord[]> {
+): GradeHealthRecord[] {
   // Build map: student_id → grade
   const studentGradeMap = new Map<string, number>()
   const enrollmentMap   = new Map<string, string>()  // student_id → class_id
@@ -274,15 +245,9 @@ async function computeGradeHealth(
 export async function computeInterventionEfficacy(
   teacherUserIds: string[],
 ): Promise<InterventionEfficacyRecord[]> {
-  const db = createServiceClient()
+  const data = await repos.schools.findInterventions(teacherUserIds)
 
-  const { data } = await db
-    .from('intervention_log')
-    .select('intervention_type, was_effective, checkin_completed_at, intervened_at')
-    .in('teacher_id', teacherUserIds)
-    .not('checkin_completed_at', 'is', null)
-
-  if (!data?.length) return []
+  if (!data.length) return []
 
   const byType = new Map<string, { total: number; effective: number }>()
   for (const row of data) {
@@ -309,7 +274,6 @@ export async function computeTeacherActivity(
   teacherIds:     string[],
   teacherUserIds: string[],
 ): Promise<TeacherActivitySignal[]> {
-  const db      = createServiceClient()
   const termStart = getTermStart()
 
   const signals: TeacherActivitySignal[] = []
@@ -319,34 +283,21 @@ export async function computeTeacherActivity(
     const teacherUserId = teacherUserIds[i]
 
     // Formative signal count this term
-    const { count: signalCount } = await db
-      .from('formative_signals')
-      .select('id', { count: 'exact', head: true })
-      .eq('teacher_id', teacherId)
-      .gte('recorded_at', termStart)
+    const signalCount = await repos.schools.countFormativeSignals(teacherId, termStart)
 
     // Classes and at-risk students
-    const { data: classes } = await db
-      .from('teacher_classes')
-      .select('id, grade, subject')
-      .eq('teacher_id', teacherId)
+    const classes = await repos.schools.findTeacherClasses([teacherId])
 
     let atRisk = 0; let atRiskResolved = 0
-    for (const cls of classes ?? []) {
-      const { data: enrolled } = await db
-        .from('class_students')
-        .select('student_id')
-        .eq('class_id', cls.id as string)
+    for (const cls of classes) {
+      const enrolled = await repos.schools.findEnrolledStudents(cls.id)
 
-      const studentIds = (enrolled ?? []).map(e => e.student_id as string)
+      const studentIds = enrolled.map(e => e.student_id as string)
       if (!studentIds.length) continue
 
-      const { data: profiles } = await db
-        .from('learner_profiles')
-        .select('overall_risk_level, risk_history')
-        .in('student_id', studentIds)
+      const profiles = await repos.schools.findLearnerRiskProfiles(studentIds)
 
-      for (const p of profiles ?? []) {
+      for (const p of profiles) {
         if (['at_risk', 'critical'].includes(p.overall_risk_level as string)) atRisk++
         const history = (p.risk_history as Array<{ resolved_at?: string }>) ?? []
         if (history.some(r => r.resolved_at)) atRiskResolved++
@@ -354,21 +305,17 @@ export async function computeTeacherActivity(
     }
 
     // Intervention efficacy
-    const { data: interventions } = await db
-      .from('intervention_log')
-      .select('was_effective')
-      .eq('teacher_id', teacherUserId)
-      .not('checkin_completed_at', 'is', null)
+    const interventions = await repos.schools.findTeacherInterventions(teacherUserId)
 
-    const withOutcome  = (interventions ?? []).length
-    const effective    = (interventions ?? []).filter(i => i.was_effective).length
+    const withOutcome  = interventions.length
+    const effective    = interventions.filter(i => i.was_effective).length
     const efficacy     = withOutcome > 0 ? effective / withOutcome : 0
 
     signals.push({
       teacher_id:    `teacher_${i + 1}`,  // anonymised
       grade:         (classes?.[0]?.grade as number) ?? 0,
       subject:       (classes?.[0]?.subject as string) ?? 'unknown',
-      formative_signal_count_this_term: signalCount ?? 0,
+      formative_signal_count_this_term: signalCount,
       at_risk_students:    atRisk,
       at_risk_resolved:    atRiskResolved,
       intervention_efficacy: Math.round(efficacy * 100) / 100,
@@ -382,16 +329,10 @@ export async function computeTeacherActivity(
 // ── Principal Dashboard ───────────────────────────────────────────────────────
 
 export async function buildPrincipalDashboard(schoolId: string): Promise<PrincipalDashboard> {
-  const db = createServiceClient()
+  const teachers = await repos.schools.findVerifiedTeachers(schoolId)
 
-  const { data: teachers } = await db
-    .from('teachers')
-    .select('id, user_id, grade_levels, subjects')
-    .eq('school_name', schoolId)
-    .eq('is_verified', true)
-
-  const teacherIds     = (teachers ?? []).map(t => t.id as string)
-  const teacherUserIds = (teachers ?? []).map(t => t.user_id as string)
+  const teacherIds     = teachers.map(t => t.id as string)
+  const teacherUserIds = teachers.map(t => t.user_id as string)
 
   const [summary, efficacy, activity] = await Promise.all([
     computeSchoolIntelligence(schoolId),
@@ -400,15 +341,7 @@ export async function buildPrincipalDashboard(schoolId: string): Promise<Princip
   ])
 
   // Trend vs last term
-  const { data: prevTermSnapshot } = await db
-    .from('school_intelligence_snapshots')
-    .select('at_risk_count, critical_count, total_students, top_struggling_substrands')
-    .eq('school_id', schoolId)
-    .is('grade', null)
-    .is('subject', null)
-    .order('week_of', { ascending: false })
-    .range(1, 2)   // skip current (index 0), get previous
-    .maybeSingle()
+  const prevTermSnapshot = await repos.schools.findPreviousIntelligenceSnapshot(schoolId)
 
   const prevAtRiskPct = prevTermSnapshot
     ? (((prevTermSnapshot.at_risk_count as number) + (prevTermSnapshot.critical_count as number))

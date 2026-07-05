@@ -1,7 +1,26 @@
 // app/api/assessments/create/route.ts
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
+
+const CreateAssessmentSchema = z.object({
+  student_id:              z.string().uuid(),
+  grade:                   z.number().int().optional(),
+  term:                    z.number().int().min(1).max(3),
+  year:                    z.number().int(),
+  grade_level:             z.enum(['junior', 'senior']).optional(),
+  subject_scores:          z.record(z.string(), z.unknown()).refine(s => Object.keys(s).length >= 5, {
+    message: 'At least 5 subject scores are required',
+  }),
+  curriculum_type:         z.string().optional(),
+  assessment_style:        z.string().optional(),
+  mathematics_type:        z.string().optional(),
+  pathway_electives:       z.unknown().optional(),
+  pathway_recommendations: z.unknown().optional(),
+  source:                  z.enum(['teacher', 'parent']).optional(),
+  raw_marks:               z.record(z.string(), z.unknown()).optional(),
+})
 
 export async function POST(request: Request) {
   try {
@@ -9,8 +28,8 @@ export async function POST(request: Request) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) return apiUnauthorized()
 
-    const body = await request.json()
-    console.log('[assessments/create] payload:', JSON.stringify(body, null, 2))
+    const parsed = CreateAssessmentSchema.safeParse(await request.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
 
     const {
       student_id,
@@ -26,14 +45,7 @@ export async function POST(request: Request) {
       pathway_recommendations,
       source,
       raw_marks,
-    } = body
-
-    if (!student_id) return apiBadRequest('student_id is required')
-    if (!subject_scores || Object.keys(subject_scores).length < 5) {
-      return apiBadRequest('At least 5 subject scores are required')
-    }
-    if (!term || term < 1 || term > 3) return apiBadRequest('Term must be 1, 2, or 3')
-    if (!year) return apiBadRequest('Year is required')
+    } = parsed.data
 
     const service = createServiceClient()
 

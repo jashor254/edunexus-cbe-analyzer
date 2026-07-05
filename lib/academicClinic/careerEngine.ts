@@ -4,7 +4,7 @@
 // CAREER_DATABASE + CareerEngine.matchCareers/analyze + analyzeDreamCareer.
 // ============================================================
 
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 import { analyzePerformance } from '@/lib/adaptiveLearning'
 import { formatSubjectName } from '@/lib/pathwayCalculator'
 
@@ -2521,11 +2521,6 @@ export function normalizePathway(raw: string): string {
 }
 
 export class CareerEngine {
-  private _db: ReturnType<typeof createServiceClient> | null = null
-  private get db() {
-    if (!this._db) this._db = createServiceClient()
-    return this._db
-  }
 
   // ── SECTION A: CAREER MATCHING ──────────────────────────────
 
@@ -2669,22 +2664,15 @@ export class CareerEngine {
 
   private async getMarketSignal(careerId: string, useCache: boolean): Promise<MarketSignal> {
     if (useCache) {
-      const { data: cached } = await this.db
-        .from('career_market_cache')
-        .select('data, cached_at')
-        .eq('career_id', careerId)
-        .single()
-      const isStale = !cached || Date.now() - new Date((cached as { cached_at: string }).cached_at).getTime() > 24 * 60 * 60 * 1000
-      if (!isStale && cached) return (cached as { data: MarketSignal }).data as MarketSignal
+      const cached = await repos.careers.findMarketCacheById(careerId)
+      const isStale = !cached || Date.now() - new Date(cached.cached_at).getTime() > 24 * 60 * 60 * 1000
+      if (!isStale && cached) return cached.data as unknown as MarketSignal
     }
 
     const fresh = await this.searchKenyaMarket(
       CAREER_DATABASE.find(c => c.id === careerId)?.name ?? careerId
     )
-    await this.db.from('career_market_cache').upsert(
-      { career_id: careerId, data: fresh, cached_at: new Date().toISOString() },
-      { onConflict: 'career_id' }
-    )
+    await repos.careers.upsertMarketCacheById(careerId, fresh as unknown as Record<string, unknown>, new Date().toISOString())
     return fresh
   }
 

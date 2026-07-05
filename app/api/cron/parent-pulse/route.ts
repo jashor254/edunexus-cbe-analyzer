@@ -6,11 +6,13 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
 import { buildAllParentPulses } from '@/lib/parentPulse/builder'
 import { sendWhatsApp } from '@/lib/whatsapp/sender'
+import { timingSafeEqualString } from '@/lib/api/secretCompare'
+import { publishEvent } from '@/lib/events'
 
 export async function POST(req: Request): Promise<Response> {
   try {
     const cronSecret = req.headers.get('x-cron-secret')
-    if (cronSecret !== process.env.CRON_SECRET) return apiUnauthorized()
+    if (!timingSafeEqualString(cronSecret, process.env.CRON_SECRET)) return apiUnauthorized()
 
     const db  = createServiceClient()
     const weekOf = new Date().toISOString().slice(0, 10)
@@ -36,6 +38,17 @@ export async function POST(req: Request): Promise<Response> {
           phone_number: pulse.parent_phone,
           success:      true,
         })
+
+        void publishEvent({
+          event_type:      'parent.pulse.generated',
+          resource_type:   'student',
+          resource_id:     pulse.student_id,
+          payload: {
+            student_id: pulse.student_id,
+            week_of:    weekOf,
+          },
+          idempotency_key: `parent.pulse.generated:${pulse.student_id}:${weekOf}`,
+        }).catch(err => console.error('[events] parent.pulse.generated:', err instanceof Error ? err.message : String(err)))
 
         sent++
       } catch (err) {

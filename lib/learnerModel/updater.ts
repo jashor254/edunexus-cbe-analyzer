@@ -7,7 +7,7 @@
 // EIOS Principle: every interaction must either update the model, read from it,
 // validate it, or improve confidence in it. This file is where it updates.
 
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 import { extractCapabilityProfile } from '@/lib/career/capabilityExtractor'
 import {
   getOrCreateLearnerProfile,
@@ -49,8 +49,6 @@ type AssessmentSignal = {
 }
 
 export async function updateFromAssessment(signal: AssessmentSignal): Promise<void> {
-  const db = createServiceClient()
-
   // 1. Update knowledge state for this substrand
   const key   = `${signal.subject}:${signal.subStrand}`
   const level = computeCBCLevel(signal.subjectMarks[signal.subject] ?? 0)
@@ -76,15 +74,8 @@ export async function updateFromAssessment(signal: AssessmentSignal): Promise<vo
   await recomputeConfirmedGaps(signal.studentId)
 
   // 3. Compute capability profile from full assessment history
-  const { data: allHistory } = await db
-    .from('strand_assessments')
-    .select('subject_scores')
-    .eq('student_id', signal.studentId)
-    .order('created_at', { ascending: true })
-
-  const scoreHistory = (allHistory ?? [])
-    .filter(r => r.subject_scores && typeof r.subject_scores === 'object')
-    .map(r => r.subject_scores as Record<string, number>)
+  const allHistory = await repos.learnerModel.findAssessmentHistory(signal.studentId)
+  const scoreHistory = allHistory.map(r => r.subject_scores as Record<string, number>)
 
   const currentScores = { ...signal.subjectScores }
   if (!scoreHistory.length || JSON.stringify(scoreHistory[scoreHistory.length - 1]) !== JSON.stringify(currentScores)) {
@@ -97,18 +88,18 @@ export async function updateFromAssessment(signal: AssessmentSignal): Promise<vo
       const capabilityProfile = extractCapabilityProfile(scoreHistory)
 
       const newDimensions = {
-        analytical_reasoning: { ...capabilityProfile.analytical_reasoning, last_computed: now, previous_level: prevDimensions.analytical_reasoning?.level },
-        communication:        { ...capabilityProfile.communication,        last_computed: now, previous_level: prevDimensions.communication?.level },
-        creative_thinking:    { ...capabilityProfile.creative_thinking,    last_computed: now, previous_level: prevDimensions.creative_thinking?.level },
-        technical_aptitude:   { ...capabilityProfile.technical_aptitude,   last_computed: now, previous_level: prevDimensions.technical_aptitude?.level },
-        social_intelligence:  { ...capabilityProfile.social_intelligence,  last_computed: now, previous_level: prevDimensions.social_intelligence?.level },
-        resilience:           { ...capabilityProfile.resilience,           last_computed: now, previous_level: prevDimensions.resilience?.level },
+        analytical_reasoning: { ...capabilityProfile.analytical_reasoning, last_computed: now, previous_level: prevDimensions.analytical_reasoning?.level as CapabilityLevel | undefined },
+        communication:        { ...capabilityProfile.communication,        last_computed: now, previous_level: prevDimensions.communication?.level        as CapabilityLevel | undefined },
+        creative_thinking:    { ...capabilityProfile.creative_thinking,    last_computed: now, previous_level: prevDimensions.creative_thinking?.level    as CapabilityLevel | undefined },
+        technical_aptitude:   { ...capabilityProfile.technical_aptitude,   last_computed: now, previous_level: prevDimensions.technical_aptitude?.level   as CapabilityLevel | undefined },
+        social_intelligence:  { ...capabilityProfile.social_intelligence,  last_computed: now, previous_level: prevDimensions.social_intelligence?.level  as CapabilityLevel | undefined },
+        resilience:           { ...capabilityProfile.resilience,           last_computed: now, previous_level: prevDimensions.resilience?.level           as CapabilityLevel | undefined },
       }
 
       await patchCapabilityDimensions(signal.studentId, newDimensions)
 
       // Snapshot to capability_history for trend analysis
-      await db.from('capability_history').insert({
+      await repos.learnerModel.insertCapabilityHistory({
         student_id:         signal.studentId,
         capability_profile: capabilityProfile,
         assessment_count:   scoreHistory.length,
@@ -146,11 +137,11 @@ type CompassSignal = {
   masteredConcepts:   string[]
   sessionMins:        number
   completedAt:        string
-  mode:               'school' | 'holiday'
-  reason:             'teacher_recommendation' | 'weakest_gap' | 'rotation' | 'holiday_plan'
-  consecutiveRight:   number   // from session_state — persistence signal
-  consecutiveWrong:   number   // from session_state — confidence signal
-  sessionAbandoned:   boolean
+  mode?:              'school' | 'holiday'
+  reason?:            'teacher_recommendation' | 'weakest_gap' | 'rotation' | 'holiday_plan'
+  consecutiveRight?:  number   // from session_state — persistence signal
+  consecutiveWrong?:  number   // from session_state — confidence signal
+  sessionAbandoned?:  boolean
 }
 
 export async function updateFromCompass(signal: CompassSignal): Promise<void> {
@@ -210,17 +201,21 @@ async function updateBehaviourFromCompass(
 ): Promise<void> {
   const now = new Date().toISOString()
 
+  const sessionAbandoned  = signal.sessionAbandoned  ?? false
+  const consecutiveWrong  = signal.consecutiveWrong  ?? 0
+  const consecutiveRight  = signal.consecutiveRight  ?? 0
+
   // Persistence: high consecutiveWrong before completion = persistence
-  const persistenceSignal = signal.sessionAbandoned
+  const persistenceSignal = sessionAbandoned
     ? 0.0   // abandoned = low persistence
-    : signal.consecutiveWrong >= 3
+    : consecutiveWrong >= 3
       ? 0.8  // pushed through difficulty = high persistence
       : 0.5  // normal
 
   // Confidence: correct after wrong = recovering confidence
-  const confidenceSignal = signal.consecutiveRight > signal.consecutiveWrong
+  const confidenceSignal = consecutiveRight > consecutiveWrong
     ? 0.7
-    : signal.consecutiveRight < signal.consecutiveWrong
+    : consecutiveRight < consecutiveWrong
       ? 0.3
       : 0.5
 
@@ -450,7 +445,6 @@ export async function recomputeRiskFlags(studentId: string): Promise<void> {
 // ── Confirmed Gaps Computation ────────────────────────────────────────────────
 
 async function recomputeConfirmedGaps(studentId: string): Promise<void> {
-  const db      = createServiceClient()
   const profile = await getOrCreateLearnerProfile(studentId)
 
   // A gap is confirmed when the same substrand is below Level 3 in 2+ assessments
@@ -479,45 +473,32 @@ async function recomputeConfirmedGaps(studentId: string): Promise<void> {
 
   // Populate substrand_health in DB for Remedial Planner
   // Find the student's active class to link the SOW
-  const { data: classEnrollment } = await db
-    .from('class_students')
-    .select('class_id, teacher_classes(id, teacher_id, subject, grade)')
-    .eq('student_id', studentId)
-    .limit(1)
-    .maybeSingle()
+  const classEnrollment = await repos.learnerModel.findClassEnrollment(studentId)
 
   if (classEnrollment) {
-    const cls = classEnrollment.teacher_classes as unknown as Record<string, unknown> | null
+    const cls = classEnrollment.teacher_classes
     if (!cls) return
 
     // Find active SOW for this class
-    const { data: sow } = await db
-      .from('schemes_of_work')
-      .select('id')
-      .eq('teacher_id', cls.teacher_id as string)
-      .eq('grade', cls.grade as number)
-      .eq('subject', cls.subject as string)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    const sow = await repos.curriculum.findActiveSOW(
+      cls.teacher_id as string,
+      cls.grade as number,
+      cls.subject as string,
+    )
 
     if (sow) {
       // Trigger substrand_health computation for each confirmed gap
       for (const gapKey of confirmedGaps.slice(0, 5)) {
         const [subject, subStrand] = gapKey.split(':')
         if (!subject || !subStrand) continue
-        try {
-          await db.rpc('compute_substrand_health', {
-            p_sow_id:     sow.id,
-            p_teacher_id: cls.teacher_id,
-            p_class_id:   classEnrollment.class_id,
-            p_subject:    subject,
-            p_strand:     subStrand,    // approximation — strand = substrand for initial population
-            p_sub_strand: subStrand,
-          })
-        } catch {
-          // non-fatal
-        }
+        void repos.curriculum.triggerComputeSubstrandHealth({
+          p_sow_id:     sow.id,
+          p_teacher_id: cls.teacher_id as string,
+          p_class_id:   classEnrollment.class_id,
+          p_subject:    subject,
+          p_strand:     subStrand,    // approximation — strand = substrand for initial population
+          p_sub_strand: subStrand,
+        }).catch(() => {})  // non-fatal
       }
     }
   }
@@ -526,23 +507,12 @@ async function recomputeConfirmedGaps(studentId: string): Promise<void> {
 // ── Career Signals Refresh ────────────────────────────────────────────────────
 
 async function refreshCareerSignals(studentId: string): Promise<void> {
-  const db = createServiceClient()
-
-  const [{ data: interests }, { data: strand }] = await Promise.all([
-    db.from('student_career_interests')
-      .select('career_slug, interest_level')
-      .eq('student_id', studentId)
-      .order('explored_at', { ascending: false })
-      .limit(10),
-    db.from('strand_assessments')
-      .select('subject_scores')
-      .eq('student_id', studentId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+  const [interests, strand] = await Promise.all([
+    repos.learnerModel.findRecentCareerInterests(studentId, 10),
+    repos.learnerModel.findLatestStrandAssessment(studentId),
   ])
 
-  const topCareers = (interests ?? [])
+  const topCareers = interests
     .filter(i => (i.interest_level as number) >= 3)
     .map(i => i.career_slug as string)
 
@@ -724,40 +694,30 @@ async function checkPrerequisiteGaps(
   studentId:    string,
   knowledgeState: Record<string, { level: number }>,
 ): Promise<RiskFlag[]> {
-  const db    = createServiceClient()
+  void studentId  // not needed at query level — repos operate on concepts/node IDs
   const flags: RiskFlag[] = []
 
   const weakKeys = Object.entries(knowledgeState)
     .filter(([, m]) => m.level <= 2)
     .map(([key]) => key.split(':')[1])
-    .filter(Boolean)
+    .filter((k): k is string => Boolean(k))
 
   if (!weakKeys.length) return []
 
-  const { data: weakNodes } = await db
-    .from('knowledge_nodes')
-    .select('id, concept')
-    .in('concept', weakKeys.slice(0, 10))
+  const weakNodes = await repos.learnerModel.findWeakKnowledgeNodes(weakKeys.slice(0, 10))
 
-  if (!weakNodes?.length) return []
+  if (!weakNodes.length) return []
 
-  const nodeIds = weakNodes.map(n => n.id as string)
-  const { data: edges } = await db
-    .from('knowledge_edges')
-    .select('prerequisite_node_id, dependent_node_id')
-    .in('dependent_node_id', nodeIds)
+  const nodeIds = weakNodes.map(n => n.id)
+  const edges = await repos.learnerModel.findPrerequisiteEdges(nodeIds)
 
-  if (!edges?.length) return []
+  if (!edges.length) return []
 
-  const prereqIds = [...new Set(edges.map(e => e.prerequisite_node_id as string))]
-  const { data: prereqNodes } = await db
-    .from('knowledge_nodes')
-    .select('id, concept')
-    .in('id', prereqIds)
-    .limit(3)
+  const prereqIds = [...new Set(edges.map(e => e.prerequisite_node_id))]
+  const prereqNodes = await repos.learnerModel.findPrerequisiteNodes(prereqIds, 3)
 
-  for (const node of prereqNodes ?? []) {
-    const concept  = node.concept as string
+  for (const node of prereqNodes) {
+    const concept  = node.concept
     const inState  = Object.keys(knowledgeState).some(k => k.endsWith(`:${concept}`))
     if (!inState) {
       flags.push({

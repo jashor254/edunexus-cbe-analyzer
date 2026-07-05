@@ -12,7 +12,6 @@ import { getOrCreateLearnerProfile } from '@/lib/learnerModel/queries'
 import type { LearnerProfile, RiskFlag } from '@/lib/learnerModel/types'
 import type { RootCauseResult } from '@/lib/knowledgeGraph/types'
 import type { ReasoningResult, ActionRecommendation, ReasoningEvidence } from './types'
-import { createServiceClient } from '@/utils/supabase/service'
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -21,10 +20,9 @@ export async function whyIsLearnerStruggling(
   grade:     number,
   subject?:  string,
 ): Promise<ReasoningResult> {
-  const db = createServiceClient()
   const [profile, rootCauses] = await Promise.all([
     getOrCreateLearnerProfile(studentId),
-    safeRootCauses(db, studentId, grade),
+    safeRootCauses(studentId, grade),
   ])
 
   const focusRootCauses = subject
@@ -235,10 +233,9 @@ export async function whichInterventionIsLikelyToWork(
   studentId: string,
   grade:     number,
 ): Promise<ReasoningResult> {
-  const db = createServiceClient()
   const [profile, rootCauses] = await Promise.all([
     getOrCreateLearnerProfile(studentId),
-    safeRootCauses(db, studentId, grade),
+    safeRootCauses(studentId, grade),
   ])
 
   const evidence  = buildEvidence(profile, rootCauses)
@@ -410,13 +407,13 @@ function buildEvidence(
 }
 
 async function safeRootCauses(
-  db:        ReturnType<typeof createServiceClient>,
   studentId: string,
   grade:     number,
 ): Promise<RootCauseResult[]> {
   try {
-    return await analyseStudentRootCauses(db, studentId, grade)
-  } catch {
+    return await analyseStudentRootCauses(studentId, grade)
+  } catch (e: unknown) {
+    console.error('[reasoningEngine:safeRootCauses]', e instanceof Error ? e.message : String(e))
     return []
   }
 }

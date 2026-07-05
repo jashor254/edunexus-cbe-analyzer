@@ -27,7 +27,7 @@ export async function buildIntelligenceSnapshot(
   // Fan out — all reads in parallel
   const [profile, rootCauses, eilsData] = await Promise.all([
     getOrCreateLearnerProfile(studentId),
-    analyseStudentRootCausesGracefully(db, studentId, grade),
+    analyseStudentRootCausesGracefully(studentId, grade),
     loadEILSData(studentId, db),
   ])
 
@@ -114,13 +114,13 @@ function buildSummary(
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function analyseStudentRootCausesGracefully(
-  db:        ReturnType<typeof createServiceClient>,
   studentId: string,
   grade:     number,
 ): Promise<RootCauseResult[]> {
   try {
-    return await analyseStudentRootCauses(db, studentId, grade)
-  } catch {
+    return await analyseStudentRootCauses(studentId, grade)
+  } catch (e: unknown) {
+    console.error('[profile:analyseStudentRootCausesGracefully]', e instanceof Error ? e.message : String(e))
     return []
   }
 }

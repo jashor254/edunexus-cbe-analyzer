@@ -1,5 +1,6 @@
 // lib/slides/aiSlideGenerator.ts
 // Calls DeepSeek to generate structured slide content for a given lesson topic.
+import { callDeepSeek } from '@/lib/ai/deepseek'
 
 const TEMPERATURE = 0.7
 const MAX_TOKENS  = 4000
@@ -84,32 +85,7 @@ Return this exact JSON structure:
   ]
 }`
 
-  const response = await fetch('https://api.deepseek.com/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model:      'deepseek-chat',
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user',   content: prompt },
-      ],
-      temperature: TEMPERATURE,
-      max_tokens:  MAX_TOKENS,
-    }),
-  })
-
-  if (!response.ok) {
-    throw new Error(`DeepSeek API error: ${response.status} ${response.statusText}`)
-  }
-
-  const data = await response.json() as {
-    choices: { message: { content: string } }[]
-  }
-
-  const raw = data.choices[0]?.message?.content?.trim()
+  const raw = await callDeepSeek(prompt, SYSTEM_PROMPT, { temperature: TEMPERATURE, maxTokens: MAX_TOKENS })
   if (!raw) throw new Error('Empty response from AI')
 
   // Strip any accidental markdown code fences

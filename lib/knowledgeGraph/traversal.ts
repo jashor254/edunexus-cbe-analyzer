@@ -1,7 +1,6 @@
 // lib/knowledgeGraph/traversal.ts
 // Pure graph traversal — no AI. Deterministic and explainable.
 
-import { createServiceClient } from '@/utils/supabase/service'
 import { getPrerequisiteEdges, getNodeById } from './queries'
 import type {
   StudentNodeData,
@@ -10,8 +9,6 @@ import type {
   KnowledgeNode,
   KnowledgeEdge,
 } from './types'
-
-type DB = ReturnType<typeof createServiceClient>
 
 // Mastery threshold — a rating of 3 (Meeting Expectations) or above is considered mastered
 const MASTERY_THRESHOLD = 3
@@ -23,23 +20,22 @@ type TraversalCache = {
   edges: Map<string, KnowledgeEdge[]>
 }
 
-async function cachedGetNode(db: DB, nodeId: string, cache: TraversalCache): Promise<KnowledgeNode | null> {
+async function cachedGetNode(nodeId: string, cache: TraversalCache): Promise<KnowledgeNode | null> {
   if (cache.nodes.has(nodeId)) return cache.nodes.get(nodeId) ?? null
-  const node = await getNodeById(db, nodeId)
+  const node = await getNodeById(nodeId)
   cache.nodes.set(nodeId, node)
   return node
 }
 
-async function cachedGetEdges(db: DB, nodeId: string, cache: TraversalCache): Promise<KnowledgeEdge[]> {
+async function cachedGetEdges(nodeId: string, cache: TraversalCache): Promise<KnowledgeEdge[]> {
   if (cache.edges.has(nodeId)) return cache.edges.get(nodeId)!
-  const edges = await getPrerequisiteEdges(db, nodeId)
+  const edges = await getPrerequisiteEdges(nodeId)
   cache.edges.set(nodeId, edges)
   return edges
 }
 
 // Core recursive traversal
 async function traverse(
-  db:          DB,
   nodeId:      string,
   studentData: StudentNodeData,
   depth:       number,
@@ -57,11 +53,11 @@ async function traverse(
   if (score !== undefined && score >= MASTERY_THRESHOLD) return []
 
   // Get prerequisites of this node
-  const edges = await cachedGetEdges(db, nodeId, cache)
+  const edges = await cachedGetEdges(nodeId, cache)
 
   // No prerequisites — this node itself is a root cause
   if (edges.length === 0) {
-    const node = await cachedGetNode(db, nodeId, cache)
+    const node = await cachedGetNode(nodeId, cache)
     if (!node) return []
     return [buildRootCause(node, score ?? null, 'root', depth, 0.99)]
   }
@@ -74,7 +70,7 @@ async function traverse(
 
     // Unassessed prerequisite — flag but don't recurse (no data to trace)
     if (prereqScore === undefined) {
-      const prereqNode = await cachedGetNode(db, prereqId, cache)
+      const prereqNode = await cachedGetNode(prereqId, cache)
       if (prereqNode) {
         results.push(buildRootCause(prereqNode, null, 'unassessed', depth + 1, edge.weight))
       }
@@ -84,15 +80,15 @@ async function traverse(
     if (prereqScore < MASTERY_THRESHOLD) {
       // Prerequisite is also weak — recurse deeper unless at max depth
       if (depth >= maxDepth) {
-        const prereqNode = await cachedGetNode(db, prereqId, cache)
+        const prereqNode = await cachedGetNode(prereqId, cache)
         if (prereqNode) {
           results.push(buildRootCause(prereqNode, prereqScore, 'root', depth + 1, edge.weight))
         }
       } else {
-        const deeper = await traverse(db, prereqId, studentData, depth + 1, maxDepth, cache, new Set(visited))
+        const deeper = await traverse(prereqId, studentData, depth + 1, maxDepth, cache, new Set(visited))
         if (deeper.length === 0) {
           // No deeper causes found — this prerequisite IS a root cause
-          const prereqNode = await cachedGetNode(db, prereqId, cache)
+          const prereqNode = await cachedGetNode(prereqId, cache)
           if (prereqNode) {
             results.push(buildRootCause(prereqNode, prereqScore, 'root', depth + 1, edge.weight))
           }
@@ -103,7 +99,7 @@ async function traverse(
     } else {
       // Student has this prerequisite mastered but still struggles with dependent.
       // This is a surface cause — the gap is at this level, not deeper.
-      const prereqNode = await cachedGetNode(db, prereqId, cache)
+      const prereqNode = await cachedGetNode(prereqId, cache)
       if (prereqNode) {
         results.push(buildRootCause(prereqNode, prereqScore, 'surface', depth + 1, edge.weight))
       }
@@ -174,7 +170,6 @@ function buildInterventionChains(
 // ── Public function ────────────────────────────────────────────────────────────
 
 export async function findRootCauses(
-  db:          DB,
   failingNodeId: string,
   studentData: StudentNodeData,
   maxDepth:    number = DEFAULT_MAX_DEPTH
@@ -184,7 +179,7 @@ export async function findRootCauses(
     edges: new Map(),
   }
 
-  const failingNode = await cachedGetNode(db, failingNodeId, cache)
+  const failingNode = await cachedGetNode(failingNodeId, cache)
   if (!failingNode) return null
 
   const performance = studentData[failingNodeId] ?? null
@@ -193,7 +188,6 @@ export async function findRootCauses(
   if (performance !== null && performance >= MASTERY_THRESHOLD) return null
 
   const rawCauses = await traverse(
-    db,
     failingNodeId,
     studentData,
     0,
@@ -216,13 +210,12 @@ export async function findRootCauses(
 
 // Convenience: run findRootCauses across ALL weak topics for a student at once
 export async function findAllRootCauses(
-  db:            DB,
   weakNodeIds:   string[],    // node_ids where student rating < 3
   studentData:   StudentNodeData,
   maxDepth:      number = DEFAULT_MAX_DEPTH
 ): Promise<RootCauseResult[]> {
   const results = await Promise.all(
-    weakNodeIds.map(nodeId => findRootCauses(db, nodeId, studentData, maxDepth))
+    weakNodeIds.map(nodeId => findRootCauses(nodeId, studentData, maxDepth))
   )
   return results.filter((r): r is RootCauseResult => r !== null)
 }

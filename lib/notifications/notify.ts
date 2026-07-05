@@ -4,6 +4,7 @@
 // Routes call these fire-and-forget via .catch().
 
 import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 import { sendAssignmentMarkedEmail, sendAlertCreatedEmail } from '@/lib/email/sender'
 import {
   sendAssignmentMarkedWhatsApp,
@@ -50,6 +51,8 @@ function getLevelDisplay(
   return 'Level 1'
 }
 
+void getLevelDisplay // available for callers
+
 function deriveCbcLevel(score: number, maxScore: number): 1 | 2 | 3 | 4 {
   if (maxScore === 0) return 1
   const pct = (score / maxScore) * 100
@@ -68,33 +71,16 @@ export async function notifyAssignmentMarked(
   assignmentId: string
 ): Promise<void> {
   try {
-    const db = createServiceClient()
-
     // 1. Submission
-    const { data: submission } = await db
-      .from('assignment_submissions')
-      .select('id, student_id, score, teacher_feedback, status')
-      .eq('id', submissionId)
-      .single()
-
+    const submission = await repos.notifications.findSubmissionById(submissionId)
     if (!submission) return
 
     // 2. Assignment
-    const { data: assignment } = await db
-      .from('assignments')
-      .select('id, title, max_score, class_id, teacher_id')
-      .eq('id', assignmentId)
-      .single()
-
+    const assignment = await repos.notifications.findAssignmentById(assignmentId)
     if (!assignment) return
 
     // 3 & 4. Student + parent data in one query
-    const { data: student } = await db
-      .from('students')
-      .select('id, name, grade, curriculum_type, parent_email, notification_email, parent_phone, notification_whatsapp, whatsapp_opted_in, parent_first_name')
-      .eq('id', submission.student_id)
-      .single()
-
+    const student = await repos.notifications.findStudentNotificationData(submission.student_id)
     if (!student) return
 
     const hasEmail    = student.notification_email && student.parent_email
@@ -103,24 +89,19 @@ export async function notifyAssignmentMarked(
     if (!hasEmail && !hasWhatsApp) return
 
     // 5. Teacher
-    const { data: teacher } = await db
-      .from('teachers')
-      .select('full_name, school')
-      .eq('id', assignment.teacher_id)
-      .single()
+    const teacher = await repos.notifications.findTeacherContact(assignment.teacher_id)
 
     // Resolve parent name — prefer stored first name, fall back to class_students→auth
     let parentName: string = student.parent_first_name ?? ''
 
     if (!parentName) {
-      const { data: classStudent } = await db
-        .from('class_students')
-        .select('parent_id')
-        .eq('student_id', submission.student_id)
-        .eq('class_id', assignment.class_id)
-        .maybeSingle()
+      const classStudent = await repos.notifications.findClassStudentParentId(
+        submission.student_id,
+        assignment.class_id,
+      )
 
       if (classStudent?.parent_id) {
+        const db = createServiceClient()
         const { data: { user: parentAuthUser } } = await db.auth.admin.getUserById(
           classStudent.parent_id
         )
@@ -136,8 +117,8 @@ export async function notifyAssignmentMarked(
     const maxScore = (assignment.max_score as number) ?? 100
     const cbcLevel = deriveCbcLevel(score, maxScore)
 
-    const teacherName   = (teacher?.full_name as string) ?? 'Your Teacher'
-    const teacherSchool = (teacher?.school    as string) ?? ''
+    const teacherName   = teacher?.full_name ?? 'Your Teacher'
+    const teacherSchool = teacher?.school    ?? ''
 
     // 7. Fire both channels in parallel
     const sends: Promise<unknown>[] = []
@@ -153,7 +134,7 @@ export async function notifyAssignmentMarked(
           score,
           maxScore,
           cbcLevel,
-          teacherFeedback: (submission.teacher_feedback as string) ?? null,
+          teacherFeedback: submission.teacher_feedback ?? null,
           teacherName,
           assignmentId,
         })
@@ -172,7 +153,7 @@ export async function notifyAssignmentMarked(
           score,
           maxScore,
           cbcLevel,
-          teacherFeedback: (submission.teacher_feedback as string) ?? null,
+          teacherFeedback: submission.teacher_feedback ?? null,
           teacherName,
           teacherSchool,
           assignmentId,
@@ -192,24 +173,12 @@ export async function notifyAssignmentMarked(
 
 export async function notifyAlertCreated(alertId: string): Promise<void> {
   try {
-    const db = createServiceClient()
-
     // 1. Alert
-    const { data: alert } = await db
-      .from('student_alerts')
-      .select('id, student_id, alert_type, message, teacher_id')
-      .eq('id', alertId)
-      .single()
-
+    const alert = await repos.notifications.findStudentAlertById(alertId)
     if (!alert) return
 
     // 2 & 3. Student + parent data
-    const { data: student } = await db
-      .from('students')
-      .select('id, name, grade, parent_email, notification_email, parent_phone, notification_whatsapp, whatsapp_opted_in, parent_first_name')
-      .eq('id', alert.student_id)
-      .single()
-
+    const student = await repos.notifications.findStudentNotificationData(alert.student_id)
     if (!student) return
 
     const hasEmail    = student.notification_email && student.parent_email
@@ -218,24 +187,18 @@ export async function notifyAlertCreated(alertId: string): Promise<void> {
     if (!hasEmail && !hasWhatsApp) return
 
     // 4. Teacher
-    const { data: teacher } = await db
-      .from('teachers')
-      .select('full_name, school, user_id')
-      .eq('id', alert.teacher_id)
-      .single()
+    const teacher = await repos.notifications.findTeacherContact(alert.teacher_id)
 
     // Resolve parent name
     let parentName: string = student.parent_first_name ?? ''
 
     if (!parentName) {
-      const { data: classStudent } = await db
-        .from('class_students')
-        .select('parent_id')
-        .eq('student_id', alert.student_id)
-        .limit(1)
-        .maybeSingle()
+      const classStudent = await repos.notifications.findAnyClassStudentParentId(
+        alert.student_id,
+      )
 
       if (classStudent?.parent_id) {
+        const db = createServiceClient()
         const { data: { user: parentAuthUser } } = await db.auth.admin.getUserById(
           classStudent.parent_id
         )
@@ -246,8 +209,8 @@ export async function notifyAlertCreated(alertId: string): Promise<void> {
       }
     }
 
-    const teacherName   = (teacher?.full_name as string) ?? 'Your Teacher'
-    const teacherSchool = (teacher?.school    as string) ?? ''
+    const teacherName   = teacher?.full_name ?? 'Your Teacher'
+    const teacherSchool = teacher?.school    ?? ''
     const userId        = teacher?.user_id as string | undefined
 
     // 5. Fire both channels in parallel

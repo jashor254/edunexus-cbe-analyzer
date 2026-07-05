@@ -1,11 +1,12 @@
 import { apiSuccess, apiError } from '@/lib/api/response'
 import { generateChallengesForAllGroups } from '@/lib/studyGroups/challengeGenerator'
+import { timingSafeEqualString } from '@/lib/api/secretCompare'
 
 export const maxDuration = 300
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!timingSafeEqualString(authHeader, `Bearer ${process.env.CRON_SECRET}`)) {
     return new Response('Unauthorized', { status: 401 })
   }
 

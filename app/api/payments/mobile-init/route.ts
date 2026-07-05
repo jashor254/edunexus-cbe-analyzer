@@ -1,49 +1,79 @@
 // app/api/payments/mobile-init/route.ts
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
+// Mobile (M-PESA) Paystack transaction initializer.
+// Amount is ALWAYS derived server-side from productId — never trusted from client.
+import { z } from 'zod'
+import { NextRequest } from 'next/server'
+import { createServiceClient } from '@/utils/supabase/service'
+import { apiSuccess, apiError, apiBadRequest } from '@/lib/api/response'
+import { requireAuth } from '@/lib/api/middleware'
+import { SUBSCRIPTION_PLANS, TOKEN_PACK } from '@/lib/payments/config'
+
+const MobileInitSchema = z.object({
+  phone:     z.string().min(1),
+  productId: z.string().min(1),
+})
+
+const PRODUCTS: Record<string, { price: number; type: string; label: string; tokens?: number }> = {
+  starter: { price: TOKEN_PACK.priceKes,                        type: 'token',        label: 'Pay-As-You-Go', tokens: TOKEN_PACK.tokens },
+  term:    { price: SUBSCRIPTION_PLANS.TERMLY_SINGLE.priceKes, type: 'subscription', label: 'Term Plan'      },
+  family:  { price: SUBSCRIPTION_PLANS.TERMLY_FAMILY.priceKes, type: 'subscription', label: 'Family Plan'    },
+}
 
 export async function POST(req: NextRequest) {
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  const auth = await requireAuth()
+  if ('response' in auth) return auth.response
 
-    const { email, amount, phone, productId } = await req.json()
+  try {
+    const parsed = MobileInitSchema.safeParse(await req.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'phone and productId are required')
+    const { phone, productId } = parsed.data
+
+    // 🔒 Server-side price lookup — client-supplied amount is never used
+    const product = PRODUCTS[productId]
+    if (!product) return apiBadRequest('Invalid product selected')
 
     if (!process.env.PAYSTACK_SECRET_KEY) {
-      return NextResponse.json({ error: 'Paystack not configured' }, { status: 500 })
+      return apiError('Payment provider not configured')
     }
 
     const response = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+        Authorization:  `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        email: email || user.email,
-        amount: amount * 100,
-        currency: 'KES',
-        channels: ['mpesa', 'card', 'bank', 'ussd', 'qr'],
-        metadata: { productId, phone_number: phone },
+        email:       auth.user.email,
+        amount:      product.price * 100, // kobo
+        currency:    'KES',
+        channels:    ['mpesa', 'card', 'bank', 'ussd', 'qr'],
+        metadata:    { productId, phone_number: phone, user_id: auth.user.id },
         callback_url: `${process.env.NEXT_PUBLIC_SITE_URL}/payment/success`,
       }),
     })
 
-    const data = await response.json()
+    const data = await response.json() as { status: boolean; data: { authorization_url: string; reference: string }; message?: string }
 
-    if (!response.ok) {
-      return NextResponse.json({ error: data.message }, { status: response.status })
+    if (!response.ok || !data.status) {
+      return apiError(data.message ?? 'Paystack initialization failed')
     }
 
-    return NextResponse.json({
-      authorization_url: data.data.authorization_url,
-      reference: data.data.reference,
+    // Record pending payment
+    const db = createServiceClient()
+    await db.from('payments').insert({
+      user_id:        auth.user.id,
+      transaction_id: data.data.reference,
+      amount:         product.price,
+      status:         'pending',
+      product_id:     productId,
+      metadata:       { phone, email: auth.user.email, purchase_type: product.type, product_label: product.label },
     })
-  } catch (error) {
-    console.error('[payments/mobile-init]', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+
+    return apiSuccess({
+      authorization_url: data.data.authorization_url,
+      reference:         data.data.reference,
+    })
+  } catch (err: unknown) {
+    return apiError(err instanceof Error ? err.message : 'Internal server error')
   }
 }

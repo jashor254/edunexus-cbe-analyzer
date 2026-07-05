@@ -1,14 +1,22 @@
 // app/api/tokens/check/route.ts
 // Thin route — all logic lives in lib/payments/access.ts
 
+import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
 import { checkFeatureAccess } from '@/lib/payments/access'
 import { type FeatureKey, FEATURE_ACCESS } from '@/lib/payments/config'
 
+const TokenCheckSchema = z.object({
+  feature: z.string().optional(),
+})
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const feature = body?.feature as FeatureKey | undefined
+    const parsed = TokenCheckSchema.safeParse(await request.json())
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid or missing feature' }, { status: 400 })
+    }
+    const feature = parsed.data.feature as FeatureKey | undefined
 
     if (!feature || !(feature in FEATURE_ACCESS)) {
       return NextResponse.json(

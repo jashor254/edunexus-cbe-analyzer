@@ -4,6 +4,7 @@
 
 import { validateLesson } from './validators'
 import { isKiswahiliSubject } from '@/lib/curriculum/subjectUtils'
+import { callDeepSeek as callAI } from '@/lib/ai/deepseek'
 import type { CurriculumMode } from './types'
 import type { DiversitySeed } from './diversityEngine'
 
@@ -107,32 +108,13 @@ NEVER: page numbers, "pp.", descriptions after the name, community resource pers
   farm visits, radio recordings, government maps, purchased materials, internet resources.`
 }
 
-// ─── DeepSeek API call ───────────────────────────────────────────────────────
+// ─── AI call — routes through shared lib/ai/deepseek.ts ─────────────────────
 
-async function callDeepSeek(prompt: string, isKiswahili = false): Promise<string> {
-  const response = await fetch('https://api.deepseek.com/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: 'deepseek-chat',
-      messages: [
-        { role: 'system', content: getDiversitySystemRules(isKiswahili) },
-        { role: 'user',   content: prompt },
-      ],
-      temperature: TEMPERATURE,
-      max_tokens: 1200,
-    }),
+function callSowAI(prompt: string, isKiswahili = false): Promise<string> {
+  return callAI(prompt, getDiversitySystemRules(isKiswahili), {
+    temperature: TEMPERATURE,
+    maxTokens:   1200,
   })
-
-  if (!response.ok) {
-    throw new Error(`DeepSeek API error: ${response.status} ${response.statusText}`)
-  }
-
-  const data = await response.json()
-  return data.choices[0].message.content
 }
 
 // ─── Prompt builder ──────────────────────────────────────────────────────────
@@ -474,7 +456,7 @@ ${isMathsRetry && lastError.includes('progress') ? 'MATHS REMINDER: a)=recall/id
 
     let aiResponse: string
     try {
-      aiResponse = await callDeepSeek(prompt, isKiswahiliCtx)
+      aiResponse = await callSowAI(prompt, isKiswahiliCtx)
     } catch (err: unknown) {
       lastError = `AI request failed: ${err instanceof Error ? err.message : String(err)}`
       continue

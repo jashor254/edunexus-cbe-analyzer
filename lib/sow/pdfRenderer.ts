@@ -1,3 +1,4 @@
+import { esc } from '@/lib/pdf/utils'
 // lib/sow/pdfRenderer.ts
 // HTML → browser print renderer for SOW download.
 // Produces: Page 1 = cover page, Page 2+ = A4 landscape SOW table.
@@ -51,14 +52,6 @@ export function getColumnConfig(mode: CurriculumMode): ColConfig {
     col10: 'REFLECTION',
     hasInquiryQuestions: true,
   }
-}
-
-function esc(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
 }
 
 

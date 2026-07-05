@@ -1,6 +1,26 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/utils/supabase/middleware'
+import { generateTraceId } from '@/lib/observability/tracing'
+import { SUPPORTED_LOCALES, DEFAULT_LOCALE } from '@/lib/i18n/config'
+
+/** Pick the best supported locale from an Accept-Language header. */
+function detectLocale(acceptLang: string): string {
+  if (!acceptLang) return DEFAULT_LOCALE
+  const candidates = acceptLang
+    .split(',')
+    .map(entry => { const [tag, q] = entry.trim().split(';q='); return { tag: tag.trim().toLowerCase(), q: parseFloat(q ?? '1') } })
+    .sort((a, b) => b.q - a.q)
+    .map(e => e.tag)
+  for (const candidate of candidates) {
+    const exact = SUPPORTED_LOCALES.find(l => l.toLowerCase() === candidate)
+    if (exact) return exact
+    const lang = candidate.split('-')[0]
+    const loose = SUPPORTED_LOCALES.find(l => l.toLowerCase().startsWith(lang + '-') || l.toLowerCase() === lang)
+    if (loose) return loose
+  }
+  return DEFAULT_LOCALE
+}
 
 const PUBLIC_PREFIXES = [
   '/api/',
@@ -26,6 +46,14 @@ export async function proxy(request: NextRequest) {
   // route handlers can call getSession() (local cookie read, ~0ms) instead of
   // getUser() (remote network call, ~2s on slow connections).
   const sessionResponse = await updateSession(request)
+
+  // ── Observability: correlation trace ID ────────────────────────────────────
+  const traceId = request.headers.get('x-trace-id') ?? generateTraceId()
+  sessionResponse.headers.set('x-trace-id', traceId)
+
+  // ── Global readiness: locale detection ────────────────────────────────────
+  const locale = detectLocale(request.headers.get('accept-language') ?? '')
+  sessionResponse.headers.set('x-locale', locale)
 
   const { pathname } = request.nextUrl
 

@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { ADMIN_CONFIG } from '@/lib/config/api'
 
 export async function updateSession(request: NextRequest) {
   // Must use NextResponse.next({ request }) so Next.js forwards the mutated
@@ -45,7 +46,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (pathname.startsWith('/admin')) {
-    if (user?.email !== 'kariukidennis092@gmail.com') {
+    if (!user?.email || !ADMIN_CONFIG.isAdmin(user.email)) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
   }

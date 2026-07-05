@@ -1,6 +1,7 @@
 // lib/api-protection.ts
 import { createClient } from '@/utils/supabase/server';
 import { canAccessPremiumFeatures } from './access';
+import { ADMIN_CONFIG } from '@/lib/config/api';
 
 export async function validateUserAccess() {
   // MUHIMU: Await hapa kurekebisha ile error
@@ -36,6 +37,6 @@ export async function validateUserAccess() {
     user,
     subscription,
     // Hii inatusaidia kujua kama tukate token au la
-    isUnlimited: profile?.role === 'school_admin' || user.email === 'kariukidennis092@gmail.com'
+    isUnlimited: profile?.role === 'school_admin' || (!!user.email && ADMIN_CONFIG.isAdmin(user.email))
   };
 }

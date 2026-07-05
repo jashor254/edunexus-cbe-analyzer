@@ -23,6 +23,8 @@ import {
 import { getOrCreateLearnerProfile } from '@/lib/learnerModel/queries'
 import { computeNextBestActions } from './nextAction'
 import { detectAndRecordCareerMilestones } from './careerIntelligence'
+import { runLearnerResearchCycle } from '@/lib/eir/engine'
+import { publishEvent } from '@/lib/events'
 import type {
   EILSEventType,
   EILSEventSource,
@@ -93,18 +95,35 @@ export async function afterAssessment(params: {
     year:           params.year,
   })
 
+  // 2b. Publish platform event
+  void publishEvent({
+    event_type:      'system.intelligence.updated',
+    resource_type:   'learner_intelligence',
+    resource_id:     params.studentId,
+    actor_id:        params.studentId,
+    payload: {
+      student_id:     params.studentId,
+      trigger:        'assessment',
+      layers_updated: ['learner_model', 'next_actions', 'career_milestones'],
+    },
+    idempotency_key: `system.intelligence.updated:${params.studentId}:${params.assessmentId}`,
+  }).catch((e: unknown) => console.error('[events] system.intelligence.updated (assessment):', e instanceof Error ? e.message : String(e)))
+
   // 3. Recompute next best actions
-  void computeNextBestActions(params.studentId, 'assessment').catch(() => {})
+  void computeNextBestActions(params.studentId, 'assessment').catch((e: unknown) => console.error('[continuousLearning:afterAssessment] computeNextBestActions failed:', e instanceof Error ? e.message : String(e)))
 
   // 4. Check career milestones
   const profile = await getOrCreateLearnerProfile(params.studentId)
-  void detectAndRecordCareerMilestones(params.studentId, profile, db).catch(() => {})
+  void detectAndRecordCareerMilestones(params.studentId, profile, db).catch((e: unknown) => console.error('[continuousLearning:afterAssessment] detectAndRecordCareerMilestones failed:', e instanceof Error ? e.message : String(e)))
 
   // 5. Check if any active interventions are now resolved
-  void checkInterventionOutcomes(params.studentId, db).catch(() => {})
+  void checkInterventionOutcomes(params.studentId, db).catch((e: unknown) => console.error('[continuousLearning:afterAssessment] checkInterventionOutcomes failed:', e instanceof Error ? e.message : String(e)))
 
   // 6. Detect term breakthrough milestone
-  void detectTermBreakthrough(params.studentId, profile, db).catch(() => {})
+  void detectTermBreakthrough(params.studentId, profile, db).catch((e: unknown) => console.error('[continuousLearning:afterAssessment] detectTermBreakthrough failed:', e instanceof Error ? e.message : String(e)))
+
+  // 7. EIR research cycle — discovers misconceptions, trajectory, risk predictions
+  void runLearnerResearchCycle({ studentId: params.studentId, trigger: 'assessment' }).catch((e: unknown) => console.error('[continuousLearning:afterAssessment] runLearnerResearchCycle failed:', e instanceof Error ? e.message : String(e)))
 }
 
 // ── After Compass Session ─────────────────────────────────────────────────────
@@ -149,13 +168,30 @@ export async function afterCompassSession(params: {
     abandoned:        params.sessionAbandoned ?? false,
   })
 
+  // 2b. Publish platform event
+  void publishEvent({
+    event_type:      'system.intelligence.updated',
+    resource_type:   'learner_intelligence',
+    resource_id:     params.studentId,
+    actor_id:        params.studentId,
+    payload: {
+      student_id:     params.studentId,
+      trigger:        'compass',
+      layers_updated: ['learner_model', 'next_actions'],
+    },
+    idempotency_key: `system.intelligence.updated:${params.studentId}:compass:${params.completedAt}`,
+  }).catch((e: unknown) => console.error('[events] system.intelligence.updated (compass):', e instanceof Error ? e.message : String(e)))
+
   // 3. Recompute next best actions (compass sessions may resolve gap recommendations)
-  void computeNextBestActions(params.studentId, 'compass').catch(() => {})
+  void computeNextBestActions(params.studentId, 'compass').catch((e: unknown) => console.error('[continuousLearning:afterCompassSession] computeNextBestActions failed:', e instanceof Error ? e.message : String(e)))
 
   // 4. Check if compass session resolved a compass_assignment intervention
   if (params.masteredConcepts.length > 0) {
-    void checkCompassInterventionResolution(params.studentId, params.masteredConcepts, db).catch(() => {})
+    void checkCompassInterventionResolution(params.studentId, params.masteredConcepts, db).catch((e: unknown) => console.error('[continuousLearning:afterCompassSession] checkCompassInterventionResolution failed:', e instanceof Error ? e.message : String(e)))
   }
+
+  // 5. EIR research cycle — updates trajectory model, personalization, risk
+  void runLearnerResearchCycle({ studentId: params.studentId, trigger: 'compass' }).catch((e: unknown) => console.error('[continuousLearning:afterCompassSession] runLearnerResearchCycle failed:', e instanceof Error ? e.message : String(e)))
 }
 
 // ── After Formative Signal ────────────────────────────────────────────────────
@@ -184,7 +220,7 @@ export async function afterFormativeSignal(params: {
   })
 
   if (params.outcome === 'lost') {
-    void computeNextBestActions(params.studentId, 'formative').catch(() => {})
+    void computeNextBestActions(params.studentId, 'formative').catch((e: unknown) => console.error('[continuousLearning:afterFormativeSignal] computeNextBestActions failed:', e instanceof Error ? e.message : String(e)))
   }
 }
 
@@ -212,7 +248,7 @@ export async function afterParentObservation(params: {
   })
 
   if (params.outcome === 'struggled') {
-    void computeNextBestActions(params.studentId, 'parent').catch(() => {})
+    void computeNextBestActions(params.studentId, 'parent').catch((e: unknown) => console.error('[continuousLearning:afterParentObservation] computeNextBestActions failed:', e instanceof Error ? e.message : String(e)))
   }
 }
 
@@ -281,7 +317,10 @@ export async function afterRemedialPlanCompleted(params: {
   })
 
   // Recompute next actions after remediation
-  void computeNextBestActions(params.studentId, 'periodic').catch(() => {})
+  void computeNextBestActions(params.studentId, 'periodic').catch((e: unknown) => console.error('[continuousLearning:afterRemedialPlanCompleted] computeNextBestActions failed:', e instanceof Error ? e.message : String(e)))
+
+  // EIR: record intervention outcome + run research cycle
+  void runLearnerResearchCycle({ studentId: params.studentId, trigger: 'intervention_resolved' }).catch((e: unknown) => console.error('[continuousLearning:afterRemedialPlanCompleted] runLearnerResearchCycle failed:', e instanceof Error ? e.message : String(e)))
 }
 
 // ── Intervention Outcome Checking ─────────────────────────────────────────────

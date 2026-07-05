@@ -1,5 +1,6 @@
 // POST: Mark a lesson plan as taught
 // Body: { taughtDate: string, reflection?: string }
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import {
@@ -14,6 +15,11 @@ interface RouteContext {
   params: Promise<{ planId: string }>
 }
 
+const MarkTaughtSchema = z.object({
+  taughtDate: z.string().min(1),
+  reflection: z.string().optional(),
+})
+
 export async function POST(req: Request, { params }: RouteContext) {
   try {
     const { planId } = await params
@@ -21,8 +27,9 @@ export async function POST(req: Request, { params }: RouteContext) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return apiUnauthorized()
 
-    const { taughtDate, reflection } = await req.json()
-    if (!taughtDate) return apiBadRequest('taughtDate is required')
+    const parsed = MarkTaughtSchema.safeParse(await req.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'taughtDate is required')
+    const { taughtDate, reflection } = parsed.data
 
     const db = createServiceClient()
     const update: Record<string, unknown> = {

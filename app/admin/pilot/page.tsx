@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 
-const ADMIN_EMAIL = 'kariukidennis092@gmail.com'
+const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS ?? '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
 
 const LEVEL_LABELS: Record<number, string> = {
   1: 'Emerging',
@@ -84,7 +84,7 @@ export default function PilotPage() {
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user || user.email?.toLowerCase().trim() !== ADMIN_EMAIL) {
+      if (!user || !ADMIN_EMAILS.includes(user.email?.toLowerCase().trim() ?? '')) {
         router.replace('/dashboard')
         return
       }

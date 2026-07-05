@@ -36,7 +36,7 @@ export async function GET(
       .select('student_id')
       .eq('class_id', classId)
 
-    const studentIds = (studentLinks || []).map((s: any) => s.student_id)
+    const studentIds = (studentLinks || []).map((s: { student_id: string }) => s.student_id)
 
     if (studentIds.length === 0) {
       return apiSuccess({
@@ -74,21 +74,25 @@ export async function GET(
     const allAssessments = assessmentsResult.data || []
     const studentData = studentsResult.data || []
 
+    type SessionRow = { learner_id: string; updated_at: string }
+    type AssessmentRow = { student_id: string; subject_scores: Record<string, number>; created_at: string }
+    type StudentRow = { id: string; name: string; grade: number }
+
     // Active in last 7 days
     const recentlyActive = new Set(
-      sessions
-        .filter((s: any) => s.updated_at >= sevenDaysAgo)
-        .map((s: any) => s.learner_id)
+      (sessions as SessionRow[])
+        .filter((s) => s.updated_at >= sevenDaysAgo)
+        .map((s) => s.learner_id)
     )
 
     // Per-student risk
     const riskMap: Record<string, 'high' | 'medium' | 'low'> = {}
     studentIds.forEach((sid: string) => {
       const isActive = recentlyActive.has(sid)
-      const latestAssessment = allAssessments.find((a: any) => a.student_id === sid)
+      const latestAssessment = (allAssessments as AssessmentRow[]).find((a) => a.student_id === sid)
       let avgScore = 2.5
       if (latestAssessment?.subject_scores) {
-        const vals = Object.values(latestAssessment.subject_scores as Record<string, number>)
+        const vals = Object.values(latestAssessment.subject_scores)
         avgScore = vals.reduce((s, v) => s + v, 0) / vals.length
       }
 
@@ -97,9 +101,9 @@ export async function GET(
       else riskMap[sid] = 'low'
     })
 
-    const holidayRisk = studentData
-      .filter((s: any) => riskMap[s.id] === 'high' || riskMap[s.id] === 'medium')
-      .map((s: any) => ({
+    const holidayRisk = (studentData as StudentRow[])
+      .filter((s) => riskMap[s.id] === 'high' || riskMap[s.id] === 'medium')
+      .map((s) => ({
         ...s,
         riskLevel: riskMap[s.id],
         isActive: recentlyActive.has(s.id),
@@ -107,11 +111,11 @@ export async function GET(
 
     // Subject distribution across class
     const subjectDistribution: Record<string, number[]> = {}
-    const latestPerStudent: Record<string, any> = {}
-    allAssessments.forEach((a: any) => {
+    const latestPerStudent: Record<string, AssessmentRow> = {};
+    (allAssessments as AssessmentRow[]).forEach((a) => {
       if (!latestPerStudent[a.student_id]) {
         latestPerStudent[a.student_id] = a
-        const scores = a.subject_scores as Record<string, number>
+        const scores = a.subject_scores
         Object.entries(scores).forEach(([subj, score]) => {
           if (!subjectDistribution[subj]) subjectDistribution[subj] = []
           subjectDistribution[subj].push(score)

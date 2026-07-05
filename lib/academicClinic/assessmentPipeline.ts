@@ -2,7 +2,7 @@
 // Shared processing pipeline: assessment scores → adaptive analysis → context save → PDF → notify parent.
 // Used by both the teacher-run flow and the parent self-service flow.
 
-import type { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 import { analyzePerformance } from '@/lib/adaptiveLearning'
 import { calculateJuniorPathwayAffinity } from '@/lib/pathwayCalculator'
 import {
@@ -59,7 +59,6 @@ export type AssessmentPipelineResult = {
 }
 
 export type RunAssessmentPipelineParams = {
-  db:            ReturnType<typeof createServiceClient>
   studentId:     string
   assessmentId:  string
   actorName:     string
@@ -70,7 +69,6 @@ export type RunAssessmentPipelineParams = {
 }
 
 export async function runAssessmentPipeline({
-  db,
   studentId,
   assessmentId,
   actorName,
@@ -82,19 +80,12 @@ export async function runAssessmentPipeline({
   try {
     // Load student + assessment
     const [studentRes, assessmentRes] = await Promise.all([
-      db.from('students')
-        .select('id, name, grade, curriculum_type, school, current_pathway, parent_email, parent_phone, parent_first_name, parent_user_id, notification_email, notification_whatsapp, whatsapp_opted_in')
-        .eq('id', studentId)
-        .single(),
-      db.from('assessments')
-        .select('id, term, year, subject_scores, created_at')
-        .eq('id', assessmentId)
-        .eq('student_id', studentId)
-        .single(),
+      repos.careers.findStudentForPipeline(studentId),
+      repos.assessments.findAssessmentForPipeline(assessmentId, studentId),
     ])
 
-    const student    = studentRes.data
-    const assessment = assessmentRes.data
+    const student    = studentRes
+    const assessment = assessmentRes
 
     if (!student)    return { student_id: studentId, student_name: '?', status: 'error', error: 'Student not found' }
     if (!assessment) return { student_id: studentId, student_name: student.name, status: 'error', error: 'Assessment not found or does not belong to student' }
@@ -140,7 +131,7 @@ export async function runAssessmentPipeline({
     // Knowledge graph — root cause analysis (non-blocking, requires strand_assessments data)
     let knowledgeRootCauses: RootCauseResult[] = []
     try {
-      knowledgeRootCauses = await analyseStudentRootCauses(db, student.id, student.grade)
+      knowledgeRootCauses = await analyseStudentRootCauses(student.id, student.grade)
     } catch (err) {
       console.error('[assessmentPipeline] knowledge graph traversal failed (non-fatal):', err)
     }
@@ -192,7 +183,7 @@ export async function runAssessmentPipeline({
       : null
 
     // Save to student_learning_context
-    await db.from('student_learning_context').upsert({
+    await repos.careers.upsertStudentLearningContext({
       student_id:          student.id,
       user_id:             actorUserId,
       overall_tier:        adaptiveAnalysis.overallTier,
@@ -239,17 +230,9 @@ export async function runAssessmentPipeline({
     const pdfBuffer = Buffer.from(await pdfBlob.arrayBuffer())
 
     // Load invite token for magic link
-    const { data: invite } = await db
-      .from('student_invites')
-      .select('token')
-      .eq('student_id', student.id)
-      .is('used_at', null)
-      .gt('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    const invite = await repos.careers.findStudentInviteToken(student.id)
 
-    const signupToken = !student.parent_user_id ? (invite?.token ?? undefined) : undefined
+    const signupToken = !student.parent_user_id ? (invite ?? undefined) : undefined
 
     // Fire notifications in parallel
     const parentName = student.parent_first_name ?? 'Parent'
@@ -293,7 +276,7 @@ export async function runAssessmentPipeline({
     // Persist report record so teacher dashboard can track delivery
     if (teacherId) {
       try {
-        await db.from('student_clinic_reports').upsert({
+        await repos.careers.upsertStudentClinicReport({
           student_id:       student.id,
           teacher_id:       teacherId,
           class_id:         classId ?? null,
@@ -302,7 +285,7 @@ export async function runAssessmentPipeline({
           year:             assessment.year,
           whatsapp_sent_at: whatsappSent ? new Date().toISOString() : null,
           email_sent_at:    emailSent    ? new Date().toISOString() : null,
-        }, { onConflict: 'student_id,assessment_id' })
+        })
       } catch { /* non-fatal — report record failure doesn't block the response */ }
     }
 

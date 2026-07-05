@@ -4,7 +4,8 @@ import { createServiceClient } from '@/utils/supabase/service'
 import {
   apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest,
 } from '@/lib/api/response'
-import { getTeacherAssessments, getClassAssessments, createAssessment } from '@/lib/assessments/queries'
+import { getTeacherAssessments, getClassAssessments } from '@/lib/assessments/getters'
+import { createAssessment } from '@/lib/assessments/mutations'
 
 const CreateSchema = z.object({
   classId:        z.uuid(),

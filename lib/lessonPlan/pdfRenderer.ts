@@ -1,16 +1,9 @@
+import { esc } from '@/lib/pdf/utils'
 import type { LessonPlanRecord } from './types'
 import type { CurriculumMode } from '@/lib/sow/types'
 import { isKiswahiliSubject } from '@/lib/curriculum/subjectUtils'
 import { toTitleCase } from '@/lib/utils/formatters'
 
-function esc(s: string | null | undefined): string {
-  if (!s) return ''
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
 
 function bullets(items: string[]): string {
   if (!items?.length) return '—'

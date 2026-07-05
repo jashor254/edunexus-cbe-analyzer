@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 
 export type TeacherCompetency = {
   id: string
@@ -12,19 +12,17 @@ export type TeacherCompetency = {
 }
 
 export async function getTeacherCompetencyScores(teacherId: string): Promise<TeacherCompetency[]> {
-  const db = createServiceClient()
-
-  const [compRes, mappingRes, progressRes, lessonRes] = await Promise.all([
-    db.from('academy_competencies').select('id, label, description, category, color').order('id'),
-    db.from('academy_module_competencies').select('module_id, competency_id'),
-    db.from('academy_progress').select('lesson_id').eq('teacher_id', teacherId),
-    db.from('academy_lessons').select('id, module_id'),
+  const [competencies, mappings, progress, publishedModules] = await Promise.all([
+    repos.academy.findCompetencies(),
+    repos.academy.findModuleCompetencyMappings(),
+    repos.academy.findProgressByTeacher(teacherId),
+    repos.academy.findPublishedModules(),
   ])
 
-  const competencies  = compRes.data    ?? []
-  const mappings      = mappingRes.data ?? []
-  const doneIds       = new Set((progressRes.data ?? []).map(r => r.lesson_id))
-  const allLessons    = lessonRes.data  ?? []
+  const allModuleIds = publishedModules.map(m => m.id)
+  const allLessons = await repos.academy.findLessonIdsByModuleIds(allModuleIds)
+
+  const doneIds    = new Set(progress.map(r => r.lesson_id))
 
   // Per-module: how many lessons total vs completed
   const moduleCounts = new Map<string, { total: number; done: number }>()

@@ -1,6 +1,13 @@
+import { z } from 'zod'
 import { createClient }        from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest, apiNotFound } from '@/lib/api/response'
+
+const ChallengeAnswerSchema = z.object({
+  groupId:     z.string().uuid(),
+  answer:      z.string().min(1),
+  isAnonymous: z.boolean().optional(),
+})
 
 export async function POST(req: Request) {
   try {
@@ -8,8 +15,9 @@ export async function POST(req: Request) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) return apiUnauthorized()
 
-    const { groupId, answer, isAnonymous } = await req.json()
-    if (!groupId || answer === undefined) return apiBadRequest('Missing groupId or answer')
+    const parsed = ChallengeAnswerSchema.safeParse(await req.json())
+    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Missing groupId or answer')
+    const { groupId, answer, isAnonymous } = parsed.data
 
     const db = createServiceClient()
 

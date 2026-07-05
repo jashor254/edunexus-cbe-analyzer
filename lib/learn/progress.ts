@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 import { formatSubjectName } from '@/lib/academicClinic/reportGenerator'
 
 export interface SubjectProgress {
@@ -11,26 +11,19 @@ export interface SubjectProgress {
 }
 
 export async function getStudentProgress(studentId: string): Promise<SubjectProgress[]> {
-  const db = createServiceClient()
+  const sessions = await repos.compass.findCompletedSessionsByLearner(studentId)
 
-  const { data: sessions } = await db
-    .from('compass_sessions')
-    .select('subject, duration_seconds, completed_at, one_line_summary')
-    .eq('learner_id', studentId)
-    .eq('status', 'completed')
-    .order('completed_at', { ascending: true })
-
-  if (!sessions?.length) return []
+  if (!sessions.length) return []
 
   const bySubject: Record<string, typeof sessions> = {}
   for (const s of sessions) {
-    const key = (s.subject as string | null) ?? 'unknown'
+    const key = s.subject ?? 'unknown'
     if (!bySubject[key]) bySubject[key] = []
     bySubject[key].push(s)
   }
 
   return Object.entries(bySubject).map(([subject, list]) => {
-    const totalSeconds = list.reduce((sum, s) => sum + ((s.duration_seconds as number | null) ?? 0), 0)
+    const totalSeconds = list.reduce((sum, s) => sum + (s.duration_seconds ?? 0), 0)
     const last = list[list.length - 1]
 
     return {
@@ -38,10 +31,10 @@ export async function getStudentProgress(studentId: string): Promise<SubjectProg
       subjectDisplay:    formatSubjectName(subject),
       completedSessions: list.length,
       totalMinutes:       Math.round(totalSeconds / 60),
-      lastCompletedAt:    (last.completed_at as string | null) ?? null,
+      lastCompletedAt:    last.completed_at ?? null,
       recentSummaries:    list
         .slice(-3)
-        .map(s => s.one_line_summary as string | null)
+        .map(s => s.one_line_summary)
         .filter((s): s is string => Boolean(s)),
     }
   })

@@ -1,10 +1,11 @@
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 import { generateLessonPlan } from './generator'
+import { publishEvent } from '@/lib/events'
 import type { LessonPlanContext, WeeklyGenerationResult } from './types'
 import type { GeneratedLesson } from '@/lib/sow/types'
 import type { TimelineSlot } from '@/lib/sow/types'
 
-interface SOWRecord {
+interface SavedSOW {
   id: string
   teacher_id: string
   school: string
@@ -14,25 +15,9 @@ interface SOWRecord {
   year: number
   teacher_name: string | null
   tsc_number: string | null
-}
-
-interface SavedSOW extends SOWRecord {
   lessons: GeneratedLesson[]
   timeline: TimelineSlot[]
   breaks: Array<{ startWeek: number; endWeek: number; title: string }>
-}
-
-async function getSowWithTimeline(sowId: string): Promise<SavedSOW> {
-  const db = createServiceClient()
-
-  const { data: sow, error } = await db
-    .from('schemes_of_work')
-    .select('id, teacher_id, school, grade, learning_area, term, year, lessons, timeline, breaks, teacher_name, tsc_number')
-    .eq('id', sowId)
-    .single()
-
-  if (error || !sow) throw new Error(`SOW not found: ${sowId}`)
-  return sow as SavedSOW
 }
 
 function getNextTeachingWeek(timeline: TimelineSlot[], fromWeek: number): number {
@@ -59,8 +44,6 @@ async function savePlans(
   weekNumber: number,
   sow: SavedSOW
 ): Promise<void> {
-  const db = createServiceClient()
-
   const rows = plans.map(({ plan, lesson }) => ({
     sow_id: sowId,
     teacher_id: teacherId,
@@ -82,8 +65,7 @@ async function savePlans(
     status: 'generated',
   }))
 
-  const { error } = await db.from('lesson_plans').insert(rows)
-  if (error) throw new Error(`Failed to save lesson plans: ${error.message}`)
+  await repos.curriculum.insertLessonPlans(rows)
 }
 
 export async function generateWeeklyPlans(
@@ -92,7 +74,7 @@ export async function generateWeeklyPlans(
   currentWeek: number
 ): Promise<WeeklyGenerationResult> {
   const nextWeek = currentWeek + 1
-  const sow = await getSowWithTimeline(sowId)
+  const sow = await repos.curriculum.findSOWWithTimeline(sowId) as unknown as SavedSOW
 
   const nextWeekSlots = (sow.timeline || []).filter(s => s.week === nextWeek)
 
@@ -140,6 +122,21 @@ export async function generateWeeklyPlans(
 
   await savePlans(results, sowId, teacherId, nextWeek, sow)
 
+  void publishEvent({
+    event_type:      'teacher.lesson_plan.generated',
+    resource_type:   'lesson_plan',
+    resource_id:     `${sowId}:week:${nextWeek}`,
+    actor_id:        teacherId,
+    payload: {
+      sow_id:      sowId,
+      subject:     sow.learning_area,
+      grade:       sow.grade,
+      week_number: nextWeek,
+      count:       results.length,
+    },
+    idempotency_key: `teacher.lesson_plan.generated:${sowId}:week:${nextWeek}`,
+  }).catch(err => console.error('[events] teacher.lesson_plan.generated:', err instanceof Error ? err.message : String(err)))
+
   return {
     generated: results.length,
     week: nextWeek,
@@ -152,7 +149,7 @@ export async function generateSpecificWeekPlans(
   teacherId: string,
   weekNumber: number
 ): Promise<WeeklyGenerationResult> {
-  const sow = await getSowWithTimeline(sowId)
+  const sow = await repos.curriculum.findSOWWithTimeline(sowId) as unknown as SavedSOW
 
   const weekSlots = (sow.timeline || []).filter(s => s.week === weekNumber && !s.isBreak)
   const sowLessons = matchSlotsToLessons(weekSlots, sow.lessons || [])
@@ -187,6 +184,21 @@ export async function generateSpecificWeekPlans(
   )
 
   await savePlans(results, sowId, teacherId, weekNumber, sow)
+
+  void publishEvent({
+    event_type:      'teacher.lesson_plan.generated',
+    resource_type:   'lesson_plan',
+    resource_id:     `${sowId}:week:${weekNumber}`,
+    actor_id:        teacherId,
+    payload: {
+      sow_id:      sowId,
+      subject:     sow.learning_area,
+      grade:       sow.grade,
+      week_number: weekNumber,
+      count:       results.length,
+    },
+    idempotency_key: `teacher.lesson_plan.generated:${sowId}:week:${weekNumber}`,
+  }).catch(err => console.error('[events] teacher.lesson_plan.generated:', err instanceof Error ? err.message : String(err)))
 
   return {
     generated: results.length,

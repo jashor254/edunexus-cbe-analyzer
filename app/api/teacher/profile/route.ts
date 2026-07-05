@@ -1,6 +1,16 @@
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
+
+const UpdateProfileSchema = z.object({
+  full_name:    z.string().trim().min(1),
+  school:       z.string().trim().min(1),
+  subject:      z.string().optional(),
+  grade_levels: z.array(z.number().int()).optional(),
+  phone:        z.string().optional(),
+  tsc_number:   z.string().optional(),
+})
 
 export async function GET() {
   try {
@@ -34,12 +44,9 @@ export async function POST(req: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return apiUnauthorized()
 
-    const body = await req.json()
-    const { full_name, school, subject, grade_levels, phone, tsc_number } = body
-
-    if (!full_name || !school) {
-      return apiError('full_name and school are required', 400)
-    }
+    const parsed = UpdateProfileSchema.safeParse(await req.json())
+    if (!parsed.success) return apiError(parsed.error.issues[0]?.message ?? 'full_name and school are required', 400)
+    const { full_name, school, subject, grade_levels, phone, tsc_number } = parsed.data
 
     // Use the user's own authenticated client for INSERT/UPDATE so RLS
     // (auth.uid() = user_id) passes without needing service role on user tables.

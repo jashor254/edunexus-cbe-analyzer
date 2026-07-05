@@ -72,12 +72,12 @@ export async function GET(req: Request) {
     const strandIds = strandsData.map(s => s.id)
     const PAGE = 1000
     let from = 0
-    const allSubstrands: Array<{ id: string; strand_id: string; title: string; order_index: number }> = []
+    const allSubstrands: Array<{ id: string; strand_id: string; title: string; suggested_lessons: number; order_index: number }> = []
 
     while (true) {
       const { data: page, error: subErr } = await db
         .from('sow_substrands')
-        .select('id, strand_id, title, order_index')
+        .select('id, strand_id, title, suggested_lessons, order_index')
         .in('strand_id', strandIds)
         .order('order_index')
         .range(from, from + PAGE - 1)
@@ -93,10 +93,10 @@ export async function GET(req: Request) {
     }
 
     // 3. Group substrands by strand
-    const subsByStrand: Record<string, Array<{ id: string; title: string }>> = {}
+    const subsByStrand: Record<string, Array<{ id: string; title: string; suggested_lessons: number }>> = {}
     for (const sub of allSubstrands) {
       if (!subsByStrand[sub.strand_id]) subsByStrand[sub.strand_id] = []
-      subsByStrand[sub.strand_id].push({ id: sub.id, title: sub.title })
+      subsByStrand[sub.strand_id].push({ id: sub.id, title: sub.title, suggested_lessons: sub.suggested_lessons })
     }
 
     const strands = strandsData.map(s => ({

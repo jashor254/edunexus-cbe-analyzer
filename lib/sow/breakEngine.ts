@@ -37,12 +37,6 @@ export function validateBreak(
     lessonsPerWeek
   )
 
-  console.log('validateBreak startSlot:', startSlot,
-              'endSlot:', endSlot,
-              'termStart:', termStart,
-              'termEnd:', termEnd,
-              'startSlot > endSlot:', startSlot > endSlot)
-
   if (startSlot > endSlot) {
     return { valid: false, error: 'Break start is after break end' }
   }

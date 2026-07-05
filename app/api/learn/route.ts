@@ -92,8 +92,6 @@ function normalisePathway(raw: string | null): ValidPathway | null {
 
 export async function POST(req: Request) {
   try {
-    console.time('[COMPASS] total')
-    const t0 = Date.now()
     const {
       message,
       sessionId,
@@ -124,7 +122,6 @@ export async function POST(req: Request) {
     const isClosing = CLOSING_WORDS.some(w => (message as string).toLowerCase().includes(w))
 
     // ── Single parallel round: auth + all DB reads + topics + session ─────────
-    console.time('[COMPASS] db-reads')
     const [
       access,
       savedSession,
@@ -141,9 +138,9 @@ export async function POST(req: Request) {
       // Session history (only if resuming)
       sessionId ? readSession(sessionId, studentId) : Promise.resolve(null),
 
-      // Student profile
+      // Student profile (parent_user_id used for ownership verification)
       db.from('students')
-        .select('name, grade, current_pathway')
+        .select('name, grade, current_pathway, parent_user_id')
         .eq('id', studentId)
         .maybeSingle(),
 
@@ -177,13 +174,17 @@ export async function POST(req: Request) {
         : Promise.resolve(null),
     ])
     const lastSessionRow = lastSessionResult.data
-    console.timeEnd('[COMPASS] db-reads')
 
     // ── Auth result ───────────────────────────────────────────────────────────
     if (access.allowed === false) {
       const status = access.reason === 'unauthenticated' ? 401 : 403
       return apiError(access.reason, status)
     }
+
+    // ── Ownership: verify this student belongs to the authenticated user ───────
+    const studentOwner = studentResult.data?.parent_user_id ?? null
+    if (!studentResult.data) return apiError('Student not found', 404)
+    if (studentOwner !== access.userId) return apiError('Access denied', 403)
 
     // ── Daily abuse-prevention cap ────────────────────────────────────────────
     const rateLimit = await checkDailyCallLimit(access.userId, FEATURE)
@@ -320,7 +321,6 @@ export async function POST(req: Request) {
     // ── Topics + session — use early results if subject/grade matched request params ─
     // Junior (Grade 7–9): include topics from all lower grades for revision context.
     // Senior (Grade 10+): locked to their own grade.
-    console.time('[COMPASS] topics+session')
     const gradeTopicsPromise = (earlySubject === subject && earlyGrade === grade && earlyTopics !== null)
       ? Promise.resolve(earlyTopics)
       : getGradeTopics(grade, subject, { minGrade: isJunior ? 7 : grade })
@@ -330,7 +330,6 @@ export async function POST(req: Request) {
       : getOrCreateSession(studentId, subject, mode)
 
     const [gradeTopics, session] = await Promise.all([gradeTopicsPromise, sessionPromise])
-    console.timeEnd('[COMPASS] topics+session')
     const activeSessionId = sessionId ?? session.sessionId
 
     // Enable graph-driven opener only for brand-new sessions with root cause data
@@ -371,16 +370,13 @@ export async function POST(req: Request) {
       questionMode,
     }
 
-    console.time('[COMPASS] prompt-assembly')
     const systemPrompt = buildCompassPrompt(promptParams)
-    console.timeEnd('[COMPASS] prompt-assembly')
 
     const history = Array.isArray(conversationHistory)
       ? (conversationHistory as { role: 'user' | 'assistant'; content: string }[])
       : []
 
     // ── Stream from DeepSeek ──────────────────────────────────────────────────
-    console.time('[COMPASS] ai-ttfb')
     const rawStream = await streamDeepSeek(systemPrompt, message as string, history, { temperature: 0.3 })
 
     type CompassEval = {
@@ -411,10 +407,7 @@ export async function POST(req: Request) {
             const parsed = JSON.parse(data) as { choices: [{ delta: { content?: string } }] }
             const content = parsed.choices[0]?.delta?.content ?? ''
             if (content) {
-              if (!firstToken) {
-                firstToken = true
-                console.timeEnd('[COMPASS] ai-ttfb')
-              }
+              if (!firstToken) firstToken = true
               accumulated += content
               controller.enqueue(encoder.encode(content))
             }
@@ -423,7 +416,6 @@ export async function POST(req: Request) {
       },
 
       async flush(controller) {
-        console.time('[COMPASS] post-stream-writes')
         // Flush any remaining SSE buffer line
         if (sseBuffer.startsWith('data: ')) {
           const data = sseBuffer.slice(6).trim()
@@ -528,8 +520,6 @@ export async function POST(req: Request) {
         if (access.deductTokens) {
           await deductFeatureTokens(access.userId, FEATURE, access.cost)
         }
-        console.timeEnd('[COMPASS] post-stream-writes')
-        console.timeEnd('[COMPASS] total')
       },
     })
 
