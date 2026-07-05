@@ -1,0 +1,52 @@
+# .github/workflows/queue-cron.yml
+# Drives the async event/job queues that vercel.json can no longer schedule
+# natively — Vercel's Hobby (free) plan caps cron jobs at 2 per project,
+# daily schedule max, so the two every-minute crons (events/dispatch,
+# jobs/process) were dropped from vercel.json. Those queues (ai.generation,
+# email.send, whatsapp.send, webhook.deliver, report.generation,
+# analytics.aggregate, data.import/export) still need something to drain
+# them, so this workflow pings the routes externally instead.
+#
+# GitHub Actions' shortest supported cron interval is 5 minutes (not the
+# 1-minute cadence the routes were designed for) — acceptable trade-off for
+# a free tier; revisit if queue latency becomes a problem.
+
+name: Queue Cron
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  dispatch-events:
+    name: Dispatch Pending Events
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/cron/events/dispatch
+        run: |
+          STATUS=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ vars.PRODUCTION_URL }}/api/cron/events/dispatch")
+          cat /tmp/response.json
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "❌ events/dispatch failed with status $STATUS"
+            exit 1
+          fi
+
+  process-jobs:
+    name: Process Job Queues
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/cron/jobs/process
+        run: |
+          STATUS=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ vars.PRODUCTION_URL }}/api/cron/jobs/process")
+          cat /tmp/response.json
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "❌ jobs/process failed with status $STATUS"
+            exit 1
+          fi
