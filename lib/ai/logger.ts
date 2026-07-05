@@ -1,5 +1,4 @@
 import { repos } from '@/lib/repositories'
-import { env } from '@/lib/config/env'
 
 export interface AICallLog {
   feature: string    // 'sow' | 'lesson-plan' | 'compass' | etc.
@@ -14,7 +13,7 @@ export interface AICallLog {
 }
 
 export async function logAICall(log: AICallLog): Promise<void> {
-  if (env.NODE_ENV === 'development') {
+  if (process.env.NODE_ENV === 'development') {
     console.log('[AI_LOG]', {
       feature: log.feature,
       model: log.model,
