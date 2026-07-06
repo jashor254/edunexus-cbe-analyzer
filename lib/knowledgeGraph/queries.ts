@@ -41,3 +41,12 @@ export async function getNodesForSubjectGrade(
 ): Promise<KnowledgeNode[]> {
   return repos.knowledgeGraph.getNodesForSubjectGrade(subject, grade)
 }
+
+// Returns every edge whose prerequisite lives in this subject + grade — the
+// full forward-traversable edge set, fetched once for in-memory traversal.
+export async function getEdgesForSubjectGrade(
+  subject: string,
+  grade: number
+): Promise<KnowledgeEdge[]> {
+  return repos.knowledgeGraph.getEdgesForSubjectGrade(subject, grade)
+}

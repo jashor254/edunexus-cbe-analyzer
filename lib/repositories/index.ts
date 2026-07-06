@@ -11,6 +11,7 @@ import { KnowledgeGraphRepository } from './knowledge-graph.repository'
 import { LearnerIntelligenceRepository } from './learner-intelligence.repository'
 import { LearnerModelRepository } from './learner-model.repository'
 import { LearnerRepository } from './learner.repository'
+import { LearningSignalRepository } from './learning-signal.repository'
 import { NotificationRepository } from './notification.repository'
 import { OrganizationRepository } from './organization.repository'
 import { SchoolRepository } from './school.repository'
@@ -31,6 +32,7 @@ export const repos = {
   learnerIntelligence: new LearnerIntelligenceRepository(),
   learnerModel:        new LearnerModelRepository(),
   learners:            new LearnerRepository(),
+  learningSignal:      new LearningSignalRepository(),
   notifications:       new NotificationRepository(),
   organizations:       new OrganizationRepository(),
   schools:             new SchoolRepository(),
@@ -53,6 +55,7 @@ export { KnowledgeGraphRepository } from './knowledge-graph.repository'
 export { LearnerIntelligenceRepository } from './learner-intelligence.repository'
 export { LearnerModelRepository } from './learner-model.repository'
 export { LearnerRepository } from './learner.repository'
+export { LearningSignalRepository } from './learning-signal.repository'
 export { NotificationRepository } from './notification.repository'
 export { OrganizationRepository } from './organization.repository'
 export { SchoolRepository } from './school.repository'

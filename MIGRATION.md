@@ -11,6 +11,65 @@ out → prioritized remedial + TSC docs + parent report. No fees, no payroll, no
 
 ## Phase 2 — Prerequisite Intelligence Engine
 
+### Built, 2026-07-07: two layers on top of the existing knowledge graph
+
+**Bug fixes along the way:**
+- `lib/repositories/knowledge-graph.repository.ts`: `findNodeByConceptLike`/
+  `getNodesByConcepts` queried a non-existent `concept` column — fixed to the
+  real column, `name`. Verified live against the DB (previously threw).
+- Found but **not fixed** (flagged, out of scope): `lib/remedial/planner.ts`
+  passes `knowledge_nodes.id` (uuid) into `getPrerequisiteEdges()`, which
+  filters on `dependent_node_id` (text `node_id`) — a type mismatch that
+  makes the Remedial Planner's prerequisite-concept lookup silently return
+  empty every time. No longer throws; still a no-op.
+- `lib/curriculum/prerequisites/{types.ts, dag.ts, seed.ts}` removed entirely
+  (unreferenced after the substrand_prerequisites abandonment above). The
+  pure DFS-descendant logic from `dag.ts` was lifted into
+  `lib/knowledgeGraph/forwardTraversal.ts` (`transitiveDependents`) first,
+  adapted to `KnowledgeEdge`'s field names.
+
+**Layer 1 — `lib/learningSignal/` (graph-free, subject/grade-agnostic):**
+`didLearningTakePlace(learnerId, subject, grade, fromDate, toDate)` and
+`didLearningTakePlaceForClass(classId, ...)`. Reads `strand_assessments`
+directly (joined only against `assessments` for the grade filter — never
+touches `knowledge_nodes`/`knowledge_edges`/`node_assessment_map`). Compares
+earliest vs. latest rating per topic in the date range; a topic with only one
+sample in range is `insufficient_data`, not assumed flat. New repository:
+`lib/repositories/learning-signal.repository.ts`. 9 unit tests (`node:test`,
+zero new deps), all passing.
+
+**Layer 2 — `lib/knowledgeGraph/quickWins.ts` (uses the existing graph):**
+`computeQuickWins(learnerId, subject, grade)` reuses `buildStudentNodeData`,
+`getNodesForSubjectGrade`, and `MASTERY_THRESHOLD` as-is. New repo method
+`getEdgesForSubjectGrade` (forward edge fetch — everything else in
+`lib/knowledgeGraph` was backward-only). Ranks weak topics by frontier logic:
+an unmet **hard** prerequisite outranks a **soft** one regardless of raw
+blast radius; raw blast radius is the tiebreaker. 10 unit tests, all passing.
+
+**Bug found and fixed during headless verification, not before:**
+`getEdgesForSubjectGrade` filters only on the *prerequisite*'s subject+grade —
+a prerequisite's edges can legitimately reach a different subject
+(cross-subject, e.g. `Whole Numbers → Integrated Science`) or a different
+grade (`cross_grade = true`, e.g. `Whole Numbers → Grade 8 Math`). Blast
+radius was silently counting those out-of-scope descendants (inflating
+`Whole Numbers`'s blast radius to 20, when only 14 other Grade 7 Math nodes
+exist), and their names couldn't be resolved for the reason string, producing
+blank `()`. Fixed in `rankQuickWins` by dropping any edge whose dependent
+falls outside the given node set before traversal. Regression test added.
+
+**Synthetic seed (wipeable):** `scripts/seed-grade7-math-synthetic.ts` — 11
+fake Grade 7 Math learners (`students.school = 'SYNTHETIC_TEST_GRADE7_MATH_SEED'`,
+cascades on delete), one shared `assessments` parent row (the FK wrinkle from
+Phase 2's Step D audit — `strand_assessments.assessment_id` references the
+career/pathway `assessments` table, not a classroom test event), 328
+`strand_assessments` rows across 2 timepoints. Topic/strand strings are
+pulled live from `node_assessment_map` at seed time (never hand-typed), so
+they're guaranteed to match exactly.
+
+**Headless proof run:** `scripts/report-grade7-math-engines.ts` — both layers
+run over the synthetic cohort, output sanity-checked (see conversation for
+the full tables). Not wired into any teacher-facing surface yet.
+
 ### `substrand_prerequisites` — ABANDONED (2026-07-07)
 
 A new table + seed (`substrand_prerequisites`, `lib/curriculum/prerequisites/grade7MathematicsSeed.ts`,

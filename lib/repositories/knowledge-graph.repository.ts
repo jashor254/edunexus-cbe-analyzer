@@ -42,6 +42,27 @@ export class KnowledgeGraphRepository extends BaseRepository {
     return (data ?? []) as KnowledgeEdge[]
   }
 
+  /**
+   * Every edge whose prerequisite lives in this subject+grade — the full
+   * forward-traversable edge set for one subject+grade in a single query.
+   * knowledge_edges itself has no subject/grade column (edges reference
+   * nodes by node_id text), so this resolves node_ids for the subject+grade
+   * first, then fetches edges keyed on those.
+   */
+  async getEdgesForSubjectGrade(subject: string, grade: number): Promise<KnowledgeEdge[]> {
+    const nodes = await this.getNodesForSubjectGrade(subject, grade)
+    const nodeIds = nodes.map(n => n.node_id)
+    if (nodeIds.length === 0) return []
+
+    const { data, error } = await this.db
+      .from('knowledge_edges')
+      .select(EDGE_COLS)
+      .in('prerequisite_node_id', nodeIds)
+
+    if (error) throw new Error(`knowledge_edges subject/grade query failed: ${error.message}`)
+    return (data ?? []) as KnowledgeEdge[]
+  }
+
   // ── Nodes ─────────────────────────────────────────────────────────────────────
 
   /** Returns a single node by its node_id (the domain identifier, not the uuid). */
@@ -87,9 +108,9 @@ export class KnowledgeGraphRepository extends BaseRepository {
     if (concepts.length === 0) return []
     const { data } = await this.db
       .from('knowledge_nodes')
-      .select('id, concept')
-      .in('concept', concepts)
-    return data ?? []
+      .select('id, name')
+      .in('name', concepts)
+    return (data ?? []).map(row => ({ id: row.id as string, concept: row.name as string }))
   }
 
   /** Returns all nodes for a given subject + grade (full graph view). */
@@ -169,12 +190,12 @@ export class KnowledgeGraphRepository extends BaseRepository {
   async findNodeByConceptLike(concept: string): Promise<{ id: string; concept: string } | null> {
     const { data, error } = await this.db
       .from('knowledge_nodes')
-      .select('id, concept')
-      .ilike('concept', `%${concept}%`)
+      .select('id, name')
+      .ilike('name', `%${concept}%`)
       .maybeSingle()
 
     if (error) throw new Error(`Failed to find knowledge node: ${error.message}`)
-    return data ? { id: data.id as string, concept: data.concept as string } : null
+    return data ? { id: data.id as string, concept: data.name as string } : null
   }
 }
 

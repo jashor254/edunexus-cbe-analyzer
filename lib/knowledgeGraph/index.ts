@@ -21,9 +21,20 @@ export {
 export {
   buildStudentNodeData,
   getNodesForSubjectGrade,
+  getEdgesForSubjectGrade,
   getNodeById,
   getNodesByIds,
 } from './queries'
+
+export {
+  transitiveDependents,
+  directDependentEdges,
+} from './forwardTraversal'
+
+export {
+  computeQuickWins,
+} from './quickWins'
+export type { QuickWin } from './quickWins'
 
 export {
   buildCareerReadinessChains,
