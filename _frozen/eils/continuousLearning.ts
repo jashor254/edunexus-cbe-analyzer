@@ -23,7 +23,7 @@ import {
 import { getOrCreateLearnerProfile } from '@/lib/learnerModel/queries'
 import { computeNextBestActions } from './nextAction'
 import { detectAndRecordCareerMilestones } from './careerIntelligence'
-import { runLearnerResearchCycle } from '@/lib/eir/engine'
+import { runLearnerResearchCycle } from '@/_frozen/eir/engine'
 import { publishEvent } from '@/lib/events'
 import type {
   EILSEventType,

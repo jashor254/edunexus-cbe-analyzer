@@ -17,11 +17,11 @@ import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
 import {
   runPlatformResearchCycle,
   runLearnerResearchCycle,
-} from '@/lib/eir/engine'
+} from '@/_frozen/eir/engine'
 import {
   evaluatePastPredictions,
   expireStalePendingOutcomes,
-} from '@/lib/eir'
+} from '@/_frozen/eir'
 import { timingSafeEqualString } from '@/lib/api/secretCompare'
 
 export async function GET(req: Request): Promise<Response> {

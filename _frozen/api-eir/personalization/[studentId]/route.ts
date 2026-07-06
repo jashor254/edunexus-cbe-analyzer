@@ -7,7 +7,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
 import { isTeacherOfLearner } from '@/lib/api/middleware'
-import { getPersonalizationModel, buildPersonalizationModel } from '@/lib/eir'
+import { getPersonalizationModel, buildPersonalizationModel } from '@/_frozen/eir'
 
 export async function GET(
   _req:    Request,

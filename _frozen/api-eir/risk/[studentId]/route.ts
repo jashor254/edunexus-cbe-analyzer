@@ -6,7 +6,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
 import { isTeacherOfLearner } from '@/lib/api/middleware'
-import { getRiskPredictions, predictRisks } from '@/lib/eir'
+import { getRiskPredictions, predictRisks } from '@/_frozen/eir'
 
 export async function GET(
   _req:    Request,

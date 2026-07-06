@@ -10,9 +10,9 @@ import {
   buildKnowledgeBaseReport,
   getFindings,
   proposeHypothesis,
-} from '@/lib/eir'
+} from '@/_frozen/eir'
 import { getUserRole } from '@/lib/auth/getRole'
-import type { ResearchPillar } from '@/lib/eir'
+import type { ResearchPillar } from '@/_frozen/eir'
 
 const QuerySchema = z.object({
   type:    z.enum(['report', 'findings']).default('report'),

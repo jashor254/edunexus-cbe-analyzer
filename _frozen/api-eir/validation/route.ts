@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
 import { isTeacherOfLearner } from '@/lib/api/middleware'
-import { buildValidationSummary, markRecommendationAccepted, markRecommendationDismissed } from '@/lib/eir'
+import { buildValidationSummary, markRecommendationAccepted, markRecommendationDismissed } from '@/_frozen/eir'
 import { getUserRole } from '@/lib/auth/getRole'
 
 const QuerySchema = z.object({

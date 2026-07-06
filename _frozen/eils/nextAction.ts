@@ -12,7 +12,7 @@
 
 import { createServiceClient } from '@/utils/supabase/service'
 import { getOrCreateLearnerProfile } from '@/lib/learnerModel/queries'
-import { afterRecommendationCreated } from '@/lib/eir/engine'
+import { afterRecommendationCreated } from '@/_frozen/eir/engine'
 import type { LearnerProfile, RiskFlag } from '@/lib/learnerModel/types'
 import type { EILSRecommendation, ActionType, RecommendationEvidence } from './types'
 
