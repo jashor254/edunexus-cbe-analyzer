@@ -1,10 +1,76 @@
 # Lean Intelligence Layer — Migration Plan
 
 Branch: `refactor/lean-intelligence-layer`
-Status: **Phase 0 (audit + plan) and Phase 1 (freeze EILS/EIR) both complete.**
+Status: **Phase 0 (audit + plan) and Phase 1 (freeze EILS/EIR) both complete.
+Phase 2 (prerequisite engine) in progress — see below.**
 
 Target shape: learning signals in (Door 1 + Door 2) → prerequisite intelligence
 out → prioritized remedial + TSC docs + parent report. No fees, no payroll, no admin.
+
+---
+
+## Phase 2 — Prerequisite Intelligence Engine
+
+### `substrand_prerequisites` — ABANDONED (2026-07-07)
+
+A new table + seed (`substrand_prerequisites`, `lib/curriculum/prerequisites/grade7MathematicsSeed.ts`,
+`supabase/migrations/20260707_substrand_prerequisites.sql`) was drafted for a
+Grade 7 Mathematics prerequisite graph, grounded in the KICD curriculum bank
+(`sow_substrands`) since no live Grade 7 usage data exists yet.
+
+**Discarded before anything was applied to the database** — a live, seeded,
+KEEP-zone prerequisite graph already exists: `knowledge_nodes` / `knowledge_edges`
+(Grade 7 Mathematics: 15 nodes, ~28 weighted hard/soft edges, with per-edge
+rationale), with a working traversal engine (`lib/knowledgeGraph/traversal.ts`,
+`findRootCauses`/`findAllRootCauses`) already wired into `lib/remedial/planner.ts`.
+Shipping a second, disagreeing prerequisite graph for the same domain would have
+been a direct duplication of a system that's already live product — the
+Prerequisite Intelligence Engine is being built on top of `knowledge_nodes`/
+`knowledge_edges` instead. No migration was ever applied; no seed was ever run;
+nothing in `substrand_prerequisites` ever existed in the database. Files removed
+(`rm`, not `git rm` — all three were untracked, never committed):
+- `lib/curriculum/prerequisites/grade7MathematicsSeed.ts`
+- `supabase/migrations/20260707_substrand_prerequisites.sql`
+- `scripts/seed-substrand-prerequisites.ts`
+
+Left in place (currently unreferenced by anything, pending a decision — see
+end-of-turn report): `lib/curriculum/prerequisites/{types.ts, dag.ts, seed.ts}`.
+
+### The 23 hand-validated edges — preserved here as an independent check
+
+Before the discard, these 23 edges were drafted from the KICD curriculum bank
+and reviewed edge-by-edge by a human (topic-level granularity, not the
+existing graph's node IDs). They were never applied to any table. Keeping
+them here — not deleting them — because they're a second, independently-derived
+opinion on Grade 7 Mathematics prerequisites, useful for diffing against
+`knowledge_edges` to sanity-check its coverage (see Phase 2 taxonomy
+reconciliation below for that diff).
+
+| Prerequisite → Unlocks | Rationale |
+|---|---|
+| Whole Numbers → Factors | GCD/LCM needs whole-number mult/div |
+| Whole Numbers → Fractions | Fraction ops build on whole-number ops |
+| Factors → Fractions | Simplifying fractions needs GCD/LCM |
+| Fractions → Decimals | Decimals extend fraction place-value |
+| Fractions → Squares and Square Roots | Squaring fractions needs fraction mult |
+| Decimals → Squares and Square Roots | Squaring decimals needs decimal mult |
+| Whole Numbers → Algebraic Expressions | Same ops, applied symbolically |
+| Algebraic Expressions → Linear Equations | Must simplify before solving |
+| Linear Equations → Linear Inequalities | Same technique + sign-flip rule |
+| Fractions → Money | Profit/loss/discount are fraction-of-quantity |
+| Decimals → Money | Currency is decimal by convention |
+| Whole Numbers → Length | Unit conversion is whole-number arithmetic |
+| Length → Area | Area formulas built from length |
+| Area → Volume and Capacity | Volume extends area to 3D |
+| Squares and Square Roots → Pythagorean Relationship | a²+b²=c² needs squaring/roots |
+| Length → Pythagorean Relationship | Applied to find side lengths |
+| Whole Numbers → Time, Distance and Speed | Unit conversions |
+| Length → Time, Distance and Speed | Distance is a length quantity |
+| Whole Numbers → Temperature | Conversion arithmetic |
+| Whole Numbers → Angles | Missing-angle problems are whole-number subtraction |
+| Angles → Geometrical Constructions | Constructions require angle theory |
+| Whole Numbers → Data Handling | Tallying/frequency needs counting |
+| Fractions → Data Handling | Pie charts need fraction-of-whole |
 
 ---
 
