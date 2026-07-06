@@ -141,6 +141,16 @@ async function main() {
       t1: { ...baseline(4), [INTEGERS]: 2 },
       t2: { ...baseline(4), [INTEGERS]: 2 },
     },
+    {
+      // Genuinely broad foundational gap, not a relabeled version of profile 4.
+      // Whole Numbers never gets fixed AND every other topic is also weak
+      // (rating 2) at both timepoints — a real learner whose entire Grade 7
+      // Maths year is shaky because the foundation was never repaired.
+      // blastRadius should legitimately come out high here, not by fiat.
+      label: 'Weak root: Whole Numbers stuck AND downstream genuinely unmastered (real high blast radius)',
+      t1: { ...baseline(2), [WHOLE_NUMBERS]: 1 },
+      t2: { ...baseline(2), [WHOLE_NUMBERS]: 1 },
+    },
   ]
 
   console.log(`Seeding ${profiles.length} synthetic learners...`)

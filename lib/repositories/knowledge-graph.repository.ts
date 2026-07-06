@@ -187,15 +187,22 @@ export class KnowledgeGraphRepository extends BaseRepository {
     return data ?? []
   }
 
-  async findNodeByConceptLike(concept: string): Promise<{ id: string; concept: string } | null> {
+  /**
+   * Fuzzy-finds a node by its display name (used for substrand-text lookups
+   * from teacher-facing free text, e.g. a SOW sub_strand string). Returns
+   * both the uuid primary key (`id`) and the text `node_id` that
+   * knowledge_edges actually keys on — getPrerequisiteEdges/getEdgesByDependentNodeIds
+   * filter on `node_id`, not the uuid, so callers must use `node_id` for edge lookups.
+   */
+  async findNodeByConceptLike(concept: string): Promise<{ id: string; node_id: string; concept: string } | null> {
     const { data, error } = await this.db
       .from('knowledge_nodes')
-      .select('id, name')
+      .select('id, node_id, name')
       .ilike('name', `%${concept}%`)
       .maybeSingle()
 
     if (error) throw new Error(`Failed to find knowledge node: ${error.message}`)
-    return data ? { id: data.id as string, concept: data.name as string } : null
+    return data ? { id: data.id as string, node_id: data.node_id as string, concept: data.name as string } : null
   }
 }
 

@@ -42,8 +42,11 @@ export async function generateRemedialPlan(input: PlannerInput): Promise<Remedia
   const currentNode = await repos.knowledgeGraph.findNodeByConceptLike(input.subStrand)
 
   let prerequisiteConcepts: string[] = []
-  if (currentNode?.id) {
-    const prereqEdges = await repos.knowledgeGraph.getPrerequisiteEdges(currentNode.id)
+  if (currentNode?.node_id) {
+    // getPrerequisiteEdges filters on the text node_id (e.g. 'G7-MAT-NUM-T02'),
+    // not the uuid primary key — passing currentNode.id here silently
+    // returned zero edges every time.
+    const prereqEdges = await repos.knowledgeGraph.getPrerequisiteEdges(currentNode.node_id)
     if (prereqEdges.length) {
       const prereqIds = prereqEdges.map(e => e.prerequisite_node_id as string)
       const prereqNodes = await repos.knowledgeGraph.getNodesByIds(prereqIds)

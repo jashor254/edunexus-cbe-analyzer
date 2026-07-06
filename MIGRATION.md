@@ -17,11 +17,20 @@ out → prioritized remedial + TSC docs + parent report. No fees, no payroll, no
 - `lib/repositories/knowledge-graph.repository.ts`: `findNodeByConceptLike`/
   `getNodesByConcepts` queried a non-existent `concept` column — fixed to the
   real column, `name`. Verified live against the DB (previously threw).
-- Found but **not fixed** (flagged, out of scope): `lib/remedial/planner.ts`
-  passes `knowledge_nodes.id` (uuid) into `getPrerequisiteEdges()`, which
-  filters on `dependent_node_id` (text `node_id`) — a type mismatch that
-  makes the Remedial Planner's prerequisite-concept lookup silently return
-  empty every time. No longer throws; still a no-op.
+- **Fixed 2026-07-07 (was flagged, not fixed, in the previous pass):**
+  `lib/remedial/planner.ts` passed `knowledge_nodes.id` (uuid) into
+  `getPrerequisiteEdges()`, which filters on `dependent_node_id` (the text
+  `node_id`, e.g. `'G7-MAT-NUM-T02'`) — a type mismatch that made the
+  Remedial Planner's prerequisite-concept lookup silently return empty every
+  time, with no error. `findNodeByConceptLike` now also returns `node_id`;
+  `planner.ts` uses that instead of `id` for the edge lookup. Proved with
+  real data via `scripts/report-grade7-math-engines.ts`'s "PLANNER FIX PROOF"
+  section, reproducing planner.ts's exact step-4 call sequence for
+  subStrand `'Fractions'`:
+  - BEFORE (`getPrerequisiteEdges(currentNode.id)`): **0 edges**
+  - AFTER (`getPrerequisiteEdges(currentNode.node_id)`): **1 edge** →
+    resolves to `['Whole Numbers']`, the real prerequisite for Fractions
+    in the seeded Grade 7 Maths graph.
 - `lib/curriculum/prerequisites/{types.ts, dag.ts, seed.ts}` removed entirely
   (unreferenced after the substrand_prerequisites abandonment above). The
   pure DFS-descendant logic from `dag.ts` was lifted into
@@ -57,14 +66,24 @@ exist), and their names couldn't be resolved for the reason string, producing
 blank `()`. Fixed in `rankQuickWins` by dropping any edge whose dependent
 falls outside the given node set before traversal. Regression test added.
 
-**Synthetic seed (wipeable):** `scripts/seed-grade7-math-synthetic.ts` — 11
+**Synthetic seed (wipeable):** `scripts/seed-grade7-math-synthetic.ts` — 12
 fake Grade 7 Math learners (`students.school = 'SYNTHETIC_TEST_GRADE7_MATH_SEED'`,
 cascades on delete), one shared `assessments` parent row (the FK wrinkle from
 Phase 2's Step D audit — `strand_assessments.assessment_id` references the
-career/pathway `assessments` table, not a classroom test event), 328
+career/pathway `assessments` table, not a classroom test event), 358
 `strand_assessments` rows across 2 timepoints. Topic/strand strings are
 pulled live from `node_assessment_map` at seed time (never hand-typed), so
 they're guaranteed to match exactly.
+
+**2026-07-07 addition — the Whole Numbers demo case, made honest:** the
+original "Whole Numbers stuck" profile showed `blastRadius=0` because every
+*other* topic for that learner was seeded at rating 3 (mastered) — a real
+result, not a bug, but not illustrative. Rather than relabel that profile, a
+12th learner was added with Whole Numbers weak (rating 1, unfixed at both
+timepoints) **and** every other topic genuinely weak too (rating 2, real
+data, no fudging). Result: `blastRadius=12, hardBlocked=7` for Whole Numbers,
+correctly ranked #1 above Fractions (`blastRadius=6`) and every other weak
+topic for that learner, with named downstream topics in the reason string.
 
 **Headless proof run:** `scripts/report-grade7-math-engines.ts` — both layers
 run over the synthetic cohort, output sanity-checked (see conversation for
