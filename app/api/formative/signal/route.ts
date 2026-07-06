@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
-import { afterFormativeSignal } from '@/lib/eils'
+import { updateFromFormativeSignal } from '@/lib/learnerModel/updater'
 
 const Schema = z.object({
   classId:      z.string().uuid(),
@@ -81,11 +81,12 @@ export async function POST(req: Request): Promise<Response> {
       recorded_at:   now,
     })
 
-    // Update EILS + Learner Model for each student — fire and forget
+    // Update Learner Model for each student — fire and forget
+    const signalBase = { class_id: d.classId, subject: d.subject, substrand: d.subStrand, recorded_at: now }
     const allUpdates = [
-      ...d.gotItIds.map(id  => afterFormativeSignal({ studentId: id, classId: d.classId, subject: d.subject, substrand: d.subStrand, outcome: 'got_it',  recordedAt: now })),
-      ...d.confusedIds.map(id => afterFormativeSignal({ studentId: id, classId: d.classId, subject: d.subject, substrand: d.subStrand, outcome: 'confused', recordedAt: now })),
-      ...d.lostIds.map(id   => afterFormativeSignal({ studentId: id, classId: d.classId, subject: d.subject, substrand: d.subStrand, outcome: 'lost',    recordedAt: now })),
+      ...d.gotItIds.map(id    => updateFromFormativeSignal(id, { ...signalBase, outcome: 'got_it' })),
+      ...d.confusedIds.map(id => updateFromFormativeSignal(id, { ...signalBase, outcome: 'confused' })),
+      ...d.lostIds.map(id     => updateFromFormativeSignal(id, { ...signalBase, outcome: 'lost' })),
     ]
     Promise.allSettled(allUpdates).catch(() => {})
 

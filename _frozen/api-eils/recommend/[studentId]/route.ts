@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
-import { computeNextBestActions, markRecommendationActioned } from '@/lib/eils'
+import { computeNextBestActions, markRecommendationActioned } from '@/_frozen/eils'
 
 const TriggerSchema = z.object({
   trigger: z.enum(['assessment', 'compass', 'formative', 'parent', 'periodic', 'risk_change']).default('periodic'),

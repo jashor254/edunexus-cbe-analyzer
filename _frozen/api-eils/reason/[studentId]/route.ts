@@ -11,7 +11,7 @@ import {
   isLearnerImproving,
   whichInterventionIsLikelyToWork,
   shouldTeacherIntervene,
-} from '@/lib/eils'
+} from '@/_frozen/eils'
 
 const BodySchema = z.object({
   question: z.enum([

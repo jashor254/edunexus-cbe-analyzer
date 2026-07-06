@@ -4,7 +4,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { checkFeatureAccess } from '@/lib/payments/access'
 import { type FeatureKey } from '@/lib/payments/config'
 import { endSession } from '@/lib/compass/session'
-import { afterCompassSession } from '@/lib/eils'
+import { updateFromCompass } from '@/lib/learnerModel/updater'
 import { apiSuccess, apiError, apiForbidden, getErrorMessage } from '@/lib/api/response'
 
 const FEATURE: FeatureKey = 'learning_compass'
@@ -154,9 +154,9 @@ export async function POST(req: Request): Promise<Response> {
       }
     }
 
-    // Update EILS + Learner Model — fire and forget
+    // Update Learner Model — fire and forget
     if (sessionRow?.subject) {
-      afterCompassSession({
+      updateFromCompass({
         studentId,
         topic:             sessionRow.subject as string,
         subject:           sessionRow.subject as string,

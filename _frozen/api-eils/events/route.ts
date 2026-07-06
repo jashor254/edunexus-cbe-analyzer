@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
-import { emitEvent } from '@/lib/eils'
+import { emitEvent } from '@/_frozen/eils'
 
 const BodySchema = z.object({
   student_id:  z.string().uuid(),

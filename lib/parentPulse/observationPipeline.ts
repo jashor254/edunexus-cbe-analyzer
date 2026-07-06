@@ -8,7 +8,7 @@
 //                                                   → whatsapp_inbound_log
 
 import { repos } from '@/lib/repositories'
-import { afterParentObservation } from '@/lib/eils'
+import { updateFromParentObservation } from '@/lib/learnerModel/updater'
 import { publishEvent } from '@/lib/events'
 import type { ParentObservationOutcome } from '@/lib/learnerModel/types'
 
@@ -179,8 +179,8 @@ export async function processInboundReply(
       return { processed: true, outcome: 'free_form' }
     }
 
-    // Structured outcome — update EILS + Learner Model
-    await afterParentObservation({
+    // Structured outcome — update Learner Model
+    await updateFromParentObservation({
       studentId:  parsed.studentId,
       substrand:  parsed.substrand,
       outcome:    outcome as ParentObservationOutcome,

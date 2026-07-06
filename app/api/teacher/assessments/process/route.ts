@@ -11,7 +11,7 @@ import {
 import { runAssessmentPipeline, type AssessmentPipelineResult } from '@/lib/academicClinic/assessmentPipeline'
 import { extractCapabilityProfile } from '@/lib/career/capabilityExtractor'
 import { saveCapabilityProfile } from '@/lib/career/careerEngine'
-import { afterAssessment } from '@/lib/eils'
+import { updateFromAssessment } from '@/lib/learnerModel/updater'
 
 const BodySchema = z.union([
   z.object({
@@ -100,8 +100,8 @@ export async function POST(req: Request) {
         recomputeCapabilityProfile(db, sid).catch(err =>
           console.error('[assessments/process] capability recompute failed', sid, err)
         )
-        triggerEILSUpdate(db, sid, result.student_name, assessment_id).catch(err =>
-          console.error('[assessments/process] EILS update failed', sid, err)
+        triggerLearnerModelUpdate(db, sid, result.student_name, assessment_id).catch(err =>
+          console.error('[assessments/process] learner model update failed', sid, err)
         )
       }
     }
@@ -117,8 +117,8 @@ export async function POST(req: Request) {
   }
 }
 
-// Trigger EILS continuous learning update after a successful assessment pipeline run.
-async function triggerEILSUpdate(
+// Trigger learner model update after a successful assessment pipeline run.
+async function triggerLearnerModelUpdate(
   db:           ReturnType<typeof import('@/utils/supabase/service').createServiceClient>,
   studentId:    string,
   studentName:  string,
@@ -145,10 +145,9 @@ async function triggerEILSUpdate(
     marks[subj] = Math.min(100, level * 25)
   }
 
-  await afterAssessment({
+  await updateFromAssessment({
     studentId,
     studentName,
-    assessmentId,
     subjectScores: scores,
     subjectMarks:  marks,
     strand,

@@ -19,7 +19,7 @@ import type {
   AlternativeAction,
   EducationalTheory,
 } from './types'
-import type { EILSRecommendation } from '@/lib/eils/types'
+import type { EILSRecommendation } from '@/_frozen/eils/types'
 
 // ── Explain and Persist a Recommendation ─────────────────────────────────────
 

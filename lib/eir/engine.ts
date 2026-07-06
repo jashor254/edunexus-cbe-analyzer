@@ -34,7 +34,7 @@ import type {
   ResearchPillar,
   EIRInterventionType,
 } from './types'
-import type { EILSRecommendation } from '@/lib/eils/types'
+import type { EILSRecommendation } from '@/_frozen/eils/types'
 
 // ── Per-Learner Research Cycle ────────────────────────────────────────────────
 // Call this after every major EILS event for a student.

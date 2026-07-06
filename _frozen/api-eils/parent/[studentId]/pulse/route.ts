@@ -6,7 +6,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
-import { buildParentInsight } from '@/lib/eils'
+import { buildParentInsight } from '@/_frozen/eils'
 
 export async function GET(
   _req:    Request,

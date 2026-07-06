@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
-import { buildTeacherPanel } from '@/lib/eils'
+import { buildTeacherPanel } from '@/_frozen/eils'
 
 const QuerySchema = z.object({
   class_id: z.string().uuid(),

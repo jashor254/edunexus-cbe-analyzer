@@ -327,14 +327,16 @@ async function loadStudentNames(
   classId: string,
   db:      ReturnType<typeof createServiceClient>,
 ): Promise<Map<string, string>> {
-  const { data } = await db
-    .from('class_enrollments')
-    .select('student_id, learners(full_name)')
+  const { data, error } = await db
+    .from('class_students')
+    .select('student_id, students(name)')
     .eq('class_id', classId)
+
+  if (error) throw new Error(`loadStudentNames: ${error.message}`)
 
   const map = new Map<string, string>()
   for (const row of data ?? []) {
-    const name = (row.learners as { full_name?: string } | null)?.full_name
+    const name = (row.students as { name?: string } | null)?.name
     if (row.student_id && name) map.set(row.student_id as string, name)
   }
   return map
