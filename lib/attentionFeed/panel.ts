@@ -14,8 +14,24 @@
 // Reads only from lib/learnerModel — no EILS reasoning/arbitration dependency.
 
 import { createServiceClient } from '@/utils/supabase/service'
-import { getClassLearnerProfiles, getAtRiskStudents } from '@/lib/learnerModel/queries'
+import { getClassLearnerProfiles } from '@/lib/learnerModel/queries'
 import type { LearnerProfile, RiskLevel } from '@/lib/learnerModel/types'
+import { recomputeLearnerProjection } from '@/lib/projection/recompute'
+import type { LearnerIntelligenceProjection, RiskFlag } from '@/lib/projection/types'
+
+// Partial migration only (see docs/architecture/migration-ledger.md): the
+// attention list, class trajectory, and every risk-level check in this file
+// (including inside peer-helper matching and acceleration candidates) are
+// sourced from the Projection Engine — one risk engine, no exceptions. Mastery
+// heatmap, hidden misconceptions, and the acceleration/peer-helper *content*
+// (capability dimensions, substrand knowledge, risk-duration) stay on legacy
+// learner_profiles below — they need substrand-level knowledge_state,
+// 6-dimension capability, and consecutive-weeks duration, none of which the
+// frozen v1.0 Projection Engine computes (knowledgeProjector is subject-level
+// only; capabilityProjector has no 6-dimension breakdown; riskProjector has no
+// duration tracking). This is a documented engine gap, not an oversight — do
+// not "fix" it by reading learner_profiles substrand data into a
+// Projection-labeled field.
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -75,20 +91,26 @@ export async function buildTeacherPanel(
   const db  = createServiceClient()
   const now = weekOf ?? new Date().toISOString().slice(0, 10)
 
-  // Load all learner profiles for this class
-  const [allProfiles, atRiskProfiles] = await Promise.all([
-    getClassLearnerProfiles(classId),
-    getAtRiskStudents(classId, 'watch'),
-  ])
+  // Load all learner profiles for this class (still needed for heatmap,
+  // misconceptions, acceleration, and peer-helper — see the module comment).
+  const allProfiles = await getClassLearnerProfiles(classId)
 
   // Load student names
   const studentNames = await loadStudentNames(classId, db)
 
-  const studentsNeeding  = buildAttentionList(atRiskProfiles, studentNames, allProfiles)
+  // Batch-recompute projections for the whole class — a class-sized batch
+  // (tens of learners) is well within recompute.ts's stated "few hundred" scope.
+  const projections = new Map<string, LearnerIntelligenceProjection>(
+    await Promise.all(
+      allProfiles.map(async p => [p.student_id, await recomputeLearnerProjection(p.student_id)] as const)
+    )
+  )
+
+  const studentsNeeding  = buildAttentionList(projections, allProfiles, studentNames)
   const misconceptions   = detectHiddenMisconceptions(allProfiles, studentNames)
-  const accelerateable   = detectAccelerationCandidates(allProfiles, studentNames)
+  const accelerateable   = detectAccelerationCandidates(projections, allProfiles, studentNames)
   const heatmap          = buildMasteryHeatmap(allProfiles)
-  const trajectory       = computeClassTrajectory(allProfiles)
+  const trajectory       = computeClassTrajectory(projections)
   const adaptationTips   = buildAdaptationTips(misconceptions, studentsNeeding, heatmap)
 
   return {
@@ -108,30 +130,33 @@ export async function buildTeacherPanel(
 // ── Students Needing Attention ────────────────────────────────────────────────
 
 function buildAttentionList(
-  profiles:     LearnerProfile[],
-  studentNames: Map<string, string>,
+  projections:  Map<string, LearnerIntelligenceProjection>,
   allProfiles:  LearnerProfile[],
+  studentNames: Map<string, string>,
 ): StudentAttentionItem[] {
   const items: StudentAttentionItem[] = []
-
-  // Sort by risk severity
   const riskOrder: Record<RiskLevel, number> = { normal: 0, watch: 1, at_risk: 2, critical: 3 }
-  const sorted = [...profiles].sort((a, b) =>
-    riskOrder[b.overall_risk_level] - riskOrder[a.overall_risk_level]
-  )
 
-  for (const profile of sorted.slice(0, 10)) {
-    const name         = studentNames.get(profile.student_id) ?? 'Unknown'
-    const topFlag      = profile.risk_flags.sort((a, b) => severityOrder(b.severity) - severityOrder(a.severity))[0]
-    const weeksAtRisk  = getWeeksAtRisk(profile)
-    const peerHelper   = findPeerHelper(profile, allProfiles, studentNames)
+  const atRisk = [...projections.entries()]
+    .map(([studentId, projection]) => ({ studentId, risk: projection.risk?.value ?? null }))
+    .filter((r): r is { studentId: string; risk: NonNullable<LearnerIntelligenceProjection['risk']>['value'] } =>
+      r.risk !== null && r.risk.overallRiskLevel !== 'normal'
+    )
+    .sort((a, b) => riskOrder[b.risk.overallRiskLevel] - riskOrder[a.risk.overallRiskLevel])
+
+  for (const { studentId, risk } of atRisk.slice(0, 10)) {
+    const name       = studentNames.get(studentId) ?? 'Unknown'
+    const topFlag    = [...risk.flags].sort((a, b) => riskFlagSeverityOrder(b.severity) - riskFlagSeverityOrder(a.severity))[0]
+    const legacy     = allProfiles.find(p => p.student_id === studentId)
+    const weeksAtRisk = legacy ? getWeeksAtRisk(legacy) : 0
+    const peerHelper  = legacy ? findPeerHelper(legacy, allProfiles, projections, studentNames) : undefined
 
     items.push({
-      student_id:       profile.student_id,
+      student_id:       studentId,
       student_name:     name,
-      risk_level:       profile.overall_risk_level,
-      reason:           topFlag ? topFlag.detail : 'Risk flag active',
-      suggested_action: suggestAction(profile),
+      risk_level:       risk.overallRiskLevel,
+      reason:           topFlag ? topFlag.reason : 'Risk flag active',
+      suggested_action: suggestAction(topFlag),
       weeks_at_risk:    weeksAtRisk,
       peer_helper:      peerHelper,
     })
@@ -140,18 +165,17 @@ function buildAttentionList(
   return items
 }
 
-function suggestAction(profile: LearnerProfile): string {
-  const flags = profile.risk_flags
-  if (flags.find(f => f.type === 'missing_prerequisite')) return 'Assign Compass remediation for the prerequisite concept'
-  if (flags.find(f => f.type === 'disengaged'))            return 'Check in with learner — find out what is happening'
-  if (flags.find(f => f.type === 'declining_performance')) return 'Review latest assessment results with the learner'
-  if (flags.find(f => f.type === 'multiple_weak_substrands')) return 'Include in small-group remediation session'
-  return 'Monitor progress and re-assess next week'
+function suggestAction(topFlag: RiskFlag | undefined): string {
+  if (!topFlag) return 'Monitor progress and re-assess next week'
+  if (topFlag.reason.includes('declining')) return 'Review latest assessment results with the learner'
+  if (topFlag.severity === 'critical') return 'Include in small-group remediation session'
+  return 'Check in with the learner this week about this specific concern'
 }
 
 function findPeerHelper(
   profile:      LearnerProfile,
   allProfiles:  LearnerProfile[],
+  projections:  Map<string, LearnerIntelligenceProjection>,
   studentNames: Map<string, string>,
 ): string | undefined {
   // A peer helper is a student with strong capability in the struggling student's weak subjects
@@ -161,7 +185,10 @@ function findPeerHelper(
 
   for (const other of allProfiles) {
     if (other.student_id === profile.student_id) continue
-    if (other.overall_risk_level !== 'normal') continue
+    // Risk check sourced from Projection — the same risk engine as the
+    // attention list itself — not the legacy overall_risk_level field.
+    const otherRisk = projections.get(other.student_id)?.risk?.value.overallRiskLevel ?? 'normal'
+    if (otherRisk !== 'normal') continue
 
     const isStrong = [...weakSubjects].every(subject => {
       const entries = Object.entries(other.knowledge_state)
@@ -231,13 +258,17 @@ function detectHiddenMisconceptions(
 // ── Acceleration Candidates ───────────────────────────────────────────────────
 
 function detectAccelerationCandidates(
+  projections:  Map<string, LearnerIntelligenceProjection>,
   profiles:     LearnerProfile[],
   studentNames: Map<string, string>,
 ): AccelerationCandidate[] {
   const candidates: AccelerationCandidate[] = []
 
   for (const profile of profiles) {
-    if (profile.overall_risk_level !== 'normal') continue
+    // Risk check sourced from Projection, not the legacy overall_risk_level
+    // field — same risk engine as the attention list and peer-helper matching.
+    const risk = projections.get(profile.student_id)?.risk?.value.overallRiskLevel ?? 'normal'
+    if (risk !== 'normal') continue
 
     // Check for 'accelerating' capability trend
     const dims = profile.capability_dimensions as Record<string, { trend?: string; raw_score?: number }>
@@ -311,16 +342,15 @@ function buildMasteryHeatmap(profiles: LearnerProfile[]): MasteryHeatmapRow[] {
 
 // ── Class Trajectory ──────────────────────────────────────────────────────────
 
-function computeClassTrajectory(profiles: LearnerProfile[]): TeacherPanel['class_trajectory'] {
-  if (profiles.length === 0) return 'stable'
+function computeClassTrajectory(projections: Map<string, LearnerIntelligenceProjection>): TeacherPanel['class_trajectory'] {
+  const trends = [...projections.values()]
+    .map(p => p.growth?.value.trend)
+    .filter((t): t is 'improving' | 'declining' | 'stable' => t === 'improving' || t === 'declining' || t === 'stable')
 
-  const dims = profiles.flatMap(p => {
-    const d = p.capability_dimensions as Record<string, { trend?: string }>
-    return Object.values(d).map(v => v?.trend ?? 'stable')
-  })
+  if (trends.length === 0) return 'stable'
 
-  const improving = dims.filter(t => t === 'improving' || t === 'accelerating').length
-  const declining = dims.filter(t => t === 'declining').length
+  const improving = trends.filter(t => t === 'improving').length
+  const declining = trends.filter(t => t === 'declining').length
 
   if (improving > declining * 1.5) return 'improving'
   if (declining > improving * 1.5) return 'declining'
@@ -393,4 +423,8 @@ function getWeeksAtRisk(profile: LearnerProfile): number {
 
 function severityOrder(s: 'low' | 'medium' | 'high'): number {
   return { low: 0, medium: 1, high: 2 }[s]
+}
+
+function riskFlagSeverityOrder(s: RiskFlag['severity']): number {
+  return { watch: 0, at_risk: 1, critical: 2 }[s]
 }

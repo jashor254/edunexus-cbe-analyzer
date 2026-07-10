@@ -12,7 +12,9 @@
     "sow:grade10-bio-t1": "tsx scripts/generateGrade10BiologyTerm1.ts",
     "seed:grade10": "tsx scripts/seedGrade10Subjects.ts",
     "scrape:kicd": "tsx scripts/scrapeKicdCurriculum.ts",
-    "seed:demo": "node --env-file=.env.local node_modules/.bin/tsx scripts/seed-demo-teacher.ts"
+    "seed:demo": "node --env-file=.env.local node_modules/.bin/tsx scripts/seed-demo-teacher.ts",
+    "seed:reference-school": "tsx --env-file=.env.local scripts/reference-school/run-all.ts",
+    "test:reference-school": "tsx --env-file=.env.local --test scripts/reference-school/integration.test.ts"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^2.0.32",
@@ -32,6 +34,7 @@
     "lucide-react": "^0.563.0",
     "next": "^16.2.4",
     "openai": "^6.17.0",
+    "papaparse": "^5.5.4",
     "pptxgenjs": "^4.0.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -54,6 +57,7 @@
     "@tailwindcss/typography": "^0.5.19",
     "@types/dotenv": "^6.1.1",
     "@types/node": "^20.19.37",
+    "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

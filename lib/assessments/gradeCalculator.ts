@@ -1,3 +1,5 @@
+import { DEFAULT_MARKS_THRESHOLDS, marksToLevel, type MarksThresholds } from '@/lib/intelligence/cbcScale'
+
 export type CurriculumType = 'cbc' | '844'
 
 export type MeanGrade =
@@ -110,40 +112,24 @@ export function calculateMeanScore(subjectScores: Record<string, number>): numbe
 }
 
 // ─── Marks → CBC Level ────────────────────────────────────────────────────────
+// Canonically owned by the Evidence Domain (lib/intelligence/cbcScale.ts) —
+// re-exported here so every existing caller of this module keeps working
+// unchanged. Do not redefine these — import from cbcScale.ts if you need them
+// directly.
 
-// marksToLevel(74) → 3  Meeting ✓
-// marksToLevel(75) → 4  Exceeding ✓
-// marksToLevel(49) → 2  Approaching ✓
-// marksToLevel(50) → 3  Meeting ✓
-// marksToLevel(29) → 1  Below ✓
-// marksToLevel(30) → 2  Approaching ✓
-
-export const DEFAULT_MARKS_THRESHOLDS = {
-  level4: 75,   // 75-100 → Exceeding Expectations
-  level3: 50,   // 50-74  → Meeting Expectations
-  level2: 30,   // 30-49  → Approaching Expectations
-  level1: 0,    // 0-29   → Below Expectations
-} as const
-
-export type MarksThresholds = {
-  level4: number
-  level3: number
-  level2: number
-}
+export { DEFAULT_MARKS_THRESHOLDS, marksToLevel }
+export type { MarksThresholds }
 
 export type CBCLevel = 1 | 2 | 3 | 4
 
-export function marksToLevel(
-  marks:      number,
-  thresholds: MarksThresholds = DEFAULT_MARKS_THRESHOLDS,
-): CBCLevel {
-  if (marks < 0 || marks > 100) {
-    throw new Error(`Marks must be 0-100, got ${marks}`)
-  }
-  if (marks >= thresholds.level4) return 4
-  if (marks >= thresholds.level3) return 3
-  if (marks >= thresholds.level2) return 2
-  return 1
+// Inverse of marksToLevel — approximates a raw mark from an already-known CBC
+// level. Used when a downstream consumer (e.g. updateFromAssessment) only
+// accepts raw 0-100 marks but the source data only has the level. Midpoints
+// are chosen to round-trip correctly through both this file's thresholds and
+// lib/learnerModel/updater.ts's computeCBCLevel band boundaries.
+export function levelToApproxMarks(level: CBCLevel): number {
+  const midpoints: Record<CBCLevel, number> = { 1: 15, 2: 40, 3: 63, 4: 90 }
+  return midpoints[level]
 }
 
 export function levelToLabel(level: CBCLevel): string {

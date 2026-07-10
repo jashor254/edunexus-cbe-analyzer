@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { transferLearner, getLearnerTransfers } from '@/lib/core/transfers'
 import { isSchoolAdmin } from '@/lib/core/school-users'
+import { assertLearnerOwnership } from '@/lib/api/middleware'
 import { z } from 'zod'
 
 const TransferSchema = z.object({
@@ -27,6 +28,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const admin = await isSchoolAdmin(user.id, schoolId)
   if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  const ownershipFail = await assertLearnerOwnership(learnerId, schoolId)
+  if (ownershipFail) return ownershipFail
+
   const data = await getLearnerTransfers(learnerId)
   return NextResponse.json({ data })
 }
@@ -43,6 +47,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const { schoolId, ...input } = parsed.data
   const admin = await isSchoolAdmin(user.id, schoolId)
   if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const ownershipFail = await assertLearnerOwnership(input.learner_id, schoolId)
+  if (ownershipFail) return ownershipFail
 
   const data = await transferLearner(user.id, input)
   return NextResponse.json({ data }, { status: 201 })

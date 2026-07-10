@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, Mail, Lock, Loader2, ArrowRight } from 'lucide-react'
 
 const GoogleIcon = () => (
   <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
@@ -15,16 +15,28 @@ const GoogleIcon = () => (
   </svg>
 )
 
+const CALLBACK_ERROR_MESSAGES: Record<string, string> = {
+  'no-code':        'Google sign-in was cancelled or did not complete. Please try again.',
+  'exchange-failed': 'We couldn\'t complete your sign-in. Please try again.',
+}
+
 function LoginContent() {
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState('')
+  const [loading, setLoading]           = useState(false)
+  const [email, setEmail]               = useState('')
+  const [password, setPassword]         = useState('')
+  const [emailLoading, setEmailLoading] = useState(false)
 
   const router       = useRouter()
   const searchParams = useSearchParams()
   const supabase     = createClient()
 
-  const returnTo = searchParams?.get('returnTo') || '/dashboard'
-  const product  = searchParams?.get('product')
+  const returnTo    = searchParams?.get('returnTo') || '/dashboard'
+  const product     = searchParams?.get('product')
+  const callbackErr = searchParams?.get('error')
+
+  const [error, setError] = useState(
+    callbackErr ? (CALLBACK_ERROR_MESSAGES[callbackErr] || 'Sign-in failed. Please try again.') : ''
+  )
 
   const resolveDestination = async (_returnTo: string | null): Promise<string> => {
     try {
@@ -101,6 +113,24 @@ function LoginContent() {
     }
   }
 
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setEmailLoading(true)
+    setError('')
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+
+    if (error) {
+      setError(error.message === 'Invalid login credentials'
+        ? 'Incorrect email or password.'
+        : error.message)
+      setEmailLoading(false)
+      return
+    }
+
+    router.push(await resolveDestination(returnTo))
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
@@ -140,6 +170,45 @@ function LoginContent() {
             )}
             {loading ? 'Signing in…' : 'Continue with Google'}
           </button>
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10" /></div>
+            <div className="relative flex justify-center text-sm"><span className="px-4 bg-slate-900 text-white/30">OR</span></div>
+          </div>
+
+          <form onSubmit={handleEmailLogin} className="space-y-3">
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="you@school.ac.ke"
+                required
+                disabled={emailLoading || loading}
+                className="w-full bg-black/20 border border-white/10 rounded-xl pl-11 pr-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
+              />
+            </div>
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                disabled={emailLoading || loading}
+                className="w-full bg-black/20 border border-white/10 rounded-xl pl-11 pr-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={emailLoading || loading}
+              className="w-full flex items-center justify-center gap-2 bg-white/5 border border-white/10 text-white py-3 rounded-xl font-bold text-sm hover:bg-white/10 transition-all disabled:opacity-50"
+            >
+              {emailLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Sign in <ArrowRight className="w-4 h-4" /></>}
+            </button>
+          </form>
 
           <p className="text-center text-sm text-white/40 mt-6">
             New to EduNexus?{' '}

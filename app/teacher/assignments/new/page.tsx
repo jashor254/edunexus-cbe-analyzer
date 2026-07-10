@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { FileText, ChevronRight, Compass, Home, Search, Copy, Check, MessageCircle, ArrowRight } from 'lucide-react'
 import { SENIOR_PATHWAY_ELECTIVES, getSeniorCompulsorySubjects, SENIOR_PATHWAYS } from '@/lib/curriculum/subjects'
+import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 
 type SubstrandItem = {
   id: string
@@ -707,7 +708,7 @@ function NewAssignmentForm() {
 
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
-              {error}
+              {friendlyMessage(error).message}
             </div>
           )}
 

@@ -1,10 +1,10 @@
 // app/dashboard/layout.tsx
 import { createClient } from '@/utils/supabase/server'
-import { createServiceClient } from '@/utils/supabase/service'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import DashboardNavbar from './components/DashboardNavbar'
 import { VideoOnboardingModal } from '@/components/video-onboarding-modal'
+import { getUserRoles } from '@/lib/auth/getRole'
 
 export default async function DashboardLayout({
   children,
@@ -15,30 +15,16 @@ export default async function DashboardLayout({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const db = createServiceClient()
+  // Single canonical role lookup — see lib/auth/getRole.ts. Do not re-derive
+  // this here; a second, disagreeing implementation is what caused the
+  // /dashboard <-> /teacher/dashboard infinite redirect loop.
+  const roles = await getUserRoles(user.id)
 
-  // profiles.id = auth user UUID (the column is `id`, not `user_id`)
-  const { data: profile } = await db
-    .from('profiles')
-    .select('role, secondary_role')
-    .eq('id', user.id)
-    .maybeSingle()
-
-  const isTeacher        = profile?.role === 'teacher'
-  const isDualRoleTeacher = isTeacher && profile?.secondary_role === 'parent'
+  const isTeacher         = roles.primary === 'teacher'
+  const isDualRoleTeacher = isTeacher && roles.secondary === 'parent'
 
   if (isTeacher && !isDualRoleTeacher) redirect('/teacher/dashboard')
-  if (profile?.role === 'student')     redirect('/student')
-
-  // Legacy: profile row missing but has a teachers record
-  if (!profile?.role) {
-    const { data: teacherRow } = await db
-      .from('teachers')
-      .select('id')
-      .eq('user_id', user.id)
-      .maybeSingle()
-    if (teacherRow?.id) redirect('/teacher/dashboard')
-  }
+  if (roles.primary === 'student')     redirect('/student')
 
   return (
     <div className="min-h-screen bg-white">
@@ -61,7 +47,7 @@ export default async function DashboardLayout({
       <main className="pb-16 md:pb-0">
         {children}
       </main>
-      <VideoOnboardingModal userId={user.id} role={profile?.role as 'parent' | 'teacher' | 'student' | 'school_admin' | 'admin' ?? 'parent'} secondaryRole={profile?.secondary_role} />
+      <VideoOnboardingModal userId={user.id} role={roles.primary} secondaryRole={roles.secondary} />
     </div>
   )
 }

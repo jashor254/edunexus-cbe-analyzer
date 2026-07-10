@@ -163,6 +163,65 @@ export class JobRepository extends BaseRepository {
   }
 
   /**
+   * Merge-update a job's live `result` (and optionally `status`) while it is
+   * still running — lets a long batch job report incremental progress
+   * (queued/running/N-of-M/failed-so-far) for a client to poll, instead of
+   * only reporting state once at the very end.
+   */
+  async updateProgress(jobId: string, patch: { status?: JobStatus; result: Record<string, unknown> }): Promise<void> {
+    const { error } = await this.db
+      .from('jobs')
+      .update(patch)
+      .eq('id', jobId)
+
+    if (error) throw new Error(`Failed to update job progress: ${error.message}`)
+  }
+
+  /**
+   * Fetch full status + result for a job, scoped to the requesting user —
+   * used by status-polling endpoints so one teacher can't read another's job.
+   */
+  async findStatusForUser(
+    jobId: string,
+    userId: string
+  ): Promise<Pick<JobRecord, 'id' | 'status' | 'result' | 'error_message' | 'completed_at'> | null> {
+    const { data } = await this.db
+      .from('jobs')
+      .select('id, status, result, error_message, completed_at')
+      .eq('id', jobId)
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    return data as Pick<JobRecord, 'id' | 'status' | 'result' | 'error_message' | 'completed_at'> | null
+  }
+
+  /**
+   * Find the most recent in-flight (or just-finished) job of a given type
+   * for a user — lets the UI "reconnect" to an already-running batch after
+   * a page reload without the client having to remember the jobId itself.
+   */
+  async findLatestJobForUser(
+    userId: string,
+    type: string,
+    payloadFilter: Record<string, unknown>
+  ): Promise<Pick<JobRecord, 'id' | 'status' | 'result' | 'payload' | 'completed_at'> | null> {
+    let query = this.db
+      .from('jobs')
+      .select('id, status, result, payload, completed_at')
+      .eq('user_id', userId)
+      .eq('type', type)
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    for (const [key, value] of Object.entries(payloadFilter)) {
+      query = query.eq(`payload->>${key}`, String(value))
+    }
+
+    const { data } = await query.maybeSingle()
+    return data as Pick<JobRecord, 'id' | 'status' | 'result' | 'payload' | 'completed_at'> | null
+  }
+
+  /**
    * Mark a job as completed and store its result.
    */
   async markComplete(jobId: string, result: Record<string, unknown>): Promise<void> {

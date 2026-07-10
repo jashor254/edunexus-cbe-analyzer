@@ -5,6 +5,7 @@ import {
 } from '@/lib/api/response'
 import { getAssessmentById } from '@/lib/assessments/getters'
 import { upsertMarksCSV, triggerLearnerModelUpdates } from '@/lib/assessments/mutations'
+import { recordAssessmentEvidence } from '@/lib/assessments/evidence'
 import type { MarkInput } from '@/lib/assessments/types'
 
 type UploadError = { row: number; field: string; message: string }
@@ -108,6 +109,10 @@ export async function POST(
 
     // Update Learner Model for linked students — fire and forget
     triggerLearnerModelUpdates(assessmentId, teacher.id).catch((e: unknown) => console.error('[marks upload] triggerLearnerModelUpdates failed:', e instanceof Error ? e.message : String(e)))
+
+    // Emit Evidence Domain records so Blueprint/Career/Adaptive Learning move
+    // from these marks too, not only from Compass sessions — fire and forget
+    recordAssessmentEvidence(assessmentId, teacher.id, user.id).catch((e: unknown) => console.error('[marks upload] recordAssessmentEvidence failed:', e instanceof Error ? e.message : String(e)))
 
     return apiSuccess({
       imported: result.inserted,

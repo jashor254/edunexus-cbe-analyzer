@@ -4,8 +4,8 @@
 // a school-wide efficacy rate.
 
 import { createClient } from '@/utils/supabase/server'
-import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
+import { repos } from '@/lib/repositories'
 import { computeInterventionEfficacy } from '@/lib/school/intelligence'
 import type { InterventionEfficacyRecord } from '@/lib/school/types'
 
@@ -22,25 +22,17 @@ export async function GET(): Promise<Response> {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return apiUnauthorized()
 
-    const db = createServiceClient()
-    const { data: teacher } = await db
-      .from('teachers')
-      .select('id, school_name')
-      .eq('user_id', user.id)
-      .single()
-
+    const teacher = await repos.teachers.findTeacherByUserId(user.id)
     if (!teacher) return apiForbidden()
 
-    const schoolName = teacher.school_name as string | null
-    if (!schoolName) return apiError('Teacher is not associated with a school', 403)
+    const schoolUser = await repos.schools.findSchoolUserByUserId(user.id)
+    if (!schoolUser) return apiError('Teacher is not associated with a school', 403)
 
-    // Find all teachers in the same school — match on school_name
-    const { data: schoolTeachers } = await db
-      .from('teachers')
-      .select('user_id')
-      .eq('school_name', schoolName)
+    // Find all teachers in the same school via Core School membership
+    // (school_users), not free-text school_name matching.
+    const schoolTeachers = await repos.schools.findTeachersBySchoolId(schoolUser.school_id)
 
-    if (!schoolTeachers?.length) {
+    if (!schoolTeachers.length) {
       return apiSuccess<InterventionEfficacyResponse>({
         efficacy:             [],
         total_interventions:  0,
@@ -49,7 +41,7 @@ export async function GET(): Promise<Response> {
       })
     }
 
-    const teacherUserIds = schoolTeachers.map(t => t.user_id as string)
+    const teacherUserIds = schoolTeachers.map(t => t.user_id)
 
     const efficacy = await computeInterventionEfficacy(teacherUserIds)
 

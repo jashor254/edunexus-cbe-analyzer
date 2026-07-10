@@ -1,5 +1,13 @@
 // lib/knowledgeGraph/types.ts
 
+// Shared prerequisite-alert thresholds — used identically by
+// lib/knowledgeGraph/prerequisiteAlerts.ts (one specific upcoming lesson)
+// and lib/attentionFeed/prerequisiteGaps.ts (a whole-class scan). Different
+// questions, same threshold values — previously two independently
+// maintained copies of the same two numbers.
+export const PREREQUISITE_MISSING_LEVEL_THRESHOLD = 2      // level <= 2 (BE or AE) counts as missing
+export const PREREQUISITE_PCT_ALERT_THRESHOLD      = 0.20  // only surface once >= 20% of the class is affected
+
 export type NodeType       = 'topic' | 'concept'
 export type ImportanceLevel = 'Critical' | 'Important' | 'Supporting'
 export type DependencyType  = 'hard' | 'soft' | 'cross_subject'

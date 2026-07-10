@@ -99,7 +99,7 @@ export async function POST(req: Request) {
     if (!teacher) return apiForbidden()
 
     const body = await req.json()
-    const { name, grade, subject, academic_year, stream } = body
+    const { name, grade, subject, academic_year, stream, standalone } = body
 
     if (!name || !grade || !subject || !academic_year) {
       return apiError('name, grade, subject, academic_year are required', 400)
@@ -128,7 +128,11 @@ export async function POST(req: Request) {
         subject,
         academic_year,
         class_code,
-        grade_cohort: `Grade ${grade}`,
+        // A class only auto-combines with same-grade streams in analytics
+        // when it shares this exact cohort string. `standalone: true` opts
+        // a class (e.g. a pilot/testing roster) out of that grouping even
+        // though it shares a grade number with real streams.
+        grade_cohort: standalone ? name : `Grade ${grade}`,
         ...(stream ? { stream: stream.trim() } : {}),
       })
       .select()

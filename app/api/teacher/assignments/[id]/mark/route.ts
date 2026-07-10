@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound, apiBadRequest } from '@/lib/api/response'
 import { notifyAssignmentMarked } from '@/lib/notifications/notify'
+import { recordAssignmentMarkEvidence } from '@/lib/assignments/evidence'
 
 const MarkSubmissionSchema = z.object({
   submissionId: z.string().uuid().optional(),
@@ -38,7 +39,7 @@ export async function POST(
     // Verify assignment belongs to this teacher
     const { data: assignment } = await db
       .from('assignments')
-      .select('id, title, max_score, class_id')
+      .select('id, title, max_score, class_id, subject, topic')
       .eq('id', assignmentId)
       .eq('teacher_id', teacher.id)
       .single()
@@ -81,6 +82,25 @@ export async function POST(
 
     notifyAssignmentMarked(submission.id, assignmentId)
       .catch(err => console.error('[notify] mark:', err))
+
+    // Emit Evidence Domain observation — additive, fire and forget, never
+    // blocking the response. Only meaningful once a numeric score exists;
+    // a status-only update (e.g. "needs_revision") has nothing to convert.
+    if (score !== undefined && score !== null) {
+      recordAssignmentMarkEvidence({
+        studentId:     submission.student_id as string,
+        teacherId:     teacher.id,
+        teacherUserId: user.id,
+        assignmentId,
+        subject:       assignment.subject as string,
+        topic:         (assignment.topic as string | null) ?? null,
+        score,
+        maxScore,
+        academicYear:  new Date().getFullYear(),
+        term:          null,
+        markedAt:      new Date().toISOString(),
+      }).catch(err => console.error('[assignments/mark] evidence emission failed:', err instanceof Error ? err.message : String(err)))
+    }
 
     return apiSuccess({ submission })
   } catch (e: unknown) {

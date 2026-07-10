@@ -115,6 +115,26 @@ export async function isTeacherOfLearner(
 }
 
 /**
+ * Verifies that a Core-schema learner belongs to the given school.
+ * Returns null on success, 403 response on failure (including not-found,
+ * so callers cannot distinguish "wrong school" from "doesn't exist").
+ */
+export async function assertLearnerOwnership(
+  learnerId: string,
+  schoolId: string
+): Promise<ReturnType<typeof apiForbidden> | null> {
+  const db = createServiceClient()
+  const { data: learner } = await db
+    .from('learners')
+    .select('school_id')
+    .eq('id', learnerId)
+    .maybeSingle()
+
+  if (!learner || learner.school_id !== schoolId) return apiForbidden()
+  return null
+}
+
+/**
  * Verifies that a payment record belongs to the authenticated user.
  * Returns null on success, 403 response on failure.
  */

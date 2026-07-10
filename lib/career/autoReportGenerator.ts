@@ -206,10 +206,17 @@ export type ClassReportResult = {
   }>
 }
 
+export type ClassReportProgress = {
+  total:              number
+  completed:          number
+  currentStudentName: string
+}
+
 export async function generateClassReports(
   classId: string,
   assessmentIds: string[],
-  db: SupabaseClient
+  db: SupabaseClient,
+  onProgress?: (event: ClassReportProgress) => void | Promise<void>,
 ): Promise<ClassReportResult> {
   const { data: links } = await db
     .from('class_students')
@@ -228,10 +235,13 @@ export async function generateClassReports(
     .in('id', studentIds)
 
   const results: ClassReportResult['results'] = []
+  const total = (students ?? []).length
+  let completed = 0
 
   for (const s of students ?? []) {
     const studentId = s.id as string
     const studentName = s.name as string
+    await onProgress?.({ total, completed, currentStudentName: studentName })
     try {
       // 1. Build clinic report (updates learning context)
       await buildClinicReport(studentId, db)
@@ -262,6 +272,7 @@ export async function generateClassReports(
       console.error(`[autoReportGenerator] failed for ${studentName}:`, msg)
       results.push({ student_id: studentId, student_name: studentName, status: 'error', error: msg })
     }
+    completed++
   }
 
   return {

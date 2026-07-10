@@ -3,7 +3,8 @@
 // Query params: learningAreaId
 
 import { createClient } from '@/utils/supabase/server'
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
+import { CurriculumService } from '@/lib/curriculum/service'
 import {
   apiSuccess,
   apiError,
@@ -36,14 +37,8 @@ export async function GET(req: Request) {
     const learningAreaId = url.searchParams.get('learningAreaId')?.trim()
     if (!learningAreaId) return apiBadRequest('Missing learningAreaId')
 
-    const db = createServiceClient()
-
     // Curriculum data is teacher-only — students and parents have no access
-    const { data: teacher } = await db
-      .from('teachers')
-      .select('id')
-      .eq('user_id', user.id)
-      .maybeSingle()
+    const teacher = await repos.teachers.findTeacherByUserId(user.id)
     if (!teacher) return apiForbidden()
 
     // Sliding-window rate limit: 30 requests/minute per teacher
@@ -51,59 +46,7 @@ export async function GET(req: Request) {
       return apiError('Too many requests — slow down and try again in a minute', 429)
     }
 
-    // 1. Fetch all strands for this learning area
-    const { data: strandsData, error: stErr } = await db
-      .from('sow_strands')
-      .select('id, title, order_index')
-      .eq('learning_area_id', learningAreaId)
-      .order('order_index')
-      .limit(500)
-
-    if (stErr) {
-      console.error('[sow/strands] strands fetch:', stErr)
-      return apiError('Failed to load strands')
-    }
-
-    if (!strandsData?.length) {
-      return apiSuccess({ strands: [] })
-    }
-
-    // 2. Fetch all substrands with pagination (avoids PostgREST 1000-row cap)
-    const strandIds = strandsData.map(s => s.id)
-    const PAGE = 1000
-    let from = 0
-    const allSubstrands: Array<{ id: string; strand_id: string; title: string; suggested_lessons: number; order_index: number }> = []
-
-    while (true) {
-      const { data: page, error: subErr } = await db
-        .from('sow_substrands')
-        .select('id, strand_id, title, suggested_lessons, order_index')
-        .in('strand_id', strandIds)
-        .order('order_index')
-        .range(from, from + PAGE - 1)
-
-      if (subErr) {
-        console.error('[sow/strands] substrands fetch:', subErr)
-        return apiError('Failed to load substrands')
-      }
-
-      if (page) allSubstrands.push(...page)
-      if (!page || page.length < PAGE) break
-      from += PAGE
-    }
-
-    // 3. Group substrands by strand
-    const subsByStrand: Record<string, Array<{ id: string; title: string; suggested_lessons: number }>> = {}
-    for (const sub of allSubstrands) {
-      if (!subsByStrand[sub.strand_id]) subsByStrand[sub.strand_id] = []
-      subsByStrand[sub.strand_id].push({ id: sub.id, title: sub.title, suggested_lessons: sub.suggested_lessons })
-    }
-
-    const strands = strandsData.map(s => ({
-      id: s.id,
-      title: s.title,
-      substrands: subsByStrand[s.id] || [],
-    }))
+    const strands = await CurriculumService.resolveStrandsWithSubstrands(learningAreaId)
 
     const response = apiSuccess({ strands })
     response.headers.set('Cache-Control', 'private, max-age=600, stale-while-revalidate=120')

@@ -1,16 +1,10 @@
 // app/api/learn/student/route.ts
 import { createClient }        from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
-import { apiSuccess, apiError } from '@/lib/api/response'
-
-// ── Tier mapping (same source-of-truth as route.ts) ───────────────────────────
-// DB values: 'challenge' | 'standard' | 'reinforcement' | 'remedial'
-function tierToLevel(tier: string): 1 | 2 | 3 | 4 {
-  if (tier === 'challenge'     || tier.includes('exceeding'))   return 4
-  if (tier === 'standard'      || tier.includes('meeting'))     return 3
-  if (tier === 'reinforcement' || tier.includes('approaching')) return 2
-  return 1
-}
+import { apiSuccess, apiError, apiForbidden } from '@/lib/api/response'
+import { tierToLevel } from '@/lib/compass/session'
+import { resolveCompassStudentAccess } from '@/lib/compass/ownership'
+import { repos } from '@/lib/repositories'
 
 function formatFirstName(name: string | null): string {
   return ((name ?? '').split(' ')[0] || 'there')
@@ -51,6 +45,9 @@ export async function GET(req: Request) {
 
   // ── Explicit student selection ───────────────────────────────────────────────
   if (studentId) {
+    const ownership = await resolveCompassStudentAccess(user.id, studentId)
+    if (!ownership.allowed) return apiForbidden()
+
     const { data, error } = await db
       .from('students')
       .select(SELECT)
@@ -70,14 +67,11 @@ export async function GET(req: Request) {
   // First get a lightweight list of all students linked to this user.
   // TODO: when the parent dashboard Compass entry point is built, always
   // supply ?studentId= in the link so this picker is skipped entirely.
-  const { data: allStudents, error: listError } = await db
-    .from('students')
-    .select('id, name, grade')
-    .or(`user_id.eq.${user.id},parent_user_id.eq.${user.id}`)
-    .order('created_at', { ascending: false })
-
-  if (listError) {
-    console.error('[learn/student] list error:', listError)
+  let allStudents: Array<{ id: string; name: string | null; grade: number | null }>
+  try {
+    allStudents = await repos.compass.findOwnedStudents(user.id)
+  } catch (err) {
+    console.error('[learn/student] list error:', err)
     return apiError('Failed to load students', 500)
   }
   if (!allStudents || allStudents.length === 0) return apiError('Student not found', 404)

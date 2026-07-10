@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, Mail, Lock, Loader2, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 
 const GoogleIcon = () => (
@@ -19,7 +19,12 @@ function SignupForm() {
   const [loading,        setLoading]        = useState(false)
   const [error,          setError]          = useState<string | null>(null)
   const [wantsSecondary, setWantsSecondary] = useState(false)
+  const [email,          setEmail]          = useState('')
+  const [password,       setPassword]       = useState('')
+  const [emailLoading,   setEmailLoading]   = useState(false)
+  const [checkEmail,     setCheckEmail]     = useState(false)
 
+  const router        = useRouter()
   const searchParams = useSearchParams()
   const supabase     = createClient()
 
@@ -52,6 +57,39 @@ function SignupForm() {
       setError(error.message)
       setLoading(false)
     }
+  }
+
+  const handleEmailSignup = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setEmailLoading(true)
+    setError(null)
+
+    const { data, error } = await supabase.auth.signUp({ email, password })
+    if (error) {
+      setError(error.message)
+      setEmailLoading(false)
+      return
+    }
+
+    // No session yet — project requires email confirmation before sign-in.
+    if (!data.session) {
+      setCheckEmail(true)
+      setEmailLoading(false)
+      return
+    }
+
+    const effectiveRole = role === 'teacher' ? 'teacher' : role === 'parent' ? 'parent' : 'parent'
+    await fetch('/api/auth/complete-profile', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        role:          effectiveRole,
+        secondaryRole: wantsSecondary && secondaryRole ? secondaryRole : undefined,
+      }),
+    })
+
+    const destination = effectiveRole === 'teacher' ? '/teacher/dashboard' : '/dashboard'
+    router.push(productId ? `${destination}?product=${productId}` : destination)
   }
 
   return (
@@ -120,6 +158,52 @@ function SignupForm() {
                 {secondaryLabel}
               </span>
             </label>
+          )}
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10" /></div>
+            <div className="relative flex justify-center text-sm"><span className="px-4 bg-slate-900 text-white/30">OR</span></div>
+          </div>
+
+          {checkEmail ? (
+            <p className="text-sm text-white/60 text-center bg-white/5 border border-white/10 rounded-xl px-4 py-4">
+              Check <span className="text-white font-bold">{email}</span> for a confirmation link to finish creating your account.
+            </p>
+          ) : (
+            <form onSubmit={handleEmailSignup} className="space-y-3">
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="you@school.ac.ke"
+                  required
+                  disabled={emailLoading || loading}
+                  className="w-full bg-black/20 border border-white/10 rounded-xl pl-11 pr-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
+                />
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                  disabled={emailLoading || loading}
+                  className="w-full bg-black/20 border border-white/10 rounded-xl pl-11 pr-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={emailLoading || loading}
+                className="w-full flex items-center justify-center gap-2 bg-white/5 border border-white/10 text-white py-3 rounded-xl font-bold text-sm hover:bg-white/10 transition-all disabled:opacity-50"
+              >
+                {emailLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Create account <ArrowRight className="w-4 h-4" /></>}
+              </button>
+            </form>
           )}
 
           <p className="text-center text-[11px] text-white/30 mt-5 leading-relaxed">

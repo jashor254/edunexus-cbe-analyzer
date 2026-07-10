@@ -1,5 +1,5 @@
 import { BaseRepository } from './base'
-import type { School, SchoolSettings, AcademicYear, Term, SchoolReportCard, ReportCardWithSubjects, CbcLevel } from '@/types/core'
+import type { School, SchoolUser, SchoolUserRole, SchoolSettings, AcademicYear, Term, SchoolReportCard, ReportCardWithSubjects, CbcLevel } from '@/types/core'
 import type {
   SchoolIntelligenceSummary,
   StrandHealthRecord,
@@ -9,7 +9,10 @@ import type {
 } from '@/lib/school/types'
 
 const SCHOOL_COLS =
-  'id, school_name, nemis_code, school_type, county, sub_county, ward, address, contact_phone, contact_email, logo_url, motto, subscription_tier, is_active, created_at, updated_at'
+  'id, school_name, nemis_code, school_type, county, sub_county, ward, address, contact_phone, contact_email, logo_url, motto, subscription_tier, is_active, created_by, created_at, updated_at'
+
+const SCHOOL_USER_COLS =
+  'id, school_id, user_id, role, is_active, invited_by, joined_at, created_at, updated_at'
 
 const SETTINGS_COLS =
   'id, school_id, curriculum_type, cbc_levels, grade_boundaries, school_open_days, report_footer, intelligence_enabled, intelligence_enabled_at, sms_enabled, timezone, created_at, updated_at'
@@ -36,6 +39,16 @@ export class SchoolRepository extends BaseRepository {
     return data
   }
 
+  async findByName(schoolName: string): Promise<School | null> {
+    const { data, error } = await this.db
+      .from('schools')
+      .select(SCHOOL_COLS)
+      .eq('school_name', schoolName)
+      .maybeSingle()
+    if (error) throw new Error(`findSchoolByName: ${error.message}`)
+    return data
+  }
+
   async update(
     schoolId: string,
     updates: Partial<Pick<School, 'school_name' | 'nemis_code' | 'school_type' | 'county' | 'sub_county' | 'ward' | 'address' | 'contact_phone' | 'contact_email' | 'logo_url' | 'motto'>>
@@ -47,6 +60,42 @@ export class SchoolRepository extends BaseRepository {
       .select(SCHOOL_COLS)
       .single()
     if (error) throw new Error(`updateSchool: ${error.message}`)
+    return data
+  }
+
+  async create(
+    input: Pick<School, 'school_name'> & Partial<Pick<School, 'school_type' | 'county' | 'sub_county' | 'ward' | 'address' | 'contact_phone' | 'contact_email' | 'nemis_code' | 'motto'>>,
+    createdBy: string
+  ): Promise<School> {
+    const { data, error } = await this.db
+      .from('schools')
+      .insert({ ...input, created_by: createdBy })
+      .select(SCHOOL_COLS)
+      .single()
+    if (error) throw new Error(`createSchool: ${error.message}`)
+    return data
+  }
+
+  // ── School Users ───────────────────────────────────────────────────────────
+
+  async findSchoolUserByUserId(userId: string): Promise<SchoolUser | null> {
+    const { data, error } = await this.db
+      .from('school_users')
+      .select(SCHOOL_USER_COLS)
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .maybeSingle()
+    if (error) throw new Error(`findSchoolUserByUserId: ${error.message}`)
+    return data
+  }
+
+  async addSchoolUser(schoolId: string, userId: string, role: SchoolUserRole): Promise<SchoolUser> {
+    const { data, error } = await this.db
+      .from('school_users')
+      .insert({ school_id: schoolId, user_id: userId, role, joined_at: new Date().toISOString() })
+      .select(SCHOOL_USER_COLS)
+      .single()
+    if (error) throw new Error(`addSchoolUser: ${error.message}`)
     return data
   }
 
@@ -361,15 +410,50 @@ export class SchoolRepository extends BaseRepository {
 
   // ── Intelligence: raw data reads ───────────────────────────────────────────
 
+  // Resolves teacher membership via the Core School `school_users` table —
+  // never via the legacy free-text `teachers.school_name` field. `schoolId`
+  // here is a real `schools.id` UUID.
+  async findTeacherUserIdsBySchoolId(schoolId: string): Promise<string[]> {
+    const { data, error } = await this.db
+      .from('school_users')
+      .select('user_id')
+      .eq('school_id', schoolId)
+      .eq('is_active', true)
+    if (error) throw new Error(`findTeacherUserIdsBySchoolId: ${error.message}`)
+    return (data ?? []).map(r => r.user_id as string)
+  }
+
+  // All teachers belonging to a school (no verification filter) — used where
+  // the caller previously matched every teacher row on school_name regardless
+  // of is_verified. `grade_levels`/`subjects` were previously selected here
+  // but never read by any caller, and `subjects` isn't a real column on
+  // `teachers` (the column is `subject`, singular) — dropped rather than
+  // carrying forward an unused, incorrect field.
+  async findTeachersBySchoolId(
+    schoolId: string
+  ): Promise<{ id: string; user_id: string }[]> {
+    const userIds = await this.findTeacherUserIdsBySchoolId(schoolId)
+    if (userIds.length === 0) return []
+    const { data, error } = await this.db
+      .from('teachers')
+      .select('id, user_id')
+      .in('user_id', userIds)
+    if (error) throw new Error(`findTeachersBySchoolId: ${error.message}`)
+    return (data ?? []) as { id: string; user_id: string }[]
+  }
+
   async findVerifiedTeachers(
     schoolId: string
-  ): Promise<{ id: string; user_id: string; grade_levels: unknown; subjects: unknown }[]> {
-    const { data } = await this.db
+  ): Promise<{ id: string; user_id: string }[]> {
+    const userIds = await this.findTeacherUserIdsBySchoolId(schoolId)
+    if (userIds.length === 0) return []
+    const { data, error } = await this.db
       .from('teachers')
-      .select('id, user_id, grade_levels, subjects')
-      .eq('school_name', schoolId)
+      .select('id, user_id')
+      .in('user_id', userIds)
       .eq('is_verified', true)
-    return (data ?? []) as { id: string; user_id: string; grade_levels: unknown; subjects: unknown }[]
+    if (error) throw new Error(`findVerifiedTeachers: ${error.message}`)
+    return (data ?? []) as { id: string; user_id: string }[]
   }
 
   async findTeacherClasses(

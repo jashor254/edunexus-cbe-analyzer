@@ -5,6 +5,7 @@ import Link from 'next/link'
 import {
   BookOpen, PlusCircle, Users, ChevronRight, Copy, Check, X,
 } from 'lucide-react'
+import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 
 function levelLabel(avg: number) {
   if (avg >= 3.5) return 'Exceeds'
@@ -270,7 +271,7 @@ export default function TeacherClassesPage() {
 
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
-                  {error}
+                  {friendlyMessage(error).message}
                 </div>
               )}
 

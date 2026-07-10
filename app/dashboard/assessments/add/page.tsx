@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 import { getCurriculumConfig, getGradeColor, getGradeLabel } from '@/lib/curriculum'
 import { marksToLevel, levelToLabel, levelToColor, type CBCLevel } from '@/lib/assessments/gradeCalculator'
+import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Student {
@@ -594,7 +595,7 @@ function AddAssessmentContent() {
         {error && (
           <div className="flex items-start gap-3 bg-red-100 border-4 border-red-600 text-red-900 p-5 rounded-3xl mb-8 font-black">
             <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-            {error}
+            {friendlyMessage(error).message}
           </div>
         )}
 

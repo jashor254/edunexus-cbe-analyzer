@@ -412,6 +412,31 @@ export class CurriculumRepository extends BaseRepository {
     return (data ?? []) as Array<{ numeric_grade: number }>
   }
 
+  /** Real, seeded Specific Learning Outcomes for a substrand — Curriculum Grounding Layer. */
+  async findLearningOutcomesBySubstrandId(
+    substrandId: string,
+  ): Promise<Array<{ id: string; outcome: string; outcome_type: string | null }>> {
+    const { data, error } = await this.db
+      .from('sow_learning_outcomes')
+      .select('id, outcome, outcome_type')
+      .eq('substrand_id', substrandId)
+      .order('order_index')
+    if (error) throw new Error(`Failed to find learning outcomes: ${error.message}`)
+    return (data ?? []) as Array<{ id: string; outcome: string; outcome_type: string | null }>
+  }
+
+  async findSubstrandById(
+    substrandId: string,
+  ): Promise<{ id: string; title: string; strand_id: string } | null> {
+    const { data, error } = await this.db
+      .from('sow_substrands')
+      .select('id, title, strand_id')
+      .eq('id', substrandId)
+      .maybeSingle()
+    if (error) throw new Error(`Failed to find substrand: ${error.message}`)
+    return data as { id: string; title: string; strand_id: string } | null
+  }
+
   async findSubstrandsByTitle(
     searchTerm: string,
   ): Promise<Array<{ id: string; title: string; strand_id: string }>> {
@@ -426,13 +451,128 @@ export class CurriculumRepository extends BaseRepository {
 
   async findStrandsByIds(
     strandIds: string[],
-  ): Promise<Array<{ id: string; learning_area_id: string }>> {
+  ): Promise<Array<{ id: string; learning_area_id: string; title: string }>> {
     const { data, error } = await this.db
       .from('sow_strands')
-      .select('id, learning_area_id')
+      .select('id, learning_area_id, title')
       .in('id', strandIds)
     if (error) throw new Error(`Failed to find strands by ids: ${error.message}`)
-    return (data ?? []) as Array<{ id: string; learning_area_id: string }>
+    return (data ?? []) as Array<{ id: string; learning_area_id: string; title: string }>
+  }
+
+  // ── SOW generator tree lookups (grades/learning-areas/strands/kicd-context routes) ──
+
+  async findPrimaryLevelId(curriculumType: string): Promise<{ id: string } | null> {
+    const { data, error } = await this.db
+      .from('sow_levels')
+      .select('id')
+      .eq('curriculum_type', curriculumType)
+      .order('order_index')
+      .limit(1)
+    if (error) throw new Error(`Failed to find primary level: ${error.message}`)
+    return data?.[0] ?? null
+  }
+
+  async findActiveGradesByLevelId(
+    levelId: string,
+  ): Promise<Array<{ id: string; level_id: string; name: string; numeric_grade: number; order_index: number }>> {
+    const { data, error } = await this.db
+      .from('sow_grades')
+      .select('id, level_id, name, numeric_grade, order_index')
+      .eq('level_id', levelId)
+      .eq('is_active', true)
+      .order('numeric_grade')
+    if (error) throw new Error(`Failed to find active grades: ${error.message}`)
+    return (data ?? []) as Array<{ id: string; level_id: string; name: string; numeric_grade: number; order_index: number }>
+  }
+
+  async findActiveGradeByNamePrefix(
+    levelId: string,
+    gradePrefix: string,
+  ): Promise<{ id: string } | null> {
+    const { data, error } = await this.db
+      .from('sow_grades')
+      .select('id')
+      .eq('level_id', levelId)
+      .eq('is_active', true)
+      .ilike('name', `${gradePrefix}%`)
+      .order('order_index')
+      .limit(1)
+    if (error) throw new Error(`Failed to find grade by name prefix: ${error.message}`)
+    return data?.[0] ?? null
+  }
+
+  async findLearningAreasByGradeId(
+    gradeId: string,
+  ): Promise<Array<{ id: string; name: string }>> {
+    const { data, error } = await this.db
+      .from('sow_learning_areas')
+      .select('id, name')
+      .eq('grade_id', gradeId)
+      .order('order_index')
+    if (error) throw new Error(`Failed to find learning areas for grade: ${error.message}`)
+    return (data ?? []) as Array<{ id: string; name: string }>
+  }
+
+  async findStrandsForGeneration(
+    learningAreaId: string,
+  ): Promise<Array<{ id: string; title: string; order_index: number }>> {
+    const { data, error } = await this.db
+      .from('sow_strands')
+      .select('id, title, order_index')
+      .eq('learning_area_id', learningAreaId)
+      .order('order_index')
+      .limit(500)
+    if (error) throw new Error(`Failed to find strands for generation: ${error.message}`)
+    return (data ?? []) as Array<{ id: string; title: string; order_index: number }>
+  }
+
+  /** Paginated substrand fetch (avoids PostgREST's 1000-row cap) — for SOW generation, which needs every substrand. */
+  async findAllSubstrandsByStrandIds(
+    strandIds: string[],
+  ): Promise<Array<{ id: string; strand_id: string; title: string; suggested_lessons: number; order_index: number }>> {
+    const PAGE = 1000
+    let from = 0
+    const all: Array<{ id: string; strand_id: string; title: string; suggested_lessons: number; order_index: number }> = []
+
+    while (true) {
+      const { data, error } = await this.db
+        .from('sow_substrands')
+        .select('id, strand_id, title, suggested_lessons, order_index')
+        .in('strand_id', strandIds)
+        .order('order_index')
+        .range(from, from + PAGE - 1)
+
+      if (error) throw new Error(`Failed to find substrands: ${error.message}`)
+      if (data) all.push(...data)
+      if (!data || data.length < PAGE) break
+      from += PAGE
+    }
+
+    return all
+  }
+
+  async findKicdContextBySubjectName(subject: string): Promise<{
+    area: { kicd_subject_data: Record<string, unknown> | null } | null
+    strands: Array<{ title: string; kicd_data: Record<string, unknown> | null }>
+  }> {
+    const [{ data: area }, { data: strands }] = await Promise.all([
+      this.db
+        .from('sow_learning_areas')
+        .select('kicd_subject_data')
+        .ilike('name', `%${subject}%`)
+        .limit(1)
+        .maybeSingle(),
+      this.db
+        .from('sow_strands')
+        .select('title, kicd_data')
+        .ilike('title', `%${subject}%`),
+    ])
+
+    return {
+      area: (area ?? null) as { kicd_subject_data: Record<string, unknown> | null } | null,
+      strands: (strands ?? []) as Array<{ title: string; kicd_data: Record<string, unknown> | null }>,
+    }
   }
 
   // ── Search ────────────────────────────────────────────────────────────────────

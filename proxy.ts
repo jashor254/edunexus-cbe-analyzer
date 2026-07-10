@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/utils/supabase/middleware'
 import { generateTraceId } from '@/lib/observability/tracing'
 import { SUPPORTED_LOCALES, DEFAULT_LOCALE } from '@/lib/i18n/config'
+import { getUserRoles } from '@/lib/auth/getRole'
 
 /** Pick the best supported locale from an Accept-Language header. */
 function detectLocale(acceptLang: string): string {
@@ -111,27 +112,14 @@ export async function proxy(request: NextRequest) {
     // /teacher/setup is open to any logged-in user (completes onboarding)
     if (pathname === '/teacher/setup') return response
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, secondary_role')
-      .eq('id', user.id)
-      .single()
+    const roles = await getUserRoles(user.id, supabase)
 
-    const canAccessTeacher =
-      profile?.role === 'teacher' || profile?.secondary_role === 'teacher'
-
-    if (!canAccessTeacher) {
+    if (roles.primary !== 'teacher' && roles.secondary !== 'teacher') {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
     // Verify teacher record exists (role may be set but setup incomplete)
-    const { data: teacher } = await supabase
-      .from('teachers')
-      .select('id')
-      .eq('user_id', user.id)
-      .maybeSingle()
-
-    if (!teacher) {
+    if (!roles.hasTeacherRecord) {
       return NextResponse.redirect(new URL('/teacher/setup', request.url))
     }
 
@@ -140,14 +128,10 @@ export async function proxy(request: NextRequest) {
 
   // ── Dashboard routes ──────────────────────────────────────────────────────
   if (pathname.startsWith('/dashboard')) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, secondary_role')
-      .eq('id', user.id)
-      .single()
+    const roles = await getUserRoles(user.id, supabase)
 
     // Pure teachers (no parent secondary role) belong in teacher dashboard
-    if (profile?.role === 'teacher' && profile?.secondary_role !== 'parent') {
+    if (roles.primary === 'teacher' && roles.secondary !== 'parent') {
       return NextResponse.redirect(new URL('/teacher/dashboard', request.url))
     }
 

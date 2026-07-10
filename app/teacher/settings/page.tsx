@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Save, CheckCircle2, User, School, Phone, BadgeCheck, Trophy, Calendar, Hash } from 'lucide-react'
+import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 
 const SUBJECTS = [
   'Mathematics','English','Kiswahili','Integrated Science','Geography',
@@ -281,7 +282,7 @@ export default function TeacherProfilePage() {
 
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm font-medium">
-              {error}
+              {friendlyMessage(error).message}
             </div>
           )}
 

@@ -140,6 +140,50 @@ export class CompassRepository extends BaseRepository {
     return { id: data.id as string, created_at: data.created_at as string }
   }
 
+  // ── Ownership ────────────────────────────────────────────────────────────────
+  // Single source of truth for the columns every Compass ownership check needs.
+  // Consolidates what was previously six separate inline `.from('students')`
+  // queries scattered across app/api/learn/* and app/api/teacher/*.
+
+  async findStudentOwnership(
+    studentId: string,
+  ): Promise<{ id: string; teacher_id: string | null; user_id: string | null; parent_user_id: string | null } | null> {
+    const { data, error } = await this.db
+      .from('students')
+      .select('id, teacher_id, user_id, parent_user_id')
+      .eq('id', studentId)
+      .maybeSingle()
+
+    if (error) throw new Error(`Failed to read student ownership: ${error.message}`)
+    return data
+  }
+
+  // List of students self-owned or parent-owned by this user — used to render
+  // a picker when a user has more than one linked student. Not a single-student
+  // ownership decision (that's lib/compass/ownership.ts); a listing query, kept
+  // here alongside the other student-ownership reads it's built from.
+  async findOwnedStudents(userId: string): Promise<Array<{ id: string; name: string | null; grade: number | null }>> {
+    const { data, error } = await this.db
+      .from('students')
+      .select('id, name, grade')
+      .or(`user_id.eq.${userId},parent_user_id.eq.${userId}`)
+      .order('created_at', { ascending: false })
+
+    if (error) throw new Error(`Failed to list owned students: ${error.message}`)
+    return data ?? []
+  }
+
+  async findSessionLearnerId(sessionId: string): Promise<string | null> {
+    const { data, error } = await this.db
+      .from('compass_sessions')
+      .select('learner_id')
+      .eq('id', sessionId)
+      .maybeSingle()
+
+    if (error) throw new Error(`Failed to read session owner: ${error.message}`)
+    return (data?.learner_id as string | null) ?? null
+  }
+
   // ── Session — read state ────────────────────────────────────────────────────
 
   async findSessionState(
@@ -318,11 +362,11 @@ export class CompassRepository extends BaseRepository {
   async findRecentSessionsByStudent(
     studentId: string,
     limit = 3,
-  ): Promise<Array<{ topic: string | null; subject: string | null; status: string | null }>> {
+  ): Promise<Array<{ subject: string | null; status: string | null }>> {
     const { data, error } = await this.db
       .from('compass_sessions')
-      .select('topic, subject, status')
-      .eq('student_id', studentId)
+      .select('subject, status')
+      .eq('learner_id', studentId)
       .eq('status', 'completed')
       .order('created_at', { ascending: false })
       .limit(limit)
@@ -330,7 +374,6 @@ export class CompassRepository extends BaseRepository {
     if (error) throw new Error(`Failed to fetch recent sessions: ${error.message}`)
 
     return (data ?? []).map(row => ({
-      topic:   row.topic   as string | null,
       subject: row.subject as string | null,
       status:  row.status  as string | null,
     }))

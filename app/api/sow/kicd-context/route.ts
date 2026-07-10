@@ -3,8 +3,9 @@
 // Query params: subject (learning area name, partial match)
 
 import { createClient } from '@/utils/supabase/server'
-import { createServiceClient } from '@/utils/supabase/service'
-import { apiSuccess, apiError, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
+import { repos } from '@/lib/repositories'
+import { CurriculumService } from '@/lib/curriculum/service'
+import { apiSuccess, apiError, apiUnauthorized, apiBadRequest, apiForbidden } from '@/lib/api/response'
 
 export async function GET(req: Request) {
   try {
@@ -16,23 +17,13 @@ export async function GET(req: Request) {
     const subject = url.searchParams.get('subject')?.trim()
     if (!subject) return apiBadRequest('Missing subject')
 
-    const db = createServiceClient()
+    // Curriculum data is teacher-only — students and parents have no access
+    const teacher = await repos.teachers.findTeacherByUserId(user.id)
+    if (!teacher) return apiForbidden()
 
-    const [{ data: area }, { data: strands }] = await Promise.all([
-      db.from('sow_learning_areas')
-        .select('kicd_subject_data')
-        .ilike('name', `%${subject}%`)
-        .limit(1)
-        .maybeSingle(),
-      db.from('sow_strands')
-        .select('title, kicd_data')
-        .ilike('title', `%${subject}%`),
-    ])
+    const context = await CurriculumService.resolveKicdContext(subject)
 
-    return apiSuccess({
-      kicdArea: area ?? null,
-      kicdStrands: strands ?? [],
-    })
+    return apiSuccess(context)
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to load KICD context'
     return apiError(message)

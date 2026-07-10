@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, use, Fragment } from 'react'
+import { useState, useEffect, useRef, useCallback, use, Fragment } from 'react'
 import Link from 'next/link'
 import {
   Users, BookOpen, BarChart3, Sun, Copy, Check,
@@ -9,7 +9,8 @@ import {
   Loader2, X, UserPlus, Mail, Phone, FileText, CheckCircle2,
   FlaskConical, ChevronDown, ChevronRight,
   Upload, Sparkles, Target, Zap, ClipboardList, Layers,
-  MessageSquare, CalendarDays, ThumbsUp, HelpCircle, AlertCircle,
+  MessageSquare, CalendarDays, ThumbsUp, HelpCircle, AlertCircle, ClipboardCheck,
+  RefreshCw,
 } from 'lucide-react'
 import {
   SENIOR_PATHWAYS,
@@ -18,6 +19,7 @@ import {
   validateSeniorSubjects,
   type SeniorPathway,
 } from '@/lib/curriculum/subjects'
+import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 
 type Tab = 'students' | 'gaps' | 'assignments' | 'holiday' | 'remedial' | 'compass' | 'clinic' | 'upload' | 'analytics'
 
@@ -346,7 +348,7 @@ function AddStudentModal({
 
           {error && (
             <div className="mx-6 mb-4 flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-              <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
+              <AlertTriangle className="w-4 h-4 shrink-0" /> {friendlyMessage(error).message}
             </div>
           )}
 
@@ -411,8 +413,34 @@ function UploadAssessmentTab({
   const [atype,  setAtype]  = useState('midterm')
   const [scores, setScores] = useState<Record<string, Record<string, string>>>({})
   const [phase,  setPhase]  = useState<'entry' | 'saving' | 'generating' | 'done' | 'error'>('entry')
-  const [progress, setProgress] = useState({ done: 0, total: 0 })
+  const [progress, setProgress] = useState({ done: 0, total: 0, currentStudentName: null as string | null })
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [reportJobId, setReportJobId] = useState<string | null>(null)
+
+  // Live progress while report generation runs server-side — same pattern as
+  // the Holiday Planner (HOTFIX 2/4, pilot-readiness sprint). Previously
+  // this phase showed a hardcoded 60% bar for however long the whole class
+  // took to generate, regardless of actual progress.
+  useEffect(() => {
+    if (phase !== 'generating' || !reportJobId) return
+    const interval = setInterval(async () => {
+      try {
+        const res  = await fetch(`/api/teacher/classes/${classId}/generate-reports/status?jobId=${reportJobId}`)
+        const json = await res.json()
+        if (!res.ok || !json.success || !json.data) return
+        const job = json.data as { status: string; result: { total: number; completed: number; currentStudentName: string | null; success?: number; errorMessage?: string } }
+        setProgress({ done: job.result.completed, total: job.result.total, currentStudentName: job.result.currentStudentName })
+        if (job.status === 'completed') setPhase('done')
+        else if (job.status === 'failed') {
+          setErrorMsg(job.result.errorMessage ?? 'Report generation failed')
+          setPhase('error')
+        }
+      } catch {
+        // transient — next tick retries
+      }
+    }, 1500)
+    return () => clearInterval(interval)
+  }, [phase, reportJobId, classId])
 
   function setScore(studentId: string, subject: string, val: string) {
     setScores(prev => ({
@@ -461,9 +489,10 @@ function UploadAssessmentTab({
         throw new Error(marksData.error ?? 'Failed to save marks')
       }
 
-      // 3. Generate reports with compass_bridge
+      // 3. Generate reports with compass_bridge — starts a background job and
+      // returns immediately; the polling effect above tracks it to 'done'.
       setPhase('generating')
-      setProgress({ done: 0, total: students.length })
+      setProgress({ done: 0, total: students.length, currentStudentName: null })
 
       const genRes = await fetch(`/api/teacher/classes/${classId}/generate-reports`, {
         method: 'POST',
@@ -475,8 +504,7 @@ function UploadAssessmentTab({
         throw new Error(genData.error ?? 'Failed to generate reports')
       }
 
-      setProgress({ done: genData.data?.success ?? students.length, total: students.length })
-      setPhase('done')
+      setReportJobId(genData.data.jobId as string)
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'An error occurred')
       setPhase('error')
@@ -501,13 +529,21 @@ function UploadAssessmentTab({
   if (phase === 'generating') return (
     <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center space-y-4">
       <Loader2 className="w-10 h-10 text-violet-500 mx-auto animate-spin" />
-      <h3 className="font-black text-gray-800">Generating Reports & Compass Briefings…</h3>
+      <h3 className="font-black text-gray-800">
+        {progress.total === 0 ? 'Preparing reports…' : `Student ${Math.min(progress.done + 1, progress.total)} of ${progress.total}`}
+      </h3>
       <p className="text-gray-500 text-sm">
-        Building personalised learning plans for each student. This takes ~30 seconds.
+        {progress.currentStudentName
+          ? <>Building {progress.currentStudentName}&apos;s learning plan…</>
+          : 'Building personalised learning plans for each student.'}
       </p>
       <div className="bg-gray-100 rounded-full h-3 overflow-hidden max-w-sm mx-auto">
-        <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: '60%' }} />
+        <div
+          className="h-full bg-violet-500 rounded-full transition-all"
+          style={{ width: `${progress.total === 0 ? 8 : Math.max(6, (progress.done / progress.total) * 100)}%` }}
+        />
       </div>
+      <p className="text-xs text-gray-400">It&apos;s safe to leave this tab — generation keeps running.</p>
     </div>
   )
 
@@ -530,9 +566,19 @@ function UploadAssessmentTab({
       </div>
 
       {phase === 'error' && errorMsg && (
-        <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-          <AlertTriangle className="w-4 h-4 shrink-0" />
-          {errorMsg}
+        <div className="flex items-center justify-between gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+          <span className="flex items-center gap-3">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            {friendlyMessage(errorMsg).message}
+          </span>
+          {friendlyMessage(errorMsg).retryable && (
+            <button
+              onClick={() => setPhase('entry')}
+              className="flex items-center gap-1.5 text-xs bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg font-bold hover:bg-red-200 transition shrink-0"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Try Again
+            </button>
+          )}
         </div>
       )}
 
@@ -1923,6 +1969,178 @@ function FormativeSignalModal({
   )
 }
 
+// ─── Topical Check Modal ──────────────────────────────────────────────────────
+// One subject, one strand/topic, rate the whole class 1-4 — fast enough that
+// teachers actually do it between term assessments, unlike the full form.
+
+const RATING_CONFIG = [
+  { level: 1 as const, label: 'BE', full: 'Below Expectations',      color: 'bg-red-100 border-red-300 text-red-800',       active: 'bg-red-500 text-white border-red-500' },
+  { level: 2 as const, label: 'AE', full: 'Approaching Expectations', color: 'bg-amber-100 border-amber-300 text-amber-800', active: 'bg-amber-500 text-white border-amber-500' },
+  { level: 3 as const, label: 'ME', full: 'Meeting Expectations',     color: 'bg-green-100 border-green-300 text-green-800', active: 'bg-green-500 text-white border-green-500' },
+  { level: 4 as const, label: 'EE', full: 'Exceeding Expectations',   color: 'bg-teal-100 border-teal-300 text-teal-800',    active: 'bg-teal-500 text-white border-teal-500' },
+]
+
+function TopicalCheckModal({
+  classId,
+  students,
+  onClose,
+}: {
+  classId:  string
+  students: Array<{ id: string; name: string }>
+  onClose:  () => void
+}) {
+  const [subject,  setSubject]  = useState(CBC_SUBJECTS_SHORT[0])
+  const [strand,   setStrand]   = useState('')
+  const [topic,    setTopic]    = useState('')
+  const [ratings,  setRatings]  = useState<Map<string, 1 | 2 | 3 | 4>>(new Map())
+  const [saving,   setSaving]   = useState(false)
+  const [saved,    setSaved]    = useState(false)
+  const [error,    setError]    = useState<string | null>(null)
+
+  function setRating(studentId: string, level: 1 | 2 | 3 | 4) {
+    setRatings(prev => new Map(prev).set(studentId, level))
+  }
+
+  async function handleSubmit() {
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/teacher/assessments/topical', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          classId,
+          subject: subject.toLowerCase().replace(/ & /g, '_').replace(/ /g, '_'),
+          strand:  strand || topic || 'general',
+          topic:   topic || strand || 'general',
+          ratings: [...ratings.entries()].map(([studentId, rating]) => ({ studentId, rating })),
+        }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(body?.error ?? 'Failed to save')
+      }
+      setSaved(true)
+      setTimeout(onClose, 1200)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (saved) {
+    return (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl p-8 text-center shadow-2xl">
+          <CheckCircle2 className="w-14 h-14 text-green-500 mx-auto mb-3" />
+          <div className="font-black text-gray-900 text-lg">Topical check recorded</div>
+          <div className="text-sm text-gray-500 mt-1">Learner profiles are updating in the background.</div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-lg overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-indigo-100 rounded-xl flex items-center justify-center">
+              <ClipboardCheck className="w-4.5 h-4.5 text-indigo-600" />
+            </div>
+            <div>
+              <div className="font-black text-gray-900 text-sm">Topical Check</div>
+              <div className="text-xs text-gray-400">One topic. Rate the class 1-4.</div>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-xl">
+            <X className="w-4 h-4 text-gray-400" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wide">Subject</label>
+              <select
+                value={subject}
+                onChange={e => setSubject(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm font-medium focus:border-indigo-400 focus:outline-none bg-white"
+              >
+                {CBC_SUBJECTS_SHORT.map(s => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wide">Strand</label>
+              <input
+                value={strand}
+                onChange={e => setStrand(e.target.value)}
+                placeholder="e.g. Numbers"
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:border-indigo-400 focus:outline-none"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wide">Topic</label>
+            <input
+              value={topic}
+              onChange={e => setTopic(e.target.value)}
+              placeholder="e.g. Fractions"
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:border-indigo-400 focus:outline-none"
+            />
+          </div>
+
+          {students.length === 0 ? (
+            <p className="text-sm text-center text-gray-400 py-4">No students in this class yet.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {students.map(s => {
+                const current = ratings.get(s.id) ?? null
+                return (
+                  <div key={s.id} className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-gray-800 flex-1 min-w-0 truncate">{s.name}</span>
+                    <div className="flex gap-1">
+                      {RATING_CONFIG.map(r => (
+                        <button
+                          key={r.level}
+                          onClick={() => setRating(s.id, r.level)}
+                          title={r.full}
+                          className={`w-9 h-9 rounded-xl border-2 flex items-center justify-center transition-all text-xs font-black ${
+                            current === r.level ? r.active : 'border-gray-200 text-gray-300 hover:border-gray-300'
+                          }`}
+                        >
+                          {r.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {error && <p className="text-sm text-red-600">{friendlyMessage(error).message}</p>}
+        </div>
+
+        <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border-2 border-gray-200 font-bold text-gray-600 hover:bg-gray-50 text-sm">
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={saving || ratings.size === 0 || !topic}
+            className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 text-white py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+            {saving ? 'Saving…' : 'Record Check'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Holiday Planner Tab ──────────────────────────────────────────────────────
 
 type HolidayStudentPlan = {
@@ -1932,6 +2150,17 @@ type HolidayStudentPlan = {
   weeks:       Array<{ week: number; label: string; student_task: string; parent_action: string; is_rest_week: boolean }>
   parent_summary: string
 }
+
+type HolidayJobProgress = {
+  total:              number
+  completed:          number
+  generated:          number
+  failed:             number
+  currentStudentName: string | null
+  failedStudents:     Array<{ studentId: string; studentName: string; reason: string }>
+  errorMessage?:      string
+}
+
 
 function HolidayPlannerTab({
   classId,
@@ -1946,37 +2175,118 @@ function HolidayPlannerTab({
 }) {
   const [period,        setPeriod]        = useState('August Holiday')
   const [days,          setDays]          = useState(21)
-  const [generating,    setGenerating]    = useState(false)
   const [plans,         setPlans]         = useState<HolidayStudentPlan[]>([])
+  const [plansLoading,  setPlansLoading]  = useState(true)
+  const [planTerm,      setPlanTerm]      = useState<{ term: number; year: number } | null>(null)
   const [error,         setError]         = useState<string | null>(null)
   const [expandedId,    setExpandedId]    = useState<string | null>(null)
   const [copiedId,      setCopiedId]      = useState<string | null>(null)
+  const [publishedIds,  setPublishedIds]  = useState<Set<string>>(new Set())
+  const [publishing,    setPublishing]    = useState<string | null>(null) // studentId or 'all'
 
-  async function generate() {
-    setGenerating(true)
+  const [jobId,       setJobId]       = useState<string | null>(null)
+  const [jobStatus,   setJobStatus]   = useState<'idle' | 'processing' | 'completed' | 'failed'>('idle')
+  const [progress,    setProgress]    = useState<HolidayJobProgress | null>(null)
+  const [retrying,    setRetrying]    = useState(false)
+  const jobStartedAtRef = useRef<number>(0)
+
+  const loadPlans = useCallback(async () => {
+    setPlansLoading(true)
+    try {
+      const res  = await fetch(`/api/holiday/generate?classId=${classId}`)
+      const json = await res.json()
+      if (!res.ok || !json.success) throw new Error(json.error ?? 'Could not load holiday plans')
+      setPlanTerm({ term: json.data.term as number, year: json.data.year as number })
+      setPlans(json.data.plans as HolidayStudentPlan[])
+      setPublishedIds(new Set((json.data.plans as Array<{ studentId: string; published: boolean }>).filter(p => p.published).map(p => p.studentId)))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load holiday plans')
+    } finally {
+      setPlansLoading(false)
+    }
+  }, [classId])
+
+  // Reconnect to an in-flight (or just-finished) batch on tab load — a
+  // teacher who started generating, left, and came back must see real
+  // progress, not an empty "Generate Plans" button as if nothing happened.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res  = await fetch(`/api/holiday/generate/status?classId=${classId}`)
+        const json = await res.json()
+        if (cancelled) return
+        if (res.ok && json.success && json.data) {
+          const job = json.data as { id: string; status: string; result: HolidayJobProgress }
+          setJobId(job.id)
+          setProgress(job.result)
+          if (job.status === 'processing') { setJobStatus('processing'); jobStartedAtRef.current = Date.now() - 1000 }
+          else if (job.status === 'completed') { setJobStatus('completed'); loadPlans() }
+          else if (job.status === 'failed') setJobStatus('failed')
+        } else {
+          loadPlans()
+        }
+      } catch {
+        loadPlans()
+      }
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classId])
+
+  // Poll while a batch is running.
+  useEffect(() => {
+    if (jobStatus !== 'processing' || !jobId) return
+    const interval = setInterval(async () => {
+      try {
+        const res  = await fetch(`/api/holiday/generate/status?jobId=${jobId}`)
+        const json = await res.json()
+        if (!res.ok || !json.success || !json.data) return
+        const job = json.data as { status: string; result: HolidayJobProgress }
+        setProgress(job.result)
+        if (job.status === 'completed') { setJobStatus('completed'); loadPlans() }
+        else if (job.status === 'failed') setJobStatus('failed')
+      } catch {
+        // transient — next tick retries. Never leave the teacher on a
+        // silently-stuck progress bar because of one dropped poll.
+      }
+    }, 1500)
+    return () => clearInterval(interval)
+  }, [jobStatus, jobId, loadPlans])
+
+  function estimatedSecondsRemaining(): number | null {
+    if (!progress || progress.completed === 0) return null
+    const elapsedMs = Date.now() - jobStartedAtRef.current
+    const msPerStudent = elapsedMs / progress.completed
+    const remaining = progress.total - progress.completed
+    return Math.max(0, Math.round((msPerStudent * remaining) / 1000))
+  }
+
+  async function generate(retryStudentIds?: string[]) {
     setError(null)
+    if (retryStudentIds) setRetrying(true)
     try {
       const res = await fetch('/api/holiday/generate', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ classId, holidayPeriod: period, holidayDays: days }),
+        body:    JSON.stringify({
+          classId,
+          holidayPeriod: period,
+          holidayDays: days,
+          ...(retryStudentIds ? { studentIds: retryStudentIds } : {}),
+        }),
       })
       const json = await res.json()
       if (!res.ok || !json.success) throw new Error(json.error ?? 'Generation failed')
 
-      // Normalise response — batch returns an array
-      const rawPlans = Array.isArray(json.data) ? json.data : [json.data]
-      setPlans(rawPlans.map((p: Record<string, unknown>) => ({
-        studentId:      p.studentId    as string,
-        studentName:    p.student_name as string ?? p.studentName as string,
-        message:        (p.whatsapp_message as string) ?? '',
-        weeks:          (p.weeks as HolidayStudentPlan['weeks']) ?? [],
-        parent_summary: (p.parent_summary as string) ?? '',
-      })))
+      jobStartedAtRef.current = Date.now()
+      setJobId(json.data.jobId as string)
+      setJobStatus('processing')
+      setProgress({ total: json.data.total as number, completed: 0, generated: 0, failed: 0, currentStudentName: null, failedStudents: [] })
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error generating plans')
+      setError(e instanceof Error ? e.message : 'Error starting plan generation')
     } finally {
-      setGenerating(false)
+      setRetrying(false)
     }
   }
 
@@ -1984,6 +2294,44 @@ function HolidayPlannerTab({
     navigator.clipboard.writeText(plan.message)
     setCopiedId(plan.studentId)
     setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  async function publishOne(studentId: string) {
+    if (!planTerm) return
+    setPublishing(studentId)
+    try {
+      const res = await fetch('/api/holiday/publish', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ studentId, term: planTerm.term, year: planTerm.year }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) throw new Error(json.error ?? 'Publish failed')
+      setPublishedIds(prev => new Set(prev).add(studentId))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error publishing plan')
+    } finally {
+      setPublishing(null)
+    }
+  }
+
+  async function publishAll() {
+    if (!planTerm) return
+    setPublishing('all')
+    try {
+      const res = await fetch('/api/holiday/publish', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ classId, term: planTerm.term, year: planTerm.year }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.success) throw new Error(json.error ?? 'Publish failed')
+      setPublishedIds(new Set(plans.map(p => p.studentId)))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error publishing plans')
+    } finally {
+      setPublishing(null)
+    }
   }
 
   return (
@@ -2023,29 +2371,131 @@ function HolidayPlannerTab({
           </select>
         </div>
         <button
-          onClick={generate}
-          disabled={generating || students.length === 0}
+          onClick={() => generate()}
+          disabled={jobStatus === 'processing' || students.length === 0}
           className="flex items-center gap-2 bg-amber-500 text-white px-6 py-2.5 rounded-xl font-black hover:bg-amber-600 disabled:opacity-50 transition"
         >
-          {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-          {generating ? `Generating ${students.length} plans…` : `Generate Plans for ${students.length} Students`}
+          {jobStatus === 'processing' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+          {jobStatus === 'processing' ? 'Generating…' : `Generate Plans for ${students.length} Students`}
         </button>
       </div>
 
       {error && (
         <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-          <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
+          <AlertTriangle className="w-4 h-4 shrink-0" /> {friendlyMessage(error).message}
+        </div>
+      )}
+
+      {/* Live progress — HOTFIX 2: a teacher must never see a frozen page
+          while 45 students' worth of AI calls run in the background. Safe
+          to navigate away from; reconnects on reload via the effect above. */}
+      {jobStatus === 'processing' && progress && (
+        <div className="bg-white border border-amber-200 rounded-2xl p-5 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 text-sm font-bold text-gray-800">
+              <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
+              {progress.completed === 0
+                ? 'Preparing learner plans…'
+                : `Student ${Math.min(progress.completed + 1, progress.total)} of ${progress.total}`}
+            </div>
+            {estimatedSecondsRemaining() !== null && progress.completed < progress.total && (
+              <span className="text-xs text-gray-400 font-medium">
+                ~{estimatedSecondsRemaining()! < 60 ? `${estimatedSecondsRemaining()}s` : `${Math.ceil(estimatedSecondsRemaining()! / 60)} min`} remaining
+              </span>
+            )}
+          </div>
+
+          <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+            <div
+              className="h-2 bg-amber-500 rounded-full transition-all"
+              style={{ width: `${Math.min(100, (progress.completed / Math.max(1, progress.total)) * 100)}%` }}
+            />
+          </div>
+
+          {progress.currentStudentName && (
+            <p className="text-xs text-gray-500">Currently generating: <span className="font-bold text-gray-700">{progress.currentStudentName}</span></p>
+          )}
+
+          <div className="flex items-center gap-4 text-xs font-bold pt-1">
+            <span className="text-green-600">✓ {progress.generated} completed</span>
+            {progress.failed > 0 && <span className="text-red-500">✕ {progress.failed} failed</span>}
+            <span className="text-gray-400 font-medium">It's safe to leave this tab — generation keeps running.</span>
+          </div>
+        </div>
+      )}
+
+      {jobStatus === 'failed' && (
+        <div className="flex items-center justify-between gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-sm">
+          <span className="text-red-700">
+            We couldn&apos;t generate holiday plans this time. Nothing has been lost — your class and settings are unchanged.
+          </span>
+          <button
+            onClick={() => generate()}
+            className="flex items-center gap-1.5 text-xs bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg font-bold hover:bg-red-200 transition shrink-0"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Retry
+          </button>
+        </div>
+      )}
+
+      {/* Some students didn't get a plan — HOTFIX 3: never silently swallow
+          this. 37-of-45 must never look like "job done, 37 requested." */}
+      {jobStatus === 'completed' && progress && progress.failed > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-5 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 text-sm font-bold text-red-800">
+              <AlertTriangle className="w-4 h-4" />
+              We couldn&apos;t generate plans for {progress.failed} learner{progress.failed !== 1 ? 's' : ''}.
+            </div>
+            <button
+              onClick={() => generate(progress.failedStudents.map(f => f.studentId))}
+              disabled={retrying}
+              className="flex items-center gap-1.5 text-xs bg-red-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-red-700 transition disabled:opacity-50 shrink-0"
+            >
+              {retrying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              Retry Failed Only
+            </button>
+          </div>
+          <ul className="space-y-1.5">
+            {progress.failedStudents.map(f => (
+              <li key={f.studentId} className="text-xs text-red-700 flex items-start gap-1.5">
+                <span className="font-bold shrink-0">{f.studentName}:</span>
+                <span>{friendlyMessage(f.reason, "Something went wrong generating this student's plan.").message}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-red-500">Click Retry — the {progress.generated} plans already generated won&apos;t be touched.</p>
         </div>
       )}
 
       {/* Plans */}
-      {plans.length > 0 && (
+      {plansLoading && jobStatus !== 'processing' && (
+        <div className="flex items-center gap-2 text-sm text-gray-400 p-4">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loading holiday plans…
+        </div>
+      )}
+      {!plansLoading && plans.length > 0 && (
         <div className="space-y-3">
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <CheckCircle2 className="w-4 h-4 text-green-500" />
-            <span>{plans.length} personalised plans generated</span>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <CheckCircle2 className="w-4 h-4 text-green-500" />
+              <span>{plans.length} personalised plans generated — drafts until you publish</span>
+            </div>
+            <button
+              onClick={publishAll}
+              disabled={publishing !== null || publishedIds.size === plans.length}
+              className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl font-black text-sm hover:bg-indigo-700 disabled:opacity-50 transition"
+            >
+              {publishing === 'all' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              {publishedIds.size === plans.length ? 'All Published' : `Publish All to Parents (${plans.length - publishedIds.size} pending)`}
+            </button>
           </div>
-          {plans.map(plan => (
+          <p className="text-xs text-gray-400">
+            Unpublished drafts are auto-published after 3 days so parents don&apos;t miss them if you forget — publishing now shares them immediately via the Learner Blueprint.
+          </p>
+          {plans.map(plan => {
+            const isPublished = publishedIds.has(plan.studentId)
+            return (
             <div key={plan.studentId} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
               <div
                 className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-gray-50"
@@ -2062,8 +2512,21 @@ function HolidayPlannerTab({
                       {plan.weeks.length}-week plan
                     </span>
                   )}
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${isPublished ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                    {isPublished ? 'Published' : 'Draft'}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
+                  {!isPublished && (
+                    <button
+                      onClick={e => { e.stopPropagation(); publishOne(plan.studentId) }}
+                      disabled={publishing !== null}
+                      className="flex items-center gap-1.5 text-xs bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-200 transition disabled:opacity-50"
+                    >
+                      {publishing === plan.studentId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                      Publish
+                    </button>
+                  )}
                   {plan.message && (
                     <button
                       onClick={e => { e.stopPropagation(); copyWhatsApp(plan) }}
@@ -2110,12 +2573,13 @@ function HolidayPlannerTab({
                 </div>
               )}
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
       {/* Existing at-risk list (holiday risk from insights) */}
-      {plans.length === 0 && existingHolidayRisk && existingHolidayRisk.length > 0 && (
+      {!plansLoading && jobStatus !== 'processing' && plans.length === 0 && existingHolidayRisk && existingHolidayRisk.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
             <h3 className="font-black text-gray-900">Holiday Risk Radar</h3>
@@ -2160,7 +2624,7 @@ Asante! 🙏`
         </div>
       )}
 
-      {plans.length === 0 && (!existingHolidayRisk || existingHolidayRisk.length === 0) && (
+      {!plansLoading && jobStatus !== 'processing' && plans.length === 0 && (!existingHolidayRisk || existingHolidayRisk.length === 0) && (
         <div className="bg-green-50 border border-green-200 rounded-2xl p-8 text-center">
           <TrendingUp className="w-10 h-10 text-green-400 mx-auto mb-3" />
           <p className="text-green-700 font-bold">No high-risk students identified.</p>
@@ -2296,7 +2760,7 @@ function RemedialPlannerTab({
 
         {error && (
           <div className="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-            <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
+            <AlertTriangle className="w-4 h-4 shrink-0" /> {friendlyMessage(error).message}
           </div>
         )}
 
@@ -2458,6 +2922,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ classId:
   const [selectedStudentName, setSelectedStudentName] = useState('')
   const [expandedStudentId, setExpandedStudentId]     = useState<string | null>(null)
   const [showFormative, setShowFormative]             = useState(false)
+  const [showTopical, setShowTopical]                 = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -2627,6 +3092,12 @@ na kuwasaidia vizuri zaidi darasani.
             >
               <MessageSquare className="w-4 h-4" /> After Lesson
             </button>
+            <button
+              onClick={() => setShowTopical(true)}
+              className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-indigo-700 transition"
+            >
+              <ClipboardCheck className="w-4 h-4" /> Topical Check
+            </button>
             <Link
               href={`/teacher/assignments/new?classId=${cls.id}`}
               className="flex items-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-teal-700 transition"
@@ -2720,7 +3191,7 @@ na kuwasaidia vizuri zaidi darasani.
                         </button>
                       </td>
                     </tr>
-                  ) : students.map((s: any) => {
+                  ) : rawStudents.map((s: any) => {
                     const badge      = s.avgScore !== null ? levelBadge(s.avgScore) : null
                     const isDone     = processedIds.has(s.id)
                     const isBusy     = processingId === s.id
@@ -2744,7 +3215,23 @@ na kuwasaidia vizuri zaidi darasani.
                               }
                               <div>
                                 <div className="font-bold text-gray-900">{s.name}</div>
-                                <div className="text-xs text-gray-400">Grade {s.grade}</div>
+                                <div className="text-xs text-gray-400 flex items-center gap-2">
+                                  <span>Grade {s.grade}</span>
+                                  <Link
+                                    href={`/teacher/reports/blueprint/${s.id}`}
+                                    onClick={e => e.stopPropagation()}
+                                    className="flex items-center gap-1 text-teal-600 hover:text-teal-700 hover:underline"
+                                  >
+                                    <Brain className="w-3 h-3" /> Blueprint
+                                  </Link>
+                                  <Link
+                                    href={`/teacher/reports/career-intelligence/${s.id}`}
+                                    onClick={e => e.stopPropagation()}
+                                    className="flex items-center gap-1 text-teal-600 hover:text-teal-700 hover:underline"
+                                  >
+                                    <Compass className="w-3 h-3" /> Career
+                                  </Link>
+                                </div>
                               </div>
                             </div>
                           </td>
@@ -3260,6 +3747,15 @@ na kuwasaidia vizuri zaidi darasani.
           classId={classId}
           students={students.map((s: any) => ({ id: s.id, name: s.name }))}
           onClose={() => setShowFormative(false)}
+        />
+      )}
+
+      {/* Topical Check Modal */}
+      {showTopical && (
+        <TopicalCheckModal
+          classId={classId}
+          students={students.map((s: any) => ({ id: s.id, name: s.name }))}
+          onClose={() => setShowTopical(false)}
         />
       )}
     </div>

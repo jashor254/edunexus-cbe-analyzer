@@ -1,6 +1,22 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
+import { getPendingReview } from '@/lib/intelligence/evidenceLifecycle'
+import { MASTERY_EXTRACTION_METHOD } from '@/lib/compass/evidenceClaimTypes'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound } from '@/lib/api/response'
+
+export type PendingCompassEvidence = {
+  id:              string
+  subject:         string
+  claimType:       'engagement' | 'mastery'
+  createdAt:       string
+  evidenceConfidence: number
+  rawInputRef:     string
+}
+
+function classifyClaim(extractionMethod: string): 'engagement' | 'mastery' {
+  return extractionMethod === MASTERY_EXTRACTION_METHOD ? 'mastery' : 'engagement'
+}
 
 function tierLabel(tier: string): string {
   switch (tier) {
@@ -24,32 +40,20 @@ export async function GET(
 
     const db = createServiceClient()
 
-    const { data: teacher } = await db
-      .from('teachers')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
+    const teacher = await repos.teachers.findTeacherByUserId(user.id)
     if (!teacher) return apiForbidden()
 
-    const { data: cls } = await db
-      .from('teacher_classes')
-      .select('id')
-      .eq('id', classId)
-      .eq('teacher_id', teacher.id)
-      .single()
-    if (!cls) return apiNotFound('Class not found')
+    const teacherClasses = await repos.schools.findTeacherClasses([teacher.id])
+    const ownsClass = teacherClasses.some(c => c.id === classId)
+    if (!ownsClass) return apiNotFound('Class not found')
 
-    const { data: studentLinks } = await db
-      .from('class_students')
-      .select('student_id')
-      .eq('class_id', classId)
-
-    const studentIds = (studentLinks || []).map((s: { student_id: string }) => s.student_id)
+    const studentLinks = await repos.schools.findClassStudents([classId])
+    const studentIds = studentLinks.map(s => s.student_id)
 
     if (studentIds.length === 0) return apiSuccess({ students: [] })
 
     // Batch: students + all their compass sessions in two queries
-    const [studentsResult, sessionsResult] = await Promise.all([
+    const [studentsResult, sessionsResult, pendingByStudent] = await Promise.all([
       db.from('students')
         .select('id, name, grade')
         .in('id', studentIds),
@@ -57,7 +61,26 @@ export async function GET(
         .select('id, learner_id, session_state, last_subject, updated_at')
         .in('learner_id', studentIds)
         .order('updated_at', { ascending: false }),
+      // One pending-review lookup per roster student — a class roster is small
+      // (tens, not thousands), so this stays a simple loop rather than a new
+      // batch repository method (per Wave 2's "reuse existing repositories,
+      // no new query shapes" instruction — getPendingReview already exists).
+      Promise.all(studentIds.map(id => getPendingReview({ learnerId: id }))),
     ])
+
+    const pendingEvidenceByStudent: Record<string, PendingCompassEvidence[]> = {}
+    studentIds.forEach((id, i) => {
+      pendingEvidenceByStudent[id] = pendingByStudent[i]
+        .filter(row => row.evidence_source === 'compass_session')
+        .map(row => ({
+          id:                 row.id,
+          subject:             row.subject,
+          claimType:           classifyClaim(row.extraction_method),
+          createdAt:           row.created_at,
+          evidenceConfidence:  row.evidence_confidence,
+          rawInputRef:         row.raw_input_ref,
+        }))
+    })
 
     const studentList = studentsResult.data || []
     const allSessions = sessionsResult.data || []
@@ -109,6 +132,7 @@ export async function GET(
         strugglingConcepts: (state?.strugglingConcepts as string[]) ?? [],
         confidenceLevel:    (state?.confidenceLevel    as string)  ?? null,
         latestInsight:      session ? (latestInsight[session.id] ?? null) : null,
+        pendingEvidence:    pendingEvidenceByStudent[student.id] ?? [],
       }
     })
 

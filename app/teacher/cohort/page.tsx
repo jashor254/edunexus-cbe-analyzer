@@ -10,6 +10,7 @@ import {
 import { GRADE_META } from '@/lib/assessments/gradeCalculator'
 import type { MeanGrade } from '@/lib/assessments/gradeCalculator'
 import type { CohortResult } from '@/lib/assessments/cohortQueries'
+import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function GradeBadge({ grade }: { grade: string }) {
@@ -159,7 +160,7 @@ function CohortInner() {
       {error && !loading && (
         <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center">
           <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-          <p className="text-red-700 font-bold">{error}</p>
+          <p className="text-red-700 font-bold">{friendlyMessage(error).message}</p>
           <p className="text-sm text-red-500 mt-1">
             Make sure both streams have assessments saved for Term {term} {year}.
           </p>

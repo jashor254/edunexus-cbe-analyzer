@@ -26,6 +26,25 @@ export async function getClassLearnerProfiles(classId: string): Promise<LearnerP
   return repos.learnerModel.getClassLearnerProfiles(classId)
 }
 
+export async function getStudentAccessInfo(studentId: string): Promise<{
+  user_id:        string | null
+  parent_user_id: string | null
+  teacher_id:     string | null
+} | null> {
+  return repos.learnerModel.findStudentAccessInfo(studentId)
+}
+
+export async function getStudentBasicInfo(studentId: string): Promise<{
+  name:            string
+  grade:           number
+  school:          string | null
+  term:            number | null
+  year:            number | null
+  current_pathway: string | null
+} | null> {
+  return repos.learnerModel.findStudentBasicInfo(studentId)
+}
+
 export async function getAtRiskStudents(
   classId:  string,
   minRisk:  RiskLevel = 'watch',

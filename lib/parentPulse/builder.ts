@@ -5,6 +5,7 @@
 
 import { repos } from '@/lib/repositories'
 import { getOrCreateLearnerProfile } from '@/lib/learnerModel/queries'
+import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 
 type ParentPulse = {
   student_id:      string
@@ -25,11 +26,19 @@ type PulseContext = {
 }
 
 export async function buildParentPulse(ctx: PulseContext): Promise<string> {
-  // Get learner profile
-  const profile = await getOrCreateLearnerProfile(ctx.studentId)
-  const knowledgeState = profile.knowledge_state ?? {}
-  const riskLevel      = profile.overall_risk_level
-  const flags          = profile.risk_flags ?? []
+  // `profile` is retained only for career_signals and engagement_patterns —
+  // neither has a Projection equivalent yet (no careerProjector exists, and
+  // behaviourProjector has no wired evidence source). Knowledge and risk
+  // come from the Projection Engine — the same risk engine Blueprint, Career
+  // Intelligence, and Adaptive Recommendation already use. See
+  // docs/architecture/migration-ledger.md.
+  const [profile, projection] = await Promise.all([
+    getOrCreateLearnerProfile(ctx.studentId),
+    recomputeLearnerProjection(ctx.studentId),
+  ])
+  const knowledgeBySubject = projection.knowledge?.value.bySubject ?? {}
+  const riskLevel      = projection.risk?.value.overallRiskLevel ?? 'normal'
+  const flags          = projection.risk?.value.flags ?? []
   const engagement     = profile.engagement_patterns as Record<string, unknown> ?? {}
   const careerSignals  = profile.career_signals as Record<string, unknown> ?? {}
 
@@ -56,15 +65,15 @@ export async function buildParentPulse(ctx: PulseContext): Promise<string> {
   sections.push(`EduNexus — ${firstName}'s Week (${ctx.weekOf}) 📚`)
 
   // 2. Good news first (what went well)
-  const strongSubstrands = Object.entries(knowledgeState)
-    .filter(([, m]) => m.level >= 3)
-    .map(([key]) => key.split(':')[1] ?? key)
+  const strongSubjects = Object.entries(knowledgeBySubject)
+    .filter(([, m]) => m.currentLevel >= 3)
+    .map(([subject]) => subject)
     .slice(0, 2)
 
-  const compassTopics = recentCompass.map(s => s.topic).filter(Boolean) as string[]
+  const compassTopics = recentCompass.map(s => s.subject).filter(Boolean) as string[]
   const gotItSubjects = formativeThisWeek.map(s => s.subject).filter(Boolean) as string[]
 
-  const goodNews = [...new Set([...strongSubstrands, ...compassTopics, ...gotItSubjects])].slice(0, 2)
+  const goodNews = [...new Set([...strongSubjects, ...compassTopics, ...gotItSubjects])].slice(0, 2)
 
   if (goodNews.length > 0) {
     sections.push(`Strong this week: ${goodNews.join(', ')}`)
@@ -75,11 +84,11 @@ export async function buildParentPulse(ctx: PulseContext): Promise<string> {
   // 3. One concern (if any)
   const concernSubject = formativeConcerning[0]?.subject ?? undefined
   const topFlag        = flags[0]
-  const topWeakSubstrand = Object.entries(knowledgeState)
-    .filter(([, m]) => m.level === 1)
-    .map(([key]) => key.split(':')[1] ?? key)[0]
+  const topWeakSubject = Object.entries(knowledgeBySubject)
+    .filter(([, m]) => m.currentLevel === 1)
+    .map(([subject]) => subject)[0]
 
-  const concern = concernSubject ?? topWeakSubstrand ?? (topFlag?.substrand as string | undefined)
+  const concern = concernSubject ?? topWeakSubject ?? (topFlag?.subject ?? undefined)
   if (concern) {
     sections.push(`Needs attention: ${concern}`)
   }
@@ -131,9 +140,8 @@ export async function buildAllParentPulses(weekOf: string): Promise<ParentPulse[
     if (!student) continue
 
     const studentId   = row.student_id
-    const firstName   = (student.first_name as string) ?? ''
-    const lastName    = (student.last_name as string) ?? ''
-    const studentName = `${firstName} ${lastName}`.trim()
+    const studentName = ((student.name as string) ?? '').trim()
+    const firstName   = studentName.split(' ')[0] ?? ''
     const grade       = (student.grade as number) ?? 8
     const parentPhone = (student.parent_phone as string) ?? null
 

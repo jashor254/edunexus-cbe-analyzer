@@ -7,6 +7,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
 import { updateFromFormativeSignal } from '@/lib/learnerModel/updater'
+import { recordFormativeSignalEvidence } from '@/lib/formativeSignals/evidence'
 
 const Schema = z.object({
   classId:      z.string().uuid(),
@@ -89,6 +90,20 @@ export async function POST(req: Request): Promise<Response> {
       ...d.lostIds.map(id     => updateFromFormativeSignal(id, { ...signalBase, outcome: 'lost' })),
     ]
     Promise.allSettled(allUpdates).catch(() => {})
+
+    // Emit Evidence Domain observations — additive, fire and forget, never
+    // blocking the response or affecting the existing legacy write above.
+    recordFormativeSignalEvidence({
+      teacherId:     teacher.id,
+      teacherUserId: user.id,
+      subject:       d.subject,
+      strand:        d.strand ?? null,
+      subStrand:     d.subStrand ?? null,
+      gotItIds:      d.gotItIds,
+      confusedIds:   d.confusedIds,
+      lostIds:       d.lostIds,
+      recordedAt:    now,
+    }).catch(err => console.error('[formative/signal] evidence emission failed:', err instanceof Error ? err.message : String(err)))
 
     return apiSuccess({
       recorded:     true,

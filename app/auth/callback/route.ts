@@ -70,12 +70,16 @@ export async function GET(request: Request) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) { return cookieStore.get(name)?.value },
-        set(name: string, value: string, options: Record<string, unknown>) {
-          try { cookieStore.set(name, value, options) } catch { /* Server Component context */ }
+        // getAll/setAll (not get/set/remove) — required so chunked session
+        // tokens (sb-xxx-auth-token.0, .1 …) are all read and written. See the
+        // matching comment in utils/supabase/middleware.ts.
+        getAll() {
+          return cookieStore.getAll()
         },
-        remove(name: string, options: Record<string, unknown>) {
-          try { cookieStore.set(name, '', options) } catch { /* Server Component context */ }
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            try { cookieStore.set(name, value, options) } catch { /* Server Component context */ }
+          })
         },
       },
     }
@@ -83,6 +87,12 @@ export async function GET(request: Request) {
 
   const { error } = await supabase.auth.exchangeCodeForSession(code)
   if (error) {
+    console.error('[auth/callback] exchangeCodeForSession failed:', {
+      message: error.message,
+      status: error.status,
+      code: error.code,
+      cookieNames: cookieStore.getAll().map(c => c.name),
+    })
     return NextResponse.redirect(new URL('/login?error=exchange-failed', requestUrl.origin))
   }
 

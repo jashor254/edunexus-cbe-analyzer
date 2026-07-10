@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Bell, CheckCircle2, AlertTriangle, TrendingDown, Clock, BookOpen, Sun } from 'lucide-react'
+import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 
 type AlertType =
   | 'inactive'
@@ -205,7 +206,7 @@ export default function ParentAlertsPage() {
       {/* Error */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-2xl p-5 mb-6">
-          <p className="text-sm text-red-700 font-medium">{error}</p>
+          <p className="text-sm text-red-700 font-medium">{friendlyMessage(error).message}</p>
         </div>
       )}
 

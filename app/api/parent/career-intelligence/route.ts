@@ -3,9 +3,12 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized, apiBadRequest, apiNotFound } from '@/lib/api/response'
-import { getCapabilityProfile, getAllCareersWithCOS } from '@/lib/career/careerEngine'
+import { getAllCareersWithCOS } from '@/lib/career/careerEngine'
 import { computeCapabilityMatches } from '@/lib/career/capabilityMatchEngine'
+import { extractCapabilityProfile } from '@/lib/career/capabilityExtractor'
 import { buildParentIntelligence } from '@/lib/career/parentIntelligence'
+import { recomputeLearnerProjection } from '@/lib/projection/recompute'
+import { projectionToScoreHistory } from '@/lib/learnerIntelligence/projectionAdapters'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,10 +34,15 @@ export async function GET(req: NextRequest) {
     const isParent = student.parent_user_id === user.id
     if (!isOwner && !isParent) return apiUnauthorized()
 
-    const profile = await getCapabilityProfile(studentId)
-    if (!profile) {
+    // Sourced live from Projection — the same path Blueprint and Career
+    // Intelligence use — instead of the separately-stored, potentially stale
+    // `career_capability_profiles` snapshot. See docs/architecture/migration-ledger.md.
+    const projection   = await recomputeLearnerProjection(studentId)
+    const scoreHistory = projectionToScoreHistory(projection)
+    if (scoreHistory.length === 0) {
       return apiSuccess({ has_profile: false, report: null })
     }
+    const profile = extractCapabilityProfile(scoreHistory)
 
     const careers = await getAllCareersWithCOS()
     const matchReport = computeCapabilityMatches(studentId, profile, careers)

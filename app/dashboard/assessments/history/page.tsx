@@ -10,6 +10,7 @@ import {
   GraduationCap, BarChart3, FileText, ArrowLeft,
 } from 'lucide-react'
 import { getGradeColor, getGradeLabel, getCurriculumConfig } from '@/lib/curriculum'
+import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface AssessmentRecord {
@@ -475,7 +476,7 @@ function HistoryContent() {
         {error && !loading && (
           <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700">
             <AlertCircle className="w-5 h-5 shrink-0" />
-            <span className="font-medium">{error}</span>
+            <span className="font-medium">{friendlyMessage(error).message}</span>
           </div>
         )}
 

@@ -17,6 +17,7 @@ import Step4Breaks from '@/components/sow/Step4Breaks'
 import { buildTermSchedule } from '@/lib/sow/termSchedule'
 import type { TermScheduleResult } from '@/lib/sow/termSchedule'
 import { applyBreaksToSchedule } from '@/lib/sow/breakEngine'
+import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -144,6 +145,9 @@ export default function SchemeOfWorkPage() {
   // Step 5
   const [generating, setGenerating]   = useState(false)
   const [progress, setProgress]       = useState('')
+  const [genJobId,  setGenJobId]      = useState<string | null>(null)
+  const [genCounts, setGenCounts]     = useState<{ completed: number; total: number } | null>(null)
+  const genStartedAtRef = useRef<number>(0)
   const [result, setResult]           = useState<SOWGenerationResult | null>(null)
   const [reflections, setReflections] = useState<Record<string, string>>({})
   const [saving, setSaving]           = useState(false)
@@ -268,15 +272,37 @@ export default function SchemeOfWorkPage() {
     if (selections.length === 0) { setProgress('Please select at least one strand in Step 2.'); return }
 
     setGenerating(true)
-    setProgress('Creating your scheme of work...')
+    setProgress('Looking up official KICD content for this subject…')
+    setGenCounts(null)
     setResult(null)
 
-    const context: SOWContext = { school, grade, gradeName: grade, learningArea, learningAreaName, term, year, curriculumMode, textbook }
+    // Real curriculum grounding, not free generation — same lookup the
+    // Step5Preview flow already uses. When this comes back empty (no KICD
+    // data indexed for this subject yet), generation still proceeds, but
+    // the result carries `groundedInKicd: false` and Step 5 shows an
+    // explicit notice rather than silently presenting AI-only content as
+    // official CBC-aligned material.
+    let kicdContext: SOWContext['kicdContext']
+    try {
+      const kicdRes = await fetch(`/api/sow/kicd-context?subject=${encodeURIComponent(learningAreaName || learningArea)}`)
+      if (kicdRes.ok) {
+        const kicdJson = await kicdRes.json() as { data?: { kicdArea?: { kicd_subject_data?: unknown }; kicdStrands?: Array<{ title: string; kicd_data?: unknown }> } }
+        kicdContext = {
+          subjectData: (kicdJson.data?.kicdArea?.kicd_subject_data ?? {}) as Record<string, Record<string, unknown>>,
+          strandData:  (kicdJson.data?.kicdStrands ?? []) as { title: string; kicd_data: Record<string, unknown>[] }[],
+        }
+      }
+    } catch {
+      // Non-fatal — generation proceeds ungrounded and says so on Step 5.
+    }
+
+    const context: SOWContext = { school, grade, gradeName: grade, learningArea, learningAreaName, term, year, curriculumMode, textbook, kicdContext }
     const selectedSubstrands: SelectedSubstrand[] = selections.map((s, i) => ({
       strandId: s.strandId, strandTitle: s.strandTitle, substrandId: s.substrandId,
       substrandTitle: s.substrandTitle, lessonsRequired: s.lessonsRequired, orderIndex: i,
     }))
     try {
+      setProgress('Preparing your scheme of work…')
       const res = await fetch('/api/sow/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -287,19 +313,49 @@ export default function SchemeOfWorkPage() {
         return
       }
       const data = await res.json()
-      if (data.success) {
-        setResult(data.data.result)
-        setProgress('')
-        setStep(5)
+      if (data.success && data.data.jobId) {
+        genStartedAtRef.current = Date.now()
+        setGenJobId(data.data.jobId as string)
+        setGenCounts({ completed: 0, total: data.data.total as number })
       } else {
-        setProgress(data.error ? `Error: ${data.error}` : 'Could not generate scheme. Please try again.')
+        setProgress(data.error ? friendlyMessage(data.error, 'Could not generate scheme. Please try again.').message : 'Could not generate scheme. Please try again.')
+        setGenerating(false)
       }
     } catch {
       setProgress('Something went wrong. Please check your connection and try again.')
-    } finally {
       setGenerating(false)
     }
   }, [curriculumMode, grade, learningArea, learningAreaName, school, term, year, textbook, selections, lessonStructure, breaks])
+
+  // Poll while a scheme generates in the background — mirrors the Holiday
+  // Planner / class report generation pattern. Safe to leave this step;
+  // generation keeps running server-side via `after()`.
+  useEffect(() => {
+    if (!generating || !genJobId) return
+    const interval = setInterval(async () => {
+      try {
+        const res  = await fetch(`/api/sow/generate/status?jobId=${genJobId}`)
+        const json = await res.json()
+        if (!res.ok || !json.success || !json.data) return
+        const job = json.data as { status: string; result: { total: number; completed: number; failed: number; result?: SOWGenerationResult; errorMessage?: string } }
+        setGenCounts({ completed: job.result.completed, total: job.result.total })
+        if (job.status === 'completed' && job.result.result) {
+          setResult(job.result.result)
+          setProgress('')
+          setGenerating(false)
+          setGenJobId(null)
+          setStep(5)
+        } else if (job.status === 'failed') {
+          setProgress(friendlyMessage(job.result.errorMessage, 'Could not generate scheme. Please try again.').message)
+          setGenerating(false)
+          setGenJobId(null)
+        }
+      } catch {
+        // transient — next tick retries
+      }
+    }, 1500)
+    return () => clearInterval(interval)
+  }, [generating, genJobId])
 
   function buildSchemeData() {
     if (!result || !curriculumMode || !grade) return null
@@ -967,12 +1023,42 @@ export default function SchemeOfWorkPage() {
           />
         )}
 
-        {/* Generating spinner — shown between Step 4 next and Step 5 result */}
-        {step === 4 && generating && (
+        {/* Generating — shown between Step 4 next and Step 5 result. Also
+            shown (without the spinner) once `generating` flips false on
+            error, so a failure message doesn't just vanish with the spinner
+            — previously `progress` held the error text but nothing ever
+            rendered it once `generating` was false. */}
+        {step === 4 && (generating || progress) && (
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-12 text-center">
-            <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mx-auto mb-4" />
-            <p className="text-gray-700 font-bold">{progress || 'Generating your scheme…'}</p>
-            <p className="text-gray-400 text-sm mt-2">This may take 1–3 minutes for large schemes</p>
+            {generating
+              ? <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mx-auto mb-4" />
+              : <AlertTriangle className="w-10 h-10 text-red-500 mx-auto mb-4" />
+            }
+            <p className={`font-bold ${generating ? 'text-gray-700' : 'text-red-700'}`}>
+              {generating && genCounts && genCounts.total > 0
+                ? `Lesson ${Math.min(genCounts.completed + 1, genCounts.total)} of ${genCounts.total}`
+                : (progress || 'Generating your scheme…')}
+            </p>
+            {generating && genCounts && genCounts.total > 0 && (
+              <div className="max-w-sm mx-auto mt-4 space-y-2">
+                <div className="bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                  <div
+                    className="h-full bg-indigo-500 rounded-full transition-all"
+                    style={{ width: `${Math.max(4, (genCounts.completed / genCounts.total) * 100)}%` }}
+                  />
+                </div>
+                <p className="text-gray-400 text-xs">It&apos;s safe to leave this page — generation keeps running.</p>
+              </div>
+            )}
+            {generating && !genCounts && <p className="text-gray-400 text-sm mt-2">This may take 1–3 minutes for large schemes</p>}
+            {!generating && progress && (
+              <button
+                onClick={() => setProgress('')}
+                className="mt-4 text-sm bg-red-50 text-red-700 border border-red-200 px-4 py-2 rounded-xl font-bold hover:bg-red-100 transition"
+              >
+                Dismiss and try again
+              </button>
+            )}
           </div>
         )}
 
@@ -994,16 +1080,29 @@ export default function SchemeOfWorkPage() {
               </div>
             </div>
 
-            {/* Attribution badge */}
-            <div className="flex items-center gap-3 bg-white border border-slate-100 rounded-2xl px-5 py-3.5 shadow-sm">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center shrink-0">
-                <CheckCircle2 className="w-4 h-4 text-white" />
+            {/* Attribution badge — only claims KICD alignment when real KICD
+                strand data was actually attached to the generation prompt.
+                CBC/CBE trust audit requirement: never present AI-only
+                content as officially curriculum-aligned. */}
+            {result.groundedInKicd ? (
+              <div className="flex items-center gap-3 bg-white border border-slate-100 rounded-2xl px-5 py-3.5 shadow-sm">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-4 h-4 text-white" />
+                </div>
+                <div className="text-sm text-gray-700 font-medium">
+                  Aligned to{' '}
+                  <strong>KICD {curriculumMode?.startsWith('cbc') ? 'CBC' : '8-4-4'}</strong> · {grade} · Term {term} {year}
+                </div>
               </div>
-              <div className="text-sm text-gray-700 font-medium">
-                Aligned to{' '}
-                <strong>KICD {curriculumMode?.startsWith('cbc') ? 'CBC' : '8-4-4'}</strong> · {grade} · Term {term} {year}
+            ) : (
+              <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3.5">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="text-sm text-amber-800">
+                  <strong>No official KICD content was found for this subject</strong> — these lessons were generated from the subject, grade, and strand names only, not from indexed KICD curriculum data.
+                  Please review learning outcomes against your own scheme guide before teaching from this.
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Action buttons */}
             <div className="flex flex-wrap gap-3">

@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
+import { ensureSchoolMembership } from '@/lib/core/school'
 
 const UpdateProfileSchema = z.object({
   full_name:    z.string().trim().min(1),
@@ -100,6 +101,15 @@ export async function POST(req: Request) {
         return apiError(`Failed to create teacher profile: ${error.message}`, 500)
       }
       teacher = data
+    }
+
+    // Best-effort: link this teacher to a real schools/school_users row from
+    // the free-text school name. Never blocks profile save — a school-linking
+    // failure shouldn't stop a teacher from completing setup.
+    try {
+      await ensureSchoolMembership(user.id, school)
+    } catch (linkErr) {
+      console.error('[teacher/profile POST] school membership link failed', linkErr)
     }
 
     // Pioneer counter needs service role to touch beta_stats

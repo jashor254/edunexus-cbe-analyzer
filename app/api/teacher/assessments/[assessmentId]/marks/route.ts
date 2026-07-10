@@ -6,6 +6,7 @@ import {
 } from '@/lib/api/response'
 import { getAssessmentById, getLearnerMarks } from '@/lib/assessments/getters'
 import { bulkSaveMarks, triggerLearnerModelUpdates } from '@/lib/assessments/mutations'
+import { recordAssessmentEvidence } from '@/lib/assessments/evidence'
 
 const BulkSaveSchema = z.object({
   marks: z.array(z.object({
@@ -122,6 +123,10 @@ export async function POST(
 
     // Update Learner Model for linked students — fire and forget
     triggerLearnerModelUpdates(assessmentId, teacher.id).catch(() => {})
+
+    // Emit Evidence Domain records so Blueprint/Career/Adaptive Learning move
+    // from these marks too, not only from Compass sessions — fire and forget
+    recordAssessmentEvidence(assessmentId, teacher.id, user.id).catch((e: unknown) => console.error('[marks POST] recordAssessmentEvidence failed:', e instanceof Error ? e.message : String(e)))
 
     return apiSuccess({ marks, saved: marks.length })
   } catch (e: unknown) {

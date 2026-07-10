@@ -15,9 +15,26 @@ export interface PrintAssignmentOptions {
   }
   level: 1 | 2 | 3 | 4
   studentName?: string
+  /**
+   * 'enrichment' — Group C / on_track task style (Adaptive Learning v2
+   * Architecture §3): open-ended prompts, no fixed "correct answer"
+   * scaffold, additive to the four standard levels. Defaults to
+   * 'standard' — existing callers are unaffected.
+   */
+  taskStyle?: 'standard' | 'enrichment'
+  /**
+   * Curriculum Grounding Layer (Wave 7) — real Specific Learning Outcomes
+   * from lib/curriculum/curriculumContext.ts. When present and non-empty,
+   * questions are built FROM this real curriculum text instead of the
+   * generic topic-only templates below, and the sheet visibly states it
+   * is curriculum-grounded. When absent, the sheet visibly states that no
+   * curriculum outcome data was available for this sub-strand — never
+   * silently presented as equivalent to grounded content.
+   */
+  learningOutcomes?: string[]
 }
 
-const LEVELS = {
+export const LEVELS = {
   1: { name: 'Emerging',    colour: '#dc2626', bg: '#fef2f2', border: '#fca5a5' },
   2: { name: 'Approaching', colour: '#d97706', bg: '#fffbeb', border: '#fcd34d' },
   3: { name: 'Meeting',     colour: '#2563eb', bg: '#eff6ff', border: '#93c5fd' },
@@ -31,7 +48,42 @@ const SCAFFOLDS = {
   4: 'Go beyond the lesson — connect ideas, evaluate different approaches, and justify your thinking.',
 }
 
-function buildTasks(topic: string, instructions: string, level: 1 | 2 | 3 | 4) {
+const ENRICHMENT_SCAFFOLD =
+  'There is no single correct answer here. Think it through, take a position, and explain your reasoning. If you can, lead a classmate through your thinking.'
+
+/**
+ * Group C / on_track enrichment tasks — open-ended, no fixed scaffold or
+ * answer lines of a predetermined "correct length." Additive to the four
+ * standard levels (§3 of the frozen architecture), not a replacement.
+ */
+export function buildEnrichmentTasks(topic: string) {
+  const t = topic
+  return [
+    { question: `Investigate: what is one real, local example of <strong>${t}</strong> you can find this week — at home, in the market, on the news? Explain the connection.`, lines: 6, marks: null },
+    { question: `Design a short activity, game, or mini-project that would help someone younger understand ${t}. Describe how it works.`, lines: 6, marks: null },
+    { question: `Lead a 10-minute conversation with a classmate, sibling, or parent about ${t}. What question did they ask that made you think harder?`, lines: 5, marks: null },
+    { question: `If you could extend or change one idea about ${t}, what would it be and why?`, lines: 5, marks: null },
+  ]
+}
+
+/**
+ * Curriculum Grounding Layer (Wave 7) — questions built directly from real
+ * Specific Learning Outcome text, per level. Cycles through the available
+ * outcomes if there are fewer than 4 (never invents a 5th outcome to fill
+ * the set — repetition of a real outcome is preferred over fabrication).
+ */
+export function buildOutcomeGroundedTasks(learningOutcomes: string[], level: 1 | 2 | 3 | 4) {
+  const FRAMES: Record<1 | 2 | 3 | 4, (o: string) => { question: string; lines: number; marks: number }> = {
+    1: o => ({ question: `In your own words, explain what this means: <em>${o}</em>`, lines: 4, marks: 3 }),
+    2: o => ({ question: `Show that you can do this — give one worked example: <em>${o}</em>`, lines: 4, marks: 4 }),
+    3: o => ({ question: `Apply this to a new, real-life situation and explain your reasoning: <em>${o}</em>`, lines: 5, marks: 5 }),
+    4: o => ({ question: `Critically evaluate or extend this, justifying your thinking: <em>${o}</em>`, lines: 6, marks: 6 }),
+  }
+  const count = Math.min(4, learningOutcomes.length)
+  return Array.from({ length: count }, (_, i) => FRAMES[level](learningOutcomes[i % learningOutcomes.length]))
+}
+
+export function buildTasks(topic: string, instructions: string, level: 1 | 2 | 3 | 4) {
   const t = topic
   const instr = instructions.slice(0, 100)
 
@@ -65,10 +117,16 @@ function buildTasks(topic: string, instructions: string, level: 1 | 2 | 3 | 4) {
 }
 
 export function generateAssignmentPDF(opts: PrintAssignmentOptions): string {
-  const { assignment, meta, level, studentName } = opts
+  const { assignment, meta, level, studentName, taskStyle = 'standard', learningOutcomes = [] } = opts
   const lbl = LEVELS[level]
-  const scaffold = SCAFFOLDS[level]
-  const tasks = buildTasks(assignment.topic, assignment.instructions, level)
+  const isEnrichment = taskStyle === 'enrichment'
+  const scaffold = isEnrichment ? ENRICHMENT_SCAFFOLD : SCAFFOLDS[level]
+  const isCurriculumGrounded = !isEnrichment && learningOutcomes.length > 0
+  const tasks = isCurriculumGrounded
+    ? buildOutcomeGroundedTasks(learningOutcomes, level)
+    : isEnrichment
+      ? buildEnrichmentTasks(assignment.topic)
+      : buildTasks(assignment.topic, assignment.instructions, level)
 
   const dueFormatted = (() => {
     try {
@@ -80,7 +138,7 @@ export function generateAssignmentPDF(opts: PrintAssignmentOptions): string {
     }
   })()
 
-  const totalMarks = tasks.reduce((s, t) => s + t.marks, 0)
+  const totalMarks = tasks.reduce((s, t) => s + (t.marks ?? 0), 0)
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -100,7 +158,10 @@ body{font-family:Arial,sans-serif;font-size:11pt;color:#111;padding:18mm 20mm}
 .info-label{font-size:7.5pt;color:#999;text-transform:uppercase;letter-spacing:.5px}
 .info-val{font-weight:bold;font-size:10.5pt;border-bottom:1px solid #aaa;min-width:140px;padding-bottom:1px}
 .instr-box{background:#f7f7f7;border-left:3px solid #0d9488;padding:9px 13px;margin-bottom:14px;font-size:10pt;line-height:1.5}
-.scaffold{background:${lbl.bg};border:1px dashed ${lbl.colour}40;padding:7px 12px;margin-bottom:18px;font-size:9.5pt;color:${lbl.colour};border-radius:4px}
+.scaffold{background:${lbl.bg};border:1px dashed ${lbl.colour}40;padding:7px 12px;margin-bottom:8px;font-size:9.5pt;color:${lbl.colour};border-radius:4px}
+.curriculum-status{font-size:8pt;padding:5px 10px;margin-bottom:18px;border-radius:3px}
+.curriculum-status.grounded{background:#f0fdf4;color:#166534;border:1px solid #86efac}
+.curriculum-status.ungrounded{background:#fffbeb;color:#92400e;border:1px solid #fcd34d}
 .question{margin-bottom:20px;page-break-inside:avoid}
 .q-num{font-weight:bold;font-size:11pt;margin-bottom:5px}
 .q-marks{font-size:8.5pt;color:#777;font-weight:normal;margin-left:6px}
@@ -141,16 +202,21 @@ body{font-family:Arial,sans-serif;font-size:11pt;color:#111;padding:18mm 20mm}
   </div>
   <div class="info-cell">
     <span class="info-label">Score</span>
-    <span class="info-val">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; / ${totalMarks}</span>
+    <span class="info-val">${isEnrichment ? 'Open response — no fixed marks' : `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; / ${totalMarks}`}</span>
   </div>
 </div>
 
 <div class="instr-box"><strong>Instructions:</strong> ${assignment.instructions}</div>
-<div class="scaffold"><strong>Tip for Level ${level}:</strong> ${scaffold}</div>
+<div class="scaffold"><strong>${isEnrichment ? 'Challenge:' : `Tip for Level ${level}:`}</strong> ${scaffold}</div>
+<div class="curriculum-status ${isCurriculumGrounded ? 'grounded' : 'ungrounded'}">
+  ${isCurriculumGrounded
+    ? '✓ Grounded in the official curriculum Specific Learning Outcomes for this sub-strand.'
+    : '⚠ No curriculum Learning Outcome data was available for this sub-strand — the questions below are general practice, not yet verified against a specific curriculum outcome. Assign a sub-strand via the Topic Picker for curriculum-grounded content.'}
+</div>
 
 ${tasks.map((task, i) => `
 <div class="question">
-  <div class="q-num">Question ${i + 1}<span class="q-marks">(${task.marks} mark${task.marks !== 1 ? 's' : ''})</span></div>
+  <div class="q-num">Question ${i + 1}${task.marks !== null ? `<span class="q-marks">(${task.marks} mark${task.marks !== 1 ? 's' : ''})</span>` : ''}</div>
   <div class="q-text">${task.question}</div>
   ${Array.from({ length: task.lines }, () => '<div class="ans-line"></div>').join('')}
 </div>`).join('')}

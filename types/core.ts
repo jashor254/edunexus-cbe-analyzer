@@ -81,6 +81,7 @@ export type School = {
   motto: string | null
   subscription_tier: SubscriptionTier
   is_active: boolean
+  created_by: string | null
   created_at: string
   updated_at: string
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Clock, CheckCircle2, Trophy, Compass, FileText, X, Send } from 'lucide-react'
+import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -126,7 +127,7 @@ function SubmitModal({
 
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
-              {error}
+              {friendlyMessage(error).message}
             </div>
           )}
 

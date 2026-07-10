@@ -5,11 +5,13 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend,
   ResponsiveContainer, Cell,
 } from 'recharts'
-import { BarChart3, ChevronDown, ChevronUp } from 'lucide-react'
+import Link from 'next/link'
+import { BarChart3, ChevronDown, ChevronUp, GitCompareArrows } from 'lucide-react'
 import type {
   AnalyticsData, ClassOverview, SubjectRow, LearnerRow,
   GradeLevel,
 } from '@/lib/assessments/analytics'
+import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 
 // ── Grade helpers ─────────────────────────────────────────────────────────────
 const GRADE_COLOR: Record<GradeLevel, string> = {
@@ -490,6 +492,14 @@ export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [cohorts, setCohorts] = useState<{ grade: number; gradeCohort: string; streamCount: number; classNames: string[] }[]>([])
+
+  // Only relevant when a grade actually has 2+ streams worth comparing.
+  useEffect(() => {
+    fetch('/api/teacher/cohorts')
+      .then((r) => r.json())
+      .then((res) => { if (res.success) setCohorts(res.data.cohorts) })
+  }, [])
 
   // Step 1: when term/year changes, fetch available assessment types
   useEffect(() => {
@@ -542,6 +552,22 @@ export default function AnalyticsPage() {
         />
       </div>
 
+      {/* Stream comparison — only shown when a grade actually has 2+ streams */}
+      {cohorts.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {cohorts.map((c) => (
+            <Link
+              key={c.gradeCohort}
+              href={`/teacher/cohort?grade=${c.grade}&term=${term}&year=${year}`}
+              className="flex items-center gap-2 bg-teal-50 border border-teal-100 text-teal-700 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-teal-100 transition"
+            >
+              <GitCompareArrows className="w-4 h-4" />
+              Compare {c.classNames.join(' vs ')} ({c.gradeCohort})
+            </Link>
+          ))}
+        </div>
+      )}
+
       {/* Assessment type picker */}
       {typesLoading && (
         <div className="flex gap-2">
@@ -579,7 +605,7 @@ export default function AnalyticsPage() {
       {!loading && error && (
         <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
           <BarChart3 className="w-10 h-10 text-red-300 mx-auto mb-3" />
-          <p className="text-red-700 font-bold">{error}</p>
+          <p className="text-red-700 font-bold">{friendlyMessage(error).message}</p>
         </div>
       )}
 

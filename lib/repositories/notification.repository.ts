@@ -127,8 +127,8 @@ export class NotificationRepository extends BaseRepository {
   }>> {
     const { data, error } = await this.db
       .from('whatsapp_opt_ins')
-      .select('student_id, students(first_name, last_name, grade, parent_phone, parent_user_id)')
-      .eq('opted_in_at', 'not.null')
+      .select('student_id, students(name, grade, parent_phone, parent_user_id)')
+      .not('opted_in_at', 'is', null)
       .limit(limit)
 
     if (error) throw new Error(`Failed to fetch WhatsApp opt-ins: ${error.message}`)

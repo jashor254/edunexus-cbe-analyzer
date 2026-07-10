@@ -107,6 +107,12 @@ export interface SOWGenerationResult {
     substrand: string
     error: string
   }>
+  // False when no real KICD strand data was attached to the prompt for this
+  // subject — the content was generated from subject/grade/strand names
+  // alone. CBC/CBE trust audit requirement: curriculum grounding gaps must
+  // be surfaced explicitly to the teacher, never silently presented as
+  // official KICD-aligned content. See app/teacher/scheme-of-work/new/page.tsx.
+  groundedInKicd: boolean
 }
 
 export interface SOWPreviewData {

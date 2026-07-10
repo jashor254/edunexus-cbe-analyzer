@@ -3,7 +3,9 @@
 // Query params: grade (e.g. "Grade 7", "Form 3"), mode (e.g. "cbc_junior", "844_form3")
 
 import { createClient } from '@/utils/supabase/server'
-import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
+import { CurriculumService } from '@/lib/curriculum/service'
+import { resolveCurriculumType } from '@/lib/curriculum/curriculumMode'
 import {
   apiSuccess,
   apiError,
@@ -12,13 +14,6 @@ import {
   apiForbidden,
 } from '@/lib/api/response'
 import type { CurriculumMode } from '@/lib/sow/types'
-
-const MODE_TO_CURRICULUM_TYPE: Record<string, string> = {
-  cbc_senior: 'cbc_senior',
-  cbc_junior: 'cbc_junior',
-  '844_form3': '844',
-  '844_form4': '844',
-}
 
 export async function GET(req: Request) {
   try {
@@ -34,61 +29,15 @@ export async function GET(req: Request) {
 
     if (!grade || !mode) return apiBadRequest('Missing grade or mode')
 
-    const curriculumType = MODE_TO_CURRICULUM_TYPE[mode]
-    if (!curriculumType) return apiBadRequest(`Unknown mode: ${mode}`)
-
-    const db = createServiceClient()
+    if (!resolveCurriculumType(mode)) return apiBadRequest(`Unknown mode: ${mode}`)
 
     // Curriculum data is teacher-only — students and parents have no access
-    const { data: teacher } = await db
-      .from('teachers')
-      .select('id')
-      .eq('user_id', user.id)
-      .maybeSingle()
+    const teacher = await repos.teachers.findTeacherByUserId(user.id)
     if (!teacher) return apiForbidden()
 
-    // 1. Find the primary level for this curriculum type
-    const { data: levels, error: lvlErr } = await db
-      .from('sow_levels')
-      .select('id')
-      .eq('curriculum_type', curriculumType)
-      .order('order_index')
-      .limit(1)
+    const areas = await CurriculumService.resolveLearningAreasForGrade(mode, grade)
 
-    if (lvlErr || !levels?.length) {
-      console.error('[sow/learning-areas] level lookup:', lvlErr)
-      return apiSuccess({ areas: [] })
-    }
-
-    // 2. Find the grade row — match on name starting with the given grade string
-    //    Handles both "Grade 7" and "Grade 7 (JSS)" in the DB
-    const { data: gradeRows, error: grErr } = await db
-      .from('sow_grades')
-      .select('id')
-      .eq('level_id', levels[0].id)
-      .eq('is_active', true)
-      .ilike('name', `${grade}%`)
-      .order('order_index')
-      .limit(1)
-
-    if (grErr || !gradeRows?.length) {
-      console.error('[sow/learning-areas] grade lookup:', grErr, { grade, curriculumType })
-      return apiSuccess({ areas: [] })
-    }
-
-    // 3. Fetch learning areas for that grade
-    const { data: areas, error: aErr } = await db
-      .from('sow_learning_areas')
-      .select('id, name')
-      .eq('grade_id', gradeRows[0].id)
-      .order('order_index')
-
-    if (aErr) {
-      console.error('[sow/learning-areas] areas fetch:', aErr)
-      return apiError('Failed to load subjects')
-    }
-
-    const response = apiSuccess({ areas: areas || [] })
+    const response = apiSuccess({ areas })
     response.headers.set('Cache-Control', 'private, max-age=600, stale-while-revalidate=120')
     return response
   } catch (err: unknown) {

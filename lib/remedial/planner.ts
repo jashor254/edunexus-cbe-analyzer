@@ -7,6 +7,7 @@
 import { repos } from '@/lib/repositories'
 import { callDeepSeek } from '@/lib/ai/deepseek'
 import { getClassLearnerProfiles } from '@/lib/learnerModel/queries'
+import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import type { RemedialGroup, RemedialPlan, RemedialStudent, TeacherAllocation } from './types'
 
 type PlannerInput = {
@@ -38,6 +39,17 @@ export async function generateRemedialPlan(input: PlannerInput): Promise<Remedia
   const profiles = await getClassLearnerProfiles(input.classId)
   const profileMap = new Map(profiles.map(p => [p.student_id, p]))
 
+  // Projection risk — same risk engine as Blueprint/Career Intelligence/
+  // Parent Intelligence/Monday Panel/Attention Feed — replaces the legacy
+  // risk_flags.length count used below to gate the "critical" group.
+  const projections = new Map(
+    await Promise.all(
+      profiles.map(async p => [p.student_id, await recomputeLearnerProjection(p.student_id)] as const)
+    )
+  )
+  const isProjectionCritical = (studentId: string | null): boolean =>
+    !!studentId && projections.get(studentId)?.risk?.value.overallRiskLevel === 'critical'
+
   // 4. Get prerequisite concepts from knowledge graph
   const currentNode = await repos.knowledgeGraph.findNodeByConceptLike(input.subStrand)
 
@@ -68,18 +80,16 @@ export async function generateRemedialPlan(input: PlannerInput): Promise<Remedia
     score:      number | null   // 0–100 raw mark
     level:      number          // 1–4 CBC level
     rootCause:  string | null
-    flags:      number          // risk flag count
+    isCritical: boolean         // Projection risk === 'critical'
   }
 
   const students: StudentData[] = marks.map(m => {
     const raw     = (m.subject_scores[subjectKey] ?? m.subject_scores[Object.keys(m.subject_scores)[0]] ?? 0) as number
     const pct     = maxScore > 0 ? (raw / maxScore) * 100 : raw
     const level   = pct >= 75 ? 4 : pct >= 50 ? 3 : pct >= 25 ? 2 : 1
-    const profile = m.student_id ? profileMap.get(m.student_id) : null
-    const flags   = profile?.risk_flags?.length ?? 0
     const rootCause = health?.root_cause ?? null
 
-    return { name: m.student_name, student_id: m.student_id, score: pct, level, rootCause, flags }
+    return { name: m.student_name, student_id: m.student_id, score: pct, level, rootCause, isCritical: isProjectionCritical(m.student_id) }
   })
 
   // Also include enrolled students with no marks
@@ -87,13 +97,13 @@ export async function generateRemedialPlan(input: PlannerInput): Promise<Remedia
     if (!students.some(s => s.student_id === id)) {
       const profile = profileMap.get(id)
       if (profile) {
-        students.push({ name: `Student (${id.slice(-4)})`, student_id: id, score: null, level: 1, rootCause: null, flags: profile.risk_flags?.length ?? 0 })
+        students.push({ name: `Student (${id.slice(-4)})`, student_id: id, score: null, level: 1, rootCause: null, isCritical: isProjectionCritical(id) })
       }
     }
   }
 
   // 7. Build groups based on classification
-  const criticalStudents  = students.filter(s => s.level === 1 && s.flags >= 2)
+  const criticalStudents  = students.filter(s => s.level === 1 && s.isCritical)
   const prereqStudents    = students.filter(s => s.level <= 2 && !criticalStudents.includes(s))
   const confusedStudents  = students.filter(s => s.level === 3)
   const onTrackStudents   = students.filter(s => s.level === 4)

@@ -7,6 +7,7 @@ import Link from 'next/link'
 import {
   BookOpen, AlertTriangle, Sparkles, ArrowUpRight,
 } from 'lucide-react'
+import AttentionFeed from '@/components/teacher/AttentionFeed'
 
 function getTermInfo() {
   const month = new Date().getMonth() + 1
@@ -119,6 +120,9 @@ export default async function TeacherDashboardPage() {
 
       {/* ── Body ─────────────────────────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-7 space-y-4">
+
+        {/* Unified attention feed — merges EILS, Monday panel, weekly intelligence, and student alerts */}
+        {activeClasses > 0 && <AttentionFeed />}
 
         {/* TIE Intel summary — only if weekly_intelligence exists */}
         {weeklyIntel && (

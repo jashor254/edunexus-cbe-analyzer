@@ -6,6 +6,8 @@ import { CareerRepository } from './career.repository'
 import { CompassRepository } from './compass.repository'
 import { CurriculumRepository } from './curriculum.repository'
 import { DeveloperRepository } from './developer.repository'
+import { EvidenceRepository } from './evidence.repository'
+import { IntelligenceRepository } from './intelligence.repository'
 import { JobRepository } from './job.repository'
 import { KnowledgeGraphRepository } from './knowledge-graph.repository'
 import { LearnerIntelligenceRepository } from './learner-intelligence.repository'
@@ -14,6 +16,7 @@ import { LearnerRepository } from './learner.repository'
 import { LearningSignalRepository } from './learning-signal.repository'
 import { NotificationRepository } from './notification.repository'
 import { OrganizationRepository } from './organization.repository'
+import { ProjectionRepository } from './projection.repository'
 import { SchoolRepository } from './school.repository'
 import { TeacherRepository } from './teacher.repository'
 import { WebhookRepository } from './webhook.repository'
@@ -27,6 +30,8 @@ export const repos = {
   compass:             new CompassRepository(),
   curriculum:          new CurriculumRepository(),
   developers:          new DeveloperRepository(),
+  evidence:            new EvidenceRepository(),
+  intelligence:        new IntelligenceRepository(),
   jobs:                new JobRepository(),
   knowledgeGraph:      new KnowledgeGraphRepository(),
   learnerIntelligence: new LearnerIntelligenceRepository(),
@@ -35,6 +40,7 @@ export const repos = {
   learningSignal:      new LearningSignalRepository(),
   notifications:       new NotificationRepository(),
   organizations:       new OrganizationRepository(),
+  projections:         new ProjectionRepository(),
   schools:             new SchoolRepository(),
   teachers:            new TeacherRepository(),
   webhooks:            new WebhookRepository(),
@@ -50,6 +56,8 @@ export { CareerRepository } from './career.repository'
 export { CompassRepository } from './compass.repository'
 export { CurriculumRepository } from './curriculum.repository'
 export { DeveloperRepository } from './developer.repository'
+export { EvidenceRepository } from './evidence.repository'
+export { IntelligenceRepository } from './intelligence.repository'
 export { JobRepository } from './job.repository'
 export { KnowledgeGraphRepository } from './knowledge-graph.repository'
 export { LearnerIntelligenceRepository } from './learner-intelligence.repository'
@@ -58,6 +66,7 @@ export { LearnerRepository } from './learner.repository'
 export { LearningSignalRepository } from './learning-signal.repository'
 export { NotificationRepository } from './notification.repository'
 export { OrganizationRepository } from './organization.repository'
+export { ProjectionRepository } from './projection.repository'
 export { SchoolRepository } from './school.repository'
 export { TeacherRepository } from './teacher.repository'
 export { WebhookRepository } from './webhook.repository'

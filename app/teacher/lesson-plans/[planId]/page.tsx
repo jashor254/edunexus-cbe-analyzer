@@ -15,6 +15,7 @@ import {
   Printer,
 } from 'lucide-react'
 import type { LessonPlanRecord } from '@/lib/lessonPlan/types'
+import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 
 interface SOWMeta {
   school: string
@@ -299,7 +300,7 @@ export default function LessonPlanDetailPage({ params }: { params: Promise<{ pla
 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-3 text-red-700 text-sm font-medium">
-          {error}
+          {friendlyMessage(error).message}
         </div>
       )}
 

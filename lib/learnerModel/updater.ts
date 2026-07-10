@@ -144,6 +144,13 @@ type CompassSignal = {
   sessionAbandoned?:  boolean
 }
 
+// TEMPORARY DUAL-WRITE (Phase 4): this write into learner_profiles is kept
+// only because Holiday Planner, Parent Pulse, Remedial Planner, Monday Panel,
+// and Prerequisite Readiness still read from it (see
+// docs/architecture/migration-ledger.md). Compass also emits Evidence now
+// (lib/compass/evidence.ts, called from app/api/learn/end/route.ts). EXIT
+// CONDITION: once all of those consumers migrate to the Projection Engine,
+// delete this function's body and let Compass write Evidence only.
 export async function updateFromCompass(signal: CompassSignal): Promise<void> {
   const profile = await getOrCreateLearnerProfile(signal.studentId)
   const existing = profile.engagement_patterns as Record<string, unknown>

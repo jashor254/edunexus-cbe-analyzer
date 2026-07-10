@@ -110,8 +110,15 @@ function distributeSlots(
   }))
 }
 
+export type SOWGenerationProgress = {
+  total:     number
+  completed: number
+  failed:    number
+}
+
 export async function generateSchemePipeline(
-  input: PipelineInput
+  input: PipelineInput,
+  onProgress?: (event: SOWGenerationProgress) => void | Promise<void>,
 ): Promise<SOWGenerationResult> {
   const { timeline, selectedSubstrands, context } = input
 
@@ -128,6 +135,7 @@ export async function generateSchemePipeline(
       summary: { totalSlots: 0, generated: 0, failed: 0 },
       lessons: [],
       failures: [],
+      groundedInKicd: false,
     }
   }
 
@@ -213,6 +221,8 @@ export async function generateSchemePipeline(
         })
       }
     }
+
+    await onProgress?.({ total: allocatedLessons.length, completed: lessons.length, failed: failures.length })
   }
 
   // STEP 3: Diversity audit (non-blocking — logs issues but does not fail)
@@ -239,5 +249,6 @@ export async function generateSchemePipeline(
     },
     lessons,
     failures,
+    groundedInKicd: !!context.kicdContext?.strandData?.length,
   }
 }

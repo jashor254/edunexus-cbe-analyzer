@@ -4,7 +4,10 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { checkFeatureAccess } from '@/lib/payments/access'
 import { type FeatureKey } from '@/lib/payments/config'
 import { endSession } from '@/lib/compass/session'
+import { resolveCompassStudentAccess, resolveSessionOwnership } from '@/lib/compass/ownership'
+import { recordCompassSessionEvidence } from '@/lib/compass/evidence'
 import { updateFromCompass } from '@/lib/learnerModel/updater'
+import { getStudentBasicInfo } from '@/lib/learnerModel'
 import { apiSuccess, apiError, apiForbidden, getErrorMessage } from '@/lib/api/response'
 
 const FEATURE: FeatureKey = 'learning_compass'
@@ -62,14 +65,11 @@ export async function POST(req: Request): Promise<Response> {
 
     const db = createServiceClient()
 
-    const { data: student } = await db
-      .from('students')
-      .select('id')
-      .eq('id', studentId)
-      .or(`user_id.eq.${access.userId},parent_user_id.eq.${access.userId}`)
-      .maybeSingle()
+    const ownership = await resolveCompassStudentAccess(access.userId, studentId)
+    if (!ownership.allowed) return apiForbidden()
 
-    if (!student) return apiForbidden()
+    const sessionOwned = await resolveSessionOwnership(sessionId, studentId)
+    if (!sessionOwned) return apiForbidden()
 
     const [sessionRes, contextRes] = await Promise.all([
       db.from('compass_sessions')
@@ -100,12 +100,15 @@ export async function POST(req: Request): Promise<Response> {
     const newWeekly      = isSameWeek ? prevWeekly + 1 : 1
     const newTotal       = prevTotal + 1
 
-    // Resolve subject for group-points bonus
+    // Resolve subject for group-points bonus, and session_state for Learner Model evidence
     const { data: sessionRow } = await db
       .from('compass_sessions')
-      .select('subject')
+      .select('subject, session_state')
       .eq('id', sessionId)
       .maybeSingle()
+
+    const sessionState    = (sessionRow?.session_state as Record<string, unknown> | null) ?? null
+    const masteredConcepts = (sessionState?.masteredConcepts as string[] | null) ?? []
 
     await Promise.all([
       endSession(sessionId, studentId, status, durationSeconds),
@@ -154,17 +157,36 @@ export async function POST(req: Request): Promise<Response> {
       }
     }
 
-    // Update Learner Model — fire and forget
+    // Update Learner Model — fire and forget. Dual-write with Evidence emission
+    // below; see lib/compass/evidence.ts and docs/architecture/migration-ledger.md
+    // for the exit condition that eventually removes this write.
     if (sessionRow?.subject) {
       updateFromCompass({
         studentId,
         topic:             sessionRow.subject as string,
         subject:           sessionRow.subject as string,
-        masteredConcepts:  [],
+        masteredConcepts:  status === 'completed' ? masteredConcepts : [],
         sessionMins:       Math.round(durationSeconds / 60),
         completedAt:       new Date().toISOString(),
         sessionAbandoned:  status === 'abandoned',
       }).catch(() => {})
+
+      getStudentBasicInfo(studentId)
+        .then(student => recordCompassSessionEvidence({
+          studentId,
+          initiatedBy:      access.userId,
+          sessionId,
+          subject:          sessionRow.subject as string,
+          sessionAbandoned: status === 'abandoned',
+          exchangeCount:    exchanges,
+          durationSeconds,
+          genuineProgress,
+          masteredConcepts: status === 'completed' ? masteredConcepts : [],
+          endingLevel,
+          academicYear:     student?.year ?? new Date().getFullYear(),
+          term:             student?.term ?? null,
+        }))
+        .catch(err => console.error('[learn/end] recordCompassSessionEvidence failed', err))
     }
 
     return apiSuccess<EndSessionResult>({

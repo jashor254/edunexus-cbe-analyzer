@@ -13,6 +13,7 @@ import {
 import { getCurriculumConfig, getNumericScore } from '@/lib/curriculum'
 import type { CurriculumType } from '@/lib/curriculum'
 import { StudentCardsSkeleton } from '@/components/ui/skeletons'
+import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 import { NoStudentsEmpty } from '@/components/ui/empty-states'
 import type { ClinicReport as CareerClinicReport } from '@/lib/career/types'
 
@@ -212,7 +213,7 @@ function AddStudentModal({
         {error && (
           <div className="mb-4 flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 font-medium">
             <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-            {error}
+            {friendlyMessage(error).message}
           </div>
         )}
 
@@ -1263,7 +1264,7 @@ export default function ClinicPage() {
         {error && !loading && (
           <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700">
             <AlertCircle className="w-5 h-5 flex-shrink-0" />
-            <span className="font-medium">{error}</span>
+            <span className="font-medium">{friendlyMessage(error).message}</span>
           </div>
         )}
 

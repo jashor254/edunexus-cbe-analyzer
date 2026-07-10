@@ -339,16 +339,38 @@ export class AssessmentRepository extends BaseRepository {
     if (error) throw new Error(`Failed to upsert marks: ${error.message}`)
   }
 
-  async upsertStrandAssessments(
+  async findStudentNamesByIds(studentIds: string[]): Promise<Map<string, string>> {
+    if (studentIds.length === 0) return new Map()
+
+    const { data, error } = await this.db
+      .from('students')
+      .select('id, name')
+      .in('id', studentIds)
+
+    if (error) throw new Error(`Failed to fetch student names: ${error.message}`)
+
+    return new Map((data ?? []).map(s => [s.id as string, s.name as string]))
+  }
+
+  async insertTopicalAssessments(
     rows: Array<{
-      assessment_id: string
-      student_id: string | null
-      subject_scores: Record<string, number>
+      class_id:   string
+      teacher_id: string
+      student_id: string
+      subject:    string
+      strand:     string
+      topic:      string
+      rating:     number
+      marks:      number
+      term:       number
+      year:       number
     }>,
   ): Promise<void> {
-    await this.db
+    const { error } = await this.db
       .from('strand_assessments')
-      .upsert(rows, { onConflict: 'assessment_id,student_id' })
+      .insert(rows.map(r => ({ ...r, source: 'topical_check' as const })))
+
+    if (error) throw new Error(`Failed to insert topical assessments: ${error.message}`)
   }
 
   async findPendingAssessments(
@@ -660,6 +682,10 @@ export class AssessmentRepository extends BaseRepository {
   ): Promise<CohortResult | null> {
     const gradeCohort = `Grade ${grade}`
 
+    // grade_cohort is the sole, deliberate signal for cohort membership — a
+    // class sharing the same `grade` number is NOT automatically part of the
+    // same cohort (e.g. a standalone pilot class shouldn't merge with real
+    // grade streams just because it happens to share a grade number).
     const { data: classes } = await this.db
       .from('teacher_classes')
       .select('id, name, grade, stream, grade_cohort')

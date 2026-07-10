@@ -16,6 +16,7 @@ import {
   Target,
 } from 'lucide-react'
 import type { MissionWithCompletion, MissionVerdict, RubricDimension } from '@/lib/academy/types'
+import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 
 const TYPE_META: Record<string, { label: string; color: string; bg: string }> = {
   compare:     { label: 'Compare',     color: '#7c3aed', bg: '#f5f3ff' },
@@ -296,7 +297,7 @@ export default function MissionClient({ mission, moduleColor }: Props) {
             )}
           </div>
 
-          {error && <p className="text-xs text-red-600 font-semibold">{error}</p>}
+          {error && <p className="text-xs text-red-600 font-semibold">{friendlyMessage(error).message}</p>}
 
           <button
             onClick={handleSubmit}

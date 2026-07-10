@@ -101,9 +101,12 @@ export class LearnerModelRepository extends BaseRepository {
     const existing = await this.getLearnerProfile(studentId)
     if (existing) return existing
 
+    // Upsert on the student_id uniqueness constraint rather than a plain
+    // insert — two concurrent callers racing past the check above must not
+    // be able to create two rows for the same student.
     const { data, error } = await this.db
       .from('learner_profiles')
-      .insert({ student_id: studentId })
+      .upsert({ student_id: studentId }, { onConflict: 'student_id', ignoreDuplicates: false })
       .select(COLUMNS)
       .single()
 
@@ -369,11 +372,62 @@ export class LearnerModelRepository extends BaseRepository {
 
   // ── Strand assessments (for capability history) ───────────────────────────────
 
+  async findStudentAccessInfo(studentId: string): Promise<{
+    user_id:        string | null
+    parent_user_id: string | null
+    teacher_id:     string | null
+  } | null> {
+    const { data, error } = await this.db
+      .from('students')
+      .select('user_id, parent_user_id, teacher_id')
+      .eq('id', studentId)
+      .maybeSingle()
+
+    if (error) throw new Error(`findStudentAccessInfo: ${error.message}`)
+    if (!data) return null
+
+    return {
+      user_id:        data.user_id as string | null,
+      parent_user_id: data.parent_user_id as string | null,
+      teacher_id:     data.teacher_id as string | null,
+    }
+  }
+
+  async findStudentBasicInfo(studentId: string): Promise<{
+    name:            string
+    grade:           number
+    school:          string | null
+    term:            number | null
+    year:            number | null
+    current_pathway: string | null
+  } | null> {
+    const { data, error } = await this.db
+      .from('students')
+      .select('name, grade, school, term, year, current_pathway')
+      .eq('id', studentId)
+      .maybeSingle()
+
+    if (error) throw new Error(`findStudentBasicInfo: ${error.message}`)
+    if (!data) return null
+
+    return {
+      name:            data.name as string,
+      grade:           data.grade as number,
+      school:          data.school as string | null,
+      term:            data.term as number | null,
+      year:            data.year as number | null,
+      current_pathway: data.current_pathway as string | null,
+    }
+  }
+
   async findAssessmentHistory(
     studentId: string,
   ): Promise<Array<{ subject_scores: Record<string, number> }>> {
+    // NOTE: capability scoring reads term-level subject_scores from `assessments`,
+    // not per-topic ratings from `strand_assessments` (that table has no
+    // subject_scores column at all — verified against the live schema).
     const { data, error } = await this.db
-      .from('strand_assessments')
+      .from('assessments')
       .select('subject_scores')
       .eq('student_id', studentId)
       .order('created_at', { ascending: true })

@@ -15,9 +15,8 @@ export interface CompassSession {
   isRevision:       boolean
   studentGrade:     number
   overallLevel:     number
-  consecutiveRight: number
-  consecutiveWrong: number
   initialized:      boolean
+  masteredConcepts: string[]
 }
 
 export interface SessionHandle {
@@ -34,9 +33,11 @@ export interface NextSubject {
 
 // ── Internal helpers ───────────────────────────────────────────────────────────
 
+// Canonical tier→level mapping — imported by app/api/learn/route.ts and
+// app/api/learn/student/route.ts rather than redefined in each.
 // Current DB values: 'challenge' | 'standard' | 'reinforcement' | 'remedial'
 // Legacy fallback handles old 'approaching_expectations' style strings.
-function tierToLevel(tier: string): 1 | 2 | 3 | 4 {
+export function tierToLevel(tier: string): 1 | 2 | 3 | 4 {
   if (tier === 'challenge'     || tier.includes('exceeding'))   return 4
   if (tier === 'standard'      || tier.includes('meeting'))     return 3
   if (tier === 'reinforcement' || tier.includes('approaching')) return 2
@@ -49,7 +50,7 @@ const PATHWAY_SUBJECTS: Record<string, string[]> = {
   'Arts & Sports':   ['creative_arts', 'music', 'physical_education', 'art_design'],
 }
 
-const SESSION_TTL_MS        = 30 * 60 * 1000       // 30 min — used by isSessionExpired (client keepalive)
+const SESSION_TTL_MS        = 30 * 60 * 1000       // 30 min — holiday-mode resume window
 const SCHOOL_RESUME_MS      = 3 * 60 * 60 * 1000   // 3 h  — resume window during school day
 
 // ── 1. getOrCreateSession ──────────────────────────────────────────────────────
@@ -200,13 +201,7 @@ export async function recordExchange(sessionId: string): Promise<number> {
   return next
 }
 
-// ── 5. isSessionExpired ───────────────────────────────────────────────────────
-
-export function isSessionExpired(startedAt: string): boolean {
-  return Date.now() - new Date(startedAt).getTime() > SESSION_TTL_MS
-}
-
-// ── 6. endSession ──────────────────────────────────────────────────────────────
+// ── 5. endSession ──────────────────────────────────────────────────────────────
 
 export async function endSession(
   sessionId:       string,
@@ -255,9 +250,8 @@ export async function readSession(
     isRevision:       (s.isRevision       as boolean)        ?? false,
     studentGrade:     (s.studentGrade     as number)         ?? 7,
     overallLevel:     (s.overallLevel     as number)         ?? 2,
-    consecutiveRight: (s.consecutiveRight as number)         ?? 0,
-    consecutiveWrong: (s.consecutiveWrong as number)         ?? 0,
     initialized:      (s.initialized     as boolean)        ?? false,
+    masteredConcepts: (s.masteredConcepts as string[] | null) ?? [],
   }
 }
 

@@ -3,6 +3,7 @@
 // Used by the parent dashboard to show: subject, level movement, summary, XP.
 import { createServiceClient } from '@/utils/supabase/service'
 import { createClient }        from '@/utils/supabase/server'
+import { repos } from '@/lib/repositories'
 import { apiSuccess, apiError, getErrorMessage } from '@/lib/api/response'
 
 const LEVEL_LABEL: Record<number, string> = { 1: 'BE', 2: 'AE', 3: 'ME', 4: 'EE' }
@@ -59,10 +60,7 @@ export async function GET(): Promise<Response> {
     const db = createServiceClient()
 
     // All students belonging to this parent (both scenarios)
-    const { data: students } = await db
-      .from('students')
-      .select('id, name, grade')
-      .or(`user_id.eq.${user.id},parent_user_id.eq.${user.id}`)
+    const students = await repos.compass.findOwnedStudents(user.id)
 
     if (!students || students.length === 0) {
       return apiSuccess<CompassActivityResult>({

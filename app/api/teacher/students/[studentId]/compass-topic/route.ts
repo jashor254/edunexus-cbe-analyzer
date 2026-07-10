@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
+import { resolveTeacherOwnership } from '@/lib/compass/ownership'
 import { z } from 'zod'
 
 const BodySchema = z.object({
@@ -32,22 +33,8 @@ export async function PATCH(
 
     const db = createServiceClient()
 
-    const { data: teacher } = await db
-      .from('teachers')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-    if (!teacher) return apiForbidden()
-
-    // Verify this student belongs to the authenticated teacher
-    const { data: student } = await db
-      .from('students')
-      .select('id, teacher_id')
-      .eq('id', studentId)
-      .maybeSingle()
-
-    if (!student) return apiBadRequest('Student not found')
-    if (student.teacher_id !== teacher.id) return apiForbidden()
+    const ownership = await resolveTeacherOwnership(user.id, studentId)
+    if (!ownership.allowed) return apiForbidden()
 
     // Upsert student_learning_context with updated compass_bridge
     const { data: existing } = await db

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { GraduationCap, School, Hash, ChevronRight, Trophy, CheckCircle2, ArrowRight, Sparkles } from 'lucide-react'
+import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 
 export default function TeacherSetupPage() {
   const router = useRouter()
@@ -228,7 +229,7 @@ export default function TeacherSetupPage() {
 
                 {error && (
                   <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl px-4 py-3 text-sm font-medium">
-                    {error}
+                    {friendlyMessage(error).message}
                   </div>
                 )}
 

@@ -1,5 +1,5 @@
 import { repos } from '@/lib/repositories'
-import { calculateMeanScore, calculateMeanGrade } from './gradeCalculator'
+import { calculateMeanScore, calculateMeanGrade, marksToLevel } from './gradeCalculator'
 import { updateFromAssessment } from '@/lib/learnerModel/updater'
 import { publishEvent } from '@/lib/events'
 import type { ClassAssessment, LearnerMark, MarkInput, CurriculumType } from './types'
@@ -216,28 +216,48 @@ export async function triggerLearnerModelUpdates(
 
   const now = new Date().toISOString()
 
-  await repos.assessments.upsertStrandAssessments(
-    filteredMarks.map(m => ({
-      assessment_id:  assessmentId,
-      student_id:     m.student_id,
-      subject_scores: m.subject_scores as Record<string, number>,
-    }))
-  )
+  // Note: strand_assessments is not written here. Its assessment_id FK points
+  // at the legacy `assessments` table, not `class_assessments` — this
+  // assessmentId belongs to a different id space, so a row can never actually
+  // be inserted here. strand_assessments now gets real data exclusively from
+  // topical checks (lib/assessments/topical.ts), which have genuine
+  // strand/topic granularity that a general term assessment doesn't have.
 
-  await Promise.allSettled(
-    filteredMarks.map(m =>
-      updateFromAssessment({
-        studentId:     m.student_id as string,
-        studentName:   m.student_name as string,
-        subjectScores: m.subject_scores as Record<string, number>,
-        subjectMarks:  m.subject_scores as Record<string, number>,
-        strand:        '',
-        subStrand:     '',
-        subject:       (assessment.subjects as string[])?.[0] ?? '',
-        term:          Number(assessment.term),
-        year:          Number(assessment.year),
-        assessedAt:    now,
-      })
-    )
-  )
+  // subject_scores holds raw marks bounded by assessment.max_score (any
+  // total — 20, 50, 70, 100, ...), not CBC levels. Normalize to a percentage
+  // before deriving the CBC level, mirroring the already-correct pattern in
+  // lib/assessments/evidence.ts (recordAssessmentEvidence), so the learner
+  // model is grading-system agnostic regardless of what the exam was out of.
+  const maxScore = assessment.max_score > 0 ? assessment.max_score : 100
+  const updates: Promise<void>[] = []
+  for (const m of filteredMarks) {
+    const rawScores = m.subject_scores as Record<string, number>
+    const subjectMarks: Record<string, number> = {}
+    const subjectLevels: Record<string, number> = {}
+    for (const [subject, rawMark] of Object.entries(rawScores)) {
+      const percentScore = (Number(rawMark) / maxScore) * 100
+      subjectMarks[subject] = percentScore
+      subjectLevels[subject] = marksToLevel(Math.round(Math.min(100, Math.max(0, percentScore))))
+    }
+
+    // One call per subject so every subject in this assessment updates its
+    // own knowledge_state entry, not just the class's first listed subject.
+    for (const subject of Object.keys(rawScores)) {
+      updates.push(
+        updateFromAssessment({
+          studentId:     m.student_id as string,
+          studentName:   m.student_name as string,
+          subjectScores: subjectLevels,
+          subjectMarks,
+          strand:        'general',
+          subStrand:     'general',
+          subject,
+          term:          Number(assessment.term),
+          year:          Number(assessment.year),
+          assessedAt:    now,
+        })
+      )
+    }
+  }
+  await Promise.allSettled(updates)
 }

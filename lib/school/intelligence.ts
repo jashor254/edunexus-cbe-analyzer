@@ -8,10 +8,23 @@
 // in the school-level output. Only anonymised counts and percentages.
 
 import { repos } from '@/lib/repositories'
+import { recomputeLearnerProjection } from '@/lib/projection/recompute'
+import type { RiskValue } from '@/lib/projection/types'
 import type {
   SchoolIntelligenceSummary, StrandHealthRecord, GradeHealthRecord,
   InterventionEfficacyRecord, TeacherActivitySignal, PrincipalDashboard,
 } from './types'
+
+// Partial migration only (see docs/architecture/migration-ledger.md): risk
+// distribution (school-wide and per-grade) is sourced from the Projection
+// Engine, since projection.risk models exactly the same concept. Persistent-risk
+// count (needs consecutive-weeks duration tracking) and the 6-dimension
+// avg_capability_dimensions (needs analytical_reasoning/communication/etc.
+// breakdown, which projection.capability does not compute — only per-subject
+// level) stay on legacy learner_profiles — documented engine gaps, not an
+// oversight. avg_capability_dimensions must not be migrated by routing it
+// through the Blueprint/Career Intelligence capability adapter — that shim is
+// explicitly scoped to those two consumers only.
 
 // ── Main: compute full school intelligence ────────────────────────────────────
 
@@ -49,15 +62,27 @@ export async function computeSchoolIntelligence(
 
   const studentIds = [...new Set(enrollments.map(e => e.student_id as string))]
 
-  // 4. Load learner profiles (only the fields we need — no PII beyond student_id)
+  // 4. Load learner profiles (only the fields we need — no PII beyond student_id).
+  // Still needed for persistent_risk_count and avg_capability_dimensions — see
+  // the module comment for why those two stay on the legacy path.
   const profileList = await repos.schools.findLearnerProfiles(studentIds)
 
-  // 5. Risk distribution
+  // Batch-recompute projections for the whole school — "a few hundred" is
+  // exactly the scale recompute.ts's batching was scoped for, matching one
+  // pilot school.
+  const riskByStudent = new Map<string, RiskValue['overallRiskLevel']>(
+    await Promise.all(
+      studentIds.map(async id => {
+        const projection = await recomputeLearnerProjection(id)
+        return [id, projection.risk?.value.overallRiskLevel ?? 'normal'] as const
+      })
+    )
+  )
+
+  // 5. Risk distribution (sourced from the Projection Engine)
   const riskDist = { normal: 0, watch: 0, at_risk: 0, critical: 0 }
-  for (const p of profileList) {
-    const level = (p.overall_risk_level as string) ?? 'normal'
-    if (level in riskDist) riskDist[level as keyof typeof riskDist]++
-    else riskDist.normal++
+  for (const id of studentIds) {
+    riskDist[riskByStudent.get(id) ?? 'normal']++
   }
 
   const total = profileList.length || 1
@@ -135,14 +160,6 @@ export async function computeSchoolIntelligence(
     else if (currAtRiskPct > prevAtRiskPct + 2) riskTrend = 'declining'
   }
 
-  const typedProfileList = profileList as Array<{
-    student_id: string
-    overall_risk_level: unknown
-    capability_dimensions: unknown
-    risk_history: unknown
-    knowledge_state: unknown
-  }>
-
   const typedClasses = classes as Array<{ id: string; grade: unknown; subject: unknown; teacher_id: unknown }>
   const typedEnrollments = enrollments as Array<{ student_id: string; class_id: string }>
 
@@ -156,7 +173,7 @@ export async function computeSchoolIntelligence(
     risk_pcts:         riskPcts,
     risk_trend:        riskTrend,
     top_struggling_strands: topStrugglingStrands,
-    grade_health:      computeGradeHealth(typedClasses, typedProfileList, typedEnrollments),
+    grade_health:      computeGradeHealth(typedClasses, studentIds, riskByStudent, typedEnrollments),
     persistent_risk_count: persistentRiskCount,
     interventions_this_term: interventionCount,
     intervention_efficacy:   Math.round(efficacyRate * 100) / 100,
@@ -188,9 +205,10 @@ export async function computeSchoolIntelligence(
 // ── Grade-level health breakdown ──────────────────────────────────────────────
 
 function computeGradeHealth(
-  classes:     Array<{ id: string; grade: unknown; subject: unknown; teacher_id: unknown }>,
-  profileList: Array<{ student_id: string; overall_risk_level: unknown; capability_dimensions: unknown }>,
-  enrollments: Array<{ student_id: string; class_id: string }>,
+  classes:      Array<{ id: string; grade: unknown; subject: unknown; teacher_id: unknown }>,
+  studentIds:   string[],
+  riskByStudent: Map<string, RiskValue['overallRiskLevel']>,
+  enrollments:  Array<{ student_id: string; class_id: string }>,
 ): GradeHealthRecord[] {
   // Build map: student_id → grade
   const studentGradeMap = new Map<string, number>()
@@ -207,27 +225,26 @@ function computeGradeHealth(
     }
   }
 
-  // Group profiles by grade
-  const byGrade = new Map<number, typeof profileList>()
-  for (const p of profileList) {
-    const grade = studentGradeMap.get(p.student_id)
+  // Group students by grade
+  const byGrade = new Map<number, string[]>()
+  for (const studentId of studentIds) {
+    const grade = studentGradeMap.get(studentId)
     if (!grade) continue
     if (!byGrade.has(grade)) byGrade.set(grade, [])
-    byGrade.get(grade)!.push(p)
+    byGrade.get(grade)!.push(studentId)
   }
 
   const records: GradeHealthRecord[] = []
-  for (const [grade, gradeProfiles] of byGrade) {
+  for (const [grade, gradeStudentIds] of byGrade) {
     const dist = { normal: 0, watch: 0, at_risk: 0, critical: 0 }
-    for (const p of gradeProfiles) {
-      const level = (p.overall_risk_level as string) ?? 'normal'
-      if (level in dist) dist[level as keyof typeof dist]++
+    for (const studentId of gradeStudentIds) {
+      dist[riskByStudent.get(studentId) ?? 'normal']++
     }
-    const t = gradeProfiles.length || 1
+    const t = gradeStudentIds.length || 1
 
     records.push({
       grade,
-      total_students: gradeProfiles.length,
+      total_students: gradeStudentIds.length,
       normal_pct:   Math.round((dist.normal   / t) * 100),
       watch_pct:    Math.round((dist.watch    / t) * 100),
       at_risk_pct:  Math.round((dist.at_risk  / t) * 100),

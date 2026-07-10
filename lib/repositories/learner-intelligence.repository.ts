@@ -25,7 +25,9 @@ const FORMATIVE_CONCERN_COLS = 'subject, sub_strand' as const
 
 const COMPASS_PULSE_COLS = 'topic, subject, status' as const
 
-const STUDENT_HOLIDAY_COLS = 'first_name, last_name, grade, dream_career' as const
+// students has a single `name` column (no first_name/last_name split) and no
+// dream_career column at all — both were referenced incorrectly before this fix.
+const STUDENT_HOLIDAY_COLS = 'name, grade' as const
 
 const CLASS_ENROLLMENT_COLS = 'student_id' as const
 
@@ -67,10 +69,8 @@ export type CompassPulseRow = {
 }
 
 export type StudentHolidayRow = {
-  first_name:   string | null
-  last_name:    string | null
-  grade:        number | null
-  dream_career: string | null
+  name:  string | null
+  grade: number | null
 }
 
 export type RowRecord = {
@@ -311,11 +311,100 @@ export class LearnerIntelligenceRepository extends BaseRepository {
         holiday_period: params.holiday_period,
         holiday_days:   params.holiday_days,
         plan_data:      params.plan_data,
+        // Regenerating replaces the content, so it goes back to draft —
+        // whatever was previously approved no longer reflects what's saved.
+        is_published:   false,
+        published_at:   null,
       },
       { onConflict: 'student_id,term,year' },
     )
 
     if (error) throw new Error(`Failed to upsert holiday plan: ${error.message}`)
+  }
+
+  /**
+   * All generated holiday plans for a set of students in one term/year —
+   * used to render the Holiday Planner tab's results once a background
+   * batch (see app/api/holiday/generate/route.ts) has written them, since
+   * the batch job's own progress record only carries counts, not full plan
+   * content (WhatsApp message, weeks) for every student.
+   */
+  async findHolidayPlansForStudents(
+    studentIds: string[],
+    term:       number,
+    year:       number,
+  ): Promise<Array<{ student_id: string; plan_data: HolidayPlanData; is_published: boolean }>> {
+    if (studentIds.length === 0) return []
+    const { data, error } = await this.db
+      .from('holiday_plans')
+      .select('student_id, plan_data, is_published')
+      .in('student_id', studentIds)
+      .eq('term', term)
+      .eq('year', year)
+
+    if (error) throw new Error(`Failed to fetch holiday plans: ${error.message}`)
+    return (data ?? []) as Array<{ student_id: string; plan_data: HolidayPlanData; is_published: boolean }>
+  }
+
+  async publishHolidayPlans(params: {
+    teacherId: string
+    term:      number
+    year:      number
+    studentIds: string[]
+  }): Promise<number> {
+    if (params.studentIds.length === 0) return 0
+
+    const { data, error } = await this.db
+      .from('holiday_plans')
+      .update({ is_published: true, published_at: new Date().toISOString() })
+      .eq('teacher_id', params.teacherId)
+      .eq('term', params.term)
+      .eq('year', params.year)
+      .in('student_id', params.studentIds)
+      .select('id')
+
+    if (error) throw new Error(`Failed to publish holiday plans: ${error.message}`)
+    return data?.length ?? 0
+  }
+
+  // Only a recently-published plan is still relevant guidance — an old
+  // holiday's plan shouldn't nag a parent forever once that break is over.
+  async findPublishedHolidayPlan(studentId: string, publishedSinceIso: string): Promise<HolidayPlanData & { published_at: string } | null> {
+    const { data, error } = await this.db
+      .from('holiday_plans')
+      .select('plan_data, published_at')
+      .eq('student_id', studentId)
+      .eq('is_published', true)
+      .gte('published_at', publishedSinceIso)
+      .order('published_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) throw new Error(`Failed to fetch published holiday plan: ${error.message}`)
+    if (!data) return null
+
+    return { ...(data.plan_data as HolidayPlanData), published_at: data.published_at as string }
+  }
+
+  async findDraftHolidayPlansOlderThan(cutoff: string): Promise<Array<{ id: string; teacher_id: string | null; student_id: string; term: number; year: number }>> {
+    const { data, error } = await this.db
+      .from('holiday_plans')
+      .select('id, teacher_id, student_id, term, year')
+      .eq('is_published', false)
+      .lt('created_at', cutoff)
+
+    if (error) throw new Error(`Failed to fetch stale draft holiday plans: ${error.message}`)
+    return data ?? []
+  }
+
+  async publishHolidayPlanIds(ids: string[]): Promise<void> {
+    if (ids.length === 0) return
+    const { error } = await this.db
+      .from('holiday_plans')
+      .update({ is_published: true, published_at: new Date().toISOString() })
+      .in('id', ids)
+
+    if (error) throw new Error(`Failed to auto-publish holiday plans: ${error.message}`)
   }
 
   // ── Student data (holiday planner) ─────────────────────────────────────────
@@ -331,27 +420,22 @@ export class LearnerIntelligenceRepository extends BaseRepository {
     if (!data) return null
 
     return {
-      first_name:   data.first_name   as string | null,
-      last_name:    data.last_name    as string | null,
-      grade:        data.grade        as number | null,
-      dream_career: data.dream_career as string | null,
+      name:  data.name  as string | null,
+      grade: data.grade as number | null,
     }
   }
 
-  async getStudentNameById(studentId: string): Promise<{ first_name: string | null; last_name: string | null } | null> {
+  async getStudentNameById(studentId: string): Promise<{ name: string | null } | null> {
     const { data, error } = await this.db
       .from('students')
-      .select('first_name, last_name')
+      .select('name')
       .eq('id', studentId)
       .maybeSingle()
 
     if (error) throw new Error(`Failed to fetch student name: ${error.message}`)
     if (!data) return null
 
-    return {
-      first_name: data.first_name as string | null,
-      last_name:  data.last_name  as string | null,
-    }
+    return { name: data.name as string | null }
   }
 
   // ── Class enrollment ────────────────────────────────────────────────────────
@@ -365,6 +449,143 @@ export class LearnerIntelligenceRepository extends BaseRepository {
     if (error) throw new Error(`Failed to fetch class enrollment: ${error.message}`)
 
     return (data ?? []).map(row => row.student_id as string)
+  }
+
+  /** Batch name lookup — avoids the N+1 pattern of calling getStudentNameById in a loop. */
+  async getStudentNamesByIds(studentIds: string[]): Promise<Array<{ id: string; name: string | null }>> {
+    if (studentIds.length === 0) return []
+    const { data, error } = await this.db
+      .from('students')
+      .select('id, name')
+      .in('id', studentIds)
+
+    if (error) throw new Error(`Failed to fetch student names: ${error.message}`)
+    return (data ?? []).map(row => ({ id: row.id as string, name: row.name as string | null }))
+  }
+
+  // ── Class differentiation plans ─────────────────────────────────────────────
+  // Adaptive Learning v2 Architecture §3/§9/§10 (FROZEN). Stored separately
+  // from remedial_plans — see 20260708_class_differentiation_plans.sql for why.
+
+  async upsertClassDifferentiationPlan(params: {
+    class_id:   string
+    teacher_id: string
+    subject:    string
+    term:       number
+    year:       number
+    plan_data:  unknown
+  }): Promise<string> {
+    const { data, error } = await this.db
+      .from('class_differentiation_plans')
+      .upsert(
+        {
+          class_id:   params.class_id,
+          teacher_id: params.teacher_id,
+          subject:    params.subject,
+          term:       params.term,
+          year:       params.year,
+          plan_data:  params.plan_data,
+          // Regenerating/re-saving replaces the content, so it goes back to
+          // draft — same rule as upsertHolidayPlan: whatever was previously
+          // approved no longer reflects what's saved.
+          is_published: false,
+          published_at: null,
+        },
+        { onConflict: 'class_id,subject,term,year' },
+      )
+      .select('id')
+      .single()
+
+    if (error) throw new Error(`Failed to upsert class differentiation plan: ${error.message}`)
+    return data.id as string
+  }
+
+  async getClassDifferentiationPlan(params: {
+    class_id: string
+    subject:  string
+    term:     number
+    year:     number
+  }): Promise<{ id: string; plan_data: unknown; is_published: boolean; published_at: string | null } | null> {
+    const { data, error } = await this.db
+      .from('class_differentiation_plans')
+      .select('id, plan_data, is_published, published_at')
+      .eq('class_id', params.class_id)
+      .eq('subject', params.subject)
+      .eq('term', params.term)
+      .eq('year', params.year)
+      .maybeSingle()
+
+    if (error) throw new Error(`Failed to fetch class differentiation plan: ${error.message}`)
+    if (!data) return null
+    return {
+      id: data.id as string,
+      plan_data: data.plan_data,
+      is_published: data.is_published as boolean,
+      published_at: data.published_at as string | null,
+    }
+  }
+
+  /** Ownership enforced by filtering on teacher_id — returns 0 if the plan doesn't belong to this teacher. */
+  async publishClassDifferentiationPlan(params: {
+    class_id:   string
+    teacher_id: string
+    subject:    string
+    term:       number
+    year:       number
+    plan_data?: unknown
+  }): Promise<number> {
+    const update: Record<string, unknown> = { is_published: true, published_at: new Date().toISOString() }
+    if (params.plan_data !== undefined) update.plan_data = params.plan_data
+
+    const { data, error } = await this.db
+      .from('class_differentiation_plans')
+      .update(update)
+      .eq('class_id', params.class_id)
+      .eq('teacher_id', params.teacher_id)
+      .eq('subject', params.subject)
+      .eq('term', params.term)
+      .eq('year', params.year)
+      .select('id')
+
+    if (error) throw new Error(`Failed to publish class differentiation plan: ${error.message}`)
+    return (data ?? []).length
+  }
+
+  // ── Holiday returns ──────────────────────────────────────────────────────────
+  // Adaptive Learning v2 Architecture §4/§7/§10 (FROZEN). Operational
+  // tracking row for a returned holiday pack — separate from the Evidence
+  // itself (lib/holiday/return.ts persists that via evidenceLifecycle.ts).
+
+  async upsertHolidayReturn(params: {
+    student_id:       string
+    teacher_id:       string
+    ingestion_run_id: string | null
+    term:             number
+    year:             number
+    weeks_assigned:   number
+    weeks_completed:  number
+    teacher_comment:  string | null
+  }): Promise<string> {
+    const { data, error } = await this.db
+      .from('holiday_returns')
+      .upsert(
+        {
+          student_id:       params.student_id,
+          teacher_id:       params.teacher_id,
+          ingestion_run_id: params.ingestion_run_id,
+          term:             params.term,
+          year:             params.year,
+          weeks_assigned:   params.weeks_assigned,
+          weeks_completed:  params.weeks_completed,
+          teacher_comment:  params.teacher_comment,
+        },
+        { onConflict: 'student_id,term,year' },
+      )
+      .select('id')
+      .single()
+
+    if (error) throw new Error(`Failed to upsert holiday return: ${error.message}`)
+    return data.id as string
   }
 
   // ── Career lookup ───────────────────────────────────────────────────────────

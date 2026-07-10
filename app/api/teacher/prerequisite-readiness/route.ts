@@ -6,14 +6,8 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
 import { getClassLearnerProfiles } from '@/lib/learnerModel/queries'
-import type { PrerequisiteAlert } from '@/lib/learnerModel/types'
+import { findPrerequisiteAlerts } from '@/lib/knowledgeGraph/prerequisiteAlerts'
 
-// A student is considered to be missing a prerequisite if their mastery level
-// for that topic is ≤ 2 (Below Expectation or Approaching Expectation).
-const MISSING_THRESHOLD = 2
-
-// Only surface an alert when at least this fraction of the class is affected.
-const PCT_ALERT_THRESHOLD = 0.20   // 20%
 // When ≥ 30% are affected, log an intervention so the teacher gets a follow-up.
 const PCT_INTERVENTION_THRESHOLD = 0.30
 
@@ -72,42 +66,7 @@ export async function GET(req: Request): Promise<Response> {
       })
     }
 
-    // ── 3. Find prerequisite edges for this node ─────────────────────────────
-    const { data: edges, error: edgesErr } = await db
-      .from('knowledge_edges')
-      .select('prerequisite_node_id, dependency_type, weight')
-      .eq('dependent_node_id', node.id)
-
-    if (edgesErr) throw new Error(`knowledge_edges: ${edgesErr.message}`)
-
-    if (!edges || edges.length === 0) {
-      // No prerequisites — class is automatically ready
-      return apiSuccess({
-        ready:            true,
-        readiness_pct:    100,
-        alerts:           [],
-        lesson_substrand: subStrand,
-        total_students:   0,
-        recommendation:   'Class is ready for this lesson. Proceed.',
-      })
-    }
-
-    // ── 4. Get prerequisite node details ─────────────────────────────────────
-    const prereqIds = edges.map(e => e.prerequisite_node_id as string)
-
-    const { data: prereqNodes, error: prereqErr } = await db
-      .from('knowledge_nodes')
-      .select('id, node_id, name, strand, remediation, weak_mastery_signs')
-      .in('id', prereqIds)
-
-    if (prereqErr) throw new Error(`knowledge_nodes prereq fetch: ${prereqErr.message}`)
-
-    // Build lookup: db id → node data
-    const prereqMap = new Map(
-      (prereqNodes ?? []).map(n => [n.id as string, n])
-    )
-
-    // ── 5. Get class learner profiles ─────────────────────────────────────────
+    // ── 3. Get class learner profiles ────────────────────────────────────────
     const profiles = await getClassLearnerProfiles(classId)
     const total    = profiles.length
 
@@ -136,58 +95,10 @@ export async function GET(req: Request): Promise<Response> {
       ])
     )
 
-    // ── 6 & 7. Check mastery of each prerequisite per student ────────────────
-    // knowledge_state keys are "subject:substrand" — try several key forms.
-    const alerts: PrerequisiteAlert[] = []
-
-    for (const edge of edges) {
-      const prereq = prereqMap.get(edge.prerequisite_node_id as string)
-      if (!prereq) continue
-
-      const prereqName   = prereq.name as string
-      const prereqStrand = prereq.strand as string
-
-      const missingStudentNames: string[] = []
-
-      for (const profile of profiles) {
-        const ks = profile.knowledge_state ?? {}
-
-        // Try to find this prereq in the student's knowledge state.
-        // Keys are stored as "subject:substrand" — match against name and strand.
-        const matchedEntry = Object.entries(ks).find(([key]) => {
-          const lkey   = key.toLowerCase()
-          const lname  = prereqName.toLowerCase()
-          const lstrand = prereqStrand.toLowerCase()
-          return lkey.includes(lname) || lkey.includes(lstrand)
-        })
-
-        const isMissing =
-          !matchedEntry ||                          // no entry at all
-          matchedEntry[1].level <= MISSING_THRESHOLD  // BE or Approaching
-
-        if (isMissing) {
-          missingStudentNames.push(
-            nameMap.get(profile.student_id) ?? `Student (${profile.student_id.slice(-4)})`
-          )
-        }
-      }
-
-      const pctAffected = missingStudentNames.length / total
-
-      if (pctAffected >= PCT_ALERT_THRESHOLD) {
-        const remediation = (prereq.remediation as string[] | null)?.[0]
-          ?? `Review "${prereqName}" with the class before proceeding`
-
-        alerts.push({
-          lesson_substrand:  subStrand,
-          missing_prereq:    prereqName,
-          students_affected: missingStudentNames.length,
-          pct_affected:      Math.round(pctAffected * 100),
-          suggested_warmup:  remediation,
-          student_names:     missingStudentNames,
-        } satisfies PrerequisiteAlert)
-      }
-    }
+    // ── 4. Check mastery of each prerequisite per student ────────────────────
+    // Shared with the Monday Panel (lib/knowledgeGraph/prerequisiteAlerts.ts)
+    // so both surfaces produce identical results from the same learner data.
+    const alerts = await findPrerequisiteAlerts(db, profiles, nameMap, subject, subStrand)
 
     // ── 8. Build overall readiness ────────────────────────────────────────────
     // A student "passes" readiness if they are not missing any prerequisite.

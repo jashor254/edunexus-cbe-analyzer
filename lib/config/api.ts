@@ -66,6 +66,37 @@ export const SUPABASE_SERVER_CONFIG = {
 }
 
 // ============================================================
+// COMPASS AUTO-CONFIRM SYSTEM ACCOUNT
+// ============================================================
+// A real auth.users row (created once via
+// scripts/create-compass-auto-confirm-account.ts, per Compass v2 Wave 2
+// Phase 11) representing the automated policy actor that confirms
+// engagement-only Compass evidence. Required because learner_evidence.reviewed_by
+// is a hard FK to auth.users(id) — there is no way to call confirmReview()
+// legally without a real user row as the reviewer.
+
+export const COMPASS_AUTO_CONFIRM_CONFIG = {
+  get userId() {
+    return process.env.COMPASS_AUTO_CONFIRM_USER_ID
+  },
+
+  isConfigured() {
+    return Boolean(this.userId)
+  },
+
+  getUserIdOrThrow() {
+    const id = this.userId
+    if (!id) {
+      throw new Error(
+        'COMPASS_AUTO_CONFIRM_USER_ID is missing. Run scripts/create-compass-auto-confirm-account.ts ' +
+        'once and set the resulting user id in your environment before engagement evidence can be auto-confirmed.'
+      )
+    }
+    return id
+  }
+}
+
+// ============================================================
 // PAYMENT CONFIG (Paystack)
 // ============================================================
 

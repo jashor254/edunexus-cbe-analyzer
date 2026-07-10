@@ -1,22 +1,3 @@
-// lib/database.types.ts
-// AUTO-GENERATED from the live production schema via
-// mcp__supabase__generate_typescript_types (or `npm run db:types`, which
-// wraps `supabase gen types typescript --linked`). Do not hand-edit —
-// regenerate instead.
-//
-// STALE AS OF 2026-07-03: generated BEFORE the pending Phase 8 / EIR-index /
-// Phase 9 migrations were deployed, so it does NOT yet include organizations,
-// organization_members, api_keys, subscription_plans, invoices,
-// platform_events, event_subscriptions, event_deliveries, job_queues, jobs,
-// job_logs, or any eir_* table. lib/repositories/base.ts deliberately does
-// NOT import this yet — wiring SupabaseClient<Database> in before
-// regenerating produces ~429 compile errors (every repository method
-// touching those tables gets typed as `never`), confirmed by actually
-// running tsc with it wired in. Regenerate this file immediately after the
-// pending migrations are applied to production, THEN wire it into
-// base.ts's `SupabaseClient<Database>` — that one change would have caught
-// every column/table-name bug found during this release's review at
-// compile time instead of requiring manual production cross-checks.
 export type Json =
   | string
   | number
@@ -1098,6 +1079,41 @@ export type Database = {
           },
         ]
       }
+      attention_feed_dismissals: {
+        Row: {
+          created_at: string
+          dismissed_at: string
+          id: string
+          item_key: string
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          dismissed_at?: string
+          id?: string
+          item_key: string
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          dismissed_at?: string
+          id?: string
+          item_key?: string
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attention_feed_dismissals_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       beta_stats: {
         Row: {
           created_at: string | null
@@ -1561,10 +1577,12 @@ export type Database = {
           class_id: string | null
           created_at: string | null
           curriculum_type: string | null
+          external_id: string | null
           grade_id: string | null
           grade_scale_id: string | null
           grading_type: string
           id: string
+          integration_connection_id: string | null
           is_published: boolean
           max_score: number | null
           subjects: string[]
@@ -1580,10 +1598,12 @@ export type Database = {
           class_id?: string | null
           created_at?: string | null
           curriculum_type?: string | null
+          external_id?: string | null
           grade_id?: string | null
           grade_scale_id?: string | null
           grading_type?: string
           id?: string
+          integration_connection_id?: string | null
           is_published?: boolean
           max_score?: number | null
           subjects?: string[]
@@ -1599,10 +1619,12 @@ export type Database = {
           class_id?: string | null
           created_at?: string | null
           curriculum_type?: string | null
+          external_id?: string | null
           grade_id?: string | null
           grade_scale_id?: string | null
           grading_type?: string
           id?: string
+          integration_connection_id?: string | null
           is_published?: boolean
           max_score?: number | null
           subjects?: string[]
@@ -1636,7 +1658,71 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "class_assessments_integration_connection_id_fkey"
+            columns: ["integration_connection_id"]
+            isOneToOne: false
+            referencedRelation: "integration_connections"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "class_assessments_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      class_differentiation_plans: {
+        Row: {
+          class_id: string
+          created_at: string
+          id: string
+          is_published: boolean
+          plan_data: Json
+          published_at: string | null
+          subject: string
+          teacher_id: string
+          term: number
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          class_id: string
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          plan_data: Json
+          published_at?: string | null
+          subject: string
+          teacher_id: string
+          term: number
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          class_id?: string
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          plan_data?: Json
+          published_at?: string | null
+          subject?: string
+          teacher_id?: string
+          term?: number
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_differentiation_plans_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "teacher_classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_differentiation_plans_teacher_id_fkey"
             columns: ["teacher_id"]
             isOneToOne: false
             referencedRelation: "teachers"
@@ -3789,6 +3875,95 @@ export type Database = {
           },
         ]
       }
+      evidence_audit_log: {
+        Row: {
+          actor: string
+          event_type: string
+          evidence_id: string
+          id: string
+          metadata: Json
+          new_state: string
+          occurred_at: string
+          previous_state: string | null
+          reason: string | null
+        }
+        Insert: {
+          actor: string
+          event_type: string
+          evidence_id: string
+          id?: string
+          metadata?: Json
+          new_state: string
+          occurred_at?: string
+          previous_state?: string | null
+          reason?: string | null
+        }
+        Update: {
+          actor?: string
+          event_type?: string
+          evidence_id?: string
+          id?: string
+          metadata?: Json
+          new_state?: string
+          occurred_at?: string
+          previous_state?: string | null
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evidence_audit_log_evidence_id_fkey"
+            columns: ["evidence_id"]
+            isOneToOne: false
+            referencedRelation: "learner_evidence"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      evidence_projection_events: {
+        Row: {
+          event_type: string
+          evidence_id: string
+          id: string
+          learner_id: string
+          metadata: Json
+          occurred_at: string
+          processed_at: string | null
+        }
+        Insert: {
+          event_type: string
+          evidence_id: string
+          id?: string
+          learner_id: string
+          metadata?: Json
+          occurred_at?: string
+          processed_at?: string | null
+        }
+        Update: {
+          event_type?: string
+          evidence_id?: string
+          id?: string
+          learner_id?: string
+          metadata?: Json
+          occurred_at?: string
+          processed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evidence_projection_events_evidence_id_fkey"
+            columns: ["evidence_id"]
+            isOneToOne: false
+            referencedRelation: "learner_evidence"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evidence_projection_events_learner_id_fkey"
+            columns: ["learner_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feature_requests: {
         Row: {
           admin_notes: string | null
@@ -4076,8 +4251,10 @@ export type Database = {
           holiday_days: number
           holiday_period: string
           id: string
+          is_published: boolean
           parent_opened_at: string | null
           plan_data: Json
+          published_at: string | null
           school_id: string | null
           student_id: string
           teacher_id: string | null
@@ -4092,8 +4269,10 @@ export type Database = {
           holiday_days?: number
           holiday_period: string
           id?: string
+          is_published?: boolean
           parent_opened_at?: string | null
           plan_data?: Json
+          published_at?: string | null
           school_id?: string | null
           student_id: string
           teacher_id?: string | null
@@ -4108,8 +4287,10 @@ export type Database = {
           holiday_days?: number
           holiday_period?: string
           id?: string
+          is_published?: boolean
           parent_opened_at?: string | null
           plan_data?: Json
+          published_at?: string | null
           school_id?: string | null
           student_id?: string
           teacher_id?: string | null
@@ -4136,6 +4317,132 @@ export type Database = {
           },
           {
             foreignKeyName: "holiday_plans_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      holiday_returns: {
+        Row: {
+          created_at: string
+          id: string
+          ingestion_run_id: string | null
+          student_id: string
+          teacher_comment: string | null
+          teacher_id: string
+          term: number
+          updated_at: string
+          weeks_assigned: number
+          weeks_completed: number
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ingestion_run_id?: string | null
+          student_id: string
+          teacher_comment?: string | null
+          teacher_id: string
+          term: number
+          updated_at?: string
+          weeks_assigned: number
+          weeks_completed: number
+          year: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ingestion_run_id?: string | null
+          student_id?: string
+          teacher_comment?: string | null
+          teacher_id?: string
+          term?: number
+          updated_at?: string
+          weeks_assigned?: number
+          weeks_completed?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "holiday_returns_ingestion_run_id_fkey"
+            columns: ["ingestion_run_id"]
+            isOneToOne: false
+            referencedRelation: "ingestion_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "holiday_returns_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "holiday_returns_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ingestion_runs: {
+        Row: {
+          completed_at: string | null
+          confirmed_count: number
+          created_at: string
+          failure_reason: string | null
+          id: string
+          initiated_by: string
+          institution: string | null
+          pending_review_count: number
+          processing_duration_ms: number | null
+          record_count: number
+          rejected_count: number
+          source: string
+          started_at: string
+          status: string
+          teacher_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          confirmed_count?: number
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          initiated_by: string
+          institution?: string | null
+          pending_review_count?: number
+          processing_duration_ms?: number | null
+          record_count?: number
+          rejected_count?: number
+          source: string
+          started_at?: string
+          status?: string
+          teacher_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          confirmed_count?: number
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          initiated_by?: string
+          institution?: string | null
+          pending_review_count?: number
+          processing_duration_ms?: number | null
+          record_count?: number
+          rejected_count?: number
+          source?: string
+          started_at?: string
+          status?: string
+          teacher_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ingestion_runs_teacher_id_fkey"
             columns: ["teacher_id"]
             isOneToOne: false
             referencedRelation: "teachers"
@@ -4416,6 +4723,60 @@ export type Database = {
           slug?: string
         }
         Relationships: []
+      }
+      integration_connections: {
+        Row: {
+          config: Json
+          created_at: string
+          developer_id: string
+          id: string
+          integration_type: string
+          last_sync_at: string | null
+          name: string
+          status: string
+          teacher_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          developer_id: string
+          id?: string
+          integration_type: string
+          last_sync_at?: string | null
+          name: string
+          status?: string
+          teacher_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          developer_id?: string
+          id?: string
+          integration_type?: string
+          last_sync_at?: string | null
+          name?: string
+          status?: string
+          teacher_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_connections_developer_id_fkey"
+            columns: ["developer_id"]
+            isOneToOne: false
+            referencedRelation: "developer_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_connections_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       intervention_log: {
         Row: {
@@ -4879,6 +5240,137 @@ export type Database = {
           },
         ]
       }
+      learner_evidence: {
+        Row: {
+          academic_year: number
+          assessment_type: string
+          cbc_level: number | null
+          confidence_formula_version: string
+          created_at: string
+          evidence_confidence: number
+          evidence_source: string
+          extracted_external_id: string | null
+          extracted_name: string
+          extraction_method: string
+          id: string
+          ingestion_run_id: string
+          issues: Json
+          learner_id: string | null
+          lifecycle_state: string
+          raw_input_ref: string
+          raw_subject: string
+          retracted_at: string | null
+          retracted_by: string | null
+          retraction_reason: string | null
+          review_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          score: number | null
+          subject: string
+          superseded_by: string | null
+          supersedes: string | null
+          term: number | null
+          trust_tier: number
+          updated_at: string
+          verification_state: string
+        }
+        Insert: {
+          academic_year: number
+          assessment_type: string
+          cbc_level?: number | null
+          confidence_formula_version?: string
+          created_at?: string
+          evidence_confidence: number
+          evidence_source: string
+          extracted_external_id?: string | null
+          extracted_name: string
+          extraction_method: string
+          id?: string
+          ingestion_run_id: string
+          issues?: Json
+          learner_id?: string | null
+          lifecycle_state: string
+          raw_input_ref: string
+          raw_subject: string
+          retracted_at?: string | null
+          retracted_by?: string | null
+          retraction_reason?: string | null
+          review_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          score?: number | null
+          subject: string
+          superseded_by?: string | null
+          supersedes?: string | null
+          term?: number | null
+          trust_tier: number
+          updated_at?: string
+          verification_state?: string
+        }
+        Update: {
+          academic_year?: number
+          assessment_type?: string
+          cbc_level?: number | null
+          confidence_formula_version?: string
+          created_at?: string
+          evidence_confidence?: number
+          evidence_source?: string
+          extracted_external_id?: string | null
+          extracted_name?: string
+          extraction_method?: string
+          id?: string
+          ingestion_run_id?: string
+          issues?: Json
+          learner_id?: string | null
+          lifecycle_state?: string
+          raw_input_ref?: string
+          raw_subject?: string
+          retracted_at?: string | null
+          retracted_by?: string | null
+          retraction_reason?: string | null
+          review_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          score?: number | null
+          subject?: string
+          superseded_by?: string | null
+          supersedes?: string | null
+          term?: number | null
+          trust_tier?: number
+          updated_at?: string
+          verification_state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learner_evidence_ingestion_run_id_fkey"
+            columns: ["ingestion_run_id"]
+            isOneToOne: false
+            referencedRelation: "ingestion_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "learner_evidence_learner_id_fkey"
+            columns: ["learner_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "learner_evidence_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "learner_evidence"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "learner_evidence_supersedes_fkey"
+            columns: ["supersedes"]
+            isOneToOne: false
+            referencedRelation: "learner_evidence"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       learner_guardians: {
         Row: {
           can_receive_reports: boolean
@@ -5114,6 +5606,68 @@ export type Database = {
           {
             foreignKeyName: "learner_profiles_student_id_fkey"
             columns: ["student_id"]
+            isOneToOne: true
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      learner_projections: {
+        Row: {
+          confidence: number
+          coverage: number | null
+          created_at: string
+          evidence_count: number
+          evidence_diversity: number
+          freshness_days: number | null
+          id: string
+          last_computed: string
+          latest_evidence_at: string | null
+          learner_id: string
+          oldest_evidence_at: string | null
+          projection_version: string
+          projector_type: string
+          supporting_evidence_ids: string[]
+          value: Json
+        }
+        Insert: {
+          confidence: number
+          coverage?: number | null
+          created_at?: string
+          evidence_count?: number
+          evidence_diversity?: number
+          freshness_days?: number | null
+          id?: string
+          last_computed?: string
+          latest_evidence_at?: string | null
+          learner_id: string
+          oldest_evidence_at?: string | null
+          projection_version: string
+          projector_type: string
+          supporting_evidence_ids?: string[]
+          value: Json
+        }
+        Update: {
+          confidence?: number
+          coverage?: number | null
+          created_at?: string
+          evidence_count?: number
+          evidence_diversity?: number
+          freshness_days?: number | null
+          id?: string
+          last_computed?: string
+          latest_evidence_at?: string | null
+          learner_id?: string
+          oldest_evidence_at?: string | null
+          projection_version?: string
+          projector_type?: string
+          supporting_evidence_ids?: string[]
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learner_projections_learner_id_fkey"
+            columns: ["learner_id"]
             isOneToOne: false
             referencedRelation: "students"
             referencedColumns: ["id"]
@@ -7311,49 +7865,64 @@ export type Database = {
       }
       strand_assessments: {
         Row: {
-          assessment_id: string
+          assessment_id: string | null
+          class_id: string | null
           created_at: string
           id: string
           learner_notes: string | null
           marks: number | null
           rating: number
+          source: string
           strand: string
           student_id: string
           subject: string
+          teacher_id: string | null
           teacher_notes: string | null
+          term: number | null
           topic: string
           total_marks: number | null
           updated_at: string
+          year: number | null
         }
         Insert: {
-          assessment_id: string
+          assessment_id?: string | null
+          class_id?: string | null
           created_at?: string
           id?: string
           learner_notes?: string | null
           marks?: number | null
           rating: number
+          source?: string
           strand: string
           student_id: string
           subject: string
+          teacher_id?: string | null
           teacher_notes?: string | null
+          term?: number | null
           topic: string
           total_marks?: number | null
           updated_at?: string
+          year?: number | null
         }
         Update: {
-          assessment_id?: string
+          assessment_id?: string | null
+          class_id?: string | null
           created_at?: string
           id?: string
           learner_notes?: string | null
           marks?: number | null
           rating?: number
+          source?: string
           strand?: string
           student_id?: string
           subject?: string
+          teacher_id?: string | null
           teacher_notes?: string | null
+          term?: number | null
           topic?: string
           total_marks?: number | null
           updated_at?: string
+          year?: number | null
         }
         Relationships: [
           {
@@ -7364,10 +7933,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "strand_assessments_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "teacher_classes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "strand_assessments_student_id_fkey"
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "strand_assessments_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "teachers"
             referencedColumns: ["id"]
           },
         ]
@@ -7872,9 +8455,11 @@ export type Database = {
           current_pathway: string | null
           curriculum_type: string
           date_of_birth: string | null
+          external_id: string | null
           financial_tier: string | null
           grade: number
           id: string
+          integration_connection_id: string | null
           is_beta_tester: boolean
           level: string
           location_preference: Json | null
@@ -7904,9 +8489,11 @@ export type Database = {
           current_pathway?: string | null
           curriculum_type?: string
           date_of_birth?: string | null
+          external_id?: string | null
           financial_tier?: string | null
           grade: number
           id?: string
+          integration_connection_id?: string | null
           is_beta_tester?: boolean
           level: string
           location_preference?: Json | null
@@ -7936,9 +8523,11 @@ export type Database = {
           current_pathway?: string | null
           curriculum_type?: string
           date_of_birth?: string | null
+          external_id?: string | null
           financial_tier?: string | null
           grade?: number
           id?: string
+          integration_connection_id?: string | null
           is_beta_tester?: boolean
           level?: string
           location_preference?: Json | null
@@ -7961,6 +8550,13 @@ export type Database = {
           year_level?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "students_integration_connection_id_fkey"
+            columns: ["integration_connection_id"]
+            isOneToOne: false
+            referencedRelation: "integration_connections"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "students_teacher_id_fkey"
             columns: ["teacher_id"]
@@ -8340,9 +8936,11 @@ export type Database = {
           class_code: string
           created_at: string
           curriculum_level: string | null
+          external_id: string | null
           grade: number
           grade_cohort: string | null
           id: string
+          integration_connection_id: string | null
           name: string
           selected_subjects: string[] | null
           stream: string | null
@@ -8356,9 +8954,11 @@ export type Database = {
           class_code: string
           created_at?: string
           curriculum_level?: string | null
+          external_id?: string | null
           grade: number
           grade_cohort?: string | null
           id?: string
+          integration_connection_id?: string | null
           name: string
           selected_subjects?: string[] | null
           stream?: string | null
@@ -8372,9 +8972,11 @@ export type Database = {
           class_code?: string
           created_at?: string
           curriculum_level?: string | null
+          external_id?: string | null
           grade?: number
           grade_cohort?: string | null
           id?: string
+          integration_connection_id?: string | null
           name?: string
           selected_subjects?: string[] | null
           stream?: string | null
@@ -8384,6 +8986,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "teacher_classes_integration_connection_id_fkey"
+            columns: ["integration_connection_id"]
+            isOneToOne: false
+            referencedRelation: "integration_connections"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "teacher_classes_teacher_id_fkey"
             columns: ["teacher_id"]

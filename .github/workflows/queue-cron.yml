@@ -7,6 +7,9 @@
 # analytics.aggregate, data.import/export) still need something to drain
 # them, so this workflow pings the routes externally instead.
 #
+# Also drains evidence_projection_events (Projection Event Pipeline
+# activation) — same outbox-consumer pattern as events/dispatch above.
+#
 # GitHub Actions' shortest supported cron interval is 5 minutes (not the
 # 1-minute cadence the routes were designed for) — acceptable trade-off for
 # a free tier; revisit if queue latency becomes a problem.
@@ -48,5 +51,21 @@ jobs:
           echo "HTTP status: $STATUS"
           if [ "$STATUS" != "200" ]; then
             echo "❌ jobs/process failed with status $STATUS"
+            exit 1
+          fi
+
+  process-projection-events:
+    name: Process Projection Events
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/cron/projection-events/process
+        run: |
+          STATUS=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ vars.PRODUCTION_URL }}/api/cron/projection-events/process")
+          cat /tmp/response.json
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "❌ projection-events/process failed with status $STATUS"
             exit 1
           fi

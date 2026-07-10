@@ -19,6 +19,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react'
+import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 
 interface LessonPlan {
   id: string
@@ -324,7 +325,7 @@ export default function LessonPlansPage() {
 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-3 text-red-700 text-sm font-medium">
-          {error}
+          {friendlyMessage(error).message}
         </div>
       )}
 

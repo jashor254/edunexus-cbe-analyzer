@@ -1,11 +1,22 @@
 // lib/holiday/planner.ts
 // Generates a personalised holiday learning plan per student.
-// Based on: learner model gaps + career signals + holiday duration.
+// Based on: Projection (academic gaps) + Career Intelligence + holiday duration.
 // Light, focused, parent-friendly — not a worksheet mountain.
+//
+// Re-pointed to Projection per Adaptive Learning v2 Architecture §4
+// (docs/architecture/adaptive-learning-v2-architecture.md, FROZEN) — this
+// moves Holiday Planner from Legacy to Projection in the Migration Ledger.
+// Priority gaps are now subject-level, not substrand-level: the frozen
+// Projection Engine's `knowledgeProjector` is subject-level only (a named,
+// accepted Migration Ledger gap, per architecture §8 — not a bug in this
+// change, and not something this module works around with a parallel
+// substrand computation, per LI-1).
 
 import { repos } from '@/lib/repositories'
 import { callDeepSeek } from '@/lib/ai/deepseek'
-import { getOrCreateLearnerProfile } from '@/lib/learnerModel/queries'
+import { recomputeLearnerProjection } from '@/lib/projection/recompute'
+import { buildAdaptiveTask } from '@/lib/adaptiveLearning/recommend'
+import { buildCareerIntelligence } from '@/lib/learnerIntelligence/careerIntelligence'
 import type { HolidayPlanData, HolidayWeek } from './types'
 
 type PlanInput = {
@@ -19,59 +30,49 @@ type PlanInput = {
 }
 
 export async function generateHolidayPlan(input: PlanInput): Promise<HolidayPlanData> {
-  // 1. Load student profile
-  const [student, profile] = await Promise.all([
+  // 1. Load student basic info + current Projection — the one source every
+  // other Adaptive Learning channel reads (Recommendation Layer, §2 of the
+  // architecture). `buildCareerIntelligence` is best-effort: a learner with
+  // zero confirmed evidence yet still gets a plan, just without a career note.
+  const [student, projection, careerIntel] = await Promise.all([
     repos.learnerIntelligence.getStudentHolidayData(input.studentId),
-    getOrCreateLearnerProfile(input.studentId),
+    recomputeLearnerProjection(input.studentId),
+    buildCareerIntelligence(input.studentId).catch(() => null),
   ])
 
-  const studentName = student
-    ? `${student.first_name ?? ''} ${student.last_name ?? ''}`.trim()
-    : 'Student'
+  const studentName = student?.name?.trim() || 'Student'
   const grade = (student?.grade as number) ?? 8
 
-  // 2. Identify priority gaps from knowledge state
-  const priorityGaps: string[] = []
-  const knowledgeState = profile.knowledge_state ?? {}
+  // 2. Priority subjects, weakest first (subject-level — see module header).
+  const subjectPerformance = projection.academic ? Object.values(projection.academic.value.bySubject) : []
+  const priorityGaps = subjectPerformance
+    .filter(s => s.latestLevel <= 2)
+    .sort((a, b) => a.latestLevel - b.latestLevel)
+    .map(s => s.subject)
 
-  // Level 1 (BE) substrands are highest priority
-  const beSubstrands = Object.entries(knowledgeState)
-    .filter(([, m]) => m.level === 1)
-    .sort((a, b) => a[1].assessment_count - b[1].assessment_count)  // least assessed first
-    .map(([key]) => key.split(':')[1] ?? key)
-    .slice(0, 2)
-
-  // Level 2 (AE) substrands are secondary
-  const aeSubstrands = Object.entries(knowledgeState)
-    .filter(([, m]) => m.level === 2)
-    .map(([key]) => key.split(':')[1] ?? key)
-    .slice(0, 1)
-
-  priorityGaps.push(...beSubstrands, ...aeSubstrands)
-
-  // 3. Get career signals
-  const careerSlugs = (profile.career_signals as Record<string, unknown>)?.top_career_slugs as string[] | undefined
-  const weakestSubjects = (profile.career_signals as Record<string, unknown>)?.weakest_subjects as string[] | undefined
-
-  // Also check student's career interests directly
+  // 3. Career note — via the existing, already-Projection-sourced Career
+  // Intelligence module (Migration Ledger: Projection), not a bespoke read
+  // of career_signals.
   let careerNote: string | null = null
-  if (careerSlugs?.length) {
-    const career = await repos.learnerIntelligence.getCareerBySlug(careerSlugs[0])
-
-    if (career) {
-      const requiredSubjects = (career as unknown as { required_subjects?: string[] }).required_subjects ?? null
-      const weakRequiredSubject = requiredSubjects?.find(s =>
-        weakestSubjects?.some(w => w.toLowerCase().includes(s.toLowerCase()))
-      )
-      if (weakRequiredSubject) {
-        careerNote = `${career.title} requires strong ${weakRequiredSubject}. This holiday is a good time to strengthen it.`
-      } else {
-        careerNote = `Career path: ${career.title}. Keep building the subjects that matter for this path.`
-      }
-    }
+  if (careerIntel?.matches?.length) {
+    const top = careerIntel.matches[0]
+    careerNote = `${top.careerTitle} is a strong match for you. ${top.insight.action}`
+  } else if (careerIntel?.families?.length) {
+    const top = careerIntel.families[0]
+    careerNote = `Explore ${top.categoryLabel}. ${top.insight.action}`
   }
 
-  // 4. Build week structure
+  // 4. AdaptiveTasks for the top priority subjects, via the Recommendation
+  // Layer — the same function Classroom Differentiation and the Printable
+  // Pack read (one engine, per architecture §1). Each task's `.action` is
+  // Insight-backed (observation/evidence/confidence/action), giving the
+  // week's plain-language text a traceable, evidence-grounded source
+  // instead of a template string built from a raw substrand key.
+  const topTasks = priorityGaps
+    .slice(0, 2)
+    .map(subject => buildAdaptiveTask(input.studentId, studentName, subject, projection, { careerNote }))
+
+  // 5. Build week structure
   const holidayWeeks = Math.ceil(input.holidayDays / 7)
   const weeks: HolidayWeek[] = []
 
@@ -88,26 +89,31 @@ export async function generateHolidayPlan(input: PlanInput): Promise<HolidayPlan
       const isRestWeek = isLastWeek && holidayWeeks >= 3
 
       if (isRestWeek) {
+        const careerSlug = careerIntel?.matches?.[0]?.careerSlug
         weeks.push({
           week: w, label: `Week ${w} — Rest & Explore`,
-          compass_topics: careerSlugs?.length ? [careerSlugs[0]] : [],
+          compass_topics: careerSlug ? [careerSlug] : [],
           parent_action: 'Let your child rest. Congratulate them on the term.',
           student_task: `Optional: explore one career that interests you in the Career Explorer.`,
           is_rest_week: true,
         })
       } else if (w === 1) {
-        const topic = priorityGaps[0] ?? (weakestSubjects?.[0] ?? 'revision')
+        const task = topTasks[0]
+        const topic = task?.subject
         weeks.push({
           week: w, label: `Week ${w} — Consolidate`,
           compass_topics: topic ? [topic] : [],
-          parent_action: `Ask ${studentName.split(' ')[0]} to explain ${topic} in their own words — even 5 minutes counts.`,
+          parent_action: topic
+            ? `Ask ${studentName.split(' ')[0]} to explain ${topic} in their own words — even 5 minutes counts.`
+            : 'Have a brief conversation about what was learned this term.',
           student_task: topic
             ? `Complete 2 Compass sessions on "${topic}". Take your time — no rush.`
             : 'Review your notes from this term. Identify one concept you want to understand better.',
           is_rest_week: false,
         })
       } else if (w === 2) {
-        const topic = priorityGaps[1] ?? weakestSubjects?.[1] ?? priorityGaps[0]
+        const task = topTasks[1] ?? topTasks[0]
+        const topic = task?.subject
         weeks.push({
           week: w, label: `Week ${w} — Strengthen`,
           compass_topics: topic ? [topic] : [],
@@ -131,7 +137,7 @@ export async function generateHolidayPlan(input: PlanInput): Promise<HolidayPlan
     }
   }
 
-  // 5. Build parent WhatsApp message
+  // 6. Build parent WhatsApp message
   const firstName = studentName.split(' ')[0]
   const topGap = priorityGaps[0]
   const compassCount = weeks.reduce((s, w) => s + w.compass_topics.length, 0)
@@ -156,14 +162,14 @@ export async function generateHolidayPlan(input: PlanInput): Promise<HolidayPlan
     parent_summary:  parentSummary,
   }
 
-  // 6. Enrich with AI for a more personalised narrative
-  const enriched = await enrichPlanWithAI(planData, student?.dream_career as string | null)
+  // 7. Enrich with AI for a more personalised narrative
+  const enriched = await enrichPlanWithAI(planData, null)
   if (enriched) {
     planData.whatsapp_message = enriched.whatsappMessage ?? planData.whatsapp_message
     planData.parent_summary   = enriched.parentSummary   ?? planData.parent_summary
   }
 
-  // 7. Persist
+  // 8. Persist
   await repos.learnerIntelligence.upsertHolidayPlan({
     student_id:     input.studentId,
     teacher_id:     input.teacherId,
@@ -178,26 +184,92 @@ export async function generateHolidayPlan(input: PlanInput): Promise<HolidayPlan
   return planData
 }
 
+// ── Publish (teacher approval gate) ───────────────────────────────────────────
+// A generated plan is a draft until a teacher explicitly approves it — nothing
+// reaches a parent through the Learner Blueprint before that (see
+// lib/learnerIntelligence/blueprint.ts). Bulk publish covers the whole class
+// roster the plans were generated for.
+
+export async function publishHolidayPlan(
+  studentId: string,
+  teacherId: string,
+  term:      number,
+  year:      number,
+): Promise<number> {
+  return repos.learnerIntelligence.publishHolidayPlans({ teacherId, term, year, studentIds: [studentId] })
+}
+
+export async function publishClassHolidayPlans(
+  classId:   string,
+  teacherId: string,
+  term:      number,
+  year:      number,
+): Promise<number> {
+  const studentIds = await repos.learnerIntelligence.getClassEnrollment(classId)
+  return repos.learnerIntelligence.publishHolidayPlans({ teacherId, term, year, studentIds })
+}
+
 // ── Batch generate for a whole class ─────────────────────────────────────────
 
 type BatchInput = Omit<PlanInput, 'studentId'>
 type BatchResult = { studentId: string; studentName: string; plan: HolidayPlanData | null; error?: string }
 
+export type HolidayBatchProgress = {
+  phase:               'started' | 'done'
+  total:               number
+  completed:           number
+  generated:           number
+  failed:              number
+  currentStudentName:  string
+  failedStudents:      Array<{ studentId: string; studentName: string; reason: string }>
+}
+
+/**
+ * Generate holiday plans for a class (or, when `studentIds` is passed, for
+ * just that subset — used by "Retry Failed Only" so a partial failure never
+ * requires regenerating the students that already succeeded).
+ *
+ * `onProgress` fires twice per student (started, then done) so a caller can
+ * show live "Generating: <name>" text plus running generated/failed counts
+ * instead of a single opaque wait — see app/api/holiday/generate/route.ts,
+ * which persists each event onto a `jobs` row so the UI can poll it and
+ * survive the teacher navigating away mid-generation.
+ */
 export async function generateClassHolidayPlans(
-  classId:  string,
-  input:    BatchInput,
+  classId:    string,
+  input:      BatchInput,
+  onProgress?: (event: HolidayBatchProgress) => void | Promise<void>,
+  studentIds?: string[],
 ): Promise<BatchResult[]> {
-  const enrollment = await repos.learnerIntelligence.getClassEnrollment(classId)
+  const enrollment = studentIds ?? await repos.learnerIntelligence.getClassEnrollment(classId)
   if (!enrollment.length) return []
+
+  const names = await repos.learnerIntelligence.getStudentNamesByIds(enrollment)
+  const nameById = new Map(names.map(n => [n.id, n.name?.trim() || n.id]))
+
+  let completed = 0
+  let generated = 0
+  let failed = 0
+  const failedStudents: Array<{ studentId: string; studentName: string; reason: string }> = []
+
+  const emit = (phase: HolidayBatchProgress['phase'], currentStudentName: string) =>
+    onProgress?.({ total: enrollment.length, completed, generated, failed, currentStudentName, failedStudents: [...failedStudents], phase })
 
   const results = await Promise.allSettled(
     enrollment.map(async (studentId) => {
-      const plan = await generateHolidayPlan({ studentId, ...input })
-      const s = await repos.learnerIntelligence.getStudentNameById(studentId)
-      return {
-        studentId,
-        studentName: s ? `${s.first_name ?? ''} ${s.last_name ?? ''}`.trim() : studentId,
-        plan,
+      const studentName = nameById.get(studentId) ?? studentId
+      await emit('started', studentName)
+      try {
+        const plan = await generateHolidayPlan({ studentId, ...input })
+        completed++; generated++
+        await emit('done', studentName)
+        return { studentId, studentName, plan }
+      } catch (err) {
+        completed++; failed++
+        const reason = err instanceof Error ? err.message : String(err)
+        failedStudents.push({ studentId, studentName, reason })
+        await emit('done', studentName)
+        throw err
       }
     })
   )
@@ -205,7 +277,8 @@ export async function generateClassHolidayPlans(
   return results.map((r, i) => {
     const id = enrollment[i]
     if (r.status === 'fulfilled') return r.value as BatchResult
-    return { studentId: id, studentName: id, plan: null, error: String((r as PromiseRejectedResult).reason) }
+    const failedEntry = failedStudents.find(f => f.studentId === id)
+    return { studentId: id, studentName: nameById.get(id) ?? id, plan: null, error: failedEntry?.reason ?? String((r as PromiseRejectedResult).reason) }
   })
 }
 

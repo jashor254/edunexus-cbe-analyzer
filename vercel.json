@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/generate-record-of-work",
       "schedule": "0 3 * * 1"
+    },
+    {
+      "path": "/api/cron/auto-publish-holiday-plans",
+      "schedule": "0 6 * * *"
     }
   ]
 }

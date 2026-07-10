@@ -13,12 +13,15 @@
 import { createClient }        from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
-import { getClassLearnerProfiles, getAtRiskStudents } from '@/lib/learnerModel/queries'
+import { getClassLearnerProfiles } from '@/lib/learnerModel/queries'
+import { findPrerequisiteAlerts } from '@/lib/knowledgeGraph/prerequisiteAlerts'
+import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import type {
   StudentIntelligenceSummary, ClassIntelligencePanel,
   TeachingPatternInsight, PrerequisiteAlert,
-  InterventionCheckin, CareerMicroMoment,
+  InterventionCheckin, CareerMicroMoment, RiskLevel,
 } from '@/lib/learnerModel/types'
+import type { LearnerIntelligenceProjection } from '@/lib/projection/types'
 
 export async function GET(req: Request): Promise<Response> {
   try {
@@ -59,24 +62,34 @@ export async function GET(req: Request): Promise<Response> {
     }
 
     // ── Fetch base data in parallel ───────────────────────────────────────────
-    const [atRisk, allProfiles] = await Promise.all([
-      getAtRiskStudents(classId, 'watch'),
-      getClassLearnerProfiles(classId),
-    ])
+    const allProfiles = await getClassLearnerProfiles(classId)
+    const allIds       = allProfiles.map(p => p.student_id)
 
-    const atRiskIds = atRisk.map(p => p.student_id)
-    const allIds    = allProfiles.map(p => p.student_id)
+    // Batch-recompute Projection risk for the whole class — the same risk
+    // engine already used by Blueprint, Career Intelligence, Parent
+    // Intelligence, and the Attention Feed. Replaces the legacy
+    // overall_risk_level-based getAtRiskStudents() query. Per-flag detail
+    // (top_flags/buildAction() below) stays on learner_profiles.risk_flags —
+    // Projection's flags have no `type`/`substrand` taxonomy to drive those
+    // action templates. See docs/architecture/migration-ledger.md.
+    const projections = new Map<string, LearnerIntelligenceProjection>(
+      await Promise.all(
+        allProfiles.map(async p => [p.student_id, await recomputeLearnerProjection(p.student_id)] as const)
+      )
+    )
+    const riskOrder: Record<RiskLevel, number> = { normal: 0, watch: 1, at_risk: 2, critical: 3 }
+    const projectionRisk = (studentId: string): RiskLevel =>
+      projections.get(studentId)?.risk?.value.overallRiskLevel ?? 'normal'
+
+    const atRisk = allProfiles.filter(p => riskOrder[projectionRisk(p.student_id)] >= riskOrder.watch)
 
     const { data: students } = await db
       .from('students')
-      .select('id, first_name, last_name')
+      .select('id, name')
       .in('id', allIds)
 
     const nameMap = new Map(
-      (students ?? []).map(s => [
-        s.id as string,
-        `${s.first_name ?? ''} ${s.last_name ?? ''}`.trim()
-      ])
+      (students ?? []).map(s => [s.id as string, (s.name as string) ?? ''])
     )
 
     const capabilityMap = new Map(
@@ -88,20 +101,20 @@ export async function GET(req: Request): Promise<Response> {
 
     // ── Layer 1: Students needing attention (enhanced) ────────────────────────
     const summaries: StudentIntelligenceSummary[] = atRisk
-      .sort((a, b) => {
-        const order = { critical: 3, at_risk: 2, watch: 1, normal: 0 }
-        return order[b.overall_risk_level] - order[a.overall_risk_level]
-      })
+      .sort((a, b) => riskOrder[projectionRisk(b.student_id)] - riskOrder[projectionRisk(a.student_id)])
       .slice(0, 8)
       .map(profile => {
         const name    = nameMap.get(profile.student_id) ?? `Student (${profile.student_id.slice(-4)})`
         const topFlag = profile.risk_flags?.[0]
         const flags   = profile.risk_flags ?? []
 
-        // How many consecutive weeks at risk — from risk_history
+        // How many consecutive weeks at risk — from risk_history. Duration
+        // itself has no Projection equivalent (documented gap), but "is this
+        // student currently at_risk/critical" is gated by Projection's risk
+        // level, not the legacy one.
         const weeksAtRisk = profile.risk_history
           .filter(r => !r.resolved_at && ['at_risk', 'critical'].includes(
-            profile.overall_risk_level
+            projectionRisk(profile.student_id)
           ))
           .reduce((max, r) => Math.max(max, r.consecutive_weeks ?? 0), 0)
 
@@ -111,7 +124,7 @@ export async function GET(req: Request): Promise<Response> {
 
         if (weakDim) {
           const helper = allProfiles
-            .filter(p => p.student_id !== profile.student_id && p.overall_risk_level === 'normal')
+            .filter(p => p.student_id !== profile.student_id && projectionRisk(p.student_id) === 'normal')
             .sort((a, b) => {
               const aScore = ((a.capability_dimensions as Record<string, { raw_score?: number }>)[weakDim]?.raw_score ?? 0)
               const bScore = ((b.capability_dimensions as Record<string, { raw_score?: number }>)[weakDim]?.raw_score ?? 0)
@@ -135,7 +148,7 @@ export async function GET(req: Request): Promise<Response> {
         return {
           student_id:          profile.student_id,
           student_name:        name,
-          risk_level:          profile.overall_risk_level,
+          risk_level:          projectionRisk(profile.student_id),
           top_flags:           flags.slice(0, 2),
           action:              buildAction(topFlag, firstName) + urgency,
           peer_pairing:        peerPairing,
@@ -176,7 +189,7 @@ export async function GET(req: Request): Promise<Response> {
         ?? lessons.find(l => (l.weekNumber ?? 0) === currentWeek)
 
       if (upcomingLesson?.subStrand) {
-        const alerts = await checkPrerequisiteReadiness(
+        const alerts = await findPrerequisiteAlerts(
           db, allProfiles, nameMap, cls.subject as string, upcomingLesson.subStrand
         )
         prerequisiteAlerts.push(...alerts)
@@ -255,10 +268,10 @@ export async function GET(req: Request): Promise<Response> {
     }
 
     // ── Class trajectory ──────────────────────────────────────────────────────
-    const criticalCount = allProfiles.filter(p => p.overall_risk_level === 'critical').length
-    const atRiskCount   = allProfiles.filter(p => p.overall_risk_level === 'at_risk').length
-    const watchCount    = allProfiles.filter(p => p.overall_risk_level === 'watch').length
-    const normalCount   = allProfiles.filter(p => p.overall_risk_level === 'normal').length
+    const criticalCount = allProfiles.filter(p => projectionRisk(p.student_id) === 'critical').length
+    const atRiskCount   = allProfiles.filter(p => projectionRisk(p.student_id) === 'at_risk').length
+    const watchCount    = allProfiles.filter(p => projectionRisk(p.student_id) === 'watch').length
+    const normalCount   = allProfiles.filter(p => projectionRisk(p.student_id) === 'normal').length
     const total         = allProfiles.length
 
     const trajectory = buildTrajectoryMessage(total, normalCount, watchCount, atRiskCount, criticalCount)
@@ -353,87 +366,6 @@ function buildTeachingPatterns(rows: FormativeRow[]): TeachingPatternInsight[] {
   }
 
   return patterns.sort((a, b) => b.count - a.count).slice(0, 3)
-}
-
-// ── Layer 3: Prerequisite readiness check ────────────────────────────────────
-
-async function checkPrerequisiteReadiness(
-  db:          ReturnType<typeof createServiceClient>,
-  profiles:    Awaited<ReturnType<typeof getClassLearnerProfiles>>,
-  nameMap:     Map<string, string>,
-  subject:     string,
-  subStrand:   string,
-): Promise<PrerequisiteAlert[]> {
-  // Find the knowledge node for this substrand
-  const { data: node } = await db
-    .from('knowledge_nodes')
-    .select('id, name, strand, remediation, weak_mastery_signs')
-    .eq('subject', subject.toLowerCase())
-    .or(`name.ilike.%${subStrand}%,strand.ilike.%${subStrand}%`)
-    .limit(1)
-    .maybeSingle()
-
-  if (!node) return []
-
-  // Find prerequisite edges
-  const { data: edges } = await db
-    .from('knowledge_edges')
-    .select('prerequisite_node_id, weight')
-    .eq('dependent_node_id', node.id as string)
-    .order('weight', { ascending: false })
-    .limit(3)
-
-  if (!edges?.length) return []
-
-  const prereqIds = edges.map(e => e.prerequisite_node_id as string)
-  const { data: prereqNodes } = await db
-    .from('knowledge_nodes')
-    .select('id, name, strand, remediation')
-    .in('id', prereqIds)
-
-  const alerts: PrerequisiteAlert[] = []
-
-  for (const prereq of prereqNodes ?? []) {
-    const prereqName    = prereq.name as string
-    const prereqStrand  = prereq.strand as string
-
-    // Check which students are missing this prerequisite
-    const affectedStudents: string[] = []
-    for (const profile of profiles) {
-      const state = profile.knowledge_state
-      const matchKey = Object.keys(state).find(k =>
-        k.toLowerCase().includes(prereqName.toLowerCase()) ||
-        k.toLowerCase().includes(prereqStrand.toLowerCase())
-      )
-      if (!matchKey || state[matchKey].level <= 2) {
-        affectedStudents.push(profile.student_id)
-      }
-    }
-
-    const pctAffected = profiles.length > 0
-      ? Math.round((affectedStudents.length / profiles.length) * 100)
-      : 0
-
-    if (pctAffected < 20) continue
-
-    const studentNames = affectedStudents
-      .slice(0, 5)
-      .map(id => nameMap.get(id)?.split(' ')[0] ?? id.slice(-4))
-
-    const remediation = (prereq.remediation as string[] | null)?.[0]
-      ?? `Review "${prereqName}" before proceeding`
-
-    alerts.push({
-      lesson_substrand:  subStrand,
-      missing_prereq:    prereqName,
-      students_affected: affectedStudents.length,
-      pct_affected:      pctAffected,
-      suggested_warmup:  remediation,
-      student_names:     studentNames,
-    })
-  }
-
-  return alerts
 }
 
 // ── Class trajectory message ──────────────────────────────────────────────────

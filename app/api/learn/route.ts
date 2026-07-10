@@ -1,7 +1,8 @@
 // app/api/learn/route.ts
 import { createServiceClient } from '@/utils/supabase/service'
 import { streamDeepSeek } from '@/lib/ai/deepseek'
-import { getOrCreateSession, readSession, writeSession, resolveSubject, recordExchange } from '@/lib/compass/session'
+import { getOrCreateSession, readSession, writeSession, resolveSubject, recordExchange, tierToLevel } from '@/lib/compass/session'
+import { resolveCompassStudentAccess } from '@/lib/compass/ownership'
 import { buildCompassPrompt, type CompassPromptParams, type KnowledgeContextBlock } from '@/lib/compass/prompt'
 import type { RootCauseResult } from '@/lib/knowledgeGraph/types'
 import { getGradeTopics } from '@/lib/compass/topics'
@@ -38,16 +39,6 @@ function detectMode(date: Date): { mode: 'school' | 'holiday'; holidayWeek?: num
   ) + 1))
 
   return { mode: 'holiday', holidayWeek: week }
-}
-
-// Maps DB tier string to 1–4.
-// Current values: 'challenge' | 'standard' | 'reinforcement' | 'remedial'
-// Legacy fallback handles old 'approaching_expectations' style strings.
-function tierToLevel(tier: string): 1 | 2 | 3 | 4 {
-  if (tier === 'challenge'     || tier.includes('exceeding'))   return 4
-  if (tier === 'standard'      || tier.includes('meeting'))     return 3
-  if (tier === 'reinforcement' || tier.includes('approaching')) return 2
-  return 1 // remedial or unknown
 }
 
 // Keywords that unambiguously belong to maths — not to any science subject
@@ -100,7 +91,6 @@ export async function POST(req: Request) {
       lockedSubstrand,
       lockedGrade,
       isRevision = false,
-      sessionState,
       subjectLevel,
       conversationHistory,
     } = await req.json()
@@ -138,9 +128,9 @@ export async function POST(req: Request) {
       // Session history (only if resuming)
       sessionId ? readSession(sessionId, studentId) : Promise.resolve(null),
 
-      // Student profile (parent_user_id used for ownership verification)
+      // Student profile
       db.from('students')
-        .select('name, grade, current_pathway, parent_user_id')
+        .select('name, grade, current_pathway')
         .eq('id', studentId)
         .maybeSingle(),
 
@@ -182,9 +172,9 @@ export async function POST(req: Request) {
     }
 
     // ── Ownership: verify this student belongs to the authenticated user ───────
-    const studentOwner = studentResult.data?.parent_user_id ?? null
     if (!studentResult.data) return apiError('Student not found', 404)
-    if (studentOwner !== access.userId) return apiError('Access denied', 403)
+    const ownership = await resolveCompassStudentAccess(access.userId, studentId)
+    if (!ownership.allowed) return apiError('Access denied', 403)
 
     // ── Daily abuse-prevention cap ────────────────────────────────────────────
     const rateLimit = await checkDailyCallLimit(access.userId, FEATURE)
@@ -212,7 +202,6 @@ export async function POST(req: Request) {
     const subject = resolveSubject(
       {
         lockedSubject,
-        sessionSubject: (sessionState as { currentSubject?: string } | null)?.currentSubject,
         message,
       },
       savedSession
@@ -482,6 +471,14 @@ export async function POST(req: Request) {
           }
         }
 
+        // A substrand the AI itself assessed as genuine progress this exchange
+        // counts as evidence of mastery for the Learner Model at session end.
+        const priorMastered = savedSession?.masteredConcepts ?? []
+        const masteredConcepts =
+          parsedEval?.genuine_progress && activeSubstrand && !priorMastered.includes(activeSubstrand)
+            ? [...priorMastered, activeSubstrand].slice(-20)
+            : priorMastered
+
         // Save session state
         await writeSession(activeSessionId, {
           lockedSubject:    lockedSubject    || savedSession?.lockedSubject    || null,
@@ -490,9 +487,8 @@ export async function POST(req: Request) {
           isRevision,
           studentGrade:     grade,
           overallLevel:     level,
-          consecutiveRight: savedSession?.consecutiveRight ?? 0,
-          consecutiveWrong: savedSession?.consecutiveWrong ?? 0,
           initialized:      true,
+          masteredConcepts,
         })
 
         // Log messages

@@ -3,11 +3,19 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { redirect } from 'next/navigation'
 import TeacherSidebar from '@/components/teacher/TeacherSidebar'
 import { VideoOnboardingModal } from '@/components/video-onboarding-modal'
+import { getUserRoles } from '@/lib/auth/getRole'
 
 export default async function TeacherLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  // Single canonical role lookup — see lib/auth/getRole.ts. proxy.ts has
+  // already gated this route with the same function; this second check is
+  // defense in depth, not a second source of truth.
+  const roles = await getUserRoles(user.id)
+  const canAccessTeacher = roles.primary === 'teacher' || roles.secondary === 'teacher'
+  if (!canAccessTeacher) redirect('/dashboard')
 
   const db = createServiceClient()
 
@@ -18,21 +26,8 @@ export default async function TeacherLayout({ children }: { children: React.Reac
     .maybeSingle()
 
   if (!teacher) {
-    // No teacher record — check if they are a parent/student without teacher access
-    const { data: profile } = await db
-      .from('profiles')
-      .select('role, secondary_role')
-      .eq('id', user.id)   // profiles.id = auth user UUID
-      .maybeSingle()
-
-    const isParentOrStudent = profile?.role === 'parent' || profile?.role === 'student'
-    const hasTeacherAccess  = profile?.secondary_role === 'teacher'
-
-    if (isParentOrStudent && !hasTeacherAccess) {
-      redirect('/dashboard')
-    }
-
-    // No teacher row + no blocking role → allow through (teacher setup flow)
+    // Role granted but the teachers row (setup) doesn't exist yet — allow
+    // through for the /teacher/setup flow.
     return <>{children}</>
   }
 

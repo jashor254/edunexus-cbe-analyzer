@@ -1,6 +1,6 @@
 import { checkFeatureAccess } from '@/lib/payments/access'
 import { getStudentProgress } from '@/lib/learn/progress'
-import { createServiceClient } from '@/utils/supabase/service'
+import { resolveCompassStudentAccess } from '@/lib/compass/ownership'
 import { apiSuccess, apiError, apiForbidden } from '@/lib/api/response'
 
 export async function GET(req: Request): Promise<Response> {
@@ -14,15 +14,8 @@ export async function GET(req: Request): Promise<Response> {
       return apiError(access.reason, access.reason === 'unauthenticated' ? 401 : 403)
     }
 
-    const db = createServiceClient()
-    const { data: student } = await db
-      .from('students')
-      .select('id')
-      .eq('id', studentId)
-      .or(`user_id.eq.${access.userId},parent_user_id.eq.${access.userId}`)
-      .maybeSingle()
-
-    if (!student) return apiForbidden()
+    const ownership = await resolveCompassStudentAccess(access.userId, studentId)
+    if (!ownership.allowed) return apiForbidden()
 
     const progress = await getStudentProgress(studentId)
     return apiSuccess({ progress })
