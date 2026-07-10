@@ -11,7 +11,7 @@ import type {
 } from './types'
 
 // Mastery threshold — a rating of 3 (Meeting Expectations) or above is considered mastered
-const MASTERY_THRESHOLD = 3
+export const MASTERY_THRESHOLD = 3
 const DEFAULT_MAX_DEPTH  = 4
 
 // Cache node + edge data within a single traversal call to avoid redundant DB queries

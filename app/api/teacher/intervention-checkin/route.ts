@@ -8,6 +8,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
 import { recomputeRiskFlags } from '@/lib/learnerModel/updater'
+import { recordInterventionCheckinEvidence } from '@/lib/remedial/interventionEvidence'
 import type { InterventionCheckin } from '@/lib/learnerModel/types'
 
 // ── GET ───────────────────────────────────────────────────────────────────────
@@ -136,7 +137,7 @@ export async function POST(req: Request): Promise<Response> {
     // Verify teacher owns this intervention — never trust ids from request body
     const { data: existing, error: fetchErr } = await db
       .from('intervention_log')
-      .select('id, teacher_id')
+      .select('id, teacher_id, subject, substrand')
       .eq('id', interventionId)
       .eq('student_id', studentId)
       .maybeSingle()
@@ -163,6 +164,18 @@ export async function POST(req: Request): Promise<Response> {
         console.error('[intervention-checkin POST] recomputeRiskFlags failed', err)
       })
     }
+
+    recordInterventionCheckinEvidence({
+      studentId,
+      teacherId: teacher.id,
+      teacherUserId: user.id,
+      subject: (existing.subject as string | null) ?? null,
+      subStrand: (existing.substrand as string | null) ?? null,
+      outcome,
+      recordedAt: new Date().toISOString(),
+    }).catch(err => {
+      console.error('[intervention-checkin POST] evidence emission failed', err)
+    })
 
     return apiSuccess({ recorded: true, outcome })
   } catch (e: unknown) {

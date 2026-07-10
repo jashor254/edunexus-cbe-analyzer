@@ -12,9 +12,8 @@
 
 import { getNodesForSubjectGrade, getEdgesForSubjectGrade, buildStudentNodeData } from './queries'
 import { transitiveDependents } from './forwardTraversal'
+import { MASTERY_THRESHOLD } from './traversal'
 import type { KnowledgeNode, KnowledgeEdge, StudentNodeData } from './types'
-
-const MASTERY_THRESHOLD = 3
 
 export type QuickWin = {
   nodeId:             string
