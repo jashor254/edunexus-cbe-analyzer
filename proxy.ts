@@ -29,6 +29,8 @@ const PUBLIC_PREFIXES = [
   '/signup',
   '/pricing',
   '/legal',
+  '/about',
+  '/insights',
   '/auth',
   '/join',
   '/shared',
