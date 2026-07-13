@@ -21,7 +21,7 @@ export type GradeCategory =
   | 'upper_primary'
   | 'junior_secondary'
 
-export type SubjectCategory = 'pre_primary' | 'primary' | 'junior_secondary'
+export type SubjectCategory = 'pre_primary' | 'primary' | 'junior_secondary' | 'senior_secondary'
 
 export type SchoolUserRole =
   | 'school_admin'

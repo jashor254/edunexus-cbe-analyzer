@@ -22,6 +22,7 @@
 import { config } from 'dotenv'
 config({ path: '.env.local' })
 
+import type { User } from '@supabase/supabase-js'
 import { createServiceClient } from '../utils/supabase/service'
 
 const SYSTEM_ACCOUNT_EMAIL = 'compass-auto-confirm@system.edunexus.internal'
@@ -29,8 +30,9 @@ const SYSTEM_ACCOUNT_EMAIL = 'compass-auto-confirm@system.edunexus.internal'
 async function main() {
   const supabase = createServiceClient()
 
-  const { data: existing } = await supabase.auth.admin.listUsers()
-  const already = existing?.users.find(u => u.email === SYSTEM_ACCOUNT_EMAIL)
+  const listResult = await supabase.auth.admin.listUsers()
+  if (listResult.error) throw listResult.error
+  const already = listResult.data.users.find((u: User) => u.email === SYSTEM_ACCOUNT_EMAIL)
   if (already) {
     console.log(`[compass-auto-confirm] already exists: ${already.id}`)
     console.log(`Set COMPASS_AUTO_CONFIRM_USER_ID=${already.id}`)

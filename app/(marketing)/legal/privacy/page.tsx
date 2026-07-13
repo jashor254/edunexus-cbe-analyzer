@@ -80,7 +80,7 @@ export default function PrivacyPage() {
               Kenya Data Protection Act 2019
             </span>
             <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-white/10 text-slate-300 border border-white/15">
-              Jashor Technologies · edunexus.co.ke
+              EduNexus Kenya · edunexus.co.ke
             </span>
           </div>
         </div>
@@ -140,11 +140,13 @@ export default function PrivacyPage() {
                 </p>
                 <p>
                   Under the Kenya Data Protection Act 2019, Jashor Technologies is the <strong>Data Controller</strong>{' '}
-                  for all personal data processed through the EduNexus platform.
+                  for all personal data processed through the EduNexus platform, which it operates in Kenya under
+                  the business name <strong>EduNexus Kenya</strong>.
                 </p>
                 <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 grid sm:grid-cols-2 gap-3 text-sm">
                   {[
                     ['Data Controller', 'Jashor Technologies'],
+                    ['Trading as', 'EduNexus Kenya'],
                     ['Product', 'EduNexus Platform'],
                     ['Registration', 'Kenya'],
                     ['Website', 'edunexus.co.ke'],
@@ -885,7 +887,7 @@ export default function PrivacyPage() {
               <SectionHead id="contact" icon={<Mail className="w-4 h-4 text-slate-500" />} number="16" title="Contact Us & How to Complain" />
               <div className="space-y-4">
                 <div className="bg-slate-900 text-white rounded-2xl p-6">
-                  <p className="font-black text-lg mb-4">Jashor Technologies — EduNexus</p>
+                  <p className="font-black text-lg mb-4">Jashor Technologies — trading as EduNexus Kenya</p>
                   <div className="grid sm:grid-cols-2 gap-3 text-sm text-slate-300">
                     <div>
                       <p className="text-slate-500 text-xs mb-1">Email</p>

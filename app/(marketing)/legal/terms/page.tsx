@@ -29,7 +29,8 @@ export default function TermsPage() {
             By accessing or using EduNexus ("the Platform"), you agree to be bound by these Terms of Service. If you do not agree, please do not use our services.
           </p>
           <p>
-            <strong>EduNexus</strong> is operated from Nairobi, Kenya, and governed by Kenyan law.
+            <strong>EduNexus</strong> is operated by <strong>EduNexus Kenya</strong> from Nairobi, Kenya,
+            and governed by Kenyan law.
           </p>
 
           <h2>Services Provided</h2>
@@ -217,7 +218,7 @@ export default function TermsPage() {
 
           <h2>Contact Information</h2>
           <div className="bg-slate-50 border-2 border-slate-200 rounded-xl p-6 not-prose">
-            <p className="font-bold text-slate-900 mb-2">EduNexus</p>
+            <p className="font-bold text-slate-900 mb-2">EduNexus — operated by EduNexus Kenya</p>
             <p className="text-slate-700"><strong>Email:</strong> kariukidennis092@gmail.com</p>
             <p className="text-slate-700"><strong>Location:</strong> Nairobi, Kenya</p>
           </div>
