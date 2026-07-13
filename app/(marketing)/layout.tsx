@@ -52,6 +52,9 @@ function MarketingNav() {
             Insights
             <span className="text-[9px] font-bold bg-violet-500/20 text-violet-400 px-1.5 py-0.5 rounded-full">New</span>
           </Link>
+          <Link href="/about" className="text-sm font-semibold text-white/60 hover:text-white transition-colors">
+            About
+          </Link>
         </div>
 
         {/* Desktop right */}
@@ -90,6 +93,7 @@ function MarketingNav() {
               { href: '#clinic',    label: 'Learner Blueprint' },
               { href: '/pricing',   label: 'Pricing'          },
               { href: '/insights',  label: 'Insights ✦'       },
+              { href: '/about',     label: 'About'            },
               { href: '/login',     label: 'Log in'           },
             ].map((item) => (
               <a
@@ -135,13 +139,16 @@ function MarketingFooter() {
 
           {/* Center — links */}
           <div className="flex flex-col gap-3">
+            <Link href="/about" className="text-sm text-white/50 hover:text-white transition-colors">
+              About
+            </Link>
             <Link href="/insights" className="text-sm text-white/50 hover:text-white transition-colors">
               Insights
             </Link>
-            <Link href="/privacy" className="text-sm text-white/50 hover:text-white transition-colors">
+            <Link href="/legal/privacy" className="text-sm text-white/50 hover:text-white transition-colors">
               Privacy Policy
             </Link>
-            <Link href="/terms" className="text-sm text-white/50 hover:text-white transition-colors">
+            <Link href="/legal/terms" className="text-sm text-white/50 hover:text-white transition-colors">
               Terms of Use
             </Link>
             <a
@@ -166,7 +173,8 @@ function MarketingFooter() {
         </div>
 
         <div className="border-t border-white/10 pt-6 text-center space-y-1">
-          <p className="text-xs text-white/20">Developed by Jashor Technologies © 2026</p>
+          <p className="text-xs text-white/30">© 2026 EduNexus Kenya. All rights reserved.</p>
+          <p className="text-xs text-white/20">Developed by Jashor Technologies</p>
           <p className="text-xs text-white/15">AI-assisted · edunexus.co.ke</p>
         </div>
       </div>
