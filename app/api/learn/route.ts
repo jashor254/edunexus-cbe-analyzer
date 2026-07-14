@@ -111,7 +111,9 @@ export async function POST(req: Request) {
     const CLOSING_WORDS = ['done', 'goodbye', 'bye', 'kwa heri', 'tutaonana', "that's all", 'stop', 'quit']
     const isClosing = CLOSING_WORDS.some(w => (message as string).toLowerCase().includes(w))
 
-    // ── Single parallel round: auth + all DB reads + topics + session ─────────
+    // ── Single parallel round: auth + all DB reads + topics ───────────────────
+    // NOTE: getOrCreateSession() is intentionally NOT included here — it writes to
+    // compass_sessions and must not run before ownership is verified below.
     const [
       access,
       savedSession,
@@ -120,7 +122,6 @@ export async function POST(req: Request) {
       lastSessionResult,
       keepaliveRow,
       earlyTopics,
-      earlySession,
     ] = await Promise.all([
       // Auth + token check (was sequential before, now parallel)
       checkFeatureAccess(FEATURE),
@@ -157,11 +158,6 @@ export async function POST(req: Request) {
       earlySubject && earlyGrade
         ? getGradeTopics(earlyGrade, earlySubject, { minGrade: earlyGrade <= 9 ? 7 : earlyGrade })
         : Promise.resolve(null),
-
-      // Session upsert — start immediately if subject is in the request
-      earlySubject
-        ? getOrCreateSession(studentId, earlySubject, mode)
-        : Promise.resolve(null),
     ])
     const lastSessionRow = lastSessionResult.data
 
@@ -175,6 +171,12 @@ export async function POST(req: Request) {
     if (!studentResult.data) return apiError('Student not found', 404)
     const ownership = await resolveCompassStudentAccess(access.userId, studentId)
     if (!ownership.allowed) return apiError('Access denied', 403)
+
+    // Session upsert — only runs once ownership is verified above, since this writes
+    // to compass_sessions. Started immediately post-auth if subject is in the request.
+    const earlySession = earlySubject
+      ? await getOrCreateSession(studentId, earlySubject, mode)
+      : null
 
     // ── Daily abuse-prevention cap ────────────────────────────────────────────
     const rateLimit = await checkDailyCallLimit(access.userId, FEATURE)

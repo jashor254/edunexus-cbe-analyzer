@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { createServiceClient } from '@/utils/supabase/service'
 import { checkFeatureAccess } from '@/lib/payments/access'
 import { type FeatureKey } from '@/lib/payments/config'
-import { endSession } from '@/lib/compass/session'
+import { endSession, tierToLevel } from '@/lib/compass/session'
 import { resolveCompassStudentAccess, resolveSessionOwnership } from '@/lib/compass/ownership'
 import { recordCompassSessionEvidence } from '@/lib/compass/evidence'
 import { updateFromCompass } from '@/lib/learnerModel/updater'
@@ -20,9 +20,16 @@ const EndSessionSchema = z.object({
   genuineProgress: z.boolean().optional().default(false),
 })
 
+// No confirmed Evidence exists yet at the point XP is awarded — this session's
+// own Evidence is recorded afterward (recordCompassSessionEvidence, below) and
+// mastery claims are never auto-confirmed (lib/compass/evidence.ts), so there is
+// nothing confirmed to derive XP from synchronously. Formula unchanged; gated on
+// the actual completion event so XP reflects finishing a session, not just
+// exchanging messages and abandoning it.
 function calcXp(exchanges: number, completed: boolean, genuineProgress: boolean): number {
+  if (!completed) return 0
   const base     = Math.min(exchanges, 15) * 10
-  const complete = completed       ? 40 : 0
+  const complete = 40
   const progress = genuineProgress ? 60 : 0
   return base + complete + progress
 }
@@ -73,11 +80,11 @@ export async function POST(req: Request): Promise<Response> {
 
     const [sessionRes, contextRes] = await Promise.all([
       db.from('compass_sessions')
-        .select('exchange_count, starting_level, ending_level')
+        .select('exchange_count, starting_level')
         .eq('id', sessionId)
         .maybeSingle(),
       db.from('student_learning_context')
-        .select('overall_level, total_sessions, sessions_this_week, week_start_date')
+        .select('overall_level, subject_tiers, total_sessions, sessions_this_week, week_start_date')
         .eq('student_id', studentId)
         .maybeSingle(),
     ])
@@ -86,14 +93,12 @@ export async function POST(req: Request): Promise<Response> {
     const ctx           = contextRes.data
     const exchanges     = (session?.exchange_count  as number | null) ?? 0
     const startingLevel = (session?.starting_level  as number | null) ?? null
-    const endingLevel   = (session?.ending_level    as number | null) ?? null
 
     const prevTotal     = (ctx?.total_sessions     as number | null) ?? 0
     const prevWeekly    = (ctx?.sessions_this_week as number | null) ?? 0
     const prevWeekStart = (ctx?.week_start_date    as string | null) ?? null
 
     const xpEarned       = calcXp(exchanges, status === 'completed', genuineProgress)
-    const levelGained    = startingLevel !== null && endingLevel !== null && endingLevel > startingLevel
 
     const thisWeekMonday = getMondayOf(new Date())
     const isSameWeek     = prevWeekStart === thisWeekMonday
@@ -110,9 +115,21 @@ export async function POST(req: Request): Promise<Response> {
     const sessionState    = (sessionRow?.session_state as Record<string, unknown> | null) ?? null
     const masteredConcepts = (sessionState?.masteredConcepts as string[] | null) ?? []
 
+    // Ending level — same tier→level lookup used at session start (app/api/learn/route.ts),
+    // read fresh here since it's what changed (if anything) during the session.
+    const subjectTiers = (ctx?.subject_tiers as Record<string, string> | null) ?? {}
+    const tierKey       = sessionRow?.subject
+      ? Object.keys(subjectTiers).find(k => k.toLowerCase() === (sessionRow.subject as string).toLowerCase())
+      : undefined
+    const endingLevel = tierKey
+      ? tierToLevel(subjectTiers[tierKey])
+      : ((ctx?.overall_level as number | null) ?? null)
+
+    const levelGained = startingLevel !== null && endingLevel !== null && endingLevel > startingLevel
+
     await Promise.all([
       endSession(sessionId, studentId, status, durationSeconds),
-      db.from('compass_sessions').update({ xp_earned: xpEarned }).eq('id', sessionId),
+      db.from('compass_sessions').update({ xp_earned: xpEarned, ending_level: endingLevel }).eq('id', sessionId),
       db.from('student_learning_context')
         .update({
           total_sessions:     newTotal,

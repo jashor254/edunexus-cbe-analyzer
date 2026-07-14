@@ -11,7 +11,7 @@ export default function LearningCompassPage() {
   useEffect(() => {
     // Redirect after 1.5 seconds
     const timer = setTimeout(() => {
-      router.push('/chat')
+      router.push('/learn')
     }, 1500)
 
     return () => clearTimeout(timer)
