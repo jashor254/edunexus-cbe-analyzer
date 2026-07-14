@@ -29,7 +29,6 @@ const config = [
       "react-hooks/set-state-in-effect": "warn",
       "react-hooks/purity": "warn",
 
-      // Hii ndiyo imekuletea hiyo message
       "import/no-anonymous-default-export": "off",
     },
   },

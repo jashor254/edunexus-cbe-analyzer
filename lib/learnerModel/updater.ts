@@ -97,7 +97,7 @@ export async function updateFromAssessment(signal: AssessmentSignal): Promise<vo
 
   if (capabilityProfile) {
     try {
-      const prevDimensions = profile.capability_dimensions as Record<string, { level?: string; raw_score?: number }>
+      const prevDimensions = profile.capability_dimensions as Record<string, { level?: CapabilityLevel; raw_score?: number }>
 
       const newDimensions = {
         analytical_reasoning: { ...capabilityProfile.analytical_reasoning, last_computed: now, previous_level: prevDimensions.analytical_reasoning?.level as CapabilityLevel | undefined },

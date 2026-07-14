@@ -1,6 +1,5 @@
-import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -63,27 +62,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL('/login?error=no-code', requestUrl.origin))
   }
 
-  const cookieStore = await cookies()
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        // getAll/setAll (not get/set/remove) — required so chunked session
-        // tokens (sb-xxx-auth-token.0, .1 …) are all read and written. See the
-        // matching comment in utils/supabase/middleware.ts.
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            try { cookieStore.set(name, value, options) } catch { /* Server Component context */ }
-          })
-        },
-      },
-    }
-  )
+  const supabase = await createClient()
 
   const { error } = await supabase.auth.exchangeCodeForSession(code)
   if (error) {
@@ -91,7 +70,6 @@ export async function GET(request: Request) {
       message: error.message,
       status: error.status,
       code: error.code,
-      cookieNames: cookieStore.getAll().map(c => c.name),
     })
     return NextResponse.redirect(new URL('/login?error=exchange-failed', requestUrl.origin))
   }

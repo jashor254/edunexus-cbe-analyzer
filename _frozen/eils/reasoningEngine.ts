@@ -406,7 +406,10 @@ function buildEvidence(
   }
 }
 
-async function safeRootCauses(studentId: string, grade: number): Promise<RootCauseResult[]> {
+async function safeRootCauses(
+  studentId: string,
+  grade:     number,
+): Promise<RootCauseResult[]> {
   try {
     return await analyseStudentRootCauses(studentId, grade)
   } catch (e: unknown) {

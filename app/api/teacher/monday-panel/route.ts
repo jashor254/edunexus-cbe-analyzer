@@ -295,7 +295,7 @@ export async function GET(req: Request): Promise<Response> {
       generated_at:              new Date().toISOString(),
     }
 
-    // Cache the result
+    // Cache the result (best-effort — a failed cache write shouldn't fail the request)
     void Promise.resolve(db.from('monday_panel_cache').upsert({
       class_id:           classId,
       teacher_id:         user.id,
