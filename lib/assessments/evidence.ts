@@ -61,6 +61,15 @@ export async function recordAssessmentEvidence(
   ])
   if (!assessment || !marks.length) return
 
+  // Phase G (learner-record-layer-decisions.md Decision 2): resolve a
+  // purpose from this assessment's assessment_type_id (Phase B), when one
+  // was set. Null on any assessment created before Phase B/G, or whose
+  // type has no default_purpose_id yet (a custom name a teacher registered
+  // via resolve-or-create, with no purpose chosen for it) — never guessed.
+  const purposeId = assessment.assessment_type_id
+    ? (await repos.assessmentTypes.findById(assessment.assessment_type_id))?.default_purpose_id ?? null
+    : null
+
   // student_id is selected by the repository but not on the LearnerMark type
   // (same gap triggerLearnerModelUpdates already works around).
   type MarkWithStudentId = (typeof marks[number]) & { student_id: string | null }
@@ -108,6 +117,7 @@ export async function recordAssessmentEvidence(
         rawInputRef: `class_assessments:${assessmentId}:${rawSubject}:${mark.student_id}`,
         importedAt,
         issues: [],
+        purposeId,
       })
     }
   }

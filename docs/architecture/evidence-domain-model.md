@@ -107,10 +107,25 @@ used:
   fraud is discovered). Retraction always carries an actor and a reason,
   same as rejection, but starts from a different place in the lifecycle
   and has different downstream consequences (§10).
+- **`erased`** *(Phase -1, added post-ratification — see
+  `learner-record-layer-signoff.md`)* — distinct from retraction again.
+  Retraction says "this claim is wrong"; erasure says "this identifying
+  data must be removed," typically to satisfy a legal right-to-erasure
+  request, and is not a statement about whether the underlying claim was
+  ever accurate. Reachable from **any** other lifecycle state, not just
+  confirmed ones — a request to erase does not wait for review to finish.
+  Erasure nulls `extracted_name` / `extracted_external_id` / `score`
+  (the one documented, actor-attributed, audited exception to fact
+  immutability — enforced by the same database trigger that protects
+  every other factual column, not by application discipline) but leaves
+  the row, its id, its position in any supersession/audit chain, and its
+  `learner_id` link untouched: this purges identifying text, it does not
+  delete the record or unlink it from the learner (invariant 3 still
+  holds — nothing is deleted).
 
 Only `auto_confirmed` and `reviewed_confirmed` records that are not
-`superseded` or `retracted` are "current" — the only ones the Learner
-Intelligence Engine's projection may read.
+`superseded`, `retracted`, or `erased` are "current" — the only ones the
+Learner Intelligence Engine's projection may read.
 
 ---
 
@@ -151,6 +166,14 @@ of a database write — a future refinement could route *conflicting*
 evidence (same key, meaningfully different content) to review instead of
 silent auto-supersession, but the base rule must be explicit either way,
 because "which fact wins" is an epistemic decision, not a technical one.
+
+**Exception, added Phase C (2026-07-13)**: `teacher_remark` evidence never
+supersedes another record, even sharing the same learner/subject/year/term
+— each remark is its own permanent claim, since "quiet learner" one year
+and "confidence improving" the next are both true statements at their
+respective times, not competing versions of one fact. Enforced by routing
+`teacher_remark` through the same `null`-claim-key path unkeyed evidence
+already takes, not by inventing new machinery.
 
 ---
 

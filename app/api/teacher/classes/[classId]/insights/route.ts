@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound } from '@/lib/api/response'
+import { computeStudentRiskLevel } from '@/lib/assessments/analyticsStats'
 
 export async function GET(
   _req: Request,
@@ -85,20 +86,16 @@ export async function GET(
         .map((s) => s.learner_id)
     )
 
-    // Per-student risk
+    // Per-student risk — Phase D (docs/architecture/academic-evidence-layer.md
+    // §8): computeStudentRiskLevel averages across all of a student's
+    // assessments, not just the most recent one (see its own doc comment).
     const riskMap: Record<string, 'high' | 'medium' | 'low'> = {}
     studentIds.forEach((sid: string) => {
       const isActive = recentlyActive.has(sid)
-      const latestAssessment = (allAssessments as AssessmentRow[]).find((a) => a.student_id === sid)
-      let avgScore = 2.5
-      if (latestAssessment?.subject_scores) {
-        const vals = Object.values(latestAssessment.subject_scores)
-        avgScore = vals.reduce((s, v) => s + v, 0) / vals.length
-      }
-
-      if (!isActive && avgScore < 2) riskMap[sid] = 'high'
-      else if (!isActive || avgScore < 2.5) riskMap[sid] = 'medium'
-      else riskMap[sid] = 'low'
+      const studentAssessmentScores = (allAssessments as AssessmentRow[])
+        .filter((a) => a.student_id === sid)
+        .map((a) => a.subject_scores)
+      riskMap[sid] = computeStudentRiskLevel(isActive, studentAssessmentScores)
     })
 
     const holidayRisk = (studentData as StudentRow[])

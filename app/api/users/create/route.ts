@@ -52,7 +52,8 @@ export async function POST(request: NextRequest) {
     })
 
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+      console.error('[users/create]', error.message)
+      return NextResponse.json({ success: false, error: 'Failed to create user' }, { status: 500 })
     }
 
     const userData = data[0]
@@ -70,6 +71,7 @@ export async function POST(request: NextRequest) {
         : 'Account created! You have 1 free analysis!',
     })
   } catch (err: unknown) {
+    console.error('[users/create] Unhandled error', { userId: auth.user.id, message: err instanceof Error ? err.message : String(err) })
     return NextResponse.json(
       { success: false, error: err instanceof Error ? err.message : 'Internal error' },
       { status: 500 }

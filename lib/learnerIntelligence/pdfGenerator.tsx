@@ -60,7 +60,28 @@ const S = StyleSheet.create({
   action:     { fontSize: 8.5, color: C.text, lineHeight: 1.4 },
 
   subLabel: { fontSize: 8, fontWeight: 700, color: C.muted, letterSpacing: 0.5, marginBottom: 4, marginTop: 4 },
+
+  evidenceSummary:     { borderWidth: 1, borderColor: C.border, borderRadius: 6, padding: 8, marginBottom: 12, backgroundColor: C.grayBg },
+  evidenceSummaryLine: { fontSize: 7.5, color: C.muted, lineHeight: 1.4 },
 })
+
+function EvidenceSummaryBox({ summary }: { summary: LearnerBlueprint['evidenceSummary'] }) {
+  return (
+    <View style={S.evidenceSummary}>
+      <Text style={S.evidenceSummaryLine}>
+        <Text style={{ fontWeight: 700 }}>Evidence used: </Text>
+        {summary.evidenceUsed.length > 0 ? summary.evidenceUsed.join(', ') : 'none yet'}
+        {'  ·  '}
+        <Text style={{ fontWeight: 700 }}>Confidence: </Text>{summary.confidence}
+        {summary.freshnessDays !== null && `  ·  Most recent evidence: ${summary.freshnessDays}d ago`}
+      </Text>
+      {summary.missingEvidence.length > 0 && (
+        <Text style={S.evidenceSummaryLine}><Text style={{ fontWeight: 700 }}>Missing evidence: </Text>{summary.missingEvidence.join(', ')}</Text>
+      )}
+      <Text style={S.evidenceSummaryLine}>{summary.recommendedNextEvidence}</Text>
+    </View>
+  )
+}
 
 function InsightCard({ insight }: { insight: Insight }) {
   return (
@@ -106,6 +127,7 @@ export async function generateLearnerBlueprintPDF(blueprint: LearnerBlueprint): 
         <PageHeader title="Who is this learner becoming?" name={blueprint.studentName} grade={blueprint.grade} />
         <View style={S.content}>
           <Text style={S.disclaimer}>{blueprint.disclaimer}</Text>
+          <EvidenceSummaryBox summary={blueprint.evidenceSummary} />
           {blueprint.becoming.insights.length === 0
             ? <Text style={S.evidence}>Insufficient assessment data yet to speak to this.</Text>
             : blueprint.becoming.insights.map((insight, i) => <InsightCard key={i} insight={insight} />)}

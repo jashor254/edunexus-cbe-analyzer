@@ -9,7 +9,6 @@ import { ChevronLeft, Copy, Share2, CheckCircle, X, Loader2 } from 'lucide-react
 interface Challenge {
   id: string
   question: string
-  correct_answer: string
   hint?: string
   subject: string
   difficulty: number
@@ -72,7 +71,7 @@ export default function GroupPage() {
     const [{ data: grp }, { data: mems }, { data: todayChallenge }] = await Promise.all([
       supabase.from('study_groups').select('id, name, subject, grade, invite_code, ground_rules').eq('id', groupId).single(),
       supabase.from('study_group_members').select('id, user_id, student_name, points, streak_days').eq('group_id', groupId).order('points', { ascending: false }),
-      supabase.from('study_group_challenges').select('id, question, correct_answer, hint, subject, difficulty, kenyan_context, date').eq('group_id', groupId).eq('date', today).single(),
+      supabase.from('study_group_challenges').select('id, question, hint, subject, difficulty, kenyan_context, date').eq('group_id', groupId).eq('date', today).single(),
     ])
 
     setGroup(grp)

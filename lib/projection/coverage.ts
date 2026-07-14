@@ -52,11 +52,19 @@ export function normalizeLevelToUnit(level: number): number {
  *                  (a single low-corroboration data point should never
  *                  produce full confidence, regardless of how confident
  *                  that one record's own extraction was)
- *   result     = base * countFactor, capped [0, 100]
+ *   conflict factor = halved when any supporting evidence carries
+ *                  verification_state === 'contradicted' (see
+ *                  lib/intelligence/evidenceLifecycle.ts's
+ *                  flagContradictionIfAny) — genuine disagreement between
+ *                  two confirmed sources must read as real uncertainty, not
+ *                  be silently averaged away by whichever arrived last.
+ *   result     = base * countFactor * conflictFactor, capped [0, 100]
  */
 export function computeProjectionConfidence(evidence: EvidenceRow[]): number {
   if (evidence.length === 0) return 0
   const base = evidence.reduce((sum, e) => sum + e.evidence_confidence, 0) / evidence.length
   const countFactor = Math.min(1, evidence.length / 3)
-  return Math.round(base * countFactor)
+  const hasContradiction = evidence.some(e => e.verification_state === 'contradicted')
+  const conflictFactor = hasContradiction ? 0.5 : 1
+  return Math.round(base * countFactor * conflictFactor)
 }

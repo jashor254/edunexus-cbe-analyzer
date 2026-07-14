@@ -8,6 +8,22 @@ import {
   Mail, Phone, Eye, ExternalLink,
 } from 'lucide-react'
 
+// The clinic-reports storage bucket is private — mint a short-lived signed
+// URL on demand rather than relying on a stored public URL.
+async function openClinicReportUrl(reportId: string): Promise<void> {
+  try {
+    const res = await fetch(`/api/reports/clinic/${reportId}/url`)
+    const json = await res.json()
+    if (!res.ok || !json.data?.url) {
+      alert(json.error ?? 'Could not open the report. Please try again.')
+      return
+    }
+    window.open(json.data.url, '_blank', 'noopener,noreferrer')
+  } catch {
+    alert('Could not open the report. Please try again.')
+  }
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface TeacherClass { id: string; name: string; grade: number; subject: string; academic_year: string }
@@ -232,15 +248,13 @@ function ClinicReportsSection({ classes }: { classes: TeacherClass[] }) {
                       )}
                     </td>
                     <td className="px-5 py-3">
-                      {r.pdfUrl ? (
-                        <a
-                          href={r.pdfUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                      {r.pdfUrl && r.reportId ? (
+                        <button
+                          onClick={() => openClinicReportUrl(r.reportId as string)}
                           className="inline-flex items-center gap-1 text-xs text-violet-600 font-bold hover:underline"
                         >
                           <ExternalLink className="w-3 h-3" /> View PDF
-                        </a>
+                        </button>
                       ) : (
                         <span className="text-gray-300 text-xs">—</span>
                       )}

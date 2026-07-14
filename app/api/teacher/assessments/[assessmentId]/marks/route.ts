@@ -122,7 +122,9 @@ export async function POST(
     }
 
     // Update Learner Model for linked students — fire and forget
-    triggerLearnerModelUpdates(assessmentId, teacher.id).catch(() => {})
+    triggerLearnerModelUpdates(assessmentId, teacher.id).catch((e: unknown) =>
+      console.error('[marks POST] triggerLearnerModelUpdates failed:', e instanceof Error ? e.message : String(e), { assessmentId })
+    )
 
     // Emit Evidence Domain records so Blueprint/Career/Adaptive Learning move
     // from these marks too, not only from Compass sessions — fire and forget

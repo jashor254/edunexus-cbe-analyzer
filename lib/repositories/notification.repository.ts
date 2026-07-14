@@ -220,4 +220,16 @@ export class NotificationRepository extends BaseRepository {
       .single()
     return data as typeof data ?? null
   }
+
+  async insertStudentAlert(row: {
+    student_id: string
+    teacher_id: string
+    alert_type: string
+    message:    string
+  }): Promise<void> {
+    const { error } = await this.db
+      .from('student_alerts')
+      .insert({ ...row, is_resolved: false })
+    if (error) throw new Error(`insertStudentAlert: ${error.message}`)
+  }
 }

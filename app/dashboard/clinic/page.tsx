@@ -17,6 +17,31 @@ import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 import { NoStudentsEmpty } from '@/components/ui/empty-states'
 import type { ClinicReport as CareerClinicReport } from '@/lib/career/types'
 
+// The clinic-reports storage bucket is private — mint a short-lived signed
+// URL on demand rather than relying on a stored public URL.
+async function openClinicReport(reportId: string, mode: 'view' | 'download'): Promise<void> {
+  try {
+    const res = await fetch(`/api/reports/clinic/${reportId}/url`)
+    const json = await res.json()
+    if (!res.ok || !json.data?.url) {
+      alert(json.error ?? 'Could not open the report. Please try again.')
+      return
+    }
+    if (mode === 'download') {
+      const a = document.createElement('a')
+      a.href = json.data.url
+      a.download = ''
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+    } else {
+      window.open(json.data.url, '_blank', 'noopener,noreferrer')
+    }
+  } catch {
+    alert('Could not open the report. Please try again.')
+  }
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Assessment {
   id: string
@@ -1046,21 +1071,18 @@ function StudentCard({ student, onViewReport }: { student: Student; onViewReport
           <div className="flex gap-2">
             {report.pdf_url ? (
               <>
-                <a
-                  href={report.pdf_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  onClick={() => openClinicReport(report.id, 'view')}
                   className="flex-1 py-2 bg-green-600 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-green-700 transition"
                 >
                   <FileText className="w-3.5 h-3.5" /> View Report
-                </a>
-                <a
-                  href={report.pdf_url}
-                  download
+                </button>
+                <button
+                  onClick={() => openClinicReport(report.id, 'download')}
                   className="flex-1 py-2 bg-white border border-green-200 text-green-700 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-green-50 transition"
                 >
                   <ArrowRight className="w-3.5 h-3.5 rotate-90" /> Download PDF
-                </a>
+                </button>
               </>
             ) : (
               <Link

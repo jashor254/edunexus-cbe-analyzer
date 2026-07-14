@@ -293,7 +293,12 @@ export default function CareerIntelligenceReportPage() {
             {/* Report header */}
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
-                <h2 className="text-white font-bold text-xl">{report.student_name}</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-white font-bold text-xl">{report.student_name}</h2>
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300">
+                    {report.mode === 'exploration' ? 'Exploring Possibilities' : 'Career Planning'}
+                  </span>
+                </div>
                 <p className="text-white/40 text-sm">
                   Grade {report.grade} · Age {report.age}
                   {report.pathway ? ` · ${report.pathway} Pathway` : ''}

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { createHmac, timingSafeEqual } from 'crypto'
-import { TOKEN_PACK } from '@/lib/payments/config'
 import { publishEvent } from '@/lib/events'
+import { fulfillPayment } from '@/lib/payments/fulfillment'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL!
 
@@ -26,7 +26,10 @@ async function processPayment(
     return 'not_found'
   }
 
-  // 2. Idempotency guard — never process twice
+  // 2. Fast-path idempotency check — avoids an unnecessary Paystack call for
+  //    the common case. The real guard against a race between this GET and
+  //    the webhook POST arriving concurrently is the atomic conditional
+  //    update inside fulfillPayment() below, not this check.
   if (payment.status === 'success') {
     return 'already_processed'
   }
@@ -58,77 +61,15 @@ async function processPayment(
     return 'failed'
   }
 
-  // 4. Mark payment success
-  await db
-    .from('payments')
-    .update({ status: 'success' })
-    .eq('transaction_id', reference)
-
+  // 4. Atomically mark success and credit tokens/subscription — this is the
+  //    step that must not run twice. fulfillPayment()'s conditional update
+  //    means only one of a racing GET+POST pair actually credits anything.
   const userId    = payment.user_id
   const productId = payment.product_id
+  const result    = await fulfillPayment(db, { id: payment.id, user_id: userId, product_id: productId })
 
-  // 5. Fulfill based on product ─────────────────────────────────────────────
-
-  if (productId === 'starter') {
-    const tokensToAdd = TOKEN_PACK.tokens
-    const { data: existing } = await db
-      .from('token_balances')
-      .select('balance, total_ever')
-      .eq('user_id', userId)
-      .single()
-
-    if (existing) {
-      await db
-        .from('token_balances')
-        .update({
-          balance:    existing.balance    + tokensToAdd,
-          total_ever: existing.total_ever + tokensToAdd,
-        })
-        .eq('user_id', userId)
-    } else {
-      await db
-        .from('token_balances')
-        .insert({ user_id: userId, balance: tokensToAdd, total_ever: tokensToAdd })
-    }
-
-  } else if (productId === 'term' || productId === 'family' || productId === 'premium') {
-    // Create or extend subscription by 3 months
-    const { data: existingSub } = await db
-      .from('subscriptions')
-      .select('id, expires_at')
-      .eq('user_id', userId)
-      .eq('status', 'active')
-      .single()
-
-    if (existingSub) {
-      // Extend from current expiry — not from today
-      const newExpiry = new Date(existingSub.expires_at)
-      newExpiry.setMonth(newExpiry.getMonth() + 3)
-
-      await db
-        .from('subscriptions')
-        .update({
-          plan:       productId,
-          status:     'active',
-          expires_at: newExpiry.toISOString(),
-          payment_id: payment.id,
-        })
-        .eq('id', existingSub.id)
-    } else {
-      const expiry = new Date()
-      expiry.setMonth(expiry.getMonth() + 3)
-
-      await db
-        .from('subscriptions')
-        .insert({
-          user_id:    userId,
-          payment_id: payment.id,
-          plan:       productId,
-          status:     'active',
-          started_at: new Date().toISOString(),
-          expires_at: expiry.toISOString(),
-        })
-    }
+  if (result === 'already_processed') {
+    return 'already_processed'
   }
 
   // Emit billing event — fire and forget, never block the redirect

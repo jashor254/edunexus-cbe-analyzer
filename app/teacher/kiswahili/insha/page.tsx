@@ -108,6 +108,29 @@ function DimensionCard({
   )
 }
 
+function FallbackNotice({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 flex flex-col items-center text-center gap-3">
+        <AlertTriangle className="w-8 h-8 text-amber-500" />
+        <div>
+          <h2 className="text-lg font-black text-amber-900">Tathmini Haijakamilika</h2>
+          <p className="text-amber-700 text-sm mt-1.5 max-w-md">
+            AI haikuweza kutathmini insha hii kwa sasa. Insha yako haijapotea — tafadhali jaribu tena.
+            Hii SI alama halisi.
+          </p>
+        </div>
+        <button
+          onClick={onRetry}
+          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-bold px-5 py-2.5 rounded-xl transition shadow-sm text-sm mt-1"
+        >
+          <RefreshCw className="w-4 h-4" /> Jaribu Tena
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function FeedbackResults({
   feedback,
   onReset,
@@ -298,7 +321,14 @@ export default function InshaFeedbackPage() {
 
       {/* Results view */}
       {feedback ? (
-        <FeedbackResults feedback={feedback} onReset={() => { setFeedback(null); setInsha('') }} />
+        feedback.isFallback ? (
+          // Never render a fallback score like a genuine evaluation. Insha
+          // text is deliberately preserved (not cleared) so the teacher can
+          // retry without retyping the student's work.
+          <FallbackNotice onRetry={() => setFeedback(null)} />
+        ) : (
+          <FeedbackResults feedback={feedback} onReset={() => { setFeedback(null); setInsha('') }} />
+        )
       ) : (
 
         /* Form */

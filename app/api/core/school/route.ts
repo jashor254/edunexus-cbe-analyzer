@@ -1,9 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { getSchool, updateSchool, getSchoolSettings, upsertSchoolSettings } from '@/lib/core/school'
+import { createSchool, getSchool, updateSchool, getSchoolSettings, upsertSchoolSettings } from '@/lib/core/school'
 import { getSchoolUser } from '@/lib/core/school-users'
 import type { SchoolSettings } from '@/types/core'
 import { z } from 'zod'
+
+const CreateSchoolSchema = z.object({
+  school_name: z.string().min(1),
+  school_type: z.enum(['public_primary', 'private_primary', 'public_comprehensive', 'private_comprehensive']).optional(),
+  nemis_code: z.string().optional(),
+  county: z.string().optional(),
+  sub_county: z.string().optional(),
+  ward: z.string().optional(),
+  address: z.string().optional(),
+  contact_phone: z.string().optional(),
+  contact_email: z.string().email().optional(),
+  motto: z.string().optional(),
+})
 
 const UpdateSchoolSchema = z.object({
   school_name: z.string().min(1).optional(),
@@ -24,6 +37,22 @@ const UpdateSettingsSchema = z.object({
   sms_enabled: z.boolean().optional(),
   grade_boundaries: z.record(z.string(), z.object({ min: z.number() })).optional(),
 })
+
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const body = await req.json()
+  const parsed = CreateSchoolSchema.safeParse(body)
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
+
+  // No existing schoolId to check membership against yet — same rule as
+  // organization creation (app/api/organizations/create): any authenticated
+  // user may create a school, and becomes its first school_admin.
+  const { school, schoolUser } = await createSchool(parsed.data, user.id)
+  return NextResponse.json({ data: { school, schoolUser } }, { status: 201 })
+}
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const supabase = await createClient()

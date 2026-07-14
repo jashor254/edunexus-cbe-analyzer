@@ -1,4 +1,5 @@
 import { repos } from '@/lib/repositories'
+import { publishEvent } from '@/lib/events'
 import type { SchoolReportCard, ReportCardWithSubjects, CbcLevel } from '@/types/core'
 
 export async function generateReportCards(
@@ -71,7 +72,19 @@ export async function publishReportCards(
   termId: string,
   classId?: string
 ): Promise<{ published: number }> {
-  return repos.schools.publishReportCards(schoolId, termId, classId)
+  const result = await repos.schools.publishReportCards(schoolId, termId, classId)
+
+  // Report-card publication is a high-stakes, parent-facing action (final
+  // grades released) — same convention as the sibling publishAssessment()
+  // (lib/core/assessments.ts), which already emits an event on publish.
+  void publishEvent({
+    event_type:    'teacher.report_card.published',
+    resource_type: 'school_report_card',
+    resource_id:   classId ?? termId,
+    payload:       { school_id: schoolId, term_id: termId, class_id: classId, published_count: result.published },
+  }).catch(err => console.error('[events] teacher.report_card.published:', err instanceof Error ? err.message : String(err)))
+
+  return result
 }
 
 export async function getReportCard(

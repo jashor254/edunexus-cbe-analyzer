@@ -63,7 +63,8 @@ export async function scoreReflection(
   const wordCount = countWords(input)
   const start = Date.now()
 
-  // Very short reflections get scored 1 without an AI call — saves tokens
+  // Very short reflections get scored 1 without an AI call — saves tokens.
+  // This is a heuristic, not an AI judgement — flagged as such.
   if (wordCount < 15) {
     return {
       quality_score: 1,
@@ -72,6 +73,7 @@ export async function scoreReflection(
       growth_indicator: 'surface',
       suggested_next_action:
         'Try the classroom application task from this lesson with one of your classes this week, then come back and describe what actually happened.',
+      isFallback: true,
     }
   }
 
@@ -124,11 +126,33 @@ export async function scoreReflection(
         feedback_text: parsed.feedback_text,
         growth_indicator: parsed.growth_indicator as ReflectionFeedback['growth_indicator'],
         suggested_next_action: parsed.suggested_next_action,
+        isFallback: false,
       }
     }
+    await logAICall({
+      feature: 'academy-reflection-judge',
+      model: 'deepseek',
+      prompt: prompt.substring(0, 500),
+      response: raw.substring(0, 500),
+      latencyMs: Date.now() - start,
+      success: false,
+      error: 'AI response failed shape validation',
+      userId,
+    })
     return fallbackFeedback(wordCount)
   } catch (e: unknown) {
-    console.error('[aiJudge:judgeReflection] JSON parse failed:', e instanceof Error ? e.message : String(e))
+    const message = e instanceof Error ? e.message : String(e)
+    console.error('[aiJudge:judgeReflection] JSON parse failed:', message)
+    await logAICall({
+      feature: 'academy-reflection-judge',
+      model: 'deepseek',
+      prompt: prompt.substring(0, 500),
+      response: raw.substring(0, 500),
+      latencyMs: Date.now() - start,
+      success: false,
+      error: `JSON parse failed: ${message}`,
+      userId,
+    })
     return fallbackFeedback(wordCount)
   }
 }
@@ -142,6 +166,7 @@ function fallbackFeedback(wordCount: number): ReflectionFeedback {
     growth_indicator: score >= 3 ? 'developing' : 'surface',
     suggested_next_action:
       'Open the EduNexus lesson planner and generate a lesson for the topic you just reflected on. Compare the AI output with what you actually taught.',
+    isFallback: true,
   }
 }
 
@@ -211,7 +236,7 @@ export async function scoreMissionComparison(
     .split(/\s+/)
     .filter(Boolean).length
 
-  // Too short to evaluate meaningfully
+  // Too short to evaluate meaningfully — heuristic, not an AI judgement
   if (totalWords < 20) {
     return fallbackVerdict(1)
   }
@@ -265,11 +290,33 @@ export async function scoreMissionComparison(
         ai_verdict: parsed.ai_verdict,
         key_insight: parsed.key_insight,
         suggested_next_action: parsed.suggested_next_action,
+        isFallback: false,
       }
     }
+    await logAICall({
+      feature: 'academy-mission-judge',
+      model: 'deepseek',
+      prompt: prompt.substring(0, 500),
+      response: raw.substring(0, 500),
+      latencyMs: Date.now() - start,
+      success: false,
+      error: 'AI response failed shape validation',
+      userId,
+    })
     return fallbackVerdict(totalWords >= 100 ? 3 : 2)
   } catch (e: unknown) {
-    console.error('[aiJudge:judgeMission] JSON parse failed:', e instanceof Error ? e.message : String(e))
+    const message = e instanceof Error ? e.message : String(e)
+    console.error('[aiJudge:judgeMission] JSON parse failed:', message)
+    await logAICall({
+      feature: 'academy-mission-judge',
+      model: 'deepseek',
+      prompt: prompt.substring(0, 500),
+      response: raw.substring(0, 500),
+      latencyMs: Date.now() - start,
+      success: false,
+      error: `JSON parse failed: ${message}`,
+      userId,
+    })
     return fallbackVerdict(totalWords >= 100 ? 3 : 2)
   }
 }
@@ -283,5 +330,6 @@ function fallbackVerdict(score: 1 | 2 | 3 | 4 | 5): MissionVerdict {
       'Comparing AI tools helps teachers build independent judgement about which outputs are genuinely CBC-aligned.',
     suggested_next_action:
       'Open the EduNexus lesson planner and generate a lesson for the topic you compared. Check if it scores higher on CBC alignment than the generic AI output.',
+    isFallback: true,
   }
 }

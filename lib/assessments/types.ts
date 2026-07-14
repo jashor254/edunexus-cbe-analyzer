@@ -10,6 +10,8 @@ export type ClassAssessment = {
   teacher_id: string
   title: string
   assessment_type: AssessmentType
+  /** Phase B (academic-evidence-layer.md §7) — null on rows created before this phase, or if resolve-or-create somehow failed. */
+  assessment_type_id: string | null
   term: string
   year: number
   max_score: number

@@ -229,7 +229,7 @@ export default function LessonAccordion({ lessons: initial, moduleColor, moduleI
                       Done
                     </span>
                   )}
-                  {lesson.completed && existingReflection && (
+                  {lesson.completed && existingReflection && !existingReflection.is_fallback && (
                     <span
                       className="text-[10px] px-1.5 py-0.5 rounded font-bold border"
                       style={{
@@ -239,6 +239,11 @@ export default function LessonAccordion({ lessons: initial, moduleColor, moduleI
                       }}
                     >
                       {GROWTH_ICONS[existingReflection.ai_feedback ? 'deep' : 'developing']} Reflected
+                    </span>
+                  )}
+                  {lesson.completed && existingReflection && existingReflection.is_fallback && (
+                    <span className="text-[10px] bg-amber-50 text-amber-600 border border-amber-100 px-1.5 py-0.5 rounded font-bold">
+                      Reflected
                     </span>
                   )}
                   {lesson.completed && !existingReflection && (
@@ -378,7 +383,7 @@ export default function LessonAccordion({ lessons: initial, moduleColor, moduleI
                         Recommended
                       </span>
                     )}
-                    {existingReflection?.quality_score && (
+                    {existingReflection?.quality_score && !existingReflection.is_fallback && (
                       <span
                         className="text-[10px] px-1.5 py-0.5 rounded font-bold border"
                         style={{
@@ -478,12 +483,27 @@ function FeedbackCard({
   existing: AcademyReflection | null
   moduleColor: string
 }) {
-  const score    = feedback?.quality_score    ?? existing?.quality_score    ?? null
-  const text     = feedback?.feedback_text    ?? existing?.ai_feedback      ?? null
-  const next     = feedback?.suggested_next_action ?? null
-  const growth   = feedback?.growth_indicator ?? null
+  const score      = feedback?.quality_score    ?? existing?.quality_score    ?? null
+  const text       = feedback?.feedback_text    ?? existing?.ai_feedback      ?? null
+  const next       = feedback?.suggested_next_action ?? null
+  const growth     = feedback?.growth_indicator ?? null
+  const isFallback = feedback?.isFallback ?? existing?.is_fallback ?? false
 
   if (!text) return null
+
+  // A fallback score is not a genuine AI judgement — never present it with
+  // the same "AI Feedback" scored styling as a real evaluation.
+  if (isFallback) {
+    return (
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-1.5">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 shrink-0 text-amber-500" />
+          <span className="text-xs font-black text-amber-700">Reflection received — AI review pending</span>
+        </div>
+        <p className="text-sm text-amber-800 leading-relaxed">{text}</p>
+      </div>
+    )
+  }
 
   const meta = score ? SCORE_LABELS[score] : null
 

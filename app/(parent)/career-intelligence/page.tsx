@@ -10,6 +10,7 @@ import {
 import type {
   ParentIntelligenceReport, CapabilityCareerMatch,
 } from '@/lib/career/types'
+import type { CareerFamilyInsight } from '@/lib/learnerIntelligence/careerIntelligence'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -68,6 +69,23 @@ function CareerCard({ match }: { match: CapabilityCareerMatch }) {
       <div className="flex flex-wrap gap-1.5">
         <span className="text-xs px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/40 capitalize">{match.career_category}</span>
         <span className="text-xs px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/40">{match.pathway}</span>
+      </div>
+    </div>
+  )
+}
+
+function CareerFamilyCard({ family }: { family: CareerFamilyInsight }) {
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-white font-semibold text-sm">{family.categoryLabel}</div>
+        <span className="text-[11px] font-medium text-violet-300">{family.insight.confidence} confidence</span>
+      </div>
+      <p className="text-white/50 text-xs leading-relaxed">{family.insight.observation}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {family.exampleCareerTitles.map(t => (
+          <span key={t} className="text-xs px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/40">{t}</span>
+        ))}
       </div>
     </div>
   )
@@ -221,9 +239,21 @@ export default function CareerIntelligencePage() {
               </Section>
             </div>
 
-            {/* Career matches */}
-            <Section icon={Sparkles} title="Career Matches" color="text-violet-400">
-              {report.recommended_careers.length === 0 ? (
+            {/* Career matches / exploration families */}
+            <Section
+              icon={Sparkles}
+              title={report.mode === 'exploration' ? 'Fields Worth Exploring' : 'Career Matches'}
+              color="text-violet-400"
+            >
+              {report.mode === 'exploration' ? (
+                (report.career_families?.length ?? 0) === 0 ? (
+                  <p className="text-white/40 text-sm">More assessment data will unlock exploration areas.</p>
+                ) : (
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {report.career_families!.map(f => <CareerFamilyCard key={f.category} family={f} />)}
+                  </div>
+                )
+              ) : report.recommended_careers.length === 0 ? (
                 <p className="text-white/40 text-sm">More assessment data will unlock career matches.</p>
               ) : (
                 <div className="grid sm:grid-cols-2 gap-3">

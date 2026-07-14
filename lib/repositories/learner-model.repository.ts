@@ -422,20 +422,26 @@ export class LearnerModelRepository extends BaseRepository {
 
   async findAssessmentHistory(
     studentId: string,
-  ): Promise<Array<{ subject_scores: Record<string, number> }>> {
+  ): Promise<Array<{ subject_scores: Record<string, number>; created_at: string }>> {
     // NOTE: capability scoring reads term-level subject_scores from `assessments`,
     // not per-topic ratings from `strand_assessments` (that table has no
     // subject_scores column at all — verified against the live schema).
+    //
+    // `created_at` is returned (Phase H, additive) so callers blending this
+    // history with another chronological source (Projection's evidence-derived
+    // history, via projectionToTimestampedScoreHistory) can interleave both
+    // in true time order rather than concatenating two separately-sorted
+    // arrays — see lib/career/careerEngine.ts's recomputeAndSaveCapabilityProfile.
     const { data, error } = await this.db
       .from('assessments')
-      .select('subject_scores')
+      .select('subject_scores, created_at')
       .eq('student_id', studentId)
       .order('created_at', { ascending: true })
 
     if (error) throw new Error(`findAssessmentHistory: ${error.message}`)
     return (data ?? [])
       .filter(r => r.subject_scores && typeof r.subject_scores === 'object')
-      .map(r => ({ subject_scores: r.subject_scores as Record<string, number> }))
+      .map(r => ({ subject_scores: r.subject_scores as Record<string, number>, created_at: r.created_at }))
   }
 
   // ── Capability history ────────────────────────────────────────────────────────
@@ -483,6 +489,25 @@ export class LearnerModelRepository extends BaseRepository {
       class_id:        data.class_id as string,
       teacher_classes: cls,
     }
+  }
+
+  // A student can be enrolled in more than one class (different subjects) —
+  // unlike findClassEnrollment's single-row shortcut above, this returns
+  // every class_id so cache invalidation doesn't miss any of them.
+  async findClassIdsForStudent(studentId: string): Promise<string[]> {
+    const { data } = await this.db
+      .from('class_students')
+      .select('class_id')
+      .eq('student_id', studentId)
+    return (data ?? []).map(r => r.class_id as string)
+  }
+
+  // Forces the next Monday Panel request for these classes to recompute
+  // instead of serving a stale (up to 24h) cached snapshot — called whenever
+  // an evidence correction changes a projection for a student in the class.
+  async invalidateMondayPanelCache(classIds: string[]): Promise<void> {
+    if (classIds.length === 0) return
+    await this.db.from('monday_panel_cache').delete().in('class_id', classIds)
   }
 
   // ── Knowledge graph prerequisite check ───────────────────────────────────────

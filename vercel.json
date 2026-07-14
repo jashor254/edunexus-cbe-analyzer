@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/auto-publish-holiday-plans",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/ai-log-retention",
+      "schedule": "0 4 * * *"
     }
   ]
 }

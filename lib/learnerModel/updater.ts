@@ -8,7 +8,8 @@
 // validate it, or improve confidence in it. This file is where it updates.
 
 import { repos } from '@/lib/repositories'
-import { extractCapabilityProfile } from '@/lib/career/capabilityExtractor'
+import { marksToLevel } from '@/lib/intelligence/cbcScale'
+import { computeCapabilityProfile } from '@/lib/career/capabilityExtractor'
 import {
   getOrCreateLearnerProfile,
   patchKnowledgeState,
@@ -48,10 +49,26 @@ type AssessmentSignal = {
   rootCause?:    string
 }
 
+// A cross-source confirmation (formative "got_it", parent "demonstrated")
+// never re-lowers an existing mastery entry's confidence below 'medium' —
+// unlike the initial assessment computation (which can be 'low'), a second
+// independent source agreeing is itself evidence, so the floor is higher.
+// Shared by updateFromFormativeSignal and updateFromParentObservation so the
+// floor can't drift between the two call sites.
+function confirmedMasteryConfidence(level: SubstrandMastery['level']): SubstrandMastery['confidence'] {
+  return level >= 3 ? 'high' : 'medium'
+}
+
 export async function updateFromAssessment(signal: AssessmentSignal): Promise<void> {
   // 1. Update knowledge state for this substrand
   const key   = `${signal.subject}:${signal.subStrand}`
-  const level = computeCBCLevel(signal.subjectMarks[signal.subject] ?? 0)
+  // Canonical Evidence Domain conversion (lib/intelligence/cbcScale.ts) — the
+  // same function every other CBC scoring path in this codebase uses. Clamp
+  // to 0-100 first: marksToLevel throws outside that range, unlike the old
+  // local computeCBCLevel it replaces, matching the clamping pattern already
+  // used at every other marksToLevel call site (e.g. lib/assessments/mutations.ts).
+  const rawMark = Math.min(100, Math.max(0, signal.subjectMarks[signal.subject] ?? 0))
+  const level = marksToLevel(Math.round(rawMark))
   const now   = new Date().toISOString()
 
   const profile = await getOrCreateLearnerProfile(signal.studentId)
@@ -73,19 +90,14 @@ export async function updateFromAssessment(signal: AssessmentSignal): Promise<vo
   // 2. Update confirmed/persistent gaps
   await recomputeConfirmedGaps(signal.studentId)
 
-  // 3. Compute capability profile from full assessment history
-  const allHistory = await repos.learnerModel.findAssessmentHistory(signal.studentId)
-  const scoreHistory = allHistory.map(r => r.subject_scores as Record<string, number>)
+  // 3. Compute capability profile via the canonical computation — same
+  //    formula, same scoreHistory-construction logic every other consumer
+  //    (careerEngine.ts, /api/career/*) now uses.
+  const capabilityProfile = await computeCapabilityProfile(signal.studentId, signal.subjectScores)
 
-  const currentScores = { ...signal.subjectScores }
-  if (!scoreHistory.length || JSON.stringify(scoreHistory[scoreHistory.length - 1]) !== JSON.stringify(currentScores)) {
-    scoreHistory.push(currentScores)
-  }
-
-  if (scoreHistory.length > 0) {
+  if (capabilityProfile) {
     try {
       const prevDimensions = profile.capability_dimensions as Record<string, { level?: string; raw_score?: number }>
-      const capabilityProfile = extractCapabilityProfile(scoreHistory)
 
       const newDimensions = {
         analytical_reasoning: { ...capabilityProfile.analytical_reasoning, last_computed: now, previous_level: prevDimensions.analytical_reasoning?.level as CapabilityLevel | undefined },
@@ -102,7 +114,7 @@ export async function updateFromAssessment(signal: AssessmentSignal): Promise<vo
       await repos.learnerModel.insertCapabilityHistory({
         student_id:         signal.studentId,
         capability_profile: capabilityProfile,
-        assessment_count:   scoreHistory.length,
+        assessment_count:   capabilityProfile.assessment_count,
         computed_at:        now,
       })
 
@@ -263,7 +275,7 @@ export async function updateFromFormativeSignal(
         [key]: {
           ...existing,
           source:           existing.source === 'assessment' ? 'assessment' : 'formative',
-          confidence:       existing.level >= 3 ? 'high' : 'medium',
+          confidence:       confirmedMasteryConfidence(existing.level),
           last_validated:   signal.recorded_at,
           validation_count: existing.validation_count + 1,
         },
@@ -319,7 +331,7 @@ export async function updateFromParentObservation(input: ParentObservationInput)
             source:           'parent' as const,
             last_validated:   input.recordedAt,
             validation_count: existing.validation_count + 1,
-            confidence:       existing.level >= 3 ? 'high' : 'medium',
+            confidence:       confirmedMasteryConfidence(existing.level),
           },
         })
         break
@@ -512,8 +524,12 @@ async function recomputeConfirmedGaps(studentId: string): Promise<void> {
 }
 
 // ── Career Signals Refresh ────────────────────────────────────────────────────
+// Exported so the Projection Engine's evidence-correction outbox consumer
+// (lib/projection/eventConsumer.ts) can recompute this alongside the
+// canonical projections — idempotent, reads current DB state, safe to call
+// for any reason a learner's evidence changed.
 
-async function refreshCareerSignals(studentId: string): Promise<void> {
+export async function refreshCareerSignals(studentId: string): Promise<void> {
   const [interests, strand] = await Promise.all([
     repos.learnerModel.findRecentCareerInterests(studentId, 10),
     repos.learnerModel.findLatestStrandAssessment(studentId),
@@ -550,30 +566,56 @@ async function refreshPathwayReadiness(
   // Normalise CBC levels 1-4 to 0-100
   const norm = (level: number) => Math.round(((level - 1) / 3) * 100)
 
-  const math   = norm(subjectScores['mathematics']       ?? subjectScores['core_mathematics'] ?? 0)
-  const sci    = norm(subjectScores['integrated_science'] ?? subjectScores['physics']         ?? 0)
-  const eng    = norm(subjectScores['english']           ?? 0)
-  const kiswah = norm(subjectScores['kiswahili']         ?? 0)
-  const arts   = norm(subjectScores['creative_arts']     ?? subjectScores['art_design']       ?? 0)
-  const tech   = norm(subjectScores['pre_technical']     ?? subjectScores['pre_technical_studies'] ?? 0)
-  const social = norm(subjectScores['social_studies']    ?? subjectScores['history']           ?? 0)
+  // `pick` returns null (not 0) when a subject wasn't part of THIS signal —
+  // missing evidence must never be read as a level-0 score. A single-subject
+  // topical check, for example, only ever supplies one of these seven keys;
+  // every other subject is simply unknown to this call, not "failing."
+  const pick = (...keys: string[]): number | null => {
+    for (const k of keys) {
+      const v = subjectScores[k]
+      if (v !== undefined) return norm(v)
+    }
+    return null
+  }
 
-  // Weight subject scores into pathway readiness
-  const stemScore    = Math.round((math * 0.4) + (sci * 0.35) + (eng * 0.25))
-  const socialScore  = Math.round((social * 0.4) + (eng * 0.3) + (kiswah * 0.3))
-  const artsScore    = Math.round((arts * 0.5)  + (eng * 0.3) + (kiswah * 0.2))
-  const techScore    = Math.round((tech * 0.5)  + (math * 0.3) + (sci * 0.2))
+  const math   = pick('mathematics', 'core_mathematics')
+  const sci    = pick('integrated_science', 'physics')
+  const eng    = pick('english')
+  const kiswah = pick('kiswahili')
+  const arts   = pick('creative_arts', 'art_design')
+  const tech   = pick('pre_technical', 'pre_technical_studies')
+  const social = pick('social_studies', 'history')
+
+  // Weight subject scores into pathway readiness, renormalizing over
+  // whichever contributing subjects this signal actually touched — a
+  // pathway with only one of its inputs present is scored from that one
+  // input, not dragged toward zero by inputs this call never saw.
+  const weighted = (parts: Array<{ value: number | null; weight: number }>): number | null => {
+    const present = parts.filter((p): p is { value: number; weight: number } => p.value !== null)
+    if (present.length === 0) return null
+    const totalWeight = present.reduce((sum, p) => sum + p.weight, 0)
+    return Math.round(present.reduce((sum, p) => sum + p.value * p.weight, 0) / totalWeight)
+  }
+
+  const stemScore    = weighted([{ value: math,   weight: 0.4 }, { value: sci,  weight: 0.35 }, { value: eng,    weight: 0.25 }])
+  const socialScore  = weighted([{ value: social, weight: 0.4 }, { value: eng,  weight: 0.3 },  { value: kiswah, weight: 0.3 }])
+  const artsScore    = weighted([{ value: arts,   weight: 0.5 }, { value: eng,  weight: 0.3 },  { value: kiswah, weight: 0.2 }])
+  const techScore    = weighted([{ value: tech,   weight: 0.5 }, { value: math, weight: 0.3 },  { value: sci,    weight: 0.2 }])
 
   const prev = profile.pathway_readiness
 
-  const makeTrend = (prev: number, next: number) =>
-    next > prev + 3 ? 'improving' : next < prev - 3 ? 'declining' : 'stable'
+  const makeTrend = (prevScore: number, next: number) =>
+    next > prevScore + 3 ? 'improving' : next < prevScore - 3 ? 'declining' : 'stable'
 
+  // Only pathways this signal actually supplied evidence for are touched —
+  // every other pathway keeps its previous state untouched, unchanged
+  // last_updated included, per the "missing evidence is not negative
+  // evidence" principle.
   const newReadiness: PathwayReadiness = {
-    stem:            { score: stemScore,   trend: makeTrend(prev.stem.score,            stemScore),   last_updated: now },
-    social_sciences: { score: socialScore, trend: makeTrend(prev.social_sciences.score, socialScore), last_updated: now },
-    arts_sports:     { score: artsScore,   trend: makeTrend(prev.arts_sports.score,     artsScore),   last_updated: now },
-    technical_tvet:  { score: techScore,   trend: makeTrend(prev.technical_tvet.score,  techScore),   last_updated: now },
+    stem:            stemScore   !== null ? { score: stemScore,   trend: makeTrend(prev.stem.score,            stemScore),   last_updated: now } : prev.stem,
+    social_sciences: socialScore !== null ? { score: socialScore, trend: makeTrend(prev.social_sciences.score, socialScore), last_updated: now } : prev.social_sciences,
+    arts_sports:     artsScore   !== null ? { score: artsScore,   trend: makeTrend(prev.arts_sports.score,     artsScore),   last_updated: now } : prev.arts_sports,
+    technical_tvet:  techScore   !== null ? { score: techScore,   trend: makeTrend(prev.technical_tvet.score,  techScore),   last_updated: now } : prev.technical_tvet,
   }
 
   await patchPathwayReadiness(studentId, newReadiness)
@@ -741,13 +783,6 @@ async function checkPrerequisiteGaps(
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function computeCBCLevel(rawMark: number): 1 | 2 | 3 | 4 {
-  if (rawMark >= 75) return 4   // EE — Exceeding Expectations
-  if (rawMark >= 50) return 3   // ME — Meeting Expectations
-  if (rawMark >= 25) return 2   // AE — Approaching Expectations
-  return 1                       // BE — Below Expectations
-}
 
 function computeOverallRisk(flags: RiskFlag[]): RiskLevel {
   if (!flags.length) return 'normal'

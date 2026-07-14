@@ -9,8 +9,7 @@ import {
   apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest,
 } from '@/lib/api/response'
 import { runAssessmentPipeline, type AssessmentPipelineResult } from '@/lib/academicClinic/assessmentPipeline'
-import { extractCapabilityProfile } from '@/lib/career/capabilityExtractor'
-import { saveCapabilityProfile } from '@/lib/career/careerEngine'
+import { recomputeAndSaveCapabilityProfile } from '@/lib/career/careerEngine'
 import { updateFromAssessment } from '@/lib/learnerModel/updater'
 import { levelToApproxMarks, type CBCLevel } from '@/lib/assessments/gradeCalculator'
 import { recordReportCardAssessmentEvidence } from '@/lib/assessments/reportCardEvidence'
@@ -99,7 +98,7 @@ export async function POST(req: Request) {
 
       // Fire-and-forget: update capability profile and EILS learner model.
       if (result.status === 'ok') {
-        recomputeCapabilityProfile(db, sid).catch(err =>
+        recomputeAndSaveCapabilityProfile(sid).catch(err =>
           console.error('[assessments/process] capability recompute failed', sid, err)
         )
         triggerLearnerModelUpdate(db, sid, result.student_name, assessment_id).catch(err =>
@@ -145,8 +144,9 @@ async function triggerLearnerModelUpdate(
   const rawMarksMap = (assessment.subject_marks as Record<string, { marks?: number }>) ?? {}
 
   // Prefer the actual raw mark when present; only approximate from the CBC
-  // level (which must round-trip through computeCBCLevel's band boundaries
-  // back to the same level) when no raw mark was recorded.
+  // level (which must round-trip through marksToLevel's band boundaries
+  // back to the same level — see lib/intelligence/cbcScale.ts) when no raw
+  // mark was recorded.
   const marks: Record<string, number> = {}
   for (const [subj, level] of Object.entries(scores)) {
     marks[subj] = rawMarksMap[subj]?.marks ?? levelToApproxMarks(level as CBCLevel)
@@ -170,24 +170,4 @@ async function triggerLearnerModelUpdate(
       })
     )
   )
-}
-
-// Fetch latest assessment scores for a student and recompute their capability profile.
-async function recomputeCapabilityProfile(
-  db: ReturnType<typeof import('@/utils/supabase/service').createServiceClient>,
-  studentId: string
-): Promise<void> {
-  const { data: assessments } = await db
-    .from('assessments')
-    .select('subject_scores')
-    .eq('student_id', studentId)
-    .not('subject_scores', 'is', null)
-    .order('created_at', { ascending: true })
-    .limit(10)
-
-  if (!assessments || assessments.length === 0) return
-
-  const scoreHistory = assessments.map(a => a.subject_scores as Record<string, number>)
-  const profile      = extractCapabilityProfile(scoreHistory)
-  await saveCapabilityProfile(studentId, profile)
 }

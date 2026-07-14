@@ -7,10 +7,14 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { callDeepSeek } from '@/lib/ai/deepseek'
 import { buildClinicReport } from './clinicReportBuilder'
-import { getCapabilityProfile, getAllCareersWithCOS } from './careerEngine'
-import { computeCapabilityMatches } from './capabilityMatchEngine'
-import { CAPABILITY_LABELS } from './capabilityExtractor'
+import { getAllCareersWithCOS } from './careerEngine'
+import { computeCapabilityMatches, confidenceFromAssessmentCount } from './capabilityMatchEngine'
+import { CAPABILITY_LABELS, extractCapabilityProfile } from './capabilityExtractor'
 import { STANDARD_DISCLAIMER } from './types'
+import { familiesFromMatches } from '@/lib/learnerIntelligence/careerIntelligence'
+import { recomputeLearnerProjection } from '@/lib/projection/recompute'
+import { projectionToScoreHistory } from '@/lib/learnerIntelligence/projectionAdapters'
+import type { ConfidenceLevel } from '@/lib/learnerIntelligence/insight'
 import type {
   CareerIntelligenceReport,
   HiddenStrength,
@@ -286,7 +290,8 @@ function buildGrowthBarriers(
 
 function buildOpportunityLandscape(
   matchReport: CapabilityMatchReport | null,
-  clinicReport: ClinicReport
+  clinicReport: ClinicReport,
+  mode: 'exploration' | 'planning',
 ): {
   strong_fit_now:        OpportunityEntry[]
   fit_after_improvement: StretchOpportunityEntry[]
@@ -295,6 +300,26 @@ function buildOpportunityLandscape(
   const strong_fit_now:        OpportunityEntry[]         = []
   const fit_after_improvement: StretchOpportunityEntry[]  = []
   const unlikely_today:        UnlikelyOpportunityEntry[] = []
+
+  // Career Principle: Junior (exploration mode) never sees a ranked
+  // single-career prediction, a "stretch goal," or an "unlikely" verdict —
+  // those are all judgments about who a 12-14 year old will become. Same
+  // matcher, same data (computeCapabilityMatches, familiesFromMatches — no
+  // parallel engine), just regrouped into broad categories with no ranking
+  // implication and no downside-facing "unlikely" tier at all.
+  if (matchReport && mode === 'exploration') {
+    const families = familiesFromMatches([...matchReport.primary, ...matchReport.stretch])
+    for (const f of families.slice(0, 3)) {
+      strong_fit_now.push({
+        career: f.categoryLabel,
+        reason: `${f.insight.observation} Worth exploring through: ${f.exampleCareerTitles.join(', ')}.`,
+      })
+    }
+    // fit_after_improvement / unlikely_today intentionally left empty —
+    // both require judging a specific career as a stretch or out of reach,
+    // which this stage of guidance must not do.
+    return { strong_fit_now, fit_after_improvement, unlikely_today }
+  }
 
   if (matchReport) {
     for (const m of matchReport.primary.slice(0, 3)) {
@@ -442,16 +467,34 @@ async function generateNarrativeSections(
   readinessScore: number,
   readinessLabel: string,
   topMatchTitles: string[],
-  dreamCareer:    string | null
+  dreamCareer:    string | null,
+  assessmentCount: number,
+  confidenceLevel: ConfidenceLevel,
+  mode:           'exploration' | 'planning',
 ): Promise<NarrativeSections> {
   const firstName = studentName.split(' ')[0]
   const pathwayStr = pathway ?? 'General'
+  const modeNote = mode === 'exploration'
+    ? `${firstName} is in Junior School — this stage is about exploring broad fields, not predicting a career. topMatchTitles below are FIELD CATEGORIES, not specific job titles — never write as if a specific career has been identified or matched. Use language like "worth exploring," "an area to try," never "you should become" or "you are suited for."`
+    : `${firstName} is in Senior School — specific career guidance proportional to the evidence is appropriate, but every claim must still be hedged by the evidence note below and framed as a direction, not a destiny.`
+  const evidenceNote = confidenceLevel === 'Low'
+    ? `Evidence is THIN — only ${assessmentCount} assessment${assessmentCount === 1 ? '' : 's'} so far. Hedge every claim accordingly ("early signal", "based on what we've seen so far") and do not state anything as a settled conclusion.`
+    : confidenceLevel === 'Medium'
+      ? `Evidence is MODERATE — ${assessmentCount} assessments so far. Offer tentative, not absolute, guidance.`
+      : `Evidence is STRONG — ${assessmentCount} assessments so far. Stronger claims are warranted, but still ground every one in the data below.`
 
   const prompt = `You are the EduNexus Career Intelligence Engine — a Kenyan education AI that helps learners, parents, and teachers understand how today's education connects to tomorrow's opportunities.
 
 You are NOT recommending jobs. You are helping people understand trajectories.
 
 Your writing style: natural, evidence-based, honest. Not corporate language. Not exaggerated praise. Not fear. Use Kenyan examples where relevant.
+
+GROUNDING RULES — every sentence you write must obey these:
+- Only describe capabilities, strengths, or patterns that are directly supported by the STUDENT PROFILE data below. Do not invent traits, talents, or abilities the data does not show.
+- Never claim to reveal something "hidden," "undiscovered," or a "natural genius" / "innate talent" — describe strengths as what the evidence shows, in evidence-aware language (e.g. "the data suggests," "based on current performance"), not as secret discoveries.
+- ${evidenceNote}
+- ${modeNote}
+- If a section of the profile below says "not yet assessed", say so plainly rather than filling the gap with a confident-sounding guess.
 
 STUDENT PROFILE:
 - Name: ${studentName} (use first name "${firstName}" in writing)
@@ -464,6 +507,7 @@ STUDENT PROFILE:
 - Overall career readiness: ${readinessScore}/100 (${readinessLabel})
 - Top career matches: ${topMatchTitles.join(', ') || 'not yet matched'}
 - Dream career: ${dreamCareer ?? 'not stated'}
+- Evidence base: ${assessmentCount} assessment${assessmentCount === 1 ? '' : 's'} (confidence: ${confidenceLevel})
 
 Generate a JSON object with EXACTLY these keys:
 
@@ -474,7 +518,7 @@ Generate a JSON object with EXACTLY these keys:
 
   "teacher_insight": {
     "subjects_requiring_intervention": ["2–3 specific subjects based on weak_subjects and capability gaps"],
-    "hidden_strengths": ["2–3 non-obvious strengths a teacher might not notice from marks alone — based on capability and learning patterns"],
+    "hidden_strengths": ["2–3 strengths grounded strictly in the dominant/emerging capabilities and strong subjects listed above, phrased as evidence-based observations a teacher can verify against marks — not as claims about hidden or innate ability. If the profile above has fewer than 2 dominant/emerging capabilities to draw on, say fewer things rather than inventing more."],
     "suggested_classroom_opportunities": ["2–3 specific classroom activities, projects, or roles that would bring out ${firstName}'s strengths"],
     "suggested_responsibilities": ["2–3 leadership or responsibility roles that would build confidence and visible contribution"],
     "how_to_nurture_confidence": "One specific, actionable approach tailored to ${firstName}'s profile — not generic advice"
@@ -517,8 +561,25 @@ export async function buildCareerIntelligenceReport(
   // 1. Clinic report — the deterministic data backbone
   const clinicReport = await buildClinicReport(studentId, db)
 
-  // 2. Capability profile — may not exist for students with only one assessment
-  const profile = await getCapabilityProfile(studentId).catch(() => null)
+  // Career Principle: Junior (Grade 7-9) is exploring, never predicted —
+  // gates the opportunity landscape and the AI narrative context below.
+  const mode: 'exploration' | 'planning' =
+    clinicReport.grade >= 7 && clinicReport.grade <= 9 ? 'exploration' : 'planning'
+
+  // 2. Capability profile — sourced live from Projection, the same
+  // canonical path Blueprint/Career Intelligence/Parent Career
+  // Intelligence/Career Explorer all use (lib/learnerIntelligence/
+  // projectionAdapters.ts), instead of the separately-stored
+  // `students.capability_profile` snapshot this report previously read —
+  // so a Career Intelligence Report never disagrees with what every other
+  // surface concludes from the same evidence. May be null for a student
+  // with no evidence yet.
+  const profile = await recomputeLearnerProjection(studentId)
+    .then(projection => {
+      const scoreHistory = projectionToScoreHistory(projection)
+      return scoreHistory.length > 0 ? extractCapabilityProfile(scoreHistory) : null
+    })
+    .catch(() => null)
 
   // 3. Capability match report — requires COS Phase 1 career data
   let matchReport: CapabilityMatchReport | null = null
@@ -532,7 +593,7 @@ export async function buildCareerIntelligenceReport(
   // 4. Build all deterministic sections
   const hiddenStrengths = buildHiddenStrengths(profile, clinicReport)
   const growthBarriers  = buildGrowthBarriers(profile, clinicReport)
-  const landscape       = buildOpportunityLandscape(matchReport, clinicReport)
+  const landscape       = buildOpportunityLandscape(matchReport, clinicReport, mode)
   const educationChains = buildEducationChains(clinicReport)
   const aiRealityCheck  = buildAIRealityCheck(clinicReport)
   const fourDoors       = buildFourDoors(clinicReport)
@@ -565,11 +626,18 @@ export async function buildCareerIntelligenceReport(
     ? buildLearningHabitsNote(profile, clinicReport)
     : `Based on ${clinicReport.section === 'senior' ? 'senior pathway' : 'junior pathway'} assessment data. More assessments will reveal learning patterns and trends over time.`
 
-  // 5. Context for AI call
-  const topMatchTitles = [
-    clinicReport.top_career?.career.title,
-    ...(matchReport?.primary.slice(0, 2).map(m => m.career_title) ?? []),
-  ].filter((t): t is string => typeof t === 'string').slice(0, 3)
+  // 5. Context for AI call — Junior gets category-level labels (already
+  // built into landscape.strong_fit_now for exploration mode), never
+  // specific ranked career titles, matching the Career Principle.
+  const topMatchTitles = mode === 'exploration'
+    ? landscape.strong_fit_now.map(e => e.career).slice(0, 3)
+    : [
+        clinicReport.top_career?.career.title,
+        ...(matchReport?.primary.slice(0, 2).map(m => m.career_title) ?? []),
+      ].filter((t): t is string => typeof t === 'string').slice(0, 3)
+
+  const assessmentCount = profile?.assessment_count ?? 0
+  const confidenceLevel = confidenceFromAssessmentCount(assessmentCount)
 
   const narratives = await generateNarrativeSections(
     clinicReport.student_name,
@@ -583,7 +651,10 @@ export async function buildCareerIntelligenceReport(
     readinessScore,
     readinessLabel,
     topMatchTitles,
-    clinicReport.dream_career
+    clinicReport.dream_career,
+    assessmentCount,
+    confidenceLevel,
+    mode,
   )
 
   return {
@@ -593,6 +664,7 @@ export async function buildCareerIntelligenceReport(
     age:          clinicReport.age,
     pathway:      clinicReport.recommended_pathway,
     dream_career: clinicReport.dream_career,
+    mode,
     generated_at: new Date().toISOString(),
 
     readiness_score:      readinessScore,

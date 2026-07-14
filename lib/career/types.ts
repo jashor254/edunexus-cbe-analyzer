@@ -1,5 +1,6 @@
 // lib/career/types.ts
 import type { PathwayResult } from '@/lib/pathwayCalculator'
+import type { ConfidenceLevel } from '@/lib/learnerIntelligence/insight'
 export type { PathwayResult }
 
 // ── COS Disclaimer ────────────────────────────────────────────────────────────
@@ -436,6 +437,14 @@ export type CapabilityCareerMatch = {
   pathway:           CareerPathway
   tier:              CapabilityMatchTier
   alignment_score:   number                              // 0.0–1.0
+  /**
+   * Same Low/Medium/High label every other consumer uses
+   * (lib/learnerIntelligence/insight.ts), derived from the same
+   * assessment-count thresholds scoreCareer() already uses to cap
+   * alignment_score — not a second scoring scheme, just labeling the one
+   * that already exists so evidence quality travels with the match.
+   */
+  confidence:        ConfidenceLevel
   dimension_scores:  Partial<Record<CapabilityDimension, number>>
   gaps:              CapabilityGap[]
   strengths:         CapabilityStrength[]
@@ -498,7 +507,11 @@ export type ParentIntelligenceReport = {
   profile_summary:       string
   top_strengths:         string[]
   growth_areas:          string[]
+  /** Grade 10-12 only — Junior always gets `career_families` instead, never a ranked/percentage career prediction. */
   recommended_careers:   CapabilityCareerMatch[]
+  /** Grade 7-9 only — broad exploration families (Career Principle: Junior learners are exploring, never predicted). */
+  career_families?:      import('@/lib/learnerIntelligence/careerIntelligence').CareerFamilyInsight[]
+  mode:                  'exploration' | 'planning'
   conversation_starters: string[]
   support_actions:       string[]
   weekly_habits:         string[]
@@ -578,6 +591,8 @@ export type CareerIntelligenceReport = {
   age:          number
   pathway:      string | null
   dream_career: string | null
+  /** Career Principle gate — Junior (Grade 7-9) = exploration, Senior (10-12) = planning. */
+  mode:         'exploration' | 'planning'
   generated_at: string
 
   // S1: Career Readiness Snapshot

@@ -7,7 +7,7 @@ import { RoleSwitcher } from '@/components/layout/RoleSwitcher'
 import { Logo } from '@/components/ui/Logo'
 
 const NAV_LINKS = [
-  { href: '/chat',                       label: 'Compass',     color: 'hover:text-violet-600'  },
+  { href: '/learn',                      label: 'Compass',     color: 'hover:text-violet-600'  },
   { href: '/career',                     label: 'Careers',     color: 'hover:text-purple-600'  },
   { href: '/dashboard/clinic',           label: 'Clinic',      color: 'hover:text-cyan-600'    },
   { href: '/dashboard/assignments',      label: 'Assignments',  color: 'hover:text-pink-600'    },
@@ -16,14 +16,51 @@ const NAV_LINKS = [
 
 const BOTTOM_NAV = [
   { href: '/dashboard',                  label: 'Home',        icon: '🏠' },
-  { href: '/chat',                       label: 'Compass',     icon: '🧭' },
+  { href: '/learn',                      label: 'Compass',     icon: '🧭' },
   { href: '/dashboard/clinic',           label: 'Clinic',      icon: '🏥' },
   { href: '/dashboard/assignments',      label: 'Assignments', icon: '📋' },
   { href: '/career',                     label: 'Careers',     icon: '💼' },
 ]
 
-export default function DashboardNavbar() {
+// Student-only pages (Sprint 19) — appended rather than folded into the
+// shared arrays above so parent/teacher nav is completely unaffected.
+const STUDENT_EXTRA_NAV_LINKS = [
+  { href: '/blueprint',                  label: 'Blueprint',   color: 'hover:text-indigo-600'  },
+  { href: '/holiday',                    label: 'Holiday',     color: 'hover:text-orange-600'  },
+  { href: '/progress',                   label: 'Progress',    color: 'hover:text-emerald-600' },
+]
+
+const STUDENT_EXTRA_BOTTOM_NAV = [
+  { href: '/progress',                   label: 'Progress',    icon: '📈' },
+]
+
+// `/dashboard/assignments` is only reachable when app/dashboard/layout.tsx's
+// own redirect doesn't apply — i.e. never for a student account, which that
+// layout always sends to /student instead. Student layouts pass isStudent so
+// this shared nav points "Assignments" at /learn instead, where a student's
+// assignments actually render (see app/learn/page.tsx's "Your Assignments"
+// section) — same component, correct destination per audience, no new
+// route, no new redirect. Default is unchanged for every existing caller.
+export default function DashboardNavbar({ isStudent = false }: { isStudent?: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const assignmentsHref = isStudent ? '/learn' : '/dashboard/assignments'
+  // Careers points students at their own explorer, everyone else at the
+  // parent-facing career intelligence entry point (Sprint 19 — see
+  // app/(parent)/career-intelligence for the consolidated parent flow).
+  const careersHref = isStudent ? '/career' : '/career-intelligence'
+  const applyOverrides = <T extends { label: string; href: string }>(link: T): T => {
+    if (link.label === 'Assignments') return { ...link, href: assignmentsHref }
+    if (link.label === 'Careers')     return { ...link, href: careersHref }
+    return link
+  }
+  const navLinks = [
+    ...NAV_LINKS.map(applyOverrides),
+    ...(isStudent ? STUDENT_EXTRA_NAV_LINKS : []),
+  ]
+  const bottomNav = [
+    ...BOTTOM_NAV.map(applyOverrides),
+    ...(isStudent ? STUDENT_EXTRA_BOTTOM_NAV : []),
+  ]
 
   return (
     <>
@@ -39,7 +76,7 @@ export default function DashboardNavbar() {
 
             {/* Desktop links */}
             <div className="hidden md:flex items-center gap-4 lg:gap-6">
-              {NAV_LINKS.map(({ href, label, color }) => (
+              {navLinks.map(({ href, label, color }) => (
                 <Link
                   key={href}
                   href={href}
@@ -88,7 +125,7 @@ export default function DashboardNavbar() {
         {menuOpen && (
           <div className="md:hidden border-t border-slate-100 bg-white shadow-lg">
             <div className="max-w-6xl mx-auto px-4 py-2 flex flex-col">
-              {NAV_LINKS.map(({ href, label, color }) => (
+              {navLinks.map(({ href, label, color }) => (
                 <Link
                   key={href}
                   href={href}
@@ -109,7 +146,7 @@ export default function DashboardNavbar() {
       {/* ── Mobile Bottom Nav ───────────────────────────────────────────────── */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t-2 border-slate-200 shadow-lg">
         <div className="flex items-stretch h-16">
-          {BOTTOM_NAV.map(({ href, label, icon }) => (
+          {bottomNav.map(({ href, label, icon }) => (
             <Link
               key={href}
               href={href}

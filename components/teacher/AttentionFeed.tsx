@@ -1,9 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { AlertOctagon, AlertTriangle, Eye, Sparkles, X, Loader2 } from 'lucide-react'
 import type { AttentionItem, AttentionSeverity } from '@/lib/attentionFeed/types'
+import { topPriorityItems } from '@/lib/attentionFeed/prioritize'
+import { useDashboardData } from '@/components/teacher/DashboardDataProvider'
+
+const MISSION_PRIORITY_COUNT = 3
 
 const SEVERITY_META: Record<AttentionSeverity, { label: string; icon: typeof AlertOctagon; cls: string; iconCls: string }> = {
   critical: { label: 'Critical', icon: AlertOctagon,  cls: 'bg-red-50 border-red-100',    iconCls: 'bg-red-500 text-white' },
@@ -13,22 +17,24 @@ const SEVERITY_META: Record<AttentionSeverity, { label: string; icon: typeof Ale
 }
 
 export default function AttentionFeed() {
-  const [items, setItems]     = useState<AttentionItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [dismissing, setDismissing] = useState<string | null>(null)
+  const { attentionItems } = useDashboardData()
+  const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(new Set())
+  const [dismissing, setDismissing]       = useState<string | null>(null)
 
-  useEffect(() => {
-    fetch('/api/teacher/attention-feed')
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.success) setItems(data.data.items)
-      })
-      .finally(() => setLoading(false))
-  }, [])
+  const loading = attentionItems === null
+
+  // Today's Mission already surfaces the top priorities up front — don't
+  // repeat them here (no duplicate recommendations across the dashboard).
+  const alreadySurfaced = new Set(
+    topPriorityItems(attentionItems ?? [], MISSION_PRIORITY_COUNT).map((i) => i.itemKey)
+  )
+  const items = (attentionItems ?? []).filter(
+    (i) => !alreadySurfaced.has(i.itemKey) && !dismissedKeys.has(i.itemKey)
+  )
 
   async function dismiss(itemKey: string) {
     setDismissing(itemKey)
-    setItems((prev) => prev.filter((i) => i.itemKey !== itemKey))
+    setDismissedKeys((prev) => new Set(prev).add(itemKey))
     try {
       await fetch('/api/teacher/attention-feed', {
         method: 'POST',
@@ -51,8 +57,7 @@ export default function AttentionFeed() {
   if (items.length === 0) {
     return (
       <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-6 text-center">
-        <p className="text-gray-400 text-sm">Nothing needs your attention right now.</p>
-        <p className="text-gray-300 text-xs mt-1">This grows smarter as you save marksheets and teach more weeks.</p>
+        <p className="text-gray-500 text-sm font-bold">Everything looks good today.</p>
       </div>
     )
   }
@@ -64,7 +69,7 @@ export default function AttentionFeed() {
         <p className="text-gray-400 text-xs mt-0.5">{items.length} item{items.length !== 1 ? 's' : ''} across your classes</p>
       </div>
       <div className="divide-y divide-gray-50">
-        {items.map((item) => {
+        {items.map((item: AttentionItem) => {
           const meta = SEVERITY_META[item.severity]
           const Icon = meta.icon
           return (

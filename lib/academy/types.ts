@@ -134,6 +134,7 @@ export type AcademyReflection = {
   next_action: string
   ai_feedback: string | null
   quality_score: number | null
+  is_fallback: boolean
   word_count: number
   created_at: string
   updated_at: string
@@ -154,6 +155,10 @@ export type ReflectionFeedback = {
   feedback_text: string
   growth_indicator: 'surface' | 'developing' | 'deep' | 'transformative'
   suggested_next_action: string
+  // true when this score is NOT a genuine AI judgement — either the AI call
+  // failed/timed out, its response failed to parse, or the submission was
+  // too short to send to the AI at all. Never render this as a real grade.
+  isFallback: boolean
 }
 
 export type ReflectionResponse = {
@@ -213,6 +218,7 @@ export type MissionCompletion = {
   self_scores: Record<string, number> | null
   ai_score: number | null
   ai_verdict: string | null
+  is_fallback: boolean
   completed_at: string
   updated_at: string
 }
@@ -234,6 +240,9 @@ export type MissionVerdict = {
   ai_verdict: string
   key_insight: string
   suggested_next_action: string
+  // true when this score is NOT a genuine AI judgement — see
+  // ReflectionFeedback.isFallback for the identical rationale.
+  isFallback: boolean
 }
 
 export type MissionCompleteResponse = {

@@ -45,12 +45,14 @@ export async function POST(req: Request) {
 
     const db = createServiceClient()
 
-    // Verify student belongs to this user
+    // Verify student belongs to this user — checks both link mechanisms
+    // (direct creator via user_id, or invite-linked parent via parent_user_id),
+    // matching every other parent-facing route.
     const { data: student } = await db
       .from('students')
       .select('id, name, parent_first_name')
       .eq('id', studentId)
-      .eq('user_id', user.id)
+      .or(`user_id.eq.${user.id},parent_user_id.eq.${user.id}`)
       .single()
 
     if (!student) return apiForbidden()

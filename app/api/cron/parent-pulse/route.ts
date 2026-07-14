@@ -1,6 +1,8 @@
 // POST /api/cron/parent-pulse
 // Runs every Sunday — sends the weekly parent pulse via WhatsApp.
-// Protected by cron secret. Fire-and-forget per student.
+// Scheduled via .github/workflows/notification-crons.yml (not vercel.json —
+// see that workflow's header comment for why). Protected by cron secret.
+// Fire-and-forget per student.
 
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'

@@ -15,6 +15,11 @@ export type ClassOverview = {
   gradeDistribution: GradeDist
   highestTotal: number
   lowestTotal: number
+  /** Phase D (academic-evidence-layer.md §8), additive traditional-analytics stats. */
+  medianScore: number
+  modalGrade: string | null
+  /** KNEC/CBC points-scale mean — null only if no mark in this class has a recognized grade label. */
+  meanPoints: number | null
 }
 
 export type SubjectRow = {

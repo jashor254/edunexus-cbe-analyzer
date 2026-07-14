@@ -1,19 +1,12 @@
-// Runs daily at 08:00 EAT (05:00 UTC)
+// Runs daily at 08:00 EAT (05:00 UTC), scheduled via
+// .github/workflows/notification-crons.yml
 // Finds teachers who completed a lesson 7+ days ago with no reflection → sends one WhatsApp nudge per lesson (lifetime dedup).
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { sendAcademyReflectionNudge } from '@/lib/whatsapp/sender'
 import { timingSafeEqualString } from '@/lib/api/secretCompare'
 
-export async function POST(request: NextRequest) {
-  const authHeader  = request.headers.get('authorization')
-  const cronSecret  = process.env.CRON_SECRET
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1'
-
-  if (!isVercelCron && (!cronSecret || !timingSafeEqualString(authHeader, `Bearer ${cronSecret}`))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
+async function runAcademyNudge(): Promise<{ sent: number; skipped: number; total: number; message?: string }> {
   const db = createServiceClient()
 
   // 1. Lesson completions older than 7 days
@@ -25,7 +18,7 @@ export async function POST(request: NextRequest) {
     .lt('completed_at', cutoff)
 
   if (!oldProgress?.length) {
-    return NextResponse.json({ sent: 0, message: 'No old progress records' })
+    return { sent: 0, skipped: 0, total: 0, message: 'No old progress records' }
   }
 
   // 2. Which of those have reflections?
@@ -48,7 +41,7 @@ export async function POST(request: NextRequest) {
   )
 
   if (!needsNudge.length) {
-    return NextResponse.json({ sent: 0, message: 'All old lessons have reflections — great work!' })
+    return { sent: 0, skipped: 0, total: 0, message: 'All old lessons have reflections — great work!' }
   }
 
   // 4. Check which nudges were already sent (lifetime dedup via notification_log)
@@ -68,7 +61,7 @@ export async function POST(request: NextRequest) {
   )
 
   if (!toSend.length) {
-    return NextResponse.json({ sent: 0, message: 'All pending nudges already sent' })
+    return { sent: 0, skipped: 0, total: 0, message: 'All pending nudges already sent' }
   }
 
   // 5. Fetch teacher profiles + lesson → module data in parallel (batch)
@@ -120,7 +113,25 @@ export async function POST(request: NextRequest) {
     else skipped++
   }
 
-  console.info(`[cron/academy-nudge] ${sent} sent, ${skipped} skipped`)
+  return { sent, skipped, total: perTeacher.size }
+}
 
-  return NextResponse.json({ sent, skipped, total: perTeacher.size })
+export async function POST(request: NextRequest) {
+  const authHeader  = request.headers.get('authorization')
+  const cronSecret  = process.env.CRON_SECRET
+  const isVercelCron = request.headers.get('x-vercel-cron') === '1'
+
+  if (!isVercelCron && (!cronSecret || !timingSafeEqualString(authHeader, `Bearer ${cronSecret}`))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const result = await runAcademyNudge()
+    console.info(`[cron/academy-nudge] ${result.sent} sent, ${result.skipped} skipped${result.message ? ` — ${result.message}` : ''}`)
+    return NextResponse.json(result)
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[cron/academy-nudge] failed', message)
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
 }

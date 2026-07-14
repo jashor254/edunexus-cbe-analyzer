@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { paystackClient } from '@/lib/payments/paystack'
 import { requireAuth } from '@/lib/api/middleware'
+import { fulfillPayment } from '@/lib/payments/fulfillment'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
     // 1. FIND PAYMENT RECORD
     const { data: payment, error: paymentError } = await supabase
       .from('payments')
-      .select('id, status, amount, user_id, transaction_id, plan, created_at, product_id, payment_type, metadata')
+      .select('id, status, amount, user_id, transaction_id, created_at, product_id, metadata')
       .eq('transaction_id', transactionId)
       .single()
 
@@ -45,11 +46,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 })
     }
 
-    // 2. IDEMPOTENCY — never process twice
-    if (payment.status === 'completed' || payment.status === 'successful') {
+    // 2. IDEMPOTENCY fast path — 'success' is the only terminal-success value
+    // in the payments.status enum (pending | success | failed | cancelled).
+    // The authoritative guard against double-fulfillment is the atomic
+    // conditional update inside fulfillPayment() below.
+    if (payment.status === 'success') {
       return NextResponse.json({
         success: true,
-        status: 'completed',
+        status: 'success',
         message: 'Payment already verified and active.',
       })
     }
@@ -59,13 +63,12 @@ export async function POST(request: NextRequest) {
     try {
       verifyResult = await paystackClient.verifyPayment(transactionId)
     } catch (verifyError: unknown) {
+      const message = verifyError instanceof Error ? verifyError.message : String(verifyError)
+      console.error('[payments/verify] Paystack verification threw', { paymentId: payment.id, transactionId, message })
+
       await supabase
         .from('payments')
-        .update({
-          status: 'failed',
-          error_message: 'Paystack verification failed',
-          updated_at: new Date().toISOString(),
-        })
+        .update({ status: 'failed', updated_at: new Date().toISOString() })
         .eq('id', payment.id)
 
       return NextResponse.json({ success: false, error: 'Payment verification failed with Paystack' }, { status: 502 })
@@ -75,7 +78,7 @@ export async function POST(request: NextRequest) {
       const newStatus = verifyResult.data.status === 'pending' ? 'pending' : 'failed'
       await supabase
         .from('payments')
-        .update({ status: newStatus, paystack_data: verifyResult.data, updated_at: new Date().toISOString() })
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
         .eq('id', payment.id)
       return NextResponse.json({ success: false, status: newStatus, error: `Payment ${newStatus}` }, { status: 400 })
     }
@@ -87,66 +90,31 @@ export async function POST(request: NextRequest) {
     if (paystackData.amount < expectedKobo) {
       await supabase
         .from('payments')
-        .update({ status: 'failed', error_message: 'Amount mismatch', paystack_data: paystackData, updated_at: new Date().toISOString() })
+        .update({ status: 'failed', updated_at: new Date().toISOString() })
         .eq('id', payment.id)
       return NextResponse.json({ success: false, error: 'Amount mismatch — possible fraud' }, { status: 400 })
     }
 
-    // 5. ATOMIC FULFILLMENT via RPC
-    const { error: rpcError } = await supabase.rpc('handle_successful_payment', {
-      p_payment_id:    payment.id,
-      p_user_id:       payment.user_id,
-      p_product_id:    payment.product_id,
-      p_payment_type:  payment.payment_type,
-      p_tokens_to_add: (payment.metadata as { tokens_to_add?: number } | null)?.tokens_to_add ?? 0,
-      p_paystack_data: paystackData,
+    // 5. ATOMIC FULFILLMENT — same guarded transition + crediting path used
+    // by the webhook/browser callback route (lib/payments/fulfillment.ts),
+    // so there is exactly one way a payment ever gets fulfilled.
+    await fulfillPayment(supabase, {
+      id:         payment.id,
+      user_id:    payment.user_id,
+      product_id: payment.product_id,
     })
-
-    if (rpcError) {
-      // Fallback manual fulfillment — still atomic per resource type
-      await supabase
-        .from('payments')
-        .update({ status: 'completed', verified_at: new Date().toISOString(), paystack_data: paystackData, updated_at: new Date().toISOString() })
-        .eq('id', payment.id)
-
-      if (payment.payment_type === 'bundle' && (payment.metadata as { tokens_to_add?: number } | null)?.tokens_to_add) {
-        const { error: tokenErr } = await supabase.rpc('add_tokens_to_user', {
-          p_user_id:   payment.user_id,
-          p_tokens:    (payment.metadata as { tokens_to_add: number }).tokens_to_add,
-          p_source:    'payment',
-          p_reference: transactionId,
-        })
-        if (tokenErr) {
-          // Token RPC failed — log but don't surface to caller (payment status already set)
-          console.error('[verify] add_tokens_to_user failed:', tokenErr.message)
-        }
-      }
-
-      if (payment.payment_type === 'subscription') {
-        const endDate = new Date()
-        endDate.setMonth(endDate.getMonth() + 3)
-        await supabase.from('subscriptions').insert({
-          user_id:    payment.user_id,
-          plan_type:  payment.product_id,
-          status:     'active',
-          start_date: new Date().toISOString(),
-          end_date:   endDate.toISOString(),
-          payment_id: payment.id,
-        })
-      }
-    }
 
     return NextResponse.json({
       success: true,
-      status: 'completed',
+      status: 'success',
       message: 'Payment verified and account upgraded successfully!',
       data: {
-        payment_type: payment.payment_type,
-        product_id:   payment.product_id,
-        amount:       payment.amount,
+        product_id: payment.product_id,
+        amount:     payment.amount,
       },
     })
   } catch (err: unknown) {
+    console.error('[payments/verify] Unhandled error', { userId: auth.user.id, message: err instanceof Error ? err.message : String(err) })
     return NextResponse.json(
       { success: false, error: 'Internal server error during verification' },
       { status: 500 }

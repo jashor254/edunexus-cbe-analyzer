@@ -146,6 +146,7 @@ export default function MissionClient({ mission, moduleColor }: Props) {
             ai_verdict: mission.completion.ai_verdict ?? '',
             key_insight: '',
             suggested_next_action: '',
+            isFallback: mission.completion.is_fallback,
           }}
           xpEarned={0}
           moduleColor={moduleColor}
@@ -415,33 +416,39 @@ function VerdictCard({
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      <div className="h-1.5 w-full bg-gradient-to-r from-amber-400 to-yellow-300" />
+      <div className={`h-1.5 w-full ${verdict.isFallback ? 'bg-amber-300' : 'bg-gradient-to-r from-amber-400 to-yellow-300'}`} />
       <div className="p-6 space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4" style={{ color: moduleColor }} />
-            <span className="text-sm font-black text-gray-900">AI Verdict</span>
+            <span className="text-sm font-black text-gray-900">
+              {verdict.isFallback ? 'Mission received — AI review pending' : 'AI Verdict'}
+            </span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex">
-              {[1, 2, 3, 4, 5].map(n => (
-                <Star
-                  key={n}
-                  className="w-4 h-4"
-                  style={{
-                    fill: n <= verdict.ai_score ? '#f59e0b' : 'transparent',
-                    color: n <= verdict.ai_score ? '#f59e0b' : '#d1d5db',
-                  }}
-                />
-              ))}
+          {/* A fallback score is not a genuine AI judgement — never show the
+              scored star rating or XP as if this were a real evaluation. */}
+          {!verdict.isFallback && (
+            <div className="flex items-center gap-2">
+              <div className="flex">
+                {[1, 2, 3, 4, 5].map(n => (
+                  <Star
+                    key={n}
+                    className="w-4 h-4"
+                    style={{
+                      fill: n <= verdict.ai_score ? '#f59e0b' : 'transparent',
+                      color: n <= verdict.ai_score ? '#f59e0b' : '#d1d5db',
+                    }}
+                  />
+                ))}
+              </div>
+              <span className="text-xs font-black text-gray-600">{scoreLabel}</span>
+              {xpEarned > 0 && (
+                <span className="flex items-center gap-1 text-[11px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-lg border border-amber-100">
+                  <Zap className="w-3 h-3" /> +{xpEarned} XP
+                </span>
+              )}
             </div>
-            <span className="text-xs font-black text-gray-600">{scoreLabel}</span>
-            {xpEarned > 0 && (
-              <span className="flex items-center gap-1 text-[11px] font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-lg border border-amber-100">
-                <Zap className="w-3 h-3" /> +{xpEarned} XP
-              </span>
-            )}
-          </div>
+          )}
         </div>
 
         <p className="text-sm text-gray-700 leading-relaxed">{verdict.ai_verdict}</p>

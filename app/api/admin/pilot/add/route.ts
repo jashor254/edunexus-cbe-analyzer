@@ -36,7 +36,10 @@ export async function POST(req: NextRequest) {
       .select('id, student_id, term, year, parent_name, parent_phone, created_at')
       .single()
 
-    if (error) return apiError(error.message)
+    if (error) {
+      console.error('[admin/pilot/add]', error.message)
+      return apiError('Failed to save pilot tracking record')
+    }
 
     return apiSuccess({ record: data })
   } catch (err) {

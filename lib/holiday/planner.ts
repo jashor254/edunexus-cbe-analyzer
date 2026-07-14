@@ -17,6 +17,7 @@ import { callDeepSeek } from '@/lib/ai/deepseek'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { buildAdaptiveTask } from '@/lib/adaptiveLearning/recommend'
 import { buildCareerIntelligence } from '@/lib/learnerIntelligence/careerIntelligence'
+import { publishEvent } from '@/lib/events'
 import type { HolidayPlanData, HolidayWeek } from './types'
 
 type PlanInput = {
@@ -37,7 +38,13 @@ export async function generateHolidayPlan(input: PlanInput): Promise<HolidayPlan
   const [student, projection, careerIntel] = await Promise.all([
     repos.learnerIntelligence.getStudentHolidayData(input.studentId),
     recomputeLearnerProjection(input.studentId),
-    buildCareerIntelligence(input.studentId).catch(() => null),
+    buildCareerIntelligence(input.studentId).catch(err => {
+      console.error('[holiday/planner] buildCareerIntelligence failed, plan proceeds without a career note', {
+        studentId: input.studentId,
+        message: err instanceof Error ? err.message : String(err),
+      })
+      return null
+    }),
   ])
 
   const studentName = student?.name?.trim() || 'Student'
@@ -72,6 +79,16 @@ export async function generateHolidayPlan(input: PlanInput): Promise<HolidayPlan
     .slice(0, 2)
     .map(subject => buildAdaptiveTask(input.studentId, studentName, subject, projection, { careerNote }))
 
+  // Workload must scale with how confident the underlying evidence is, not
+  // just the raw level — a gap resting on one thin data point (Low
+  // confidence, per the same Projection confidence every other consumer
+  // reads) gets a lighter, exploratory task, not the same full remedial
+  // load as a gap backed by several corroborating pieces of evidence.
+  // Reuses AdaptiveTask.confidence (lib/adaptiveLearning/recommend.ts) —
+  // already computed, previously never read here.
+  const sessionsPerTask = (task: ReturnType<typeof buildAdaptiveTask> | undefined): 1 | 2 =>
+    task?.confidence === 'Low' ? 1 : 2
+
   // 5. Build week structure
   const holidayWeeks = Math.ceil(input.holidayDays / 7)
   const weeks: HolidayWeek[] = []
@@ -100,20 +117,24 @@ export async function generateHolidayPlan(input: PlanInput): Promise<HolidayPlan
       } else if (w === 1) {
         const task = topTasks[0]
         const topic = task?.subject
+        const sessions = sessionsPerTask(task)
         weeks.push({
           week: w, label: `Week ${w} — Consolidate`,
           compass_topics: topic ? [topic] : [],
           parent_action: topic
-            ? `Ask ${studentName.split(' ')[0]} to explain ${topic} in their own words — even 5 minutes counts.`
+            ? task?.confidence === 'Low'
+              ? `Current evidence is limited here — ask ${studentName.split(' ')[0]} to explain ${topic} in their own words, just to see how it lands. No pressure.`
+              : `Ask ${studentName.split(' ')[0]} to explain ${topic} in their own words — even 5 minutes counts.`
             : 'Have a brief conversation about what was learned this term.',
           student_task: topic
-            ? `Complete 2 Compass sessions on "${topic}". Take your time — no rush.`
+            ? `Complete ${sessions} short Compass session${sessions > 1 ? 's' : ''} on "${topic}". Take your time — no rush.`
             : 'Review your notes from this term. Identify one concept you want to understand better.',
           is_rest_week: false,
         })
       } else if (w === 2) {
         const task = topTasks[1] ?? topTasks[0]
         const topic = task?.subject
+        const sessions = sessionsPerTask(task)
         weeks.push({
           week: w, label: `Week ${w} — Strengthen`,
           compass_topics: topic ? [topic] : [],
@@ -121,7 +142,7 @@ export async function generateHolidayPlan(input: PlanInput): Promise<HolidayPlan
             ? `This week, ask "${studentName.split(' ')[0]}, what is ${topic}?" Listen to the answer — it tells you a lot.`
             : 'Check in on how your child is feeling about the upcoming term.',
           student_task: topic
-            ? `Complete 2 Compass sessions on "${topic}". Connect it to something real around you.`
+            ? `Complete ${sessions} short Compass session${sessions > 1 ? 's' : ''} on "${topic}". Connect it to something real around you.`
             : 'Prepare one question to ask your teacher on the first day of Term 3.',
           is_rest_week: false,
         })
@@ -147,8 +168,11 @@ export async function generateHolidayPlan(input: PlanInput): Promise<HolidayPlan
     weeks, compassCount, holidayPeriod: input.holidayPeriod,
   })
 
+  const topGapConfidence = topTasks[0]?.confidence
   const parentSummary = topGap
-    ? `${firstName} had a strong term but has room to grow in ${topGap}. ${careerNote ? careerNote + ' ' : ''}The holiday plan is light and focused — ${compassCount} short Compass session${compassCount !== 1 ? 's' : ''} spread across the break.`
+    ? topGapConfidence === 'Low'
+      ? `Current evidence suggests ${firstName} may benefit from more practice in ${topGap}, though this is based on limited evidence so far. ${careerNote ? careerNote + ' ' : ''}The holiday plan is light and exploratory — ${compassCount} short Compass session${compassCount !== 1 ? 's' : ''} spread across the break.`
+      : `${firstName} had a strong term but has room to grow in ${topGap}. ${careerNote ? careerNote + ' ' : ''}The holiday plan is light and focused — ${compassCount} short Compass session${compassCount !== 1 ? 's' : ''} spread across the break.`
     : `${firstName} had a solid term. The holiday plan keeps momentum light — rest, explore, and stay curious.`
 
   const planData: HolidayPlanData = {
@@ -160,6 +184,7 @@ export async function generateHolidayPlan(input: PlanInput): Promise<HolidayPlan
     weeks,
     whatsapp_message: whatsappMessage,
     parent_summary:  parentSummary,
+    evidence_confidence: topGapConfidence ?? null,
   }
 
   // 7. Enrich with AI for a more personalised narrative
@@ -196,7 +221,9 @@ export async function publishHolidayPlan(
   term:      number,
   year:      number,
 ): Promise<number> {
-  return repos.learnerIntelligence.publishHolidayPlans({ teacherId, term, year, studentIds: [studentId] })
+  const published = await repos.learnerIntelligence.publishHolidayPlans({ teacherId, term, year, studentIds: [studentId] })
+  emitHolidayPlanPublished({ teacherId, term, year, studentIds: [studentId], trigger: 'teacher' })
+  return published
 }
 
 export async function publishClassHolidayPlans(
@@ -206,7 +233,39 @@ export async function publishClassHolidayPlans(
   year:      number,
 ): Promise<number> {
   const studentIds = await repos.learnerIntelligence.getClassEnrollment(classId)
-  return repos.learnerIntelligence.publishHolidayPlans({ teacherId, term, year, studentIds })
+  const published  = await repos.learnerIntelligence.publishHolidayPlans({ teacherId, term, year, studentIds })
+  emitHolidayPlanPublished({ teacherId, term, year, studentIds, classId, trigger: 'teacher' })
+  return published
+}
+
+// Nothing distinguished a teacher-approved publish from the 3-day
+// auto-publish fallback (app/api/cron/auto-publish-holiday-plans) in any
+// audit trail, despite this being a governance-sensitive path (Holiday Plans
+// Publish Gate — teacher approval before parent-facing content ships).
+// `trigger` records which path fired.
+export function emitHolidayPlanPublished(input: {
+  teacherId?: string | null
+  term?:      number
+  year?:      number
+  studentIds: string[]
+  classId?:   string
+  trigger:    'teacher' | 'auto'
+}): void {
+  if (input.studentIds.length === 0) return
+  void publishEvent({
+    event_type:    'teacher.holiday_plan.published',
+    resource_type: 'holiday_plan',
+    resource_id:   input.classId ?? input.studentIds[0],
+    actor_id:      input.teacherId ?? undefined,
+    payload: {
+      teacher_id:  input.teacherId ?? null,
+      term:        input.term,
+      year:        input.year,
+      class_id:    input.classId,
+      student_ids: input.studentIds,
+      trigger:     input.trigger,
+    },
+  }).catch(err => console.error('[events] teacher.holiday_plan.published:', err instanceof Error ? err.message : String(err)))
 }
 
 // ── Batch generate for a whole class ─────────────────────────────────────────
@@ -354,7 +413,15 @@ SUMMARY:
       whatsappMessage: waMatch?.[1]?.trim(),
       parentSummary:   sumMatch?.[1]?.trim(),
     }
-  } catch {
+  } catch (err) {
+    // Falls back to the non-AI template message (see buildWhatsAppMessage) —
+    // but that fallback was previously indistinguishable from "AI enrichment
+    // was never attempted." Log which plan it was so a spike is traceable.
+    console.error('[holiday/planner] enrichPlanWithAI failed, falling back to template message', {
+      studentName: plan.student_name,
+      holidayPeriod: plan.holiday_period,
+      message: err instanceof Error ? err.message : String(err),
+    })
     return null
   }
 }

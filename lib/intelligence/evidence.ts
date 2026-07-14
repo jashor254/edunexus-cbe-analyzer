@@ -19,6 +19,7 @@ export type EvidenceSource =
   | 'classroom_observation'
   | 'national_dataset'
   | 'holiday_return'
+  | 'teacher_remark'
 
 export type EvidenceReviewStatus =
   | 'auto_confirmed'
@@ -67,7 +68,42 @@ export type LearnerEvidence = {
   strand?: string | null
   subStrand?: string | null
   knowledgeNodeId?: string | null
+
+  // ── Phase -1 (learner-record-layer-signoff.md), additive ────────────────
+  // Both optional: no resolution heuristic (teacher-school-text -> schools.id,
+  // or a default curriculum version) is specified anywhere in the ratified
+  // architecture, so none is invented here. Producers that already know
+  // these values at creation time may set them; producers that don't leave
+  // them null rather than guessing — same rule as strand/subStrand above.
+  schoolId?: string | null
+  curriculumVersionId?: string | null
+
+  // ── Phase G (learner-record-layer-decisions.md Decision 2), additive ────
+  // Educational meaning independent of the surface assessment-type label.
+  // Optional, same rule as schoolId/curriculumVersionId above: only set
+  // when the producer genuinely knows it (e.g. resolved from the
+  // assessment's assessment_type_id -> assessment_types.default_purpose_id),
+  // never guessed.
+  purposeId?: string | null
+
+  // ── Phase C (learner-record-layer-decisions.md Decision 1), additive ────
+  // Shape-specific content for narrative/non-scored evidence, discriminated
+  // by evidenceSource. One shared column (payload jsonb), not a new
+  // nullable scalar column per source — see EvidencePayload below. Null for
+  // measured (scored) evidence.
+  payload?: EvidencePayload | null
 }
+
+/**
+ * Discriminated by `kind`, which tracks evidenceSource (not 1:1 forever —
+ * a source could in principle produce more than one payload shape). Every
+ * variant carries its own `payloadVersion` so a future shape change is
+ * detectable on already-written rows instead of requiring runtime shape
+ * sniffing (learner-record-layer-adversarial-challenge.md: "add
+ * payload_version... before the first row ships").
+ */
+export type EvidencePayload =
+  | { kind: 'remark'; payloadVersion: 1; body: string }
 
 /** LI-6: each source has a declared trust tier. Confidence scoring (confidence.ts) is capped by this. */
 export const EVIDENCE_SOURCE_TRUST_TIER: Record<EvidenceSource, 1 | 2 | 3> = {
@@ -88,4 +124,8 @@ export const EVIDENCE_SOURCE_TRUST_TIER: Record<EvidenceSource, 1 | 2 | 3> = {
   report_card_photo:       1,
   compass_session:         1, // AI-inferred, per LI-3 — never equated with human-verified evidence
   parent_observation:      1,
+  // Phase C (learner-record-layer-decisions.md Decision 1): same tier as
+  // teacher_upload — a teacher directly attests to this observation, same
+  // epistemic standing as a mark they entered themselves.
+  teacher_remark:          3,
 }

@@ -19,6 +19,11 @@ EduNexus is a Kenya CBC/CBE AI education platform for teachers, parents, and stu
 - Server-side DB: always use `createServiceClient()` from `utils/supabase/service.ts`
 - Client-side DB: always use `createClient()` from `utils/supabase/client.ts`
 - NEVER import `createClient` from `@supabase/supabase-js` directly in route files
+- Learner intelligence state (capability, risk, knowledge) is read via `lib/projection/recompute.ts` (`recomputeLearnerProjection`) only — never read `repos.evidence.findByLearner` / `findConfirmedEvidenceForLearner` / `findPendingReview` or `learner_profiles` directly from a feature module. Enforced by ESLint (`eslint.config.mjs`), not just convention — see `docs/architecture/learner-record-layer-decisions.md` Decision 5.
+- Evidence rows (`learner_evidence`) are never mutated after creation except through the domain functions in `lib/intelligence/evidenceLifecycle.ts` (`confirmReview`, `rejectReview`, `retractEvidence`, `eraseEvidence`, `updateVerificationState`). Corrections are new evidence superseding old evidence, never an edit — enforced by a database trigger, not just this rule.
+- `capabilityExtractor.ts` (`lib/career/`) is the Reasoning layer's first citizen, not a "temporary shim to retire" — see `docs/architecture/learner-record-layer-decisions.md` Decision 6.
+- `lib/learnerRecord/timeline.ts`'s `getLearnerTimeline()` is **the** canonical Learner Record — the one function that answers "what do we know about this learner, in order." A new feature needing a learner's full chronological history (Evidence + promotions) extends this function; it does not reimplement the merge.
+- `teacher_id` (or any actor id) on any evidence-producing row means "who entered this," never "who owns this" or "who may read this downstream." Teachers change, transfer, and leave; a learner's evidence does not become inaccessible or ownerless when they do. Never add a query filter that uses `teacher_id` to gate *read* access to evidence/marks belonging to a learner the current teacher doesn't teach — ownership for access-control purposes is "does this teacher currently teach this student" (`class_students`), checked separately, never inferred from who originally entered a record (`docs/architecture/academic-evidence-layer.md` §3).
 
 ---
 

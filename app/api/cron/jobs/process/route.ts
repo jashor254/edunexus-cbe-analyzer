@@ -40,6 +40,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const summary = results.map(r => r.status === 'fulfilled' ? r.value : { error: 'queue_error' })
   const totalProcessed = summary.reduce((s, r) => s + ('processed' in r ? r.processed : 0), 0)
 
+  // A per-queue failure was previously only visible inside the JSON response
+  // body — nothing polls that for cron routes, so it was effectively silent.
+  for (const r of summary) {
+    if ('error' in r && r.error) {
+      logger.error('Queue processing failed', { service: 'cron.jobs.process', queue: 'queue' in r ? r.queue : 'unknown', error: r.error })
+    }
+  }
+
   logger.info('Job processing cron completed', {
     service:     'cron.jobs.process',
     total:       totalProcessed,

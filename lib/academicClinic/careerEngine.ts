@@ -2,6 +2,19 @@
 // ============================================================
 // Career matching engine for the Academic Clinic report:
 // CAREER_DATABASE + CareerEngine.matchCareers/analyze + analyzeDreamCareer.
+//
+// Sprint 21 (Educational Intelligence Convergence): this engine is scoped
+// to the legacy Academic Clinic PDF/email/WhatsApp report only — it is NOT
+// the canonical source of career recommendations. The canonical engine is
+// lib/career/capabilityMatchEngine.ts, surfaced via
+// lib/learnerIntelligence/careerIntelligence.ts, and is the only place new
+// career-recommendation UI should read from. This file's output language
+// has been aligned to the canonical engine's evidence-aware hedging
+// (see generateSeniorGuidance in reportGenerator.ts) so a parent cannot see
+// two contradictory confidence claims about the same student, but the
+// underlying career catalog/matching logic itself is intentionally left
+// as-is — replacing it is a larger migration, not a hardening fix, and is
+// tracked as a deferred item rather than attempted in this pass.
 // ============================================================
 
 import { repos } from '@/lib/repositories'
@@ -2643,15 +2656,15 @@ export class CareerEngine {
                           career.kenyaShortageScore >= 50 ? 'growing demand' :
                           'stable demand'
 
-    const matchLabel = matchScore >= 70 ? 'an excellent match' :
-                        matchScore >= 50 ? 'a good match' :
+    const matchLabel = matchScore >= 70 ? 'a strong match based on current evidence' :
+                        matchScore >= 50 ? 'a good match worth exploring' :
                         'an early-stage match worth exploring'
 
     const outlookMap: Record<JobGrowthOutlook, string> = {
       declining: 'Declining — consider other options',
-      stable: 'Stable — good long-term career',
-      growing: 'Growing — good prospects',
-      booming: 'Booming — excellent future',
+      stable: 'Stable — steady long-term prospects',
+      growing: 'Growing — favourable prospects',
+      booming: 'Strong growth — favourable long-term prospects',
     }
 
     return {

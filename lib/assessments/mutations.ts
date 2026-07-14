@@ -2,6 +2,7 @@ import { repos } from '@/lib/repositories'
 import { calculateMeanScore, calculateMeanGrade, marksToLevel } from './gradeCalculator'
 import { updateFromAssessment } from '@/lib/learnerModel/updater'
 import { publishEvent } from '@/lib/events'
+import { ASSESSMENT_TYPE_DEFAULT_PURPOSE_CODE } from '@/lib/config/assessmentTypePurposes'
 import type { ClassAssessment, LearnerMark, MarkInput, CurriculumType } from './types'
 
 function sumScores(scores: Record<string, number>): number {
@@ -19,6 +20,37 @@ function buildPositionMap(rows: { id: string; total: number }[]): Map<string, nu
   return map
 }
 
+/**
+ * Phase B (docs/architecture/academic-evidence-layer.md §7, Rule 5): the
+ * one place a submitted assessment-type name becomes a real,
+ * teacher-scoped assessment_types row. Finds an exact (case-sensitive)
+ * match first — every existing teacher already has the 6 previously-hardcoded
+ * names seeded by the Phase B migration, so today's only real caller (the
+ * teacher-facing dropdown) always resolves on the first lookup. A name not
+ * yet seen from this teacher is created on the fly, `sort_order` appended
+ * after their existing types — this is what makes the type genuinely
+ * school/teacher-configurable rather than cosmetically so: the API layer
+ * no longer hardcodes what a teacher is allowed to call an assessment.
+ */
+async function resolveOrCreateAssessmentType(teacherId: string, name: string): Promise<string> {
+  const existing = await repos.assessmentTypes.findByTeacherAndName(teacherId, name)
+  if (existing) return existing.id
+
+  const existingTypes = await repos.assessmentTypes.findAllForTeacher(teacherId)
+  const nextSortOrder = existingTypes.length
+
+  // Phase G's migration-time backfill only reached rows that existed when
+  // it ran — any teacher whose assessment_types row is created afterward
+  // needs the same canonical mapping applied here, or their evidence's
+  // purpose_id silently stays null forever (Production Hardening Audit
+  // finding: this was a live gap for every teacher onboarded after Phase G).
+  const purposeCode = ASSESSMENT_TYPE_DEFAULT_PURPOSE_CODE[name] ?? null
+  const defaultPurposeId = purposeCode ? (await repos.evidencePurposes.findByCode(purposeCode))?.id ?? null : null
+
+  const created = await repos.assessmentTypes.create(teacherId, name, nextSortOrder, defaultPurposeId)
+  return created.id
+}
+
 export async function createAssessment(
   teacherId: string,
   classId: string,
@@ -33,7 +65,8 @@ export async function createAssessment(
     gradeScaleId?: string | null
   }
 ): Promise<ClassAssessment> {
-  const assessment = await repos.assessments.createAssessment(teacherId, classId, input)
+  const assessmentTypeId = await resolveOrCreateAssessmentType(teacherId, input.assessmentType)
+  const assessment = await repos.assessments.createAssessment(teacherId, classId, { ...input, assessmentTypeId })
 
   void publishEvent({
     event_type:      'teacher.assessment.created',

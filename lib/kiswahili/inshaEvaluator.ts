@@ -4,6 +4,7 @@
 // All feedback is generated in Kiswahili to match what students receive in class.
 
 import { callDeepSeek } from '@/lib/ai/deepseek'
+import { logAICall } from '@/lib/ai/logger'
 
 export type InshaType =
   | 'masimulizi'   // narrative
@@ -37,6 +38,10 @@ export type InshaFeedback = {
   hatua_inayofuata: string         // single clearest next step (Kiswahili)
   makosa_ya_sarufi: string[]       // up to 4 specific grammar errors with corrections
   ngeli_zilizokosewa: string[]     // noun class agreement errors spotted (e.g. "watoto mzuri → watoto wazuri")
+  // true when the AI call failed or its response could not be parsed —
+  // this is a placeholder score, NOT a genuine evaluation. The UI must
+  // never render this like a real grade.
+  isFallback: boolean
 }
 
 // ── CBC level labels ──────────────────────────────────────────────────────────
@@ -196,6 +201,7 @@ function parseRawResponse(
     hatua_inayofuata:     raw.hatua_inayofuata ?? '',
     makosa_ya_sarufi:     (raw.makosa_ya_sarufi ?? []).slice(0, 4),
     ngeli_zilizokosewa:   (raw.ngeli_zilizokosewa ?? []).slice(0, 4),
+    isFallback:           false,
   }
 }
 
@@ -224,6 +230,7 @@ function buildFallback(inshaType: InshaType, grade: number): InshaFeedback {
     hatua_inayofuata:   'Tafadhali jaribu tena baadaye.',
     makosa_ya_sarufi:   [],
     ngeli_zilizokosewa: [],
+    isFallback:         true,
   }
 }
 
@@ -242,6 +249,7 @@ export async function evaluateInsha({
 }: EvaluateInshaParams): Promise<InshaFeedback> {
   const systemPrompt = buildSystemPrompt(grade, inshaType)
   const prompt       = buildPrompt(insha, inshaType, grade)
+  const start        = Date.now()
 
   let raw: string
   try {
@@ -250,7 +258,16 @@ export async function evaluateInsha({
       maxTokens:   1200,   // ~900 tokens of JSON + buffer
     })
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
     console.error('[inshaEvaluator] DeepSeek call failed:', err)
+    await logAICall({
+      feature:   'kiswahili-insha-evaluator',
+      model:     'deepseek',
+      prompt:    prompt.substring(0, 500),
+      latencyMs: Date.now() - start,
+      success:   false,
+      error:     message,
+    })
     return buildFallback(inshaType, grade)
   }
 
@@ -261,7 +278,17 @@ export async function evaluateInsha({
     const parsed = JSON.parse(cleaned) as RawResponse
     return parseRawResponse(parsed, inshaType, grade)
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
     console.error('[inshaEvaluator] JSON parse failed. Raw output:', raw, err)
+    await logAICall({
+      feature:   'kiswahili-insha-evaluator',
+      model:     'deepseek',
+      prompt:    prompt.substring(0, 500),
+      response:  raw.substring(0, 500),
+      latencyMs: Date.now() - start,
+      success:   false,
+      error:     `JSON parse failed: ${message}`,
+    })
     return buildFallback(inshaType, grade)
   }
 }

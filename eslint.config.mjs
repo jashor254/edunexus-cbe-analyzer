@@ -33,6 +33,43 @@ const config = [
       "import/no-anonymous-default-export": "off",
     },
   },
+
+  // Read-path guardrail (Phase 0 — docs/architecture/learner-record-layer-decisions.md
+  // Decision 5, docs/architecture/learner-record-layer-closure.md invariant 2).
+  // The three learner-scoped bulk-read methods on the Evidence repository
+  // (findByLearner, findConfirmedEvidenceForLearner, findPendingReview) are
+  // reserved for lib/projection/ and lib/intelligence/ — nothing else may
+  // call them. This targets those three specific methods only, not the
+  // Evidence repository as a whole: every evidence-writer module (assessments,
+  // compass, holiday, remedial, etc.) legitimately calls createIngestionRun/
+  // completeIngestionRun on repos.evidence today, and must keep working.
+  {
+    files: ["**/*.{ts,tsx}"],
+    ignores: ["lib/projection/**", "lib/intelligence/**", "**/*.test.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "CallExpression[callee.object.object.name='repos'][callee.object.property.name='evidence'][callee.property.name='findByLearner']",
+          message:
+            "repos.evidence.findByLearner() is reserved for lib/projection/ and lib/intelligence/. Learner intelligence state is read via lib/projection/recompute.ts (recomputeLearnerProjection) only. See docs/architecture/learner-record-layer-decisions.md Decision 5.",
+        },
+        {
+          selector:
+            "CallExpression[callee.object.object.name='repos'][callee.object.property.name='evidence'][callee.property.name='findConfirmedEvidenceForLearner']",
+          message:
+            "repos.evidence.findConfirmedEvidenceForLearner() is reserved for lib/projection/ and lib/intelligence/. Learner intelligence state is read via lib/projection/recompute.ts (recomputeLearnerProjection) only. See docs/architecture/learner-record-layer-decisions.md Decision 5.",
+        },
+        {
+          selector:
+            "CallExpression[callee.object.object.name='repos'][callee.object.property.name='evidence'][callee.property.name='findPendingReview']",
+          message:
+            "repos.evidence.findPendingReview() is reserved for lib/projection/ and lib/intelligence/. See docs/architecture/learner-record-layer-decisions.md Decision 5.",
+        },
+      ],
+    },
+  },
 ];
 
 export default config;

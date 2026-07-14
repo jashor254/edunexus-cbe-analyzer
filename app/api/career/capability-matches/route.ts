@@ -12,12 +12,15 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiBadRequest, apiForbidden } from '@/lib/api/response'
 import {
-  getCapabilityProfile,
-  saveCapabilityProfile,
   getAllCareersWithCOS,
+  recomputeAndSaveCapabilityProfile,
 } from '@/lib/career/careerEngine'
-import { extractCapabilityProfile } from '@/lib/career/capabilityExtractor'
 import { computeCapabilityMatches } from '@/lib/career/capabilityMatchEngine'
+import { familiesFromMatches } from '@/lib/learnerIntelligence/careerIntelligence'
+import { extractCapabilityProfile } from '@/lib/career/capabilityExtractor'
+import { recomputeLearnerProjection } from '@/lib/projection/recompute'
+import { projectionToScoreHistory } from '@/lib/learnerIntelligence/projectionAdapters'
+import type { CapabilityMatchReport } from '@/lib/career/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,12 +38,33 @@ async function verifyStudent(userId: string, studentId: string) {
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('students')
-    .select('id, user_id')
+    .select('id, user_id, grade')
     .eq('id', studentId)
     .single()
   if (error || !data) return null
   if (data.user_id !== userId) return null
   return data
+}
+
+// Junior (Grade 7–9) never sees a ranked/percentage career prediction — the
+// Career Principle requires exploration, not prediction, at this stage.
+// Same matcher, same data (computeCapabilityMatches, unchanged) — just
+// regrouped into broad families via the one shared helper every career
+// consumer uses for this gate.
+function shapeForGrade(grade: number, report: CapabilityMatchReport) {
+  const isJunior = grade >= 7 && grade <= 9
+  if (!isJunior) return { ...report, mode: 'planning' as const }
+
+  return {
+    mode:                 'exploration' as const,
+    student_id:            report.student_id,
+    families:              familiesFromMatches([...report.primary, ...report.stretch]),
+    total_careers_scored:  report.total_careers_scored,
+    assessment_count:      report.assessment_count,
+    dominant_cluster:      report.dominant_cluster,
+    generated_at:          report.generated_at,
+    disclaimer:            report.disclaimer,
+  }
 }
 
 // ── GET — fetch matches from stored capability profile ────────────────────────
@@ -59,17 +83,23 @@ export async function GET(req: NextRequest) {
     const student = await verifyStudent(user.id, studentId)
     if (!student) return apiForbidden()
 
-    const profile = await getCapabilityProfile(studentId)
-    if (!profile) {
-      return apiBadRequest(
-        'No capability profile found for this student. Call POST /api/career/capability first to compute one.'
-      )
+    // Sourced live from Projection — the same canonical path Blueprint,
+    // Career Intelligence, and Parent Career Intelligence already use
+    // (lib/learnerIntelligence/projectionAdapters.ts), instead of the
+    // separately-stored, potentially-diverging `students.capability_profile`
+    // snapshot — so the matches shown here always agree with what those
+    // other surfaces conclude from the same evidence.
+    const projection   = await recomputeLearnerProjection(studentId)
+    const scoreHistory = projectionToScoreHistory(projection)
+    if (scoreHistory.length === 0) {
+      return apiBadRequest('No evidence found for this student yet. Add an assessment first.')
     }
+    const profile = extractCapabilityProfile(scoreHistory)
 
     const careers = await getAllCareersWithCOS()
     const report  = computeCapabilityMatches(studentId, profile, careers)
 
-    return apiSuccess(report)
+    return apiSuccess(shapeForGrade(student.grade, report))
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     return apiError(message, 500)
@@ -92,29 +122,30 @@ export async function POST(req: NextRequest) {
     const student = await verifyStudent(user.id, studentId)
     if (!student) return apiForbidden()
 
-    // Load assessment history — oldest first for correct trend direction
-    const service = createServiceClient()
-    const { data: assessments, error: assessErr } = await service
-      .from('assessments')
-      .select('subject_scores, created_at')
-      .eq('student_id', studentId)
-      .not('subject_scores', 'is', null)
-      .order('created_at', { ascending: true })
-      .limit(20)
-
-    if (assessErr) throw new Error(`Failed to load assessments: ${assessErr.message}`)
-    if (!assessments || assessments.length === 0) {
+    // Still recomputes-and-persists the legacy `students.capability_profile`
+    // snapshot — the profile bars (`/api/career/capability`) and growth
+    // trend (`/api/career/growth`) are deliberately out of this wave's scope
+    // (they need persisted history Projection doesn't keep; see
+    // docs/architecture/migration-ledger.md). Its return value is used only
+    // for that side effect here, not for the matches below — matching
+    // always comes from the same Projection-sourced profile GET uses, so
+    // "Refresh" can never show a different match than a plain reload.
+    const saved = await recomputeAndSaveCapabilityProfile(studentId)
+    if (!saved) {
       return apiBadRequest('No assessments found for this student — add assessments first.')
     }
 
-    const scoreHistory = assessments.map(a => a.subject_scores as Record<string, number>)
-    const profile      = extractCapabilityProfile(scoreHistory)
-    await saveCapabilityProfile(studentId, profile)
+    const projection   = await recomputeLearnerProjection(studentId)
+    const scoreHistory = projectionToScoreHistory(projection)
+    if (scoreHistory.length === 0) {
+      return apiBadRequest('No evidence found for this student yet. Add an assessment first.')
+    }
+    const profile = extractCapabilityProfile(scoreHistory)
 
     const careers = await getAllCareersWithCOS()
     const report  = computeCapabilityMatches(studentId, profile, careers)
 
-    return apiSuccess({ ...report, profile_recomputed: true })
+    return apiSuccess({ ...shapeForGrade(student.grade, report), profile_recomputed: true })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     return apiError(message, 500)

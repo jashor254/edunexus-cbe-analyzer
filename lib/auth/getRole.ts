@@ -29,10 +29,21 @@ export interface UserRoles {
 export async function getUserRoles(userId: string, db?: SupabaseClient): Promise<UserRoles> {
   const client = db ?? createServiceClient()
 
-  const [{ data: profile }, { data: teacher }] = await Promise.all([
+  const [{ data: profile, error: profileError }, { data: teacher, error: teacherError }] = await Promise.all([
     client.from('profiles').select('role, secondary_role').eq('id', userId).maybeSingle(),
     client.from('teachers').select('id').eq('user_id', userId).maybeSingle(),
   ])
+
+  // A query failure here silently falls through to the 'parent' default
+  // below, which can misroute a teacher — this runs on every navigation, so
+  // only log the (rare) error case, not every call.
+  if (profileError || teacherError) {
+    console.error('[auth/getRole] role lookup query failed', {
+      userId,
+      profileError: profileError?.message,
+      teacherError: teacherError?.message,
+    })
+  }
 
   const hasTeacherRecord = !!teacher?.id
 

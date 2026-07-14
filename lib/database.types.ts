@@ -306,6 +306,7 @@ export type Database = {
           comparison_notes: string | null
           completed_at: string
           id: string
+          is_fallback: boolean
           mission_id: string
           self_scores: Json | null
           teacher_id: string
@@ -319,6 +320,7 @@ export type Database = {
           comparison_notes?: string | null
           completed_at?: string
           id?: string
+          is_fallback?: boolean
           mission_id: string
           self_scores?: Json | null
           teacher_id: string
@@ -332,6 +334,7 @@ export type Database = {
           comparison_notes?: string | null
           completed_at?: string
           id?: string
+          is_fallback?: boolean
           mission_id?: string
           self_scores?: Json | null
           teacher_id?: string
@@ -547,6 +550,7 @@ export type Database = {
           created_at: string
           failed: string
           id: string
+          is_fallback: boolean
           lesson_id: string
           module_id: string
           next_action: string
@@ -563,6 +567,7 @@ export type Database = {
           created_at?: string
           failed?: string
           id?: string
+          is_fallback?: boolean
           lesson_id: string
           module_id: string
           next_action?: string
@@ -579,6 +584,7 @@ export type Database = {
           created_at?: string
           failed?: string
           id?: string
+          is_fallback?: boolean
           lesson_id?: string
           module_id?: string
           next_action?: string

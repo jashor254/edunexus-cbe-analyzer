@@ -34,13 +34,13 @@ const PROGRESS_COLS =
   'id, teacher_id, lesson_id, completed_at'
 
 const REFLECTION_COLS =
-  'id, teacher_id, lesson_id, module_id, tried, worked, failed, surprised, next_action, ai_feedback, quality_score, word_count, created_at, updated_at'
+  'id, teacher_id, lesson_id, module_id, tried, worked, failed, surprised, next_action, ai_feedback, quality_score, is_fallback, word_count, created_at, updated_at'
 
 const MISSION_COLS =
   'id, module_id, phase, title, description, instructions, mission_type, tool_a_label, tool_b_label, tool_a_prompt, tool_b_link, evaluation_rubric, xp_reward, order, published, created_at'
 
 const COMPLETION_COLS =
-  'id, teacher_id, mission_id, tool_a_output, tool_b_output, comparison_notes, self_scores, ai_score, ai_verdict, completed_at, updated_at'
+  'id, teacher_id, mission_id, tool_a_output, tool_b_output, comparison_notes, self_scores, ai_score, ai_verdict, is_fallback, completed_at, updated_at'
 
 const EVIDENCE_COLS =
   'id, teacher_id, lesson_id, evidence_type, content, linked_id, linked_title, description, created_at, updated_at'
@@ -282,6 +282,7 @@ export class AcademyRepository extends BaseRepository {
           next_action:   input.next_action,
           ai_feedback:   feedback.feedback_text,
           quality_score: feedback.quality_score,
+          is_fallback:   feedback.isFallback,
           word_count:    wordCount,
           updated_at:    new Date().toISOString(),
         },
@@ -437,6 +438,7 @@ export class AcademyRepository extends BaseRepository {
           self_scores:      selfScores,
           ai_score:         verdict.ai_score,
           ai_verdict:       verdict.ai_verdict,
+          is_fallback:      verdict.isFallback,
           updated_at:       new Date().toISOString(),
         },
         { onConflict: 'teacher_id,mission_id' }

@@ -37,7 +37,10 @@ export async function PATCH(req: NextRequest) {
       .select('id, student_id, term, year, whatsapp_sent_at, parent_name, parent_phone, feedback_notes, feedback_received_at, updated_at')
       .single()
 
-    if (error) return apiError(error.message)
+    if (error) {
+      console.error('[admin/pilot/tracking]', error.message)
+      return apiError('Failed to update pilot tracking record')
+    }
 
     return apiSuccess({ record: data })
   } catch (err) {

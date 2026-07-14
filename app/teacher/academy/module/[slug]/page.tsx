@@ -168,7 +168,7 @@ export default async function ModulePage({ params }: Props) {
         <div className="mt-10 flex items-center justify-between gap-4">
           {prev ? (
             <Link
-              href={`/teacher/academy/mod/${prev.slug}`}
+              href={`/teacher/academy/module/${prev.slug}`}
               className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 hover:border-gray-300 hover:shadow-sm px-4 py-2.5 rounded-xl text-sm font-bold transition"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -185,7 +185,7 @@ export default async function ModulePage({ params }: Props) {
 
           {next ? (
             <Link
-              href={`/teacher/academy/mod/${next.slug}`}
+              href={`/teacher/academy/module/${next.slug}`}
               className="flex items-center gap-2 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition hover:opacity-90 shadow-sm"
               style={{ background: mod.color ?? '#14b8a6' }}
             >

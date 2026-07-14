@@ -28,7 +28,14 @@ export async function logAICall(log: AICallLog): Promise<void> {
 
   try {
     await repos.analytics.insertAICallLog(log)
-  } catch {
-    // Logging must never crash the caller — silently drop the failure.
+  } catch (err) {
+    // Logging must never crash the caller — but a failure here means an AI
+    // call's cost/usage silently never reaches ai_call_logs, so at least
+    // surface it server-side instead of dropping it entirely.
+    console.error('[ai/logger] insertAICallLog failed', {
+      feature: log.feature,
+      userId:  log.userId,
+      message: err instanceof Error ? err.message : String(err),
+    })
   }
 }

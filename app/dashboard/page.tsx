@@ -1239,7 +1239,18 @@ export default function DashboardPage() {
                 sub: 'Explore careers',
                 gradient: 'from-cyan-500 to-blue-500',
                 shadow: 'shadow-cyan-500/20',
-                href: '/career',
+                // Parent-facing career intelligence entry point — /career is
+                // the student's own self-service explorer (Sprint 19).
+                href: '/career-intelligence',
+                badge: null,
+              },
+              {
+                icon: FileText,
+                title: 'Report Card',
+                sub: 'View published report card',
+                gradient: 'from-slate-500 to-slate-700',
+                shadow: 'shadow-slate-500/20',
+                href: '/report-card',
                 badge: null,
               },
               {

@@ -29,7 +29,10 @@ export async function GET() {
       .or(`user_id.eq.${user.id},parent_user_id.eq.${user.id}`)
       .order('name')
 
-    if (error) return apiError(error.message)
+    if (error) {
+      console.error('[students/list]', error.message)
+      return apiError('Failed to load students')
+    }
 
     // teacherManaged = true  → Scenario B (teacher created, parent linked via invite)
     // teacherManaged = false → Scenario A (parent created directly, no teacher involved)

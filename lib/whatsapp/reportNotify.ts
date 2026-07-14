@@ -32,10 +32,14 @@ export async function sendReportWhatsApp(params: ReportWhatsAppParams): Promise<
       ? `${APP_URL}/parent-join?student=${params.studentId}&token=${params.signupToken}`
       : `${APP_URL}/dashboard`
 
+    // Deliberately makes no claim about email — this WhatsApp send happens
+    // independently of the email channel (assessmentPipeline.ts fires both
+    // in parallel, and either can be disabled/fail on its own), so this
+    // message must never assert something about a channel it can't confirm.
     const messageSnip =
       `${params.studentName}'s Grade ${params.grade} Learner Blueprint is ready. ` +
       `Your child's personalised report covers who they are becoming, how they learn, ` +
-      `and which future opportunities are opening up. Full report sent to your email. ` +
+      `and which future opportunities are opening up. ` +
       `${params.signupToken ? 'Create your EduNexus parent account to access the Learning Compass for your child.' : 'View on your dashboard.'}`
 
     const result = await sendWhatsAppTemplate({

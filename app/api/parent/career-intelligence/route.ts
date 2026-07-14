@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     // Verify caller is the student's owner or the linked parent (parent_user_id)
     const { data: student } = await supabase
       .from('students')
-      .select('id, name, user_id, parent_user_id')
+      .select('id, name, user_id, parent_user_id, grade')
       .eq('id', studentId)
       .maybeSingle()
 
@@ -46,9 +46,12 @@ export async function GET(req: NextRequest) {
 
     const careers = await getAllCareersWithCOS()
     const matchReport = computeCapabilityMatches(studentId, profile, careers)
-    const report = buildParentIntelligence(profile, matchReport, studentId, student.name)
+    // Career Principle: Junior (Grade 7-9) parents see broad exploration
+    // families, never a ranked/percentage career prediction.
+    const mode = student.grade >= 7 && student.grade <= 9 ? 'exploration' as const : 'planning' as const
+    const report = buildParentIntelligence(profile, matchReport, studentId, student.name, mode)
 
-    return apiSuccess({ has_profile: true, report, match_report: matchReport })
+    return apiSuccess({ has_profile: true, report, match_report: mode === 'planning' ? matchReport : null })
   } catch (err) {
     console.error('[parent/career-intelligence]', err)
     return apiError('Failed to load career intelligence')

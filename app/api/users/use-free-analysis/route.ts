@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Free analysis error:', error);
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      return NextResponse.json({ success: false, error: 'Failed to use free analysis' }, { status: 500 });
     }
 
     if (!data) {
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     console.error('Use free analysis API error:', error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Internal error' },
+      { success: false, error: 'Internal error' },
       { status: 500 }
     );
   }

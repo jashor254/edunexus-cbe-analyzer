@@ -107,9 +107,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // ── Send acknowledgement if outcome is structured ───────────────────────
     if (result.processed && result.outcome && result.outcome !== 'free_form') {
-      const ack = await buildAcknowledgementForPhone(fromPhone, result.outcome as 'demonstrated' | 'struggled' | 'not_attempted')
+      const ack = await buildAcknowledgementForPhone(
+        fromPhone,
+        result.outcome as 'demonstrated' | 'struggled' | 'not_attempted',
+        result.teacherNotified ?? false,
+      )
       if (ack) {
-        await sendWhatsApp(fromPhone, ack)
+        // notification_log.reference_id is a NOT NULL uuid — processInboundReply's
+        // result doesn't expose a studentId here (only outcome/error), so
+        // logging this ack to notification_log would need that return shape
+        // widened first. Deferred; this at least stops the send failing silently.
+        try {
+          await sendWhatsApp(fromPhone, ack)
+        } catch (err) {
+          console.error('[whatsapp/inbound] ack send failed', { fromPhone, message: err instanceof Error ? err.message : String(err) })
+        }
       }
     }
 
@@ -173,8 +185,9 @@ function extractMessage(
  * Returns null if the lookup fails (non-fatal).
  */
 async function buildAcknowledgementForPhone(
-  phone:   string,
-  outcome: 'demonstrated' | 'struggled' | 'not_attempted'
+  phone:           string,
+  outcome:         'demonstrated' | 'struggled' | 'not_attempted',
+  teacherNotified: boolean,
 ): Promise<string | null> {
   try {
     const db = createServiceClient()
@@ -220,7 +233,7 @@ async function buildAcknowledgementForPhone(
       }
     }
 
-    return buildAcknowledgement(firstName, outcome, substrand)
+    return buildAcknowledgement(firstName, outcome, substrand, teacherNotified)
   } catch {
     // Non-fatal — skip the ack rather than crashing the pipeline
     return null

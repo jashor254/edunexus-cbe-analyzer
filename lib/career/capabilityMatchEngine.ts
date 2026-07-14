@@ -13,6 +13,7 @@
 
 import { CAPABILITY_LABELS, LEVEL_DESCRIPTIONS } from './capabilityExtractor'
 import { COS_DISCLAIMER } from './types'
+import type { ConfidenceLevel } from '@/lib/learnerIntelligence/insight'
 import type {
   Career,
   CapabilityProfile,
@@ -147,27 +148,47 @@ function buildRealityCheck(career: Career, profile: CapabilityProfile): RealityC
   }
 }
 
+// ── Confidence labeling ────────────────────────────────────────────────────────
+// The same thresholds scoreCareer() already uses to cap alignment_score for
+// thin evidence (assessment_count < 2 / < 3) — labeled, not re-derived, so
+// the Low/Medium/High shown to a learner always agrees with the score that
+// produced their tier. Longitudinal evidence (3+ assessments) is the only
+// case that earns High — matching the "longitudinal evidence -> high
+// confidence guidance" ladder every Career Intelligence consumer follows.
+export function confidenceFromAssessmentCount(assessmentCount: number): ConfidenceLevel {
+  if (assessmentCount < 2) return 'Low'
+  if (assessmentCount < 3) return 'Medium'
+  return 'High'
+}
+
 // ── Match narrative ───────────────────────────────────────────────────────────
 
 function buildMatchNarrative(
-  tier:     CapabilityMatchTier,
-  career:   Career,
-  gaps:     CapabilityGap[],
-  strengths:CapabilityStrength[],
-  score:    number,
-  profile:  CapabilityProfile
+  tier:      CapabilityMatchTier,
+  career:    Career,
+  gaps:      CapabilityGap[],
+  strengths: CapabilityStrength[],
+  score:     number,
+  profile:   CapabilityProfile,
+  confidence: ConfidenceLevel
 ): string {
   const topStrength = strengths[0]
   const topGap      = gaps.find(g => g.gap_severity === 'significant') ?? gaps[0]
+  // A 'primary' tier match resting on thin evidence must still read as
+  // provisional — the tier alone ("Strong Match") should never carry more
+  // certainty than the evidence behind it does.
+  const confidenceCaveat = confidence !== 'High'
+    ? ` Confidence is ${confidence.toLowerCase()} because this is based on a small number of assessments so far — this will sharpen as more evidence arrives.`
+    : ''
 
   if (tier === 'primary') {
     const strengthPart = topStrength
-      ? `Your ${CAPABILITY_LABELS[topStrength.dimension]} is a strong signal here.`
-      : `Your capability profile maps well to the demands of this career.`
+      ? `Current evidence suggests your ${CAPABILITY_LABELS[topStrength.dimension]} is a strong signal here.`
+      : `Current evidence suggests your capability profile maps well to the demands of this career.`
     const gapPart = topGap
       ? ` The area to watch is ${CAPABILITY_LABELS[topGap.dimension]} — ${topGap.narrative}`
-      : ` Your profile has no critical gaps for this path.`
-    return `${career.title} is a natural fit for your current capability profile. ${strengthPart}${gapPart}`
+      : ` Your profile shows no critical gaps for this path so far.`
+    return `Based on available evidence, ${career.title} looks like a strong match for your current capability profile. ${strengthPart}${gapPart}${confidenceCaveat}`
   }
 
   if (tier === 'stretch') {
@@ -177,16 +198,16 @@ function buildMatchNarrative(
     const strengthPart = topStrength
       ? ` Your ${CAPABILITY_LABELS[topStrength.dimension]} is already an asset.`
       : ''
-    return `${career.title} is within reach with focused development.${strengthPart} ${gapPart}`
+    return `Current evidence suggests ${career.title} is within reach with focused development.${strengthPart} ${gapPart}${confidenceCaveat}`
   }
 
   if (tier === 'alternative') {
     const mainGap = gaps.find(g => g.gap_severity === 'significant')
-    return `${career.title} is a possible path but requires significant growth${mainGap ? ` in ${CAPABILITY_LABELS[mainGap.dimension]}` : ''}. Consider it as a longer-term goal while building your capabilities.`
+    return `Current evidence suggests ${career.title} is a possible path worth exploring, though it would require significant growth${mainGap ? ` in ${CAPABILITY_LABELS[mainGap.dimension]}` : ''}. Consider it a longer-term goal while building your capabilities.`
   }
 
   // entrepreneurial
-  return `The entrepreneurial door of ${career.title} is well-suited for your cluster. Starting your own venture in this space requires less formal qualification and lets your strongest capabilities lead.`
+  return `Based on available evidence, the entrepreneurial door of ${career.title} looks well-suited for your cluster. Starting your own venture in this space requires less formal qualification and lets your strongest capabilities lead.${confidenceCaveat}`
 }
 
 // ── Main scoring function ─────────────────────────────────────────────────────
@@ -274,7 +295,13 @@ const ENTREPRENEURIAL_DIMENSIONS: CapabilityDimension[] = [
   'social_intelligence',
 ]
 
+// Requires 2+ assessments — the same evidence-volume floor scoreCareer()
+// applies to every other tier via its confidence cap (assessment_count < 2
+// caps rawScore at 0.65). Without this gate, a single high score on one
+// entrepreneurial-adjacent dimension could promote a specific career
+// (entrepreneur-business) on thinner evidence than any other tier allows.
 function qualifiesForEntrepreneurialTier(profile: CapabilityProfile): boolean {
+  if (profile.assessment_count < 2) return false
   return ENTREPRENEURIAL_DIMENSIONS.some(
     dim => profile[dim].raw_score >= 0.50 || profile.dominant_cluster.includes(dim)
   )
@@ -294,6 +321,7 @@ export function computeCapabilityMatches(
   let   totalScored = 0
 
   const showEntrepreneurial = qualifiesForEntrepreneurialTier(profile)
+  const confidence = confidenceFromAssessmentCount(profile.assessment_count)
 
   for (const career of careers) {
     const result = scoreCareer(career, profile)
@@ -303,7 +331,7 @@ export function computeCapabilityMatches(
     const tier = classifyTier(result.score)
     const realityCheck = buildRealityCheck(career, profile)
     const narrative    = buildMatchNarrative(
-      tier, career, result.gaps, result.strengths, result.score, profile
+      tier, career, result.gaps, result.strengths, result.score, profile, confidence
     )
 
     const match: CapabilityCareerMatch = {
@@ -313,6 +341,7 @@ export function computeCapabilityMatches(
       pathway:          career.pathway,
       tier,
       alignment_score:  Math.round(result.score * 1000) / 1000,
+      confidence,
       dimension_scores: result.dimensionScores,
       gaps:             result.gaps,
       strengths:        result.strengths,
@@ -331,7 +360,7 @@ export function computeCapabilityMatches(
       entrepreneurial.push({
         ...match,
         tier:      'entrepreneurial',
-        narrative: buildMatchNarrative('entrepreneurial', career, result.gaps, result.strengths, result.score, profile),
+        narrative: buildMatchNarrative('entrepreneurial', career, result.gaps, result.strengths, result.score, profile, confidence),
       })
     }
   }

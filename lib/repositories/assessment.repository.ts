@@ -20,6 +20,8 @@ import type {
 } from '@/lib/assessments/analytics'
 import type { DbGradeScale } from '@/lib/assessments/gradeScales'
 import type { GradeBand } from '@/lib/assessments/gradeCalculator'
+import { gradeToPoints } from '@/lib/assessments/gradeCalculator'
+import { median, mode } from '@/lib/assessments/analyticsStats'
 import type {
   CohortResult,
   StreamSummary,
@@ -29,7 +31,7 @@ import type {
 // ── Column constants ───────────────────────────────────────────────────────────
 
 const ASSESSMENT_COLS =
-  'id, class_id, teacher_id, title, assessment_type, term, year, max_score, subjects, curriculum_type, grade_scale_id, created_at, updated_at'
+  'id, class_id, teacher_id, title, assessment_type, assessment_type_id, term, year, max_score, subjects, curriculum_type, grade_scale_id, created_at, updated_at'
 
 const MARK_COLS =
   'id, assessment_id, class_id, teacher_id, student_name, admission_number, student_id, subject_scores, total_marks, mean_score, mean_grade, position, created_at, updated_at'
@@ -60,6 +62,7 @@ export class AssessmentRepository extends BaseRepository {
     input: {
       title: string
       assessmentType: string
+      assessmentTypeId?: string | null
       term: string
       year: number
       maxScore: number
@@ -71,16 +74,17 @@ export class AssessmentRepository extends BaseRepository {
     const { data, error } = await this.db
       .from('class_assessments')
       .insert({
-        teacher_id:      teacherId,
-        class_id:        classId,
-        title:           input.title,
-        assessment_type: input.assessmentType,
-        term:            input.term,
-        year:            input.year,
-        max_score:       input.maxScore,
-        subjects:        input.subjects,
-        curriculum_type: input.curriculumType ?? 'cbc',
-        grade_scale_id:  input.gradeScaleId ?? null,
+        teacher_id:         teacherId,
+        class_id:           classId,
+        title:              input.title,
+        assessment_type:    input.assessmentType,
+        assessment_type_id: input.assessmentTypeId ?? null,
+        term:               input.term,
+        year:               input.year,
+        max_score:          input.maxScore,
+        subjects:           input.subjects,
+        curriculum_type:    input.curriculumType ?? 'cbc',
+        grade_scale_id:     input.gradeScaleId ?? null,
       })
       .select(ASSESSMENT_COLS)
       .single()
@@ -205,6 +209,7 @@ export class AssessmentRepository extends BaseRepository {
         teacher_id:      raw.teacher_id,
         title:           raw.title,
         assessment_type: raw.assessment_type,
+        assessment_type_id: raw.assessment_type_id ?? null,
         term:            raw.term,
         year:            raw.year,
         max_score:       raw.max_score,
@@ -574,6 +579,9 @@ export class AssessmentRepository extends BaseRepository {
 
       const assessmentId = assessments.find(a => a.class_id === classId)?.id ?? ''
 
+      const grades = marks.map(m => m.meanGrade)
+      const points = grades.map(g => gradeToPoints(g)).filter((p): p is number => p !== null)
+
       classOverviews.push({
         classId,
         className:         info.name,
@@ -586,6 +594,9 @@ export class AssessmentRepository extends BaseRepository {
         gradeDistribution: dist,
         highestTotal:      highest,
         lowestTotal:       lowest === Infinity ? 0 : lowest,
+        medianScore:       median(marks.map(m => m.meanScore)),
+        modalGrade:        mode(grades),
+        meanPoints:        points.length > 0 ? average(points) : null,
       })
     }
 

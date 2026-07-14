@@ -10,7 +10,16 @@ import { createAssessment } from '@/lib/assessments/mutations'
 const CreateSchema = z.object({
   classId:        z.uuid(),
   title:          z.string().min(1).max(200),
-  assessmentType: z.enum(['exam', 'cat', 'midterm', 'endterm', 'opener', 'assignment']),
+  // Phase B (docs/architecture/academic-evidence-layer.md §7, Rule 5):
+  // no longer a hardcoded enum — school/teacher-configurable. The 6
+  // previously-hardcoded values are still available to every existing
+  // teacher (seeded as real assessment_types rows by the Phase B
+  // migration); this just stops the API from being the thing that
+  // permanently forecloses anything else a teacher — or curriculum,
+  // or country — might ever call an assessment. Validated against the
+  // teacher's own configured types by createAssessment's resolve-or-create
+  // step, not here — an unknown name is registered, not rejected.
+  assessmentType: z.string().min(1).max(50),
   term:           z.enum(['1', '2', '3']),
   year:           z.number().int().min(2020).max(2100),
   maxScore:       z.number().int().min(1).max(1000).default(100),

@@ -406,6 +406,12 @@ export function generateSeniorGuidance(subjects: SubjectProgress[], firstName = 
 
   const assessedSubjectKeys = subjects.map(s => s.subject)
 
+  // Evidence-count discipline, matching the canonical Career Intelligence
+  // engine's rule (lib/career/capabilityMatchEngine.ts): thin evidence must
+  // never read as a confident "primary" match. A single-subject snapshot
+  // here caps at GOOD even if the raw score would otherwise read STRONG.
+  const evidenceCount = subjects.length
+
   const scored = engineResults.map(match => {
     const keyHits = subjects.filter(s => match.career.matchRequirements.primarySubjects.includes(s.subject))
     const strongSubjectKeys = keyHits.filter(s => s.level >= 3).map(s => s.subject)
@@ -416,7 +422,8 @@ export function generateSeniorGuidance(subjects: SubjectProgress[], firstName = 
       .map(s => formatSubjectName(s))
     const score = match.matchScore / 25
     // FIX 2: thresholds aligned to score >= 3.5 / 2.5 (matchScore >= 87.5 / 62.5)
-    const matchStrength: 'STRONG' | 'GOOD' | 'POSSIBLE' = score >= 3.5 ? 'STRONG' : score >= 2.5 ? 'GOOD' : 'POSSIBLE'
+    let matchStrength: 'STRONG' | 'GOOD' | 'POSSIBLE' = score >= 3.5 ? 'STRONG' : score >= 2.5 ? 'GOOD' : 'POSSIBLE'
+    if (matchStrength === 'STRONG' && evidenceCount < 3) matchStrength = 'GOOD'
     return {
       career: {
         name: match.career.name,
@@ -430,11 +437,11 @@ export function generateSeniorGuidance(subjects: SubjectProgress[], firstName = 
   const topCareers: CareerMatch[] = scored.map(({ career, matchStrength, keyHits, gapSubjects, score }) => {
     const strong = keyHits.filter(s => s.level >= 3).map(s => s.displayName)
     const whyItFits = strong.length > 0
-      ? `${firstName} demonstrates ${getLevelLabel(keyHits[0]?.level || 3)} competency in ${strong.slice(0, 2).join(' and ')}, core requirements for ${career.name}.`
-      : `Developing aptitude across subjects aligned with ${career.name} entry requirements — structured support will strengthen this match.`
+      ? `Current evidence suggests ${firstName} shows ${getLevelLabel(keyHits[0]?.level || 3)} competency in ${strong.slice(0, 2).join(' and ')} — core requirements for ${career.name}.`
+      : `Current evidence suggests developing aptitude across subjects aligned with ${career.name} entry requirements — structured support may strengthen this alignment.`
     const keyGap = gapSubjects.length > 0
-      ? `${gapSubjects[0]} requires structured support to meet ${career.name} entry requirements.`
-      : `Maintain current strong performance across all relevant subjects to remain competitive.`
+      ? `${gapSubjects[0]} would benefit from structured support to meet ${career.name} entry requirements.`
+      : `Based on available evidence, maintaining current performance across relevant subjects should keep this pathway open.`
     return {
       name: career.name,
       description: career.name,
@@ -447,13 +454,16 @@ export function generateSeniorGuidance(subjects: SubjectProgress[], firstName = 
     }
   })
 
+  // Hedged, evidence-aware framing — never states a pathway as guaranteed or
+  // "genuinely achievable," matching the confidence language used by the
+  // canonical Career Intelligence engine (lib/learnerIntelligence/insight.ts).
   const honestAssessment = topCareers.length === 0
-    ? `Current subject performance hasn't yet produced a confident career match. Complete more assessments and focus on the action plan below — clearer pathway recommendations will follow as performance data builds up.`
+    ? `Current evidence is insufficient to suggest a confident career match. Complete more assessments and focus on the action plan below — clearer pathway signals will emerge as performance data builds up.`
     : subjectAvg >= 3.0 && topCareers.length >= 2
-    ? `Based on current performance data, ${topCareers[0].name} and ${topCareers[1].name} represent realistic and well-matched pathways. With sustained effort and targeted support in identified gap areas, these careers are genuinely achievable through the Kenyan university system.`
+    ? `Based on available evidence, ${topCareers[0].name} and ${topCareers[1].name} appear to be realistic pathways worth exploring. Confidence is moderate because it is based on current subject performance — sustained effort and targeted support in identified gap areas would strengthen this alignment further.`
     : subjectAvg >= 3.0
-    ? `Based on current performance data, ${topCareers[0].name} represents a realistic and well-matched pathway. With sustained effort and targeted support in identified gap areas, this career is genuinely achievable through the Kenyan university system.`
-    : `Current performance indicates that focused preparation will be required before these career pathways become fully accessible. The holiday action plan and consistent Learning Compass sessions are critical tools for closing the identified gaps before KCSE.`
+    ? `Based on available evidence, ${topCareers[0].name} appears to be a realistic pathway worth exploring. Confidence is moderate because it is based on current subject performance — sustained effort and targeted support in identified gap areas would strengthen this alignment further.`
+    : `Current evidence suggests focused preparation will be needed before these career pathways become fully accessible. The holiday action plan and consistent Learning Compass sessions are practical next steps for closing the identified gaps before KCSE.`
 
   return {
     topCareers,

@@ -4,17 +4,39 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import {
-  BookOpen, AlertTriangle, Sparkles, ArrowUpRight,
-} from 'lucide-react'
+import { Scroll, NotebookPen, ClipboardList, Presentation, ArrowRight } from 'lucide-react'
 import AttentionFeed from '@/components/teacher/AttentionFeed'
+import TodaysMission from '@/components/teacher/TodaysMission'
+import ContinueWorking from '@/components/teacher/ContinueWorking'
+import WeeklyTeachingProgress from '@/components/teacher/WeeklyTeachingProgress'
+import { DashboardDataProvider } from '@/components/teacher/DashboardDataProvider'
 
 function getTermInfo() {
   const month = new Date().getMonth() + 1
-  if (month >= 1 && month <= 3)  return 'Term 1'
-  if (month >= 4 && month <= 7)  return 'Term 2'
-  return 'Term 3'
+  if (month >= 1 && month <= 3)  return { term: 'Term 1', number: 1 as const }
+  if (month >= 4 && month <= 7)  return { term: 'Term 2', number: 2 as const }
+  return { term: 'Term 3', number: 3 as const }
 }
+
+// Same lightweight month/date arithmetic already used to derive the term
+// itself — a display calendar helper, not a new intelligence calculation.
+function getWeekOfTerm(termNumber: 1 | 2 | 3): number {
+  const now = new Date()
+  const termStart = termNumber === 1
+    ? new Date(now.getFullYear(), 0, 6)
+    : termNumber === 2
+    ? new Date(now.getFullYear(), 4, 5)
+    : new Date(now.getFullYear(), 8, 1)
+  const daysSince = (now.getTime() - termStart.getTime()) / (1000 * 60 * 60 * 24)
+  return Math.max(1, Math.ceil(daysSince / 7))
+}
+
+const WORKSPACE_ITEMS = [
+  { href: '/teacher/scheme-of-work', icon: Scroll,        label: 'Scheme of Work', sub: 'Plan the term' },
+  { href: '/teacher/lesson-plans',   icon: NotebookPen,   label: 'Lesson Plans',   sub: 'Prepare lessons' },
+  { href: '/teacher/record-of-work', icon: ClipboardList, label: 'Record of Work', sub: 'Log what was taught' },
+  { href: '/teacher/slides',         icon: Presentation,  label: 'AI Slides',      sub: 'Generate a deck' },
+]
 
 export default async function TeacherDashboardPage() {
   const supabase = await createClient()
@@ -31,142 +53,71 @@ export default async function TeacherDashboardPage() {
 
   if (!teacher) redirect('/teacher/setup')
 
-  const firstName = teacher.full_name?.split(' ')[0] || 'Mwalimu'
-  const term      = getTermInfo()
-  const today     = new Date().toLocaleDateString('en-KE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-  const hour      = new Date().getHours()
-  const greeting  = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const firstName   = teacher.full_name?.split(' ')[0] || 'Mwalimu'
+  const { term, number: termNumber } = getTermInfo()
+  const weekOfTerm  = getWeekOfTerm(termNumber)
+  const today       = new Date().toLocaleDateString('en-KE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
-  const [classesResult, alertsResult, weeklyIntelResult] = await Promise.all([
-    db.from('teacher_classes')
-      .select('id')
-      .eq('teacher_id', teacher.id),
-    db.from('student_alerts')
-      .select('id')
-      .eq('teacher_id', teacher.id)
-      .eq('is_resolved', false),
-    db.from('weekly_intelligence')
-      .select('week_number, week_health_score, remedial_bank_items')
-      .eq('teacher_id', teacher.id)
-      .order('week_number', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-  ])
+  const { data: classes } = await db
+    .from('teacher_classes')
+    .select('id')
+    .eq('teacher_id', teacher.id)
 
-  const activeClasses   = (classesResult.data ?? []).length
-  const needsAttention  = (alertsResult.data ?? []).length
-  const weeklyIntel     = weeklyIntelResult.data ?? null
-
-  const remedialCount = Array.isArray(weeklyIntel?.remedial_bank_items)
-    ? (weeklyIntel!.remedial_bank_items as unknown[]).length
-    : 0
+  const activeClasses = (classes ?? []).length
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-8">
 
-      {/* ── Hero header ──────────────────────────────────────────────── */}
-      <div className="bg-[#0c1929] relative overflow-hidden">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff06_1px,transparent_1px),linear-gradient(to_bottom,#ffffff06_1px,transparent_1px)] bg-[size:40px_40px]" />
-        <div className="absolute top-0 left-1/4 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+        <DashboardDataProvider activeClasses={activeClasses}>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-10">
-          <div className="flex items-center gap-2 mb-3 flex-wrap">
-            <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse shrink-0" />
-            <span className="text-teal-400 text-sm font-semibold">{today}</span>
-            <span className="w-1 h-1 rounded-full bg-slate-600 hidden sm:block" />
-            <span className="text-slate-400 text-sm">{term}, {new Date().getFullYear()}</span>
-          </div>
-          <p className="text-slate-400 text-sm font-medium mb-1 tracking-wide uppercase">Welcome back</p>
-          <h1 className="text-3xl sm:text-4xl font-black text-white leading-tight">
-            {greeting},{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-300">
-              {firstName}
-            </span>
-          </h1>
-          <p className="text-slate-400 mt-2 text-sm">
-            {teacher.school}
-            {teacher.subject && <span className="text-slate-500"> · {teacher.subject}</span>}
-          </p>
+          {/* ── 1. Today's Mission ────────────────────────────────────── */}
+          <TodaysMission
+            firstName={firstName}
+            today={today}
+            term={term}
+            weekOfTerm={weekOfTerm}
+            activeClasses={activeClasses}
+          />
 
-          {/* ── Two stat cards ─────────────────────────────────────────── */}
-          <div className="grid grid-cols-2 gap-3 mt-7 max-w-sm">
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-sm">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center mb-3 shadow-lg shadow-teal-900/20">
-                <BookOpen className="w-4 h-4 text-white" />
-              </div>
-              <div className="text-2xl font-black text-white mb-0.5">{activeClasses}</div>
-              <div className="text-xs text-slate-400 font-medium">Active Classes</div>
+          {/* ── 2. Continue Working ──────────────────────────────────── */}
+          <ContinueWorking />
+
+          {/* ── 3. Teacher Intelligence ───────────────────────────────── */}
+          {activeClasses > 0 && (
+            <div>
+              <h2 className="text-sm font-black text-slate-900 mb-3">Teacher Intelligence</h2>
+              <AttentionFeed />
             </div>
+          )}
 
-            <Link
-              href="/teacher/alerts"
-              className={`bg-white/5 border rounded-2xl p-4 backdrop-blur-sm hover:bg-white/8 transition-all ${
-                needsAttention > 0 ? 'border-red-500/30' : 'border-white/10'
-              }`}
-            >
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 shadow-lg ${
-                needsAttention > 0
-                  ? 'bg-gradient-to-br from-red-500 to-rose-500 shadow-red-900/20'
-                  : 'bg-gradient-to-br from-emerald-500 to-teal-500 shadow-emerald-900/20'
-              }`}>
-                <AlertTriangle className="w-4 h-4 text-white" />
-              </div>
-              <div className="text-2xl font-black text-white mb-0.5">{needsAttention}</div>
-              <div className="text-xs text-slate-400 font-medium">Needs Attention</div>
-            </Link>
+          {/* ── 4. Weekly Teaching Progress ───────────────────────────── */}
+          <WeeklyTeachingProgress />
+
+        </DashboardDataProvider>
+
+        {/* ── 5. Teaching Workspace ────────────────────────────────────── */}
+        <div>
+          <h2 className="text-sm font-black text-slate-900 mb-3">Teaching Workspace</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {WORKSPACE_ITEMS.map(({ href, icon: Icon, label, sub }) => (
+              <Link
+                key={href}
+                href={href}
+                className="bg-white border border-slate-200 rounded-2xl p-3.5 flex flex-col items-start hover:-translate-y-0.5 hover:shadow-sm transition-all group"
+              >
+                <div className="w-8 h-8 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center mb-2.5">
+                  <Icon className="w-4 h-4 text-teal-600" />
+                </div>
+                <div className="font-black text-slate-900 text-sm leading-tight">{label}</div>
+                <div className="text-slate-400 text-xs mt-0.5 mb-3">{sub}</div>
+                <span className="flex items-center gap-1 text-xs font-bold text-teal-600 group-hover:text-teal-700 transition-colors">
+                  Open <ArrowRight className="w-3 h-3" />
+                </span>
+              </Link>
+            ))}
           </div>
         </div>
-      </div>
-
-      {/* ── Body ─────────────────────────────────────────────────────── */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-7 space-y-4">
-
-        {/* Unified attention feed — merges EILS, Monday panel, weekly intelligence, and student alerts */}
-        {activeClasses > 0 && <AttentionFeed />}
-
-        {/* TIE Intel summary — only if weekly_intelligence exists */}
-        {weeklyIntel && (
-          <Link
-            href="/teacher/lesson-plans"
-            className="flex items-center justify-between bg-white border border-gray-100 shadow-sm rounded-2xl p-5 hover:shadow-md transition-all group"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-teal-50 rounded-xl flex items-center justify-center shrink-0">
-                <Sparkles className="w-5 h-5 text-teal-600" />
-              </div>
-              <div>
-                <p className="font-black text-gray-900 text-sm">This week&apos;s TIE Intel — Week {weeklyIntel.week_number}</p>
-                <p className="text-gray-500 text-xs mt-0.5">
-                  Health score{' '}
-                  <span className={`font-bold ${
-                    (weeklyIntel.week_health_score ?? 0) >= 75
-                      ? 'text-emerald-600'
-                      : (weeklyIntel.week_health_score ?? 0) >= 50
-                        ? 'text-amber-600'
-                        : 'text-red-600'
-                  }`}>
-                    {weeklyIntel.week_health_score ?? '—'}%
-                  </span>
-                  {/* remedial badge hidden — data capture layer not ready yet */}
-                </p>
-              </div>
-            </div>
-            <ArrowUpRight className="w-4 h-4 text-gray-400 group-hover:text-teal-600 transition-colors shrink-0" />
-          </Link>
-        )}
-
-        {/* Nudge — quick link to Documents when user has nothing else visible */}
-        {activeClasses === 0 && !weeklyIntel && (
-          <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-5 text-center">
-            <p className="text-gray-500 text-sm mb-3">No classes yet. Start by creating your first scheme of work.</p>
-            <Link
-              href="/teacher/documents"
-              className="inline-flex items-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-teal-700 transition"
-            >
-              Go to Documents
-            </Link>
-          </div>
-        )}
 
       </div>
     </div>

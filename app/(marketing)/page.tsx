@@ -38,15 +38,6 @@ const TEACHER_TIMELINE = [
   { icon: '💬', label: 'Parents notified'  },
 ]
 
-const INTELLIGENCE_FLOW = [
-  { icon: '📝', label: 'Assessment',      desc: 'Marks, strands, observations'        },
-  { icon: '🧠', label: 'Intelligence',    desc: 'Patterns, gaps, trajectories'         },
-  { icon: '👨‍🏫', label: 'Teacher Action', desc: 'Planning, intervention, insight'      },
-  { icon: '🧭', label: 'Learning Compass', desc: 'Personalised learner sessions'       },
-  { icon: '👨‍👩‍👧', label: 'Parent Insight', desc: 'Weekly pulse, real-time progress'   },
-  { icon: '🎯', label: 'Career Intel',    desc: 'Pathway signals, strength profile'    },
-]
-
 export default function LandingPage() {
   const [demoOpen,     setDemoOpen]     = useState(false)
   const [kcseDemoOpen, setKcseDemoOpen] = useState(false)
@@ -97,24 +88,52 @@ export default function LandingPage() {
       roleColor:     'teal',
     }
     : {
-      badge:         '🇰🇪 The Learning Intelligence Platform',
+      badge:         '🔎 Catch it early. Change the outcome.',
       badgeClass:    'bg-violet-500/10 border-violet-500/20 text-violet-300',
-      line1:         'Every learner.',
-      line2:         'Every classroom.',
-      gradientLine:  'One intelligence platform.',
+      line1:         'Schools should never',
+      line2:         'discover a problem too late.',
+      gradientLine:  'EduNexus shortens that gap.',
       gradientClass: 'from-violet-400 via-purple-400 to-indigo-400',
-      subtitle:      'EduNexus gives schools the intelligence to support every teacher, reach every learner, and guide every family — from Grade 7 to career readiness.',
-      ctaHref:       '#school',
-      ctaLabel:      'Explore for Schools',
+      subtitle:      'EduNexus shortens the distance between when a learning problem begins and when someone notices — while there is still time to act on it.',
+      ctaHref:       '#evidence',
+      ctaLabel:      'See How EduNexus Notices Early',
       trust:         '✓ CBC · Cambridge IGCSE · 8-4-4  ·  ✓ Grades 7–12  ·  ✓ 50+ pioneer teachers',
-      secondary:     { label: 'See how it works →', action: 'link', href: '#intelligence' },
+      secondary:     { label: 'See a sample report →', action: 'demo' },
       roleColor:     'violet',
     }
 
   return (
     <>
-      {/* ── HERO ──────────────────────────────────────────────────────────────── */}
+      {/* ── HUMAN PROBLEM ─────────────────────────────────────────────────────── */}
       <section className="py-24 md:py-32">
+        <div className="max-w-170 mx-auto px-6 text-center">
+
+          <p
+            className="font-extrabold text-white leading-snug tracking-[-0.01em] mb-8"
+            style={{ fontSize: 'clamp(26px, 4.5vw, 40px)' }}
+          >
+            Every learner has potential<br />that marks alone cannot measure.
+          </p>
+
+          <div className="space-y-2 text-white/45 text-lg leading-relaxed mb-8">
+            <p>Some need more time.</p>
+            <p>Some need a different explanation.</p>
+            <p>Some need someone to believe they will get there.</p>
+            <p>Some need to see where they are going<br className="hidden sm:block" /> before they commit to the journey.</p>
+          </div>
+
+          <p className="text-white/65 leading-relaxed max-w-125 mx-auto">
+            A learning problem rarely announces itself. It starts small — one concept in one
+            subject that didn&apos;t quite land — and for a while, nothing looks wrong.
+            By the time it shows up in a report card, it&apos;s often already three terms old.
+            By exam time, it can be too late to be the easy fix it once was.
+          </p>
+
+        </div>
+      </section>
+
+      {/* ── TRANSFORMATION (HERO) ─────────────────────────────────────────────── */}
+      <section className="py-16 md:py-24 bg-white/3">
         <div className="max-w-[820px] mx-auto px-6 text-center">
 
           {/* Role selector */}
@@ -231,54 +250,157 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── SOCIAL PROOF ──────────────────────────────────────────────────────── */}
-      <section className="bg-white/3 py-14 md:py-16">
+      {/* ── TRUST BAR ─────────────────────────────────────────────────────────── */}
+      <section className="py-10 md:py-12">
         <div className="max-w-275 mx-auto px-6">
-
           <p className="text-center text-sm font-semibold text-white/40 uppercase tracking-widest mb-1">
             Trusted by CBC and 8-4-4 teachers across Kenya
           </p>
-          <p className="text-center text-xs text-white/25 mb-10">
+          <p className="text-center text-xs text-white/25">
             50+ pioneer teachers &nbsp;·&nbsp; Nairobi, Kisumu, Nakuru &nbsp;·&nbsp; CBC · 8-4-4 · Cambridge IGCSE
           </p>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            {[
-              {
-                quote: "Brian was always failing Number Patterns. The report pinpointed exactly that strand — not just 'Mathematics is weak'. We focused on it for two weeks and his teacher noticed immediately.",
-                name: "Grace W.",
-                role: "Parent · Grade 8 · Westlands, Nairobi",
-                tag: "Learner Blueprint",
-                tagColor: "text-violet-400",
-              },
-              {
-                quote: "I used to spend my Sunday planning. Now I generate a complete SOW in under 10 minutes — CBC-aligned, TSC-ready. It's not an exaggeration to say this changed my term.",
-                name: "Mr. Omondi K.",
-                role: "CBC Integrated Science Teacher · Kisumu",
-                tag: "Teacher Tools",
-                tagColor: "text-amber-400",
-              },
-              {
-                quote: "My son is Form 3 and I've never understood why he's passing English but failing every comprehension exam. The strand breakdown showed it was inference — now we know what to fix.",
-                name: "Peter M.",
-                role: "Parent · Form 3 · Nakuru",
-                tag: "Learner Blueprint",
-                tagColor: "text-violet-400",
-              },
-            ].map((t) => (
-              <div key={t.name} className="bg-white/4 border border-white/10 rounded-2xl px-6 py-5 flex flex-col">
-                <div className={`text-[10px] font-bold uppercase tracking-widest mb-3 ${t.tagColor}`}>{t.tag}</div>
-                <p className="text-white/70 text-sm leading-relaxed mb-4 flex-1">&ldquo;{t.quote}&rdquo;</p>
-                <div className="text-xs text-white/50 font-semibold">{t.name}</div>
-                <div className="text-xs text-white/30">{t.role}</div>
-              </div>
-            ))}
-          </div>
-
         </div>
       </section>
 
-      {/* ── SCHOOL INTELLIGENCE ───────────────────────────────────────────────── */}
+      {/* ── EVIDENCE: LEARNER BLUEPRINT (centerpiece) ─────────────────────────── */}
+      <section id="evidence" className="bg-white/5 py-20 md:py-28">
+        <div className="max-w-275 mx-auto px-6">
+          <div className="grid md:grid-cols-2 gap-16 items-center">
+
+            {/* Report card mockup */}
+            <div className="order-2 md:order-1 flex justify-center">
+              <div className="relative">
+                <div className="absolute inset-0 bg-white/5 border border-white/10 rounded-2xl rotate-1 translate-x-2 translate-y-1" />
+                <div className="relative bg-white/8 border border-white/15 rounded-2xl -rotate-2 w-64 p-7">
+                  <div className="text-[10px] font-bold text-teal-400 tracking-[0.15em] uppercase mb-1">
+                    EDUNEXUS
+                  </div>
+                  <div className="text-xl font-extrabold text-white mb-0.5">Learner Blueprint</div>
+                  <div className="text-xs text-white/60 mb-5">Living Learner Intelligence Profile</div>
+
+                  <div className="border-t border-white/15 mb-4" />
+
+                  <div className="text-base font-extrabold text-white mb-0.5">Brian Otieno</div>
+                  <div className="text-xs text-white/50 mb-0.5">Grade 8 · Junior School</div>
+                  <div className="text-xs text-white/50 mb-5">Term 1, 2026</div>
+
+                  <div className="border-t border-white/15 mb-4" />
+
+                  <div className="text-xs text-white/50 mb-2">
+                    Overall Competency:{' '}
+                    <span className="font-bold text-white">DEVELOPING</span>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold px-3 py-1 rounded-full">
+                      Level 2
+                    </span>
+                  </div>
+                  <div className="text-xs text-green-400 font-semibold mb-4">
+                    Trajectory: IMPROVING ↑
+                  </div>
+
+                  {/* Mini strand bars */}
+                  <div className="space-y-2 mb-5">
+                    {[
+                      { label: 'Number Patterns', pct: 43, color: 'bg-red-400/70'   },
+                      { label: 'Algebra',          pct: 67, color: 'bg-amber-400/70' },
+                      { label: 'Geometry',         pct: 81, color: 'bg-green-400/70' },
+                    ].map(({ label, pct, color }) => (
+                      <div key={label}>
+                        <div className="flex justify-between text-[10px] text-white/35 mb-0.5">
+                          <span>{label}</span>
+                          <span>{pct}%</span>
+                        </div>
+                        <div className="h-1 bg-white/8 rounded-full overflow-hidden">
+                          <div className={`h-1 rounded-full ${color}`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="border-t border-white/15 pt-3">
+                    <div className="text-[10px] text-white/25">edunexus.co.ke · CONFIDENTIAL · Sample</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Text */}
+            <div className="order-1 md:order-2">
+              <span className="text-xs font-bold text-amber-400 uppercase tracking-widest mb-3 block">
+                The Evidence
+              </span>
+              <h2 className="text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5">
+                Discovered while there<br />was still time to fix it.
+              </h2>
+              <p className="text-white/60 leading-relaxed mb-6">
+                This is what noticing early actually looks like.
+                <br /><br />
+                Marks tell you what happened. The Learner Blueprint tells you why.
+                Every term, each learner receives a strand-by-strand intelligence profile — not a
+                general &ldquo;Mathematics is weak&rdquo; summary, but the specific concept holding
+                them back and the precise path to close it, while it&apos;s still one strand wide
+                and not a whole subject wide.
+                <br /><br />
+                Teachers, parents, and school leadership each see the same picture. One learner.
+                One truth. Everyone informed early enough to act on it.
+              </p>
+              <ul className="space-y-3 mb-8">
+                {[
+                  'Strand-level diagnosis per subject — not just overall marks',
+                  'Trajectory tracking — improving, plateauing, or declining',
+                  '3-week targeted study plan included',
+                  'Visible to the teacher, parent, and school leadership',
+                  'Career and pathway guidance built in for CBC learners',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-3 text-sm text-white/60">
+                    <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+
+              <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-3">
+                Sample reports
+              </p>
+              <div className="flex flex-wrap gap-3 mb-6">
+                <button
+                  onClick={() => setDemoOpen(true)}
+                  className="flex items-center gap-2.5 bg-white/5 border border-white/10 rounded-xl px-4 py-3 hover:bg-white/8 transition-all text-left"
+                >
+                  <div className="w-2.5 h-2.5 rounded-full bg-violet-400 shrink-0" />
+                  <div>
+                    <div className="text-sm font-bold text-white">Brian Otieno</div>
+                    <div className="text-xs text-white/40">CBC · Grade 8</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => setKcseDemoOpen(true)}
+                  className="flex items-center gap-2.5 bg-white/5 border border-white/10 rounded-xl px-4 py-3 hover:bg-white/8 transition-all text-left"
+                >
+                  <div className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
+                  <div>
+                    <div className="text-sm font-bold text-white">James Kamau</div>
+                    <div className="text-xs text-white/40">8-4-4 · Form 3</div>
+                  </div>
+                </button>
+              </div>
+
+              <Link
+                href="/signup?role=parent"
+                className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-600 text-white px-7 py-3.5 rounded-xl font-bold hover:scale-105 transition-all shadow-2xl shadow-violet-600/30"
+              >
+                Get My Child&apos;s Free Report
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* ── EVIDENCE AT SCHOOL SCALE ───────────────────────────────────────────── */}
       <section id="school" className="py-20 md:py-28">
         <div className="max-w-275 mx-auto px-6">
 
@@ -287,11 +409,12 @@ export default function LandingPage() {
               For School Leaders
             </span>
             <h2 className="text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5">
-              One dashboard.<br />Every learner. Every teacher. Every classroom.
+              The same evidence.<br />Every learner. Every classroom.
             </h2>
             <p className="text-white/60 leading-relaxed max-w-150 mx-auto">
-              EduNexus gives school leadership a live picture of learning across the entire school —
-              not just end-of-term averages, but what is happening inside every classroom, every week.
+              EduNexus gives school leadership the same early-noticing picture — not just
+              end-of-term averages, but what is happening inside every classroom, every week,
+              while there is still time to respond.
             </p>
           </div>
 
@@ -304,11 +427,10 @@ export default function LandingPage() {
               <div className="bg-white/6 border-b border-white/10 px-5 py-3.5 flex items-center justify-between">
                 <div>
                   <div className="text-sm font-bold text-white">🏫 School Intelligence</div>
-                  <div className="text-xs text-white/40">Westlands Academy · Term 2, 2026</div>
+                  <div className="text-xs text-white/40">Sample School · Term 2, 2026</div>
                 </div>
-                <span className="flex items-center gap-1.5 text-xs font-semibold text-green-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                  Live
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-white/40">
+                  Illustrative example
                 </span>
               </div>
 
@@ -432,182 +554,10 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Integration note */}
-          <div className="mt-10 bg-white/3 border border-white/8 rounded-2xl px-8 py-5 text-center max-w-180 mx-auto">
-            <p className="text-white/55 text-sm leading-relaxed">
-              EduNexus does not replace your existing School Management System.
-              It layers{' '}
-              <span className="text-white font-semibold">learning intelligence</span>{' '}
-              on top of it — so administration and academic insight work together for the first time.
-            </p>
-          </div>
-
         </div>
       </section>
 
-      {/* ── LEARNING INTELLIGENCE ENGINE ──────────────────────────────────────── */}
-      <section id="intelligence" className="bg-white/3 py-20 md:py-28">
-        <div className="max-w-250 mx-auto px-6">
-
-          <div className="text-center mb-14">
-            <span className="text-xs font-bold text-violet-400 uppercase tracking-widest mb-3 block">
-              How It Works
-            </span>
-            <h2 className="text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5">
-              Learning intelligence that compounds over time.
-            </h2>
-            <p className="text-white/60 leading-relaxed max-w-140 mx-auto">
-              EduNexus does not generate a single report and move on.
-              Every assessment, every session, every week builds a richer picture —
-              so the intelligence improves as the learner grows.
-            </p>
-          </div>
-
-          {/* Desktop: horizontal flow */}
-          <div className="hidden md:flex items-start justify-between">
-            {INTELLIGENCE_FLOW.map((node, i) => (
-              <div key={node.label} className="flex items-start flex-1">
-                <div className="flex flex-col items-center flex-1">
-                  <div className="w-14 h-14 bg-linear-to-br from-violet-500/20 to-purple-500/20 border border-violet-500/25 rounded-2xl flex items-center justify-center text-2xl mb-3 relative z-10">
-                    {node.icon}
-                  </div>
-                  <div className="text-xs font-bold text-white text-center mb-1 leading-tight">{node.label}</div>
-                  <div className="text-[10px] text-white/35 text-center leading-relaxed px-1">{node.desc}</div>
-                </div>
-                {i < INTELLIGENCE_FLOW.length - 1 && (
-                  <div className="flex items-center mt-5 shrink-0 -mx-1">
-                    <div className="w-6 h-px bg-linear-to-r from-violet-500/40 to-purple-500/40" />
-                    <div className="w-0 h-0 border-t-4 border-t-transparent border-b-4 border-b-transparent border-l-[6px] border-l-violet-400/40" />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Mobile: vertical flow */}
-          <div className="md:hidden space-y-3">
-            {INTELLIGENCE_FLOW.map((node, i) => (
-              <div key={node.label}>
-                <div className="flex items-center gap-4 bg-white/3 border border-white/8 rounded-2xl px-5 py-4">
-                  <div className="w-11 h-11 bg-violet-500/15 border border-violet-500/20 rounded-xl flex items-center justify-center text-xl shrink-0">
-                    {node.icon}
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold text-white">{node.label}</div>
-                    <div className="text-xs text-white/40 mt-0.5">{node.desc}</div>
-                  </div>
-                </div>
-                {i < INTELLIGENCE_FLOW.length - 1 && (
-                  <div className="flex justify-center my-1.5 ml-8">
-                    <div className="w-px h-3 bg-violet-500/30" />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-12 max-w-165 mx-auto text-center">
-            <p className="text-white/50 text-sm leading-relaxed">
-              Every data point feeds the next layer. A learner&apos;s strand-level assessment informs their
-              Compass sessions, which informs the teacher&apos;s planning, which is visible to the parent in
-              real time — and builds their career profile year over year.
-            </p>
-            <p className="text-white/75 font-semibold text-sm mt-3">
-              This is why EduNexus gets more valuable the longer a school uses it.
-            </p>
-          </div>
-
-        </div>
-      </section>
-
-      {/* ── TEACHER SECTION ───────────────────────────────────────────────────── */}
-      <section id="teachers" className="py-20 md:py-28">
-        <div className="max-w-275 mx-auto px-6">
-
-          <div className="text-center mb-12">
-            <span className="text-xs font-bold text-amber-400 uppercase tracking-widest mb-3 block">
-              For Teachers
-            </span>
-            <h2 className="text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5">
-              Less paperwork.<br />More teaching.
-            </h2>
-            <p className="text-white/60 leading-relaxed max-w-150 mx-auto">
-              A great teacher&apos;s time should be spent teaching.
-              <br /><br />
-              EduNexus handles the documentation — CBC-aligned schemes of work, lesson plans formatted
-              exactly as TSC expects, and class insights that show you where each learner actually is.
-              Walk into Monday&apos;s lesson prepared, not exhausted.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6 mb-10">
-            {[
-              {
-                icon: '📋',
-                title: 'Schemes of Work',
-                body: 'Your full term planned before it begins. CBC-aligned, TSC inspection ready — not a template you fill in, but a complete scheme built for your class.',
-              },
-              {
-                icon: '📖',
-                title: 'Lesson Plans',
-                body: "Every Friday, next week's plans land automatically. Objectives, activities, assessments — done before you leave school.",
-              },
-              {
-                icon: '📊',
-                title: 'Class Intelligence',
-                body: "See every learner's level at a glance. Know who needs support before the end-of-term results force the conversation.",
-              },
-            ].map((card) => (
-              <div
-                key={card.title}
-                className="bg-white/3 border border-white/10 rounded-2xl p-6 hover:bg-white/5 hover:scale-[1.02] transition-all"
-              >
-                <div className="text-3xl mb-4">{card.icon}</div>
-                <h3 className="text-base font-bold text-white mb-2">{card.title}</h3>
-                <p className="text-sm text-white/45 leading-relaxed">{card.body}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Automation timeline */}
-          <div className="mb-10">
-            <p className="text-center text-[10px] font-semibold text-white/25 uppercase tracking-widest mb-4">
-              Your week on autopilot
-            </p>
-            <div
-              className="flex items-center justify-center overflow-x-auto [&::-webkit-scrollbar]:hidden pb-1"
-              style={{ scrollbarWidth: 'none' }}
-            >
-              {TEACHER_TIMELINE.map((step, i) => (
-                <div key={step.label} className="flex items-center shrink-0">
-                  <div className="flex flex-col items-center gap-1.5">
-                    <span className="text-base">{step.icon}</span>
-                    <span className="text-[10px] text-teal-400 font-medium whitespace-nowrap">{step.label}</span>
-                  </div>
-                  {i < TEACHER_TIMELINE.length - 1 && (
-                    <div className="w-8 md:w-14 shrink-0 mx-2 border-t border-dashed border-teal-500/30" />
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="text-center">
-            <Link
-              href="/signup?role=teacher"
-              className="text-amber-400 hover:text-amber-300 font-semibold transition-colors"
-            >
-              Start planning your term for free →
-            </Link>
-            <p className="text-xs text-white/40 mt-2">
-              Trusted by CBC teachers from Nairobi to Mombasa to Kisumu.
-            </p>
-          </div>
-
-        </div>
-      </section>
-
-      {/* ── LEARNING COMPASS ──────────────────────────────────────────────────── */}
+      {/* ── ACTION: LEARNING COMPASS ──────────────────────────────────────────── */}
       <section id="compass" className="bg-white/3 py-20 md:py-28">
         <div className="max-w-275 mx-auto px-6">
           <div className="grid md:grid-cols-2 gap-16 items-center">
@@ -618,21 +568,23 @@ export default function LandingPage() {
                 Learning Compass
               </span>
               <h2 className="text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5">
-                Every learner receives a personalised learning companion.
+                Knowing isn&apos;t enough.
               </h2>
               <p className="text-white/60 leading-relaxed mb-6">
-                Not all learners struggle for the same reason.
+                Once the Blueprint identifies exactly which concept is holding a learner back,
+                the Learning Compass starts there — not a generic tutoring session, that exact
+                gap, met at the level the learner is actually at.
                 <br /><br />
-                Some are behind because they missed one foundational concept two terms ago.
-                Some understand the idea but need it explained differently.
-                Some just need someone to be patient with them.
+                Some learners are behind because they missed one foundational concept two terms
+                ago. Some understand the idea but need it explained differently. Some just need
+                someone to be patient with them.
                 <br /><br />
-                The Learning Compass meets each learner exactly where they are — Level 1 or Level 4 —
-                and builds upward from there. Available anytime, on any device, in familiar Kenyan context.
+                The diagnosis becomes the intervention. Available anytime, on any device, in
+                familiar Kenyan context.
               </p>
               <ul className="space-y-3 mb-8">
                 {[
-                  "Adapts to each learner's exact CBC / IGCSE level",
+                  "Starts from the exact strand the Blueprint identified",
                   'Explains concepts in familiar Kenyan contexts',
                   'Tracks mastery concept by concept across terms',
                   'Visible to teachers and parents in real time',
@@ -707,144 +659,98 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── LEARNER BLUEPRINT ─────────────────────────────────────────────────── */}
-      <section id="clinic" className="bg-white/5 py-20 md:py-28">
+      {/* ── MECHANISM: TEACHER WORKSPACE ──────────────────────────────────────── */}
+      <section id="teachers" className="py-20 md:py-28">
         <div className="max-w-275 mx-auto px-6">
-          <div className="grid md:grid-cols-2 gap-16 items-center">
 
-            {/* Report card mockup */}
-            <div className="order-2 md:order-1 flex justify-center">
-              <div className="relative">
-                <div className="absolute inset-0 bg-white/5 border border-white/10 rounded-2xl rotate-1 translate-x-2 translate-y-1" />
-                <div className="relative bg-white/8 border border-white/15 rounded-2xl -rotate-2 w-64 p-7">
-                  <div className="text-[10px] font-bold text-teal-400 tracking-[0.15em] uppercase mb-1">
-                    EDUNEXUS
-                  </div>
-                  <div className="text-xl font-extrabold text-white mb-0.5">Learner Blueprint</div>
-                  <div className="text-xs text-white/60 mb-5">Living Learner Intelligence Profile</div>
-
-                  <div className="border-t border-white/15 mb-4" />
-
-                  <div className="text-base font-extrabold text-white mb-0.5">Brian Otieno</div>
-                  <div className="text-xs text-white/50 mb-0.5">Grade 8 · Junior School</div>
-                  <div className="text-xs text-white/50 mb-5">Term 1, 2026</div>
-
-                  <div className="border-t border-white/15 mb-4" />
-
-                  <div className="text-xs text-white/50 mb-2">
-                    Overall Competency:{' '}
-                    <span className="font-bold text-white">DEVELOPING</span>
-                  </div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold px-3 py-1 rounded-full">
-                      Level 2
-                    </span>
-                  </div>
-                  <div className="text-xs text-green-400 font-semibold mb-4">
-                    Trajectory: IMPROVING ↑
-                  </div>
-
-                  {/* Mini strand bars */}
-                  <div className="space-y-2 mb-5">
-                    {[
-                      { label: 'Number Patterns', pct: 43, color: 'bg-red-400/70'   },
-                      { label: 'Algebra',          pct: 67, color: 'bg-amber-400/70' },
-                      { label: 'Geometry',         pct: 81, color: 'bg-green-400/70' },
-                    ].map(({ label, pct, color }) => (
-                      <div key={label}>
-                        <div className="flex justify-between text-[10px] text-white/35 mb-0.5">
-                          <span>{label}</span>
-                          <span>{pct}%</span>
-                        </div>
-                        <div className="h-1 bg-white/8 rounded-full overflow-hidden">
-                          <div className={`h-1 rounded-full ${color}`} style={{ width: `${pct}%` }} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="border-t border-white/15 pt-3">
-                    <div className="text-[10px] text-white/25">edunexus.co.ke · CONFIDENTIAL</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Text */}
-            <div className="order-1 md:order-2">
-              <span className="text-xs font-bold text-amber-400 uppercase tracking-widest mb-3 block">
-                Learner Blueprint
-              </span>
-              <h2 className="text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5">
-                Not just a report.<br />A living learner profile.
-              </h2>
-              <p className="text-white/60 leading-relaxed mb-6">
-                Marks tell you what happened. The Learner Blueprint tells you why.
-                <br /><br />
-                Every term, each learner receives a strand-by-strand intelligence profile — not a
-                general &ldquo;Mathematics is weak&rdquo; summary, but the specific concept holding
-                them back and the precise path to close it.
-                <br /><br />
-                Teachers, parents, and school leadership each see what they need to see.
-                One learner. One picture. Everyone informed.
-              </p>
-              <ul className="space-y-3 mb-8">
-                {[
-                  'Strand-level diagnosis per subject — not just overall marks',
-                  'Trajectory tracking — improving, plateauing, or declining',
-                  '3-week targeted study plan included',
-                  'Visible to the teacher, parent, and school leadership',
-                  'Career and pathway guidance built in for CBC learners',
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-3 text-sm text-white/60">
-                    <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-
-              <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-3">
-                Sample reports
-              </p>
-              <div className="flex flex-wrap gap-3 mb-6">
-                <button
-                  onClick={() => setDemoOpen(true)}
-                  className="flex items-center gap-2.5 bg-white/5 border border-white/10 rounded-xl px-4 py-3 hover:bg-white/8 transition-all text-left"
-                >
-                  <div className="w-2.5 h-2.5 rounded-full bg-violet-400 shrink-0" />
-                  <div>
-                    <div className="text-sm font-bold text-white">Brian Otieno</div>
-                    <div className="text-xs text-white/40">CBC · Grade 8</div>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => setKcseDemoOpen(true)}
-                  className="flex items-center gap-2.5 bg-white/5 border border-white/10 rounded-xl px-4 py-3 hover:bg-white/8 transition-all text-left"
-                >
-                  <div className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
-                  <div>
-                    <div className="text-sm font-bold text-white">James Kamau</div>
-                    <div className="text-xs text-white/40">8-4-4 · Form 3</div>
-                  </div>
-                </button>
-              </div>
-
-              <Link
-                href="/signup?role=parent"
-                className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-600 text-white px-7 py-3.5 rounded-xl font-bold hover:scale-105 transition-all shadow-2xl shadow-violet-600/30"
-              >
-                Get My Child&apos;s Free Report
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-
+          <div className="text-center mb-12">
+            <span className="text-xs font-bold text-amber-400 uppercase tracking-widest mb-3 block">
+              How The Noticing Happens
+            </span>
+            <h2 className="text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5">
+              Every lesson<br />becomes evidence.
+            </h2>
+            <p className="text-white/60 leading-relaxed max-w-150 mx-auto">
+              None of this works without the teacher.
+              <br /><br />
+              Every assessment marked, every scheme of work built, every lesson taught — that is
+              the raw material EduNexus reads to find the strand that&apos;s slipping before it
+              becomes a pattern. The documentation is handled for you — CBC-aligned schemes of
+              work, lesson plans formatted exactly as TSC expects — so there is more room left to
+              notice the things a form can&apos;t capture. Walk into Monday&apos;s lesson
+              prepared, not exhausted.
+            </p>
           </div>
+
+          <div className="grid md:grid-cols-3 gap-6 mb-10">
+            {[
+              {
+                icon: '📋',
+                title: 'Schemes of Work',
+                body: 'Your full term planned before it begins — CBC-aligned, TSC inspection ready. This is the structure the Blueprint reads against.',
+              },
+              {
+                icon: '📖',
+                title: 'Lesson Plans',
+                body: "Every Friday, next week's plans land automatically. Objectives, activities, assessments — the record that becomes evidence.",
+              },
+              {
+                icon: '📊',
+                title: 'Class Intelligence',
+                body: "See every learner's level at a glance. Know who needs support before the end-of-term results force the conversation.",
+              },
+            ].map((card) => (
+              <div
+                key={card.title}
+                className="bg-white/3 border border-white/10 rounded-2xl p-6 hover:bg-white/5 hover:scale-[1.02] transition-all"
+              >
+                <div className="text-3xl mb-4">{card.icon}</div>
+                <h3 className="text-base font-bold text-white mb-2">{card.title}</h3>
+                <p className="text-sm text-white/45 leading-relaxed">{card.body}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Automation timeline */}
+          <div className="mb-10">
+            <p className="text-center text-[10px] font-semibold text-white/25 uppercase tracking-widest mb-4">
+              From classroom record to family insight
+            </p>
+            <div
+              className="flex items-center justify-center overflow-x-auto [&::-webkit-scrollbar]:hidden pb-1"
+              style={{ scrollbarWidth: 'none' }}
+            >
+              {TEACHER_TIMELINE.map((step, i) => (
+                <div key={step.label} className="flex items-center shrink-0">
+                  <div className="flex flex-col items-center gap-1.5">
+                    <span className="text-base">{step.icon}</span>
+                    <span className="text-[10px] text-teal-400 font-medium whitespace-nowrap">{step.label}</span>
+                  </div>
+                  {i < TEACHER_TIMELINE.length - 1 && (
+                    <div className="w-8 md:w-14 shrink-0 mx-2 border-t border-dashed border-teal-500/30" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="text-center">
+            <Link
+              href="/signup?role=teacher"
+              className="text-amber-400 hover:text-amber-300 font-semibold transition-colors"
+            >
+              Start planning your term for free →
+            </Link>
+            <p className="text-xs text-white/40 mt-2">
+              Trusted by CBC teachers from Nairobi to Mombasa to Kisumu.
+            </p>
+          </div>
+
         </div>
       </section>
 
-      {/* ── CAREER INTELLIGENCE ───────────────────────────────────────────────── */}
-      <section id="career" className="py-20 md:py-28">
+      {/* ── FUTURE OUTCOME: CAREER INTELLIGENCE ───────────────────────────────── */}
+      <section id="career" className="bg-white/3 py-20 md:py-28">
         <div className="max-w-275 mx-auto px-6">
 
           <div className="text-center mb-14">
@@ -855,10 +761,11 @@ export default function LandingPage() {
               Education that prepares learners for life.<br />Not only examinations.
             </h2>
             <p className="text-white/60 leading-relaxed max-w-150 mx-auto">
-              By the time a learner sits their final exam, the platform has been building their
-              career intelligence picture for years — from classroom performance and learning
-              patterns to interests, strengths, and growth trajectories that marks alone will
-              never capture.
+              Do this consistently — notice early, act early, term after term — and something
+              else becomes visible that a single report card never could. By the time a learner
+              sits their final exam, the platform has been building their career intelligence
+              picture for years — from classroom performance and learning patterns to interests,
+              strengths, and growth trajectories that marks alone will never capture.
             </p>
           </div>
 
@@ -893,8 +800,9 @@ export default function LandingPage() {
 
           <div className="bg-indigo-500/5 border border-indigo-500/15 rounded-2xl px-8 py-5 text-center max-w-180 mx-auto">
             <p className="text-white/55 text-sm leading-relaxed">
-              Career Intelligence is built into EduNexus from Grade 7. It requires no separate tool
-              and no separate subscription.
+              Career Intelligence is not a separate tool. It is the same evidence, the same
+              noticing, carried forward — built into EduNexus from Grade 7, with no separate
+              subscription.
             </p>
             <p className="text-indigo-400 font-semibold text-sm mt-2">
               EduNexus does not wait until Form 6 to think about where a learner is headed.
@@ -904,20 +812,21 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── PLATFORM POSITIONING ──────────────────────────────────────────────── */}
-      <section className="bg-white/3 py-20 md:py-24">
+      {/* ── OBJECTION HANDLING: HOW EDUNEXUS FITS ─────────────────────────────── */}
+      <section className="py-16 md:py-20">
         <div className="max-w-225 mx-auto px-6">
 
-          <div className="text-center mb-12">
+          <div className="text-center mb-10">
             <span className="text-xs font-bold text-white/40 uppercase tracking-widest mb-3 block">
-              For School Decision-Makers
+              A Common Question
             </span>
-            <h2 className="text-2xl md:text-3xl font-extrabold text-white leading-tight mb-4">
-              EduNexus does not replace your school system.<br />It makes it smarter.
+            <h2 className="text-xl md:text-2xl font-extrabold text-white leading-tight mb-4">
+              Does this replace our school system?
             </h2>
             <p className="text-white/55 leading-relaxed max-w-140 mx-auto text-sm">
-              Your existing School Management System handles registration, timetabling, fee collection,
-              and attendance. It is good at that. What it does not do is understand learning.
+              No. Your existing School Management System handles registration, timetabling, fee
+              collection, and attendance. It is good at that. What it does not do is notice a
+              learning problem early enough to change the outcome — that is what EduNexus adds.
             </p>
           </div>
 
@@ -965,51 +874,18 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="mt-6 bg-white/3 border border-white/8 rounded-2xl px-8 py-5 text-center">
-            <p className="text-white/55 text-sm">
-              Administration and learning intelligence,{' '}
-              <span className="text-white font-semibold">working together for the first time.</span>
-            </p>
-          </div>
-
-        </div>
-      </section>
-
-      {/* ── PHILOSOPHY ────────────────────────────────────────────────────────── */}
-      <section className="py-28 md:py-36">
-        <div className="max-w-170 mx-auto px-6 text-center">
-
-          <p
-            className="font-extrabold text-white leading-snug tracking-[-0.01em] mb-8"
-            style={{ fontSize: 'clamp(22px, 4vw, 32px)' }}
-          >
-            Every learner has potential<br />that marks alone cannot measure.
-          </p>
-
-          <div className="space-y-2 text-white/45 text-lg leading-relaxed mb-8">
-            <p>Some need more time.</p>
-            <p>Some need a different explanation.</p>
-            <p>Some need someone to believe they will get there.</p>
-            <p>Some need to see where they are going<br className="hidden sm:block" /> before they commit to the journey.</p>
-          </div>
-
-          <p className="text-white/65 leading-relaxed max-w-125 mx-auto mb-8">
-            EduNexus exists to help schools find that potential — and act on it —
-            before a learner decides for themselves that they are not good enough.
-          </p>
-
-          <p className="text-white/35 text-sm font-semibold tracking-wide">
-            We are not building a smarter exam.
-            <br />
-            We are building a smarter school.
-          </p>
-
         </div>
       </section>
 
       {/* ── CLOSING CTA ───────────────────────────────────────────────────────── */}
       <section className="bg-white/3 py-24 md:py-32">
         <div className="max-w-190 mx-auto px-6 text-center">
+
+          <p className="text-white/35 text-sm font-semibold tracking-wide mb-6">
+            We are not building a smarter exam.
+            <br />
+            We are building a smarter school.
+          </p>
 
           <h2
             className="font-extrabold leading-tight tracking-[-0.02em] text-white mb-4"

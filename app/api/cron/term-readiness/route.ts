@@ -1,5 +1,9 @@
 // GET /api/cron/term-readiness
-// Runs on the first Monday of each term (Jan, May, Sep roughly).
+// Intended to run on the first Monday of each term (Jan, May, Sep roughly).
+// Scheduled weekly via .github/workflows/notification-crons.yml; the route
+// itself no-ops outside a ~9-day window of the real term start (see the
+// guard below) since a precise "first Monday of term" cron expression
+// isn't reliably expressible in standard cron semantics.
 // Generates a "Holiday Completion Brief" per class showing which students
 // engaged with holiday work and how that maps to their current risk level.
 // Protected by CRON_SECRET. Uses service role throughout — bypasses RLS.
@@ -8,6 +12,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
 import { sendWhatsApp } from '@/lib/whatsapp/sender'
 import { timingSafeEqualString } from '@/lib/api/secretCompare'
+import { publishEvent } from '@/lib/events'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -79,6 +84,18 @@ export async function GET(req: Request): Promise<Response> {
     // ── 2. Compute holiday window ─────────────────────────────────────────────
     // The holiday is the 50 days before term start.
     const termStart     = computeTermStartDate()
+
+    // This route is intentionally triggered weekly (a precise "first Monday
+    // of term" cron isn't expressible in standard cron day-of-month/
+    // day-of-week semantics without the classic OR-not-AND gotcha) — so it
+    // guards itself here instead: only actually run the brief outside a
+    // ~9-day window of the real term start, and no-op otherwise, rather
+    // than sending a "term readiness" brief to teachers every Monday.
+    const daysSinceTermStart = (Date.now() - termStart.getTime()) / (1000 * 60 * 60 * 24)
+    if (daysSinceTermStart < 0 || daysSinceTermStart > 9) {
+      return apiSuccess({ generated: 0, message: 'Not within the term-start window — skipped', daysSinceTermStart: Math.round(daysSinceTermStart) })
+    }
+
     const holidayStart  = new Date(termStart)
     holidayStart.setDate(holidayStart.getDate() - 50)
 
@@ -312,8 +329,44 @@ export async function GET(req: Request): Promise<Response> {
       try {
         await sendWhatsApp(teacher.phone as string, message)
         whatsappSent++
-      } catch {
-        // Never let a WhatsApp failure block the cron response
+
+        await db.from('notification_log').insert({
+          user_id:      brief.teacher_id,
+          type:         'term_readiness_brief',
+          reference_id: brief.class_id,
+          channel:      'whatsapp',
+          phone_number: teacher.phone,
+          success:      true,
+        })
+
+        void publishEvent({
+          event_type:      'teacher.term_readiness_brief.sent',
+          resource_type:   'teacher_class',
+          resource_id:      brief.class_id,
+          payload:         { teacher_id: brief.teacher_id, class_id: brief.class_id },
+          idempotency_key: `teacher.term_readiness_brief.sent:${brief.class_id}:${brief.teacher_id}`,
+        }).catch(err => console.error('[events] teacher.term_readiness_brief.sent:', err instanceof Error ? err.message : String(err)))
+      } catch (err) {
+        // Never let a WhatsApp failure block the cron response — but a
+        // silent skip here previously left no trace of which teacher/class
+        // failed to receive their brief.
+        console.error('[cron/term-readiness] sendWhatsApp failed', {
+          teacherId: brief.teacher_id,
+          classId:   brief.class_id,
+          message:   err instanceof Error ? err.message : String(err),
+        })
+
+        // Supabase's query builder resolves to { data, error } rather than
+        // throwing, so this can't itself fail the cron the way a rethrow would.
+        await db.from('notification_log').insert({
+          user_id:       brief.teacher_id,
+          type:          'term_readiness_brief',
+          reference_id:  brief.class_id,
+          channel:       'whatsapp',
+          phone_number:  teacher.phone,
+          success:       false,
+          error_message: err instanceof Error ? err.message : String(err),
+        })
       }
     }
 

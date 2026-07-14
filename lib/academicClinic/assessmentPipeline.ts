@@ -234,44 +234,55 @@ export async function runAssessmentPipeline({
 
     const signupToken = !student.parent_user_id ? (invite ?? undefined) : undefined
 
-    // Fire notifications in parallel
+    // Fire notifications in parallel. Each channel keeps its own named
+    // promise slot (rather than a conditionally-built array unpacked by
+    // position) so a channel that wasn't attempted can never be confused
+    // with a different channel's result — the bug this replaced let an
+    // untried email get reported as "sent" (and a real WhatsApp send get
+    // reported as "not sent") whenever email was the skipped channel,
+    // because Promise.allSettled([whatsappJob]) shifted WhatsApp's result
+    // into what the old code assumed was always the email slot.
     const parentName = student.parent_first_name ?? 'Parent'
-    const notifyJobs: Promise<{ success: boolean }>[] = []
 
-    if (student.notification_email && student.parent_email) {
-      notifyJobs.push(sendReportEmail({
-        studentId:   student.id,
-        parentEmail: student.parent_email,
-        parentName,
-        studentName: student.name,
-        grade:       student.grade,
-        term:        assessment.term,
-        year:        assessment.year,
-        pdfBuffer,
-        signupToken,
-        userId:      actorUserId,
-      }))
-    }
+    const emailJob: Promise<{ success: boolean }> | null =
+      (student.notification_email && student.parent_email)
+        ? sendReportEmail({
+            studentId:   student.id,
+            parentEmail: student.parent_email,
+            parentName,
+            studentName: student.name,
+            grade:       student.grade,
+            term:        assessment.term,
+            year:        assessment.year,
+            pdfBuffer,
+            signupToken,
+            userId:      actorUserId,
+          })
+        : null
 
-    if (student.notification_whatsapp && student.whatsapp_opted_in && student.parent_phone) {
-      notifyJobs.push(sendReportWhatsApp({
-        studentId:   student.id,
-        parentPhone: student.parent_phone,
-        parentName,
-        studentName: student.name,
-        teacherName: actorName,
-        grade:       student.grade,
-        term:        assessment.term,
-        year:        assessment.year,
-        signupToken,
-        userId:      actorUserId,
-      }))
-    }
+    const whatsappJob: Promise<{ success: boolean }> | null =
+      (student.notification_whatsapp && student.whatsapp_opted_in && student.parent_phone)
+        ? sendReportWhatsApp({
+            studentId:   student.id,
+            parentPhone: student.parent_phone,
+            parentName,
+            studentName: student.name,
+            teacherName: actorName,
+            grade:       student.grade,
+            term:        assessment.term,
+            year:        assessment.year,
+            signupToken,
+            userId:      actorUserId,
+          })
+        : null
 
-    const [emailResult, whatsappResult] = await Promise.allSettled(notifyJobs)
+    const [emailResult, whatsappResult] = await Promise.allSettled([
+      emailJob    ?? Promise.resolve(null),
+      whatsappJob ?? Promise.resolve(null),
+    ])
 
-    const emailSent    = student.parent_email ? (emailResult?.status === 'fulfilled' && emailResult.value.success) : false
-    const whatsappSent = student.parent_phone ? (whatsappResult?.status === 'fulfilled' && whatsappResult.value.success) : false
+    const emailSent    = emailJob    !== null && emailResult.status    === 'fulfilled' && emailResult.value?.success    === true
+    const whatsappSent = whatsappJob !== null && whatsappResult.status === 'fulfilled' && whatsappResult.value?.success === true
 
     // Persist report record so teacher dashboard can track delivery
     if (teacherId) {

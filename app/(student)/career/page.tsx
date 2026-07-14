@@ -17,8 +17,20 @@ import type {
   CapabilityDimension,
   CapabilityGrowthReport,
 } from '@/lib/career/types'
+import type { CareerFamilyInsight } from '@/lib/learnerIntelligence/careerIntelligence'
 import { CAPABILITY_LABELS } from '@/lib/career/capabilityExtractor'
 import { alignmentToPercent, tierLabel, tierColor, demandLabel } from '@/lib/career/capabilityMatchEngine'
+
+// Junior (Grade 7-9) response shape from /api/career/capability-matches —
+// broad exploration families, never a ranked/percentage career prediction.
+type CareerExplorationReport = {
+  mode:             'exploration'
+  families:         CareerFamilyInsight[]
+  disclaimer:       string
+  dominant_cluster: string[]
+  assessment_count: number
+}
+type CareerMatchesResponse = (CapabilityMatchReport & { mode: 'planning' }) | CareerExplorationReport
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -367,6 +379,61 @@ function CapabilityMatchPanel({
   )
 }
 
+// ── Junior exploration panel (families, not predictions) ──────────────────────
+
+function CareerFamilyCard({ family }: { family: CareerFamilyInsight }) {
+  return (
+    <div className="bg-white/5 border border-violet-500/20 rounded-2xl p-5 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-white font-bold text-base">{family.categoryLabel}</h3>
+        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300">
+          {family.insight.confidence} confidence
+        </span>
+      </div>
+      <p className="text-white/60 text-xs leading-relaxed">{family.insight.observation}</p>
+      {family.insight.evidence.length > 0 && (
+        <ul className="space-y-1">
+          {family.insight.evidence.slice(0, 2).map((e, i) => (
+            <li key={i} className="text-white/40 text-[11px] leading-relaxed flex items-start gap-1.5">
+              <span className="text-violet-400 mt-0.5">•</span>{e}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-violet-300/80 text-xs leading-relaxed">{family.insight.action}</p>
+      <div className="flex flex-wrap gap-1.5 pt-1">
+        {family.exampleCareerTitles.map(t => (
+          <span key={t} className="text-[11px] bg-white/5 border border-white/10 text-white/50 rounded-full px-2 py-0.5">{t}</span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function CareerExplorationPanel({ report }: { report: CareerExplorationReport }) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-white font-bold text-xl flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-violet-400" />
+          Fields Worth Exploring
+        </h2>
+        <p className="text-white/40 text-xs mt-1">
+          You&apos;re exploring possibilities, not being predicted — these broaden as you take on more subjects, projects, and activities.
+        </p>
+      </div>
+      {report.families.length === 0 ? (
+        <p className="text-white/40 text-sm">Add more assessments to unlock exploration areas.</p>
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {report.families.map(f => <CareerFamilyCard key={f.category} family={f} />)}
+        </div>
+      )}
+      <p className="text-white/20 text-xs leading-relaxed border-t border-white/5 pt-4">{report.disclaimer}</p>
+    </div>
+  )
+}
+
 // ── Explore career card ───────────────────────────────────────────────────────
 
 function CareerCard({ career }: { career: CareerSummary }) {
@@ -443,7 +510,7 @@ function GrowthBanner({ growth }: { growth: CapabilityGrowthReport }) {
 
 export default function CareerPage() {
   const [careers,         setCareers]         = useState<CareerSummary[]>([])
-  const [capabilityReport,setCapabilityReport] = useState<CapabilityMatchReport | null>(null)
+  const [capabilityReport,setCapabilityReport] = useState<CareerMatchesResponse | null>(null)
   const [profile,         setProfile]         = useState<CapabilityProfile | null>(null)
   const [growth,          setGrowth]          = useState<CapabilityGrowthReport | null>(null)
   const [loading,         setLoading]         = useState(true)
@@ -543,7 +610,7 @@ export default function CareerPage() {
       // Refresh matches too
       const report = await fetch(`/api/career/capability-matches?studentId=${studentId}`)
         .then(r => r.json())
-        .then(d => d?.data as CapabilityMatchReport | null)
+        .then(d => d?.data as CareerMatchesResponse | null)
       setCapabilityReport(report)
     } catch {
       // silent
@@ -616,7 +683,9 @@ export default function CareerPage() {
                 </div>
 
                 {/* Matches */}
-                {capabilityReport ? (
+                {capabilityReport?.mode === 'exploration' ? (
+                  <CareerExplorationPanel report={capabilityReport} />
+                ) : capabilityReport ? (
                   <CapabilityMatchPanel
                     report={capabilityReport}
                     onRefresh={handleComputeMatches}

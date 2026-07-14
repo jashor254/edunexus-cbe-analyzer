@@ -42,7 +42,7 @@ function MarketingNav() {
           <a href="#teachers" className="text-sm font-semibold text-white/60 hover:text-white transition-colors">
             For Teachers
           </a>
-          <a href="#clinic" className="text-sm font-semibold text-white/60 hover:text-white transition-colors">
+          <a href="#evidence" className="text-sm font-semibold text-white/60 hover:text-white transition-colors">
             Learner Blueprint
           </a>
           <Link href="/pricing" className="text-sm font-semibold text-white/60 hover:text-white transition-colors">
@@ -90,7 +90,7 @@ function MarketingNav() {
             {[
               { href: '#school',    label: 'For Schools'      },
               { href: '#teachers',  label: 'For Teachers'     },
-              { href: '#clinic',    label: 'Learner Blueprint' },
+              { href: '#evidence',  label: 'Learner Blueprint' },
               { href: '/pricing',   label: 'Pricing'          },
               { href: '/insights',  label: 'Insights ✦'       },
               { href: '/about',     label: 'About'            },

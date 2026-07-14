@@ -31,6 +31,19 @@ export function projectRisk(evidence: EvidenceRow[], now: Date = new Date()): Pr
     const earliest = sorted[0]
     const declining = sorted.length >= 2 && latest.cbc_level! < earliest.cbc_level!
 
+    // Conflicting evidence (see lib/intelligence/evidenceLifecycle.ts's
+    // flagContradictionIfAny) must surface as uncertainty a teacher can act
+    // on, not just a quieter confidence number — this is the one risk flag
+    // type that isn't about the learner's performance at all, only about
+    // the evidence itself being unresolved.
+    if (sorted.some(r => r.verification_state === 'contradicted')) {
+      flags.push({
+        subject, evidenceIds: sorted.filter(r => r.verification_state === 'contradicted').map(r => r.id),
+        severity: 'watch',
+        reason: `Conflicting evidence for ${subject} — two confirmed sources disagree; a teacher should review before relying on this.`,
+      })
+    }
+
     if (latest.cbc_level === 1) {
       flags.push({
         subject, evidenceIds: sorted.map(r => r.id),

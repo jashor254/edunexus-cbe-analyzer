@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
+import { recomputeAndSaveCapabilityProfile } from '@/lib/career/careerEngine'
 
 const CreateAssessmentSchema = z.object({
   student_id:              z.string().uuid(),
@@ -87,6 +88,17 @@ export async function POST(request: Request) {
       console.error('[assessments/create] insert error:', insertError)
       return apiError(insertError.message)
     }
+
+    // This route was previously a dead end: nothing else in the platform
+    // (no Evidence Domain row, no learner_profiles update, no capability
+    // recompute) reacted to a write here, so a student's capability_profile
+    // stayed stale until someone happened to hit the Career Explorer's
+    // "Update" button. Reuse the same canonical recompute every other
+    // assessment-entry path already triggers, fire-and-forget so it never
+    // blocks this response.
+    recomputeAndSaveCapabilityProfile(student_id).catch(err =>
+      console.error('[assessments/create] capability recompute failed:', err instanceof Error ? err.message : String(err))
+    )
 
     return apiSuccess({ assessment }, 201)
   } catch (err) {

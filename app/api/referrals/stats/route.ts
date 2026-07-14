@@ -14,7 +14,8 @@ export async function GET() {
     })
 
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+      console.error('[referrals/stats]', error.message)
+      return NextResponse.json({ success: false, error: 'Failed to load referral stats' }, { status: 500 })
     }
 
     const stats = data[0] ?? {

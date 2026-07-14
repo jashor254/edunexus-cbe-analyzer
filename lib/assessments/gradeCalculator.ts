@@ -74,6 +74,26 @@ export function getBuiltinScale(curriculum: CurriculumType): Omit<GradeScale, 'i
   return curriculum === '844' ? BUILTIN_844_SCALE : BUILTIN_CBC_SCALE
 }
 
+// Phase D (docs/architecture/academic-evidence-layer.md §8 / decisions.md):
+// "mean points," the standard KNEC/KCSE reporting statistic, distinct from
+// mean score — a class report says both "mean grade: B (65.2%)" and "mean
+// points: 9.1," not one or the other. CBC's EE/ME/AE/BE has no traditional
+// points convention (CBC reports performance levels, not points) — mapped
+// here to 4/3/2/1 as the direct performance-level equivalent, the only
+// reasonable non-invented choice given GRADE_META already treats these as
+// one ordered scale alongside 8-4-4's letters. The 8-4-4 mapping is the
+// standard KNEC 12-point scale; this codebase's own BUILTIN_844_SCALE has
+// no 'A-' band (a pre-existing gap, not introduced or fixed here), so
+// there is no A-=11 entry to include.
+export const POINTS_BY_GRADE: Record<string, number> = {
+  EE: 4, ME: 3, AE: 2, BE: 1,
+  A: 12, 'B+': 10, B: 9, 'B-': 8, 'C+': 7, C: 6, 'C-': 5, 'D+': 4, D: 3, 'D-': 2, E: 1,
+}
+
+export function gradeToPoints(grade: string): number | null {
+  return POINTS_BY_GRADE[grade] ?? null
+}
+
 export function calculateGradeFromScale(
   meanScore: number,
   maxScore: number,
@@ -125,8 +145,8 @@ export type CBCLevel = 1 | 2 | 3 | 4
 // Inverse of marksToLevel — approximates a raw mark from an already-known CBC
 // level. Used when a downstream consumer (e.g. updateFromAssessment) only
 // accepts raw 0-100 marks but the source data only has the level. Midpoints
-// are chosen to round-trip correctly through both this file's thresholds and
-// lib/learnerModel/updater.ts's computeCBCLevel band boundaries.
+// are chosen to round-trip correctly through this file's thresholds (the
+// same thresholds every caller in the codebase now uses — see cbcScale.ts).
 export function levelToApproxMarks(level: CBCLevel): number {
   const midpoints: Record<CBCLevel, number> = { 1: 15, 2: 40, 3: 63, 4: 90 }
   return midpoints[level]

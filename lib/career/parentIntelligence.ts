@@ -6,6 +6,7 @@ import type {
 } from './types'
 import { COS_DISCLAIMER } from './types'
 import { CAPABILITY_LABELS, LEVEL_DESCRIPTIONS } from './capabilityExtractor'
+import { familiesFromMatches } from '@/lib/learnerIntelligence/careerIntelligence'
 
 const DIMS: CapabilityDimension[] = [
   'analytical_reasoning', 'communication', 'creative_thinking',
@@ -52,7 +53,12 @@ export function buildParentIntelligence(
   profile: CapabilityProfile,
   matchReport: CapabilityMatchReport,
   studentId: string,
-  studentName: string
+  studentName: string,
+  // Career Principle: Junior (Grade 7-9) is exploring, never predicted — so
+  // Junior parents get career_families (broad, no ranking/percentage)
+  // instead of recommended_careers, even though the same matchReport (same
+  // matcher, same data) is used to derive both.
+  mode: 'exploration' | 'planning' = 'planning'
 ): ParentIntelligenceReport {
   const ranked = DIMS
     .map(d => ({ dim: d, score: profile[d].raw_score, level: profile[d].level }))
@@ -71,10 +77,12 @@ export function buildParentIntelligence(
     `${CAPABILITY_LABELS[r.dim]} — currently ${r.level}, grows quickly with regular practice`
   )
 
-  const recommendedCareers = [
-    ...matchReport.primary.slice(0, 2),
-    ...matchReport.stretch.slice(0, 1),
-  ]
+  const recommendedCareers = mode === 'planning'
+    ? [...matchReport.primary.slice(0, 2), ...matchReport.stretch.slice(0, 1)]
+    : []
+  const careerFamilies = mode === 'exploration'
+    ? familiesFromMatches([...matchReport.primary, ...matchReport.stretch])
+    : undefined
 
   const conversationStarters = [
     STARTERS[topDim][0],
@@ -91,7 +99,7 @@ export function buildParentIntelligence(
   ]
 
   const weeklyHabits = buildWeeklyHabits(profile)
-  const redFlags     = buildRedFlags(profile, matchReport)
+  const redFlags     = buildRedFlags(profile, matchReport, mode)
 
   const count          = profile.assessment_count
   const topLabel       = CAPABILITY_LABELS[topDim]
@@ -111,6 +119,8 @@ export function buildParentIntelligence(
     top_strengths:         topStrengths,
     growth_areas:          growthAreas,
     recommended_careers:   recommendedCareers,
+    career_families:       careerFamilies,
+    mode,
     conversation_starters: conversationStarters,
     support_actions:       supportActions,
     weekly_habits:         weeklyHabits,
@@ -139,7 +149,11 @@ function buildWeeklyHabits(profile: CapabilityProfile): string[] {
   return habits
 }
 
-function buildRedFlags(profile: CapabilityProfile, report: CapabilityMatchReport): string[] {
+function buildRedFlags(
+  profile: CapabilityProfile,
+  report: CapabilityMatchReport,
+  mode: 'exploration' | 'planning',
+): string[] {
   const flags: string[] = []
 
   if (profile.assessment_count < 2) {
@@ -156,16 +170,18 @@ function buildRedFlags(profile: CapabilityProfile, report: CapabilityMatchReport
   const allMatches = [...report.primary, ...report.stretch]
   if (allMatches.length === 0) {
     flags.push(
-      'No strong career matches found yet — this almost always means the profile needs more assessment data, ' +
-      'not that options are limited.'
+      mode === 'planning'
+        ? 'No strong career matches found yet — this almost always means the profile needs more assessment data, not that options are limited.'
+        : 'No exploration areas found yet — this almost always means the profile needs more assessment data, not that possibilities are limited.'
     )
   }
 
   const hasSigGaps = allMatches.some(m => m.gaps.some(g => g.gap_severity === 'significant'))
   if (hasSigGaps) {
     flags.push(
-      'Some career matches have significant capability gaps. Worth discussing which gaps are bridgeable ' +
-      'with focused effort versus which suggest exploring a different direction.'
+      mode === 'planning'
+        ? 'Some career matches have significant capability gaps. Worth discussing which gaps are bridgeable with focused effort versus which suggest exploring a different direction.'
+        : 'Some exploration areas have significant capability gaps at this stage. Perfectly normal this early — worth revisiting as more evidence comes in.'
     )
   }
 

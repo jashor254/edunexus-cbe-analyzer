@@ -14,7 +14,8 @@ const EVIDENCE_COLS =
   'cbc_level, assessment_type, academic_year, term, evidence_source, extraction_method, raw_input_ref, ' +
   'ingestion_run_id, trust_tier, evidence_confidence, confidence_formula_version, issues, lifecycle_state, ' +
   'reviewed_by, reviewed_at, review_reason, retracted_by, retracted_at, retraction_reason, supersedes, ' +
-  'superseded_by, verification_state, updated_at, strand, sub_strand, knowledge_node_id'
+  'superseded_by, verification_state, updated_at, strand, sub_strand, knowledge_node_id, ' +
+  'school_id, curriculum_version_id, erased_by, erased_at, erasure_reason, purpose_id, payload'
 
 export type EvidenceRow = {
   id: string
@@ -37,7 +38,7 @@ export type EvidenceRow = {
   evidence_confidence: number
   confidence_formula_version: string
   issues: string[]
-  lifecycle_state: 'auto_confirmed' | 'pending_review' | 'reviewed_confirmed' | 'reviewed_rejected' | 'superseded' | 'retracted'
+  lifecycle_state: 'auto_confirmed' | 'pending_review' | 'reviewed_confirmed' | 'reviewed_rejected' | 'superseded' | 'retracted' | 'erased'
   reviewed_by: string | null
   reviewed_at: string | null
   review_reason: string | null
@@ -52,13 +53,24 @@ export type EvidenceRow = {
   strand: string | null
   sub_strand: string | null
   knowledge_node_id: string | null
+  /** Phase -1 (learner-record-layer-signoff.md) — captured at write time; null on every row created before this phase, and on any writer not yet updated to resolve them. */
+  school_id: string | null
+  curriculum_version_id: string | null
+  /** Phase -1 — populated only by `erase()`, the one documented exception to fact immutability. */
+  erased_by: string | null
+  erased_at: string | null
+  erasure_reason: string | null
+  /** Phase G (learner-record-layer-decisions.md Decision 2) — educational meaning independent of the surface assessment-type label; null on any writer not yet updated to resolve it. */
+  purpose_id: string | null
+  /** Phase C (learner-record-layer-decisions.md Decision 1) — shape-specific content for narrative/non-scored evidence (e.g. a teacher remark's body), keyed by evidence_source. Null for measured (scored) evidence. */
+  payload: Record<string, unknown> | null
 }
 
 export type NewEvidenceRow = Omit<
   EvidenceRow,
   'id' | 'created_at' | 'reviewed_by' | 'reviewed_at' | 'review_reason' |
   'retracted_by' | 'retracted_at' | 'retraction_reason' | 'supersedes' | 'superseded_by' |
-  'verification_state' | 'updated_at'
+  'verification_state' | 'updated_at' | 'erased_by' | 'erased_at' | 'erasure_reason'
 > & { supersedes?: string | null }
 
 export type IngestionRun = {
@@ -81,7 +93,7 @@ export type IngestionRun = {
 export type EvidenceAuditEvent = {
   evidence_id: string
   event_type: 'created' | 'auto_confirmed' | 'routed_to_review' | 'reviewed_confirmed' |
-              'reviewed_rejected' | 'superseded' | 'retracted' | 'verification_updated'
+              'reviewed_rejected' | 'superseded' | 'retracted' | 'verification_updated' | 'erased'
   actor: string
   reason?: string | null
   previous_state?: string | null
@@ -282,6 +294,39 @@ export class EvidenceRepository extends BaseRepository {
 
   async markSuperseded(id: string, supersededByEvidenceId: string): Promise<EvidenceRow> {
     return this.transition(id, { lifecycle_state: 'superseded', superseded_by: supersededByEvidenceId })
+  }
+
+  /**
+   * The one documented exception to fact immutability (Phase -1). Nulls
+   * `extracted_name` / `extracted_external_id` / `score` / `payload` and
+   * transitions to `erased`; every other fact column, including
+   * `learner_id`, is left untouched — this purges identifying and
+   * sensitive content, it does not delete the row or unlink it from the
+   * learner. `payload` is included (added in Phase C) because a teacher
+   * remark's actual content lives there, not in `extracted_name` — erasure
+   * that skipped it would purge an empty field while leaving the real
+   * content intact. Enforced at the DB trigger level
+   * (`enforce_evidence_immutability`), not just here — a bug in this method
+   * cannot widen what erasure is allowed to change.
+   */
+  async erase(id: string, erasedBy: string, reason: string): Promise<EvidenceRow> {
+    const { data, error } = await this.db
+      .from('learner_evidence')
+      .update({
+        lifecycle_state: 'erased',
+        erased_by: erasedBy,
+        erased_at: new Date().toISOString(),
+        erasure_reason: reason,
+        extracted_name: '[erased]',
+        extracted_external_id: null,
+        score: null,
+        payload: null,
+      })
+      .eq('id', id)
+      .select(EVIDENCE_COLS)
+      .single()
+    if (error) throw new Error(`erase: ${error.message}`)
+    return data as unknown as EvidenceRow
   }
 
   async updateVerificationState(id: string, state: EvidenceRow['verification_state']): Promise<EvidenceRow> {

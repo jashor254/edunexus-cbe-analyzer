@@ -116,7 +116,7 @@ export default function StudyGroupsPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      setCreatedGroup({ inviteCode: data.inviteCode, groupId: data.groupId })
+      setCreatedGroup({ inviteCode: data.data.inviteCode, groupId: data.data.groupId })
       setCreateName(''); setCreateStudentName('')
       loadGroups()
     } catch (err: any) {
@@ -139,7 +139,7 @@ export default function StudyGroupsPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      setJoinSuccess(`Joined "${data.groupName}"! 🎉`)
+      setJoinSuccess(`Joined "${data.data.groupName}"! 🎉`)
       setInviteCode(''); setJoinStudentName('')
       loadGroups()
     } catch (err: any) {

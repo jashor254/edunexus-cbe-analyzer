@@ -9,6 +9,7 @@
 
 import { repos } from '@/lib/repositories'
 import { updateFromParentObservation } from '@/lib/learnerModel/updater'
+import { recordParentObservationEvidence } from '@/lib/parentPulse/observationEvidence'
 import { publishEvent } from '@/lib/events'
 import type { ParentObservationOutcome } from '@/lib/learnerModel/types'
 
@@ -26,6 +27,7 @@ type ParsedReply = {
   outcome:   ReplyOutcome
   studentId: string
   substrand: string
+  subject:   string | null
   weekOf:    string
   parentId:  string
 }
@@ -33,14 +35,17 @@ type ParsedReply = {
 type PhoneContext = {
   studentId: string
   substrand: string
+  subject:   string | null // known only when resolved from a "subject:substrand" confirmed-gap key
   weekOf:    string
   parentId:  string
 }
 
 type ProcessResult = {
-  processed: boolean
-  outcome?:  ReplyOutcome
-  error?:    string
+  processed:       boolean
+  outcome?:        ReplyOutcome
+  error?:          string
+  /** Only meaningful when outcome === 'struggled' — whether a real student_alerts row reached the teacher's AttentionFeed. */
+  teacherNotified?: boolean
 }
 
 // ── 1. parseReplyBody ─────────────────────────────────────────────────────────
@@ -119,6 +124,7 @@ export async function resolveParentFromPhone(
     return {
       studentId,
       substrand: latest.substrand,
+      subject:   null, // historical parent_observations entries don't carry a subject field
       weekOf:    latest.week_of ?? weekOf,
       parentId,
     }
@@ -127,14 +133,41 @@ export async function resolveParentFromPhone(
   // 3. Fallback: first confirmed gap as substrand context
   const confirmedGaps = profile?.confirmed_gaps ?? []
   const gapKey = confirmedGaps[0] ?? ''
-  // Keys are stored as "subject:substrand" — extract substrand part
-  const substrand = gapKey.includes(':') ? gapKey.split(':')[1] : gapKey
+  // Keys are stored as "subject:substrand" — both parts are available here
+  const [gapSubject, gapSubstrand] = gapKey.includes(':') ? gapKey.split(':') : [null, gapKey]
 
   return {
     studentId,
-    substrand: substrand || 'general',
+    substrand: gapSubstrand || 'general',
+    subject:   gapSubject || null,
     weekOf,
     parentId,
+  }
+}
+
+// ── 2b. notifyTeacherOfStruggle ────────────────────────────────────────────────
+// Resolves the student's teacher and inserts a real student_alerts row —
+// reusing the exact mechanism (table + AttentionFeed source) already proven
+// to reach a teacher, rather than inventing a new notification channel.
+// Returns whether a teacher was actually reachable, so the acknowledgement
+// sent back to the parent never claims more than what happened.
+
+async function notifyTeacherOfStruggle(studentId: string, substrand: string): Promise<boolean> {
+  try {
+    const enrollment = await repos.learnerModel.findClassEnrollment(studentId)
+    const teacherId = enrollment?.teacher_classes?.teacher_id
+    if (!teacherId) return false
+
+    await repos.notifications.insertStudentAlert({
+      student_id: studentId,
+      teacher_id: teacherId,
+      alert_type: 'parent_reported_struggle',
+      message:    `Parent reported their child struggled with "${substrand}" this week via WhatsApp.`,
+    })
+    return true
+  } catch (err) {
+    console.error('[observationPipeline] notifyTeacherOfStruggle error:', err instanceof Error ? err.message : String(err))
+    return false
   }
 }
 
@@ -188,6 +221,35 @@ export async function processInboundReply(
       recordedAt: inbound.receivedAt,
     })
 
+    // Also record as Evidence Domain data (dual-write during migration — see
+    // observationEvidence.ts). Best-effort: a failure here must not surface
+    // as a failure to process the parent's reply, matching the same
+    // non-fatal handling already used for logInbound below.
+    try {
+      await recordParentObservationEvidence({
+        studentId:    parsed.studentId,
+        parentUserId: parsed.parentId,
+        subject:      parsed.subject,
+        substrand:    parsed.substrand,
+        outcome:      outcome as 'demonstrated' | 'struggled' | 'not_attempted',
+        recordedAt:   inbound.receivedAt,
+      })
+    } catch (err) {
+      console.error('[observationPipeline] recordParentObservationEvidence error:', err instanceof Error ? err.message : String(err))
+    }
+
+    // A 'struggled' reply tells the parent "the teacher has been notified"
+    // (buildAcknowledgement below) — this makes that true by reusing the
+    // same student_alerts mechanism the teacher's existing, already-visible
+    // AttentionFeed reads, rather than a new notification channel. If no
+    // teacher can be resolved for this student, notifyTeacherOfStruggle is
+    // a no-op and the acknowledgement text is softened accordingly (see
+    // buildAcknowledgement) — the promise never outruns what actually happened.
+    let teacherNotified = false
+    if (outcome === 'struggled') {
+      teacherNotified = await notifyTeacherOfStruggle(parsed.studentId, parsed.substrand)
+    }
+
     await logInbound({
       phone:       inbound.fromPhone,
       rawBody:     inbound.rawBody,
@@ -211,7 +273,7 @@ export async function processInboundReply(
       },
     }).catch(err => console.error('[events] parent.observation.submitted:', err instanceof Error ? err.message : String(err)))
 
-    return { processed: true, outcome }
+    return { processed: true, outcome, teacherNotified }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[observationPipeline] processInboundReply error:', message)
@@ -238,9 +300,10 @@ export async function processInboundReply(
 // Constructs the reply message sent back to the parent on WhatsApp.
 
 export function buildAcknowledgement(
-  firstName: string,
-  outcome:   ParentObservationOutcome,
-  substrand: string
+  firstName:       string,
+  outcome:         ParentObservationOutcome,
+  substrand:       string,
+  teacherNotified: boolean = false,
 ): string {
   switch (outcome) {
     case 'demonstrated':
@@ -249,10 +312,19 @@ export function buildAcknowledgement(
         `— we'll build on this strength.`
       )
     case 'struggled':
-      return (
-        `Thank you for letting us know. ${firstName}'s teacher has been notified. ` +
-        `We'll adjust focus next week.`
-      )
+      // Only claims the teacher was notified when a real alert was actually
+      // written for them (notifyTeacherOfStruggle) — never asserts this
+      // unconditionally, since a student without a resolvable class/teacher
+      // can't be notified at all.
+      return teacherNotified
+        ? (
+            `Thank you for letting us know. ${firstName}'s teacher has been notified. ` +
+            `We'll adjust focus next week.`
+          )
+        : (
+            `Thank you for letting us know — this has been recorded on ${firstName}'s learning record. ` +
+            `We'll adjust focus next week.`
+          )
     case 'not_attempted':
       return (
         `No problem at all. This week's suggestion: Ask ${firstName} to show you ` +

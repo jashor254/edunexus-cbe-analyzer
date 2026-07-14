@@ -1,0 +1,83 @@
+# .github/workflows/notification-crons.yml
+#
+# Schedules 3 fully-built notification routes that had working, correctly
+# secret-gated code but were never wired into any scheduler — confirmed in
+# the Pilot Readiness Wave 3/4 audits to silently never fire in production.
+# Follows the same pattern as queue-cron.yml (curl + CRON_SECRET), used
+# instead of adding more entries to vercel.json because Vercel's Hobby plan
+# caps native cron jobs and vercel.json already carries 4 entries — this
+# avoids risking a silent deploy failure on an assumption about remaining
+# capacity.
+#
+# Each job below runs only on the schedule trigger matching its own cron
+# string (`github.event.schedule`), since GitHub Actions fires every
+# `on.schedule` entry for the whole workflow otherwise.
+
+name: Notification Crons
+
+on:
+  schedule:
+    # Parent Pulse — weekly, Sunday 15:00 UTC (~18:00 EAT)
+    - cron: '0 15 * * 0'
+    # Term Readiness — weekly, Monday 05:00 UTC (~08:00 EAT). The route
+    # itself no-ops outside a ~9-day window of the real term start (see
+    # app/api/cron/term-readiness/route.ts) — a precise "first Monday of
+    # term" cron isn't expressible without the classic day-of-month/
+    # day-of-week OR-not-AND gotcha, so the guard lives in the route instead.
+    - cron: '0 5 * * 1'
+    # Academy Nudge — daily, 05:00 UTC (08:00 EAT), matching its own
+    # "Runs daily at 08:00 EAT" header comment.
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+
+jobs:
+  parent-pulse:
+    name: Parent Pulse (weekly)
+    if: github.event.schedule == '0 15 * * 0' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/cron/parent-pulse
+        run: |
+          STATUS=$(curl -s -o /tmp/response.json -w "%{http_code}" -X POST \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            "${{ vars.PRODUCTION_URL }}/api/cron/parent-pulse")
+          cat /tmp/response.json
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "❌ parent-pulse failed with status $STATUS"
+            exit 1
+          fi
+
+  term-readiness:
+    name: Term Readiness (weekly, self-guarded to term start)
+    if: github.event.schedule == '0 5 * * 1' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/cron/term-readiness
+        run: |
+          STATUS=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ vars.PRODUCTION_URL }}/api/cron/term-readiness")
+          cat /tmp/response.json
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "❌ term-readiness failed with status $STATUS"
+            exit 1
+          fi
+
+  academy-nudge:
+    name: Academy Nudge (daily)
+    if: github.event.schedule == '0 5 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/cron/academy-nudge
+        run: |
+          STATUS=$(curl -s -o /tmp/response.json -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ vars.PRODUCTION_URL }}/api/cron/academy-nudge")
+          cat /tmp/response.json
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "❌ academy-nudge failed with status $STATUS"
+            exit 1
+          fi

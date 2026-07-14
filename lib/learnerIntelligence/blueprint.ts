@@ -13,16 +13,13 @@ import { COS_DISCLAIMER } from '@/lib/career/types'
 import type { CapabilityProfile, CapabilityScore } from '@/lib/career/types'
 import { computeQuickWins } from '@/lib/knowledgeGraph'
 import type { HolidayPlanData } from '@/lib/holiday/types'
+import { HOLIDAY_PLAN_RELEVANCE_DAYS } from '@/lib/holiday/types'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
-import type { RiskFlag } from '@/lib/projection/types'
+import type { RiskFlag, LearnerIntelligenceProjection } from '@/lib/projection/types'
 import { projectionToScoreHistory, projectionRiskFlags } from './projectionAdapters'
 import { confidenceFromScore, insufficientEvidenceInsight } from './insight'
 import type { Insight } from './insight'
-import type { LearnerBlueprint } from './types'
-
-// A published holiday plan is only surfaced as parent guidance for this many
-// days after approval — old holiday guidance shouldn't linger indefinitely.
-const HOLIDAY_PLAN_RELEVANCE_DAYS = 45
+import type { LearnerBlueprint, BlueprintEvidenceSummary } from './types'
 
 const CAPABILITY_LABELS: Record<string, string> = {
   analytical_reasoning: 'analytical reasoning',
@@ -157,11 +154,15 @@ function buildParentAction(
 ): Insight {
   const topFlag = riskFlags[0]
   if (topFlag) {
+    // A conflicting-evidence flag is itself an uncertainty signal — it must
+    // never read with the same "High" confidence as a corroborated risk
+    // claim, or the flag defeats its own purpose.
+    const isConflict = topFlag.reason.startsWith('Conflicting evidence')
     return {
       observation: `${topFlag.reason}`,
       evidence:    [`Risk flag: ${(topFlag.subject ?? 'overall').replace(/_/g, ' ')} (${topFlag.severity} severity)`, ...topFlag.evidenceIds.map(id => `Supporting evidence: ${id}`)],
-      confidence:  'High',
-      action:      'Check in with the class teacher this week about this specific concern.',
+      confidence:  isConflict ? 'Low' : 'High',
+      action:      isConflict ? 'Ask the class teacher to review the conflicting records before acting on either one.' : 'Check in with the class teacher this week about this specific concern.',
     }
   }
 
@@ -205,6 +206,35 @@ function buildTeacherAction(profile: Awaited<ReturnType<typeof getOrCreateLearne
     confidence:  opportunity.confidence,
     action:      opportunity.action,
   }
+}
+
+function buildEvidenceSummary(
+  projection:  LearnerIntelligenceProjection,
+  capability:  CapabilityProfile | null,
+  assessmentCount: number,
+): BlueprintEvidenceSummary {
+  const completeness = projection.completeness
+
+  const evidenceUsed = completeness?.value.subjectsCovered ?? []
+  // completeness.confidence is 0-100 (Projection Engine scale); confidenceFromScore
+  // expects 0-1 — reusing the one shared confidence-labeling function rather than
+  // inventing a second threshold set.
+  const confidence = completeness ? confidenceFromScore(completeness.confidence / 100) : 'Low'
+  const freshnessDays = completeness?.coverage.freshnessDays ?? null
+
+  const missingEvidence = capability
+    ? capabilityDimensionEntries(capability)
+        .filter(([dimension, score]) => score.evidence.length === 0 || (dimension === 'resilience' && assessmentCount < 2))
+        .map(([dimension]) => CAPABILITY_LABELS[dimension] ?? dimension.replace(/_/g, ' '))
+    : Object.values(CAPABILITY_LABELS)
+
+  const recommendedNextEvidence = missingEvidence.length > 0
+    ? `Based on available evidence, a topical assessment or teacher observation covering ${missingEvidence[0]} would sharpen this Blueprint's confidence most.`
+    : freshnessDays !== null && freshnessDays > 60
+      ? `Current evidence suggests this Blueprint is complete but ageing (${freshnessDays} days since the most recent record) — a fresh assessment would confirm it still holds.`
+      : `Current evidence suggests this Blueprint is well-supported — continued regular assessment will keep it that way.`
+
+  return { evidenceUsed, confidence, freshnessDays, missingEvidence, recommendedNextEvidence }
 }
 
 function buildLearnerAction(opportunity: Insight): Insight {
@@ -251,6 +281,7 @@ export async function buildLearnerBlueprint(studentId: string): Promise<LearnerB
     school:      student.school,
     generatedAt: new Date().toISOString(),
     disclaimer:  COS_DISCLAIMER,
+    evidenceSummary: buildEvidenceSummary(projection, capability, scoreHistory.length),
 
     becoming: {
       insights: becomingInsights,

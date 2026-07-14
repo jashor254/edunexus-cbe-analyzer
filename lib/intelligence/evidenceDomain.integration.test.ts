@@ -14,7 +14,7 @@ import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createServiceClient } from '@/utils/supabase/service'
 import { runCsvIngestion } from './runCsvIngestion'
-import { persistEvidenceBatch, confirmReview, rejectReview, retractEvidence, getPendingReview, getEvidenceAuditTrail, getEvidenceHistoryForLearner } from './evidenceLifecycle'
+import { persistEvidenceBatch, confirmReview, rejectReview, retractEvidence, eraseEvidence, getPendingReview, getEvidenceAuditTrail, getEvidenceHistoryForLearner } from './evidenceLifecycle'
 import { startIngestionRun, getIngestionRun, getIngestionRunLiveStats } from './ingestionRun'
 import { repos } from '@/lib/repositories'
 import type { LearnerEvidence } from './evidence'
@@ -306,4 +306,117 @@ test('live batch stats reflect lifecycle state accurately, distinct from the fro
 
   const runSnapshot = await getIngestionRun(result.ingestionRunId)
   assert.equal(runSnapshot!.pending_review_count, 1, 'the frozen at-completion snapshot must not retroactively change')
+})
+
+// ── Phase -1: erasure lifecycle (learner-record-layer-signoff.md) ───────────
+
+test('erasure purges identifying fields, preserves the row, and is reachable from any non-erased state', async () => {
+  const run = await startIngestionRun({ source: 'csv_export', initiatedBy: authUserId, teacherId, institution: SYNTHETIC_MARKER })
+  const evidence: LearnerEvidence = {
+    learnerId: studentIds[0], extractedName: 'Erasure Test Person', extractedExternalId: 'ext-123',
+    subject: 'science', rawSubject: 'Science', score: 72, cbcLevel: 3,
+    assessmentType: 'cat', academicYear: 2026, term: 1, evidenceSource: 'csv_export',
+    trustTier: 2, evidenceConfidence: 95, extractionMethod: 'csv_parser_v1',
+    reviewStatus: 'auto_confirmed', rawInputRef: 'test:erasure', importedAt: new Date().toISOString(), issues: [],
+  }
+  const { inserted } = await persistEvidenceBatch([evidence], run.id)
+  const evidenceId = inserted[0].id
+
+  const erased = await eraseEvidence(evidenceId, authUserId, 'Right-to-erasure request, ref #TEST-1')
+  assert.equal(erased.lifecycle_state, 'erased')
+  assert.equal(erased.erased_by, authUserId)
+  assert.equal(erased.erasure_reason, 'Right-to-erasure request, ref #TEST-1')
+  assert.notEqual(erased.extracted_name, 'Erasure Test Person', 'identifying name must be purged')
+  assert.equal(erased.extracted_external_id, null)
+  assert.equal(erased.score, null)
+
+  // The row itself, and its non-PII facts, survive — this is erasure, not deletion.
+  const stillThere = await repos.evidence.findEvidenceById(evidenceId)
+  assert.ok(stillThere, 'erased evidence must not be deleted')
+  assert.equal(stillThere!.subject, 'science', 'non-identifying facts are untouched by erasure')
+  assert.equal(stillThere!.learner_id, studentIds[0], 'erasure purges identifying text, not the learner link itself')
+
+  // Erased evidence must fall out of what Projection would read as confirmed,
+  // and must emit a projection event so any existing computed state gets recomputed.
+  const confirmed = await repos.evidence.findConfirmedEvidenceForLearner(studentIds[0])
+  assert.ok(!confirmed.some(r => r.id === evidenceId), 'erased evidence must not count as confirmed')
+  const { data: events, error } = await db
+    .from('evidence_projection_events')
+    .select('event_type')
+    .eq('evidence_id', evidenceId)
+  if (error) throw error
+  assert.ok(events!.some(e => e.event_type === 'evidence_retracted'))
+
+  // The audit trail records the erasure as its own event, not silently.
+  const trail = await getEvidenceAuditTrail(evidenceId)
+  assert.ok(trail.some(t => t.event_type === 'erased' && t.reason === 'Right-to-erasure request, ref #TEST-1'))
+})
+
+test('erasing an already-erased row is rejected, and erasure cannot be used to change other facts', async () => {
+  const run = await startIngestionRun({ source: 'csv_export', initiatedBy: authUserId, teacherId, institution: SYNTHETIC_MARKER })
+  const evidence: LearnerEvidence = {
+    learnerId: studentIds[0], extractedName: 'Double Erasure Test', extractedExternalId: null,
+    subject: 'social studies', rawSubject: 'Social Studies', score: 60, cbcLevel: 2,
+    assessmentType: 'cat', academicYear: 2026, term: 1, evidenceSource: 'csv_export',
+    trustTier: 2, evidenceConfidence: 90, extractionMethod: 'csv_parser_v1',
+    reviewStatus: 'auto_confirmed', rawInputRef: 'test:double-erasure', importedAt: new Date().toISOString(), issues: [],
+  }
+  const { inserted } = await persistEvidenceBatch([evidence], run.id)
+  const evidenceId = inserted[0].id
+
+  await eraseEvidence(evidenceId, authUserId, 'First request')
+  await assert.rejects(
+    async () => { await eraseEvidence(evidenceId, authUserId, 'Second request') },
+    /already erased/i,
+  )
+
+  // The immutability trigger's erasure exception is scoped to exactly
+  // extracted_name/extracted_external_id/score — it must not become a
+  // side door for changing subject, cbc_level, or any other fact.
+  await assert.rejects(
+    async () => { await db.from('learner_evidence').update({ subject: 'tampered' }).eq('id', evidenceId).throwOnError() },
+    /immutable/i,
+    'erasure must not widen the immutability exception to non-PII fact columns',
+  )
+})
+
+// ── Phase -1: school_id / curriculum_version_id (additive, optional) ────────
+
+test('school_id and curriculum_version_id round-trip when a producer supplies them, and default to null otherwise', async () => {
+  const { data: curriculumVersion, error: cvError } = await db
+    .from('curriculum_versions')
+    .select('id')
+    .eq('code', 'ke-cbc-2017')
+    .single()
+  if (cvError) throw cvError
+
+  const { data: school, error: schoolError } = await db
+    .from('schools')
+    .select('id')
+    .limit(1)
+    .maybeSingle()
+  if (schoolError) throw schoolError
+
+  const run = await startIngestionRun({ source: 'csv_export', initiatedBy: authUserId, teacherId, institution: SYNTHETIC_MARKER })
+  const withContext: LearnerEvidence = {
+    learnerId: studentIds[0], extractedName: 'Test Learner One', extractedExternalId: null,
+    subject: 'agriculture', rawSubject: 'Agriculture', score: 77, cbcLevel: 3,
+    assessmentType: 'cat', academicYear: 2026, term: 1, evidenceSource: 'csv_export',
+    trustTier: 2, evidenceConfidence: 95, extractionMethod: 'csv_parser_v1',
+    reviewStatus: 'auto_confirmed', rawInputRef: 'test:curriculum-context', importedAt: new Date().toISOString(), issues: [],
+    curriculumVersionId: curriculumVersion.id,
+    schoolId: school?.id ?? null,
+  }
+  const withoutContext: LearnerEvidence = {
+    ...withContext, subject: 'pre-technical studies', rawSubject: 'Pre-Technical Studies',
+    rawInputRef: 'test:no-curriculum-context', curriculumVersionId: undefined, schoolId: undefined,
+  }
+  const { inserted } = await persistEvidenceBatch([withContext, withoutContext], run.id)
+
+  const withRow = inserted.find(r => r.subject === 'agriculture')!
+  const withoutRow = inserted.find(r => r.subject === 'pre-technical studies')!
+  assert.equal(withRow.curriculum_version_id, curriculumVersion.id)
+  if (school) assert.equal(withRow.school_id, school.id)
+  assert.equal(withoutRow.curriculum_version_id, null, 'omitting curriculum context must default to null, never a guessed value')
+  assert.equal(withoutRow.school_id, null, 'omitting school context must default to null, never a guessed value')
 })

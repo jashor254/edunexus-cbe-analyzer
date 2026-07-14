@@ -18,6 +18,7 @@ import { getClassLearnerProfiles } from '@/lib/learnerModel/queries'
 import type { LearnerProfile, RiskLevel } from '@/lib/learnerModel/types'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import type { LearnerIntelligenceProjection, RiskFlag } from '@/lib/projection/types'
+import { confidenceFromScore, type ConfidenceLevel } from '@/lib/learnerIntelligence/insight'
 
 // Partial migration only (see docs/architecture/migration-ledger.md): the
 // attention list, class trajectory, and every risk-level check in this file
@@ -53,6 +54,7 @@ export type StudentAttentionItem = {
   student_name:     string
   risk_level:       RiskLevel
   reason:           string         // one sentence
+  confidence:       ConfidenceLevel   // how much evidence backs this risk flag (lib/learnerIntelligence/insight.ts)
   suggested_action: string
   weeks_at_risk:    number
   peer_helper?:     string         // name of a classmate who can support
@@ -138,13 +140,13 @@ function buildAttentionList(
   const riskOrder: Record<RiskLevel, number> = { normal: 0, watch: 1, at_risk: 2, critical: 3 }
 
   const atRisk = [...projections.entries()]
-    .map(([studentId, projection]) => ({ studentId, risk: projection.risk?.value ?? null }))
-    .filter((r): r is { studentId: string; risk: NonNullable<LearnerIntelligenceProjection['risk']>['value'] } =>
+    .map(([studentId, projection]) => ({ studentId, risk: projection.risk?.value ?? null, riskConfidence: projection.risk?.confidence ?? 0 }))
+    .filter((r): r is { studentId: string; risk: NonNullable<LearnerIntelligenceProjection['risk']>['value']; riskConfidence: number } =>
       r.risk !== null && r.risk.overallRiskLevel !== 'normal'
     )
     .sort((a, b) => riskOrder[b.risk.overallRiskLevel] - riskOrder[a.risk.overallRiskLevel])
 
-  for (const { studentId, risk } of atRisk.slice(0, 10)) {
+  for (const { studentId, risk, riskConfidence } of atRisk.slice(0, 10)) {
     const name       = studentNames.get(studentId) ?? 'Unknown'
     const topFlag    = [...risk.flags].sort((a, b) => riskFlagSeverityOrder(b.severity) - riskFlagSeverityOrder(a.severity))[0]
     const legacy     = allProfiles.find(p => p.student_id === studentId)
@@ -156,6 +158,7 @@ function buildAttentionList(
       student_name:     name,
       risk_level:       risk.overallRiskLevel,
       reason:           topFlag ? topFlag.reason : 'Risk flag active',
+      confidence:       confidenceFromScore(riskConfidence / 100),
       suggested_action: suggestAction(topFlag),
       weeks_at_risk:    weeksAtRisk,
       peer_helper:      peerHelper,

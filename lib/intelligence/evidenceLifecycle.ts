@@ -14,8 +14,55 @@ import type { EvidenceRow, NewEvidenceRow } from '@/lib/repositories/evidence.re
 
 const PREFETCH_CONCURRENCY = 20
 
-function claimKey(e: Pick<LearnerEvidence, 'learnerId' | 'subject' | 'assessmentType' | 'academicYear' | 'term'>): string | null {
+// A jump of 2+ CBC levels between two independently-confirmed pieces of
+// evidence for the exact same claim (learner/subject/assessmentType/term)
+// is not a normal one-term improvement — it's a disagreement worth a human
+// look, not something the claim-key "latest wins" supersession should
+// resolve silently. Uses the schema's existing verification_state field
+// (EvidenceRow.verification_state's 'contradicted' value, previously never
+// written by any code path) — no new column, no new scoring.
+const CONTRADICTION_LEVEL_GAP = 2
+
+function isContradiction(prior: EvidenceRow, next: EvidenceRow): boolean {
+  if (prior.cbc_level === null || next.cbc_level === null) return false
+  return Math.abs(prior.cbc_level - next.cbc_level) >= CONTRADICTION_LEVEL_GAP
+}
+
+async function flagContradictionIfAny(priorRow: EvidenceRow, newRow: EvidenceRow): Promise<void> {
+  if (!isContradiction(priorRow, newRow)) return
+  await Promise.all([
+    repos.evidence.updateVerificationState(priorRow.id, 'contradicted'),
+    repos.evidence.updateVerificationState(newRow.id, 'contradicted'),
+  ])
+  await repos.evidence.insertAuditEvents([
+    {
+      evidence_id: priorRow.id,
+      event_type: 'verification_updated',
+      actor: 'system',
+      previous_state: priorRow.verification_state,
+      new_state: 'contradicted',
+      metadata: { conflicts_with: newRow.id, prior_cbc_level: priorRow.cbc_level, new_cbc_level: newRow.cbc_level },
+    },
+    {
+      evidence_id: newRow.id,
+      event_type: 'verification_updated',
+      actor: 'system',
+      previous_state: newRow.verification_state,
+      new_state: 'contradicted',
+      metadata: { conflicts_with: priorRow.id, prior_cbc_level: priorRow.cbc_level, new_cbc_level: newRow.cbc_level },
+    },
+  ])
+}
+
+function claimKey(e: Pick<LearnerEvidence, 'learnerId' | 'subject' | 'assessmentType' | 'academicYear' | 'term' | 'evidenceSource'>): string | null {
   if (!e.learnerId) return null
+  // Phase C (learner-record-layer-decisions.md Decision 1): teacher remarks
+  // must never supersede each other — "quiet learner" in 2026 and
+  // "confidence improving" in 2027 are both true, permanently, unlike a
+  // re-graded score. Routed through the same `null` path unkeyed evidence
+  // already takes (persistEvidenceBatch skips supersession entirely for
+  // null claim keys) — no new machinery, one narrow carve-out.
+  if (e.evidenceSource === 'teacher_remark') return null
   return `${e.learnerId}:${e.subject}:${e.assessmentType}:${e.academicYear}:${e.term ?? 'null'}`
 }
 
@@ -57,6 +104,10 @@ function toNewEvidenceRow(e: LearnerEvidence, runId: string, supersedes: string 
     strand: e.strand ?? null,
     sub_strand: e.subStrand ?? null,
     knowledge_node_id: e.knowledgeNodeId ?? null,
+    school_id: e.schoolId ?? null,
+    curriculum_version_id: e.curriculumVersionId ?? null,
+    purpose_id: e.purposeId ?? null,
+    payload: e.payload ?? null,
   }
 }
 
@@ -139,6 +190,7 @@ export async function persistEvidenceBatch(evidence: LearnerEvidence[], runId: s
       await repos.evidence.insertAuditEvents([
         { evidence_id: priorRow.id, event_type: 'superseded', actor: 'system', previous_state: 'auto_confirmed', new_state: 'superseded', metadata: { supersededBy: row.id } },
       ])
+      await flagContradictionIfAny(priorRow, row)
       if (priorRow.learner_id) projectionEvents.push({ evidence_id: priorRow.id, learner_id: priorRow.learner_id, event_type: 'evidence_superseded' })
     }
     if (row.learner_id) projectionEvents.push({ evidence_id: row.id, learner_id: row.learner_id, event_type: 'evidence_confirmed' })
@@ -163,6 +215,7 @@ export async function confirmReview(evidenceId: string, reviewerId: string, reas
     await repos.evidence.insertAuditEvents([
       { evidence_id: priorRow.id, event_type: 'superseded', actor: 'system', previous_state: 'reviewed_confirmed', new_state: 'superseded', metadata: { supersededBy: updated.id } },
     ])
+    await flagContradictionIfAny(priorRow, updated)
     if (priorRow.learner_id) {
       await repos.evidence.insertProjectionEvents([{ evidence_id: priorRow.id, learner_id: priorRow.learner_id, event_type: 'evidence_superseded' }])
     }
@@ -188,6 +241,39 @@ export async function retractEvidence(evidenceId: string, actorId: string, reaso
   const updated = await repos.evidence.retract(evidenceId, actorId, reason)
   await repos.evidence.insertAuditEvents([
     { evidence_id: evidenceId, event_type: 'retracted', actor: actorId, reason, previous_state: before?.lifecycle_state ?? null, new_state: 'retracted' },
+  ])
+  if (updated.learner_id) {
+    await repos.evidence.insertProjectionEvents([{ evidence_id: updated.id, learner_id: updated.learner_id, event_type: 'evidence_retracted' }])
+  }
+  return updated
+}
+
+/**
+ * Phase -1 (learner-record-layer-signoff.md) — the legally-mandated
+ * erasure path. Distinct from retraction: retraction says "this claim is
+ * wrong"; erasure says "this identifying data must be removed," and is not
+ * conditional on the evidence's review status (the DB lifecycle-transition
+ * trigger permits `-> erased` from any non-erased state, unlike every other
+ * transition in this file, which follows the reviewed_confirmed/
+ * auto_confirmed-gated state machine). The row, its id, and its position in
+ * any supersession/audit chain are preserved — only `extracted_name` /
+ * `extracted_external_id` / `score` are purged, per the DB trigger's own
+ * enforcement (`enforce_evidence_immutability`'s `is_erasure` exception) —
+ * this function cannot widen that scope even if it tried.
+ *
+ * Reuses the `evidence_retracted` projection-event type rather than adding
+ * a new one: `evidence_projection_events.event_type`'s CHECK constraint
+ * was not part of Phase -1's ratified schema changes, and the *effect* on
+ * Projection is identical either way — erased evidence, like retracted
+ * evidence, falls outside `findConfirmedEvidenceForLearner`'s
+ * auto_confirmed/reviewed_confirmed filter, so Projection must recompute
+ * without it.
+ */
+export async function eraseEvidence(evidenceId: string, actorId: string, reason: string): Promise<EvidenceRow> {
+  const before = await repos.evidence.findEvidenceById(evidenceId)
+  const updated = await repos.evidence.erase(evidenceId, actorId, reason)
+  await repos.evidence.insertAuditEvents([
+    { evidence_id: evidenceId, event_type: 'erased', actor: actorId, reason, previous_state: before?.lifecycle_state ?? null, new_state: 'erased' },
   ])
   if (updated.learner_id) {
     await repos.evidence.insertProjectionEvents([{ evidence_id: updated.id, learner_id: updated.learner_id, event_type: 'evidence_retracted' }])

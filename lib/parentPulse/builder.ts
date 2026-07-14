@@ -6,6 +6,7 @@
 import { repos } from '@/lib/repositories'
 import { getOrCreateLearnerProfile } from '@/lib/learnerModel/queries'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
+import { confidenceFromScore } from '@/lib/learnerIntelligence/insight'
 
 type ParentPulse = {
   student_id:      string
@@ -37,6 +38,12 @@ export async function buildParentPulse(ctx: PulseContext): Promise<string> {
     recomputeLearnerProjection(ctx.studentId),
   ])
   const knowledgeBySubject = projection.knowledge?.value.bySubject ?? {}
+  // Same confidence label every other consumer uses (lib/learnerIntelligence/insight.ts),
+  // reused here to decide whether "Needs attention" reads as a settled
+  // conclusion or a tentative one — teacher classroom evidence stays the
+  // higher authority (see repos.evidence trust tiers); this only softens how
+  // confidently a knowledge-based concern is phrased to a parent.
+  const knowledgeConfidence = confidenceFromScore((projection.knowledge?.confidence ?? 0) / 100)
   const riskLevel      = projection.risk?.value.overallRiskLevel ?? 'normal'
   const flags          = projection.risk?.value.flags ?? []
   const engagement     = profile.engagement_patterns as Record<string, unknown> ?? {}
@@ -90,7 +97,9 @@ export async function buildParentPulse(ctx: PulseContext): Promise<string> {
 
   const concern = concernSubject ?? topWeakSubject ?? (topFlag?.subject ?? undefined)
   if (concern) {
-    sections.push(`Needs attention: ${concern}`)
+    sections.push(knowledgeConfidence === 'Low'
+      ? `Worth keeping an eye on: ${concern} (based on limited evidence so far)`
+      : `Needs attention: ${concern}`)
   }
 
   // 4. Career note (if career signals exist)
@@ -103,7 +112,7 @@ export async function buildParentPulse(ctx: PulseContext): Promise<string> {
   }
 
   // 5. One action for the parent
-  const action = buildParentAction(firstName, concern, riskLevel)
+  const action = buildParentAction(firstName, concern, riskLevel, knowledgeConfidence)
   sections.push(`\nThis week: ${action}`)
 
   // 6. Footer
@@ -113,12 +122,19 @@ export async function buildParentPulse(ctx: PulseContext): Promise<string> {
 }
 
 function buildParentAction(
-  firstName: string,
-  concern:   string | undefined,
-  risk:      string,
+  firstName:  string,
+  concern:    string | undefined,
+  risk:       string,
+  confidence: ReturnType<typeof confidenceFromScore>,
 ): string {
+  // Risk flags come from the Projection Engine's own risk projector, which
+  // already requires corroborating evidence for 'critical' — that authority
+  // is not softened here regardless of the knowledge-confidence label above.
   if (risk === 'critical') {
     return `Please speak with ${firstName}'s teacher this week — we have flagged some areas that need attention.`
+  }
+  if (concern && confidence === 'Low') {
+    return `Ask ${firstName} how they're finding "${concern}" lately — just a casual check-in, since we don't have much data on this yet.`
   }
   if (concern) {
     return `Ask ${firstName} to explain "${concern}" to you in 2 minutes. If they can't, that is the area to focus on.`
@@ -168,8 +184,15 @@ export async function buildAllParentPulses(weekOf: string): Promise<ParentPulse[
         summary_line: strongLine,
         week_of:      weekOf,
       })
-    } catch {
-      // Skip failed students — don't block the batch
+    } catch (err) {
+      // Skip failed students — don't block the batch — but a silent skip
+      // here is exactly what makes "my kid never got their update" support
+      // tickets undiagnosable, so log which student and why.
+      console.error('[parentPulse/builder] buildParentPulse failed, skipping student', {
+        studentId,
+        weekOf,
+        message: err instanceof Error ? err.message : String(err),
+      })
     }
   }
 

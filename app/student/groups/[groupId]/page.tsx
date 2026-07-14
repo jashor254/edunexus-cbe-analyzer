@@ -11,7 +11,6 @@ import {
 type Challenge = {
   id:              string
   question:        string
-  correct_answer:  string
   hint?:           string
   difficulty:      number
   kenyan_context?: string
@@ -88,7 +87,7 @@ export default function StudentGroupDetailPage() {
     const [{ data: grp }, { data: mems }, { data: todayChallenge }] = await Promise.all([
       sb.from('study_groups').select('id, name, subject, grade, invite_code, ground_rules').eq('id', groupId).single(),
       sb.from('study_group_members').select('id, student_id, student_name, points, streak_days').eq('group_id', groupId).order('points', { ascending: false }),
-      sb.from('study_group_challenges').select('id, question, correct_answer, hint, difficulty, kenyan_context, date').eq('group_id', groupId).eq('date', today).maybeSingle(),
+      sb.from('study_group_challenges').select('id, question, hint, difficulty, kenyan_context, date').eq('group_id', groupId).eq('date', today).maybeSingle(),
     ])
 
     setGroup(grp ?? null)

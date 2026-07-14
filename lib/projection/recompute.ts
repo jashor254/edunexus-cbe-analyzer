@@ -14,11 +14,16 @@ import { computeLearnerProjection } from './engine'
 import type { LearnerIntelligenceProjection, Projection, ProjectorType } from './types'
 import type { UpsertProjectionInput } from '@/lib/repositories/projection.repository'
 
-const PROJECTOR_TYPES: ProjectorType[] = [
+const PERSISTED_PROJECTOR_TYPES: ProjectorType[] = [
   'academic', 'capability', 'knowledge', 'behaviour', 'growth', 'risk', 'completeness',
-  // Projection V2 — additive.
-  'capabilityV2', 'trendV2', 'knowledgeV2',
 ]
+
+// Projection V2 (capabilityV2/trendV2/knowledgeV2) is computed by
+// computeLearnerProjection() and returned in-memory below, but deliberately
+// NOT persisted: learner_projections_projector_type_check only permits the
+// 7 V1 types, and no downstream code reads a persisted V2 row today. Add
+// these to PERSISTED_PROJECTOR_TYPES (and migrate the CHECK constraint)
+// once a real V2 consumer exists.
 
 function toUpsertInput(learnerId: string, type: ProjectorType, p: Projection<unknown>): UpsertProjectionInput {
   return {
@@ -49,7 +54,7 @@ export async function recomputeLearnerProjection(learnerId: string): Promise<Lea
   const evidence = await repos.evidence.findConfirmedEvidenceForLearner(learnerId)
   const projection = computeLearnerProjection(learnerId, evidence)
 
-  await Promise.all(PROJECTOR_TYPES.map(async type => {
+  await Promise.all(PERSISTED_PROJECTOR_TYPES.map(async type => {
     const value = projection[type] as Projection<unknown> | null
     if (value === null) {
       // No supporting evidence for this dimension — the projection does not

@@ -6,8 +6,10 @@ import { createClient }        from '@/utils/supabase/server'
 import { repos } from '@/lib/repositories'
 import { apiSuccess, apiError, getErrorMessage } from '@/lib/api/response'
 
-const LEVEL_LABEL: Record<number, string> = { 1: 'BE', 2: 'AE', 3: 'ME', 4: 'EE' }
-const LEVEL_NAME:  Record<number, string> = {
+// Plain-language only — parents see "Meeting", never the raw CBC code
+// ('ME') that this maps from (Sprint 19: teacher/Core surfaces keep the
+// raw CbcLevel codes; this route is parent-facing only).
+const LEVEL_NAME: Record<number, string> = {
   1: 'Beginning', 2: 'Approaching', 3: 'Meeting', 4: 'Exceeding',
 }
 
@@ -128,9 +130,9 @@ export async function GET(): Promise<Response> {
       // Build a parent-readable level line
       let levelLine: string | null = null
       if (startLvl && endLvl && startLvl !== endLvl) {
-        levelLine = `${LEVEL_LABEL[startLvl]} (${LEVEL_NAME[startLvl]}) → ${LEVEL_LABEL[endLvl]} (${LEVEL_NAME[endLvl]})`
+        levelLine = `${LEVEL_NAME[startLvl]} → ${LEVEL_NAME[endLvl]}`
       } else if (endLvl) {
-        levelLine = `Currently ${LEVEL_LABEL[endLvl]} — ${LEVEL_NAME[endLvl]}`
+        levelLine = `Currently ${LEVEL_NAME[endLvl]}`
       }
 
       return {

@@ -49,6 +49,21 @@ export class SchoolRepository extends BaseRepository {
     return data
   }
 
+  // Case/whitespace-insensitive lookup — used at teacher onboarding so
+  // "Nairobi Academy" and "nairobi academy " resolve to the same school
+  // instead of minting a duplicate. `.ilike` with no wildcards behaves as a
+  // case-insensitive exact match.
+  async findByNameCaseInsensitive(schoolName: string): Promise<School | null> {
+    const { data, error } = await this.db
+      .from('schools')
+      .select(SCHOOL_COLS)
+      .ilike('school_name', schoolName.trim().replace(/\s+/g, ' '))
+      .limit(1)
+      .maybeSingle()
+    if (error) throw new Error(`findSchoolByNameCaseInsensitive: ${error.message}`)
+    return data
+  }
+
   async update(
     schoolId: string,
     updates: Partial<Pick<School, 'school_name' | 'nemis_code' | 'school_type' | 'county' | 'sub_county' | 'ward' | 'address' | 'contact_phone' | 'contact_email' | 'logo_url' | 'motto'>>
@@ -236,6 +251,20 @@ export class SchoolRepository extends BaseRepository {
     return data
   }
 
+  // Batched counterpart to findCurrentTerm — one row per school instead of
+  // a query per school (used by the report-card selector, which may span
+  // several of a guardian's children across different schools).
+  async findCurrentTermsForSchools(schoolIds: string[]): Promise<Term[]> {
+    if (schoolIds.length === 0) return []
+    const { data, error } = await this.db
+      .from('terms')
+      .select(TERM_COLS)
+      .in('school_id', schoolIds)
+      .eq('is_current', true)
+    if (error) throw new Error(`findCurrentTermsForSchools: ${error.message}`)
+    return data ?? []
+  }
+
   // ── Report Cards ───────────────────────────────────────────────────────────
 
   async findActiveEnrollmentsByClass(
@@ -334,6 +363,48 @@ export class SchoolRepository extends BaseRepository {
       .eq('term_id', termId)
       .single()
     return data as unknown as ReportCardWithSubjects | null
+  }
+
+  // Confirms `userId` is a registered guardian of `learnerId` — the only
+  // existing auth bridge into Core for a parent account (Core's Learner type
+  // itself has no user_id; see lib/compass/ownership.ts's note on Core
+  // identity convergence being out of scope pre-Phase 11).
+  async findGuardianLink(learnerId: string, userId: string): Promise<{ id: string } | null> {
+    const { data } = await this.db
+      .from('learner_guardians')
+      .select('id')
+      .eq('learner_id', learnerId)
+      .eq('user_id', userId)
+      .maybeSingle()
+    return data
+  }
+
+  // All Core learners this parent account is a registered guardian for —
+  // drives the report-card selector (app/(parent)/report-card).
+  async listGuardianLearners(userId: string): Promise<Array<{
+    learner_id: string
+    school_id: string
+    first_name: string
+    last_name: string
+  }>> {
+    const { data, error } = await this.db
+      .from('learner_guardians')
+      .select('learner_id, learners (id, school_id, first_name, last_name)')
+      .eq('user_id', userId)
+    if (error) throw new Error(`listGuardianLearners: ${error.message}`)
+
+    return (data ?? [])
+      .map(row => {
+        const learner = row.learners as unknown as { id: string; school_id: string; first_name: string; last_name: string } | null
+        if (!learner) return null
+        return {
+          learner_id: learner.id,
+          school_id:  learner.school_id,
+          first_name: learner.first_name,
+          last_name:  learner.last_name,
+        }
+      })
+      .filter((r): r is { learner_id: string; school_id: string; first_name: string; last_name: string } => r !== null)
   }
 
   async listClassReportCards(classId: string, termId: string): Promise<SchoolReportCard[]> {

@@ -14,7 +14,7 @@ import { COS_DISCLAIMER } from '@/lib/career/types'
 import type { CapabilityCareerMatch, CareerCategory } from '@/lib/career/types'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { projectionToScoreHistory } from './projectionAdapters'
-import { confidenceFromScore, insufficientEvidenceInsight } from './insight'
+import { insufficientEvidenceInsight } from './insight'
 import type { Insight } from './insight'
 
 const CATEGORY_LABEL: Record<CareerCategory, string> = {
@@ -52,6 +52,8 @@ export type CareerIntelligence = {
   mode:        'exploration' | 'planning'   // exploration = Junior, planning = Senior
   disclaimer:  string
   generatedAt: string
+  /** Days since the most recent supporting evidence (Projection Engine coverage) — null when there's none yet. */
+  evidenceFreshnessDays: number | null
 
   // Set when there isn't enough assessment data yet for any matching/grouping.
   notice?: Insight
@@ -77,7 +79,11 @@ function matchToInsight(match: CapabilityCareerMatch): Insight {
   return {
     observation: match.narrative,
     evidence:    evidence.length > 0 ? evidence : ['Not enough capability data yet to break this down by dimension.'],
-    confidence:  confidenceFromScore(match.alignment_score),
+    // match.confidence reflects evidence quality (assessment count) — the
+    // question this Insight's confidence field is meant to answer. How well
+    // the profile aligns to the career (alignment_score) is a separate axis,
+    // already carried by `tier`/`alignmentPct`.
+    confidence:  match.confidence,
     action,
   }
 }
@@ -95,13 +101,14 @@ async function buildSeniorMatches(studentId: string, profile: ReturnType<typeof 
   }))
 }
 
-async function buildJuniorFamilies(studentId: string, profile: ReturnType<typeof extractCapabilityProfile>, careers: Awaited<ReturnType<typeof getAllCareersWithCOS>>): Promise<CareerFamilyInsight[]> {
-  const report = computeCapabilityMatches(studentId, profile, careers)
-  // Junior view groups by broad category and never surfaces a ranked
-  // "you should become X" claim — specific careers only appear as
-  // exploration examples inside the action text.
-  const all = [...report.primary, ...report.stretch]
-
+// Groups already-computed matches into broad category "families" — the one
+// Junior-safe view every consumer of computeCapabilityMatches() must use
+// instead of surfacing individual ranked/percentage predictions. Pure
+// function over CapabilityCareerMatch[] so any consumer (Career Explorer,
+// Parent Intelligence, the Career Intelligence Report) can reuse the exact
+// same grouping instead of inventing its own — same matcher, same data,
+// just regrouped for the audience the Career Principle requires.
+export function familiesFromMatches(all: CapabilityCareerMatch[]): CareerFamilyInsight[] {
   const byCategory = new Map<CareerCategory, CapabilityCareerMatch[]>()
   for (const match of all) {
     const bucket = byCategory.get(match.career_category) ?? []
@@ -126,7 +133,7 @@ async function buildJuniorFamilies(studentId: string, profile: ReturnType<typeof
       insight: {
         observation: `Current evidence suggests an emerging capability alignment with ${CATEGORY_LABEL[category] ?? category}.`,
         evidence:    evidence.length > 0 ? evidence : ['Not enough capability data yet to break this down further.'],
-        confidence:  confidenceFromScore(top.alignment_score),
+        confidence:  top.confidence,
         action:      `Explore this field through subjects, clubs, or projects related to: ${exampleTitles.join(', ')}.`,
       },
       exampleCareerTitles: exampleTitles,
@@ -160,6 +167,7 @@ export async function buildCareerIntelligence(studentId: string): Promise<Career
     mode,
     disclaimer:  COS_DISCLAIMER,
     generatedAt: new Date().toISOString(),
+    evidenceFreshnessDays: projection.completeness?.coverage.freshnessDays ?? null,
   }
 
   if (scoreHistory.length === 0) {
@@ -169,7 +177,8 @@ export async function buildCareerIntelligence(studentId: string): Promise<Career
   const profile = extractCapabilityProfile(scoreHistory)
 
   if (isJunior) {
-    return { ...base, families: await buildJuniorFamilies(studentId, profile, careers) }
+    const report = computeCapabilityMatches(studentId, profile, careers)
+    return { ...base, families: familiesFromMatches([...report.primary, ...report.stretch]) }
   }
   return { ...base, matches: await buildSeniorMatches(studentId, profile, careers) }
 }

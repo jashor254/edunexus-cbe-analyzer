@@ -2,6 +2,9 @@
 
 import { repos } from '@/lib/repositories'
 import { callDeepSeek } from '@/lib/ai/deepseek'
+import { extractCapabilityProfile } from './capabilityExtractor'
+import { recomputeLearnerProjection } from '@/lib/projection/recompute'
+import { projectionToTimestampedScoreHistory, type TimestampedScoreSnapshot } from '@/lib/learnerIntelligence/projectionAdapters'
 import { STANDARD_DISCLAIMER } from './types'
 import type {
   Career,
@@ -370,6 +373,60 @@ export async function saveCapabilityProfile(
     assessment_count:   profile.assessment_count,
     computed_at:        profile.computed_at,
   })
+}
+
+/**
+ * Merges two independently-sorted chronological score-history sources into
+ * one true time-ordered sequence — pure, no I/O, unit-testable without a
+ * database. Exported specifically so Phase H's blend logic (below) can be
+ * verified directly, the same "separate pure computation from persistence"
+ * split lib/projection/engine.ts (pure) vs recompute.ts (orchestration)
+ * already establishes in this codebase.
+ */
+export function mergeChronologicalScoreHistories(
+  ...sources: TimestampedScoreSnapshot[][]
+): Array<Record<string, number>> {
+  return sources
+    .flat()
+    .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+    .map(s => s.scores)
+}
+
+// Canonical recompute-and-persist path for `students.capability_profile`.
+//
+// Phase H (docs/architecture/learner-record-layer-decisions.md Decision 8,
+// amended): sources from Projection (recomputeLearnerProjection ->
+// projectionToTimestampedScoreHistory — the same Evidence-derived pattern
+// Blueprint/Career Intelligence already use) BLENDED with the legacy
+// `assessments` table, rather than switching to Projection alone. Projection
+// only sees evidence that reached the Evidence Domain; `app/api/assessments/create/route.ts`
+// (the Academic Clinic intake path) does not yet emit an Evidence Domain row
+// (migration-ledger.md, Implementation Wave 3) — switching this function to
+// Projection-only would have silently dropped capability signal for every
+// Academic-Clinic-only student. Blending closes the "third independent
+// capability store" duplication Decision 8 identified without that
+// regression. Returns null (never persists a fabricated profile) when
+// neither source has any evidence yet.
+export async function recomputeAndSaveCapabilityProfile(
+  studentId: string
+): Promise<CapabilityProfile | null> {
+  const [projection, legacyHistory] = await Promise.all([
+    recomputeLearnerProjection(studentId),
+    repos.learnerModel.findAssessmentHistory(studentId),
+  ])
+
+  const projectionSnapshots = projectionToTimestampedScoreHistory(projection)
+  const legacySnapshots: TimestampedScoreSnapshot[] = legacyHistory.map(r => ({
+    at: r.created_at,
+    scores: r.subject_scores,
+  }))
+
+  const merged = mergeChronologicalScoreHistories(projectionSnapshots, legacySnapshots)
+  if (merged.length === 0) return null
+
+  const profile = extractCapabilityProfile(merged)
+  await saveCapabilityProfile(studentId, profile)
+  return profile
 }
 
 export async function getCapabilityProfile(

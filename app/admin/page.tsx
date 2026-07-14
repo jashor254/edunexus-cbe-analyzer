@@ -241,10 +241,10 @@ export default function AdminPage() {
                   Pilot Students →
                 </a>
                 <a
-                  href="/admin/payments"
-                  className="flex items-center gap-2 w-full px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm font-medium rounded-lg transition-colors"
+                  href="/admin/core-schools/new"
+                  className="flex items-center gap-2 w-full px-4 py-2 bg-violet-900/40 hover:bg-violet-900/60 text-violet-300 text-sm font-medium rounded-lg transition-colors border border-violet-700/30"
                 >
-                  View All Payments →
+                  Onboard Core School →
                 </a>
                 <button
                   onClick={handleExportCSV}
