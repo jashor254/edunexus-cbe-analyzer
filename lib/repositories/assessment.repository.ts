@@ -2,6 +2,10 @@
 // All DB access for the assessments domain.
 
 import { BaseRepository } from './base'
+import { computeRankings } from '@/lib/ranking'
+import { gradeScore } from '@/lib/grading'
+import type { GradeScale } from '@/lib/grading'
+import { buildAssessmentTitle } from '@/lib/assessments/assessmentTypeCatalog'
 import type {
   ClassAssessment,
   LearnerMark,
@@ -41,11 +45,38 @@ const SCALE_COLS =
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function gradeLevelFromScore(score: number): GradeLevel {
-  if (score >= 75) return 'EE'
-  if (score >= 50) return 'ME'
-  if (score >= 25) return 'AE'
-  return 'BE'
+// Sprint 4I (docs/engineering/sprint-4f-teacher-school-identity-audit.md,
+// docs/architecture/deprecation-registry.md #5, docs/engineering/
+// implementation-log.md): replaces the deleted gradeLevelFromScore()
+// (hardcoded 75/50/25, no school-configurability) with the canonical
+// Grading Engine, honouring school_settings.grade_boundaries the same way
+// Sprint 4C1 already did for computeTermSummaries/generateReportCards. Same
+// 75/50/25 fallback defaults when no boundaries are supplied (an unbridged
+// teacher, or a school with no custom setting) — no default-boundary
+// change. Both call sites in this file (getAssessmentAnalytics,
+// getCohortData) already implicitly treated their input scores as 0-100
+// percentages with no maxScore of their own — that assumption is preserved
+// here, not corrected, since correcting it would be a grading-policy change
+// out of this sprint's mechanical scope.
+function buildCbcScale(gradeBoundaries: Record<string, { min: number }> = {}): GradeScale {
+  return {
+    name: 'CBC (school-configured or default, school_settings.grade_boundaries)',
+    bands: [
+      { label: 'EE', minPct: gradeBoundaries.EE?.min ?? 75 },
+      { label: 'ME', minPct: gradeBoundaries.ME?.min ?? 50 },
+      { label: 'AE', minPct: gradeBoundaries.AE?.min ?? 25 },
+      { label: 'BE', minPct: 0 },
+    ],
+  }
+}
+
+// Clamped defensively — see lib/core/assessments.ts's identical Sprint 4C1
+// comment. Raw subject/mean scores here are not guaranteed to be bounded to
+// 0-100 (an assessment's max_score can exceed 100), which the old
+// gradeLevelFromScore tolerated silently; gradeScore()'s stricter range
+// validation would otherwise throw on those same inputs.
+function toCbcGrade(score: number, scale: GradeScale): GradeLevel {
+  return gradeScore(Math.min(100, Math.max(0, score)), 100, scale).grade as GradeLevel
 }
 
 function average(nums: number[]): number {
@@ -99,6 +130,7 @@ export class AssessmentRepository extends BaseRepository {
     updates: {
       title?: string
       assessment_type?: string
+      assessment_type_id?: string
       term?: string
       year?: number
       max_score?: number
@@ -492,7 +524,9 @@ export class AssessmentRepository extends BaseRepository {
   async getAssessmentAnalytics(
     teacherId: string,
     filters: { term?: string; year?: number; assessmentType?: string } = {},
+    gradeBoundaries: Record<string, { min: number }> = {},
   ): Promise<AnalyticsData | null> {
+    const cbcScale = buildCbcScale(gradeBoundaries)
     let q = this.db
       .from('class_assessments')
       .select('id, title, assessment_type, term, year, class_id')
@@ -555,11 +589,7 @@ export class AssessmentRepository extends BaseRepository {
     }
 
     const { assessment_type, term, year } = assessments[0]
-    const TYPE_LABEL: Record<string, string> = {
-      opener: 'Opener', cat: 'CAT', midterm: 'Mid-Term',
-      endterm: 'End-Term', exam: 'Exam', assignment: 'Assignment',
-    }
-    const title = `Term ${term} ${TYPE_LABEL[assessment_type as string] ?? assessment_type} ${year}`
+    const title = buildAssessmentTitle(assessment_type as string, term, year)
 
     const classOverviews: ClassOverview[] = []
     for (const [classId, marks] of byClass) {
@@ -644,12 +674,12 @@ export class AssessmentRepository extends BaseRepository {
         allScores.push(...scores)
 
         const dist: Record<GradeLevel, number> = { EE: 0, ME: 0, AE: 0, BE: 0 }
-        for (const s of scores) dist[gradeLevelFromScore(s)]++
+        for (const s of scores) dist[toCbcGrade(s, cbcScale)]++
         distribution[classId] = dist
       }
 
       const combinedMean = average(allScores)
-      subjectRows.push({ subject, classMeans, combinedMean, combinedGrade: gradeLevelFromScore(combinedMean) })
+      subjectRows.push({ subject, classMeans, combinedMean, combinedGrade: toCbcGrade(combinedMean, cbcScale) })
       subjectDist.push({ subject, distribution })
     }
 
@@ -690,7 +720,9 @@ export class AssessmentRepository extends BaseRepository {
     grade: number,
     term: string,
     year: number,
+    gradeBoundaries: Record<string, { min: number }> = {},
   ): Promise<CohortResult | null> {
+    const cbcScale = buildCbcScale(gradeBoundaries)
     const gradeCohort = `Grade ${grade}`
 
     // grade_cohort is the sole, deliberate signal for cohort membership — a
@@ -784,7 +816,7 @@ export class AssessmentRepository extends BaseRepository {
         marks,
         subjectMeans,
         overallMean,
-        meanGrade:    gradeLevelFromScore(overallMean),
+        meanGrade:    toCbcGrade(overallMean, cbcScale),
         bandCounts,
         learnerCount: marks.length,
       })
@@ -822,7 +854,7 @@ export class AssessmentRepository extends BaseRepository {
 
         for (const m of stream.marks) {
           const score = Number(m.subject_scores[subj]) || 0
-          const g = gradeLevelFromScore(score)
+          const g = toCbcGrade(score, cbcScale)
           bandC[g]++
         }
       }
@@ -835,29 +867,34 @@ export class AssessmentRepository extends BaseRepository {
         subject: subj,
         perStream,
         cohortMean,
-        meanGrade: gradeLevelFromScore(cohortMean),
+        meanGrade: toCbcGrade(cohortMean, cbcScale),
         bandCounts: bandC,
       }
     })
 
-    const combined: CombinedRankRow[] = allMarks
+    // Sprint 3B.2 migration (docs/engineering/sprint-3-assessment-domain-audit.md
+    // §4, docs/engineering/implementation-log.md): delegates to the canonical
+    // Ranking Engine (lib/ranking) instead of hand-rolling sort + tie
+    // assignment. Same standard-competition-ranking algorithm as before —
+    // mechanical migration, no behaviour change. `id` here is a synthetic,
+    // function-local index (CombinedRankRow has no stable identity field);
+    // it never leaves this function.
+    const unranked = allMarks
       .filter(m => (m.total_marks ?? 0) > 0)
       .map(m => ({
-        rank:        0,
         studentName: m.student_name,
         stream:      m.streamName,
         className:   m.className,
         total:       m.total_marks ?? 0,
         meanScore:   m.mean_score ?? 0,
-        meanGrade:   m.mean_grade ?? gradeLevelFromScore(m.mean_score ?? 0),
+        meanGrade:   m.mean_grade ?? toCbcGrade(m.mean_score ?? 0, cbcScale),
       }))
-      .sort((a, b) => b.total - a.total)
 
-    let rank = 1
-    combined.forEach((r, i) => {
-      if (i > 0 && r.total < combined[i - 1].total) rank = i + 1
-      r.rank = rank
-    })
+    const ranked = computeRankings(unranked.map((r, i) => ({ id: i, score: r.total })))
+    const combined: CombinedRankRow[] = ranked.map(r => ({
+      rank: r.position,
+      ...unranked[r.id],
+    }))
 
     const allMeans = allMarks.map(m => m.mean_score ?? 0)
     const cohortMean = allMeans.length
@@ -873,7 +910,7 @@ export class AssessmentRepository extends BaseRepository {
       subjects,
       subjectStats,
       cohortMean,
-      cohortGrade:   gradeLevelFromScore(cohortMean),
+      cohortGrade:   toCbcGrade(cohortMean, cbcScale),
       topLearners:   combined.slice(0, 20),
       lowLearners:   combined.slice(-10).reverse(),
       totalLearners: allMarks.length,
@@ -968,6 +1005,7 @@ export class AssessmentRepository extends BaseRepository {
     teacher_id: string
     title: string
     assessment_type: string
+    assessment_type_id?: string | null
     term: string
     year: number
     max_score: number
@@ -1041,6 +1079,18 @@ export class AssessmentRepository extends BaseRepository {
       mean_grade?: string
     }>,
   ): Promise<void> {
+    // Sprint 3E migration (docs/engineering/sprint-3-assessment-domain-audit.md
+    // §4, docs/architecture/deprecation-registry.md #4, docs/engineering/
+    // implementation-log.md): the deleted implementation assigned
+    // `position: i+1` in raw request-array order — not a ranking algorithm,
+    // a correctness defect (the audit's most severe of the 5 duplicated
+    // ranking implementations). Delegates to the canonical Ranking Engine
+    // (lib/ranking) instead. `id` here is a synthetic, function-local index
+    // (the input array has no stable identity before this upsert assigns
+    // `student_id`); it never leaves this function.
+    const ranked = computeRankings(scores.map((s, i) => ({ id: i, score: s.total_marks })))
+    const positionByIndex = new Map(ranked.map((r) => [r.id, r.position]))
+
     const rows = scores.map((s, i) => ({
       assessment_id:    assessmentId,
       class_id:         classId,
@@ -1052,7 +1102,7 @@ export class AssessmentRepository extends BaseRepository {
       total_marks:      s.total_marks,
       mean_score:       s.mean_score,
       mean_grade:       s.mean_grade ?? null,
-      position:         i + 1,
+      position:         positionByIndex.get(i)!,
     }))
     const { error } = await this.db
       .from('learner_marks')

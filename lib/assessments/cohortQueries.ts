@@ -52,9 +52,10 @@ export async function getCohortData(
   teacherId: string,
   grade: number,
   term: string,
-  year: number
+  year: number,
+  gradeBoundaries: Record<string, { min: number }> = {}
 ): Promise<CohortResult | null> {
-  return repos.assessments.getCohortData(teacherId, grade, term, year)
+  return repos.assessments.getCohortData(teacherId, grade, term, year, gradeBoundaries)
 }
 
 /** Returns grade cohorts where teacher has 2+ streams with marks entered */

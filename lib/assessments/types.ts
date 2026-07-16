@@ -1,8 +1,7 @@
 import type { CurriculumType } from './gradeCalculator'
+import type { AssessmentType } from './assessmentTypeCatalog'
 
-export type { CurriculumType }
-
-export type AssessmentType = 'exam' | 'cat' | 'midterm' | 'endterm' | 'opener' | 'assignment'
+export type { CurriculumType, AssessmentType }
 
 export type ClassAssessment = {
   id: string

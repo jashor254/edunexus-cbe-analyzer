@@ -1,5 +1,6 @@
 import { esc } from '@/lib/pdf/utils'
 import type { ClassAssessment, LearnerMark } from './types'
+import { getBadgeLabel } from './assessmentTypeCatalog'
 
 
 export interface MarksheetMeta {
@@ -51,11 +52,7 @@ export function generateMarksheetHTML(
       </tr>`
   }).join('')
 
-  const typeLabel: Record<string, string> = {
-    opener: 'Opener', cat: 'CAT', midterm: 'Midterm',
-    endterm: 'End Term', exam: 'Exam', assignment: 'Assignment',
-  }
-  const typeStr = typeLabel[assessment.assessment_type] || assessment.assessment_type
+  const typeStr = getBadgeLabel(assessment.assessment_type)
 
   return `<!DOCTYPE html>
 <html lang="en">

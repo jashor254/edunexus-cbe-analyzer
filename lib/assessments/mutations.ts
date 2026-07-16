@@ -2,22 +2,22 @@ import { repos } from '@/lib/repositories'
 import { calculateMeanScore, calculateMeanGrade, marksToLevel } from './gradeCalculator'
 import { updateFromAssessment } from '@/lib/learnerModel/updater'
 import { publishEvent } from '@/lib/events'
-import { ASSESSMENT_TYPE_DEFAULT_PURPOSE_CODE } from '@/lib/config/assessmentTypePurposes'
+import { getDefaultPurposeCode } from '@/lib/assessments/assessmentTypeCatalog'
+import { computeRankings } from '@/lib/ranking'
 import type { ClassAssessment, LearnerMark, MarkInput, CurriculumType } from './types'
 
 function sumScores(scores: Record<string, number>): number {
   return Object.values(scores).reduce((s, v) => s + (Number(v) || 0), 0)
 }
 
+// Sprint 3B migration (docs/engineering/sprint-3-assessment-domain-audit.md §4,
+// docs/engineering/implementation-log.md): delegates to the canonical Ranking
+// Engine (lib/ranking) instead of hand-rolling sort + tie assignment. Same
+// standard-competition-ranking algorithm as before — mechanical migration,
+// no behaviour change.
 function buildPositionMap(rows: { id: string; total: number }[]): Map<string, number> {
-  const sorted = [...rows].sort((a, b) => b.total - a.total)
-  const map = new Map<string, number>()
-  let pos = 1
-  for (let i = 0; i < sorted.length; i++) {
-    if (i > 0 && sorted[i].total < sorted[i - 1].total) pos = i + 1
-    map.set(sorted[i].id, pos)
-  }
-  return map
+  const ranked = computeRankings(rows.map((r) => ({ id: r.id, score: r.total })))
+  return new Map(ranked.map((r) => [r.id, r.position]))
 }
 
 /**
@@ -32,7 +32,7 @@ function buildPositionMap(rows: { id: string; total: number }[]): Map<string, nu
  * school/teacher-configurable rather than cosmetically so: the API layer
  * no longer hardcodes what a teacher is allowed to call an assessment.
  */
-async function resolveOrCreateAssessmentType(teacherId: string, name: string): Promise<string> {
+export async function resolveOrCreateAssessmentType(teacherId: string, name: string): Promise<string> {
   const existing = await repos.assessmentTypes.findByTeacherAndName(teacherId, name)
   if (existing) return existing.id
 
@@ -44,7 +44,7 @@ async function resolveOrCreateAssessmentType(teacherId: string, name: string): P
   // needs the same canonical mapping applied here, or their evidence's
   // purpose_id silently stays null forever (Production Hardening Audit
   // finding: this was a live gap for every teacher onboarded after Phase G).
-  const purposeCode = ASSESSMENT_TYPE_DEFAULT_PURPOSE_CODE[name] ?? null
+  const purposeCode = getDefaultPurposeCode(name)
   const defaultPurposeId = purposeCode ? (await repos.evidencePurposes.findByCode(purposeCode))?.id ?? null : null
 
   const created = await repos.assessmentTypes.create(teacherId, name, nextSortOrder, defaultPurposeId)
@@ -89,6 +89,14 @@ export async function createAssessment(
   return assessment
 }
 
+// Sprint 5E (docs/engineering/sprint-5d-assessment-type-audit.md §3): a
+// PATCH that changes `assessment_type` must re-resolve `assessment_type_id`
+// through the same canonical lookup createAssessment uses, or the two
+// columns silently drift apart (the FK keeps pointing at the assessment's
+// original type after the visible name has changed). No direct way to set
+// assessment_type_id exists on this PATCH — it only ever moves as a
+// consequence of the name changing, so this is the one place drift can be
+// introduced, and the one place it needs to be closed.
 export async function updateAssessment(
   id: string,
   teacherId: string,
@@ -101,7 +109,10 @@ export async function updateAssessment(
     subjects?: string[]
   }
 ): Promise<ClassAssessment> {
-  return repos.assessments.updateAssessment(id, teacherId, updates)
+  const repoUpdates = updates.assessment_type
+    ? { ...updates, assessment_type_id: await resolveOrCreateAssessmentType(teacherId, updates.assessment_type) }
+    : updates
+  return repos.assessments.updateAssessment(id, teacherId, repoUpdates)
 }
 
 export async function bulkSaveMarks(

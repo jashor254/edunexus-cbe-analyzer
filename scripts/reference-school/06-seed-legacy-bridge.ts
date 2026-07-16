@@ -53,6 +53,7 @@ import { AssessmentRepository } from '@/lib/repositories/assessment.repository'
 import { LearnerModelRepository } from '@/lib/repositories/learner-model.repository'
 import { CareerRepository } from '@/lib/repositories/career.repository'
 import { recordAssessmentEvidence } from '@/lib/assessments/evidence'
+import { resolveOrCreateAssessmentType } from '@/lib/assessments/mutations'
 import type { CapabilityProfile, CapabilityScore, CapabilityLevel, CapabilityTrendDirection } from '@/lib/career/types'
 
 const assessmentRepo = new AssessmentRepository()
@@ -487,11 +488,19 @@ async function bridgeAssessmentsAndMarks(
     if (existingAssessment) {
       assessmentId = existingAssessment.id as string
     } else {
+      // Sprint 5E pre-implementation verification: legacyTeacherId is
+      // already resolved above (line ~287) via the script's own
+      // schoolUserIdToLegacyTeacherId map — no new lookup needed — so this
+      // completes an already-available write with the same canonical
+      // resolution the teacher-facing path uses, closing the same
+      // assessment_type_id gap for this caller.
+      const assessmentTypeId = await resolveOrCreateAssessmentType(legacyTeacherId, 'cat')
       const created = await assessmentRepo.createCoreAssessment({
         class_id: legacyClassId,
         teacher_id: legacyTeacherId,
         title: ASSESSMENT_TITLE,
         assessment_type: 'cat',
+        assessment_type_id: assessmentTypeId,
         term: String(TERM),
         year: YEAR,
         max_score: 100,

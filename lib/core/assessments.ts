@@ -1,6 +1,11 @@
 import { repos } from '@/lib/repositories'
 import { publishEvent } from '@/lib/events'
+import { computeRankings } from '@/lib/ranking'
+import { gradeScore } from '@/lib/grading'
+import type { GradeScale } from '@/lib/grading'
 import type { TermSubjectSummary, CbcLevel } from '@/types/core'
+import { resolveTeacher } from '@/lib/core/identity'
+import { resolveOrCreateAssessmentType } from '@/lib/assessments/mutations'
 
 // class_assessments is the shared table (extended by Core) — we read/write it here
 // learner_marks stores per-student scores as jsonb subject_scores
@@ -44,9 +49,31 @@ export async function listAssessments(
   return data as unknown as AssessmentConfig[]
 }
 
+// Sprint 5F (docs/architecture/adr/0002-canonical-teacher-identity.md,
+// implementation-log.md): ADR-0002 ratified `teachers.id` as the canonical
+// Teacher-domain business identity — this function's caller previously
+// passed `school_users.id` (a Permissions-domain identity, per the RAS)
+// where `teachers.id` was required, which both left `assessment_type_id`
+// unresolved (no valid id to resolve/create an `assessment_types` row
+// against) and failed the `class_assessments.teacher_id`/`teachers(id)` FK
+// outright on every real insert. Repaired by resolving the real teacher via
+// the existing `resolveTeacher()` (identical to what `requireClassTeacher`
+// already does for authorization) and reusing the existing
+// `resolveOrCreateAssessmentType()` — no new identity logic, no duplicated
+// lookup, both already exported for exactly this purpose.
+//
+// Admin edge case, deliberately NOT solved here (ADR-0002 Part 7's stated
+// scope boundary): a school_admin/headteacher/deputy_headteacher caller
+// with no `teachers` row (9 live users today, 0 with one) makes
+// resolveTeacher() return null. This throws a clear, descriptive error
+// instead of an opaque FK violation — the *outcome* (creation fails for
+// this caller) is unchanged from before this fix; only the failure's
+// clarity improved. Recorded as its own, separate technical-debt item —
+// seeing this comment is the intended way to rediscover it, not a signal
+// to solve it inline.
 export async function createAssessment(input: {
   class_id: string
-  teacher_id: string
+  userId: string
   title: string
   assessment_type: string
   term: string
@@ -58,7 +85,21 @@ export async function createAssessment(input: {
   grading_type?: string
   grade_id?: string
 }): Promise<AssessmentConfig> {
-  const data = await repos.assessments.createCoreAssessment(input)
+  const { userId, ...rest } = input
+  const teacher = await resolveTeacher(userId)
+  if (!teacher) {
+    // Known tech debt (ADR-0002 Part 7, admin edge case): no teachers row
+    // for this user. Every current admin-tier school_users row has none —
+    // this is not solved here, only surfaced clearly.
+    throw new Error('createAssessment: no teacher record found for this user — admin-created assessments are a known, unresolved gap (see ADR-0002)')
+  }
+
+  const assessmentTypeId = await resolveOrCreateAssessmentType(teacher.id, input.assessment_type)
+  const data = await repos.assessments.createCoreAssessment({
+    ...rest,
+    teacher_id: teacher.id,
+    assessment_type_id: assessmentTypeId,
+  })
   return data as unknown as AssessmentConfig
 }
 
@@ -144,12 +185,30 @@ export async function computeTermSummaries(
     })
   }
 
-  const toCbcLevel = (score: number): CbcLevel => {
-    if (score >= (gradeBoundaries.EE?.min ?? 75)) return 'EE'
-    if (score >= (gradeBoundaries.ME?.min ?? 50)) return 'ME'
-    if (score >= (gradeBoundaries.AE?.min ?? 25)) return 'AE'
-    return 'BE'
+  // Sprint 4C1 (docs/engineering/sprint-4c0-grading-policy-integration.md,
+  // Option B, docs/engineering/implementation-log.md): activates the
+  // dormant school_settings.grade_boundaries capability through the
+  // canonical Grading Engine (lib/grading) instead of a local closure. The
+  // boundary VALUES are unchanged — same gradeBoundaries parameter, same
+  // 75/50/25 fallback defaults — only the computation now runs through
+  // gradeScore(). BE's floor is always 0 (matching the deleted closure's
+  // unconditional `return 'BE'` for anything below AE).
+  const cbcScale: GradeScale = {
+    name: 'CBC (school-configured, school_settings.grade_boundaries)',
+    bands: [
+      { label: 'EE', minPct: gradeBoundaries.EE?.min ?? 75 },
+      { label: 'ME', minPct: gradeBoundaries.ME?.min ?? 50 },
+      { label: 'AE', minPct: gradeBoundaries.AE?.min ?? 25 },
+      { label: 'BE', minPct: 0 },
+    ],
   }
+  // Clamped defensively: weighted scores are mathematically bounded to
+  // 0-100, but this guards against floating-point summation artifacts
+  // (e.g. 100.00000000000001) that would otherwise trip gradeScore()'s
+  // stricter range validation — the old closure had no such validation to
+  // trip. Not a behaviour change to any real grading outcome.
+  const toCbcLevel = (score: number): CbcLevel =>
+    gradeScore(Math.min(100, Math.max(0, score)), 100, cbcScale).grade as CbcLevel
 
   const rows: Omit<TermSubjectSummary, 'id' | 'created_at' | 'updated_at' | 'position_in_class' | 'teacher_comment'>[] = []
 
@@ -189,9 +248,24 @@ async function updateClassPositions(classId: string, termId: string): Promise<vo
     bySubject[r.subject_id].push(r)
   })
 
+  // Sprint 3C migration (docs/engineering/sprint-3-assessment-domain-audit.md
+  // §4, docs/architecture/deprecation-registry.md #4, docs/engineering/
+  // implementation-log.md): delegates to the canonical Ranking Engine
+  // (lib/ranking) instead of `i+1` sequential assignment, which never
+  // handled ties. This is an intentional behaviour change — tied
+  // weighted_scores within a subject now share a position, where they
+  // previously received arbitrary, database-row-order-dependent distinct
+  // positions. Rows with a non-finite weighted_score (not expected from the
+  // sole writer, computeTermSummaries, but the column is nullable) are
+  // skipped rather than crashing the recompute or fabricating a position.
   for (const rows of Object.values(bySubject)) {
-    for (let i = 0; i < rows.length; i++) {
-      await repos.assessments.updateTermSummaryPosition(rows[i].id, i + 1)
+    const rankable = rows.filter(
+      (r): r is typeof r & { weighted_score: number } =>
+        typeof r.weighted_score === 'number' && Number.isFinite(r.weighted_score)
+    )
+    const ranked = computeRankings(rankable.map((r) => ({ id: r.id, score: r.weighted_score })))
+    for (const r of ranked) {
+      await repos.assessments.updateTermSummaryPosition(r.id, r.position)
     }
   }
 }

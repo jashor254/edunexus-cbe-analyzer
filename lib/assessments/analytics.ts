@@ -58,7 +58,8 @@ export type AnalyticsData = {
 
 export async function getAssessmentAnalytics(
   teacherId: string,
-  filters: { term?: string; year?: number; assessmentType?: string } = {}
+  filters: { term?: string; year?: number; assessmentType?: string } = {},
+  gradeBoundaries: Record<string, { min: number }> = {}
 ): Promise<AnalyticsData | null> {
-  return repos.assessments.getAssessmentAnalytics(teacherId, filters)
+  return repos.assessments.getAssessmentAnalytics(teacherId, filters, gradeBoundaries)
 }

@@ -96,6 +96,32 @@ export async function getSchoolSettings(schoolId: string): Promise<SchoolSetting
   return repos.schools.findSettings(schoolId)
 }
 
+// Sprint 4I (docs/engineering/sprint-4f-teacher-school-identity-audit.md,
+// docs/architecture/deprecation-registry.md #5, docs/engineering/
+// implementation-log.md): resolves a legacy teacher's grade_boundaries via
+// Sprint 4G's findSchoolIdByTeacherId, the same way
+// computeTermSummaries/generateReportCards already receive theirs — shared
+// here (not duplicated per-route) since both
+// app/api/teacher/analytics/route.ts and app/api/teacher/cohort/[grade]/
+// route.ts need the identical resolution. Defensive by design, not just
+// convenience: most teachers today have no school_users bridge (Sprint 4F),
+// and a bridged school may not yet have a school_settings row
+// (upsertSettings is opt-in, not auto-created on school creation) — both
+// cases fall back to {} (the same 75/50/25 defaults as before this sprint),
+// never a thrown error.
+export async function resolveTeacherGradeBoundaries(
+  teacherId: string
+): Promise<Record<string, { min: number }>> {
+  const schoolId = await repos.schools.findSchoolIdByTeacherId(teacherId)
+  if (!schoolId) return {}
+  try {
+    const settings = await repos.schools.findSettings(schoolId)
+    return settings.grade_boundaries ?? {}
+  } catch {
+    return {}
+  }
+}
+
 export async function upsertSchoolSettings(
   schoolId: string,
   settings: Partial<Omit<SchoolSettings, 'id' | 'school_id' | 'created_at' | 'updated_at'>>

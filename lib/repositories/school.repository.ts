@@ -345,24 +345,44 @@ export class SchoolRepository extends BaseRepository {
     return { published: data?.length ?? 0 }
   }
 
+  // TD-014 (docs/engineering/implementation-log.md): term_subject_summaries
+  // has no FK to school_report_cards — both merely share (learner_id, term_id)
+  // — so PostgREST cannot embed one inside the other; the original single
+  // `.select()` with a nested `term_subject_summaries (...)` always failed
+  // with PGRST200, and the missing `error` destructure swallowed it, making
+  // every call return null as if the report simply didn't exist. Fixed by
+  // querying the two tables separately (each embed below — learners and
+  // subjects — has a real FK) and joining in application code.
   async findReportCardWithSubjects(
     learnerId: string,
     termId: string
   ): Promise<ReportCardWithSubjects | null> {
-    const { data } = await this.db
+    const { data: report, error: reportError } = await this.db
       .from('school_report_cards')
       .select(`
         ${REPORT_COLS},
-        learners (id, first_name, middle_name, last_name, admission_number),
-        term_subject_summaries (
-          id, subject_id, weighted_score, cbc_level, position_in_class, teacher_comment,
-          subjects (id, name, code)
-        )
+        learners (id, first_name, middle_name, last_name, admission_number)
       `)
       .eq('learner_id', learnerId)
       .eq('term_id', termId)
-      .single()
-    return data as unknown as ReportCardWithSubjects | null
+      .maybeSingle()
+    if (reportError) throw new Error(`findReportCardWithSubjects: ${reportError.message}`)
+    if (!report) return null
+
+    const { data: summaries, error: summariesError } = await this.db
+      .from('term_subject_summaries')
+      .select(`
+        id, subject_id, weighted_score, cbc_level, position_in_class, teacher_comment,
+        subjects (id, name, code)
+      `)
+      .eq('learner_id', learnerId)
+      .eq('term_id', termId)
+    if (summariesError) throw new Error(`findReportCardWithSubjects: ${summariesError.message}`)
+
+    return {
+      ...report,
+      term_subject_summaries: summaries ?? [],
+    } as unknown as ReportCardWithSubjects
   }
 
   // Confirms `userId` is a registered guardian of `learnerId` — the only
@@ -500,6 +520,36 @@ export class SchoolRepository extends BaseRepository {
   // but never read by any caller, and `subjects` isn't a real column on
   // `teachers` (the column is `subject`, singular) — dropped rather than
   // carrying forward an unused, incorrect field.
+  // Sprint 4G (docs/engineering/sprint-4f-teacher-school-identity-audit.md,
+  // docs/engineering/implementation-log.md): the reverse of
+  // findTeacherUserIdsBySchoolId/findTeachersBySchoolId above — resolves a
+  // legacy `teachers.id` to a Core `schools.id` via the same shared
+  // `auth.users.id` identity space those two already use, just walked in
+  // the other direction. Returns null for the common case (most legacy
+  // teachers have never been bridged to a `school_users` row — see Sprint
+  // 4F Part 1/4). A teacher active in more than one school (schema allows
+  // it: `school_users` is UNIQUE(school_id, user_id, role), not unique on
+  // user_id alone) resolves to whichever active membership sorts first —
+  // not disambiguated further, since no caller needs that yet.
+  async findSchoolIdByTeacherId(teacherId: string): Promise<string | null> {
+    const { data: teacher, error: teacherErr } = await this.db
+      .from('teachers')
+      .select('user_id')
+      .eq('id', teacherId)
+      .maybeSingle()
+    if (teacherErr) throw new Error(`findSchoolIdByTeacherId: ${teacherErr.message}`)
+    if (!teacher?.user_id) return null
+
+    const { data: schoolUsers, error: suErr } = await this.db
+      .from('school_users')
+      .select('school_id')
+      .eq('user_id', teacher.user_id)
+      .eq('is_active', true)
+      .limit(1)
+    if (suErr) throw new Error(`findSchoolIdByTeacherId: ${suErr.message}`)
+    return schoolUsers?.[0]?.school_id ?? null
+  }
+
   async findTeachersBySchoolId(
     schoolId: string
   ): Promise<{ id: string; user_id: string }[]> {
