@@ -51,6 +51,38 @@ For any Core-native/bridged school, every `upsertTermSubjectSummaries` call insi
 
 ---
 
+## 2026-07-16 — Sprint 10A Commit 3: End-of-Term Operational UI Activation
+
+**What changed**: built the first teacher- and admin-facing UI for the Core End-of-Term pipeline. Before this commit every step (lock, compute, generate, publish) was only reachable via direct API calls — confirmed by audit: zero pages anywhere called `/api/core/{assessments,reports,school/end-of-term}`, and `app/teacher/reports` (the only "reports" screen found) is the unrelated legacy Academic Clinic PDF system. One real orchestration gap was also found and closed: `publishAssessment()` (the "lock assessment" step) had a service function but no route ever called it.
+
+**New backend (thin, no new business logic)**:
+- `app/api/core/assessments/route.ts`: added a `publish` POST action — same auth pattern as the sibling `compute` action (`ensureBridgedClass` + `requireCanManageAssessment`), thin call-through to the existing, unmodified `publishAssessment()`.
+- `app/api/core/my-membership/route.ts` (new): resolves the caller's own Core school + role + current term, self-scoped by authentication only — same pattern as the existing `app/api/reports/report-card/mine/route.ts`, and reuses `repos.schools.findSchoolUserByUserId`, the same single-membership lookup already used unmodified by three existing `app/api/school/*` routes. No new resolution strategy.
+
+**New UI**:
+- `app/teacher/core-term/page.tsx`: the teacher journey — select class, lock each assessment, generate summaries, generate report cards, publish report cards — each a direct call to an existing route. A status row (Assessments Locked / Summaries Generated / Reports Generated / Reports Published) reads state already returned by those routes; no new computation.
+- `app/teacher/core-term/status/page.tsx`: the Headteacher/Academic Office view — per-class assessment/report completion for the current term, plus a school-wide "reports published %". Read-only, no mutation actions (Phase 7 scope guard).
+
+**A placement bug found and corrected via actually running the app**: this admin status screen was first built under `app/admin/core-schools/status`, following the styling precedent of `app/admin/core-schools/new`. Running it end-to-end in a real browser surfaced that `proxy.ts` hard-gates all of `/admin/*` to one specific internal platform email — not any real school's admin/headteacher. This platform also has no separate "school_admin" platform-auth role distinct from `teacher` (confirmed in `proxy.ts`'s own role gate and the login redirect logic). The page was moved to `app/teacher/core-term/status` — reachable the same way any teacher reaches `app/teacher/core-term` — and gates its *content* (not its route) on the existing Core `role` field from `/api/core/my-membership`, restricted to `school_admin`/`headteacher`/`deputy_headteacher`. No new platform role was introduced.
+
+**Two more findings surfaced only by running the app for real, not from reading code**:
+1. `activateSchool()` creates terms but never marks one `is_current` — every newly activated school shows "No current term is set" until an admin explicitly calls the existing `set-current-term` action. Not caused by this commit and not fixed here (out of scope — no business-logic changes); flagged as the one real remaining blocker to a brand-new school using this UI immediately after activation.
+2. The initial dark-theme styling (copied from the standalone `app/admin/core-schools/new` page) rendered as invisible white-on-white text once actually loaded inside the real `app/teacher` layout, which is light-themed (`bg-slate-50`, `slate-900` text, teal-600 accents, confirmed from `app/teacher/dashboard/page.tsx`). Corrected before verification passed. Both findings are logged here because they would not have been caught by typecheck, lint, or the unit/integration test suite — only by loading the actual page.
+
+**Verification method**: full manual browser run (not just tests) — created a real Supabase-authed teacher fixture and a real school with a class/learner/assessment, ran `next dev`, logged in via the actual `/login` form with Playwright, and drove the complete journey through the rendered UI: locked the assessment, generated summaries, generated report cards, published them (as a promoted school_admin, since generate/publish are admin-gated — confirmed the non-admin teacher correctly gets a 403, not a crash, exercising the existing, unmodified permission boundary), and confirmed the status page showed "100% Reports published" with the correct per-class pills. Screenshots taken at every step. All fixture data and the temporary role promotion were cleaned up afterward; nothing from the verification run was committed.
+
+**Tests added**: `lib/core/granularEndOfTermFlow.test.ts` (1 integration test, real synthetic Supabase data) — exercises the exact four-call sequence the new UI drives (lock → compute → generate → publish, as separate calls, not the one-shot `runEndOfTerm()` Commit 2's test already covers), asserting the intermediate state at every step matches what the UI's status row reads. Full regression: 42 tests across `granularEndOfTermFlow`, `computeTermSummariesBridge`, `endOfTermFullChain`, `reportCardOwnership.security` (including all SH-001 exploit-blocked cases), `reportCardPublicationGuard.integration`, and `permissions` — all passing. Typecheck and lint clean on all changed/new files.
+
+**Explicitly not built (Phase 7 scope guard)**: attendance, analytics dashboards, notifications, a workflow engine, approvals, messaging, email, or any parent-portal changes. The existing parent report-card page (`app/(parent)/report-card`) was not touched — already correctly published-only gated.
+
+**Architectural documents referenced**: none new — this commit composes Commit 1/2's already-fixed services and existing permission functions; no canonical-domain, identity, or Constitution/RAS question was involved.
+
+**ADR**: None — no new identity, ownership model, layer, domain, or Constitution/RAS conflict. The `my-membership` route reuses an existing repository method for its existing designed purpose; the `publish` action reuses an existing service function.
+
+**Rollback considerations**: two new route files, two new page files, one changed route file (`app/api/core/assessments/route.ts`, additive only), one new test file — every one independently revertible via `git checkout --`/deletion with no data or schema impact. Reverting restores the pre-commit state where End-of-Term is API-reachable but not screen-reachable by any teacher or admin — a known gap, not a regression risk.
+
+---
+
 ## 2026-07-16 — Sprint 10A Commit 2: End-of-Term Workflow Activation (verification)
 
 **What changed**: found and fixed a third instance of Commit 1's class_id identity-space bug (this one in `listAssessments`/`runEndOfTerm`'s own lock check, not `computeTermSummaries`), then proved the complete End-of-Term journey works end-to-end against real bridged fixture data — Assessment → Evidence → Projection → Summaries → Ranking → Report Cards → Publication → Parent view → Term closed — via a new integration test that drives `runEndOfTerm()` exactly as a school would. No new orchestration, routes, or UI were added — per user direction, this commit was scoped to verification only.

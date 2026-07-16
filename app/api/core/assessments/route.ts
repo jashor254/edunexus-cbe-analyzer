@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { listAssessments, getAssessmentScores, computeTermSummaries, getClassPerformanceSummary } from '@/lib/core/assessments'
+import { listAssessments, getAssessmentScores, computeTermSummaries, getClassPerformanceSummary, publishAssessment } from '@/lib/core/assessments'
 import { getSchoolSettings } from '@/lib/core/school'
 import { requireAuthentication, requireSchoolMembership, canManageAssessment } from '@/lib/core/permissions'
 import { UnauthorizedError, PermissionDeniedError, isEduNexusError } from '@/lib/core/errors'
@@ -126,6 +126,27 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     } catch (err) {
       return errorResponse(err)
     }
+    return NextResponse.json({ data: { success: true } })
+  }
+
+  // Sprint 10A Commit 3: the "Lock assessment" step of the teacher journey
+  // had a service function (lib/core/assessments.ts::publishAssessment,
+  // already used internally by the legacy path) but no Core route ever
+  // called it — no UI could lock an assessment. Same auth pattern as the
+  // sibling 'compute' action; no new business logic, thin call-through.
+  if (body.action === 'publish') {
+    const { schoolId, classId, assessmentId } = body
+    if (!schoolId || !classId || !assessmentId) {
+      return NextResponse.json({ error: 'schoolId, classId and assessmentId required' }, { status: 400 })
+    }
+    try {
+      await requireSchoolMembership(supabase, schoolId)
+      const bridged = await ensureBridgedClass(schoolId, classId, (await requireAuthentication(supabase)).id)
+      await requireCanManageAssessment(supabase, schoolId, bridged.legacyClassId)
+    } catch (err) {
+      return errorResponse(err)
+    }
+    await publishAssessment(assessmentId)
     return NextResponse.json({ data: { success: true } })
   }
 
