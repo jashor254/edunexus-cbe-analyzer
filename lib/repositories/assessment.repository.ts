@@ -1104,9 +1104,19 @@ export class AssessmentRepository extends BaseRepository {
       mean_grade:       s.mean_grade ?? null,
       position:         positionByIndex.get(i)!,
     }))
+    // Sprint 9F: the live UNIQUE constraint on learner_marks is
+    // (assessment_id, student_name) — confirmed via pg_constraint,
+    // `learner_marks_assessment_student_unique` — not
+    // (assessment_id, student_id) as this upsert previously targeted. That
+    // mismatch meant this call threw "no unique or exclusion constraint
+    // matching the ON CONFLICT specification" on every real invocation,
+    // pre-existing and independent of the Core↔legacy identity bridge
+    // (lib/core/academicBridge.ts) this sprint adds — discovered while
+    // exercising this path with real data for the first time. Fixed to
+    // target the constraint that actually exists, not a new one.
     const { error } = await this.db
       .from('learner_marks')
-      .upsert(rows, { onConflict: 'assessment_id,student_id' })
+      .upsert(rows, { onConflict: 'assessment_id,student_name' })
     if (error) throw new Error(`saveScores: ${error.message}`)
   }
 
@@ -1120,6 +1130,28 @@ export class AssessmentRepository extends BaseRepository {
       .from('class_assessments')
       .select('id, subjects, max_score, weight_percent')
       .eq('class_id', classId)
+      .eq('is_published', true)
+    return (data ?? []) as Array<{ id: string; subjects: unknown; max_score: number; weight_percent: number }>
+  }
+
+  // Sprint 10A: class_assessments.class_id FKs to legacy teacher_classes
+  // (confirmed live), never Core `classes` — so a Core classId can bridge
+  // to zero or more legacy class ids (lib/core/academicBridge.ts's
+  // external_id link) and must be queried with `.in()`, not `.eq()`.
+  // Used by computeTermSummaries, which needs the Core classId for its own
+  // writes (term_subject_summaries.class_id -> classes) but must read
+  // class_assessments via the bridged legacy id(s).
+  async findPublishedAssessmentsByClassIds(classIds: string[]): Promise<Array<{
+    id: string
+    subjects: unknown
+    max_score: number
+    weight_percent: number
+  }>> {
+    if (!classIds.length) return []
+    const { data } = await this.db
+      .from('class_assessments')
+      .select('id, subjects, max_score, weight_percent')
+      .in('class_id', classIds)
       .eq('is_published', true)
     return (data ?? []) as Array<{ id: string; subjects: unknown; max_score: number; weight_percent: number }>
   }

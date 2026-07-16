@@ -154,7 +154,17 @@ export async function computeTermSummaries(
   termId: string,
   gradeBoundaries: Record<string, { min: number }>
 ): Promise<void> {
-  const assessments = await repos.assessments.findPublishedAssessmentsByClass(classId)
+  // Sprint 10A: class_assessments.class_id FKs to legacy teacher_classes,
+  // never Core `classes` (confirmed live) — but this function's own writes
+  // below (term_subject_summaries.class_id) FK to `classes`, so `classId`
+  // here must stay the Core id. Resolve it to whatever legacy class(es) it
+  // bridged to (lib/core/academicBridge.ts's external_id link) before
+  // reading class_assessments. Zero bridged classes means zero assessments
+  // recorded yet for this Core class — a legitimate early exit, not an error.
+  const legacyClassIds = await repos.teachers.findLegacyClassIdsByExternalId(classId)
+  if (!legacyClassIds.length) return
+
+  const assessments = await repos.assessments.findPublishedAssessmentsByClassIds(legacyClassIds)
 
   if (!assessments.length) return
 
@@ -166,18 +176,36 @@ export async function computeTermSummaries(
   const subjects = await repos.assessments.findSubjectsByCodeList()
   const subjectByCode = Object.fromEntries(subjects.map((s) => [s.code, s]))
 
+  // Sprint 10A: learner_marks.student_id is a legacy `students.id` (Sprint
+  // 9F's bridge writes it via saveScores), but term_subject_summaries.learner_id
+  // has a real FK to `learners.id` — a different id space. Resolve every
+  // mark's student_id back to the Core learner it bridges via the same
+  // external_id link academicBridge.ts already uses in the other direction.
+  // Batched, not queried per-row (CLAUDE.md's "never query inside a loop").
+  const studentIds = Array.from(new Set(marks.map((m) => m.student_id).filter((id): id is string => id != null)))
+  const bridgeRows = await repos.teachers.findExternalIdsByStudentIds(studentIds)
+  const coreLearnerIdByStudentId = new Map(
+    bridgeRows.filter((r) => r.external_id != null).map((r) => [r.id, r.external_id as string])
+  )
+
   // Aggregate: weighted score per learner per subject
   const summaryMap: Record<string, { score: number; total_weight: number }> = {}
 
   for (const mark of marks) {
     const assessment = assessments.find((a) => a.id === mark.assessment_id)
     if (!assessment) continue
+    // No bridge row (or no external_id yet) means this mark can't be
+    // attributed to a Core learner — skip rather than writing a legacy
+    // students.id into term_subject_summaries.learner_id (which would
+    // violate that column's FK to `learners`).
+    const coreLearnerId = mark.student_id ? coreLearnerIdByStudentId.get(mark.student_id) : undefined
+    if (!coreLearnerId) continue
     const weight = assessment.weight_percent / 100
     const maxScore = assessment.max_score
 
     const scores = mark.subject_scores
     Object.entries(scores).forEach(([subjectCode, raw]) => {
-      const key = `${mark.student_id}:${subjectCode}`
+      const key = `${coreLearnerId}:${subjectCode}`
       if (!summaryMap[key]) summaryMap[key] = { score: 0, total_weight: 0 }
       const normalised = maxScore > 0 ? (raw / maxScore) * 100 : 0
       summaryMap[key].score += normalised * weight
@@ -213,14 +241,14 @@ export async function computeTermSummaries(
   const rows: Omit<TermSubjectSummary, 'id' | 'created_at' | 'updated_at' | 'position_in_class' | 'teacher_comment'>[] = []
 
   for (const [key, agg] of Object.entries(summaryMap)) {
-    const [studentId, subjectCode] = key.split(':')
+    const [learnerId, subjectCode] = key.split(':')
     const subject = subjectByCode[subjectCode]
     if (!subject) continue
     const { score, total_weight } = agg
     const weighted = total_weight > 0 ? score / total_weight : 0
     rows.push({
       school_id: schoolId,
-      learner_id: studentId,
+      learner_id: learnerId,
       term_id: termId,
       class_id: classId,
       subject_id: subject.id,

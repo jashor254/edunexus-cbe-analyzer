@@ -365,6 +365,106 @@ export class TeacherRepository extends BaseRepository {
     return data
   }
 
+  // Sprint 9E: school-wide teacher-readiness aggregation needs "which of
+  // these N school_users have a canonical teachers row," batched with
+  // .in() per CLAUDE.md's "never query inside a loop" rule — one query for
+  // the whole school instead of one per teacher.
+  async findUserIdsWithTeacherRecord(userIds: string[]): Promise<string[]> {
+    if (userIds.length === 0) return []
+    const { data, error } = await this.db
+      .from('teachers')
+      .select('user_id')
+      .in('user_id', userIds)
+    if (error) throw new Error(`findUserIdsWithTeacherRecord: ${error.message}`)
+    return (data ?? []).map(r => r.user_id)
+  }
+
+  // Sprint 9C: canonical teacher-identity creation (ADR-0002 — teachers.id
+  // is the Teacher-domain identity `createAssessment` etc. actually need,
+  // not school_users.id). Mirrors app/api/teacher/profile/route.ts's
+  // existing insert shape, but through the repository layer instead of an
+  // inline route query, since this is now the canonical (not legacy
+  // free-text) creation path.
+  async insertTeacher(
+    userId: string,
+    fields: { full_name: string; school: string; subject?: string; grade_levels?: number[]; phone?: string }
+  ): Promise<{ id: string }> {
+    const { data, error } = await this.db
+      .from('teachers')
+      .insert({
+        user_id:      userId,
+        full_name:    fields.full_name,
+        school:       fields.school,
+        subject:      fields.subject ?? null,
+        grade_levels: fields.grade_levels ?? [7, 8, 9, 10, 11, 12],
+        phone:        fields.phone ?? null,
+      })
+      .select('id')
+      .single()
+    if (error) throw new Error(`insertTeacher: ${error.message}`)
+    return data
+  }
+
+  // Mirrors app/auth/callback/route.ts's existing profiles upsert shape
+  // (onConflict: 'id') — consolidated here so the canonical teacher-onboarding
+  // path doesn't grow a second inline copy of the same upsert.
+  async upsertProfile(userId: string, fields: { role: string; full_name?: string }): Promise<void> {
+    const { error } = await this.db
+      .from('profiles')
+      .upsert(
+        { id: userId, role: fields.role, ...(fields.full_name ? { full_name: fields.full_name } : {}), updated_at: new Date().toISOString() },
+        { onConflict: 'id' }
+      )
+    if (error) throw new Error(`upsertProfile: ${error.message}`)
+  }
+
+  // Status-agnostic counterpart to findSchoolUser (which filters
+  // is_active=true only) — needed to distinguish "never invited" from
+  // "invited but not yet accepted" from "already an active member" without
+  // three separate queries.
+  async findSchoolUserByUserIdAndRole(schoolId: string, userId: string, role: SchoolUserRole): Promise<SchoolUser | null> {
+    const { data } = await this.db
+      .from('school_users')
+      .select(SCHOOL_USER_COLS)
+      .eq('school_id', schoolId)
+      .eq('user_id', userId)
+      .eq('role', role)
+      .maybeSingle()
+    return data
+  }
+
+  // Creates a *pending* membership (is_active: false) — the "invited, not
+  // yet accepted" state. Deliberately a plain insert, not an upsert: an
+  // upsert here would risk silently flipping an already-active member back
+  // to pending on a careless re-invite. Callers must check
+  // findSchoolUserByUserIdAndRole first (Sprint 9C's inviteTeacher does).
+  async insertPendingSchoolUser(schoolId: string, userId: string, role: SchoolUserRole, invitedBy: string): Promise<SchoolUser> {
+    const { data, error } = await this.db
+      .from('school_users')
+      .insert({ school_id: schoolId, user_id: userId, role, is_active: false, invited_by: invitedBy })
+      .select(SCHOOL_USER_COLS)
+      .single()
+    if (error) throw new Error(`insertPendingSchoolUser: ${error.message}`)
+    return data
+  }
+
+  // Resolves an existing auth.users account by email, for invite flows that
+  // need to check "does this person already have an account" before they
+  // can be added to school_users (user_id is NOT NULL, FK'd to auth.users —
+  // there is no way to reference someone who hasn't signed up yet).
+  // Mirrors the exact auth.admin.listUsers()-then-find-by-email pattern
+  // already used in app/api/admin/activate-user/route.ts and siblings —
+  // consolidated here rather than re-implemented inline a second time.
+  async findAuthUserByEmail(email: string): Promise<{ id: string; email: string } | null> {
+    const { data, error } = await this.db.auth.admin.listUsers()
+    if (error) throw new Error(`findAuthUserByEmail: ${error.message}`)
+    const normalized = email.toLowerCase().trim()
+    const match = (data.users as Array<{ id: string; email?: string | null }>).find(
+      u => u.email?.toLowerCase().trim() === normalized
+    )
+    return match ? { id: match.id, email: match.email! } : null
+  }
+
   // ── Legacy students table (ragContext, search) ────────────────────────────────
 
   async findLegacyStudentById(id: string): Promise<{ name: string; grade: number; curriculum_type: string } | null> {
@@ -485,5 +585,133 @@ export class TeacherRepository extends BaseRepository {
       .eq('id', userId)
       .maybeSingle()
     return (data?.full_name as string | null) ?? null
+  }
+
+  // ── Sprint 9F: Core↔legacy academic identity bridge ─────────────────────────
+  // TEMPORARY infrastructure per docs/architecture/learning-intelligence-
+  // migration-strategy.md §3's Phase-0-style carve-out — NOT the "permanent
+  // bridging adapter" that document rejects. Retire when Phase 11 (Compass
+  // port) lands and Intelligence consumes Core natively. See
+  // lib/core/academicBridge.ts for the full rationale.
+
+  async findLegacyClassByExternalId(externalId: string, teacherId: string): Promise<{ id: string } | null> {
+    const { data } = await this.db
+      .from('teacher_classes')
+      .select('id')
+      .eq('external_id', externalId)
+      .eq('teacher_id', teacherId)
+      .maybeSingle()
+    return data
+  }
+
+  // Teacher-agnostic version of the lookup above — computeTermSummaries
+  // (lib/core/assessments.ts) needs every legacy class bridged to a Core
+  // class regardless of which teacher created the bridge, to read
+  // class_assessments (legacy-keyed) for a Core-keyed class_id input.
+  async findLegacyClassIdsByExternalId(externalId: string): Promise<string[]> {
+    const { data, error } = await this.db
+      .from('teacher_classes')
+      .select('id')
+      .eq('external_id', externalId)
+    if (error) throw new Error(`findLegacyClassIdsByExternalId: ${error.message}`)
+    return (data ?? []).map((r) => r.id)
+  }
+
+  async insertLegacyClass(input: {
+    teacherId: string
+    name: string
+    grade: number
+    subject: string
+    academicYear: string
+    classCode: string
+    externalId: string
+  }): Promise<{ id: string }> {
+    const { data, error } = await this.db
+      .from('teacher_classes')
+      .insert({
+        teacher_id:    input.teacherId,
+        name:          input.name,
+        grade:         input.grade,
+        subject:       input.subject,
+        academic_year: input.academicYear,
+        class_code:    input.classCode,
+        external_id:   input.externalId,
+      })
+      .select('id')
+      .single()
+    if (error) throw new Error(`insertLegacyClass: ${error.message}`)
+    return data
+  }
+
+  async findLegacyStudentByExternalId(externalId: string): Promise<{ id: string } | null> {
+    const { data } = await this.db
+      .from('students')
+      .select('id')
+      .eq('external_id', externalId)
+      .maybeSingle()
+    return data
+  }
+
+  // Reverse of findLegacyStudentByExternalId — legacy students.id -> the
+  // Core learners.id that bridged it (Sprint 9F's external_id link).
+  // Batched (not called per-row in a loop) for
+  // lib/core/assessments.ts::computeTermSummaries, which must resolve
+  // every learner_marks.student_id in a class/term back to a real
+  // learners.id before writing term_subject_summaries.learner_id (a real
+  // FK to `learners`, never `students` — see Sprint 10A audit).
+  async findExternalIdsByStudentIds(studentIds: string[]): Promise<Array<{ id: string; external_id: string | null }>> {
+    if (!studentIds.length) return []
+    const { data, error } = await this.db
+      .from('students')
+      .select('id, external_id')
+      .in('id', studentIds)
+    if (error) throw new Error(`findExternalIdsByStudentIds: ${error.message}`)
+    return (data ?? []) as Array<{ id: string; external_id: string | null }>
+  }
+
+  async insertLegacyStudent(input: {
+    name: string
+    grade: number
+    level: string
+    teacherId: string
+    externalId: string
+    upi?: string | null
+  }): Promise<{ id: string }> {
+    const { data, error } = await this.db
+      .from('students')
+      .insert({
+        name:            input.name,
+        grade:           input.grade,
+        level:           input.level,
+        curriculum_type: 'cbc',
+        added_by:        'system',
+        teacher_id:      input.teacherId,
+        external_id:     input.externalId,
+        upi:             input.upi ?? null,
+      })
+      .select('id')
+      .single()
+    if (error) throw new Error(`insertLegacyStudent: ${error.message}`)
+    return data
+  }
+
+  // Sprint 9G: class_students.parent_id is nullable (confirmed live —
+  // the static teacher_portal_migration.sql this table was originally
+  // defined in says NOT NULL, but a later, unlogged migration relaxed it;
+  // always trust the live schema, not the historical file). This closes a
+  // real gap Sprint 9F's bridge left: without a class_students row, a
+  // bridged learner was invisible to the roster-based class view
+  // (app/api/teacher/classes/[classId]/route.ts reads class_students, not
+  // students.teacher_id directly) even though Compass/Evidence/Projection
+  // (all direct-link-based) already worked. Upserts on the live
+  // UNIQUE(class_id, student_id) constraint — idempotent.
+  async upsertLegacyClassRoster(legacyClassId: string, legacyStudentId: string): Promise<void> {
+    const { error } = await this.db
+      .from('class_students')
+      .upsert(
+        { class_id: legacyClassId, student_id: legacyStudentId, joined_at: new Date().toISOString() },
+        { onConflict: 'class_id,student_id' }
+      )
+    if (error) throw new Error(`upsertLegacyClassRoster: ${error.message}`)
   }
 }

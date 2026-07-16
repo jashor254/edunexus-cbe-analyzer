@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { listAssessments, createAssessment, getAssessmentScores, saveScores, computeTermSummaries, getClassPerformanceSummary } from '@/lib/core/assessments'
-import { getSchoolUser } from '@/lib/core/school-users'
+import { listAssessments, getAssessmentScores, computeTermSummaries, getClassPerformanceSummary } from '@/lib/core/assessments'
 import { getSchoolSettings } from '@/lib/core/school'
 import { requireAuthentication, requireSchoolMembership, canManageAssessment } from '@/lib/core/permissions'
 import { UnauthorizedError, PermissionDeniedError, isEduNexusError } from '@/lib/core/errors'
+import { ensureBridgedClass, createBridgedAssessment, recordBridgedMarks } from '@/lib/core/academicBridge'
 import { z } from 'zod'
 
 const CreateSchema = z.object({
@@ -22,12 +22,21 @@ const CreateSchema = z.object({
   grade_id: z.string().uuid().optional(),
 })
 
+// Sprint 9F: classId/coreLearnerId are Core identities (classes.id,
+// learners.id) — lib/core/academicBridge.ts resolves them to the legacy
+// teacher_classes.id/students.id the underlying tables actually require
+// (class_assessments.class_id and learner_marks.teacher_id both FK to
+// legacy tables, confirmed live; see that module's header for the full
+// rationale). Renamed learner_id -> coreLearnerId explicitly (not a
+// compatibility shim for the old field name) since nothing could
+// previously call this action successfully — class_id already failed the
+// FK before this field's value ever mattered.
 const SaveScoresSchema = z.object({
   schoolId: z.string().uuid(),
   assessmentId: z.string().uuid(),
   classId: z.string().uuid(),
   scores: z.array(z.object({
-    learner_id: z.string(),
+    coreLearnerId: z.string().uuid(),
     admission_number: z.string(),
     student_name: z.string(),
     subject_scores: z.record(z.string(), z.number()),
@@ -100,23 +109,42 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     let userId: string
     try {
       userId = (await requireAuthentication(supabase)).id
-      await requireCanManageAssessment(supabase, parsed.data.schoolId, parsed.data.classId)
+      await requireSchoolMembership(supabase, parsed.data.schoolId)
     } catch (err) {
       return errorResponse(err)
     }
-    const schoolUser = await getSchoolUser(userId, parsed.data.schoolId)
-    await saveScores(parsed.data.assessmentId, parsed.data.classId, schoolUser!.id, parsed.data.scores)
+    // ensureBridgedClass is the school-boundary + ownership check for the
+    // bridged path (see lib/core/academicBridge.ts) — resolved before, and
+    // in addition to, the existing requireCanManageAssessment gate below,
+    // which now runs against the resolved legacy class id.
+    let legacyClassId: string
+    try {
+      const bridged = await ensureBridgedClass(parsed.data.schoolId, parsed.data.classId, userId)
+      legacyClassId = bridged.legacyClassId
+      await requireCanManageAssessment(supabase, parsed.data.schoolId, legacyClassId)
+      await recordBridgedMarks(parsed.data.schoolId, parsed.data.assessmentId, bridged, userId, parsed.data.scores)
+    } catch (err) {
+      return errorResponse(err)
+    }
     return NextResponse.json({ data: { success: true } })
   }
 
   if (body.action === 'compute') {
     const { schoolId, classId, termId } = body
+    let legacyClassId: string
     try {
-      await requireCanManageAssessment(supabase, schoolId, classId)
+      await requireSchoolMembership(supabase, schoolId)
+      const bridged = await ensureBridgedClass(schoolId, classId, (await requireAuthentication(supabase)).id)
+      legacyClassId = bridged.legacyClassId
+      await requireCanManageAssessment(supabase, schoolId, legacyClassId)
     } catch (err) {
       return errorResponse(err)
     }
     const settings = await getSchoolSettings(schoolId)
+    // Sprint 10A: computeTermSummaries takes the Core classId (its own
+    // writes FK to `classes`) and resolves the legacy bridge internally —
+    // passing legacyClassId here would make it look up a bridge for a
+    // legacy id, finding none, and silently write nothing.
     await computeTermSummaries(schoolId, classId, termId, settings.grade_boundaries)
     return NextResponse.json({ data: { success: true } })
   }
@@ -124,15 +152,26 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const parsed = CreateSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
-  const { schoolId, ...input } = parsed.data
+  const { schoolId, class_id: coreClassId, ...input } = parsed.data
   let userId: string
   try {
     userId = (await requireAuthentication(supabase)).id
-    await requireCanManageAssessment(supabase, schoolId, input.class_id)
+    await requireSchoolMembership(supabase, schoolId)
   } catch (err) {
     return errorResponse(err)
   }
 
-  const data = await createAssessment({ ...input, userId })
-  return NextResponse.json({ data }, { status: 201 })
+  let result: Awaited<ReturnType<typeof createBridgedAssessment>>
+  try {
+    // ensureBridgedClass runs inside createBridgedAssessment; the existing
+    // requireCanManageAssessment check still runs, against the resolved
+    // legacy class id, as an unchanged second gate.
+    const bridged = await ensureBridgedClass(schoolId, coreClassId, userId)
+    await requireCanManageAssessment(supabase, schoolId, bridged.legacyClassId)
+    result = await createBridgedAssessment(schoolId, coreClassId, userId, input)
+  } catch (err) {
+    return errorResponse(err)
+  }
+
+  return NextResponse.json({ data: result }, { status: 201 })
 }
