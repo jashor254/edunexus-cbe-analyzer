@@ -117,6 +117,30 @@ Manual re-checks:
 - The two platform health endpoints (`app/api/health` and `app/api/platform/health`) remain independent/inconsistent — deferred to Phase 13.3 (observability).
 - No generic circuit breaker exists for non-AI external calls (Paystack, WhatsApp) — deferred per Phase 13.3/13.4 scoping decision (infra deemed stable enough for now).
 - N+1 query patterns (records-of-work, friday-generation cron, generate-record-of-work cron) identified in the performance audit are unchanged — scoped to Phase 13.2.
+- `findReportCardWithSubjects` (`lib/repositories/school.repository.ts`) embeds a `term_subject_summaries` join with no actual foreign-key relationship between the two tables — every call fails with Postgres error `PGRST200`, silently swallowed because the function never checks `error`. `getReportCard`'s `?learnerId&termId` path (`GET /api/core/reports`) has therefore returned `{data: null}` for every request, always, regardless of whether a report card exists. Found during SH-001 (below), proven unrelated to that vulnerability (the ownership check runs strictly before this broken query), and left unfixed per SH-001's explicit "do not fix unrelated findings" scope — a correctness bug, not a security issue, but worth a dedicated fix.
+
+---
+
+## SH-001 — Report Card Broken Object Level Authorization (BOLA/IDOR)
+
+| Field | Value |
+|---|---|
+| **Date** | 2026-07-15 |
+| **Severity** | Critical |
+| **Category** | Broken Object Level Authorization (BOLA / IDOR) |
+| **Affected** | `GET /api/core/reports` |
+| **Status** | Closed |
+
+**Root cause:** `app/api/core/reports/route.ts`'s `GET` handler verified only that the caller belonged to the `schoolId` query parameter (`requireSchoolMembership`) — it never verified that the `learnerId`/`classId` supplied in the same request actually belonged to that school. The underlying repository methods trusted those foreign IDs completely: `findReportCardWithSubjects` filtered only by `learner_id`/`term_id`, and `listClassReportCards` only by `class_id`/`term_id` — neither touched `school_id`. Membership was verified; resource ownership was not.
+
+**Impact:** any authenticated school staff member could read another school's report cards — grades, CBC levels, class rank, learner names — by supplying their own valid `schoolId` alongside a guessed or otherwise-obtained `learnerId`/`classId` belonging to a different school. Cross-school academic-record disclosure.
+
+**Fix:** ownership validation added before report retrieval, in `lib/core/report-cards.ts`. `getReportCard`/`listClassReportCards` now call two pre-existing, already-school-scoped repository methods (`repos.learners.findById`, `repos.teachers.findClassById`) before returning any data — no new repository method was created, and neither of those two repositories was modified, only called. A cross-school or nonexistent resource now fails identically (`404`), so no existence signal leaks across tenants. Full detail: `docs/engineering/implementation-log.md`'s "Security Hotfix SH-001" entry.
+
+**Regression tests:** 12, all passing against real (throwaway) Supabase data — `lib/core/reportCardOwnership.security.test.ts`. Covers same-school access (published and draft reports), cross-school access blocked, nonexistent learner/class blocked, malformed UUID blocked, the parent-facing caller path confirmed unchanged, and report generation confirmed unaffected.
+
+**Previous risk:** Critical — confirmed, live, exploitable cross-tenant academic-record exposure.
+**New risk:** None — request rejected before any data is returned if ownership doesn't verify.
 
 ## Recommended next work
 

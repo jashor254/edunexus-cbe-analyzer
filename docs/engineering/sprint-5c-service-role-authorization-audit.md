@@ -1,0 +1,170 @@
+# Sprint 5C — Service Role & Authorization Boundary Audit
+
+**Type**: Read-only architecture/security audit. NO CODE MODIFIED.
+**Scope**: Whether service-role usage (which bypasses RLS entirely) is contained to cron/webhooks as CLAUDE.md states, or is the de-facto default pattern everywhere — and, where it is the default, whether app-layer authorization checks are the *only* thing standing between an authenticated user and another tenant's academic records. Opens a new chapter after the Grading Domain series (Sprints 3D, 4C0-4I) and Report Card Publication Integrity series (5A-5B), both closed.
+**Method**: Every claim below is grounded in the live repository at time of audit (2026-07-15). This is a large surface (~210 route files); this audit greps systematically and samples representative routes per domain group rather than reading every route line-by-line. Every group states explicitly what was sampled vs. what was only counted. Where no evidence was found, this document says so rather than generalizing.
+
+---
+
+## Part 1 — Service role inventory
+
+### 1.1 `createServiceClient()` vs `createClient()`
+
+- `utils/supabase/service.ts:1-22` — `createServiceClient()` calls the raw `@supabase/supabase-js` `createClient(supabaseUrl, serviceKey, ...)` with `serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY`, `auth: { autoRefreshToken: false, persistSession: false }`. The Supabase service-role key is defined by Supabase itself to bypass Row Level Security entirely — this file does nothing to constrain that; it is a bare service-role client. **Confirmed from the file itself.**
+- `utils/supabase/server.ts:1-24` — `createClient()` uses `createServerClient` from `@supabase/ssr` with `NEXT_PUBLIC_SUPABASE_ANON_KEY` and the request's cookies, i.e. it authenticates *as the logged-in user* and is subject to RLS.
+
+These are the only two server-side Supabase client factories found (`grep -rn "export function createClient\|export function createServiceClient" utils/supabase/`).
+
+### 1.2 Total count
+
+`grep -rl "createServiceClient" app/api lib` → **175 files** reference the symbol directly (127 under `app/api`, 48 under `lib`, the `lib` count including 24 repository files, ~20 non-repository `lib/` modules, and several test files).
+
+This undercounts real exposure. `lib/repositories/base.ts:1-10` — `BaseRepository`'s constructor unconditionally does `this.db = createServiceClient()`. **24 repository classes extend `BaseRepository`** (`grep -l "extends BaseRepository" lib/repositories/*.ts`: `career`, `learner-intelligence`, `learner-model`, `learning-signal`, `school`, `compass`, `curriculum`, `developer`, `evidencePurpose`, `evidence`, `learner`, `notification`, `intelligence`, `job`, `knowledge-graph`, `promotion`, `billing`, `analytics`, `assessmentType`, `webhook`, `projection`, `academy`, `assessment`, `teacher`, `organization`). Any route that calls `repos.<x>.method()` (via `lib/repositories/index.ts`'s exported `repos` object) is transitively using the service-role client even though the route file itself never imports `createServiceClient` — confirmed by `app/api/core/*` (11 of 11 route files under `app/api/core` have **zero direct `createServiceClient` imports**, `grep` count = 0) but every one of them calls `lib/core/*` service functions that call `repos.schools`/`repos.learners`/etc., which are `BaseRepository` subclasses. **The entire Core domain (all school-scoped routes) is service-role, indirectly.**
+
+`grep -rl "from '@/lib/repositories'" app/api` → 21 additional non-Core route files also route through the same repository layer (holiday, sow, teacher/classes compass+generate-reports, school/intelligence family, parent/compass-activity, reports/report-card/mine, platform/health).
+
+Combining direct `createServiceClient` imports (127 in `app/api`) with indirect repository-mediated usage (all `app/api/core/**`, plus the 21 files above, minus overlap), service-role access is the dominant server-side data-access pattern in this codebase, not a minority pattern reserved for cron/webhooks.
+
+### 1.3 Grouped table (sampled)
+
+| Group | Files (createServiceClient, direct) | Files (repos.*, indirect) | Pattern found |
+|---|---|---|---|
+| **Core, school-scoped** (`app/api/core/**`) | 0 direct | 11/11 route files, all indirect via `lib/core/*` → `repos.schools`/`repos.learners`/etc. | 100% service-role. Reason stated (implicitly, by codebase convention): CLAUDE.md's "Server-side DB: always use createServiceClient()" rule, treated as the default, not cron/webhook-only. |
+| **Legacy teacher-scoped** (`app/api/teacher/**`, `app/api/assessments/**`, `app/api/students*/**`) | 29 (`teacher/**`) + 2 (`assessments/**`) + 7 (`student*/**`) direct, plus repository-mediated (`assessment.repository.ts`, `teacher.repository.ts`, `promotion.repository.ts`, `assessmentType.repository.ts` all extend `BaseRepository`) | most of the remainder | Same — default pattern, not cron/webhook-reserved. Reason found in comments: convenience / "the standard server-side DB pattern," never a stated cron/webhook justification. |
+| **Parent-facing** (`app/api/parent/**`, `app/api/reports/report-card*`, `app/api/students/[studentId]`) | 5 direct + repository-mediated (`school.repository.ts` for report-card/mine) | — | Same. |
+| **Student-facing** (`app/api/student/**`, `app/api/students/**`) | 7 direct | — | Same. |
+| **Cron/webhook** (`app/api/cron/**`, `app/api/payments/callback`, `app/api/payments/mobile-init`, `app/api/whatsapp/inbound`) | 11 (`cron/**`) + 3 (`payments/**`) + 1 (`whatsapp/inbound`) | — | This is the group the stated rule actually describes — service-role is *appropriate* here because there is no end-user session to scope to (a cron job or a webhook payload has no `auth.getUser()` to call). |
+| **Admin** (`app/api/admin/**`) | 11 direct | — | Service-role, justified by "admin" being operator/internal tooling, not itself gated by any visible role check in every sampled file (see Part 4 note under School Intelligence/Admin). |
+| **Other** (insights, notifications, attentionFeed, idempotency, monitoring, org invitations — all `lib/`) | ~15 `lib/` modules | — | Service-role used for cross-cutting infra concerns (metrics, notifications, feature content) — plausibly legitimate (no per-user scoping needed for e.g. public insights articles), sampled not exhaustively verified per-file. |
+
+**Coverage note**: Part 1's count (175 files, 127 in `app/api`) is exhaustive (grep-derived). The per-group *characterization* ("what is this route for, is service-role justified") is sampled — at least 3-5 files read per group in Parts 2-4 below, not all 127.
+
+---
+
+## Part 2 — Authorization boundary (sampled routes)
+
+For each route, the chain is: **Authentication → Authorization (scoped to the specific resource, or just "logged in") → Service-role query (unrestricted by RLS) → Returned data**.
+
+### 2.1 `app/api/core/reports/route.ts` (Core report cards)
+
+- **Authentication**: `requireSchoolMembership(supabase, schoolId)` / `requireSchoolAdmin` — calls `requireAuthentication` internally (`lib/core/permissions.ts:49-51`). Proven.
+- **Authorization**: checks the user is a member (or admin) of `schoolId` — but `schoolId` is a **request query parameter**, not derived from the resource being fetched. For `GET ?learnerId&termId` (lines 48-55) and `GET ?classId&termId` (lines 57-60), **`schoolId` is never cross-checked against `learnerId`'s or `classId`'s actual owning school.**
+- **Service-role query**: `getReportCard(learnerId, termId)` → `repos.schools.findReportCardWithSubjects(learnerId, termId)` (`lib/repositories/school.repository.ts:348-365`) — filters `.eq('learner_id', learnerId).eq('term_id', termId)` only, **no `school_id` filter at all**. Likewise `listClassReportCards(classId, termId)` (`school.repository.ts:410-417`) filters `.eq('class_id', classId).eq('term_id', termId)` only, **no `school_id` filter**.
+- **Returned data**: full report card (`overall_score`, `overall_cbc_level`, subject-level `term_subject_summaries`, learner name/admission number) for **whatever `learnerId`/`classId` the caller supplies**, regardless of whether that learner/class belongs to the `schoolId` the caller passed to `requireSchoolMembership`.
+- **Where trust is placed**: the code trusts that `schoolId` (used only for the auth check) and `learnerId`/`classId` (used only for the data query) refer to the same school — a link that is **never actually verified anywhere in this call chain**. This is not "one check that could have a bug" — it's a genuine query gap: the check and the query are checking/fetching two unrelated things.
+
+**This is confirmed exploitable**: any authenticated member of School A (any role, teacher included, via `requireSchoolMembership`) can call `GET /api/core/reports?schoolId=<their own School A id>&classId=<any UUID, e.g. discovered/brute-forced/guessed from School B>&termId=<any term>` and receive School B's entire class report card list — full grades, CBC levels, class rank — with School A's own membership as the only credential presented. See Part 4 for full ranking.
+
+### 2.2 `app/api/core/learners/[id]/route.ts` (Core learner profile)
+
+- **Authentication**: `requireSchoolMembership`/`requireSchoolAdmin`/`requireSchoolStaff` — proven.
+- **Authorization**: same `schoolId`-from-query-param pattern, but here the downstream query **does** re-scope: `getLearner(id, schoolId)` → `repos.learners.findById(learnerId, schoolId)` (`lib/repositories/learner.repository.ts:60-69`) filters `.eq('id', learnerId).eq('school_id', schoolId)` — both filters present. If `id` belongs to a different school than the `schoolId` param, the query returns no row (Postgres `.single()` errors), not another school's data.
+- **Service-role query**: correctly double-scoped (confirmed by reading the repository method body directly, not just its name).
+- **Returned data**: correctly limited to the caller's own school's learner. **This route does NOT have the Part 2.1 gap** — it is a positive control showing the same `schoolId`-in-query-param pattern is safe *when the repository method itself enforces the second filter*, and unsafe when it doesn't (2.1).
+- **Where trust is placed**: the repository's own `.eq('school_id', schoolId)` clause — a `WHERE`, not an app-layer `if`. This is the safer of the two patterns found in this audit.
+
+### 2.3 `app/api/core/assessments/route.ts` (Core assessments)
+
+- **Authentication**: `requireAuthentication`/`requireSchoolMembership` — proven.
+- **Authorization**: `canManageAssessment(client, schoolId, classId)` (`lib/core/permissions.ts:140-149`) is the composed capability check — admin-tier member of `schoolId`, OR the legacy `teacher_classes` owner of `classId` (note: checks *legacy* `teacher_classes`, not Core `classes`, per the function's own doc comment — a pre-existing convention, not a gap introduced here).
+- **Service-role query**: `GET` view=`scores` (line 80-84) calls `getAssessmentScores(assessmentId)` with **no `classId`/`schoolId` parameter at all** — `grep -n "getAssessmentScores" lib/core/assessments.ts` needed to confirm scoping; not independently re-verified against the repository body in this sprint (sampled, not exhaustive — flagged as **UNKNOWN — not independently traced** whether `getAssessmentScores` itself filters by school/class, or trusts the caller). This is a gap in *this audit's* coverage, not necessarily a code gap — noted for a future sprint to close.
+- Where the two mutating actions (`save-scores`, `compute`, `create`) go, `canManageAssessment` is checked against the specific `classId` supplied in the body before any write — proven correctly scoped for writes.
+
+### 2.4 `app/api/teacher/assessments/[assessmentId]/marks/route.ts` (legacy teacher-scoped)
+
+- **Authentication**: `requireAuthentication` → `resolveTeacher(userId)` — proven.
+- **Authorization**: `getAssessmentById(assessmentId, teacher.id)` — ownership is `teacher_id`-scoped (legacy pattern, distinct from Core's `school_id` scoping). If the assessment's `teacher_id` doesn't match, `getAssessmentById` returns null → 404. This is the **assessment repository's own query filter** (`lib/repositories/assessment.repository.ts:141-142`, `.eq('id', id).eq('teacher_id', teacherId)`), not an app-layer `if` — same "safe" shape as 2.2.
+- **Service-role query**: `db.from('class_students')...`, `db.from('students')...`, `db.from('student_alerts').insert(...)` (lines 104-133) run on the raw service client with no additional filter beyond `class_id` (already validated to belong to this teacher via the assessment lookup above). Correctly scoped, transitively.
+- **Note (architecture, not security)**: this route's ownership model is `teacher_id`, which CLAUDE.md explicitly says must never gate *read* access ("a learner's evidence does not become inaccessible or ownerless when [a teacher] transfers"). This repository's `.eq('teacher_id', teacherId)` pattern is stricter than necessary in the false-negative direction (a transferred-out teacher loses access they arguably should keep via `class_students`), not a security hole in the false-positive direction. Flagged for the architecture backlog, not this audit's Critical/High findings.
+
+### 2.5 `app/api/parent/alerts/route.ts`
+
+- **Authentication**: `requireAuthentication` — proven.
+- **Authorization**: `db.from('class_students').select('student_id').eq('parent_id', userId)` (lines 42-45) — this *is* the authorization check: it derives the caller's own linked `studentIds` directly from the DB using the authenticated `userId`, then uses those IDs (never client-supplied) to scope the alerts query (`.in('student_id', studentIds)`, line 68). **No client-suppliable resource ID is trusted anywhere in this route** — this is actually one of the safer patterns sampled, because there's no "check A, query B" split at all; the ID list itself comes from the auth-scoped lookup.
+- File's own comment (lines 7-13) flags this as a third distinct parent-ownership mechanism (`class_students.parent_id`), different from `students.parent_user_id` and Core's `learner_guardians` — an inconsistency (three ways to express "this is your child") but not a security gap in this route specifically.
+
+### 2.6 `app/api/students/[studentId]/route.ts` (DELETE/PATCH)
+
+- **Authentication**: `requireAuthentication` — proven.
+- **Authorization**: fetch-then-compare pattern — `db.from('students').select('id, user_id, added_by').eq('id', studentId)` (no scoping in the query itself), **then** an app-layer `if (student.user_id !== userId) return apiForbidden()` (line 48) / `if (student.parent_user_id !== userId) return apiForbidden()` (line 88) before the mutating query runs.
+- **This is the single-app-layer-`if`-gate pattern** (same shape as the report-card `is_published` check from Sprint 5A) — the service-role `SELECT` itself returns the row regardless of ownership; ownership is enforced entirely by the subsequent `if`. Here the blast radius is narrow (the route only deletes/nulls the caller's *own* row once the check passes — a bug in the `if` would let a wrong user delete/unlink an arbitrary student record, not read a broad dataset), but it is still a single point of failure per Part 3's classification.
+
+### 2.7 `app/api/school/intelligence/route.ts`
+
+- **Authentication**: `requireAuthentication` → `resolveTeacher(userId)` — proven.
+- **Authorization**: `repos.schools.findSchoolUserByUserId(userId)` derives the caller's own `school_id` from the DB (not client-supplied) — same safe "derive, don't trust" shape as 2.5.
+- **Service-role query**: `buildPrincipalDashboard(schoolUser.school_id)` — scoped to the derived school ID; not independently re-traced through every aggregate function inside `lib/school/intelligence.ts` in this sprint (sampled at the route boundary only — **UNKNOWN — internal aggregation functions not individually re-verified** for whether every one of their sub-queries stays scoped to the passed `school_id`, though the file's own header comment states "All output is anonymised — no individual student PII," which if true would limit blast radius even if a sub-query leaked).
+
+---
+
+## Part 3 — Defense in depth (classification)
+
+| Route | Single check identified | If deleted/buggy, what's exposed? | Classification | Why |
+|---|---|---|---|---|
+| `GET /api/core/reports?classId=&termId=` (2.1) | **None to delete** — the gap already exists today; there is no `school_id` filter in `findReportCardWithSubjects`/`listClassReportCards` to begin with | Any authenticated school staff member (own school) can read any other school's full report cards (grades, CBC levels, class rank, learner names) by guessing/enumerating `classId`/`learnerId` | **Single Point of Failure — already exploitable, not hypothetical** | Not "if a check breaks" — the check that should exist (school-id scoping on the read query) was never written. RLS is bypassed (service-role). No second layer exists. |
+| `GET /api/core/learners/[id]` (2.2) | `repos.learners.findById`'s `.eq('school_id', schoolId)` clause | If that one `.eq()` were removed, any staff member of any school could fetch any learner by ID | **Single Point of Failure, but currently correct** | One filter, no RLS backstop (service-role) — but unlike 2.1, the filter *is present today*. Rank as SPOF because nothing else would catch its removal in review (no test found asserting cross-school 404 for this specific route — `grep -rn "findById.*school" lib/repositories` shows no dedicated cross-tenant regression test for this method). |
+| `POST /api/core/assessments` (save-scores/compute/create) (2.3) | `canManageAssessment` result gating the write | If the `if (!(await canManageAssessment(...)))` were flipped or its result ignored, any authenticated school member could write assessment scores school-wide | **Single Point of Failure for writes**, but the route's own comment (lines 46-53) documents this was *already* found and fixed once (Stage 0 census gap #1) — meaning it has failed this exact way before. Elevated concern. |
+| `GET .../marks` (teacher-scoped) (2.4) | `.eq('teacher_id', teacherId)` in the repository query | If removed, any teacher could read any other teacher's assessment marks | **Partially Safe** | One filter, no RLS backstop, but blast radius is bounded to one teacher's one class's marks per request (not a whole-school sweep), and the filter lives in the repository query itself (a `WHERE`), not a post-fetch `if` — harder to "forget" than an app-layer check because it's inline in the only query that returns data. |
+| `GET /api/parent/alerts` (2.5) | The `class_students.parent_id = userId` lookup that *produces* the ID list used downstream | If that lookup were replaced by a client-supplied `studentIds` array, any parent could request any student's alerts | **Safe by construction** | There is no client-suppliable ID for an attacker to substitute — the scoping ID list is derived server-side from the authenticated user, not checked-then-trusted. This shape structurally prevents the classic "check A, query B" bug. |
+| `DELETE/PATCH /api/students/[studentId]` (2.6) | The `if (student.user_id !== userId)` / `if (student.parent_user_id !== userId)` post-fetch check | If deleted, any authenticated user could delete/unlink an arbitrary student record by ID | **Single Point of Failure**, but narrow blast radius (one record, a destructive-but-single-row action, not a bulk read) — classified separately from 2.1's "SPOF with full-dataset exposure." |
+| `GET /api/school/intelligence` (2.7) | `resolveTeacher` + `findSchoolUserByUserId` deriving `school_id` server-side | If `resolveTeacher` returned a false positive, wrong-school aggregate (anonymised, per file's own claim) dashboard data could leak | **Partially Safe** | Derived-ID shape (same safety property as 2.5) reduces risk versus a trusted client parameter, but the internal aggregation functions were not individually re-verified this sprint (see 2.7's UNKNOWN) — classification is provisional pending that trace. |
+
+---
+
+## Part 4 — Academic records risk, ranked
+
+| Group | Finding | Sole gate (file:line) | Rank |
+|---|---|---|---|
+| **Report Cards** (`app/api/core/reports/**`) | Confirmed cross-tenant read: no `school_id` filter anywhere between the `schoolId`-scoped auth check and the `learnerId`/`classId`-scoped data query | `lib/repositories/school.repository.ts:348-365` (`findReportCardWithSubjects`, no `school_id` filter) and `:410-417` (`listClassReportCards`, no `school_id` filter); the missing check would need to sit in `app/api/core/reports/route.ts:52-60` | **Critical** — full grade/CBC-level/rank exposure across tenants, reachable by any authenticated school staff member of *any* school, no privilege escalation required, only ID-guessing (UUIDs, so not trivially enumerable, but this is security-through-obscurity, not a control) |
+| `app/api/reports/report-card/**` (parent-facing) | The parent route (`app/api/reports/report-card/route.ts:39,46-47`) uses `requireParent(supabase, learnerId)` which checks the guardian link **for that exact `learnerId`** (not a separate schoolId), so this specific route does not share the Report Cards finding above — it is a different, safer shape (ID-scoped check, matching the ID used in the query). Re-verified per Sprint 5A's finding: the `is_published` check remains the sole publication gate (`route.ts:47`), unchanged, still Medium per 5A's own ranking, not re-elevated here since nothing new was found on that specific axis. | `app/api/reports/report-card/route.ts:47` | Medium (unchanged from Sprint 5A) |
+| **Assessments** (`app/api/core/assessments/**`, `app/api/teacher/assessments/**`) | Writes are correctly gated by `canManageAssessment` (composed admin-or-class-teacher check); one read path (`view=scores`) has unconfirmed scoping (Part 2.3, flagged UNKNOWN) | `app/api/core/assessments/route.ts:113-118` (`requireCanManageAssessment`, for writes) | High for the unconfirmed read path (severity unknown pending trace, treated as High until closed) — Low/none for the writes, which are correctly gated |
+| **Learner Profiles** (`app/api/core/learners/**`, `app/api/students/**`) | Core learner routes correctly double-scope (`learner.repository.ts:60-69`); legacy `app/api/students/[studentId]` uses a single post-fetch `if` ownership check with narrow (single-row, destructive) blast radius | `app/api/students/[studentId]/route.ts:48`, `:88` | Medium — SPOF but bounded blast radius, not a bulk-read exposure |
+| **Parent Views** (`app/api/parent/**`) | Sampled 5 files' pattern (alerts, and by extension the family) derives scoping IDs server-side from the authenticated user rather than trusting client-supplied IDs — the safer shape | `app/api/parent/alerts/route.ts:45` (the derivation, not a single trust point) | Low, for the sampled routes — **not exhaustively checked**; only 1 of 5 `parent/**` service-role files was read in full this sprint (`grep -rl "createServiceClient" app/api/parent` lists `alerts`, `assessments/process`, `compass-activity`, `link-student`, `whatsapp-optin` — the other 4 were not opened; flagged as sampled, not verified as a group) |
+| **Teacher Views** (`app/api/teacher/**`, 29 files with direct `createServiceClient`) | Sampled 1 of 29 in full (`marks`); this file uses the repository-query-filter shape (safer). This is the largest single group in the codebase and was sampled at roughly 3% coverage this sprint — **explicitly not characterized as a group**, only the one sampled file's pattern is reported | `app/api/teacher/assessments/[assessmentId]/marks/route.ts` (repository-level `.eq('teacher_id', teacherId)`) | UNKNOWN for the group as a whole — no claim made beyond the single sampled file |
+| **School Intelligence** (`app/api/school/**`) | Auth-derived `school_id` (safer shape) at the route boundary; internal aggregation functions not individually re-verified | `app/api/school/intelligence/route.ts:35-38` | Medium (provisional, pending internal trace) |
+
+---
+
+## Part 5 — Repository audit
+
+Sampled `assessment.repository.ts`, `school.repository.ts`, `learner.repository.ts`, `teacher.repository.ts` directly (full grep of every `.eq(` clause, not just method signatures).
+
+- **`learner.repository.ts`** — every learner-mutating and most learner-reading method takes and applies `schoolId` as a second `.eq('school_id', schoolId)` filter (`findById:60-69`, `findWithHistory:71-86`, `list:88-107`, `update:109-123`, `updateStatus:125-132`). **Enforces scope itself.** One exception: `updateStatusById` (`:134-140`) takes only `learnerId`, no `schoolId` — filters `.eq('id', learnerId)` only, trusting the caller. Not independently traced to its call site this sprint (flagged UNKNOWN whether the caller re-checks school ownership before calling it).
+- **`school.repository.ts`** — mixed. `updateReportCard` (`:315-329`) and `publishReportCards` (`:331-346`) **do** filter by `school_id`. `findReportCardWithSubjects` (`:348-365`) and `listClassReportCards` (`:410-417`) **do not** — this is the exact root cause of Part 4's Critical finding. Same repository file, inconsistent scoping discipline between its own methods — this is not a uniform pattern, it is method-by-method.
+- **`teacher.repository.ts`** — samples consistently apply `.eq('school_id', schoolId)` on school-scoped reads (`listStreams:44-48`, `listClasses:66-72`, `findClassById:78-83`, `listGradeSubjects:195-203`, `findSchoolUser:247-253`). **Enforces scope itself**, consistent with `learner.repository.ts`.
+- **`assessment.repository.ts`** (legacy) — consistently applies `.eq('teacher_id', teacherId)` (not `school_id` — this repository predates Core and has no school concept) on nearly every method sampled (`:141-142`, `:150-158`, `:164-175`, `:182-190`, `:317-325`, `:344-352`, `:411-417`, `:522-535`). **Enforces scope itself**, by teacher rather than school (see Part 2.4's architecture note on why `teacher_id`-as-access-gate is itself a separate, non-security concern flagged for the backlog).
+
+**Conclusion**: repository-level scoping is the *dominant* pattern (most methods sampled do filter by the caller's own school/teacher ID inside the query, which is the correct defense-in-depth shape even with RLS bypassed) — but it is **not universal or systematic**. `school.repository.ts`'s two report-card read methods are a confirmed counter-example in the same file as three correctly-scoped siblings, meaning a developer copying an existing pattern in that file has roughly even odds of copying the safe or unsafe one. No lint rule, base-class assertion, or code convention was found enforcing "every repository method must filter by a tenant-scoping column" — it is done by individual-method discipline only (`grep -rn "school_id\|tenant\|scope" lib/repositories/base.ts` → no matches; `BaseRepository` itself carries no scoping mechanism, only the service-role client).
+
+---
+
+## Part 6 — Minimum future hardening
+
+Scoped strictly to what Parts 3-5 actually found — no unrelated redesign:
+
+1. **Closes the Part 4 Critical finding directly**: add `.eq('school_id', schoolId)` to `findReportCardWithSubjects` and `listClassReportCards` (`lib/repositories/school.repository.ts:348-365`, `:410-417`), threading `schoolId` through `getReportCard`/`listClassReportCards` (`lib/core/report-cards.ts:143-154`) from `app/api/core/reports/route.ts`'s already-verified `schoolId`. This is the single smallest fix that closes the confirmed cross-tenant leak — matches the pattern already used correctly three lines away in the same repository file (`updateReportCard`, `publishReportCards`).
+2. **A repository-level convention, not a redesign**: for any repository method whose table has a `school_id` (or equivalent tenant) column, require the method to accept and apply that filter — could be enforced lightly via a code-review checklist item or, more durably, a lint rule similar to the existing Evidence-domain guardrail (`eslint.config.mjs`'s `no-restricted-syntax` block) flagging `.from('school_report_cards')` (or other tenant-scoped tables) calls inside `lib/repositories/*.ts` that lack a `.eq('school_id', ...)` in the same chain — mirrors the precedent already set for `repos.evidence.findByLearner` in the same config file.
+3. **Re-enable RLS as a backstop specifically for tenant-scoped tables accessed via `BaseRepository`**: since 100% of `BaseRepository` subclasses use service-role (Part 1.2), RLS provides zero protection today for any of them (matches Sprint 5A's Part 4.6 finding, now shown to be systemic, not report-card-specific). The smallest version of this is not "stop using service-role" (a large architectural change) but adding an integration-test suite that asserts, per tenant-scoped repository method, that querying with School A's caller and School B's resource ID returns nothing — turning the RLS policies that already exist in the migrations (confirmed present for `school_report_cards` per Sprint 5A) into an enforced contract even though the runtime path bypasses them.
+4. **Close the two flagged UNKNOWNs from Part 2/4** (assessment `view=scores` read scoping, `school/intelligence`'s internal aggregation scoping, `learner.repository.ts::updateStatusById`'s caller) with a targeted trace — small, bounded follow-up, not a new sprint-sized effort.
+5. **Do not** propose a blanket "stop using service-role" — Part 1 shows it is load-bearing across effectively the entire server-side data layer; removing it wholesale would require re-deriving RLS policies for every table currently relying on app-layer checks, which is a multi-sprint migration, not a minimum fix.
+
+---
+
+## Part 7 — Executive verdict
+
+**Is service-role usage appropriately contained (cron/webhook only, per CLAUDE.md), or is it the default pattern everywhere?**
+**It is the default pattern everywhere**, contradicting the literal cron/webhook-only framing of "The service role client bypasses RLS — use it only for cron jobs and webhooks." In practice, CLAUDE.md's *other* stated rule — "Server-side DB: always use `createServiceClient()`" — is the one the codebase actually follows: 175 files reference it directly, every one of the 24 `BaseRepository` subclasses uses it unconditionally (including the entire Core/school-scoped domain, which has zero direct `createServiceClient` imports precisely because it's threaded through repositories instead), and cron/webhook routes (`app/api/cron/**`, `payments/callback`, `whatsapp/inbound` — 15 files) are a small minority of total usage, not the primary use case. This is a real, load-bearing architectural fact about the codebase, not a violation waiting to be "fixed" by literally restricting service-role to cron/webhooks — that would require rebuilding RLS-aware access for nearly every route. The two CLAUDE.md rules are not reconciled in the code or in any doc found; they simply coexist, and the "always use createServiceClient" rule is the one that actually governs.
+
+**Does any production endpoint rely on exactly one authorization check as its only protection against cross-tenant academic-record exposure?**
+**Yes — worse than that, in one confirmed case there is no check at all where one is needed.** The highest-risk finding: `GET /api/core/reports?schoolId=<own>&classId=<any>&termId=<any>` (and the `learnerId` variant) returns another school's full report cards — grades, CBC levels, class rank, learner names — because `lib/repositories/school.repository.ts:348-365` (`findReportCardWithSubjects`) and `:410-417` (`listClassReportCards`) never filter by `school_id`, while the route's own authorization check (`app/api/core/reports/route.ts:43`, `requireSchoolMembership(supabase, schoolId)`) validates a *different* parameter than the one used in the data query. Classified in Part 3 as **Single Point of Failure — already exploitable, not hypothetical** (the strongest classification used in this audit — every other SPOF found has a check that is *currently correct* and could merely break in future; this one is already missing).
+
+**Which finding should be addressed first, and why?**
+The Report Cards cross-tenant read gap (Part 4, Part 6 item 1). Justification: (a) it is the only finding in this audit that is confirmed exploitable *today*, with no hypothetical "if a check were deleted" framing required; (b) the blast radius is a full academic record — the same class of data Sprint 5A already flagged as sensitive — across tenant boundaries, which is a materially worse exposure than any single-school, single-record SPOF found elsewhere in this audit; (c) the fix is small and precisely scoped (two `.eq()` additions plus threading one existing, already-verified parameter), matching the "smallest fix" discipline this project's Phase B mode requires, and it reuses an already-correct pattern that exists three lines away in the same file — no new design work needed.
+
+---
+
+## Coverage summary
+
+- **Exhaustive** (grep-derived, complete): total `createServiceClient` file count (175), per-group route file counts, `BaseRepository` subclass list (24), ESLint config review (no service-role restriction rule exists — only the unrelated Evidence-domain read guardrail).
+- **Sampled** (representative files read in full, not the whole group): Core (`reports`, `learners/[id]`, `assessments` — 3 of 11), Teacher (`assessments/[assessmentId]/marks` — 1 of 29), Parent (`alerts` — 1 of 5), Student (`students/[studentId]` — 1 of 7), School (`school/intelligence` — 1 of 1 in that specific subpath), Cron/webhook (`payments/callback`, `cron/friday-generation` header check — 2 of 15), Repositories (`learner`, `school`, `teacher`, `assessment` — 4 of 24).
+- **Not examined this sprint, flagged rather than assumed**: the remaining ~26 `app/api/teacher/**` service-role files, 4 of 5 `app/api/parent/**` files, `admin/**` (11 files, role-gating not verified), `academy/**`, `insights/**` `lib/` modules' per-call authorization context, and every repository not in the sampled set of 4 (20 remaining `BaseRepository` subclasses).
