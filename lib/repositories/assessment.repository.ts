@@ -1000,6 +1000,27 @@ export class AssessmentRepository extends BaseRepository {
     return data ?? []
   }
 
+  // Sprint 10A: same legacy-vs-Core class_id split as
+  // findPublishedAssessmentsByClassIds — a Core classId can bridge to zero
+  // or more legacy teacher_classes ids, so this must be an `.in()` query,
+  // not `.eq()`.
+  async listAssessmentsByClassIds(
+    classIds: string[],
+    filters?: { term?: string; year?: number },
+  ): Promise<Record<string, unknown>[]> {
+    if (!classIds.length) return []
+    let query = this.db
+      .from('class_assessments')
+      .select(this.CORE_ASSESSMENT_COLS)
+      .in('class_id', classIds)
+      .order('created_at', { ascending: false })
+    if (filters?.term) query = query.eq('term', filters.term)
+    if (filters?.year) query = query.eq('year', filters.year)
+    const { data, error } = await query
+    if (error) throw new Error(`listAssessmentsByClassIds: ${error.message}`)
+    return data ?? []
+  }
+
   async createCoreAssessment(input: {
     class_id: string
     teacher_id: string

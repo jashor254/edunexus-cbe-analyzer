@@ -51,6 +51,28 @@ For any Core-native/bridged school, every `upsertTermSubjectSummaries` call insi
 
 ---
 
+## 2026-07-16 — Sprint 10A Commit 2: End-of-Term Workflow Activation (verification)
+
+**What changed**: found and fixed a third instance of Commit 1's class_id identity-space bug (this one in `listAssessments`/`runEndOfTerm`'s own lock check, not `computeTermSummaries`), then proved the complete End-of-Term journey works end-to-end against real bridged fixture data — Assessment → Evidence → Projection → Summaries → Ranking → Report Cards → Publication → Parent view → Term closed — via a new integration test that drives `runEndOfTerm()` exactly as a school would. No new orchestration, routes, or UI were added — per user direction, this commit was scoped to verification only.
+
+**Root cause (third instance of the same bug class)**: `listAssessments` (`lib/core/assessments.ts`, called by `runEndOfTerm`'s unpublished-assessment lock check and by `GET /api/core/assessments`) queried `class_assessments.class_id` directly with the caller-supplied `classId` — but every real caller supplies a Core `classId`, and `class_assessments.class_id` FKs to legacy `teacher_classes.id` (confirmed live, same as Commit 1's finding). The lock check was therefore always vacuously "no unpublished assessments found," regardless of actual state — not a crash, a silent no-op, which is why it wasn't caught by Commit 1's tests (those called `computeTermSummaries` directly, never through the full `runEndOfTerm` lock-check path).
+
+**Repair**: same bridge-resolution pattern as Commit 1, no new mechanism — `lib/repositories/assessment.repository.ts::listAssessmentsByClassIds` (new, batched `.in()` variant), `lib/core/assessments.ts::listAssessments` now resolves the Core `classId` to its bridged legacy class id(s) via `repos.teachers.findLegacyClassIdsByExternalId` before querying, mirroring `computeTermSummaries`'s existing fix.
+
+**Step 1/2 audit finding (verification, not a defect)**: every End-of-Term stage — compute (`/api/core/assessments`, action=`compute`), generate/publish (`/api/core/reports`), and the one-shot orchestrator (`/api/core/school/end-of-term`) — was already correctly orchestrated, correctly ordered, and correctly permission-gated at the API layer once Commit 1 + this commit's fix landed. The only genuine "dormancy" is UI reachability: no teacher/admin page calls any Core report-card route (`app/teacher/reports` is the unrelated legacy Academic Clinic PDF system, confirmed by reading it). Parent side is not dormant — `app/(parent)/report-card/page.tsx` already exists, already published-only gated, SH-001 tests already passing. Per explicit user direction, closing the teacher/admin UI gap was deferred rather than built this commit — documented as the readiness state below rather than left silent.
+
+**Tests added**: `lib/core/endOfTermFullChain.test.ts` (1 comprehensive integration test, real synthetic Supabase data) — two learners with different scores through the full pipeline, asserting: the lock check correctly blocks on a real unpublished assessment (not vacuously), Ranking assigns correct positions or ties, Grading assigns correct CBC levels, the parent-facing `getReportCard` only returns the report once published, `setCurrentTerm` correctly archives the old term and activates the new one, and — Step 4's failure-recovery requirement — re-running `runEndOfTerm()` after publication fails safely (existing Sprint 5B guard) without corrupting the already-published cards. Full regression: all suites from Commit 1 re-run and still green (70 + 36 tests), plus `permissions`, `identity`, `context`, `coreAssessmentTypeIntegrity` (this commit's additional regression scope) — 2 unrelated transient network failures (`TypeError: fetch failed`) reproduced as passing in isolation, not real regressions. Typecheck and lint clean on all changed files.
+
+**Leadership status API (Step 7, documented per the mission's own "don't build dashboards" allowance)**: `GET /api/core/reports?classId=&termId=` already returns every report card's `is_published` state per learner — sufficient to observe generation/publication progress without new UI.
+
+**Architectural documents referenced**: same as Commit 1 — `docs/architecture/learning-intelligence-migration-strategy.md` §3 (bridge scoping respected, no new bridge mechanism).
+
+**ADR**: None — same class of fix as Commit 1, no new identity/layer/domain.
+
+**Rollback considerations**: two files changed (`lib/core/assessments.ts`, `lib/repositories/assessment.repository.ts`) plus one new test file, independently revertible via `git checkout --`. Reverting restores the pre-fix state where `runEndOfTerm`'s lock check is a silent no-op for any bridged school — a known-broken state, not a regression risk.
+
+---
+
 ## 2026-07-16 — Sprint 9G: Canonical Academic Read Path Migration (IMPLEMENTATION)
 
 **What changed**: audited every academic read surface (Teacher Dashboard, the roster-based class view, Learner Timeline, Career Intelligence, Academic Clinic, Compass, Report Cards) against the canonical identity chain, and extended `lib/core/academicBridge.ts` with four small resolve-then-call wrapper functions plus one real gap fix (`class_students` roster visibility), rather than a broad rewrite — because the audit's central finding is that almost nothing needed migrating in the sense of "point this query at a different table."

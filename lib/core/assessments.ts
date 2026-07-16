@@ -45,7 +45,14 @@ export async function listAssessments(
   classId: string,
   filters?: { term?: string; year?: number }
 ): Promise<AssessmentConfig[]> {
-  const data = await repos.assessments.listAssessmentsByClass(classId, filters)
+  // Sprint 10A: class_assessments.class_id FKs to legacy teacher_classes,
+  // never Core `classes` (same finding as computeTermSummaries) — a
+  // caller passing a Core classId here (every real caller: runEndOfTerm's
+  // lock check, the GET /api/core/assessments list view) would otherwise
+  // always see zero assessments, silently. Resolve through the bridge first.
+  const legacyClassIds = await repos.teachers.findLegacyClassIdsByExternalId(classId)
+  if (!legacyClassIds.length) return []
+  const data = await repos.assessments.listAssessmentsByClassIds(legacyClassIds, filters)
   return data as unknown as AssessmentConfig[]
 }
 
