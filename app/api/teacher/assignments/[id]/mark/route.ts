@@ -4,6 +4,9 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound, apiBadRequest } from '@/lib/api/response'
 import { notifyAssignmentMarked } from '@/lib/notifications/notify'
 import { recordAssignmentMarkEvidence } from '@/lib/assignments/evidence'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 const MarkSubmissionSchema = z.object({
   submissionId: z.string().uuid().optional(),
@@ -22,19 +25,18 @@ export async function POST(
   try {
     const { id: assignmentId } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
+
+    const teacher = await resolveTeacher(userId)
+    if (!teacher) return apiForbidden()
 
     const db = createServiceClient()
-
-    // Teacher auth check
-    const { data: teacher } = await db
-      .from('teachers')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!teacher) return apiForbidden()
 
     // Verify assignment belongs to this teacher
     const { data: assignment } = await db
@@ -90,7 +92,7 @@ export async function POST(
       recordAssignmentMarkEvidence({
         studentId:     submission.student_id as string,
         teacherId:     teacher.id,
-        teacherUserId: user.id,
+        teacherUserId: userId,
         assignmentId,
         subject:       assignment.subject as string,
         topic:         (assignment.topic as string | null) ?? null,

@@ -1,11 +1,14 @@
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
-import { createServiceClient } from '@/utils/supabase/service'
 import {
   apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest, apiNotFound,
 } from '@/lib/api/response'
 import { getAssessmentContext } from '@/lib/assessments/getters'
 import { updateAssessment } from '@/lib/assessments/mutations'
+import { KNOWN_ASSESSMENT_TYPES } from '@/lib/assessments/assessmentTypeCatalog'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 export async function GET(
   _req: Request,
@@ -14,11 +17,15 @@ export async function GET(
   try {
     const { assessmentId } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
-    const db = createServiceClient()
-    const { data: teacher } = await db.from('teachers').select('id').eq('user_id', user.id).single()
+    const teacher = await resolveTeacher(userId)
     if (!teacher) return apiForbidden()
 
     const ctx = await getAssessmentContext(assessmentId, teacher.id)
@@ -33,7 +40,7 @@ export async function GET(
 
 const PatchSchema = z.object({
   title:          z.string().min(1).max(200).optional(),
-  assessmentType: z.enum(['exam', 'cat', 'midterm', 'endterm', 'opener', 'assignment']).optional(),
+  assessmentType: z.enum(KNOWN_ASSESSMENT_TYPES).optional(),
   term:           z.enum(['1', '2', '3']).optional(),
   year:           z.number().int().min(2020).max(2100).optional(),
   maxScore:       z.number().int().min(1).max(1000).optional(),
@@ -47,11 +54,15 @@ export async function PATCH(
   try {
     const { assessmentId } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
-    const db = createServiceClient()
-    const { data: teacher } = await db.from('teachers').select('id').eq('user_id', user.id).single()
+    const teacher = await resolveTeacher(userId)
     if (!teacher) return apiForbidden()
 
     const parsed = PatchSchema.safeParse(await req.json())

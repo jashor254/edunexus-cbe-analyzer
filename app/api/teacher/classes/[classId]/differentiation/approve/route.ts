@@ -8,10 +8,12 @@
 
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
-import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
 import { approveClassDifferentiation } from '@/lib/adaptiveLearning/differentiation'
 import type { ClassGroups } from '@/lib/adaptiveLearning/recommend'
+import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 const AdaptiveTaskSchema = z.object({
   observation: z.string(),
@@ -42,20 +44,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ classId
   try {
     const { classId } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
-    const db = createServiceClient()
-    const { data: teacher } = await db.from('teachers').select('id').eq('user_id', user.id).single()
+    const teacher = await resolveTeacher(userId)
     if (!teacher) return apiForbidden()
 
-    const { data: cls } = await db
-      .from('teacher_classes')
-      .select('id')
-      .eq('id', classId)
-      .eq('teacher_id', teacher.id)
-      .maybeSingle()
-    if (!cls) return apiForbidden()
+    try {
+      await requireClassTeacher(supabase, classId)
+    } catch {
+      return apiForbidden()
+    }
 
     const parsed = BodySchema.safeParse(await req.json())
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')

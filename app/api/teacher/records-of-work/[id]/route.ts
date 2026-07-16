@@ -2,6 +2,9 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 const UpdateRowEntrySchema = z.object({
   entryId:     z.string().uuid(),
@@ -15,12 +18,18 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   try {
     const { id } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
+
+    const teacher = await resolveTeacher(userId)
+    if (!teacher) return apiForbidden()
 
     const db = createServiceClient()
-    const { data: teacher } = await db.from('teachers').select('id').eq('user_id', user.id).single()
-    if (!teacher) return apiForbidden()
 
     const { data: row, error } = await db
       .from('records_of_work')
@@ -48,12 +57,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   try {
     const { id } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
+
+    const teacher = await resolveTeacher(userId)
+    if (!teacher) return apiForbidden()
 
     const db = createServiceClient()
-    const { data: teacher } = await db.from('teachers').select('id').eq('user_id', user.id).single()
-    if (!teacher) return apiForbidden()
 
     const { data: row } = await db.from('records_of_work').select('id').eq('id', id).eq('teacher_id', teacher.id).single()
     if (!row) return apiForbidden()
@@ -82,12 +97,18 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   try {
     const { id } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
+
+    const teacher = await resolveTeacher(userId)
+    if (!teacher) return apiForbidden()
 
     const db = createServiceClient()
-    const { data: teacher } = await db.from('teachers').select('id').eq('user_id', user.id).single()
-    if (!teacher) return apiForbidden()
 
     await db.from('records_of_work').delete().eq('id', id).eq('teacher_id', teacher.id)
     return apiSuccess({ ok: true })

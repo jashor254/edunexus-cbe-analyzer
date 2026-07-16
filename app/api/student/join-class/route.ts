@@ -2,6 +2,8 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiNotFound, apiBadRequest } from '@/lib/api/response'
+import { requireAuthentication, requireStudent } from '@/lib/core/permissions'
+import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
 
 const JoinClassSchema = z.object({
   classCode: z.string().min(1),
@@ -11,8 +13,13 @@ const JoinClassSchema = z.object({
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const parsed = JoinClassSchema.safeParse(await req.json())
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'classCode and studentId are required')
@@ -21,14 +28,12 @@ export async function POST(req: Request) {
     const db = createServiceClient()
 
     // Verify student belongs to this user
-    const { data: student } = await db
-      .from('students')
-      .select('id, name, grade')
-      .eq('id', studentId)
-      .eq('user_id', user.id)
-      .single()
-
-    if (!student) return apiError('Student not found or not yours', 403)
+    try {
+      await requireStudent(supabase, studentId)
+    } catch (err) {
+      if (isEduNexusError(err)) return apiError('Student not found or not yours', 403)
+      throw err
+    }
 
     // Find class by code
     const { data: cls } = await db
@@ -60,7 +65,7 @@ export async function POST(req: Request) {
       .insert({
         class_id: cls.id,
         student_id: studentId,
-        parent_id: user.id,
+        parent_id: userId,
       })
 
     if (error) {

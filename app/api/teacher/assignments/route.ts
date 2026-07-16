@@ -4,6 +4,9 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
 import { publishEvent } from '@/lib/events'
 import { timedQuery } from '@/lib/observability/queryTiming'
+import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 const CreateAssignmentSchema = z.object({
   class_id:              z.string().uuid(),
@@ -23,18 +26,18 @@ const CreateAssignmentSchema = z.object({
 export async function GET() {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
+
+    const teacher = await resolveTeacher(userId)
+    if (!teacher) return apiForbidden()
 
     const db = createServiceClient()
-
-    const { data: teacher } = await db
-      .from('teachers')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!teacher) return apiForbidden()
 
     const { data: assignments, error } = await timedQuery('assignments', 'listByTeacher', async () => db
       .from('assignments')
@@ -88,32 +91,29 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
+
+    const teacher = await resolveTeacher(userId)
+    if (!teacher) return apiForbidden()
 
     const db = createServiceClient()
-
-    const { data: teacher } = await db
-      .from('teachers')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!teacher) return apiForbidden()
 
     const parsed = CreateAssignmentSchema.safeParse(await req.json())
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
     const { class_id, title, subject, topic, instructions, due_date, type, max_score, is_compass_guided, is_holiday_assignment, holiday_period, lesson_plan_id } = parsed.data
 
     // Verify class belongs to teacher
-    const { data: cls } = await db
-      .from('teacher_classes')
-      .select('id')
-      .eq('id', class_id)
-      .eq('teacher_id', teacher.id)
-      .single()
-
-    if (!cls) return apiForbidden()
+    try {
+      await requireClassTeacher(supabase, class_id)
+    } catch {
+      return apiForbidden()
+    }
 
     const { data: assignment, error } = await db
       .from('assignments')

@@ -7,6 +7,8 @@ import { createServiceClient } from '@/utils/supabase/service'
 import {
   apiSuccess, apiError, apiUnauthorized, apiBadRequest,
 } from '@/lib/api/response'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 const BodySchema = z.object({
   student_id: z.string().uuid(),
@@ -16,8 +18,13 @@ const BodySchema = z.object({
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let user: { id: string; email: string | null }
+    try {
+      user = await requireAuthentication(supabase)
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const parsed = BodySchema.safeParse(await req.json())
     if (!parsed.success) {

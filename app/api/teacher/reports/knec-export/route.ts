@@ -1,6 +1,8 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
+import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissions'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 const SUBJECT_LABELS: Record<string, string> = {
   mathematics: 'Mathematics',
@@ -38,15 +40,25 @@ function escapeCSV(val: string | number | null | undefined): string {
 export async function GET(req: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const db = createServiceClient()
 
+    // Full teacher row needed below (full_name/school for CSV rows), so the
+    // canonical `resolveTeacher` (which doesn't carry `school`) isn't a
+    // complete substitute here — this dual-purpose query still serves as the
+    // "does a teacher record exist" gate, same treatment as Batch C's
+    // students/route.ts POST.
     const { data: teacher } = await db
       .from('teachers')
       .select('id, full_name, school')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single()
 
     if (!teacher) return apiForbidden()
@@ -59,6 +71,12 @@ export async function GET(req: Request) {
     if (!classId) return apiError('classId is required', 400)
 
     // Verify class belongs to teacher
+    try {
+      await requireClassTeacher(supabase, classId)
+    } catch {
+      return apiForbidden()
+    }
+
     const { data: cls } = await db
       .from('teacher_classes')
       .select('id, name, grade, subject')

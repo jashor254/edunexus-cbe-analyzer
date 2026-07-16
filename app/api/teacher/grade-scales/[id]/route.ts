@@ -1,8 +1,10 @@
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
-import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
 import { updateGradeScale, deleteGradeScale } from '@/lib/assessments/gradeScales'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 const BandSchema = z.object({
   label:    z.string().min(1).max(10),
@@ -18,12 +20,6 @@ const UpdateSchema = z.object({
   isDefault:      z.boolean().optional(),
 })
 
-async function getTeacher(user: { id: string }) {
-  const db = createServiceClient()
-  const { data } = await db.from('teachers').select('id').eq('user_id', user.id).single()
-  return data
-}
-
 export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -31,10 +27,15 @@ export async function PUT(
   try {
     const { id } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
-    const teacher = await getTeacher(user)
+    const teacher = await resolveTeacher(userId)
     if (!teacher) return apiForbidden()
 
     const parsed = UpdateSchema.safeParse(await req.json())
@@ -55,10 +56,15 @@ export async function DELETE(
   try {
     const { id } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
-    const teacher = await getTeacher(user)
+    const teacher = await resolveTeacher(userId)
     if (!teacher) return apiForbidden()
 
     await deleteGradeScale(id, teacher.id)

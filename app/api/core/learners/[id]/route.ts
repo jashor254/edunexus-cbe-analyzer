@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { getLearner, updateLearner, getLearnerHistory, enrollLearner, withdrawLearner } from '@/lib/core/learners'
-import { getSchoolUser } from '@/lib/core/school-users'
+import { requireSchoolMembership, requireSchoolAdmin, requireSchoolStaff } from '@/lib/core/permissions'
+import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
 import { z } from 'zod'
 
 const UpdateSchema = z.object({
@@ -27,17 +28,24 @@ const EnrollSchema = z.object({
 
 type Params = { params: Promise<{ id: string }> }
 
+function errorResponse(err: unknown): NextResponse {
+  if (err instanceof UnauthorizedError) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (isEduNexusError(err)) return NextResponse.json({ error: 'Forbidden' }, { status: err.statusCode })
+  throw err
+}
+
 export async function GET(req: NextRequest, { params }: Params): Promise<NextResponse> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params
   const schoolId = req.nextUrl.searchParams.get('schoolId')
   if (!schoolId) return NextResponse.json({ error: 'schoolId required' }, { status: 400 })
 
-  const schoolUser = await getSchoolUser(user.id, schoolId)
-  if (!schoolUser) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  try {
+    await requireSchoolMembership(supabase, schoolId)
+  } catch (err) {
+    return errorResponse(err)
+  }
 
   const view = req.nextUrl.searchParams.get('view')
   if (view === 'history') {
@@ -51,8 +59,6 @@ export async function GET(req: NextRequest, { params }: Params): Promise<NextRes
 
 export async function PATCH(req: NextRequest, { params }: Params): Promise<NextResponse> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params
   const body = await req.json()
@@ -61,9 +67,10 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
     const parsed = EnrollSchema.safeParse(body)
     if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
     const { schoolId, ...rest } = parsed.data
-    const schoolUser = await getSchoolUser(user.id, schoolId)
-    if (!schoolUser || !['school_admin', 'headteacher', 'deputy_headteacher', 'teacher'].includes(schoolUser.role)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    try {
+      await requireSchoolStaff(supabase, schoolId)
+    } catch (err) {
+      return errorResponse(err)
     }
     const data = await enrollLearner({ school_id: schoolId, learner_id: id, ...rest })
     return NextResponse.json({ data })
@@ -71,9 +78,10 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
 
   if (body.action === 'withdraw') {
     const { schoolId, termId } = body
-    const schoolUser = await getSchoolUser(user.id, schoolId)
-    if (!schoolUser || !['school_admin', 'headteacher', 'deputy_headteacher'].includes(schoolUser.role)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    try {
+      await requireSchoolAdmin(supabase, schoolId)
+    } catch (err) {
+      return errorResponse(err)
     }
     await withdrawLearner(id, termId)
     return NextResponse.json({ data: { success: true } })
@@ -83,9 +91,10 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
   const { schoolId, ...updates } = parsed.data
-  const schoolUser = await getSchoolUser(user.id, schoolId)
-  if (!schoolUser || !['school_admin', 'headteacher', 'deputy_headteacher'].includes(schoolUser.role)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  try {
+    await requireSchoolAdmin(supabase, schoolId)
+  } catch (err) {
+    return errorResponse(err)
   }
 
   const data = await updateLearner(id, schoolId, updates)

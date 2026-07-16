@@ -1,7 +1,10 @@
 import { createClient } from '@/utils/supabase/server'
-import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest, apiNotFound } from '@/lib/api/response'
 import { getCohortData } from '@/lib/assessments/cohortQueries'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
+import { resolveTeacherGradeBoundaries } from '@/lib/core/school'
 
 export async function GET(
   req: Request,
@@ -20,14 +23,19 @@ export async function GET(
     if (isNaN(year)) return apiBadRequest('year is required')
 
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
-    const db = createServiceClient()
-    const { data: teacher } = await db.from('teachers').select('id').eq('user_id', user.id).single()
+    const teacher = await resolveTeacher(userId)
     if (!teacher) return apiForbidden()
 
-    const cohort = await getCohortData(teacher.id, grade, term, year)
+    const gradeBoundaries = await resolveTeacherGradeBoundaries(teacher.id)
+    const cohort = await getCohortData(teacher.id, grade, term, year, gradeBoundaries)
     if (!cohort) return apiNotFound('No cohort data found for this grade / term / year')
 
     return apiSuccess({ cohort })

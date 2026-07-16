@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createSchool, getSchool, updateSchool, getSchoolSettings, upsertSchoolSettings } from '@/lib/core/school'
-import { getSchoolUser } from '@/lib/core/school-users'
+import { requireAuthentication, requireSchoolMembership } from '@/lib/core/permissions'
+import { UnauthorizedError, PermissionDeniedError, isEduNexusError } from '@/lib/core/errors'
 import type { SchoolSettings } from '@/types/core'
 import { z } from 'zod'
 
@@ -38,32 +39,43 @@ const UpdateSettingsSchema = z.object({
   grade_boundaries: z.record(z.string(), z.object({ min: z.number() })).optional(),
 })
 
+function errorResponse(err: unknown): NextResponse {
+  if (err instanceof UnauthorizedError) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (isEduNexusError(err)) return NextResponse.json({ error: 'Forbidden' }, { status: err.statusCode })
+  throw err
+}
+
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
   const parsed = CreateSchoolSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
-  // No existing schoolId to check membership against yet — same rule as
-  // organization creation (app/api/organizations/create): any authenticated
-  // user may create a school, and becomes its first school_admin.
-  const { school, schoolUser } = await createSchool(parsed.data, user.id)
+  let userId: string
+  try {
+    userId = (await requireAuthentication(supabase)).id
+  } catch (err) {
+    return errorResponse(err)
+  }
+
+  // No existing schoolId to check membership against yet — any authenticated
+  // user may create a school, and becomes its first school_admin (unchanged).
+  const { school, schoolUser } = await createSchool(parsed.data, userId)
   return NextResponse.json({ data: { school, schoolUser } }, { status: 201 })
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const schoolId = req.nextUrl.searchParams.get('schoolId')
   if (!schoolId) return NextResponse.json({ error: 'schoolId required' }, { status: 400 })
 
-  const schoolUser = await getSchoolUser(user.id, schoolId)
-  if (!schoolUser) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  try {
+    await requireSchoolMembership(supabase, schoolId)
+  } catch (err) {
+    return errorResponse(err)
+  }
 
   const [school, settings] = await Promise.all([
     getSchool(schoolId),
@@ -75,17 +87,23 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
 export async function PATCH(req: NextRequest): Promise<NextResponse> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
   const { schoolId, type, ...rest } = body
 
   if (!schoolId) return NextResponse.json({ error: 'schoolId required' }, { status: 400 })
 
-  const schoolUser = await getSchoolUser(user.id, schoolId)
-  if (!schoolUser || !['school_admin', 'headteacher'].includes(schoolUser.role)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  try {
+    // NOTE: intentionally NOT `requireSchoolAdmin` — this route's existing role
+    // set is ['school_admin', 'headteacher'] only, excluding 'deputy_headteacher',
+    // unlike every other admin-gated route in this batch. This is a pre-existing
+    // inconsistency discovered during Sprint 1B migration, not one of the two
+    // named security fixes for this sprint — preserved exactly, not touched,
+    // per "business logic must remain IDENTICAL." Flagged for a future sprint.
+    const membership = await requireSchoolMembership(supabase, schoolId)
+    if (!['school_admin', 'headteacher'].includes(membership.role)) throw new PermissionDeniedError()
+  } catch (err) {
+    return errorResponse(err)
   }
 
   if (type === 'settings') {

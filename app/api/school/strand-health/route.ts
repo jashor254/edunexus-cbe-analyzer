@@ -7,6 +7,9 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
 import { repos } from '@/lib/repositories'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 type StrandRow = {
   substrand: string
@@ -28,14 +31,19 @@ type StrandHealthResponse = {
 export async function GET(req: Request): Promise<Response> {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const db = createServiceClient()
-    const teacher = await repos.teachers.findTeacherByUserId(user.id)
+    const teacher = await resolveTeacher(userId)
     if (!teacher) return apiForbidden()
 
-    const schoolUser = await repos.schools.findSchoolUserByUserId(user.id)
+    const schoolUser = await repos.schools.findSchoolUserByUserId(userId)
     if (!schoolUser) return apiError('Teacher is not associated with a school', 403)
 
     const url     = new URL(req.url)

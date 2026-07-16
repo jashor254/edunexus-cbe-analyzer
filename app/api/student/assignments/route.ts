@@ -1,12 +1,30 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
+import { requireAuthentication, requireStudent, requireParent } from '@/lib/core/permissions'
+import { UnauthorizedError } from '@/lib/core/errors'
+
+/**
+ * Preserves the exact original union check
+ * (`.or(user_id.eq,parent_user_id.eq)`) for a specific studentId, composed
+ * from the canonical self/parent gates rather than reimplemented — same
+ * pattern as app/api/parent/assessments/process and whatsapp-optin (Batch F).
+ */
+async function isSelfOrParentOf(client: Awaited<ReturnType<typeof createClient>>, studentId: string): Promise<boolean> {
+  try { await requireStudent(client, studentId); return true } catch { /* fall through */ }
+  try { await requireParent(client, studentId); return true } catch { return false }
+}
 
 export async function GET(req: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const { searchParams } = new URL(req.url)
     const studentId = searchParams.get('studentId')
@@ -16,19 +34,13 @@ export async function GET(req: Request) {
     // Get the student (verify it belongs to this user)
     let targetStudentId = studentId
     if (studentId) {
-      const { data: student } = await db
-        .from('students')
-        .select('id')
-        .eq('id', studentId)
-        .or(`user_id.eq.${user.id},parent_user_id.eq.${user.id}`)
-        .single()
-      if (!student) return apiError('Student not found', 403)
+      if (!(await isSelfOrParentOf(supabase, studentId))) return apiError('Student not found', 403)
     } else {
       // Get all students for this user
       const { data: students } = await db
         .from('students')
         .select('id')
-        .or(`user_id.eq.${user.id},parent_user_id.eq.${user.id}`)
+        .or(`user_id.eq.${userId},parent_user_id.eq.${userId}`)
         .limit(1)
       targetStudentId = students?.[0]?.id || null
     }

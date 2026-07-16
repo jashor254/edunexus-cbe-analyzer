@@ -3,6 +3,28 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
 import { sendWelcomeMessage } from '@/lib/whatsapp/sender'
+import { requireAuthentication, requireStudent, requireParent } from '@/lib/core/permissions'
+import { UnauthorizedError } from '@/lib/core/errors'
+
+/**
+ * Preserves the exact original `.or(user_id.eq,parent_user_id.eq)` check
+ * using the canonical self/parent gates, composed rather than reimplemented —
+ * same reasoning as app/api/parent/assessments/process/route.ts.
+ */
+async function isSelfOrParentOf(client: Awaited<ReturnType<typeof createClient>>, studentId: string): Promise<boolean> {
+  try {
+    await requireStudent(client, studentId)
+    return true
+  } catch {
+    // fall through to the parent check
+  }
+  try {
+    await requireParent(client, studentId)
+    return true
+  } catch {
+    return false
+  }
+}
 
 const OptInSchema = z.object({
   phone:     z.string().min(1),
@@ -33,8 +55,13 @@ function normaliseKenyanPhone(raw: string): string | null {
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const body = await req.json()
     const parsed = OptInSchema.safeParse(body)
@@ -48,11 +75,12 @@ export async function POST(req: Request) {
     // Verify student belongs to this user — checks both link mechanisms
     // (direct creator via user_id, or invite-linked parent via parent_user_id),
     // matching every other parent-facing route.
+    if (!(await isSelfOrParentOf(supabase, studentId))) return apiForbidden()
+
     const { data: student } = await db
       .from('students')
       .select('id, name, parent_first_name')
       .eq('id', studentId)
-      .or(`user_id.eq.${user.id},parent_user_id.eq.${user.id}`)
       .single()
 
     if (!student) return apiForbidden()
@@ -82,11 +110,15 @@ export async function POST(req: Request) {
       return apiBadRequest('Invalid Kenyan phone number. Use format: 0712345678 or +254712345678')
     }
 
-    // Resolve parent first name: prefer stored value, fall back to auth metadata
+    // Resolve parent first name: prefer stored value, fall back to auth metadata.
+    // `user_metadata` isn't part of the canonical CurrentUser shape (identity.ts
+    // deliberately exposes only id/email — auth metadata is a raw Supabase Auth
+    // concept, not an identity-service concern), so it's read directly here.
+    const { data: { user: authUser } } = await supabase.auth.getUser()
     const parentFirstName =
       student.parent_first_name ??
-      (user.user_metadata as Record<string, string> | undefined)?.full_name ??
-      (user.user_metadata as Record<string, string> | undefined)?.name ??
+      (authUser?.user_metadata as Record<string, string> | undefined)?.full_name ??
+      (authUser?.user_metadata as Record<string, string> | undefined)?.name ??
       null
 
     await db

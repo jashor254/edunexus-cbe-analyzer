@@ -6,20 +6,25 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
 import type { TeachingPatternInsight } from '@/lib/learnerModel/types'
+import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 export async function GET(req: Request): Promise<Response> {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
+
+    const teacher = await resolveTeacher(userId)
+    if (!teacher) return apiForbidden()
 
     const db = createServiceClient()
-    const { data: teacher } = await db
-      .from('teachers')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-    if (!teacher) return apiForbidden()
 
     const url       = new URL(req.url)
     const classId   = url.searchParams.get('classId')
@@ -27,13 +32,11 @@ export async function GET(req: Request): Promise<Response> {
     if (!classId) return apiError('classId is required', 400)
 
     // Verify teacher owns this class
-    const { data: cls } = await db
-      .from('teacher_classes')
-      .select('id')
-      .eq('id', classId)
-      .eq('teacher_id', teacher.id)
-      .maybeSingle()
-    if (!cls) return apiForbidden()
+    try {
+      await requireClassTeacher(supabase, classId)
+    } catch {
+      return apiForbidden()
+    }
 
     // Fetch last N weeks of formative signals
     const since = new Date()

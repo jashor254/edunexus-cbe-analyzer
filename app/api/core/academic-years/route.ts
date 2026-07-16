@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { listAcademicYears, createAcademicYear, setCurrentAcademicYear, listTerms, createTerm, setCurrentTerm } from '@/lib/core/school'
-import { getSchoolUser } from '@/lib/core/school-users'
+import { requireSchoolMembership, requireSchoolAdmin } from '@/lib/core/permissions'
+import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
 import { z } from 'zod'
 
 const YearSchema = z.object({ name: z.string().min(1), start_date: z.string(), end_date: z.string() })
@@ -13,16 +14,23 @@ const TermSchema = z.object({
   end_date: z.string(),
 })
 
+function errorResponse(err: unknown): NextResponse {
+  if (err instanceof UnauthorizedError) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (isEduNexusError(err)) return NextResponse.json({ error: 'Forbidden' }, { status: err.statusCode })
+  throw err
+}
+
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const schoolId = req.nextUrl.searchParams.get('schoolId')
   if (!schoolId) return NextResponse.json({ error: 'schoolId required' }, { status: 400 })
 
-  const schoolUser = await getSchoolUser(user.id, schoolId)
-  if (!schoolUser) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  try {
+    await requireSchoolMembership(supabase, schoolId)
+  } catch (err) {
+    return errorResponse(err)
+  }
 
   const academicYearId = req.nextUrl.searchParams.get('academicYearId')
   const [years, terms] = await Promise.all([
@@ -35,16 +43,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
   const { schoolId, type, setCurrent, ...rest } = body
   if (!schoolId) return NextResponse.json({ error: 'schoolId required' }, { status: 400 })
 
-  const schoolUser = await getSchoolUser(user.id, schoolId)
-  if (!schoolUser || !['school_admin', 'headteacher', 'deputy_headteacher'].includes(schoolUser.role)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  try {
+    await requireSchoolAdmin(supabase, schoolId)
+  } catch (err) {
+    return errorResponse(err)
   }
 
   if (type === 'term') {

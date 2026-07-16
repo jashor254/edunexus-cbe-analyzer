@@ -1,6 +1,16 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { UnauthorizedError } from '@/lib/core/errors'
+
+// Sprint 1B Batch F note: only the top-level auth check below is migrated.
+// This route's ownership mechanism is `class_students.parent_id` — a third
+// mechanism, distinct from `students.parent_user_id` (the dominant one used
+// elsewhere in this batch) and from Core's `learner_guardians`. First found
+// in Batch B's clinic/[reportId]/url route; confirmed here in a second file.
+// Not modeled by any Sprint 1A canonical function — left completely
+// untouched, per the Discovery Rule (document, do not normalize).
 
 type Alert = {
   id: string
@@ -18,8 +28,13 @@ type Alert = {
 export async function GET() {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const db = createServiceClient()
 
@@ -27,7 +42,7 @@ export async function GET() {
     const { data: classStudents, error: csError } = await db
       .from('class_students')
       .select('student_id')
-      .eq('parent_id', user.id)
+      .eq('parent_id', userId)
 
     if (csError) return apiError('Failed to fetch student links')
 

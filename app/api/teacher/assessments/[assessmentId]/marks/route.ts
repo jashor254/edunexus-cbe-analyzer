@@ -7,6 +7,9 @@ import {
 import { getAssessmentById, getLearnerMarks } from '@/lib/assessments/getters'
 import { bulkSaveMarks, triggerLearnerModelUpdates } from '@/lib/assessments/mutations'
 import { recordAssessmentEvidence } from '@/lib/assessments/evidence'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 const BulkSaveSchema = z.object({
   marks: z.array(z.object({
@@ -23,11 +26,15 @@ export async function GET(
   try {
     const { assessmentId } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
-    const db = createServiceClient()
-    const { data: teacher } = await db.from('teachers').select('id').eq('user_id', user.id).single()
+    const teacher = await resolveTeacher(userId)
     if (!teacher) return apiForbidden()
 
     const assessment = await getAssessmentById(assessmentId, teacher.id)
@@ -48,12 +55,18 @@ export async function POST(
   try {
     const { assessmentId } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
+
+    const teacher = await resolveTeacher(userId)
+    if (!teacher) return apiForbidden()
 
     const db = createServiceClient()
-    const { data: teacher } = await db.from('teachers').select('id').eq('user_id', user.id).single()
-    if (!teacher) return apiForbidden()
 
     const assessment = await getAssessmentById(assessmentId, teacher.id)
     if (!assessment) return apiNotFound('Assessment not found')
@@ -128,7 +141,7 @@ export async function POST(
 
     // Emit Evidence Domain records so Blueprint/Career/Adaptive Learning move
     // from these marks too, not only from Compass sessions — fire and forget
-    recordAssessmentEvidence(assessmentId, teacher.id, user.id).catch((e: unknown) => console.error('[marks POST] recordAssessmentEvidence failed:', e instanceof Error ? e.message : String(e)))
+    recordAssessmentEvidence(assessmentId, teacher.id, userId).catch((e: unknown) => console.error('[marks POST] recordAssessmentEvidence failed:', e instanceof Error ? e.message : String(e)))
 
     return apiSuccess({ marks, saved: marks.length })
   } catch (e: unknown) {

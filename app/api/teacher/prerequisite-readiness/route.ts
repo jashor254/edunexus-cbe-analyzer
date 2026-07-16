@@ -7,6 +7,9 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
 import { getClassLearnerProfiles } from '@/lib/learnerModel/queries'
 import { findPrerequisiteAlerts } from '@/lib/knowledgeGraph/prerequisiteAlerts'
+import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 // When ≥ 30% are affected, log an intervention so the teacher gets a follow-up.
 const PCT_INTERVENTION_THRESHOLD = 0.30
@@ -15,17 +18,18 @@ export async function GET(req: Request): Promise<Response> {
   try {
     // ── 1. Auth & ownership ──────────────────────────────────────────────────
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
+
+    const teacher = await resolveTeacher(userId)
+    if (!teacher) return apiForbidden()
 
     const db = createServiceClient()
-
-    const { data: teacher } = await db
-      .from('teachers')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-    if (!teacher) return apiForbidden()
 
     const url       = new URL(req.url)
     const classId   = url.searchParams.get('classId')
@@ -37,13 +41,11 @@ export async function GET(req: Request): Promise<Response> {
     if (!subject)   return apiError('subject is required', 400)
 
     // Verify the teacher owns this class
-    const { data: cls } = await db
-      .from('teacher_classes')
-      .select('id, name, grade')
-      .eq('id', classId)
-      .eq('teacher_id', teacher.id)
-      .maybeSingle()
-    if (!cls) return apiForbidden()
+    try {
+      await requireClassTeacher(supabase, classId)
+    } catch {
+      return apiForbidden()
+    }
 
     // ── 2. Find the knowledge node for this substrand ────────────────────────
     const { data: matchedNodes } = await db

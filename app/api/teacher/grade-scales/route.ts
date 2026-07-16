@@ -1,8 +1,10 @@
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
-import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
 import { getTeacherGradeScales, createGradeScale } from '@/lib/assessments/gradeScales'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 const BandSchema = z.object({
   label:    z.string().min(1).max(10),
@@ -21,11 +23,15 @@ const CreateSchema = z.object({
 export async function GET() {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
-    const db = createServiceClient()
-    const { data: teacher } = await db.from('teachers').select('id').eq('user_id', user.id).single()
+    const teacher = await resolveTeacher(userId)
     if (!teacher) return apiForbidden()
 
     const scales = await getTeacherGradeScales(teacher.id)
@@ -39,11 +45,15 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
-    const db = createServiceClient()
-    const { data: teacher } = await db.from('teachers').select('id').eq('user_id', user.id).single()
+    const teacher = await resolveTeacher(userId)
     if (!teacher) return apiForbidden()
 
     const parsed = CreateSchema.safeParse(await req.json())

@@ -5,6 +5,15 @@
 import { createClient }        from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError } from '@/lib/api/response'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { UnauthorizedError } from '@/lib/core/errors'
+
+// Sprint 1B Batch G note: only the top-level auth check below is migrated.
+// The student-fetch query needs grade/school/current_pathway/curriculum_type
+// — fields `resolveStudent` doesn't return — so forcing the canonical
+// identity function in here would require a second, redundant query for no
+// behavior change. Left as the original single dual-purpose query, same
+// treatment as Batch F's career-intelligence route.
 
 function formatSubject(raw: string): string {
   return raw.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
@@ -119,8 +128,13 @@ const LEVEL_LABELS: Record<number, string> = {
 export async function GET(): Promise<Response> {
   try {
     const auth = await createClient()
-    const { data: { user } } = await auth.auth.getUser()
-    if (!user) return apiError('Unauthenticated', 401)
+    let userId: string
+    try {
+      userId = (await requireAuthentication(auth)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiError('Unauthenticated', 401)
+      throw err
+    }
 
     const db = createServiceClient()
 
@@ -128,7 +142,7 @@ export async function GET(): Promise<Response> {
     const { data: student } = await db
       .from('students')
       .select('id, name, grade, school, current_pathway, curriculum_type')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .maybeSingle()
 
     if (!student) return apiError('No student profile found', 404)

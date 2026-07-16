@@ -4,6 +4,9 @@ import { repos } from '@/lib/repositories'
 import { getPendingReview } from '@/lib/intelligence/evidenceLifecycle'
 import { MASTERY_EXTRACTION_METHOD } from '@/lib/compass/evidenceClaimTypes'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound } from '@/lib/api/response'
+import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 export type PendingCompassEvidence = {
   id:              string
@@ -35,17 +38,24 @@ export async function GET(
   try {
     const { classId } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const db = createServiceClient()
 
-    const teacher = await repos.teachers.findTeacherByUserId(user.id)
+    const teacher = await resolveTeacher(userId)
     if (!teacher) return apiForbidden()
 
-    const teacherClasses = await repos.schools.findTeacherClasses([teacher.id])
-    const ownsClass = teacherClasses.some(c => c.id === classId)
-    if (!ownsClass) return apiNotFound('Class not found')
+    try {
+      await requireClassTeacher(supabase, classId)
+    } catch {
+      return apiNotFound('Class not found')
+    }
 
     const studentLinks = await repos.schools.findClassStudents([classId])
     const studentIds = studentLinks.map(s => s.student_id)

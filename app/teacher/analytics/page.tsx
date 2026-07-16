@@ -12,6 +12,7 @@ import type {
   GradeLevel,
 } from '@/lib/assessments/analytics'
 import { friendlyMessage } from '@/lib/errors/friendlyMessage'
+import { getTitleLabel, compareAssessmentTypes } from '@/lib/assessments/assessmentTypeCatalog'
 
 // ── Grade helpers ─────────────────────────────────────────────────────────────
 const GRADE_COLOR: Record<GradeLevel, string> = {
@@ -430,17 +431,6 @@ function DistributionChart({
   )
 }
 
-const ATYPE_LABEL: Record<string, string> = {
-  opener: 'Opener', cat: 'CAT', midterm: 'Mid-Term',
-  endterm: 'End-Term', exam: 'Exam', assignment: 'Assignment',
-}
-
-const ATYPE_ORDER = ['opener', 'cat', 'midterm', 'endterm', 'exam', 'assignment']
-
-function aTypeSort(a: string, b: string) {
-  return (ATYPE_ORDER.indexOf(a) ?? 99) - (ATYPE_ORDER.indexOf(b) ?? 99)
-}
-
 // ── Term / Year + Assessment Type selector ─────────────────────────────────────
 function TermSelector({
   term, year, onChange,
@@ -513,7 +503,7 @@ export default function AnalyticsPage() {
         if (!res.success) return
         const types: string[] = [
           ...new Set((res.data.assessments as { assessment_type: string }[]).map(a => a.assessment_type))
-        ].sort(aTypeSort)
+        ].sort(compareAssessmentTypes)
         setAvailableTypes(types)
         if (types.length > 0) setSelectedType(types[0])
       })
@@ -594,7 +584,7 @@ export default function AnalyticsPage() {
                   : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
               }`}
             >
-              {ATYPE_LABEL[t] ?? t}
+              {getTitleLabel(t)}
             </button>
           ))}
         </div>
@@ -612,7 +602,7 @@ export default function AnalyticsPage() {
       {!loading && !error && selectedType && !data && (
         <div className="bg-white border-2 border-dashed border-gray-200 rounded-2xl p-12 text-center">
           <BarChart3 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 font-semibold">No marks entered yet for {ATYPE_LABEL[selectedType] ?? selectedType} · Term {term} · {year}.</p>
+          <p className="text-gray-500 font-semibold">No marks entered yet for {getTitleLabel(selectedType)} · Term {term} · {year}.</p>
           <p className="text-gray-400 text-sm mt-1">Open the class → Enter Marks to add learner scores.</p>
         </div>
       )}

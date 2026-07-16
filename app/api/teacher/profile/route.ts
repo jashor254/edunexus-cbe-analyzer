@@ -3,6 +3,8 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
 import { ensureSchoolMembership } from '@/lib/core/school'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 const UpdateProfileSchema = z.object({
   full_name:    z.string().trim().min(1),
@@ -16,14 +18,19 @@ const UpdateProfileSchema = z.object({
 export async function GET() {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const db = createServiceClient()
     const { data: teacher, error } = await db
       .from('teachers')
       .select('id, user_id, full_name, school, subject, grade_levels, phone, is_verified, tsc_number, created_at, pioneer_number')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .maybeSingle()
 
     if (error) {
@@ -42,8 +49,13 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const parsed = UpdateProfileSchema.safeParse(await req.json())
     if (!parsed.success) return apiError(parsed.error.issues[0]?.message ?? 'full_name and school are required', 400)
@@ -57,7 +69,7 @@ export async function POST(req: Request) {
     const { data: existing, error: lookupErr } = await supabase
       .from('teachers')
       .select('id, pioneer_number')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .maybeSingle()
 
     if (lookupErr) {
@@ -81,7 +93,7 @@ export async function POST(req: Request) {
       const { data, error } = await supabase
         .from('teachers')
         .update(fields)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .select()
         .single()
       if (error) {
@@ -93,7 +105,7 @@ export async function POST(req: Request) {
       // INSERT — first time setup
       const { data, error } = await supabase
         .from('teachers')
-        .insert({ user_id: user.id, ...fields })
+        .insert({ user_id: userId, ...fields })
         .select()
         .single()
       if (error) {
@@ -107,7 +119,7 @@ export async function POST(req: Request) {
     // the free-text school name. Never blocks profile save — a school-linking
     // failure shouldn't stop a teacher from completing setup.
     try {
-      await ensureSchoolMembership(user.id, school)
+      await ensureSchoolMembership(userId, school)
     } catch (linkErr) {
       console.error('[teacher/profile POST] school membership link failed', linkErr)
     }
@@ -120,7 +132,7 @@ export async function POST(req: Request) {
         const { data: updated } = await supabase
           .from('teachers')
           .update({ pioneer_number: pioneerNum })
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .select()
           .single()
 

@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 const CreateStudentSchema = z.object({
   name:              z.string().trim().min(1),
@@ -25,8 +27,13 @@ const PLAN_LIMITS: Record<string, number> = {
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const parsed = CreateStudentSchema.safeParse(await request.json())
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
@@ -41,7 +48,7 @@ export async function POST(request: Request) {
     const { data: subscription } = await service
       .from('subscriptions')
       .select('plan')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('status', 'active')
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
@@ -56,7 +63,7 @@ export async function POST(request: Request) {
     const { count, error: countError } = await service
       .from('students')
       .select('id', { count: 'exact', head: true })
-      .or(`user_id.eq.${user.id},parent_user_id.eq.${user.id}`)
+      .or(`user_id.eq.${userId},parent_user_id.eq.${userId}`)
       .neq('added_by', 'teacher')
 
     if (countError) return apiError(countError.message)
@@ -79,7 +86,7 @@ export async function POST(request: Request) {
     const { data: student, error: insertError } = await service
       .from('students')
       .insert({
-        user_id:         user.id,
+        user_id:         userId,
         name:            name.trim(),
         grade:           gradeNum,
         school:          school?.trim() || null,
@@ -97,7 +104,7 @@ export async function POST(request: Request) {
     // Ensure token_balances row exists for user
     await service
       .from('token_balances')
-      .upsert({ user_id: user.id, balance: 0 }, { onConflict: 'user_id', ignoreDuplicates: true })
+      .upsert({ user_id: userId, balance: 0 }, { onConflict: 'user_id', ignoreDuplicates: true })
 
     return apiSuccess({ student }, 201)
   } catch (err) {

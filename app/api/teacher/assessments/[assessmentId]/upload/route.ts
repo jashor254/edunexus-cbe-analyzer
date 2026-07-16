@@ -1,5 +1,4 @@
 import { createClient } from '@/utils/supabase/server'
-import { createServiceClient } from '@/utils/supabase/service'
 import {
   apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest, apiNotFound,
 } from '@/lib/api/response'
@@ -7,6 +6,9 @@ import { getAssessmentById } from '@/lib/assessments/getters'
 import { upsertMarksCSV, triggerLearnerModelUpdates } from '@/lib/assessments/mutations'
 import { recordAssessmentEvidence } from '@/lib/assessments/evidence'
 import type { MarkInput } from '@/lib/assessments/types'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 type UploadError = { row: number; field: string; message: string }
 
@@ -26,11 +28,15 @@ export async function POST(
   try {
     const { assessmentId } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
-    const db = createServiceClient()
-    const { data: teacher } = await db.from('teachers').select('id').eq('user_id', user.id).single()
+    const teacher = await resolveTeacher(userId)
     if (!teacher) return apiForbidden()
 
     const assessment = await getAssessmentById(assessmentId, teacher.id)
@@ -112,7 +118,7 @@ export async function POST(
 
     // Emit Evidence Domain records so Blueprint/Career/Adaptive Learning move
     // from these marks too, not only from Compass sessions — fire and forget
-    recordAssessmentEvidence(assessmentId, teacher.id, user.id).catch((e: unknown) => console.error('[marks upload] recordAssessmentEvidence failed:', e instanceof Error ? e.message : String(e)))
+    recordAssessmentEvidence(assessmentId, teacher.id, userId).catch((e: unknown) => console.error('[marks upload] recordAssessmentEvidence failed:', e instanceof Error ? e.message : String(e)))
 
     return apiSuccess({
       imported: result.inserted,

@@ -15,28 +15,7 @@ import {
 } from '@/lib/curriculum/subjects'
 import type { DbGradeScale } from '@/lib/assessments/gradeScales'
 import { BUILTIN_CBC_SCALE, BUILTIN_844_SCALE } from '@/lib/assessments/gradeCalculator'
-
-const TYPE_LABEL: Record<AssessmentType, string> = {
-  opener:     'Opener',
-  cat:        'CAT',
-  midterm:    'Mid-Term',
-  endterm:    'End-Term',
-  exam:       'Exam',
-  assignment: 'Assignment',
-}
-
-function buildTitle(type: AssessmentType, term: string, year: number): string {
-  return `Term ${term} ${TYPE_LABEL[type]} ${year}`
-}
-
-const TYPE_META: Record<AssessmentType, { label: string; cls: string }> = {
-  opener:     { label: 'Opener',     cls: 'bg-teal-100 text-teal-700'     },
-  cat:        { label: 'CAT',        cls: 'bg-violet-100 text-violet-700'  },
-  midterm:    { label: 'Midterm',    cls: 'bg-orange-100 text-orange-700'  },
-  endterm:    { label: 'End Term',   cls: 'bg-red-100 text-red-700'        },
-  exam:       { label: 'Exam',       cls: 'bg-blue-100 text-blue-700'      },
-  assignment: { label: 'Assignment', cls: 'bg-green-100 text-green-700'    },
-}
+import { KNOWN_ASSESSMENT_TYPES, getAssessmentTypeMeta, getBadgeLabel, getBadgeClass, buildAssessmentTitle } from '@/lib/assessments/assessmentTypeCatalog'
 
 const CURRENT_YEAR = new Date().getFullYear()
 const CURRENT_TERM = (() => {
@@ -98,7 +77,7 @@ export default function ClassAssessmentsPage({
   // Auto-generate title when type / term / year changes unless user edited it manually
   const lastAutoTitle = useRef('')
   useEffect(() => {
-    const auto = buildTitle(form.assessmentType, form.term, form.year)
+    const auto = buildAssessmentTitle(form.assessmentType, form.term, form.year)
     if (form.title === '' || form.title === lastAutoTitle.current) {
       lastAutoTitle.current = auto
       setForm(f => ({ ...f, title: auto }))
@@ -248,15 +227,15 @@ export default function ClassAssessmentsPage({
       ) : (
         <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {assessments.map((a) => {
-            const meta = TYPE_META[a.assessment_type] || TYPE_META.exam
+            const meta = getAssessmentTypeMeta(a.assessment_type) ?? getAssessmentTypeMeta('exam')!
             return (
               <div key={a.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition overflow-hidden">
                 <div className="h-1 bg-gradient-to-r from-teal-500 to-cyan-400" />
                 <div className="p-5">
                   <div className="flex items-start justify-between mb-3 gap-2">
                     <h3 className="font-black text-gray-900 leading-snug">{a.title}</h3>
-                    <span className={`shrink-0 text-xs font-bold px-2 py-1 rounded-lg ${meta.cls}`}>
-                      {meta.label}
+                    <span className={`shrink-0 text-xs font-bold px-2 py-1 rounded-lg ${meta.badgeClass}`}>
+                      {meta.badgeLabel}
                     </span>
                   </div>
 
@@ -383,17 +362,17 @@ export default function ClassAssessmentsPage({
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Assessment Type</label>
                 <div className="flex flex-wrap gap-2">
-                  {(Object.keys(TYPE_META) as AssessmentType[]).map((t) => (
+                  {KNOWN_ASSESSMENT_TYPES.map((t) => (
                     <button
                       key={t}
                       onClick={() => setForm((f) => ({ ...f, assessmentType: t }))}
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
                         form.assessmentType === t
-                          ? `${TYPE_META[t].cls} border-current`
+                          ? `${getBadgeClass(t)} border-current`
                           : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'
                       }`}
                     >
-                      {TYPE_META[t].label}
+                      {getBadgeLabel(t)}
                     </button>
                   ))}
                 </div>

@@ -5,6 +5,9 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
+import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 export async function GET(
   _req: NextRequest,
@@ -13,19 +16,26 @@ export async function GET(
   const { classId } = await params
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return apiUnauthorized()
+  let userId: string
+  try {
+    userId = (await requireAuthentication(supabase)).id
+  } catch (err) {
+    if (err instanceof UnauthorizedError) return apiUnauthorized()
+    throw err
+  }
 
   const db = createServiceClient()
 
-  const { data: teacher } = await db
-    .from('teachers')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
+  const teacher = await resolveTeacher(userId)
   if (!teacher) return apiForbidden()
 
   // Verify class belongs to teacher
+  try {
+    await requireClassTeacher(supabase, classId)
+  } catch {
+    return apiForbidden()
+  }
+
   const { data: cls } = await db
     .from('teacher_classes')
     .select('id, name, grade, subject')

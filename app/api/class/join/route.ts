@@ -2,6 +2,8 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 const JoinSchema = z.object({
   inviteCode: z.string().min(1, 'inviteCode is required'),
@@ -10,8 +12,13 @@ const JoinSchema = z.object({
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const parsed = JoinSchema.safeParse(await req.json())
     if (!parsed.success) {
@@ -67,7 +74,7 @@ export async function POST(req: Request) {
 
     const { error: updateError } = await db
       .from('class_students')
-      .update({ parent_id: user.id })
+      .update({ parent_id: userId })
       .eq('class_id', invite.class_id)
       .is('parent_id', null)
 
@@ -80,7 +87,7 @@ export async function POST(req: Request) {
       .eq('id', invite.id)
 
     // Also store parent_email on each student for notifications
-    const { data: authUser } = await db.auth.admin.getUserById(user.id)
+    const { data: authUser } = await db.auth.admin.getUserById(userId)
     const parentEmail = authUser.user?.email
 
     if (parentEmail && studentIds.length > 0) {

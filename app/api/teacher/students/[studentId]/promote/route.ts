@@ -4,6 +4,9 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound, apiBadRequest } from '@/lib/api/response'
 import { promoteStudent, getPromotionHistory } from '@/lib/promotions/promote'
 import { reserveIdempotencyKey } from '@/lib/idempotency/reserveKey'
+import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 // Production Hardening Audit finding: fromClassId/toClassId were accepted
 // from the request body and used to write (student_promotions, then
@@ -12,19 +15,8 @@ import { reserveIdempotencyKey } from '@/lib/idempotency/reserveKey'
 // any class in the whole platform (IDOR). class_students/teacher_classes
 // ownership is already the codebase's standard shape for "does this
 // teacher own this class" (see promotion.repository.ts's archiveClass).
-async function verifyTeacherOwnsClass(
-  db: ReturnType<typeof createServiceClient>,
-  teacherId: string,
-  classId: string,
-): Promise<boolean> {
-  const { data } = await db
-    .from('teacher_classes')
-    .select('id')
-    .eq('id', classId)
-    .eq('teacher_id', teacherId)
-    .maybeSingle()
-  return !!data
-}
+// Sprint 1B Batch E: this check is now `requireClassTeacher` (the canonical
+// service), replacing the local helper that duplicated the same logic.
 
 // Phase A (docs/architecture/academic-evidence-layer.md §2, Rule 1: learner
 // permanence). No UI yet — API surface only, per the confirmed 2026-07-13
@@ -47,17 +39,24 @@ export async function POST(
   try {
     const { studentId } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
+
+    const teacher = await resolveTeacher(userId)
+    if (!teacher) return apiForbidden()
 
     const db = createServiceClient()
-    const { data: teacher } = await db.from('teachers').select('id').eq('user_id', user.id).single()
-    if (!teacher) return apiForbidden()
 
     // Ownership check: the student must be one this teacher currently
     // teaches (same class_students-scoped check as the rest of this app's
     // teacher-facing routes) — a promotion is not something any teacher
-    // may perform on any learner.
+    // may perform on any learner. Preserved exactly (Discovery Rule) — this
+    // roster-membership pattern is not yet a Sprint 1A canonical function.
     const { data: taught } = await db
       .from('class_students')
       .select('class_id, teacher_classes!inner(teacher_id)')
@@ -71,11 +70,19 @@ export async function POST(
     if (!parsed.success) return apiBadRequest(parsed.error.issues.map(i => i.message).join(', '))
     const { toGrade, fromClassId, toClassId, academicYear, notes } = parsed.data
 
-    if (fromClassId && !(await verifyTeacherOwnsClass(db, teacher.id, fromClassId))) {
-      return apiForbidden()
+    if (fromClassId) {
+      try {
+        await requireClassTeacher(supabase, fromClassId)
+      } catch {
+        return apiForbidden()
+      }
     }
-    if (toClassId && !(await verifyTeacherOwnsClass(db, teacher.id, toClassId))) {
-      return apiForbidden()
+    if (toClassId) {
+      try {
+        await requireClassTeacher(supabase, toClassId)
+      } catch {
+        return apiForbidden()
+      }
     }
 
     const idempotencyKey = req.headers.get('Idempotency-Key')
@@ -90,7 +97,7 @@ export async function POST(
       fromClassId: fromClassId ?? null,
       toClassId: toClassId ?? null,
       academicYear,
-      promotedBy: user.id,
+      promotedBy: userId,
       notes: notes ?? null,
     })
     return apiSuccess({ promotion }, 201)
@@ -107,12 +114,18 @@ export async function GET(
   try {
     const { studentId } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
+
+    const teacher = await resolveTeacher(userId)
+    if (!teacher) return apiForbidden()
 
     const db = createServiceClient()
-    const { data: teacher } = await db.from('teachers').select('id').eq('user_id', user.id).single()
-    if (!teacher) return apiForbidden()
 
     const { data: taught } = await db
       .from('class_students')

@@ -5,6 +5,8 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { createClient }        from '@/utils/supabase/server'
 import { repos } from '@/lib/repositories'
 import { apiSuccess, apiError, getErrorMessage } from '@/lib/api/response'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 // Plain-language only — parents see "Meeting", never the raw CBC code
 // ('ME') that this maps from (Sprint 19: teacher/Core surfaces keep the
@@ -56,13 +58,18 @@ function weekLabel(iso: string): string {
 export async function GET(): Promise<Response> {
   try {
     const auth = await createClient()
-    const { data: { user } } = await auth.auth.getUser()
-    if (!user) return apiError('Unauthenticated', 401)
+    let userId: string
+    try {
+      userId = (await requireAuthentication(auth)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiError('Unauthenticated', 401)
+      throw err
+    }
 
     const db = createServiceClient()
 
     // All students belonging to this parent (both scenarios)
-    const students = await repos.compass.findOwnedStudents(user.id)
+    const students = await repos.compass.findOwnedStudents(userId)
 
     if (!students || students.length === 0) {
       return apiSuccess<CompassActivityResult>({

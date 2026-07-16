@@ -1,9 +1,11 @@
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
-import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest, getErrorMessage } from '@/lib/api/response'
 import { buildAttentionFeed } from '@/lib/attentionFeed/aggregate'
 import { dismissAttentionItem } from '@/lib/attentionFeed/dismissals'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 const DismissSchema = z.object({
   itemKey: z.string().min(1),
@@ -11,18 +13,17 @@ const DismissSchema = z.object({
 
 async function getTeacherId(): Promise<{ teacherId: string } | { error: Response }> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: apiUnauthorized() }
+  let userId: string
+  try {
+    userId = (await requireAuthentication(supabase)).id
+  } catch (err) {
+    if (err instanceof UnauthorizedError) return { error: apiUnauthorized() }
+    throw err
+  }
 
-  const db = createServiceClient()
-  const { data: teacher } = await db
-    .from('teachers')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
+  const teacher = await resolveTeacher(userId)
   if (!teacher) return { error: apiForbidden() }
-  return { teacherId: teacher.id as string }
+  return { teacherId: teacher.id }
 }
 
 export async function GET(): Promise<Response> {

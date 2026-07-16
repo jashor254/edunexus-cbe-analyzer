@@ -2,6 +2,8 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 const PLAN_LIMITS: Record<string, number> = {
   free:    1,
@@ -14,8 +16,13 @@ const PLAN_LIMITS: Record<string, number> = {
 export async function GET() {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const service = createServiceClient()
 
@@ -26,7 +33,7 @@ export async function GET() {
         id, name, grade, school, current_pathway, curriculum_type, created_at, added_by,
         assessments(id, term, year, grade, subject_scores, created_at)
       `)
-      .or(`user_id.eq.${user.id},parent_user_id.eq.${user.id}`)
+      .or(`user_id.eq.${userId},parent_user_id.eq.${userId}`)
       .order('name')
 
     if (error) {
@@ -45,7 +52,7 @@ export async function GET() {
     const { data: subscription } = await service
       .from('subscriptions')
       .select('plan')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('status', 'active')
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })

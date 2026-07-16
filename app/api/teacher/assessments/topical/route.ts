@@ -10,6 +10,9 @@ import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } fr
 import { recordTopicalAssessment } from '@/lib/assessments/topical'
 import { recordTopicalEvidence } from '@/lib/assessments/topicalEvidence'
 import { KE_CBC } from '@/lib/curriculum/regional/ke-cbc'
+import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 const Schema = z.object({
   classId: z.string().uuid(),
@@ -25,15 +28,15 @@ const Schema = z.object({
 export async function POST(req: Request): Promise<Response> {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
-    const db = createServiceClient()
-    const { data: teacher } = await db
-      .from('teachers')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
+    const teacher = await resolveTeacher(userId)
     if (!teacher) return apiForbidden()
 
     const parsed = Schema.safeParse(await req.json())
@@ -41,13 +44,13 @@ export async function POST(req: Request): Promise<Response> {
     const d = parsed.data
 
     // Verify this teacher owns the class
-    const { data: cls } = await db
-      .from('teacher_classes')
-      .select('id')
-      .eq('id', d.classId)
-      .eq('teacher_id', teacher.id)
-      .maybeSingle()
-    if (!cls) return apiForbidden()
+    try {
+      await requireClassTeacher(supabase, d.classId)
+    } catch {
+      return apiForbidden()
+    }
+
+    const db = createServiceClient()
 
     // Verify every rated student belongs to this class
     const { data: classStudents } = await db
@@ -77,7 +80,7 @@ export async function POST(req: Request): Promise<Response> {
 
     recordTopicalEvidence({
       teacherId:     teacher.id,
-      teacherUserId: user.id,
+      teacherUserId: userId,
       subject:       d.subject,
       strand:        d.strand,
       topic:         d.topic,

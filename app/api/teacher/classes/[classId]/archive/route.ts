@@ -2,6 +2,9 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound } from '@/lib/api/response'
 import { archiveClassForYearEnd } from '@/lib/promotions/promote'
+import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 // Phase A (docs/architecture/academic-evidence-layer.md §2, Rule 2:
 // classes are archived, never deleted). No UI yet — API surface only, per
@@ -13,12 +16,24 @@ export async function POST(
   try {
     const { classId } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
+
+    const teacher = await resolveTeacher(userId)
+    if (!teacher) return apiForbidden()
 
     const db = createServiceClient()
-    const { data: teacher } = await db.from('teachers').select('id').eq('user_id', user.id).single()
-    if (!teacher) return apiForbidden()
+
+    try {
+      await requireClassTeacher(supabase, classId)
+    } catch {
+      return apiNotFound('Class not found')
+    }
 
     const { data: cls } = await db
       .from('teacher_classes')

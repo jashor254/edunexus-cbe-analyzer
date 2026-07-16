@@ -10,35 +10,38 @@ import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } fr
 import { recomputeRiskFlags } from '@/lib/learnerModel/updater'
 import { recordInterventionCheckinEvidence } from '@/lib/remedial/interventionEvidence'
 import type { InterventionCheckin } from '@/lib/learnerModel/types'
+import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 
 export async function GET(req: Request): Promise<Response> {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
+
+    const teacher = await resolveTeacher(userId)
+    if (!teacher) return apiForbidden()
 
     const db = createServiceClient()
-    const { data: teacher } = await db
-      .from('teachers')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-    if (!teacher) return apiForbidden()
 
     const url     = new URL(req.url)
     const classId = url.searchParams.get('classId')
     if (!classId) return apiError('classId is required', 400)
 
     // Verify teacher owns this class
-    const { data: cls } = await db
-      .from('teacher_classes')
-      .select('id')
-      .eq('id', classId)
-      .eq('teacher_id', teacher.id)
-      .maybeSingle()
-    if (!cls) return apiForbidden()
+    try {
+      await requireClassTeacher(supabase, classId)
+    } catch {
+      return apiForbidden()
+    }
 
     // Due window: now + 7 days
     const dueWindow = new Date()
@@ -118,16 +121,18 @@ const PostSchema = z.object({
 export async function POST(req: Request): Promise<Response> {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
+
+    const teacher = await resolveTeacher(userId)
+    if (!teacher) return apiForbidden()
 
     const db = createServiceClient()
-    const { data: teacher } = await db
-      .from('teachers')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-    if (!teacher) return apiForbidden()
 
     const parsed = PostSchema.safeParse(await req.json())
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
@@ -168,7 +173,7 @@ export async function POST(req: Request): Promise<Response> {
     recordInterventionCheckinEvidence({
       studentId,
       teacherId: teacher.id,
-      teacherUserId: user.id,
+      teacherUserId: userId,
       subject: (existing.subject as string | null) ?? null,
       subStrand: (existing.substrand as string | null) ?? null,
       outcome,

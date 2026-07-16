@@ -8,6 +8,9 @@ import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/r
 import { repos } from '@/lib/repositories'
 import { buildPrincipalDashboard } from '@/lib/school/intelligence'
 import type { PrincipalDashboard } from '@/lib/school/types'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 type IntelligenceResponse = {
   dashboard: PrincipalDashboard
@@ -16,15 +19,20 @@ type IntelligenceResponse = {
 export async function GET(): Promise<Response> {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     // Caller must be a teacher (this endpoint is teacher/school-staff facing,
     // not for parents — school_users also has a 'parent' role).
-    const teacher = await repos.teachers.findTeacherByUserId(user.id)
+    const teacher = await resolveTeacher(userId)
     if (!teacher) return apiForbidden()
 
-    const schoolUser = await repos.schools.findSchoolUserByUserId(user.id)
+    const schoolUser = await repos.schools.findSchoolUserByUserId(userId)
     if (!schoolUser) return apiError('Teacher is not associated with a school', 403)
 
     const dashboard = await buildPrincipalDashboard(schoolUser.school_id)

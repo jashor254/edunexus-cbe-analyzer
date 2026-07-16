@@ -6,6 +6,9 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
 import { generateClassReports, type ClassReportProgress } from '@/lib/career/autoReportGenerator'
 import { repos } from '@/lib/repositories'
+import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,30 +24,27 @@ export async function POST(
 ) {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) return apiUnauthorized()
+    let user: { id: string; email: string | null }
+    try {
+      user = await requireAuthentication(supabase)
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const db = createServiceClient()
 
     // Verify teacher owns this class
-    const { data: teacher } = await db
-      .from('teachers')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
+    const teacher = await resolveTeacher(user.id)
     if (!teacher) return apiForbidden()
 
     const { classId } = await params
 
-    const { data: cls } = await db
-      .from('teacher_classes')
-      .select('id')
-      .eq('id', classId)
-      .eq('teacher_id', teacher.id)
-      .maybeSingle()
-
-    if (!cls) return apiForbidden()
+    try {
+      await requireClassTeacher(supabase, classId)
+    } catch {
+      return apiForbidden()
+    }
 
     const body = await req.json()
     const parsed = BodySchema.safeParse(body)

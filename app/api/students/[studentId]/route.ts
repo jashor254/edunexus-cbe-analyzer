@@ -8,6 +8,16 @@ import { createServiceClient } from '@/utils/supabase/service'
 import {
   apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound,
 } from '@/lib/api/response'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { UnauthorizedError } from '@/lib/core/errors'
+
+// Sprint 1B Batch G note: only the top-level auth check below is migrated in
+// both handlers. The two-step ownership logic (404 if the student doesn't
+// exist, THEN 403 if owned by someone else) plus the downstream business
+// read of `added_by`/`parent_user_id` can't be reproduced by a blind
+// `requireStudent`/`requireParent` call without collapsing that distinction
+// — preserved verbatim, per "Do NOT rewrite ownership logic if it contains
+// business decisions."
 
 type Params = { params: Promise<{ studentId: string }> }
 
@@ -16,8 +26,13 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   try {
     const { studentId } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const db = createServiceClient()
 
@@ -30,7 +45,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     if (!student) return apiNotFound('Student not found')
 
     // Only the parent who created the student can delete — never teacher-managed
-    if (student.user_id !== user.id) return apiForbidden()
+    if (student.user_id !== userId) return apiForbidden()
     if (student.added_by === 'teacher') {
       return apiError('Teacher-managed students cannot be deleted. Use unlink instead.', 400)
     }
@@ -51,8 +66,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   try {
     const { studentId } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const db = createServiceClient()
 
@@ -65,7 +85,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (!student) return apiNotFound('Student not found')
 
     // Must be linked to this parent and must be teacher-managed
-    if (student.parent_user_id !== user.id) return apiForbidden()
+    if (student.parent_user_id !== userId) return apiForbidden()
     if (student.added_by !== 'teacher') {
       return apiError('Only teacher-managed students can be unlinked. Use delete instead.', 400)
     }

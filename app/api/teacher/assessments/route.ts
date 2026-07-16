@@ -1,11 +1,13 @@
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
-import { createServiceClient } from '@/utils/supabase/service'
 import {
   apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest,
 } from '@/lib/api/response'
 import { getTeacherAssessments, getClassAssessments } from '@/lib/assessments/getters'
 import { createAssessment } from '@/lib/assessments/mutations'
+import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 const CreateSchema = z.object({
   classId:        z.uuid(),
@@ -31,11 +33,15 @@ const CreateSchema = z.object({
 export async function GET(req: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
-    const db = createServiceClient()
-    const { data: teacher } = await db.from('teachers').select('id').eq('user_id', user.id).single()
+    const teacher = await resolveTeacher(userId)
     if (!teacher) return apiForbidden()
 
     const url     = new URL(req.url)
@@ -58,11 +64,15 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
-    const db = createServiceClient()
-    const { data: teacher } = await db.from('teachers').select('id').eq('user_id', user.id).single()
+    const teacher = await resolveTeacher(userId)
     if (!teacher) return apiForbidden()
 
     const parsed = CreateSchema.safeParse(await req.json())
@@ -72,13 +82,11 @@ export async function POST(req: Request) {
 
     const { classId, title, assessmentType, term, year, maxScore, subjects, curriculumType, gradeScaleId } = parsed.data
 
-    const { data: cls } = await db
-      .from('teacher_classes')
-      .select('id')
-      .eq('id', classId)
-      .eq('teacher_id', teacher.id)
-      .single()
-    if (!cls) return apiForbidden()
+    try {
+      await requireClassTeacher(supabase, classId)
+    } catch {
+      return apiForbidden()
+    }
 
     const assessment = await createAssessment(teacher.id, classId, {
       title, assessmentType, term, year, maxScore, subjects, curriculumType, gradeScaleId,

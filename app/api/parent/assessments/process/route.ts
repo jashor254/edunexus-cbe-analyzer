@@ -7,6 +7,31 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
 import { runAssessmentPipeline } from '@/lib/academicClinic/assessmentPipeline'
+import { requireAuthentication, requireStudent, requireParent } from '@/lib/core/permissions'
+import { UnauthorizedError } from '@/lib/core/errors'
+
+/**
+ * Preserves the exact original union check
+ * (`student.user_id === user.id || student.parent_user_id === user.id`)
+ * using the canonical self/parent gates, composed rather than reimplemented.
+ * `requireParent` additionally checks Core's `learner_guardians` — a no-op
+ * superset here since Core learner IDs are a disjoint UUID space from this
+ * legacy `students.id`, so this does not weaken or change the decision.
+ */
+async function isSelfOrParentOf(client: Awaited<ReturnType<typeof createClient>>, studentId: string): Promise<boolean> {
+  try {
+    await requireStudent(client, studentId)
+    return true
+  } catch {
+    // fall through to the parent check
+  }
+  try {
+    await requireParent(client, studentId)
+    return true
+  } catch {
+    return false
+  }
+}
 
 const BodySchema = z.object({
   assessment_id: z.string().uuid(),
@@ -16,8 +41,13 @@ const BodySchema = z.object({
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const parsed = BodySchema.safeParse(await req.json())
     if (!parsed.success) {
@@ -34,14 +64,13 @@ export async function POST(req: Request) {
       .eq('id', student_id)
       .single()
     if (!student) return apiForbidden()
-    const owned = student.user_id === user.id || student.parent_user_id === user.id
-    if (!owned) return apiForbidden()
+    if (!(await isSelfOrParentOf(supabase, student_id))) return apiForbidden()
 
     const result = await runAssessmentPipeline({
       studentId:    student_id,
       assessmentId: assessment_id,
       actorName:    'Parent',
-      actorUserId:  user.id,
+      actorUserId:  userId,
       notify:       false,
     })
 

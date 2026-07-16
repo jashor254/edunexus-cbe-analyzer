@@ -9,6 +9,9 @@ import {
   apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound, apiBadRequest,
 } from '@/lib/api/response'
 import { sendWelcomeMessage } from '@/lib/whatsapp/sender'
+import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://edunexus.co.ke'
 
@@ -36,25 +39,28 @@ export async function POST(
   try {
     const { classId } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const db = createServiceClient()
 
     const { data: teacher } = await db
       .from('teachers')
       .select('id, full_name, school')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single()
     if (!teacher) return apiForbidden()
 
-    const { data: cls } = await db
-      .from('teacher_classes')
-      .select('id, name, grade, subject')
-      .eq('id', classId)
-      .eq('teacher_id', teacher.id)
-      .single()
-    if (!cls) return apiNotFound('Class not found')
+    try {
+      await requireClassTeacher(supabase, classId)
+    } catch {
+      return apiNotFound('Class not found')
+    }
 
     const parsed = BodySchema.safeParse(await req.json())
     if (!parsed.success) {
@@ -69,7 +75,7 @@ export async function POST(
         const { data: student, error: insertErr } = await db
           .from('students')
           .insert({
-            user_id:         user.id,
+            user_id:         userId,
             name:            s.name.trim(),
             grade:           s.grade,
             curriculum_type: s.curriculum_type,
@@ -178,25 +184,24 @@ export async function GET(
   try {
     const { classId } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
-    const db = createServiceClient()
-
-    const { data: teacher } = await db
-      .from('teachers')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
+    const teacher = await resolveTeacher(userId)
     if (!teacher) return apiForbidden()
 
-    const { data: cls } = await db
-      .from('teacher_classes')
-      .select('id')
-      .eq('id', classId)
-      .eq('teacher_id', teacher.id)
-      .single()
-    if (!cls) return apiNotFound('Class not found')
+    try {
+      await requireClassTeacher(supabase, classId)
+    } catch {
+      return apiNotFound('Class not found')
+    }
+
+    const db = createServiceClient()
 
     const { data: links } = await db
       .from('class_students')

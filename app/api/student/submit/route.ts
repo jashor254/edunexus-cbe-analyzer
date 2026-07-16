@@ -3,6 +3,8 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiNotFound, apiBadRequest } from '@/lib/api/response'
 import { publishEvent } from '@/lib/events'
+import { requireAuthentication, requireStudent } from '@/lib/core/permissions'
+import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
 
 const SubmitSchema = z.object({
   assignmentId:        z.string().uuid(),
@@ -14,8 +16,13 @@ const SubmitSchema = z.object({
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const db = createServiceClient()
 
@@ -24,14 +31,12 @@ export async function POST(req: Request) {
     const { assignmentId, studentId, work_text, compass_session_id } = parsed.data
 
     // Verify student belongs to this user
-    const { data: student } = await db
-      .from('students')
-      .select('id')
-      .eq('id', studentId)
-      .eq('user_id', user.id)
-      .single()
-
-    if (!student) return apiError('Student not found', 403)
+    try {
+      await requireStudent(supabase, studentId)
+    } catch (err) {
+      if (isEduNexusError(err)) return apiError('Student not found', 403)
+      throw err
+    }
 
     // Verify the assignment exists and is active
     const { data: assignment } = await db

@@ -2,12 +2,20 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 export async function GET(request: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) return apiUnauthorized()
+
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const { searchParams } = new URL(request.url)
     const filterStudentId = searchParams.get('student_id')
@@ -20,7 +28,7 @@ export async function GET(request: Request) {
     const { data: students, error: studentsError } = await service
       .from('students')
       .select('id, name, grade, school, current_pathway')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
 
     if (studentsError) return apiError(studentsError.message)
     if (!students?.length) return apiSuccess({ assessments: [], students: [] })

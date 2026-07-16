@@ -1,12 +1,18 @@
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
 import { getTopicsForSubject } from '@/lib/compass/topicSelector'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 export async function GET(req: Request): Promise<Response> {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    try {
+      await requireAuthentication(supabase)
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const { searchParams } = new URL(req.url)
     const gradeParam = searchParams.get('grade')

@@ -20,6 +20,7 @@ import {
   type SeniorPathway,
 } from '@/lib/curriculum/subjects'
 import { friendlyMessage } from '@/lib/errors/friendlyMessage'
+import { buildAssessmentTitle } from '@/lib/assessments/assessmentTypeCatalog'
 
 type Tab = 'students' | 'gaps' | 'assignments' | 'holiday' | 'remedial' | 'compass' | 'clinic' | 'upload' | 'analytics'
 
@@ -460,7 +461,7 @@ function UploadAssessmentTab({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          classId, title: `Term ${term} ${{ midterm: 'Mid-Term', endterm: 'End-Term', opener: 'Opener', cat: 'CAT', exam: 'Exam', assignment: 'Assignment' }[atype] ?? atype} ${year}`,
+          classId, title: buildAssessmentTitle(atype, String(term), year),
           assessmentType: atype, term: String(term), year,
           maxScore: 4, subjects: CBC_SUBJECTS, curriculumType: 'cbc',
         }),

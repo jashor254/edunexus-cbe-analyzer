@@ -5,12 +5,28 @@
 // used across the parent/teacher/admin surfaces (see lib/api/response.ts and
 // app/api/parent/*/route.ts for the established .or(user_id, parent_user_id)
 // pattern reused below).
+//
+// Sprint 1B Batch A note: only the top-level `auth.getUser()` call is
+// migrated to the canonical `requireAuthentication` below. The four-branch
+// ownership check (self/parent via students, parent via the separate
+// class_students.parent_id link, teacher, admin) is deliberately left
+// untouched — it doesn't map onto any single Sprint 1A canonical function.
+// Notably, branch 2 (class_students.parent_id) is a THIRD guardian-link
+// mechanism not modeled by `lib/core/permissions.ts::requireParent` (which
+// only checks students.parent_user_id and Core's learner_guardians) —
+// forcing this route onto requireParent as-is would silently drop that path
+// and weaken guardian access, which this sprint's rules explicitly forbid.
+// Recommend folding class_students.parent_id into `resolveParent`/
+// `requireParent` as a ratified change in a future sprint, then revisiting
+// this route — not attempted here, since that would be new infrastructure.
 
 import { NextRequest } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
 import { ADMIN_CONFIG } from '@/lib/config/api'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 const BUCKET = 'clinic-reports'
 const SIGNED_URL_TTL_SECONDS = 60 * 5
@@ -33,8 +49,13 @@ export async function GET(
     const { reportId } = await params
 
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) return apiUnauthorized()
+    let user: { id: string; email: string | null }
+    try {
+      user = await requireAuthentication(supabase)
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const db = createServiceClient()
 

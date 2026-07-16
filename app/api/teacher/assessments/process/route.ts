@@ -13,6 +13,9 @@ import { recomputeAndSaveCapabilityProfile } from '@/lib/career/careerEngine'
 import { updateFromAssessment } from '@/lib/learnerModel/updater'
 import { levelToApproxMarks, type CBCLevel } from '@/lib/assessments/gradeCalculator'
 import { recordReportCardAssessmentEvidence } from '@/lib/assessments/reportCardEvidence'
+import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 const BodySchema = z.union([
   z.object({
@@ -30,17 +33,18 @@ const BodySchema = z.union([
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
+
+    const teacher = await resolveTeacher(userId)
+    if (!teacher) return apiForbidden()
 
     const db = createServiceClient()
-
-    const { data: teacher } = await db
-      .from('teachers')
-      .select('id, full_name')
-      .eq('user_id', user.id)
-      .single()
-    if (!teacher) return apiForbidden()
 
     const parsed = BodySchema.safeParse(await req.json())
     if (!parsed.success) {
@@ -53,7 +57,7 @@ export async function POST(req: Request) {
       class_id?: string
     }
 
-    const teacherName = teacher.full_name ?? 'Your Teacher'
+    const teacherName = teacher.fullName ?? 'Your Teacher'
 
     let studentIds: string[] = []
 
@@ -62,13 +66,11 @@ export async function POST(req: Request) {
       studentIds = [student_id]
     } else if (class_id) {
       // Verify class belongs to teacher, get all students
-      const { data: cls } = await db
-        .from('teacher_classes')
-        .select('id')
-        .eq('id', class_id)
-        .eq('teacher_id', teacher.id)
-        .single()
-      if (!cls) return apiForbidden()
+      try {
+        await requireClassTeacher(supabase, class_id)
+      } catch {
+        return apiForbidden()
+      }
 
       const { data: links } = await db
         .from('class_students')
@@ -89,7 +91,7 @@ export async function POST(req: Request) {
         studentId:    sid,
         assessmentId: assessment_id,
         actorName:    teacherName,
-        actorUserId:  user.id,
+        actorUserId:  userId,
         notify:       true,
         teacherId:    teacher.id,
         classId:      class_id,
@@ -104,7 +106,7 @@ export async function POST(req: Request) {
         triggerLearnerModelUpdate(db, sid, result.student_name, assessment_id).catch(err =>
           console.error('[assessments/process] learner model update failed', sid, err)
         )
-        recordReportCardAssessmentEvidence(assessment_id, sid, teacher.id, user.id).catch(err =>
+        recordReportCardAssessmentEvidence(assessment_id, sid, teacher.id, userId).catch(err =>
           console.error('[assessments/process] evidence emission failed', sid, err)
         )
       }

@@ -4,6 +4,8 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
 import { recomputeAndSaveCapabilityProfile } from '@/lib/career/careerEngine'
+import { requireStudent } from '@/lib/core/permissions'
+import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
 
 const CreateAssessmentSchema = z.object({
   student_id:              z.string().uuid(),
@@ -26,8 +28,6 @@ const CreateAssessmentSchema = z.object({
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) return apiUnauthorized()
 
     const parsed = CreateAssessmentSchema.safeParse(await request.json())
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
@@ -48,14 +48,22 @@ export async function POST(request: Request) {
       raw_marks,
     } = parsed.data
 
-    const service = createServiceClient()
+    // Verify student belongs to this user — same response for "doesn't exist"
+    // and "not yours" as the original inline check (don't leak which).
+    let userId: string
+    try {
+      userId = (await requireStudent(supabase, student_id)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      if (isEduNexusError(err)) return apiBadRequest('Student not found or does not belong to you')
+      throw err
+    }
 
-    // Verify student belongs to this user
+    const service = createServiceClient()
     const { data: student, error: studentError } = await service
       .from('students')
       .select('id, grade, curriculum_type')
       .eq('id', student_id)
-      .eq('user_id', user.id)
       .single()
 
     if (studentError || !student) return apiBadRequest('Student not found or does not belong to you')
@@ -67,7 +75,7 @@ export async function POST(request: Request) {
       .from('assessments')
       .insert({
         student_id,
-        user_id:                 user.id,
+        user_id:                 userId,
         grade:                   grade ?? student.grade,
         term,
         year,

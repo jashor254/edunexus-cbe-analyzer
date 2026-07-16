@@ -8,6 +8,9 @@ import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/r
 import { repos } from '@/lib/repositories'
 import { computeInterventionEfficacy } from '@/lib/school/intelligence'
 import type { InterventionEfficacyRecord } from '@/lib/school/types'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 type InterventionEfficacyResponse = {
   efficacy: InterventionEfficacyRecord[]
@@ -19,13 +22,18 @@ type InterventionEfficacyResponse = {
 export async function GET(): Promise<Response> {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
-    const teacher = await repos.teachers.findTeacherByUserId(user.id)
+    const teacher = await resolveTeacher(userId)
     if (!teacher) return apiForbidden()
 
-    const schoolUser = await repos.schools.findSchoolUserByUserId(user.id)
+    const schoolUser = await repos.schools.findSchoolUserByUserId(userId)
     if (!schoolUser) return apiError('Teacher is not associated with a school', 403)
 
     // Find all teachers in the same school via Core School membership

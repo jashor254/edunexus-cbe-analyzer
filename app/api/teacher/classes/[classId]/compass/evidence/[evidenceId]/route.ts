@@ -18,6 +18,14 @@ import { resolveTeacherOwnership } from '@/lib/compass/ownership'
 import { confirmReview, rejectReview } from '@/lib/intelligence/evidenceLifecycle'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest, apiNotFound, getErrorMessage } from '@/lib/api/response'
 import { z } from 'zod'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { UnauthorizedError } from '@/lib/core/errors'
+
+// Sprint 1B Batch C note: only the top-level auth check below is migrated.
+// `resolveTeacherOwnership` (lib/compass/ownership.ts) is Intelligence/Compass
+// domain logic — a student-scoped ownership resolver, not the class-scoped
+// `teacher_classes` check every other route in this batch uses — and is left
+// completely untouched, per "Do NOT touch Intelligence Layer."
 
 const BodySchema = z.object({
   studentId: z.string().uuid(),
@@ -36,14 +44,19 @@ export async function PATCH(
     const { evidenceId } = await params
 
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const parsed = BodySchema.safeParse(await req.json())
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid request')
     const { studentId, action, reason } = parsed.data
 
-    const ownership = await resolveTeacherOwnership(user.id, studentId)
+    const ownership = await resolveTeacherOwnership(userId, studentId)
     if (!ownership.allowed) return apiForbidden()
 
     const evidence = await repos.evidence.findEvidenceById(evidenceId)
@@ -60,8 +73,8 @@ export async function PATCH(
     }
 
     const updated = action === 'confirm'
-      ? await confirmReview(evidenceId, user.id, reason ?? null)
-      : await rejectReview(evidenceId, user.id, reason as string)
+      ? await confirmReview(evidenceId, userId, reason ?? null)
+      : await rejectReview(evidenceId, userId, reason as string)
 
     return apiSuccess({
       id:             updated.id,

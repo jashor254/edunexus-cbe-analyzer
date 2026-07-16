@@ -2,6 +2,9 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
+import { UnauthorizedError } from '@/lib/core/errors'
 
 const CreateRowSchema = z.object({
   schemeId:       z.string().uuid().optional(),
@@ -16,12 +19,18 @@ const CreateRowSchema = z.object({
 export async function GET() {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
+
+    const teacher = await resolveTeacher(userId)
+    if (!teacher) return apiForbidden()
 
     const db = createServiceClient()
-    const { data: teacher } = await db.from('teachers').select('id, full_name').eq('user_id', user.id).single()
-    if (!teacher) return apiForbidden()
 
     const { data: rows, error } = await db
       .from('records_of_work')
@@ -60,12 +69,18 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
+
+    const teacher = await resolveTeacher(userId)
+    if (!teacher) return apiForbidden()
 
     const db = createServiceClient()
-    const { data: teacher } = await db.from('teachers').select('id, full_name').eq('user_id', user.id).single()
-    if (!teacher) return apiForbidden()
 
     const parsed = CreateRowSchema.safeParse(await req.json())
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Missing required fields')
@@ -82,7 +97,7 @@ export async function POST(req: Request) {
         term:            String(term),
         year:            Number(year),
         curriculum_mode: curriculumMode || null,
-        teacher_name:    teacher.full_name || '',
+        teacher_name:    teacher.fullName || '',
       })
       .select('id')
       .single()

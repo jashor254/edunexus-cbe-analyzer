@@ -7,6 +7,14 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
 import { resolveTeacherOwnership } from '@/lib/compass/ownership'
 import { z } from 'zod'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { UnauthorizedError } from '@/lib/core/errors'
+
+// Sprint 1B Batch E note: only the top-level auth check below is migrated.
+// `resolveTeacherOwnership` (lib/compass/ownership.ts) is Intelligence/Compass
+// domain logic — a student-scoped ownership resolver, the same one found
+// untouched in Batch C's compass/evidence route — left completely untouched,
+// per "Do NOT touch Intelligence Layer."
 
 const BodySchema = z.object({
   subject:    z.string().min(1),
@@ -20,8 +28,13 @@ export async function PATCH(
 ) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return apiUnauthorized()
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const { studentId } = await params
 
@@ -33,7 +46,7 @@ export async function PATCH(
 
     const db = createServiceClient()
 
-    const ownership = await resolveTeacherOwnership(user.id, studentId)
+    const ownership = await resolveTeacherOwnership(userId, studentId)
     if (!ownership.allowed) return apiForbidden()
 
     // Upsert student_learning_context with updated compass_bridge

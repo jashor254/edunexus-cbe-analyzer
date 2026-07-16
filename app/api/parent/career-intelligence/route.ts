@@ -9,14 +9,33 @@ import { extractCapabilityProfile } from '@/lib/career/capabilityExtractor'
 import { buildParentIntelligence } from '@/lib/career/parentIntelligence'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { projectionToScoreHistory } from '@/lib/learnerIntelligence/projectionAdapters'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { UnauthorizedError } from '@/lib/core/errors'
+
+// Sprint 1B Batch F note: only the top-level auth check below is migrated.
+// The self-or-parent ownership check further down is deliberately left
+// untouched — it queries via the request-scoped RLS client (`supabase`),
+// not the service client every other route in this batch uses, meaning RLS
+// itself is also enforcing this read (defense in depth this route already
+// has and others don't). Composing the canonical requireStudent/requireParent
+// here would switch to the service client internally and lose that RLS
+// layer for this specific query, plus this route returns 401 (not 403) for
+// an ownership failure — a different response contract than every other
+// route in this batch. Both are business decisions this sprint's rules say
+// not to rewrite.
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) return apiUnauthorized()
+    let user: { id: string; email: string | null }
+    try {
+      user = await requireAuthentication(supabase)
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return apiUnauthorized()
+      throw err
+    }
 
     const studentId = new URL(req.url).searchParams.get('studentId')
     if (!studentId) return apiBadRequest('studentId is required')
