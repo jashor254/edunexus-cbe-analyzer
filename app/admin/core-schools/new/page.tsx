@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, CheckCircle2, XCircle, ArrowRight } from 'lucide-react'
 
 const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS ?? '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
 
@@ -15,9 +15,27 @@ const SCHOOL_TYPES = [
   { value: 'private_comprehensive',   label: 'Private Comprehensive' },
 ] as const
 
+type ActivationStepResult = {
+  step: string
+  status: 'created' | 'already_exists' | 'skipped' | 'failed'
+  detail: string
+  count?: number
+}
+
+type ActivationResult = {
+  status: 'complete' | 'failed'
+  steps: ActivationStepResult[]
+  failedStep?: string
+  error?: string
+}
+
 // Minimal internal onboarding form — posts straight to the existing
 // POST /api/core/school (its CreateSchoolSchema is the single source of
-// truth for validation; this page adds no rules of its own).
+// truth for validation; this page adds no rules of its own). Sprint 10E
+// Phase 5: the route has always run activateSchool() (Sprint 9B/9C) and
+// returned its result — this page previously discarded it and redirected
+// immediately (Sprint 10D's audit finding). It now shows what activation
+// actually did before continuing, without changing the request itself.
 export default function NewCoreSchoolPage() {
   const router = useRouter()
   const [ready, setReady] = useState(false)
@@ -32,6 +50,7 @@ export default function NewCoreSchoolPage() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [activation, setActivation] = useState<ActivationResult | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -62,9 +81,10 @@ export default function NewCoreSchoolPage() {
           contact_email: form.contact_email.trim() || undefined,
         }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error?.formErrors?.[0] ?? data.error ?? 'Failed to create school')
-      router.push('/admin')
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error?.formErrors?.[0] ?? body.error ?? 'Failed to create school')
+      setActivation(body.data.activation as ActivationResult)
+      setLoading(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
       setLoading(false)
@@ -72,6 +92,52 @@ export default function NewCoreSchoolPage() {
   }
 
   if (!ready) return null
+
+  if (activation) {
+    return (
+      <div className="min-h-screen bg-[#060d18] text-white flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-lg space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+              {activation.status === 'complete'
+                ? <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                : <XCircle className="w-6 h-6 text-amber-400" />}
+              School created
+            </h1>
+            <p className="text-white/50 text-sm mt-1">
+              {activation.status === 'complete'
+                ? 'Activation set up the academic year, terms, grades, streams, classes, and settings.'
+                : `Activation stopped at "${activation.failedStep}" — the school still exists; re-running activation later will resume from here.`}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            {activation.steps.map(s => (
+              <div key={s.step} className="flex items-start gap-3 border border-white/10 rounded-xl px-4 py-3">
+                {s.status === 'failed'
+                  ? <XCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+                  : <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />}
+                <div>
+                  <p className="text-sm font-bold text-white capitalize">{s.step.replace(/_/g, ' ')}</p>
+                  <p className="text-xs text-white/50">{s.detail}</p>
+                </div>
+              </div>
+            ))}
+            {activation.error && (
+              <p className="text-sm text-red-400">{activation.error}</p>
+            )}
+          </div>
+
+          <button
+            onClick={() => router.push('/admin')}
+            className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 text-white py-3 rounded-xl font-medium transition-colors"
+          >
+            Continue to Admin <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[#060d18] text-white flex items-center justify-center px-4 py-12">

@@ -465,6 +465,36 @@ export class TeacherRepository extends BaseRepository {
     return match ? { id: match.id, email: match.email! } : null
   }
 
+  // Batched profile lookup for a teacher-membership list screen (Sprint
+  // 10E) — mirrors findUserIdsWithTeacherRecord's .in() batching, one query
+  // for the whole roster instead of one per row.
+  async findProfilesByUserIds(userIds: string[]): Promise<Map<string, { full_name: string | null }>> {
+    if (userIds.length === 0) return new Map()
+    const { data, error } = await this.db
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', userIds)
+    if (error) throw new Error(`findProfilesByUserIds: ${error.message}`)
+    return new Map((data ?? []).map(row => [row.id, { full_name: row.full_name }]))
+  }
+
+  // Same auth.admin.listUsers() call findAuthUserByEmail already uses,
+  // batched by id instead of matched by email — a pending school_users row
+  // has no `teachers`/`profiles` row yet (those only materialize on
+  // accept), so email is the only identifying field available for an
+  // invited-but-not-yet-accepted teacher in a list UI.
+  async findAuthUsersByIds(userIds: string[]): Promise<Map<string, string>> {
+    if (userIds.length === 0) return new Map()
+    const { data, error } = await this.db.auth.admin.listUsers()
+    if (error) throw new Error(`findAuthUsersByIds: ${error.message}`)
+    const idSet = new Set(userIds)
+    const result = new Map<string, string>()
+    for (const u of data.users as Array<{ id: string; email?: string | null }>) {
+      if (idSet.has(u.id) && u.email) result.set(u.id, u.email)
+    }
+    return result
+  }
+
   // ── Legacy students table (ragContext, search) ────────────────────────────────
 
   async findLegacyStudentById(id: string): Promise<{ name: string; grade: number; curriculum_type: string } | null> {
