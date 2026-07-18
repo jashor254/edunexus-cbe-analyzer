@@ -15,9 +15,12 @@ import type { CapabilityCareerMatch, CareerCategory } from '@/lib/career/types'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { projectionToScoreHistory } from './projectionAdapters'
 import { insufficientEvidenceInsight } from './insight'
-import type { Insight } from './insight'
+import type { Insight, ConfidenceLevel } from './insight'
 
-const CATEGORY_LABEL: Record<CareerCategory, string> = {
+// Exported (Sprint 12M) so `getCareerBlueprintSummary` below — and any other
+// consumer needing the same cluster-level label a specific career maps to —
+// reuses this one label map instead of inventing a second one.
+export const CATEGORY_LABEL: Record<CareerCategory, string> = {
   technology:  'Engineering & Technology',
   health:      'Health Sciences',
   agriculture: 'Agriculture & Environmental Sciences',
@@ -40,6 +43,8 @@ export type CareerFamilyInsight = {
 export type CareerMatchInsight = {
   careerSlug:    string
   careerTitle:   string
+  /** Propagated from `CapabilityCareerMatch.career_category` — already computed by `computeCapabilityMatches`, never re-derived here. Added Sprint 12M so cluster-level consumers (Blueprint) don't need a second read to learn a match's category. */
+  careerCategory: CareerCategory
   tier:          CapabilityCareerMatch['tier']
   alignmentPct:  number
   insight:       Insight
@@ -93,11 +98,12 @@ async function buildSeniorMatches(studentId: string, profile: ReturnType<typeof 
   const all = [...report.primary, ...report.stretch, ...report.alternative, ...report.entrepreneurial]
 
   return all.map(match => ({
-    careerSlug:   match.career_slug,
-    careerTitle:  match.career_title,
-    tier:         match.tier,
-    alignmentPct: alignmentToPercent(match.alignment_score),
-    insight:      matchToInsight(match),
+    careerSlug:     match.career_slug,
+    careerTitle:    match.career_title,
+    careerCategory: match.career_category,
+    tier:           match.tier,
+    alignmentPct:   alignmentToPercent(match.alignment_score),
+    insight:        matchToInsight(match),
   }))
 }
 
@@ -181,4 +187,63 @@ export async function buildCareerIntelligence(studentId: string): Promise<Career
     return { ...base, families: familiesFromMatches([...report.primary, ...report.stretch]) }
   }
   return { ...base, matches: await buildSeniorMatches(studentId, profile, careers) }
+}
+
+// ── Blueprint-safe summary (Sprint 12M) ────────────────────────────────────────
+//
+// The one canonical read Learner Blueprint (or any future orientation-level
+// consumer) calls — never `buildCareerIntelligence` directly, never
+// `computeCapabilityMatches` directly. Selects the single top result
+// `buildCareerIntelligence` already computed and grade-gated; performs no
+// calculation of its own. Deliberately narrower than `CareerIntelligence`:
+// no specific career/job title, no full families/matches list, no
+// evidence/gap detail — Blueprint answers "what direction," never "which
+// job," per this sprint's Architectural Goal.
+export type CareerBlueprintSummary = {
+  /** Broad cluster label (e.g. "Engineering & Technology") — never a specific career/job title. */
+  careerCluster: string
+  /** One sentence — the same narrative Career Intelligence's own Insight already produced. */
+  strengthProfile: string
+  /** One sentence — Career Intelligence's own Insight.action, unmodified. */
+  futureDirection: string
+  /**
+   * No canonical cluster-level market-outlook function exists (Career's own
+   * `kenya_market_outlook` is per-specific-career metadata, and Blueprint no
+   * longer surfaces a specific career to attach it to) — always null,
+   * documented gap, never fabricated. See sprint-12n doc §5.
+   */
+  aiOutlook: string | null
+  confidence: ConfidenceLevel
+  /**
+   * No canonical algorithm-version export exists for the capability match
+   * engine (unlike Blueprint's own BLUEPRINT_VERSION) — always null,
+   * documented gap, never invented. See sprint-12n doc §5.
+   */
+  version: string | null
+}
+
+/**
+ * Null means "insufficient evidence" (Career Intelligence's own
+ * `notice` branch) — the caller renders Blueprint's explicit Unavailable
+ * state, never a fabricated default.
+ */
+export async function getCareerBlueprintSummary(studentId: string): Promise<CareerBlueprintSummary | null> {
+  const intelligence = await buildCareerIntelligence(studentId)
+  if (intelligence.notice) return null
+
+  const top = intelligence.families?.[0] ?? intelligence.matches?.[0]
+  if (!top) return null
+
+  const careerCluster = 'categoryLabel' in top
+    ? top.categoryLabel
+    : (CATEGORY_LABEL[top.careerCategory] ?? top.careerCategory)
+
+  return {
+    careerCluster,
+    strengthProfile: top.insight.observation,
+    futureDirection: top.insight.action,
+    aiOutlook: null,
+    confidence: top.insight.confidence,
+    version: null,
+  }
 }
