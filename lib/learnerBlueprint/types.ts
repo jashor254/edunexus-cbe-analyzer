@@ -202,6 +202,27 @@ export type PortfolioData = {
   portfolioUrl: string | null
 }
 
+// ── Achievement (lib/learnerAchievement/ — Sprint 12W, ADR-0012) ────────────
+//
+// Blueprint's frozen field budget for Achievement (Phase 6/7): count,
+// latest verified, highest-level, URL, availability. Never a full
+// achievement record, never a raw score — Achievement's own future
+// full-detail surface is where that lives.
+
+export type AchievementHighlightData = {
+  title: string
+  category: string
+  achievementType: string
+  publishedAt: string
+}
+
+export type AchievementData = {
+  achievementCount: number
+  latestVerifiedAchievement: AchievementHighlightData | null
+  highestLevelAchievement: AchievementHighlightData | null
+  profileUrl: string | null
+}
+
 // ── Parent Summary (presentation composition only) ───────────────────────────
 
 export type ParentSummaryData = {
@@ -263,6 +284,7 @@ export type LearnerBlueprint = {
   learningCompass: BlueprintSection<LearningCompassData>
   career: BlueprintSection<CareerData>
   portfolio: BlueprintSection<PortfolioData>
+  achievement: BlueprintSection<AchievementData>
   teacherReflection: BlueprintSection<TeacherReflectionData>
   parentSummary: BlueprintSection<ParentSummaryData>
   educationalIdentity: BlueprintSection<EducationalIdentityData>

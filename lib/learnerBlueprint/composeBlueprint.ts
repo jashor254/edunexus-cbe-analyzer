@@ -19,6 +19,7 @@ import { composeAttendance } from './composeAttendance'
 import { composeLearningCompass } from './composeLearningCompass'
 import { composeCareer } from './composeCareer'
 import { composePortfolio } from './composePortfolio'
+import { composeAchievement } from './composeAchievement'
 import { composeTeacherReflection } from './composeTeacherReflection'
 import { composeParentSummary } from './composeParentSummary'
 import { composeEducationalIdentity } from './composeEducationalIdentity'
@@ -41,13 +42,14 @@ export async function composeBlueprint(ids: BlueprintIdentifiers): Promise<Compo
   // exactly as before. No composer re-implements this lookup.
   const legacyStudentId = await resolveLegacyStudentId(ids.coreLearnerId)
 
-  const [identity, academicRecord, attendance, learningCompass, career, portfolio, teacherReflection] = await Promise.all([
+  const [identity, academicRecord, attendance, learningCompass, career, portfolio, achievement, teacherReflection] = await Promise.all([
     composeIdentity(ids),
     composeAcademicRecord(legacyStudentId),
     composeAttendance(ids.actorUserId, ids.schoolId, ids.coreLearnerId),
     composeLearningCompass(legacyStudentId),
     composeCareer(legacyStudentId),
     composePortfolio(ids.coreLearnerId, ids.schoolId),
+    composeAchievement(ids.coreLearnerId, ids.schoolId),
     composeTeacherReflection(ids.coreLearnerId, ids.schoolId),
   ])
 
@@ -65,6 +67,7 @@ export async function composeBlueprint(ids: BlueprintIdentifiers): Promise<Compo
     learningCompass,
     career,
     portfolio,
+    achievement,
     teacherReflection,
     parentSummary,
     educationalIdentity,
