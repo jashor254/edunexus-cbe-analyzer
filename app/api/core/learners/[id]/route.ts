@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { getLearner, updateLearner, getLearnerHistory, enrollLearner, withdrawLearner } from '@/lib/core/learners'
+import { getLearnerReadiness } from '@/lib/core/learnerOnboarding'
+import { getBridgedLearnerTimeline, getBridgedCareerIntelligence } from '@/lib/core/academicBridge'
 import { requireSchoolMembership, requireSchoolAdmin, requireSchoolStaff } from '@/lib/core/permissions'
 import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
 import { z } from 'zod'
@@ -50,6 +52,29 @@ export async function GET(req: NextRequest, { params }: Params): Promise<NextRes
   const view = req.nextUrl.searchParams.get('view')
   if (view === 'history') {
     const data = await getLearnerHistory(id, schoolId)
+    return NextResponse.json({ data })
+  }
+
+  if (view === 'readiness') {
+    const termId = req.nextUrl.searchParams.get('termId')
+    if (!termId) return NextResponse.json({ error: 'termId required for view=readiness' }, { status: 400 })
+    const data = await getLearnerReadiness(id, schoolId, termId)
+    return NextResponse.json({ data })
+  }
+
+  // Sprint 9G — canonical read migration. Resolves through
+  // lib/core/academicBridge.ts to the same legacy identity Sprint 9F's
+  // Assessment/Evidence/Projection pipeline already produced; the
+  // underlying reads (getLearnerTimeline/buildCareerIntelligence) are
+  // completely unmodified. null (not 404) when this learner has no
+  // assessment history yet — a real, common, non-error state.
+  if (view === 'timeline') {
+    const data = await getBridgedLearnerTimeline(id)
+    return NextResponse.json({ data })
+  }
+
+  if (view === 'career-intelligence') {
+    const data = await getBridgedCareerIntelligence(id)
     return NextResponse.json({ data })
   }
 
