@@ -23,6 +23,28 @@ Entries are never edited to rewrite history — if a change is later reverted or
 
 ---
 
+## 2026-07-18 — LMS Basics Phase 3a: Auto-Graded MCQ Quiz
+
+**What changed**: user asked directly whether Quiz was worth building given Assignments already exists — investigated before building anything. Found real overlap: Compass (`/learn`, `lib/learn/engine.ts`) already generates AI-adaptive MCQ/true-false/open-ended questions per session, auto-graded in real time, teacher-visible via `app/api/teacher/classes/[classId]/compass/route.ts`. What neither Assignments (manual grading) nor Compass (personalized, ever-different questions) covers: a uniform, fixed question set every student in a class answers identically, auto-graded, comparable side-by-side — the actual Kenyan-classroom pattern this closes is the CAT/revision quiz a teacher currently marks by hand. User then proposed a richer two-tier framing (teacher-custom questions + AI-generated strand/substrand revision banks); assessed and split: the custom-question half is this entry (small, safe, extends an existing domain); the AI-content half needs its own `TOKEN_COSTS` entry, cache-not-regenerate design, and a correctness/approval gate before real students see it — deferred to its own design pass, not built here.
+
+**Deliberately built as an extension of Assignments, not a new domain** — no ADR needed (Guardian Mode: extend an existing domain rather than duplicate it, since this introduces no new identity or repository responsibility). `assignments.is_quiz` + `assignment_questions` (question_text, choices, correct_index, order_index) + `assignment_submissions.answers` (jsonb). Consequence of this design choice: a quiz score lands in the Gradebook automatically with zero Gradebook code changes, since a quiz-type assignment is still just a row in `assignments`/`assignment_submissions` — proven directly by a route-level test that submits a quiz and asserts the score appears correctly in the Gradebook API response in the same test.
+
+**Grading is instant** — `gradeAndSubmitQuiz()` computes the score and writes `status: 'marked'` in one step on submission; no teacher marking wait, which is the entire point of choosing MCQ auto-grade over a regular assignment.
+
+**Security shape**: RLS on `assignment_questions` is teacher-only (no student/parent SELECT policy at all) — rather than trying to hide one column (`correct_index`) with row-level security, which can't do column-level hiding, the student-facing question list is served exclusively through `app/api/student/assignments/[id]/questions/route.ts` on the service-role client, which selects out `correct_index` explicitly. Same "no client policy, server route strips the sensitive field" posture already used for this initiative's private Storage buckets.
+
+**A real pre-existing bug found and fixed while wiring `is_quiz` through the read path**: `app/api/student/assignments/route.ts` never selected `max_score` from `assignments` at all — `item.max_score` on the student-facing "Marked" card (`app/dashboard/assignments/page.tsx`) has always rendered `undefined` for every non-quiz assignment too, not just quizzes. Fixed as part of the same column-list edit that added `is_quiz`.
+
+**Architectural documents referenced**: none new — extends the existing Assignments domain governed by the original `teacher_portal_migration.sql`.
+
+**ADR**: None — extension of an existing domain, no canonical-domain trigger met.
+
+**Tests added**: 41 total for this phase — `lib/quiz/quiz.pure.test.ts` (5, grading-logic edge cases including unanswered questions counting as wrong and divide-by-zero on an empty question set), `lib/quiz/quiz.integration.test.ts` (5, real synthetic data — question replace-not-append, student view never leaking `correct_index`, resubmission updating rather than duplicating the row), 7 new cases appended to `lib/testing/lmsRoutes.http.integration.test.ts` (route-level HTTP, including the quiz-score-in-Gradebook proof and an ownership-denial case for question authoring). All pass; zero synthetic-row residue confirmed via direct SQL.
+
+**Rollback considerations**: Low. Migration is additive (one new column on `assignments`, one new column on `assignment_submissions`, one new child table) — no existing table's data is altered. Code-side: all new files, plus small additive edits to the assignment-creation form, the student submission modal, and the teacher assignment-detail page (each gated behind `is_quiz`, so non-quiz assignments render exactly as before).
+
+---
+
 ## 2026-07-18 — LMS Basics Phase 2: Class Calendar + Announcements
 
 **What changed**: shipped the next two gaps from the Wave 6 LMS audit — `docs/architecture/adr-0021-lms-calendar-and-announcements.md`. Class Calendar merges teacher-created events with `assignments.due_date` at read time (`lib/calendar/calendarPure.ts`'s `mergeCalendar()`), never copying due dates into a second table — one source of truth stays intact. Announcements is a deliberately one-way, class-scoped broadcast (no replies/threads), explicitly distinct from the automated WhatsApp/parent-pulse notification pipeline, which is untouched. Same identity space (`teacher_classes`/`class_students`), RLS pattern, and private-by-default posture as ADR-0020's Phase 1 tables.
