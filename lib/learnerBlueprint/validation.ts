@@ -28,6 +28,7 @@ const ALL_SECTIONS: Array<Exclude<keyof LearnerBlueprint, 'metadata'>> = [
   'career',
   'portfolio',
   'achievement',
+  'projects',
   'teacherReflection',
   'parentSummary',
   'educationalIdentity',

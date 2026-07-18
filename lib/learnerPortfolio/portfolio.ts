@@ -93,6 +93,26 @@ export async function updateDraftItem(
   return toPortfolioItem(row, media, tags)
 }
 
+/**
+ * ADR-0013 "Relationship to ADR-0011" — links a `projects`-category item to
+ * a real Project entity. Only meaningful for that one category; throws for
+ * any other category rather than silently accepting a meaningless link.
+ * Only while the item is still `draft` — matching every other field edit's
+ * lifecycle restriction.
+ */
+export async function linkItemToProject(client: SupabaseClient, schoolId: string, itemId: string, projectId: string): Promise<PortfolioItem> {
+  await requireSchoolStaff(client, schoolId)
+
+  const existing = await repos.portfolios.findItemById(itemId, schoolId)
+  if (!existing) throw new Error('Portfolio item not found.')
+  if (existing.category !== 'projects') throw new Error('Only a "projects"-category item can be linked to a Project.')
+  if (existing.status !== 'draft') throw new Error('This Portfolio item is no longer a draft and cannot be relinked.')
+
+  const row = await repos.portfolios.linkToProject(itemId, schoolId, projectId)
+  const [media, tags] = await Promise.all([repos.portfolios.listMedia(itemId), repos.portfolios.listTags(itemId)])
+  return toPortfolioItem(row, media, tags)
+}
+
 /** Learner submits a Draft item for teacher review. */
 export async function submitItem(client: SupabaseClient, schoolId: string, itemId: string): Promise<PortfolioItem> {
   await requireSchoolStaff(client, schoolId)

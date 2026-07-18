@@ -27,6 +27,7 @@ function fixtureBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlu
     career: na(),
     portfolio: na(),
     achievement: na(),
+    projects: na(),
     teacherReflection: na(),
     parentSummary: na(),
     educationalIdentity: na(),

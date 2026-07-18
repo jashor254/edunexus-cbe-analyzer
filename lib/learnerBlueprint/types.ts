@@ -223,6 +223,26 @@ export type AchievementData = {
   profileUrl: string | null
 }
 
+// ── Projects (lib/learnerProjects/ — Sprint 12Z, ADR-0013) ──────────────────
+//
+// Blueprint's frozen field budget for Projects (Phase 2/6): count, latest
+// published, current active, featured, URL. Never a full project record,
+// never internal lifecycle state.
+
+export type ProjectHighlightData = {
+  title: string
+  category: string
+  publishedAt: string | null
+}
+
+export type ProjectsData = {
+  projectCount: number
+  latestPublishedProject: ProjectHighlightData | null
+  currentActiveProject: { title: string; category: string } | null
+  featuredProject: ProjectHighlightData | null
+  projectsUrl: string | null
+}
+
 // ── Parent Summary (presentation composition only) ───────────────────────────
 
 export type ParentSummaryData = {
@@ -285,6 +305,7 @@ export type LearnerBlueprint = {
   career: BlueprintSection<CareerData>
   portfolio: BlueprintSection<PortfolioData>
   achievement: BlueprintSection<AchievementData>
+  projects: BlueprintSection<ProjectsData>
   teacherReflection: BlueprintSection<TeacherReflectionData>
   parentSummary: BlueprintSection<ParentSummaryData>
   educationalIdentity: BlueprintSection<EducationalIdentityData>

@@ -49,6 +49,8 @@ export type PortfolioItem = {
   updatedAt: string
   media: { url: string; label: string | null }[]
   tags: string[]
+  /** ADR-0013 "Relationship to ADR-0011" — set only for `projects`-category items linked to a real Project. Never fabricated: null means unlinked, not "no project exists." */
+  projectId: string | null
 }
 
 /**
@@ -89,5 +91,6 @@ export function toPortfolioItem(
     updatedAt: row.updated_at,
     media: media.map(m => ({ url: m.url, label: m.label })),
     tags: tags.map(t => t.tag),
+    projectId: row.project_id,
   }
 }

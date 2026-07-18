@@ -50,6 +50,8 @@ export type PortfolioItemRow = {
   archived_at: string | null
   created_at: string
   updated_at: string
+  /** ADR-0013 "Relationship to ADR-0011" — Portfolio references a Project, never duplicates one. Nullable: a `projects`-category item with no link yet is Reserved (service layer), never fabricated. */
+  project_id: string | null
 }
 
 export type PortfolioMediaRow = {
@@ -84,7 +86,7 @@ export type UpdateDraftItemInput = Partial<
 >
 
 const ITEM_COLS =
-  'id, portfolio_id, learner_id, school_id, category, title, description, reflection, supporting_evidence_ids, status, created_by, verified_by, verified_at, rejected_reason, published_at, archived_at, created_at, updated_at'
+  'id, portfolio_id, learner_id, school_id, category, title, description, reflection, supporting_evidence_ids, status, created_by, verified_by, verified_at, rejected_reason, published_at, archived_at, created_at, updated_at, project_id'
 
 export class PortfolioRepository extends BaseRepository {
   // ── learner_portfolios ──────────────────────────────────────────────────
@@ -135,6 +137,24 @@ export class PortfolioRepository extends BaseRepository {
       .select(ITEM_COLS)
       .single()
     if (error) throw new Error(`updateDraftItem: ${error.message}`)
+    return data as unknown as PortfolioItemRow
+  }
+
+  /**
+   * ADR-0013 "Relationship to ADR-0011" — links a `projects`-category item
+   * to a real Project entity. Only meaningful while the item is still
+   * `draft` (the DB trigger's normal draft-only-edit rule already covers
+   * this column since it's a plain field update, not a special case).
+   */
+  async linkToProject(id: string, schoolId: string, projectId: string): Promise<PortfolioItemRow> {
+    const { data, error } = await this.db
+      .from('portfolio_items')
+      .update({ project_id: projectId })
+      .eq('id', id)
+      .eq('school_id', schoolId)
+      .select(ITEM_COLS)
+      .single()
+    if (error) throw new Error(`linkToProject: ${error.message}`)
     return data as unknown as PortfolioItemRow
   }
 
