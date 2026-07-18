@@ -96,6 +96,10 @@ export async function getSchoolSettings(schoolId: string): Promise<SchoolSetting
   return repos.schools.findSettings(schoolId)
 }
 
+export async function getSchoolSettingsOrNull(schoolId: string): Promise<SchoolSettings | null> {
+  return repos.schools.findSettingsOrNull(schoolId)
+}
+
 // Sprint 4I (docs/engineering/sprint-4f-teacher-school-identity-audit.md,
 // docs/architecture/deprecation-registry.md #5, docs/engineering/
 // implementation-log.md): resolves a legacy teacher's grade_boundaries via
