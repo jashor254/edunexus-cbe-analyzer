@@ -7,6 +7,7 @@ import { AttendanceRepository } from './attendance.repository'
 import { BillingRepository } from './billing.repository'
 import { BlueprintSnapshotRepository } from './blueprintSnapshot.repository'
 import { CareerRepository } from './career.repository'
+import { ClassResourceRepository } from './classResource.repository'
 import { CompassRepository } from './compass.repository'
 import { CompetitionRepository } from './competition.repository'
 import { CurriculumRepository } from './curriculum.repository'
@@ -50,6 +51,7 @@ export const repos = {
   // (the after-the-fact verified claim, ADR-0012) are related but never
   // the same domain. See ADR-0014 Phase 1.
   competitions:        new CompetitionRepository(),
+  classResources:      new ClassResourceRepository(),
   curriculum:          new CurriculumRepository(),
   developers:          new DeveloperRepository(),
   evidence:            new EvidenceRepository(),
@@ -98,6 +100,7 @@ export { AssessmentTypeRepository } from './assessmentType.repository'
 export { AttendanceRepository } from './attendance.repository'
 export { BillingRepository } from './billing.repository'
 export { CareerRepository } from './career.repository'
+export { ClassResourceRepository } from './classResource.repository'
 export { CompassRepository } from './compass.repository'
 export { CompetitionRepository } from './competition.repository'
 export { CurriculumRepository } from './curriculum.repository'

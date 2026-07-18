@@ -1262,6 +1262,15 @@ export default function DashboardPage() {
                 href: '/dashboard/assignments',
                 badge: stats?.pendingAssignments && stats.pendingAssignments > 0 ? stats.pendingAssignments : null,
               },
+              {
+                icon: BookOpen,
+                title: 'Class Resources',
+                sub: 'Notes & files from your teacher',
+                gradient: 'from-teal-500 to-emerald-600',
+                shadow: 'shadow-teal-500/20',
+                href: '/dashboard/resources',
+                badge: null,
+              },
             ].map(({ icon: Icon, title, sub, gradient, shadow, href, badge }) => (
               <Link
                 key={href}

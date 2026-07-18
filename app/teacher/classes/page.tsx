@@ -186,6 +186,12 @@ export default function TeacherClassesPage() {
                 >
                   Gradebook
                 </Link>
+                <Link
+                  href={`/teacher/resources/${cls.id}`}
+                  className="flex items-center justify-center gap-2 text-sm text-gray-700 border border-gray-200 bg-gray-50 px-4 py-2.5 rounded-xl font-bold hover:bg-gray-100 transition"
+                >
+                  Resources
+                </Link>
               </div>
             </div>
           ))}
