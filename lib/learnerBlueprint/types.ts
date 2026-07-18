@@ -243,6 +243,28 @@ export type ProjectsData = {
   projectsUrl: string | null
 }
 
+// ── Competitions (lib/learnerCompetitions/ — Sprint 13B, ADR-0014) ─────────
+//
+// Blueprint's frozen field budget for Competitions (mission Phase 7):
+// total, verified count, latest, current participation, URL. Never a full
+// Competition Entry, never judging, never raw feedback, never unpublished
+// work.
+
+export type CompetitionHighlightData = {
+  name: string
+  level: string
+  category: string
+  publishedAt: string
+}
+
+export type CompetitionsData = {
+  totalCompetitions: number
+  verifiedCompetitions: number
+  latestCompetition: CompetitionHighlightData | null
+  currentParticipation: { name: string; level: string; category: string } | null
+  competitionsUrl: string | null
+}
+
 // ── Parent Summary (presentation composition only) ───────────────────────────
 
 export type ParentSummaryData = {
@@ -306,6 +328,7 @@ export type LearnerBlueprint = {
   portfolio: BlueprintSection<PortfolioData>
   achievement: BlueprintSection<AchievementData>
   projects: BlueprintSection<ProjectsData>
+  competitions: BlueprintSection<CompetitionsData>
   teacherReflection: BlueprintSection<TeacherReflectionData>
   parentSummary: BlueprintSection<ParentSummaryData>
   educationalIdentity: BlueprintSection<EducationalIdentityData>

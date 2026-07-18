@@ -8,6 +8,7 @@ import { BillingRepository } from './billing.repository'
 import { BlueprintSnapshotRepository } from './blueprintSnapshot.repository'
 import { CareerRepository } from './career.repository'
 import { CompassRepository } from './compass.repository'
+import { CompetitionRepository } from './competition.repository'
 import { CurriculumRepository } from './curriculum.repository'
 import { DeveloperRepository } from './developer.repository'
 import { EvidenceRepository } from './evidence.repository'
@@ -41,6 +42,11 @@ export const repos = {
   blueprintSnapshots:  new BlueprintSnapshotRepository(),
   careers:             new CareerRepository(),
   compass:             new CompassRepository(),
+  // Deliberately distinct naming from `achievements` above — Competitions
+  // (the live, external, multi-week process, ADR-0014) and Achievement
+  // (the after-the-fact verified claim, ADR-0012) are related but never
+  // the same domain. See ADR-0014 Phase 1.
+  competitions:        new CompetitionRepository(),
   curriculum:          new CurriculumRepository(),
   developers:          new DeveloperRepository(),
   evidence:            new EvidenceRepository(),
@@ -79,6 +85,7 @@ export { AttendanceRepository } from './attendance.repository'
 export { BillingRepository } from './billing.repository'
 export { CareerRepository } from './career.repository'
 export { CompassRepository } from './compass.repository'
+export { CompetitionRepository } from './competition.repository'
 export { CurriculumRepository } from './curriculum.repository'
 export { DeveloperRepository } from './developer.repository'
 export { EvidenceRepository } from './evidence.repository'
