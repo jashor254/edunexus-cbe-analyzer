@@ -173,12 +173,20 @@ export default function TeacherClassesPage() {
                 </div>
               )}
 
-              <Link
-                href={`/teacher/classes/${cls.id}`}
-                className="w-full flex items-center justify-center gap-2 text-sm text-teal-700 border border-teal-200 bg-teal-50 px-4 py-2.5 rounded-xl font-bold hover:bg-teal-100 transition"
-              >
-                View Class <ChevronRight className="w-4 h-4" />
-              </Link>
+              <div className="flex gap-2">
+                <Link
+                  href={`/teacher/classes/${cls.id}`}
+                  className="flex-1 flex items-center justify-center gap-2 text-sm text-teal-700 border border-teal-200 bg-teal-50 px-4 py-2.5 rounded-xl font-bold hover:bg-teal-100 transition"
+                >
+                  View Class <ChevronRight className="w-4 h-4" />
+                </Link>
+                <Link
+                  href={`/teacher/gradebook/${cls.id}`}
+                  className="flex items-center justify-center gap-2 text-sm text-gray-700 border border-gray-200 bg-gray-50 px-4 py-2.5 rounded-xl font-bold hover:bg-gray-100 transition"
+                >
+                  Gradebook
+                </Link>
+              </div>
             </div>
           ))}
         </div>
