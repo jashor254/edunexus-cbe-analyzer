@@ -13,6 +13,7 @@ import { CurriculumRepository } from './curriculum.repository'
 import { DeveloperRepository } from './developer.repository'
 import { EvidenceRepository } from './evidence.repository'
 import { EvidencePurposeRepository } from './evidencePurpose.repository'
+import { InnovationRepository } from './innovation.repository'
 import { IntelligenceRepository } from './intelligence.repository'
 import { JobRepository } from './job.repository'
 import { KnowledgeGraphRepository } from './knowledge-graph.repository'
@@ -53,6 +54,7 @@ export const repos = {
   developers:          new DeveloperRepository(),
   evidence:            new EvidenceRepository(),
   evidencePurposes:    new EvidencePurposeRepository(),
+  innovations:         new InnovationRepository(),
   intelligence:        new IntelligenceRepository(),
   jobs:                new JobRepository(),
   knowledgeGraph:      new KnowledgeGraphRepository(),
@@ -102,6 +104,7 @@ export { CurriculumRepository } from './curriculum.repository'
 export { DeveloperRepository } from './developer.repository'
 export { EvidenceRepository } from './evidence.repository'
 export { EvidencePurposeRepository } from './evidencePurpose.repository'
+export { InnovationRepository } from './innovation.repository'
 export { IntelligenceRepository } from './intelligence.repository'
 export { JobRepository } from './job.repository'
 export { KnowledgeGraphRepository } from './knowledge-graph.repository'

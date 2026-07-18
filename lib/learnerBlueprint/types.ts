@@ -285,6 +285,21 @@ export type LeadershipData = {
   leadershipUrl: string | null
 }
 
+// ── Innovation (lib/learnerInnovation/ — Sprint 13I, ADR-0018) ─────────────
+//
+// Blueprint's frozen field budget for Innovation (mission Phase 6):
+// availability, current stage, iteration count, latest milestone, latest
+// implementation date, URL. Never iteration history, teacher notes,
+// internal review, artifacts, or testing data.
+
+export type InnovationsData = {
+  currentStage: { problemAddressed: string; status: string } | null
+  iterationCount: number
+  latestMilestone: string | null
+  latestImplementationDate: string | null
+  innovationsUrl: string | null
+}
+
 // ── Parent Summary (presentation composition only) ───────────────────────────
 
 export type ParentSummaryData = {
@@ -350,6 +365,7 @@ export type LearnerBlueprint = {
   projects: BlueprintSection<ProjectsData>
   competitions: BlueprintSection<CompetitionsData>
   leadership: BlueprintSection<LeadershipData>
+  innovations: BlueprintSection<InnovationsData>
   teacherReflection: BlueprintSection<TeacherReflectionData>
   parentSummary: BlueprintSection<ParentSummaryData>
   educationalIdentity: BlueprintSection<EducationalIdentityData>

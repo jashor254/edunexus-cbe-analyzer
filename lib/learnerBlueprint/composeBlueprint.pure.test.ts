@@ -137,6 +137,7 @@ function fixtureBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlu
     projects: na('not_implemented'),
     competitions: na('not_implemented'),
     leadership: na('not_implemented'),
+    innovations: na('not_implemented'),
     teacherReflection: na('not_implemented'),
     parentSummary: na('not_implemented'),
     educationalIdentity: na('not_implemented'),
