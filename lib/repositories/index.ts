@@ -1,4 +1,5 @@
 import { AcademyRepository } from './academy.repository'
+import { AchievementRepository } from './achievement.repository'
 import { AnalyticsRepository } from './analytics.repository'
 import { AssessmentRepository } from './assessment.repository'
 import { AssessmentTypeRepository } from './assessmentType.repository'
@@ -30,6 +31,7 @@ import { WebhookRepository } from './webhook.repository'
 
 export const repos = {
   academy:             new AcademyRepository(),
+  achievements:        new AchievementRepository(),
   analytics:           new AnalyticsRepository(),
   assessments:         new AssessmentRepository(),
   assessmentTypes:     new AssessmentTypeRepository(),
@@ -63,6 +65,7 @@ export const repos = {
 export type Repos = typeof repos
 
 export { AcademyRepository } from './academy.repository'
+export { AchievementRepository } from './achievement.repository'
 export { AnalyticsRepository } from './analytics.repository'
 export { AssessmentRepository } from './assessment.repository'
 export { AssessmentTypeRepository } from './assessmentType.repository'
