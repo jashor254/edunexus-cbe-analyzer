@@ -4,35 +4,7 @@ import { useEffect, useState, use } from 'react'
 import Link from 'next/link'
 import { Download } from 'lucide-react'
 import { friendlyMessage } from '@/lib/errors/friendlyMessage'
-
-type GradebookColumn = {
-  id: string
-  kind: 'assessment' | 'assignment'
-  title: string
-  maxScore: number
-  date: string | null
-}
-
-type GradebookRow = {
-  studentId: string
-  studentName: string
-  scores: Record<string, number | null>
-}
-
-type Gradebook = {
-  columns: GradebookColumn[]
-  rows: GradebookRow[]
-}
-
-function toCSV(gradebook: Gradebook): string {
-  const header = ['Student', ...gradebook.columns.map(c => `${c.title} (/${c.maxScore})`)]
-  const lines = [header.join(',')]
-  for (const row of gradebook.rows) {
-    const cells = [row.studentName, ...gradebook.columns.map(c => row.scores[c.id] ?? '')]
-    lines.push(cells.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))
-  }
-  return lines.join('\n')
-}
+import { gradebookToCSV, type Gradebook } from '@/lib/gradebook/gradebookPure'
 
 export default function GradebookPage({ params }: { params: Promise<{ classId: string }> }) {
   const { classId } = use(params)
@@ -53,7 +25,7 @@ export default function GradebookPage({ params }: { params: Promise<{ classId: s
 
   function handleExport() {
     if (!gradebook) return
-    const csv = toCSV(gradebook)
+    const csv = gradebookToCSV(gradebook)
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')

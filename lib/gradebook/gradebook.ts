@@ -4,29 +4,17 @@
 // canonical tables the per-assessment mark-entry UI already writes to
 // (class_assessments/learner_marks via assessment.repository.ts) plus
 // assignments/assignment_submissions. Read-only aggregation — no new
-// write path, no new identity.
+// write path, no new identity. Server-only (uses the service-role
+// client) — pure types/functions live in gradebookPure.ts so client
+// components (the CSV export button) can import those without pulling in
+// the service-role key.
 
 import { createServiceClient } from '@/utils/supabase/service'
 import { AssessmentRepository } from '@/lib/repositories/assessment.repository'
+import { mergeGradebook, type Gradebook } from './gradebookPure'
 
-export type GradebookColumn = {
-  id: string
-  kind: 'assessment' | 'assignment'
-  title: string
-  maxScore: number
-  date: string | null
-}
-
-export type GradebookRow = {
-  studentId: string
-  studentName: string
-  scores: Record<string, number | null> // columnId -> score, null if ungraded
-}
-
-export type Gradebook = {
-  columns: GradebookColumn[]
-  rows: GradebookRow[]
-}
+export type { Gradebook, GradebookColumn, GradebookRow } from './gradebookPure'
+export { gradebookToCSV } from './gradebookPure'
 
 export async function buildGradebook(classId: string, teacherId: string): Promise<Gradebook> {
   const db = createServiceClient()
@@ -53,15 +41,6 @@ export async function buildGradebook(classId: string, teacherId: string): Promis
     // de-dupe — a student can appear once per roster row, but guard anyway
     .filter((s, idx, arr) => arr.findIndex(x => x.id === s.id) === idx)
 
-  const columns: GradebookColumn[] = [
-    ...assessments.map(a => ({
-      id: a.id, kind: 'assessment' as const, title: a.title, maxScore: a.max_score, date: a.created_at,
-    })),
-    ...(assignments ?? []).map(a => ({
-      id: a.id, kind: 'assignment' as const, title: a.title, maxScore: a.max_score ?? 100, date: a.due_date,
-    })),
-  ]
-
   const assessmentIds = assessments.map(a => a.id)
   const marks = assessmentIds.length ? await repo.findMarksByAssessmentIds(assessmentIds) : []
 
@@ -73,18 +52,11 @@ export async function buildGradebook(classId: string, teacherId: string): Promis
         .in('assignment_id', assignmentIds)
     : { data: [] as Array<{ assignment_id: string; student_id: string; score: number | null }> }
 
-  const rows: GradebookRow[] = students.map(s => {
-    const scores: Record<string, number | null> = {}
-    for (const a of assessments) {
-      const mark = marks.find(m => m.assessment_id === a.id && m.student_id === s.id)
-      scores[a.id] = mark?.total_marks ?? null
-    }
-    for (const a of assignments ?? []) {
-      const sub = (submissions ?? []).find(sub => sub.assignment_id === a.id && sub.student_id === s.id)
-      scores[a.id] = sub?.score ?? null
-    }
-    return { studentId: s.id, studentName: s.name, scores }
+  return mergeGradebook({
+    students,
+    assessments,
+    assignments: assignments ?? [],
+    marks,
+    submissions: (submissions ?? []) as Array<{ assignment_id: string; student_id: string; score: number | null }>,
   })
-
-  return { columns, rows }
 }
