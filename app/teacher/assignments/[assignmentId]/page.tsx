@@ -26,6 +26,7 @@ interface Submission {
   teacher_feedback: string | null
   compass_summary: string | null
   work_text: string | null
+  file_name: string | null
   submitted_at: string | null
   marked_at: string | null
   isOverdue: boolean
@@ -656,6 +657,23 @@ export default function AssignmentMarkingPage({ params }: { params: Promise<{ as
                         <div className="bg-white border border-gray-200 rounded-xl p-4">
                           <div className="text-xs font-black text-gray-500 mb-2">STUDENT WORK</div>
                           <p className="text-sm text-gray-700 whitespace-pre-wrap">{sub.work_text}</p>
+                        </div>
+                      )}
+
+                      {/* Attached file */}
+                      {sub.file_name && (
+                        <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between gap-3">
+                          <div className="text-sm text-gray-700 truncate">📎 {sub.file_name}</div>
+                          <button
+                            onClick={async () => {
+                              const res = await fetch(`/api/teacher/assignments/${assignment.id}/submissions/${sub.id}/file-url`)
+                              const data = await res.json()
+                              if (data.success) window.open(data.data.url, '_blank')
+                            }}
+                            className="shrink-0 text-xs font-black text-teal-700 bg-teal-50 border border-teal-200 px-3 py-1.5 rounded-lg hover:bg-teal-100 transition"
+                          >
+                            Download
+                          </button>
                         </div>
                       )}
 

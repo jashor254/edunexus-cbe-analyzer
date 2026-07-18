@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Clock, CheckCircle2, Trophy, Compass, FileText, X, Send } from 'lucide-react'
+import { Clock, CheckCircle2, Trophy, Compass, FileText, X, Send, Paperclip } from 'lucide-react'
 import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -50,6 +50,7 @@ function SubmitModal({
 }) {
   const [workText, setWorkText] = useState('')
   const [viaCompass, setViaCompass] = useState(false)
+  const [file, setFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -57,19 +58,33 @@ function SubmitModal({
     setError('')
     setSubmitting(true)
     try {
-      const res = await fetch('/api/student/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          assignmentId: assignment.id,
-          studentId,
-          work_text: viaCompass ? undefined : workText || undefined,
-        }),
-      })
-      const data = await res.json()
-      if (!data.success) {
-        setError(data.error || 'Failed to submit. Try again.')
-        return
+      if (file) {
+        const form = new FormData()
+        form.set('assignmentId', assignment.id)
+        form.set('studentId', studentId)
+        form.set('file', file)
+        const res = await fetch('/api/student/submit-file', { method: 'POST', body: form })
+        const data = await res.json()
+        if (!data.success) {
+          setError(data.error || 'Failed to upload file. Try again.')
+          return
+        }
+      }
+      if (viaCompass || workText || !file) {
+        const res = await fetch('/api/student/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            assignmentId: assignment.id,
+            studentId,
+            work_text: viaCompass ? undefined : workText || undefined,
+          }),
+        })
+        const data = await res.json()
+        if (!data.success) {
+          setError(data.error || 'Failed to submit. Try again.')
+          return
+        }
       }
       onDone()
     } catch {
@@ -122,6 +137,24 @@ function SubmitModal({
                 placeholder="Write your answers, working, or any notes for your teacher..."
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-100 outline-none text-gray-900 resize-none"
               />
+            </div>
+          )}
+
+          {!viaCompass && (
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                Or attach a photo / PDF of your work (optional)
+              </label>
+              <label className="flex items-center gap-2 px-4 py-3 rounded-xl border border-dashed border-gray-300 text-sm text-gray-500 cursor-pointer hover:border-teal-400 hover:text-teal-600 transition">
+                <Paperclip className="w-4 h-4" />
+                {file ? file.name : 'Choose a file (max 10MB)'}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,application/pdf"
+                  className="hidden"
+                  onChange={e => setFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
             </div>
           )}
 

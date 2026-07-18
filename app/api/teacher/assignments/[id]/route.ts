@@ -43,7 +43,10 @@ export async function GET(
     const { data: submissions } = await db
       .from('assignment_submissions')
       .select(`
-        *,
+        id, assignment_id, student_id, class_id, status, score,
+        teacher_feedback, compass_summary, work_text,
+        file_path, file_name, file_type,
+        submitted_at, marked_at, created_at,
         students(name, grade)
       `)
       .eq('assignment_id', id)
