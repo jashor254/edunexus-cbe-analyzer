@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
 import { Sparkles, Mail, Lock, Loader2, ArrowRight } from 'lucide-react'
+import { ADMIN_TIER_ROLES } from '@/lib/core/adminTierRoles'
 
 const GoogleIcon = () => (
   <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
@@ -51,6 +52,21 @@ function LoginContent() {
 
       if (savedPreference === 'parent')  return '/dashboard'
       if (savedPreference === 'teacher') return '/teacher/dashboard'
+
+      // School Office (Sprint 10G): admin-tier school_users members land
+      // there by default, ahead of the teacher/parent checks below — reuses
+      // the existing /api/core/my-membership route (Sprint 10A), not a new
+      // resolution path.
+      try {
+        const res = await fetch('/api/core/my-membership', { credentials: 'include' })
+        const json = await res.json()
+        const role: string | undefined = json?.data?.membership?.role
+        if (role && ADMIN_TIER_ROLES.includes(role)) {
+          return '/teacher/core-office'
+        }
+      } catch {
+        // Fall through to the profile-based resolution below.
+      }
 
       const { data: profile } = await supabase
         .from('profiles')

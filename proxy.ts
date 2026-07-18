@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/utils/supabase/middleware'
 import { generateTraceId } from '@/lib/observability/tracing'
 import { SUPPORTED_LOCALES, DEFAULT_LOCALE } from '@/lib/i18n/config'
-import { getUserRoles } from '@/lib/auth/getRole'
+import { getUserRoles, getSchoolAdminMembership } from '@/lib/auth/getRole'
 
 /** Pick the best supported locale from an Accept-Language header. */
 function detectLocale(acceptLang: string): string {
@@ -115,8 +115,18 @@ export async function proxy(request: NextRequest) {
     if (pathname === '/teacher/setup') return response
 
     const roles = await getUserRoles(user.id, supabase)
+    const isTeacherRole = roles.primary === 'teacher' || roles.secondary === 'teacher'
 
-    if (roles.primary !== 'teacher' && roles.secondary !== 'teacher') {
+    // School Office (Sprint 10G): admin-tier school_users members may reach
+    // it even without a teacher-role profile (e.g. a headteacher who does
+    // not also teach) — every other /teacher/* route keeps the stricter
+    // teacher-only gate below, unchanged.
+    if (pathname.startsWith('/teacher/core-office')) {
+      const adminMembership = await getSchoolAdminMembership(user.id, supabase)
+      if (adminMembership) return response
+    }
+
+    if (!isTeacherRole) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
@@ -130,6 +140,15 @@ export async function proxy(request: NextRequest) {
 
   // ── Dashboard routes ──────────────────────────────────────────────────────
   if (pathname.startsWith('/dashboard')) {
+    // Admin-tier school_users members land in the School Office (Sprint
+    // 10G), taking precedence over the plain-teacher redirect below —
+    // matches this route's existing pattern of resolving one destination
+    // before falling through to the generic dashboard.
+    const adminMembership = await getSchoolAdminMembership(user.id, supabase)
+    if (adminMembership) {
+      return NextResponse.redirect(new URL('/teacher/core-office', request.url))
+    }
+
     const roles = await getUserRoles(user.id, supabase)
 
     // Pure teachers (no parent secondary role) belong in teacher dashboard

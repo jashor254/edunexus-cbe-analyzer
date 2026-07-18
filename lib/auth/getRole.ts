@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createServiceClient } from '@/utils/supabase/service'
+import { ADMIN_TIER_ROLES } from '@/lib/core/adminTierRoles'
+import type { SchoolUserRole } from '@/types/core'
 
 export type UserRole = 'teacher' | 'parent' | 'student'
 
@@ -68,4 +70,36 @@ export async function getUserRole(userId: string): Promise<UserRole | null> {
 /** Map primary role → post-login destination */
 export function getRoleRedirect(role: UserRole | null): string {
   return role === 'teacher' ? '/teacher/dashboard' : '/dashboard'
+}
+
+export type SchoolAdminMembership = { schoolId: string; role: SchoolUserRole }
+
+/**
+ * Sprint 10G — is this user an admin-tier member (school_admin, headteacher,
+ * deputy_headteacher) of any school, and if so which one. Queries
+ * `school_users` directly via the passed client rather than going through
+ * `lib/core/identity.ts`/`lib/core/permissions.ts` — those pull in
+ * `lib/repositories` (20+ repositories), which this file's `getUserRoles()`
+ * deliberately avoids because it runs on every navigation through proxy.ts.
+ * Kept in this file so both callers (proxy.ts's routing branch, the login
+ * page's post-login redirect) share one implementation instead of each
+ * re-deriving admin-tier status.
+ */
+export async function getSchoolAdminMembership(userId: string, db?: SupabaseClient): Promise<SchoolAdminMembership | null> {
+  const client = db ?? createServiceClient()
+  const { data, error } = await client
+    .from('school_users')
+    .select('school_id, role')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .in('role', ADMIN_TIER_ROLES)
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    console.error('[auth/getRole] admin membership lookup failed', { userId, error: error.message })
+    return null
+  }
+  if (!data) return null
+  return { schoolId: data.school_id, role: data.role as SchoolUserRole }
 }
