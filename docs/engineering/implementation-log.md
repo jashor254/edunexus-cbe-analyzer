@@ -2260,3 +2260,30 @@ One gap surfaced and carried forward honestly, not silently worked around: no re
 **Rollback considerations**: None — no code, schema, or data was touched.
 
 ---
+
+## 2026-07-18 — Sprint 12AB: Blueprint Canonicalization & Legacy Retirement
+
+**What changed**: resolved Sprint 12AA's one Critical finding — two independently-computed Blueprint engines reachable from live routes — without changing any educational calculation, ownership, or Constitution rule. Full findings and phase-by-phase record in `docs/architecture/sprint-12ab-blueprint-canonicalization.md`.
+
+**What was migrated**:
+- `app/teacher/reports/blueprint/[studentId]/page.tsx` — rewritten from a page that rendered the legacy `buildLearnerBlueprint()` output to a thin server component that resolves the legacy `studentId` to its bridged Core `learners.id` (via `students.external_id`, the existing Sprint 9F bridge) and `redirect()`s into the one canonical route (`app/student/blueprint/[learnerId]`), which already owns its own `requireSchoolStaff` auth check.
+- `app/(student)/blueprint/page.tsx` — rewritten the same way for the self-serve "my own Blueprint" entry point (no URL param): resolves the signed-in user's own student record via `repos.compass.findOwnedStudents` (the same function `/api/learn/student` already used for this exact case) and redirects.
+- Deleted, now zero-caller: `components/teacher/LearnerBlueprint.tsx`, `components/student/StudentBlueprint.tsx`, `app/api/learner-intelligence/blueprint/route.ts`.
+
+**What was deliberately kept, and why**: `lib/learnerIntelligence/blueprint.ts` (`buildLearnerBlueprint`) and its dependencies (`insight.ts`, `projectionAdapters.ts`, `types.ts`, `pdfGenerator.tsx`) were not deleted. `insight.ts`/`projectionAdapters.ts`/`careerIntelligence.ts` are shared, load-bearing infrastructure for the separate Career Intelligence system (out of scope — "Do NOT redesign Career"). `blueprint.ts` itself is now reachable only from two offline, manually-run scripts (`scripts/generate-learner-blueprints.ts`, a PDF demo generator; `scripts/trace-consistency-audit.ts`, a diagnostic tool) — zero live-route reachability, so the "two truths shown to a real user" problem is fully resolved even though the function still exists. Retiring it fully would require either rewriting the two scripts (redesign, out of scope) or building a canonical PDF generator (new feature, forbidden by the sprint's STOP CONDITION).
+
+**Regression test added**: `lib/learnerBlueprint/canonicalComposer.architecture.test.ts` (4 tests) — walks the real source tree (no mocks, no DB) and asserts: the legacy composer has no importer outside a named 3-entry whitelist; no `app/**/page.tsx` or `app/**/route.ts` imports it; `composeBlueprint` is defined exactly once in the repository; both migrated pages redirect without composing anything themselves. This test fails loudly if a future change reintroduces a second live Blueprint engine — the exact regression class this sprint exists to prevent.
+
+**Verification performed**: `npx tsc --noEmit -p .` clean (0 errors, after clearing two stale `.next`-generated type-cache entries unrelated to source); `npx eslint .` clean (0 errors, 37 pre-existing unrelated warnings untouched); all 16 `composeBlueprint.pure.test.ts` tests and all 34 tests across every `lib/**/*.pure.test.ts` file pass unaffected; new architecture test 4/4 pass. No existing test referenced any of the deleted files (confirmed by grep before deletion).
+
+**Explicitly out of scope, left untouched per the FORBIDDEN list**: Career (three parallel computation paths, Sprint 12AA Finding 2), the six parallel parent-guidance generators (Sprint 12AA Finding 5), Academic Clinic (confirmed via Phase 1's dependency map to never have called either Blueprint engine — no adapter needed, none introduced), Report Cards, Snapshots, Portfolio, Achievement, Projects — all reverified unchanged, not redesigned.
+
+**Architectural documents referenced**: `docs/architecture/sprint-12aa-guardian-architecture-audit.md` (the audit this sprint directly resolves), ADR-0005 through ADR-0009 (Blueprint architecture series, unchanged), ADR-0008 Part 3 (Report Card / Snapshot / Current Blueprint independence, reverified not violated).
+
+**ADR**: None — this sprint retires a duplicate implementation path, it does not change any ratified ownership, ADR, ownership boundary, or ownership. No architecture decision was reversed.
+
+**Tests added**: `lib/learnerBlueprint/canonicalComposer.architecture.test.ts` (4 tests, all passing).
+
+**Rollback considerations**: Low risk, fully reversible. The two rewritten page files are pure resolve-and-redirect with no data-shape change to anything downstream; reverting them to their prior git state restores the legacy behaviour exactly. The three deleted files can be restored from git history with no schema or data impact — nothing was migrated at the database level, this sprint touched only route/component wiring.
+
+---
