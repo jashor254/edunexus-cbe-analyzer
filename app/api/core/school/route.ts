@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createSchool, getSchool, updateSchool, getSchoolSettings, upsertSchoolSettings } from '@/lib/core/school'
+import { activateSchool } from '@/lib/core/schoolActivation'
 import { requireAuthentication, requireSchoolMembership } from '@/lib/core/permissions'
 import { UnauthorizedError, PermissionDeniedError, isEduNexusError } from '@/lib/core/errors'
 import type { SchoolSettings } from '@/types/core'
@@ -62,7 +63,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // No existing schoolId to check membership against yet — any authenticated
   // user may create a school, and becomes its first school_admin (unchanged).
   const { school, schoolUser } = await createSchool(parsed.data, userId)
-  return NextResponse.json({ data: { school, schoolUser } }, { status: 201 })
+
+  // Sprint 9C: activation runs exactly once, immediately after creation —
+  // composed here at the route (not inside createSchool() itself) to avoid
+  // a lib/core/school.ts <-> lib/core/schoolActivation.ts circular import,
+  // per RAS §6's "a route composes two service calls" allowance. School
+  // creation has already succeeded at this point (school.id exists and is
+  // durable) — a failed activation is reported in the response body, never
+  // silently retried here and never rolled back (lib/core/schoolActivation.ts's
+  // documented recovery model is idempotent retry, not rollback). The
+  // caller must check `data.activation.status === 'complete'` before
+  // treating the school as ready — this is what "never leave ambiguous
+  // success" means: the school-creation HTTP status (201) and the
+  // activation outcome are reported separately, not conflated.
+  const activation = await activateSchool(school.id)
+
+  return NextResponse.json({ data: { school, schoolUser, activation } }, { status: 201 })
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
