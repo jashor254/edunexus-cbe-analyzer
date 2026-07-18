@@ -131,14 +131,14 @@ test('granular teacher journey: lock -> compute -> generate -> publish, each a s
   assert.equal(cards.length, 0)
 
   // Step 3: Generate report cards (not yet published).
-  const { generated } = await generateReportCards(school.id, classId, termId, {})
+  const { generated } = await generateReportCards(admin.id, school.id, classId, termId, {})
   assert.equal(generated, 1)
   cards = await listClassReportCards(classId, termId, school.id)
   assert.equal(cards.length, 1)
   assert.equal(cards[0].is_published, false) // "Reports Published = false" still
 
   // Step 4: Publish report cards.
-  const { published } = await publishReportCards(school.id, termId, classId)
+  const { published } = await publishReportCards(admin.id, school.id, termId, classId)
   assert.equal(published, 1)
   cards = await listClassReportCards(classId, termId, school.id)
   assert.equal(cards[0].is_published, true)

@@ -73,6 +73,10 @@ before(async () => {
 
   const school = await repos.schools.create({ school_name: SYNTHETIC_MARKER }, authUserId)
   schoolId = school.id
+  // Sprint 12B: generateReportCards now calls the Attendance service, which
+  // requires an authorized actor — matching what the real /api/core/reports
+  // route already requires (requireSchoolAdmin) before calling it.
+  await repos.schools.addSchoolUser(schoolId, authUserId, 'school_admin')
 
   const grades = await repos.teachers.findGrades()
   if (!grades.length) throw new Error('no grades reference data found — cannot run this test')
@@ -99,7 +103,7 @@ test('ALLOWED: first generation (no existing report cards for this class/term)',
   // must not refuse. (No enrollments/assessments exist either, so this
   // exercises the guard's own decision, independent of whether any rows
   // actually get generated downstream.)
-  await assert.doesNotReject(generateReportCards(schoolId, classId, termId, {}))
+  await assert.doesNotReject(generateReportCards(authUserId, schoolId, classId, termId, {}))
 })
 
 test('ALLOWED: regenerating a class where every existing report card is still draft', async () => {
@@ -118,7 +122,7 @@ test('ALLOWED: regenerating a class where every existing report card is still dr
     generated_at: new Date().toISOString(),
   }])
 
-  await assert.doesNotReject(generateReportCards(schoolId, classId, termId, {}))
+  await assert.doesNotReject(generateReportCards(authUserId, schoolId, classId, termId, {}))
 })
 
 test('REFUSED: regenerating a class with an already-published report card', async () => {
@@ -138,7 +142,7 @@ test('REFUSED: regenerating a class with an already-published report card', asyn
   }])
 
   await assert.rejects(
-    generateReportCards(schoolId, classId, termId, {}),
+    generateReportCards(authUserId, schoolId, classId, termId, {}),
     /already published/i
   )
 })
@@ -174,7 +178,7 @@ test('REFUSED, ALL-OR-NOTHING: a mixed class (one published, one draft) is refus
     },
   ])
 
-  await assert.rejects(generateReportCards(schoolId, classId, termId, {}), /already published/i)
+  await assert.rejects(generateReportCards(authUserId, schoolId, classId, termId, {}), /already published/i)
 
   // No partial write: BOTH rows — including the draft one — must be
   // byte-for-byte unchanged, not just the published one.
@@ -206,7 +210,7 @@ test('PUBLICATION STATE PRESERVED: a refused regeneration never resets is_publis
     generated_at: publishedAt,
   }])
 
-  await assert.rejects(generateReportCards(schoolId, classId, termId, {}))
+  await assert.rejects(generateReportCards(authUserId, schoolId, classId, termId, {}))
 
   const rows = await repos.schools.listClassReportCards(classId, termId)
   const row = rows.find((r) => r.learner_id === learnerId)

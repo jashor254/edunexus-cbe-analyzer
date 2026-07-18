@@ -83,12 +83,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (body.action === 'publish') {
     const parsed = PublishSchema.safeParse(body)
     if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
+    let membership
     try {
-      await requireSchoolAdmin(supabase, parsed.data.schoolId)
+      membership = await requireSchoolAdmin(supabase, parsed.data.schoolId)
     } catch (err) {
       return errorResponse(err)
     }
-    const data = await publishReportCards(parsed.data.schoolId, parsed.data.termId, parsed.data.classId)
+    const data = await publishReportCards(membership.userId, parsed.data.schoolId, parsed.data.termId, parsed.data.classId)
     return NextResponse.json({ data })
   }
 
@@ -115,15 +116,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const parsed = GenerateSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
+  let generatedByUserId: string
   try {
-    await requireSchoolAdmin(supabase, parsed.data.schoolId)
+    generatedByUserId = (await requireSchoolAdmin(supabase, parsed.data.schoolId)).userId
   } catch (err) {
     return errorResponse(err)
   }
 
   const settings = await getSchoolSettings(parsed.data.schoolId)
   try {
-    const data = await generateReportCards(parsed.data.schoolId, parsed.data.classId, parsed.data.termId, settings.grade_boundaries)
+    // Sprint 12B — actorUserId threaded through so generateReportCards can
+    // call the Attendance service (which requires an authorized actor for
+    // every read, per ADR-0003/ADR-0004) — this admin is already verified
+    // above, exactly the identity Attendance's own ownership check expects.
+    const data = await generateReportCards(generatedByUserId, parsed.data.schoolId, parsed.data.classId, parsed.data.termId, settings.grade_boundaries)
     return NextResponse.json({ data })
   } catch (err) {
     // Sprint 5B: generateReportCards throws a plain Error (not an

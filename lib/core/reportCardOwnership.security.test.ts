@@ -57,6 +57,13 @@ async function buildSchoolFixture(label: string): Promise<SchoolFixture> {
 
   const school = await repos.schools.create({ school_name: `${SYNTHETIC_MARKER}-${label}` }, authUserId)
   const schoolId = school.id
+  // Sprint 12B: generateReportCards now calls the Attendance service, which
+  // requires an authorized actor (admin-tier or the class's own teacher) —
+  // this fixture's authUserId needs a real school_admin membership for
+  // that check to pass, matching how the real /api/core/reports route
+  // already requires requireSchoolAdmin before ever calling
+  // generateReportCards in production.
+  await repos.schools.addSchoolUser(schoolId, authUserId, 'school_admin')
 
   const year = await repos.schools.insertAcademicYear(schoolId, {
     name: `${SYNTHETIC_MARKER}-${label}`,
@@ -260,7 +267,7 @@ test('NO REGRESSION: generateReportCards still succeeds normally for an all-draf
     display_name: `${SYNTHETIC_MARKER}-A-regen`,
   })
 
-  await assert.doesNotReject(generateReportCards(schoolA.schoolId, cls.id, term.id, {}))
+  await assert.doesNotReject(generateReportCards(schoolA.authUserId, schoolA.schoolId, cls.id, term.id, {}))
 
   await db.from('classes').delete().eq('id', cls.id)
   await db.from('terms').delete().eq('id', term.id)

@@ -31,8 +31,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const parsed = BodySchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
+  let actorUserId: string
   try {
-    await requireSchoolAdmin(supabase, parsed.data.schoolId)
+    actorUserId = (await requireSchoolAdmin(supabase, parsed.data.schoolId)).userId
   } catch (err) {
     if (err instanceof UnauthorizedError) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (isEduNexusError(err)) return NextResponse.json({ error: 'Forbidden' }, { status: err.statusCode })
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     result = await runEndOfTerm({
       ...rest,
+      actorUserId,
       nextTerm: { ...nextTerm, term_number: nextTerm.term_number as 1 | 2 | 3 },
     })
   } catch (err) {

@@ -134,7 +134,7 @@ test('Final Validation: the complete End-of-Term journey — assessment through 
 
   // Lock check (Step 1's own guard): unpublished assessment must block End-of-Term.
   const preLockResult = await runEndOfTerm({
-    schoolId: school.id, classId, termId, term: '1', year: 2026,
+    actorUserId: admin.id, schoolId: school.id, classId, termId, term: '1', year: 2026,
     nextTerm: { academic_year_id: academicYearId, term_number: 2, name: 'Term 2', start_date: '2026-05-01', end_date: '2026-08-01' },
   })
   assert.equal(preLockResult.ok, false)
@@ -159,7 +159,7 @@ test('Final Validation: the complete End-of-Term journey — assessment through 
 
   // ── Summaries -> Ranking -> Report Cards -> Publication, in one call ─────
   const result = await runEndOfTerm({
-    schoolId: school.id, classId, termId, term: '1', year: 2026,
+    actorUserId: admin.id, schoolId: school.id, classId, termId, term: '1', year: 2026,
     nextTerm: { academic_year_id: academicYearId, term_number: 2, name: 'Term 2', start_date: '2026-05-01', end_date: '2026-08-01' },
   })
   assert.equal(result.ok, true)
@@ -204,7 +204,7 @@ test('Final Validation: the complete End-of-Term journey — assessment through 
     // ── Step 4: re-running End-of-Term must fail safely, not corrupt data ──
     await assert.rejects(
       () => runEndOfTerm({
-        schoolId: school.id, classId, termId, term: '1', year: 2026,
+        actorUserId: admin.id, schoolId: school.id, classId, termId, term: '1', year: 2026,
         nextTerm: { academic_year_id: academicYearId, term_number: 2, name: 'Term 2', start_date: '2026-05-01', end_date: '2026-08-01' },
       }),
       /already published/
