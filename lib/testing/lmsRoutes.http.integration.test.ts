@@ -334,3 +334,99 @@ test('DELETE /api/teacher/materials/[id]: owning teacher can delete their own no
   const bodyAfter = await listAfter.json()
   assert.ok(!bodyAfter.data.materials.some((m: { id: string }) => m.id === materialId))
 })
+
+// ── Calendar (ADR-0021) ──────────────────────────────────────────────────
+
+let calendarEventId: string
+
+test('POST /api/teacher/calendar/by-class/[classId]: teacher adds an event', async () => {
+  const res = await fetch(`${BASE_URL}/api/teacher/calendar/by-class/${fx.classId}`, {
+    method: 'POST', headers: { ...cookie(fx.teacherSession), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: 'CAT 1', eventDate: '2026-08-10' }),
+  })
+  assert.equal(res.status, 201)
+  const body = await res.json()
+  calendarEventId = body.data.event.id
+})
+
+test('POST /api/teacher/calendar/by-class/[classId]: a non-owning teacher cannot add an event to this class', async () => {
+  const res = await fetch(`${BASE_URL}/api/teacher/calendar/by-class/${fx.classId}`, {
+    method: 'POST', headers: { ...cookie(fx.otherTeacherSession), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: 'Intrusion attempt', eventDate: '2026-08-11' }),
+  })
+  assert.equal(res.status, 403)
+})
+
+test('GET /api/teacher/calendar/by-class/[classId]: merges the teacher event with the assignment due date', async () => {
+  const res = await fetch(`${BASE_URL}/api/teacher/calendar/by-class/${fx.classId}`, { headers: cookie(fx.teacherSession) })
+  assert.equal(res.status, 200)
+  const body = await res.json()
+  const kinds = body.data.calendar.map((e: { kind: string }) => e.kind)
+  assert.ok(kinds.includes('event'))
+  assert.ok(kinds.includes('assignment_due'))
+})
+
+test('GET /api/student/calendar: the enrolled student sees the same merged calendar; an outsider sees an empty one', async () => {
+  const studentRes = await fetch(`${BASE_URL}/api/student/calendar`, { headers: cookie(fx.studentSession) })
+  const studentBody = await studentRes.json()
+  assert.ok(studentBody.data.calendar.some((e: { id: string }) => e.id === calendarEventId))
+
+  const outsiderRes = await fetch(`${BASE_URL}/api/student/calendar`, { headers: cookie(fx.outsiderSession) })
+  const outsiderBody = await outsiderRes.json()
+  assert.deepEqual(outsiderBody.data.calendar, [])
+})
+
+test('DELETE /api/teacher/calendar/[id]: only the owning teacher can delete an event', async () => {
+  const denied = await fetch(`${BASE_URL}/api/teacher/calendar/${calendarEventId}`, {
+    method: 'DELETE', headers: cookie(fx.otherTeacherSession),
+  })
+  assert.equal(denied.status, 403)
+
+  const stillThere = await fetch(`${BASE_URL}/api/teacher/calendar/by-class/${fx.classId}`, { headers: cookie(fx.teacherSession) })
+  const stillThereBody = await stillThere.json()
+  assert.ok(stillThereBody.data.calendar.some((e: { id: string }) => e.id === calendarEventId))
+
+  const allowed = await fetch(`${BASE_URL}/api/teacher/calendar/${calendarEventId}`, {
+    method: 'DELETE', headers: cookie(fx.teacherSession),
+  })
+  assert.equal(allowed.status, 200)
+
+  const gone = await fetch(`${BASE_URL}/api/teacher/calendar/by-class/${fx.classId}`, { headers: cookie(fx.teacherSession) })
+  const goneBody = await gone.json()
+  assert.ok(!goneBody.data.calendar.some((e: { id: string }) => e.id === calendarEventId))
+})
+
+// ── Announcements (ADR-0021) ─────────────────────────────────────────────
+
+let announcementId: string
+
+test('POST /api/teacher/announcements/by-class/[classId]: teacher posts an announcement', async () => {
+  const res = await fetch(`${BASE_URL}/api/teacher/announcements/by-class/${fx.classId}`, {
+    method: 'POST', headers: { ...cookie(fx.teacherSession), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: 'No school tomorrow', body: 'PTA day.' }),
+  })
+  assert.equal(res.status, 201)
+  const body = await res.json()
+  announcementId = body.data.announcement.id
+})
+
+test('GET /api/student/announcements: enrolled student sees it; outsider does not', async () => {
+  const studentRes = await fetch(`${BASE_URL}/api/student/announcements`, { headers: cookie(fx.studentSession) })
+  const studentBody = await studentRes.json()
+  assert.ok(studentBody.data.announcements.some((a: { id: string }) => a.id === announcementId))
+
+  const outsiderRes = await fetch(`${BASE_URL}/api/student/announcements`, { headers: cookie(fx.outsiderSession) })
+  const outsiderBody = await outsiderRes.json()
+  assert.deepEqual(outsiderBody.data.announcements, [])
+})
+
+test('DELETE /api/teacher/announcements/[id]: owning teacher can delete their own announcement', async () => {
+  const res = await fetch(`${BASE_URL}/api/teacher/announcements/${announcementId}`, {
+    method: 'DELETE', headers: cookie(fx.teacherSession),
+  })
+  assert.equal(res.status, 200)
+
+  const listAfter = await fetch(`${BASE_URL}/api/student/announcements`, { headers: cookie(fx.studentSession) })
+  const bodyAfter = await listAfter.json()
+  assert.ok(!bodyAfter.data.announcements.some((a: { id: string }) => a.id === announcementId))
+})

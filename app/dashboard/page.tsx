@@ -1271,6 +1271,15 @@ export default function DashboardPage() {
                 href: '/dashboard/resources',
                 badge: null,
               },
+              {
+                icon: Zap,
+                title: 'Calendar',
+                sub: 'Dates & announcements',
+                gradient: 'from-indigo-500 to-violet-600',
+                shadow: 'shadow-indigo-500/20',
+                href: '/dashboard/calendar',
+                badge: null,
+              },
             ].map(({ icon: Icon, title, sub, gradient, shadow, href, badge }) => (
               <Link
                 key={href}
