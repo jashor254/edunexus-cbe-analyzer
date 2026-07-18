@@ -265,6 +265,26 @@ export type CompetitionsData = {
   competitionsUrl: string | null
 }
 
+// ── Leadership (lib/learnerLeadership/ — Sprint 13D, ADR-0015) ─────────────
+//
+// Blueprint's frozen field budget for Leadership (mission Phase 6):
+// current role, completed verified service, brief service summary, URL.
+// Never review notes, election data, meeting history, mentor comments, or
+// disciplinary information.
+
+export type LeadershipHighlightData = {
+  title: string
+  scope: string | null
+  publishedAt: string
+}
+
+export type LeadershipData = {
+  currentRole: { title: string; scope: string | null } | null
+  completedRoleCount: number
+  latestCompletedRole: LeadershipHighlightData | null
+  leadershipUrl: string | null
+}
+
 // ── Parent Summary (presentation composition only) ───────────────────────────
 
 export type ParentSummaryData = {
@@ -329,6 +349,7 @@ export type LearnerBlueprint = {
   achievement: BlueprintSection<AchievementData>
   projects: BlueprintSection<ProjectsData>
   competitions: BlueprintSection<CompetitionsData>
+  leadership: BlueprintSection<LeadershipData>
   teacherReflection: BlueprintSection<TeacherReflectionData>
   parentSummary: BlueprintSection<ParentSummaryData>
   educationalIdentity: BlueprintSection<EducationalIdentityData>

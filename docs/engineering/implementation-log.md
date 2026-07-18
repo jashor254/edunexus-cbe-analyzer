@@ -2358,3 +2358,34 @@ One gap surfaced and carried forward honestly, not silently worked around: no re
 **Rollback considerations**: None — no code, schema, or data was touched; both new files are additive documentation.
 
 ---
+
+## 2026-07-20 — Sprint 13D: Learner Leadership Foundation (Implementation)
+
+**What changed**: implemented ADR-0015 in full — the canonical Learner Leadership domain now exists. Full findings and phase-by-phase record in `docs/architecture/sprint-13d-learner-leadership-foundation.md`.
+
+**Re-audit (Phase 1, mandatory, done first)**: re-swept the repository and re-read Achievement/Portfolio/Projects/Competitions/Blueprint before writing any code. Confirmed no Leadership repository, service, schema, or route existed; nothing shipped since Sprint 13C changed the plan.
+
+**What was built**:
+- `supabase/migrations/20260720090000_learner_leadership.sql` — additive only, applied to the live project after explicit user approval. Two tables: `learner_leadership` (the one main entity — Position's own descriptive facts, `is_acting` flag, Review/Completion phase output, a dedicated `reflection` column explicitly distinct from the Teacher Reflection domain) and `leadership_history` (append-only audit trail). Twelve statuses matching ADR-0015 Phase 4 exactly: eight main-line states (Nomination→Selection→Active Service→Review→Completion→Verification→Published→Historical) plus four named terminal branches (Not Selected from Nomination, Discontinued from Active Service/Review, Rejected from Verification, Revoked from Published).
+- `lib/repositories/leadership.repository.ts` — `LeadershipRepository`, registered as `repos.leadership`. One named method per lifecycle transition; no generic `update()`/`delete()`/`mutate()` — proven by a reflection-based test.
+- `lib/learnerLeadership/{types,validation,leadership}.ts` — the canonical service. Owns lifecycle only; zero imports of Blueprint/Portfolio/Achievement/Career (grep-verified). Completion→Verification implemented as a real, automatic transition (its own repository call and history row), mirroring Competitions' Results→Verification pattern from Sprint 13B exactly.
+- `lib/learnerBlueprint/composeLeadership.ts`, wired into `composeBlueprint.ts`/`types.ts`/`validation.ts` via the identical 5-file pattern this series now uses for every domain addition. Returns exactly four fields (`currentRole`, `completedRoleCount`, `latestCompletedRole`, `leadershipUrl`) — review notes/election data/meeting history/mentor comments/disciplinary information are structurally absent from the type, not filtered at runtime.
+- Immutability enforced at all three required layers (Service/Repository/DB trigger) — `enforce_leadership_immutability()` mirrors `enforce_competition_immutability()` exactly; proven by tests that bypass the service and issue raw Supabase `.update()`/`.delete()` calls directly against published/terminal rows.
+
+**Deliberately deferred, named rather than built** (identical reasoning to Sprint 13B's Competitions↔Achievement/Portfolio deferrals): Achievement's `leadership_id` reference column (ADR-0015 Phase 7's "Achievement references Leadership, going forward") was not added — `learner_achievements`' schema was not touched at all. Portfolio's read-surface for Leadership was likewise not built — Portfolio's category taxonomy has no `leadership` slot at all (permanently reassigned to Achievement by ADR-0012); `lib/learnerPortfolio/` was not touched.
+
+**Tests**: `lib/learnerLeadership/leadership.integration.test.ts` — 12 tests against real synthetic Supabase data: full lifecycle (all eight main-line states, versioning, ordered history), all four terminal branches individually (Discontinued specifically asserted to carry only a neutral reason string with no disciplinary-case field anywhere on the row), evidence references, Blueprint composition (unavailable/available/currentRole shape, review-note text asserted absent from the serialized section), the Leadership Reflection domain-boundary test, cross-school isolation, permission checks, repository method-shape reflection, and — per the mission's explicit instruction — a regression test that builds a real Achievement, Portfolio item, Project, and Competition in the same fixture as a Leadership entry, drives each through its own lifecycle, and asserts all four summaries plus the full `composeBlueprint()` output are correct and mutually undisturbed. The two Blueprint test fixtures needed the same one-line `leadership: na(...)` addition every prior domain addition required. Full existing `lib/**/*.pure.test.ts` suite (34 tests) and the Sprint 12AB architecture test (4 tests) re-run and pass unaffected.
+
+**Verification performed**: `npx tsc --noEmit -p .` clean; `npx eslint` clean (0 errors) on every new/changed file; migration applied only after explicit user approval via `AskUserQuestion`.
+
+**Explicitly out of scope, left unbuilt per the Stop Condition**: elections, voting, leaderboards, analytics, reports, parent UI, teacher UI, student UI, notifications, messaging, certificates, AI summaries. `moveToHistorical()` exists and is tested but nothing calls it on a time-based schedule — no cron was wired.
+
+**Architectural documents referenced**: `docs/architecture/adr-0015-learner-leadership-domain.md` (the ADR this sprint implements in full), `docs/architecture/sprint-13c-learner-leadership-architecture.md`, ADR-0012/0013/0014 (Achievement/Projects/Competitions immutability and reference-not-copy precedent this sprint's schema/trigger/service directly mirrors).
+
+**ADR**: No new ADR and no change to ADR-0015 — implementation matched the frozen architecture exactly.
+
+**Tests added**: `lib/learnerLeadership/leadership.integration.test.ts` (12 tests). Two pre-existing Blueprint test fixtures updated (one-line additive fix each).
+
+**Rollback considerations**: Low-to-moderate. The migration is additive (two new tables, no existing table altered, no data migration) — dropping the two new tables and their triggers/policies would fully revert the database side with no impact on any other domain's data. Code-side: `lib/repositories/leadership.repository.ts`, `lib/learnerLeadership/`, and `lib/learnerBlueprint/composeLeadership.ts` are net-new files with no other code depending on them yet (Leadership has no live UI/route consumer this sprint); reverting the four wiring edits to `composeBlueprint.ts`/`types.ts`/`validation.ts`/`repositories/index.ts` fully removes Leadership from the Blueprint composition path.
+
+---

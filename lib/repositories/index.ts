@@ -16,6 +16,7 @@ import { EvidencePurposeRepository } from './evidencePurpose.repository'
 import { IntelligenceRepository } from './intelligence.repository'
 import { JobRepository } from './job.repository'
 import { KnowledgeGraphRepository } from './knowledge-graph.repository'
+import { LeadershipRepository } from './leadership.repository'
 import { LearnerIntelligenceRepository } from './learner-intelligence.repository'
 import { LearnerModelRepository } from './learner-model.repository'
 import { LearnerRepository } from './learner.repository'
@@ -54,6 +55,11 @@ export const repos = {
   intelligence:        new IntelligenceRepository(),
   jobs:                new JobRepository(),
   knowledgeGraph:      new KnowledgeGraphRepository(),
+  // Deliberately distinct naming from `achievements` above — Leadership
+  // (the ongoing, reviewable service, ADR-0015) and Achievement (the
+  // after-the-fact recognition, ADR-0012) are related but never the same
+  // domain, mirroring the identical `competitions`/`achievements` split.
+  leadership:          new LeadershipRepository(),
   learnerIntelligence: new LearnerIntelligenceRepository(),
   learnerModel:        new LearnerModelRepository(),
   learners:            new LearnerRepository(),
@@ -93,6 +99,7 @@ export { EvidencePurposeRepository } from './evidencePurpose.repository'
 export { IntelligenceRepository } from './intelligence.repository'
 export { JobRepository } from './job.repository'
 export { KnowledgeGraphRepository } from './knowledge-graph.repository'
+export { LeadershipRepository } from './leadership.repository'
 export { LearnerIntelligenceRepository } from './learner-intelligence.repository'
 export { LearnerModelRepository } from './learner-model.repository'
 export { LearnerRepository } from './learner.repository'
