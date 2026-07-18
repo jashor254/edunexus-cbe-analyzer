@@ -21,11 +21,11 @@
 // not a new platform role.
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
-import { Loader2, AlertCircle, ArrowLeft, CheckCircle2, Clock, XCircle } from 'lucide-react'
-import type { ClassWithDetails, SchoolReportCard, Term } from '@/types/core'
-
-const ADMIN_TIER_ROLES = ['school_admin', 'headteacher', 'deputy_headteacher']
+import { Loader2, AlertCircle, CheckCircle2, Clock, XCircle } from 'lucide-react'
+import type { Term } from '@/types/core'
+import { ADMIN_TIER_ROLES } from '@/lib/core/adminTierRoles'
+import { fetchClassTermStatuses, type ClassTermStatus } from '@/lib/core/client/termStatus'
+import { OperationalBreadcrumb } from '@/components/core/OperationalBreadcrumb'
 
 type Membership = {
   schoolId: string
@@ -34,14 +34,7 @@ type Membership = {
   currentTerm: Term | null
 }
 
-type CoreAssessment = { id: string; is_published: boolean }
-
-type ClassStatus = {
-  classId: string
-  className: string
-  assessmentState: 'missing' | 'pending' | 'locked'
-  reportState: 'missing' | 'generated' | 'published'
-}
+type ClassStatus = ClassTermStatus
 
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { credentials: 'include' })
@@ -65,28 +58,8 @@ export default function CoreTermStatusPage() {
 
   useEffect(() => {
     if (!membership?.currentTerm || !isAdminTier) return
-    const { schoolId, currentTerm } = membership
-    const year = new Date(currentTerm.start_date).getFullYear()
-
-    fetchJson<{ classes: ClassWithDetails[] }>(`/api/core/classes?schoolId=${schoolId}`)
-      .then(async ({ classes }) => {
-        const statuses = await Promise.all(classes.map(async (c): Promise<ClassStatus> => {
-          const [assessments, reportCards] = await Promise.all([
-            fetchJson<CoreAssessment[]>(
-              `/api/core/assessments?schoolId=${schoolId}&classId=${c.id}&term=${currentTerm.term_number}&year=${year}`
-            ).catch(() => [] as CoreAssessment[]),
-            fetchJson<SchoolReportCard[]>(
-              `/api/core/reports?schoolId=${schoolId}&classId=${c.id}&termId=${currentTerm.id}`
-            ).catch(() => [] as SchoolReportCard[]),
-          ])
-          const assessmentState: ClassStatus['assessmentState'] =
-            assessments.length === 0 ? 'missing' : assessments.every(a => a.is_published) ? 'locked' : 'pending'
-          const reportState: ClassStatus['reportState'] =
-            reportCards.length === 0 ? 'missing' : reportCards.every(r => r.is_published) ? 'published' : 'generated'
-          return { classId: c.id, className: c.display_name ?? c.class_name, assessmentState, reportState }
-        }))
-        setRows(statuses)
-      })
+    fetchClassTermStatuses(membership.schoolId, membership.currentTerm)
+      .then(setRows)
       .catch(e => setError(e instanceof Error ? e.message : 'Failed to load class status'))
   }, [membership, isAdminTier])
 
@@ -104,9 +77,7 @@ export default function CoreTermStatusPage() {
 
   return (
     <div className="max-w-3xl mx-auto p-6 space-y-6">
-      <Link href="/teacher/core-term" className="flex items-center gap-2 text-slate-400 hover:text-slate-700 text-sm transition-colors">
-        <ArrowLeft className="w-4 h-4" /> Back to End of Term
-      </Link>
+      <OperationalBreadcrumb parent={{ label: 'Academic Office', href: '/teacher/core-office/academic' }} current="End of Term Status" />
 
       <header>
         <h1 className="text-xl font-black text-slate-900">End of Term Status</h1>
