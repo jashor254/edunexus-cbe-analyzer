@@ -203,6 +203,44 @@ export function TeacherDashboardSkeleton() {
   );
 }
 
+// Learner Blueprint Skeleton (Current Blueprint + Historical Snapshot detail
+// share this — both render the same BlueprintView section-card layout)
+export function BlueprintSkeleton() {
+  return (
+    <div className="max-w-2xl mx-auto space-y-3 py-6 px-4 animate-pulse">
+      <div className="mb-4 space-y-2">
+        <div className="h-6 w-56 bg-slate-200 rounded-xl" />
+        <div className="h-3 w-72 bg-slate-100 rounded-lg" />
+      </div>
+      {[1, 2, 3, 4, 5].map(i => (
+        <div key={i} className="bg-white rounded-2xl border border-gray-100 px-5 py-4 space-y-2">
+          <div className="h-4 w-40 bg-slate-200 rounded-lg" />
+          <div className="h-3 w-24 bg-slate-100 rounded" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Blueprint Snapshot History List Skeleton
+export function BlueprintHistoryListSkeleton() {
+  return (
+    <div className="max-w-2xl mx-auto space-y-3 py-6 px-4 animate-pulse">
+      <div className="mb-4 space-y-2">
+        <div className="h-5 w-48 bg-slate-200 rounded-xl" />
+        <div className="h-3 w-64 bg-slate-100 rounded-lg" />
+      </div>
+      {[1, 2, 3].map(i => (
+        <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 space-y-2">
+          <div className="h-3 w-20 bg-slate-100 rounded-full" />
+          <div className="h-4 w-40 bg-slate-200 rounded-lg" />
+          <div className="h-3 w-28 bg-slate-100 rounded" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // Alerts Page Skeleton
 export function AlertsPageSkeleton() {
   return (
