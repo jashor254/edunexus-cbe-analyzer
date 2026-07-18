@@ -179,3 +179,37 @@ export async function resolveCurrentContext(client: SupabaseClient): Promise<Ide
   ])
   return { user, primaryRole: primary, teacher, student, parent }
 }
+
+// ── Core learner <-> legacy student bridge (Sprint 12H) ──────────────────────
+//
+// EduNexus has two unbridged learner identity spaces: Core's `learners.id`
+// (school_id-scoped — Attendance, Report Cards, Identity) and the legacy
+// `students.id` (Evidence, Projection, Compass, Career, Learner Model —
+// docs/architecture/learner-record-layer-decisions.md Decision 3). A real
+// bridge mechanism already existed before this sprint — `external_id` on
+// `students` (already-provisioned schema, not new), populated lazily by
+// `lib/core/academicBridge.ts`'s `ensureBridgedLearner` (Sprint 9F/9G) the
+// first time a Core learner has an assessment recorded against them via the
+// bridged pipeline. This function is that same lookup, promoted out of
+// academicBridge.ts into this module — the one this whole file's own header
+// already designates as "the only place [identity resolution] happens going
+// forward" — so every future domain (Blueprint included) depends on exactly
+// one canonical resolution path instead of importing from academicBridge.ts,
+// a module explicitly marked EXPLICITLY TEMPORARY and scoped for deletion
+// once docs/architecture/learning-intelligence-migration-strategy.md's
+// Phase 11 lands. academicBridge.ts itself now imports this function back,
+// rather than defining it a second time.
+//
+// Deliberately NOT a bridge *creator* — this is a pure, read-only lookup.
+// Returns null when no bridge exists yet for a given Core learner (a
+// legitimate, common state — a newly-enrolled learner with no assessment
+// history — never an error). Consumers that need to guarantee a legacy
+// identity exists (i.e. are about to write legacy-side data) still go
+// through academicBridge.ts's `ensureBridgedLearner`, which creates one;
+// read-only consumers (Blueprint, future read-side domains) must never
+// create a legacy shadow row as a side effect of composing a report — see
+// this function's callers for the enforced distinction.
+export async function resolveLegacyStudentId(coreLearnerId: string): Promise<string | null> {
+  const existing = await repos.teachers.findLegacyStudentByExternalId(coreLearnerId)
+  return existing?.id ?? null
+}
