@@ -6,6 +6,7 @@ import {
   LayoutDashboard, BookOpen, FileText, BarChart3,
   AlertTriangle, ClipboardList, Settings,
   LogOut, Scroll, NotebookPen, Sparkles, ChevronRight, FolderOpen, GraduationCap, BookMarked, Languages, Presentation,
+  Building2, CalendarCheck, UserCheck,
 } from 'lucide-react'
 import { RoleSwitcher } from '@/components/layout/RoleSwitcher'
 import { Logo } from '@/components/ui/Logo'
@@ -26,19 +27,25 @@ const NAV = [
   { href: '/teacher/alerts',         icon: AlertTriangle,   label: 'Alerts'         },
   { href: '/teacher/reports',        icon: ClipboardList,   label: 'Reports'        },
   { href: '/teacher/academy',        icon: GraduationCap,   label: 'AI Academy'     },
+  { href: '/teacher/core-term',      icon: CalendarCheck,   label: 'End of Term'    },
+  { href: '/teacher/attendance',     icon: UserCheck,       label: 'Attendance'     },
   { href: '/teacher/settings',       icon: Settings,        label: 'Settings'       },
 ]
 
+const SCHOOL_OFFICE_NAV = { href: '/teacher/core-office', icon: Building2, label: 'School Office' }
 
 interface Props {
   teacherName: string
   school: string
   subject: string | null
+  /** Sprint 10G — School Office only appears for admin-tier school_users members. */
+  isAdminTier?: boolean
 }
 
-export default function TeacherSidebar({ teacherName, school, subject }: Props) {
+export default function TeacherSidebar({ teacherName, school, subject, isAdminTier }: Props) {
   const pathname = usePathname()
   const initials = teacherName.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
+  const nav = isAdminTier ? [...NAV, SCHOOL_OFFICE_NAV] : NAV
 
   function isActive(href: string) {
     if (href === '/teacher/dashboard') return pathname === href
@@ -82,7 +89,7 @@ export default function TeacherSidebar({ teacherName, school, subject }: Props) 
 
         {/* Navigation */}
         <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
-          {NAV.map(item => {
+          {nav.map(item => {
             const active = isActive(item.href)
             return (
               <Link
@@ -141,7 +148,7 @@ export default function TeacherSidebar({ teacherName, school, subject }: Props) 
         </div>
       </header>
 
-      <TeacherBottomNav />
+      <TeacherBottomNav isAdminTier={isAdminTier} />
     </>
   )
 }

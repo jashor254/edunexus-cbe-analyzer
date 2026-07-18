@@ -7,7 +7,7 @@ import {
   LayoutDashboard, BookOpen, MoreHorizontal, X, PlusCircle,
   GraduationCap, BarChart3, FileText, AlertTriangle, ClipboardList,
   Settings, LogOut, BookMarked, Languages, Scroll, NotebookPen,
-  Presentation, FolderOpen,
+  Presentation, FolderOpen, Building2, CalendarCheck, UserCheck,
 } from 'lucide-react'
 import { RoleSwitcher } from '@/components/layout/RoleSwitcher'
 
@@ -30,15 +30,25 @@ const MORE_NAV = [
   { href: '/teacher/kiswahili/insha', icon: Languages,     label: 'Insha Feedback' },
   { href: '/teacher/assignments',     icon: FileText,      label: 'Assignments'    },
   { href: '/teacher/reports',         icon: ClipboardList, label: 'Reports'        },
+  { href: '/teacher/core-term',       icon: CalendarCheck, label: 'End of Term'    },
+  { href: '/teacher/attendance',      icon: UserCheck,     label: 'Attendance'     },
   { href: '/teacher/settings',        icon: Settings,      label: 'Settings'       },
 ]
+
+const SCHOOL_OFFICE_NAV = { href: '/teacher/core-office', icon: Building2, label: 'School Office' }
 
 function isRouteMatch(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + '/')
 }
 
-export default function TeacherBottomNav() {
+interface Props {
+  /** Sprint 10G — School Office only appears for admin-tier school_users members. */
+  isAdminTier?: boolean
+}
+
+export default function TeacherBottomNav({ isAdminTier }: Props = {}) {
   const pathname                        = usePathname()
+  const moreNav = isAdminTier ? [...MORE_NAV, SCHOOL_OFFICE_NAV] : MORE_NAV
   const [moreOpen, setMoreOpen]         = useState(false)
   const [createOpen, setCreateOpen]     = useState(false)
   const [pendingEvals, setPendingEvals] = useState(0)
@@ -65,7 +75,7 @@ export default function TeacherBottomNav() {
   const classesActive = isRouteMatch(pathname, '/teacher/classes')
   const alertsActive  = isRouteMatch(pathname, '/teacher/alerts')
   const createActive  = CREATE_NAV.some(item => isRouteMatch(pathname, item.href))
-  const moreActive    = MORE_NAV.some(item => isRouteMatch(pathname, item.href))
+  const moreActive    = moreNav.some(item => isRouteMatch(pathname, item.href))
   const sheetOpen     = moreOpen || createOpen
 
   return (
@@ -236,7 +246,7 @@ export default function TeacherBottomNav() {
 
         {/* Nav grid */}
         <div className="px-4 py-4 grid grid-cols-3 gap-2">
-          {MORE_NAV.map(item => {
+          {moreNav.map(item => {
             const active = isRouteMatch(pathname, item.href)
             return (
               <Link
