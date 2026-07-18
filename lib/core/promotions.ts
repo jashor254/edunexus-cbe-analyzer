@@ -1,5 +1,6 @@
 import { repos } from '@/lib/repositories'
 import type { LearnerPromotion, RunPromotionInput } from '@/types/core'
+import { createBlueprintSnapshot } from '@/lib/learnerBlueprint/snapshot'
 
 export async function getLearnerPromotionHistory(
   learnerId: string,
@@ -15,6 +16,17 @@ export async function runAnnualPromotion(
 ): Promise<{ processed: number; errors: string[] }> {
   const errors: string[] = []
   let processed = 0
+
+  // `processedBy` is a school_users.id (learner_promotions.processed_by's
+  // FK target) — the graduation Blueprint Snapshot trigger below needs the
+  // real auth.uid() instead, since composeBlueprint()'s internal permission
+  // checks (e.g. Attendance's admin check) resolve membership from
+  // auth.uid(), not a school_users row id. Resolved once, non-fatally —
+  // falling back to processedBy itself (better an imperfect actor id on a
+  // best-effort snapshot than blocking graduation on this lookup).
+  const processedByAuthUserId = await repos.schools.findSchoolUserById(processedBy)
+    .then(su => su?.user_id ?? processedBy)
+    .catch(() => processedBy)
 
   for (const decision of input.decisions) {
     try {
@@ -41,6 +53,20 @@ export async function runAnnualPromotion(
           status: 'graduated',
           graduation_date: new Date().toISOString().split('T')[0],
         })
+
+        // Sprint 12K (ADR-0008 Part 3): the third and final frozen trigger.
+        // Awaited but non-fatal (caught, never thrown) — a snapshot
+        // failure must never block or roll back a real graduation
+        // decision, which has already been recorded above.
+        await createBlueprintSnapshot({
+          coreLearnerId: decision.learner_id,
+          schoolId,
+          academicYearId: input.academic_year_id,
+          termId: null,
+          snapshotType: 'graduation',
+          sourceRecordId: decision.learner_id,
+          actorUserId: processedByAuthUserId,
+        }).catch(err => console.error('[blueprint-snapshot] graduation:', err instanceof Error ? err.message : String(err)))
       }
 
       processed++

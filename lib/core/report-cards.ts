@@ -4,8 +4,42 @@ import { computeRankings } from '@/lib/ranking'
 import { gradeScore } from '@/lib/grading'
 import type { GradeScale } from '@/lib/grading'
 import type { SchoolReportCard, ReportCardWithSubjects, CbcLevel } from '@/types/core'
+import { getAttendanceStatusCountsForClass } from '@/lib/core/attendance'
+import { createBlueprintSnapshot } from '@/lib/learnerBlueprint/snapshot'
+
+// Sprint 12B (ADR-0004 — Attendance -> Report Card Integration): Report
+// Cards is the consumer here, Attendance the owner. `days_present`/
+// `days_absent` are computed by THIS module, from Attendance's raw
+// per-status counts (`getAttendanceStatusCountsForClass`), never the
+// other way around — Report Cards decides what "present"/"absent" mean
+// for its own two-column field; Attendance never makes that decision on
+// a consumer's behalf (ADR-0004 §4). `late` counts toward Present (a
+// learner who arrived late still attended that day); `excused` counts
+// toward Absent (the learner did not attend, regardless of reason) — a
+// Report Cards-owned interpretation, not an Attendance concept.
+//
+// Computed once, at generation time, and stored — an immutable snapshot,
+// exactly like `overall_score`/`overall_cbc_level`/`position_in_class`
+// already are on this same table (Phase 6 historical-semantics decision:
+// this table already only ever computes-once-and-stores, never
+// recomputes-on-view; attendance follows that existing precedent, not a
+// new one invented for this sprint). If no Attendance session exists at
+// all for a learner's class/term, both fields are stored as `null` —
+// "no data available," never a fabricated zero that would misleadingly
+// read as perfect attendance.
+function toReportCardAttendance(counts: { present: number; absent: number; late: number; excused: number } | undefined): {
+  days_present: number | null
+  days_absent: number | null
+} {
+  if (!counts) return { days_present: null, days_absent: null }
+  return {
+    days_present: counts.present + counts.late,
+    days_absent: counts.absent + counts.excused,
+  }
+}
 
 export async function generateReportCards(
+  actorUserId: string,
   schoolId: string,
   classId: string,
   termId: string,
@@ -91,6 +125,13 @@ export async function generateReportCards(
   const ranked = computeRankings(learnerAvgs.map((r) => ({ id: r.learner_id, score: r.avg })))
   const avgByLearnerId = new Map(learnerAvgs.map((r) => [r.learner_id, r.avg]))
 
+  // Sprint 12B — Attendance is the owner, Report Cards the consumer: one
+  // bulk read for the whole class/term (never a per-learner loop against
+  // Attendance — see getAttendanceStatusCountsForClass's own doc comment
+  // for the N+1 this avoids), then this module decides what "present"/
+  // "absent" mean for its own two columns.
+  const attendanceCounts = await getAttendanceStatusCountsForClass(actorUserId, schoolId, classId, termId)
+
   const rows = ranked.map((r) => {
     const avg = avgByLearnerId.get(r.id) ?? 0
     return {
@@ -104,6 +145,7 @@ export async function generateReportCards(
       total_learners: totalLearners,
       is_published: false,
       generated_at: new Date().toISOString(),
+      ...toReportCardAttendance(attendanceCounts[r.id]),
     }
   })
 
@@ -121,9 +163,17 @@ export async function updateReportCard(
 }
 
 export async function publishReportCards(
+  actorUserId: string,
   schoolId: string,
   termId: string,
-  classId?: string
+  classId?: string,
+  // Sprint 12K: `publishReportCards` is called two ways — standalone (the
+  // direct publish API route) or as one step inside `runEndOfTerm`
+  // (lib/core/endOfTerm.ts). Both are real, distinct ADR-0008 Part 3
+  // triggers; the snapshot type reflects which one actually happened,
+  // never both at once for the same publish event (never a duplicate
+  // snapshot for one real moment). Defaults to the standalone case.
+  snapshotType: 'report_card_publication' | 'end_of_term' = 'report_card_publication'
 ): Promise<{ published: number }> {
   const result = await repos.schools.publishReportCards(schoolId, termId, classId)
 
@@ -137,7 +187,28 @@ export async function publishReportCards(
     payload:       { school_id: schoolId, term_id: termId, class_id: classId, published_count: result.published },
   }).catch(err => console.error('[events] teacher.report_card.published:', err instanceof Error ? err.message : String(err)))
 
-  return result
+  // Sprint 12K (ADR-0008 Part 3): one Blueprint Snapshot per learner whose
+  // report card was just published — the first of the three frozen
+  // triggers. Awaited (not fire-and-forget — an un-awaited promise can be
+  // killed mid-flight when a serverless function's response returns) but
+  // non-fatal: a snapshot failure is caught and logged, never thrown, so
+  // it can never block or roll back the actual report-card publish, which
+  // has already succeeded by this point. lib/learnerBlueprint owns this
+  // entirely; report-cards.ts never composes or persists a Blueprint
+  // itself.
+  for (const card of result.publishedCards) {
+    await createBlueprintSnapshot({
+      coreLearnerId: card.learner_id,
+      schoolId,
+      academicYearId: null,
+      termId,
+      snapshotType,
+      sourceRecordId: card.id,
+      actorUserId,
+    }).catch(err => console.error(`[blueprint-snapshot] ${snapshotType}:`, err instanceof Error ? err.message : String(err)))
+  }
+
+  return { published: result.published }
 }
 
 // Security Hotfix SH-001 (docs/engineering/sprint-5c-service-role-authorization-audit.md,

@@ -22,6 +22,10 @@ import { listTerms, createTerm, setCurrentTerm, getSchoolSettings } from '@/lib/
 import type { Term } from '@/types/core'
 
 export type EndOfTermInput = {
+  // Sprint 12B — the already-verified admin actor, threaded through to
+  // generateReportCards, which now calls the Attendance service (every
+  // Attendance read requires an authorized actor, per ADR-0003/ADR-0004).
+  actorUserId: string
   schoolId: string
   classId:  string
   termId:   string
@@ -62,8 +66,8 @@ export async function runEndOfTerm(input: EndOfTermInput): Promise<EndOfTermResu
     input.gradeBoundaries ?? (await getSchoolSettings(input.schoolId)).grade_boundaries
 
   await computeTermSummaries(input.schoolId, input.classId, input.termId, gradeBoundaries)
-  const { generated } = await generateReportCards(input.schoolId, input.classId, input.termId, gradeBoundaries)
-  const { published } = await publishReportCards(input.schoolId, input.termId, input.classId)
+  const { generated } = await generateReportCards(input.actorUserId, input.schoolId, input.classId, input.termId, gradeBoundaries)
+  const { published } = await publishReportCards(input.actorUserId, input.schoolId, input.termId, input.classId, 'end_of_term')
 
   // 3. Next-term prep. The lock check and report-card generation above are
   //    pure recomputation + upsert (safe to repeat), but term creation is

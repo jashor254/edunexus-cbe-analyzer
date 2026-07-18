@@ -104,6 +104,20 @@ export class SchoolRepository extends BaseRepository {
     return data
   }
 
+  // Reverse of findSchoolUserByUserId — resolves the auth user_id from a
+  // school_users.id (e.g. learner_promotions.processed_by, Sprint 12K's
+  // graduation snapshot trigger needs the real auth.uid() for downstream
+  // permission checks, not the school_users row id it's FK'd to).
+  async findSchoolUserById(schoolUserId: string): Promise<SchoolUser | null> {
+    const { data, error } = await this.db
+      .from('school_users')
+      .select(SCHOOL_USER_COLS)
+      .eq('id', schoolUserId)
+      .maybeSingle()
+    if (error) throw new Error(`findSchoolUserById: ${error.message}`)
+    return data
+  }
+
   async addSchoolUser(schoolId: string, userId: string, role: SchoolUserRole): Promise<SchoolUser> {
     const { data, error } = await this.db
       .from('school_users')
@@ -123,6 +137,19 @@ export class SchoolRepository extends BaseRepository {
       .eq('school_id', schoolId)
       .single()
     if (error) throw new Error(`getSchoolSettings: ${error.message}`)
+    return data
+  }
+
+  // Non-throwing counterpart to findSettings — needed by activation's
+  // idempotency check (Sprint 9B), which must distinguish "no row yet" from
+  // an actual query failure without relying on error-message sniffing.
+  async findSettingsOrNull(schoolId: string): Promise<SchoolSettings | null> {
+    const { data, error } = await this.db
+      .from('school_settings')
+      .select(SETTINGS_COLS)
+      .eq('school_id', schoolId)
+      .maybeSingle()
+    if (error) throw new Error(`findSettingsOrNull: ${error.message}`)
     return data
   }
 
@@ -305,6 +332,13 @@ export class SchoolRepository extends BaseRepository {
     total_learners: number
     is_published: boolean
     generated_at: string
+    // Sprint 12B (ADR-0004) — optional so any other existing caller of this
+    // method is unaffected; generateReportCards now always supplies them,
+    // computed fresh from Attendance at generation time (a snapshot,
+    // matching overall_score/overall_cbc_level/position_in_class's
+    // existing computed-at-generation, not computed-at-view, precedent).
+    days_present?: number | null
+    days_absent?: number | null
   }[]): Promise<void> {
     const { error } = await this.db
       .from('school_report_cards')
@@ -332,7 +366,7 @@ export class SchoolRepository extends BaseRepository {
     schoolId: string,
     termId: string,
     classId?: string
-  ): Promise<{ published: number }> {
+  ): Promise<{ published: number; publishedCards: Array<{ id: string; learner_id: string }> }> {
     let query = this.db
       .from('school_report_cards')
       .update({ is_published: true, published_at: new Date().toISOString() })
@@ -340,9 +374,12 @@ export class SchoolRepository extends BaseRepository {
       .eq('term_id', termId)
       .eq('is_published', false)
     if (classId) query = query.eq('class_id', classId)
-    const { data, error } = await query.select('id')
+    // `learner_id` added Sprint 12K — lets the caller trigger one Blueprint
+    // Snapshot per published learner (ADR-0008 Part 3) without a second
+    // query; purely additive to the existing select.
+    const { data, error } = await query.select('id, learner_id')
     if (error) throw new Error(`publishReportCards: ${error.message}`)
-    return { published: data?.length ?? 0 }
+    return { published: data?.length ?? 0, publishedCards: (data ?? []) as Array<{ id: string; learner_id: string }> }
   }
 
   // TD-014 (docs/engineering/implementation-log.md): term_subject_summaries
