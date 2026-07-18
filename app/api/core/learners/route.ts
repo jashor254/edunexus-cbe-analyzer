@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { admitLearner, listLearners } from '@/lib/core/learners'
+import { onboardLearner } from '@/lib/core/learnerOnboarding'
 import { requireSchoolMembership, requireSchoolAdmin } from '@/lib/core/permissions'
 import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
 import { z } from 'zod'
@@ -24,6 +25,36 @@ const AdmitSchema = z.object({
     email: z.string().email().optional(),
     national_id: z.string().optional(),
   }),
+})
+
+// Sprint 9D: the full Administration→Academics onboarding pipeline
+// (Admission → Guardian (optional) → Enrollment), reachable through this
+// same canonical route by additionally supplying class_id/term_id/
+// academic_year_id. Guardian is optional here — AdmitSchema above is left
+// completely unchanged for backward compatibility (existing callers who
+// only admit, never touching this branch, see zero behavior change).
+const OnboardSchema = z.object({
+  schoolId: z.string().uuid(),
+  admission_number: z.string().min(1),
+  first_name: z.string().min(1),
+  middle_name: z.string().optional(),
+  last_name: z.string().min(1),
+  date_of_birth: z.string().optional(),
+  gender: z.enum(['male', 'female', 'other']).optional(),
+  upi: z.string().optional(),
+  county_of_origin: z.string().optional(),
+  special_needs: z.array(z.string()).optional(),
+  notes: z.string().optional(),
+  guardian: z.object({
+    full_name: z.string().min(1),
+    phone: z.string().min(1),
+    relationship: z.enum(['father', 'mother', 'guardian', 'grandparent', 'sibling', 'other']),
+    email: z.string().email().optional(),
+    national_id: z.string().optional(),
+  }).optional(),
+  class_id: z.string().uuid(),
+  term_id: z.string().uuid(),
+  academic_year_id: z.string().uuid(),
 })
 
 function errorResponse(err: unknown): NextResponse {
@@ -56,6 +87,25 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const supabase = await createClient()
   const body = await req.json()
+
+  // Administration owns enrollment (Sprint 9D Part 3) — the full pipeline
+  // is admin-only, tighter than the pre-existing standalone enroll action
+  // on app/api/core/learners/[id] (requireSchoolStaff, left unchanged).
+  if (body?.class_id) {
+    const parsed = OnboardSchema.safeParse(body)
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
+
+    const { schoolId, ...input } = parsed.data
+    try {
+      await requireSchoolAdmin(supabase, schoolId)
+    } catch (err) {
+      return errorResponse(err)
+    }
+
+    const result = await onboardLearner(schoolId, input)
+    return NextResponse.json({ data: result }, { status: result.status === 'complete' ? 201 : 422 })
+  }
+
   const parsed = AdmitSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 

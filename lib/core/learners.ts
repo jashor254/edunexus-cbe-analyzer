@@ -18,6 +18,8 @@ export async function admitLearner(
 ): Promise<LearnerWithGuardians> {
   const learner = await repos.learners.insert(schoolId, input)
 
+  if (!input.guardian) return { ...learner, learner_guardians: [] }
+
   const guardian = await repos.learners.insertGuardian(schoolId, learner.id, {
     user_id: null,
     relationship: input.guardian.relationship,

@@ -149,7 +149,36 @@ export class LearnerRepository extends BaseRepository {
     return data.school_id
   }
 
+  // Sprint 9D: admission idempotency — mirrors the live UNIQUE(school_id,
+  // admission_number) constraint (supabase/migrations/20260629_core_foundation.sql:422)
+  // so learnerOnboarding.ts can check-then-create instead of relying on a
+  // raw constraint-violation error.
+  async findByAdmissionNumber(schoolId: string, admissionNumber: string): Promise<Learner | null> {
+    const { data } = await this.db
+      .from('learners')
+      .select(LEARNER_COLS)
+      .eq('school_id', schoolId)
+      .eq('admission_number', admissionNumber)
+      .maybeSingle()
+    return data
+  }
+
   // ── Guardians ──────────────────────────────────────────────────────────────
+
+  // Sprint 9D: guardian-link idempotency. learner_guardians has no live
+  // UNIQUE constraint (confirmed via pg_constraint) — phone number is the
+  // most realistic "same guardian" business key available on this table,
+  // so this is the only thing preventing a duplicate guardian row on
+  // retry; called explicitly for a reason, not assumed safe.
+  async findGuardianByPhone(learnerId: string, phone: string): Promise<LearnerGuardian | null> {
+    const { data } = await this.db
+      .from('learner_guardians')
+      .select(GUARDIAN_COLS)
+      .eq('learner_id', learnerId)
+      .eq('phone', phone)
+      .maybeSingle()
+    return data
+  }
 
   async insertGuardian(
     schoolId: string,

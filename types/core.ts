@@ -20,6 +20,7 @@ export type GradeCategory =
   | 'lower_primary'
   | 'upper_primary'
   | 'junior_secondary'
+  | 'senior_secondary'
 
 export type SubjectCategory = 'pre_primary' | 'primary' | 'junior_secondary' | 'senior_secondary'
 
@@ -354,7 +355,13 @@ export type AdmitLearnerInput = {
   county_of_origin?: string
   special_needs?: string[]
   notes?: string
-  guardian: {
+  // Optional as of Sprint 9D — admission and guardian-linking are
+  // independently idempotent steps in lib/core/learnerOnboarding.ts's
+  // pipeline ("Parents (optional)"). Every pre-existing caller (the
+  // app/api/core/learners POST route's Zod schema, the reference-school
+  // seed script) still always supplies one — this widening is additive,
+  // not a behavior change for them.
+  guardian?: {
     full_name: string
     phone: string
     relationship: GuardianRelationship
