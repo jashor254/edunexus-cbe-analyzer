@@ -44,6 +44,7 @@ interface Assignment {
   max_score: number
   class_id: string
   is_compass_guided: boolean
+  is_quiz: boolean
   teacher_classes: { name: string; grade: number } | null
 }
 
@@ -421,6 +422,14 @@ export default function AssignmentMarkingPage({ params }: { params: Promise<{ as
           <p className="text-gray-500 mt-1">
             {assignment.teacher_classes?.name} &nbsp;·&nbsp; Grade {assignment.teacher_classes?.grade} &nbsp;·&nbsp; {assignment.subject}
           </p>
+          {assignment.is_quiz && (
+            <Link
+              href={`/teacher/assignments/${assignment.id}/quiz`}
+              className="inline-flex items-center gap-1.5 mt-2 text-xs font-black text-teal-700 bg-teal-50 border border-teal-200 px-3 py-1.5 rounded-lg hover:bg-teal-100 transition"
+            >
+              Manage quiz questions
+            </Link>
+          )}
         </div>
       </div>
 
@@ -685,69 +694,77 @@ export default function AssignmentMarkingPage({ params }: { params: Promise<{ as
                         </div>
                       )}
 
-                      {/* Score + feedback inputs */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-bold text-gray-700 mb-1">
-                            Score (0–{assignment.max_score})
-                          </label>
-                          <input
-                            type="number"
-                            value={ms.score}
-                            onChange={e => setMarkingStates(prev => ({
-                              ...prev,
-                              [sub.student_id]: { ...prev[sub.student_id], score: e.target.value },
-                            }))}
-                            min={0}
-                            max={assignment.max_score}
-                            placeholder="e.g. 85"
-                            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 focus:border-teal-500 outline-none text-gray-900 bg-white"
-                          />
+                      {assignment.is_quiz ? (
+                        <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 text-sm text-teal-800 font-bold">
+                          Auto-graded quiz — {sub.score ?? 0}/{assignment.max_score}. No manual marking needed.
                         </div>
-                        <div>
-                          <label className="block text-xs font-bold text-gray-700 mb-1">
-                            Quick feedback (optional)
-                          </label>
-                          <input
-                            type="text"
-                            value={ms.feedback}
-                            onChange={e => setMarkingStates(prev => ({
-                              ...prev,
-                              [sub.student_id]: { ...prev[sub.student_id], feedback: e.target.value },
-                            }))}
-                            placeholder="Great work! Review Q3."
-                            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 focus:border-teal-500 outline-none text-gray-900 bg-white"
-                          />
-                        </div>
-                      </div>
+                      ) : (
+                        <>
+                          {/* Score + feedback inputs */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-bold text-gray-700 mb-1">
+                                Score (0–{assignment.max_score})
+                              </label>
+                              <input
+                                type="number"
+                                value={ms.score}
+                                onChange={e => setMarkingStates(prev => ({
+                                  ...prev,
+                                  [sub.student_id]: { ...prev[sub.student_id], score: e.target.value },
+                                }))}
+                                min={0}
+                                max={assignment.max_score}
+                                placeholder="e.g. 85"
+                                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 focus:border-teal-500 outline-none text-gray-900 bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-gray-700 mb-1">
+                                Quick feedback (optional)
+                              </label>
+                              <input
+                                type="text"
+                                value={ms.feedback}
+                                onChange={e => setMarkingStates(prev => ({
+                                  ...prev,
+                                  [sub.student_id]: { ...prev[sub.student_id], feedback: e.target.value },
+                                }))}
+                                placeholder="Great work! Review Q3."
+                                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 focus:border-teal-500 outline-none text-gray-900 bg-white"
+                              />
+                            </div>
+                          </div>
 
-                      {/* Action buttons */}
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={() => markSubmission(sub, 'marked')}
-                          disabled={ms.saving}
-                          className="flex items-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-xl font-black text-sm hover:bg-green-700 transition disabled:opacity-60"
-                        >
-                          {ms.saving
-                            ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            : <><CheckCircle2 className="w-4 h-4" /> Mark as Good</>
-                          }
-                        </button>
-                        <button
-                          onClick={() => markSubmission(sub, 'needs_revision')}
-                          disabled={ms.saving}
-                          className="flex items-center gap-2 bg-orange-500 text-white px-4 py-2.5 rounded-xl font-black text-sm hover:bg-orange-600 transition disabled:opacity-60"
-                        >
-                          <AlertTriangle className="w-4 h-4" /> Needs Revision
-                        </button>
-                        <button
-                          onClick={() => markSubmission(sub, 'marked')}
-                          disabled={ms.saving || (!ms.score && !ms.feedback)}
-                          className="flex items-center gap-2 bg-teal-600 text-white px-4 py-2.5 rounded-xl font-black text-sm hover:bg-teal-700 transition disabled:opacity-40"
-                        >
-                          <Send className="w-4 h-4" /> Send Feedback
-                        </button>
-                      </div>
+                          {/* Action buttons */}
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              onClick={() => markSubmission(sub, 'marked')}
+                              disabled={ms.saving}
+                              className="flex items-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-xl font-black text-sm hover:bg-green-700 transition disabled:opacity-60"
+                            >
+                              {ms.saving
+                                ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                : <><CheckCircle2 className="w-4 h-4" /> Mark as Good</>
+                              }
+                            </button>
+                            <button
+                              onClick={() => markSubmission(sub, 'needs_revision')}
+                              disabled={ms.saving}
+                              className="flex items-center gap-2 bg-orange-500 text-white px-4 py-2.5 rounded-xl font-black text-sm hover:bg-orange-600 transition disabled:opacity-60"
+                            >
+                              <AlertTriangle className="w-4 h-4" /> Needs Revision
+                            </button>
+                            <button
+                              onClick={() => markSubmission(sub, 'marked')}
+                              disabled={ms.saving || (!ms.score && !ms.feedback)}
+                              className="flex items-center gap-2 bg-teal-600 text-white px-4 py-2.5 rounded-xl font-black text-sm hover:bg-teal-700 transition disabled:opacity-40"
+                            >
+                              <Send className="w-4 h-4" /> Send Feedback
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>

@@ -430,3 +430,94 @@ test('DELETE /api/teacher/announcements/[id]: owning teacher can delete their ow
   const bodyAfter = await listAfter.json()
   assert.ok(!bodyAfter.data.announcements.some((a: { id: string }) => a.id === announcementId))
 })
+
+// ── Quiz (Phase 3a — extends Assignments, no new domain) ─────────────────
+
+let quizAssignmentId: string
+let quizQuestionIds: string[] = []
+
+test('POST /api/teacher/assignments: is_quiz=true creates a quiz-type assignment', async () => {
+  const res = await fetch(`${BASE_URL}/api/teacher/assignments`, {
+    method: 'POST', headers: { ...cookie(fx.teacherSession), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      class_id: fx.classId, title: 'Fractions Quiz', subject: 'Mathematics', topic: 'Fractions',
+      instructions: 'Answer all questions', due_date: new Date(Date.now() + 86400_000).toISOString(),
+      max_score: 20, is_quiz: true,
+    }),
+  })
+  assert.equal(res.status, 201)
+  const body = await res.json()
+  assert.equal(body.data.assignment.is_quiz, true)
+  quizAssignmentId = body.data.assignment.id
+})
+
+test('PUT /api/teacher/assignments/[id]/questions: teacher authors the question set', async () => {
+  const res = await fetch(`${BASE_URL}/api/teacher/assignments/${quizAssignmentId}/questions`, {
+    method: 'PUT', headers: { ...cookie(fx.teacherSession), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      questions: [
+        { questionText: '1/2 + 1/2 = ?', choices: ['1', '2', '0'], correctIndex: 0 },
+        { questionText: '3/4 - 1/4 = ?', choices: ['1/2', '1', '2'], correctIndex: 0 },
+      ],
+    }),
+  })
+  assert.equal(res.status, 200)
+  const body = await res.json()
+  assert.equal(body.data.questions.length, 2)
+  quizQuestionIds = body.data.questions.map((q: { id: string }) => q.id)
+})
+
+test('PUT /api/teacher/assignments/[id]/questions: a non-owning teacher cannot author questions for this assignment', async () => {
+  const res = await fetch(`${BASE_URL}/api/teacher/assignments/${quizAssignmentId}/questions`, {
+    method: 'PUT', headers: { ...cookie(fx.otherTeacherSession), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ questions: [{ questionText: 'Intrusion', choices: ['A', 'B'], correctIndex: 0 }] }),
+  })
+  assert.equal(res.status, 403)
+})
+
+test('GET /api/student/assignments/[id]/questions: student sees questions with no correct_index field', async () => {
+  const res = await fetch(`${BASE_URL}/api/student/assignments/${quizAssignmentId}/questions`, { headers: cookie(fx.studentSession) })
+  assert.equal(res.status, 200)
+  const body = await res.json()
+  assert.equal(body.data.questions.length, 2)
+  for (const q of body.data.questions) {
+    assert.equal('correct_index' in q, false)
+    assert.equal('correctIndex' in q, false)
+  }
+})
+
+test('GET /api/student/assignments/[id]/questions: an unenrolled outsider is forbidden', async () => {
+  const res = await fetch(`${BASE_URL}/api/student/assignments/${quizAssignmentId}/questions`, { headers: cookie(fx.outsiderSession) })
+  assert.equal(res.status, 403)
+})
+
+test('POST /api/student/submit-quiz: grades instantly and the submission shows up in the Gradebook', async () => {
+  const res = await fetch(`${BASE_URL}/api/student/submit-quiz`, {
+    method: 'POST', headers: { ...cookie(fx.studentSession), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      assignmentId: quizAssignmentId, studentId: fx.studentId,
+      answers: [
+        { questionId: quizQuestionIds[0], selectedIndex: 0 }, // correct
+        { questionId: quizQuestionIds[1], selectedIndex: 1 }, // wrong
+      ],
+    }),
+  })
+  assert.equal(res.status, 200)
+  const body = await res.json()
+  assert.equal(body.data.grade.correctCount, 1)
+  assert.equal(body.data.grade.score, 10) // 1/2 * 20
+  assert.equal(body.data.submission.status, 'marked')
+
+  const gradebookRes = await fetch(`${BASE_URL}/api/teacher/gradebook/${fx.classId}`, { headers: cookie(fx.teacherSession) })
+  const gradebookBody = await gradebookRes.json()
+  const row = gradebookBody.data.gradebook.rows.find((r: { studentId: string }) => r.studentId === fx.studentId)
+  assert.equal(row.scores[quizAssignmentId], 10)
+})
+
+test('POST /api/student/submit-quiz: a different student cannot submit on this student\'s behalf', async () => {
+  const res = await fetch(`${BASE_URL}/api/student/submit-quiz`, {
+    method: 'POST', headers: { ...cookie(fx.outsiderSession), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ assignmentId: quizAssignmentId, studentId: fx.studentId, answers: [] }),
+  })
+  assert.equal(res.status, 403)
+})

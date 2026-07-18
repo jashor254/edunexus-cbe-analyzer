@@ -17,6 +17,7 @@ interface AssignmentItem {
   type: string
   max_score: number
   is_compass_guided: boolean
+  is_quiz: boolean
   is_holiday_assignment?: boolean
   holiday_period?: string
   daysLeft: number
@@ -188,6 +189,144 @@ function SubmitModal({
   )
 }
 
+// ─── Quiz Modal ───────────────────────────────────────────────────────────────
+
+interface QuizQuestionForStudent {
+  id: string
+  question_text: string
+  choices: string[]
+}
+
+function QuizModal({
+  assignment,
+  studentId,
+  onDone,
+  onClose,
+}: {
+  assignment: AssignmentItem
+  studentId: string
+  onDone: () => void
+  onClose: () => void
+}) {
+  const [questions, setQuestions] = useState<QuizQuestionForStudent[]>([])
+  const [answers, setAnswers] = useState<Record<string, number>>({})
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [result, setResult] = useState<{ score: number; correctCount: number; total: number } | null>(null)
+
+  useEffect(() => {
+    fetch(`/api/student/assignments/${assignment.id}/questions`)
+      .then(r => r.json())
+      .then(d => { if (d.success) setQuestions(d.data.questions) })
+      .finally(() => setLoading(false))
+  }, [assignment.id])
+
+  async function handleSubmit() {
+    setError('')
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/student/submit-quiz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assignmentId: assignment.id,
+          studentId,
+          answers: Object.entries(answers).map(([questionId, selectedIndex]) => ({ questionId, selectedIndex })),
+        }),
+      })
+      const data = await res.json()
+      if (!data.success) { setError(data.error || 'Failed to submit. Try again.'); return }
+      setResult(data.data.grade)
+    } catch {
+      setError('Something went wrong.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const allAnswered = questions.length > 0 && questions.every(q => answers[q.id] !== undefined)
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h2 className="text-xl font-black text-gray-900">{result ? 'Quiz Result' : 'Take Quiz'}</h2>
+            <p className="text-sm text-gray-500 mt-0.5">{assignment.title}</p>
+          </div>
+          <button onClick={result ? onDone : onClose} className="text-gray-400 hover:text-gray-600 transition mt-0.5">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-10">
+            <span className="w-8 h-8 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : result ? (
+          <div className="text-center py-6">
+            <div className="text-5xl font-black text-teal-600 mb-2">
+              {result.score}<span className="text-gray-400 text-2xl font-bold">/{assignment.max_score}</span>
+            </div>
+            <p className="text-gray-500 mb-6">{result.correctCount} of {result.total} correct</p>
+            <button
+              onClick={onDone}
+              className="bg-teal-600 text-white px-6 py-3 rounded-xl font-black text-sm hover:bg-teal-700 transition"
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {questions.map((q, qIndex) => (
+              <div key={q.id}>
+                <p className="font-bold text-gray-900 text-sm mb-2">{qIndex + 1}. {q.question_text}</p>
+                <div className="space-y-1.5">
+                  {q.choices.map((choice, cIndex) => (
+                    <label
+                      key={cIndex}
+                      className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer transition ${
+                        answers[q.id] === cIndex ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name={`quiz-${q.id}`}
+                        checked={answers[q.id] === cIndex}
+                        onChange={() => setAnswers(prev => ({ ...prev, [q.id]: cIndex }))}
+                        className="w-4 h-4 accent-teal-600"
+                      />
+                      <span className="text-sm text-gray-800">{choice}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+                {friendlyMessage(error).message}
+              </div>
+            )}
+
+            <button
+              onClick={handleSubmit}
+              disabled={submitting || !allAnswered}
+              className="w-full bg-teal-600 text-white py-3 rounded-xl font-black text-sm hover:bg-teal-700 transition disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {submitting
+                ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                : <><Send className="w-4 h-4" /> Submit Quiz</>
+              }
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Assignment Card ───────────────────────────────────────────────────────────
 
 function AssignmentCard({
@@ -221,6 +360,11 @@ function AssignmentCard({
             {item.is_holiday_assignment && (
               <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg">
                 Holiday
+              </span>
+            )}
+            {item.is_quiz && (
+              <span className="text-xs font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg">
+                Quiz
               </span>
             )}
           </div>
@@ -315,20 +459,31 @@ function AssignmentCard({
         </div>
 
         <div className="flex gap-2 flex-wrap">
-          {item.is_compass_guided && (
-            <Link
-              href={`/chat?topic=${encodeURIComponent(item.topic)}&subject=${encodeURIComponent(item.subject)}&assignmentId=${item.id}`}
-              className="flex items-center gap-2 bg-teal-600 text-white px-4 py-2.5 rounded-xl font-black text-sm hover:bg-teal-700 transition"
+          {item.is_quiz ? (
+            <button
+              onClick={() => setShowSubmit(true)}
+              className="flex items-center gap-2 bg-amber-500 text-white px-4 py-2.5 rounded-xl font-black text-sm hover:bg-amber-600 transition"
             >
-              <Compass className="w-4 h-4" /> Start with Compass
-            </Link>
+              <Send className="w-4 h-4" /> Take Quiz
+            </button>
+          ) : (
+            <>
+              {item.is_compass_guided && (
+                <Link
+                  href={`/chat?topic=${encodeURIComponent(item.topic)}&subject=${encodeURIComponent(item.subject)}&assignmentId=${item.id}`}
+                  className="flex items-center gap-2 bg-teal-600 text-white px-4 py-2.5 rounded-xl font-black text-sm hover:bg-teal-700 transition"
+                >
+                  <Compass className="w-4 h-4" /> Start with Compass
+                </Link>
+              )}
+              <button
+                onClick={() => setShowSubmit(true)}
+                className="flex items-center gap-2 border border-gray-200 text-gray-700 bg-gray-50 px-4 py-2.5 rounded-xl font-black text-sm hover:bg-gray-100 transition"
+              >
+                <Send className="w-4 h-4" /> Submit Work
+              </button>
+            </>
           )}
-          <button
-            onClick={() => setShowSubmit(true)}
-            className="flex items-center gap-2 border border-gray-200 text-gray-700 bg-gray-50 px-4 py-2.5 rounded-xl font-black text-sm hover:bg-gray-100 transition"
-          >
-            <Send className="w-4 h-4" /> Submit Work
-          </button>
         </div>
 
         {item.is_holiday_assignment && item.holiday_period && (
@@ -339,12 +494,21 @@ function AssignmentCard({
       </div>
 
       {showSubmit && (
-        <SubmitModal
-          assignment={item}
-          studentId={studentId}
-          onDone={handleDone}
-          onClose={() => setShowSubmit(false)}
-        />
+        item.is_quiz ? (
+          <QuizModal
+            assignment={item}
+            studentId={studentId}
+            onDone={handleDone}
+            onClose={() => setShowSubmit(false)}
+          />
+        ) : (
+          <SubmitModal
+            assignment={item}
+            studentId={studentId}
+            onDone={handleDone}
+            onClose={() => setShowSubmit(false)}
+          />
+        )
       )}
     </>
   )

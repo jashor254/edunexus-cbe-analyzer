@@ -17,6 +17,7 @@ const CreateAssignmentSchema = z.object({
   due_date:              z.string().min(1),
   type:                  z.string().optional(),
   max_score:             z.number().int().positive().optional(),
+  is_quiz:               z.boolean().optional(),
   is_compass_guided:     z.boolean().optional(),
   is_holiday_assignment: z.boolean().optional(),
   holiday_period:        z.string().optional(),
@@ -43,7 +44,7 @@ export async function GET() {
       .from('assignments')
       .select(`
         id, class_id, teacher_id, title, subject, topic, type, status,
-        due_date, max_score, is_compass_guided, is_holiday_assignment,
+        due_date, max_score, is_quiz, is_compass_guided, is_holiday_assignment,
         holiday_period, lesson_plan_id, created_at, updated_at,
         teacher_classes(name, grade)
       `)
@@ -106,7 +107,7 @@ export async function POST(req: Request) {
 
     const parsed = CreateAssignmentSchema.safeParse(await req.json())
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
-    const { class_id, title, subject, topic, instructions, due_date, type, max_score, is_compass_guided, is_holiday_assignment, holiday_period, lesson_plan_id } = parsed.data
+    const { class_id, title, subject, topic, instructions, due_date, type, max_score, is_quiz, is_compass_guided, is_holiday_assignment, holiday_period, lesson_plan_id } = parsed.data
 
     // Verify class belongs to teacher
     try {
@@ -127,7 +128,9 @@ export async function POST(req: Request) {
         due_date,
         type: type || 'practice',
         max_score: max_score || 100,
-        is_compass_guided: is_compass_guided !== false,
+        is_quiz: is_quiz === true,
+        // Quizzes are self-contained MCQ, never Compass-guided.
+        is_compass_guided: is_quiz === true ? false : is_compass_guided !== false,
         is_holiday_assignment: is_holiday_assignment === true,
         holiday_period: is_holiday_assignment ? (holiday_period || null) : null,
         lesson_plan_id: lesson_plan_id || null,

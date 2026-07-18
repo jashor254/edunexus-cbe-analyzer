@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { FileText, ChevronRight, Compass, Home, Search, Copy, Check, MessageCircle, ArrowRight } from 'lucide-react'
 import { SENIOR_PATHWAY_ELECTIVES, getSeniorCompulsorySubjects, SENIOR_PATHWAYS } from '@/lib/curriculum/subjects'
@@ -48,6 +48,7 @@ const CBC_SENIOR_SUBJECTS = Array.from(new Set([
 
 function NewAssignmentForm() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const prefillClassId = searchParams.get('classId') || ''
   const planId        = searchParams.get('planId') || ''
   const planSubject   = searchParams.get('subject') || ''
@@ -80,6 +81,7 @@ function NewAssignmentForm() {
     due_date: '',
     type: 'practice' as 'practice' | 'graded' | 'exam',
     max_score: 100,
+    is_quiz: false,
     is_compass_guided: true,
     is_holiday_assignment: false,
     holiday_period: '',
@@ -207,6 +209,12 @@ function NewAssignmentForm() {
       })
       const data = await res.json()
       if (!data.success) { setError(data.error || 'Failed to create assignment'); return }
+
+      if (form.is_quiz) {
+        router.push(`/teacher/assignments/${data.data.assignment.id}/quiz`)
+        return
+      }
+
       const cls = classes.find(c => c.id === form.class_id)
       setCreated({
         id:          data.data.assignment.id,
@@ -630,7 +638,45 @@ function NewAssignmentForm() {
             </div>
           )}
 
+          {/* Quiz toggle */}
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <div className="font-black text-gray-900 text-sm">Make this a Quiz</div>
+                  <div className="text-xs text-gray-500">
+                    Multiple choice, auto-graded instantly — no marking needed
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setForm(p => ({
+                  ...p,
+                  is_quiz: !p.is_quiz,
+                  is_compass_guided: p.is_quiz ? p.is_compass_guided : false,
+                }))}
+                className={`relative w-12 h-6 rounded-full transition-colors ${
+                  form.is_quiz ? 'bg-amber-500' : 'bg-gray-200'
+                }`}
+              >
+                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${
+                  form.is_quiz ? 'left-7' : 'left-1'
+                }`} />
+              </button>
+            </div>
+            {form.is_quiz && (
+              <p className="text-xs text-amber-700 mt-3">
+                📝 After you create this assignment, you'll add multiple-choice questions. Students get their score the moment they submit.
+              </p>
+            )}
+          </div>
+
           {/* Compass Guided toggle */}
+          {!form.is_quiz && (
           <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -663,6 +709,7 @@ function NewAssignmentForm() {
               </p>
             )}
           </div>
+          )}
 
           {/* Holiday Assignment toggle */}
           <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
