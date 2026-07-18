@@ -23,6 +23,20 @@ Entries are never edited to rewrite history — if a change is later reverted or
 
 ---
 
+## 2026-07-18 — LMS Basics Phase 0-1 follow-up: Integration Tests
+
+**What changed**: closed the test gap the prior entry flagged. 15 integration tests added, run against real synthetic data on the live-linked Supabase project (SYNTHETIC_-prefixed rows, `before()`/`after()` create-and-cleanup, matching `lib/repositories/findSchoolIdByTeacherId.integration.test.ts`'s established convention). Each proves a piece of behaviour the pure/unit tests couldn't reach: `lib/repositories/classResource.repository.integration.test.ts` (6 tests) proves `deleteResource`/`deleteMaterial`'s ownership scoping actually rejects a second, real, non-owning teacher — not just asserted in a comment; `lib/gradebook/gradebook.integration.test.ts` (3 tests) proves the real Supabase roster/assessment/assignment joins produce correct null-vs-scored cells against a live fixture, not just the already-tested pure merge function; `lib/storage/lmsBuckets.integration.test.ts` (6 tests) proves both new Storage buckets are actually private — upload → signed-URL → fetch round-trips correctly, and the bucket's own public-URL path independently confirmed to NOT serve the file (this is the one piece of the Phase 0-1 work with no Postgres table to test against, so it had zero coverage until now). All 15 pass; zero synthetic-row residue confirmed via a direct SQL check after the run.
+
+**Architectural documents referenced**: none new — same domains as the prior entry (ADR-0020, CLAUDE.md's evidence-access rule).
+
+**ADR**: None — test-only change, no architecture affected.
+
+**Tests added**: the 15 described above. No remaining gap for Phase 0-1 — API-route-level (HTTP request/response, auth-header wiring) coverage is still absent, matching this project's existing convention of testing at the repository/lib layer and verifying routes via `tsc`/`eslint`/manual click-through rather than HTTP-level route tests; this is a project-wide pattern, not specific to this feature set.
+
+**Rollback considerations**: None — test files only, no production code or schema touched.
+
+---
+
 ## 2026-07-18 — LMS Basics Phase 0-1: File Upload, Gradebook, Class Resources, Content Library
 
 **What changed**: user-directed initiative to close the "LMS basics" gaps found by `docs/pilot-readiness-wave-6-lms-foundations-full-audit.md`'s sibling research pass (8-capability audit against a standard LMS baseline — courses/content, assignments+submissions, gradebook, calendar, messaging, quizzes, discussion, file sharing — 7 of 8 found Missing or partial). Shipped the four items that needed no ADR or a small one: (1) file-attachment support on `assignment_submissions` (students could previously only submit typed text — CBC classroom work is often handwritten/photographed); (2) a real Gradebook — one matrix of every student x every assessment/assignment for a class, with CSV export, aggregated from the existing canonical `class_assessments`/`learner_marks`/`assignments`/`assignment_submissions` tables (read-only, no new write path); (3) Class Resources — teacher file uploads scoped to a class, student/parent signed-URL download; (4) Content Library — teacher-authored notes/links scoped to a class, student/parent read access. All four built on the `teacher_classes`/`students`/`class_students` (legacy FK space) identity — confirmed live and canonical-in-practice for every teacher-facing feature audited (assessments, assignments, attendance), not the newer `learners`/`school_users` schema, which today is scoped to the showcase domains (achievements/competitions/leadership/wellbeing/innovation/projects) only.
