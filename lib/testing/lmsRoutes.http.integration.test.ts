@@ -1,0 +1,336 @@
+// lib/testing/lmsRoutes.http.integration.test.ts
+//
+// LMS Basics — route-level (HTTP) integration tests. Unlike every other
+// *.integration.test.ts in this repo (which import repository/lib
+// functions directly), these hit real Next.js Route Handlers over HTTP
+// against a running `next dev`/`next start` server, because
+// utils/supabase/server.ts's createClient() reads the session via
+// `next/headers` cookies() — that only resolves inside a real Next.js
+// request, so a route handler can't be exercised correctly by importing
+// and calling it directly. Authentication uses lib/testing/
+// httpAuthTestHelper.ts, which signs a synthetic user in via
+// @supabase/ssr's own createServerClient and captures the exact Cookie
+// header a browser would send.
+//
+// Requires a server already running at LMS_TEST_BASE_URL (default
+// http://localhost:3939) — this file does not start one, so a CI/local run
+// must do `next dev -p 3939 &` (or `next start`) first. All data created is
+// SYNTHETIC_-tagged and deleted in after(), including on failure.
+//
+// Run: LMS_TEST_BASE_URL=http://localhost:3939 npx tsx --env-file=.env.local --test lib/testing/lmsRoutes.http.integration.test.ts
+import { test, before, after } from 'node:test'
+import assert from 'node:assert/strict'
+import { createServiceClient } from '@/utils/supabase/service'
+import { signInForHttpTest, type SyntheticSession } from './httpAuthTestHelper'
+
+const BASE_URL = process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3939'
+const SYNTHETIC_MARKER = 'SYNTHETIC_LMS_HTTP_TEST'
+const db = createServiceClient()
+
+type Fixture = {
+  teacherAuthId: string
+  teacherId: string
+  teacherSession: SyntheticSession
+  otherTeacherAuthId: string
+  otherTeacherId: string
+  otherTeacherSession: SyntheticSession
+  studentAuthId: string
+  studentId: string
+  studentSession: SyntheticSession
+  outsiderAuthId: string
+  outsiderSession: SyntheticSession
+  classId: string
+  assignmentId: string
+  submissionId: string
+}
+
+let fx: Fixture
+
+async function createSyntheticUser(label: string): Promise<{ authId: string; session: SyntheticSession }> {
+  const email = `${SYNTHETIC_MARKER.toLowerCase()}-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`
+  const password = `Test!${Math.random().toString(36).slice(2, 10)}`
+  const { data, error } = await db.auth.admin.createUser({ email, password, email_confirm: true })
+  if (error) throw error
+  const session = await signInForHttpTest(email, password)
+  return { authId: data.user.id, session }
+}
+
+before(async () => {
+  const teacher = await createSyntheticUser('teacher')
+  const otherTeacher = await createSyntheticUser('other-teacher')
+  const student = await createSyntheticUser('student')
+  const outsider = await createSyntheticUser('outsider')
+
+  const { data: teacherRow, error: teacherErr } = await db
+    .from('teachers').insert({ user_id: teacher.authId, full_name: SYNTHETIC_MARKER, school: SYNTHETIC_MARKER })
+    .select('id').single()
+  if (teacherErr) throw teacherErr
+
+  const { data: otherTeacherRow, error: otherTeacherErr } = await db
+    .from('teachers').insert({ user_id: otherTeacher.authId, full_name: SYNTHETIC_MARKER, school: SYNTHETIC_MARKER })
+    .select('id').single()
+  if (otherTeacherErr) throw otherTeacherErr
+
+  const { data: cls, error: clsErr } = await db
+    .from('teacher_classes')
+    .insert({
+      teacher_id: teacherRow.id, name: SYNTHETIC_MARKER, grade: 8, subject: 'Mathematics',
+      class_code: `${SYNTHETIC_MARKER}_${Date.now()}`,
+    })
+    .select('id').single()
+  if (clsErr) throw clsErr
+
+  const { data: studentRow, error: studentErr } = await db
+    .from('students').insert({ user_id: student.authId, name: 'HTTP Test Student', grade: 8, level: 'Junior School' })
+    .select('id').single()
+  if (studentErr) throw studentErr
+
+  await db.from('class_students').insert({ class_id: cls.id, student_id: studentRow.id })
+
+  const { data: assignment, error: assignErr } = await db
+    .from('assignments')
+    .insert({
+      class_id: cls.id, teacher_id: teacherRow.id, title: 'HTTP Test Assignment',
+      subject: 'Mathematics', topic: 'Algebra', instructions: 'Solve 1-10',
+      due_date: new Date(Date.now() + 86400_000).toISOString(),
+    })
+    .select('id').single()
+  if (assignErr) throw assignErr
+
+  const { data: submission, error: subErr } = await db
+    .from('assignment_submissions')
+    .insert({ assignment_id: assignment.id, student_id: studentRow.id, class_id: cls.id, status: 'pending' })
+    .select('id').single()
+  if (subErr) throw subErr
+
+  fx = {
+    teacherAuthId: teacher.authId, teacherId: teacherRow.id, teacherSession: teacher.session,
+    otherTeacherAuthId: otherTeacher.authId, otherTeacherId: otherTeacherRow.id, otherTeacherSession: otherTeacher.session,
+    studentAuthId: student.authId, studentId: studentRow.id, studentSession: student.session,
+    outsiderAuthId: outsider.authId, outsiderSession: outsider.session,
+    classId: cls.id, assignmentId: assignment.id, submissionId: submission.id,
+  }
+})
+
+after(async () => {
+  if (!fx) return
+
+  // Storage objects are not cascade-deleted by the DB FKs — clean up the
+  // whole per-class/per-assignment folder in each bucket explicitly.
+  // class-resources is one level deep (classId/file); assignment-submissions
+  // is two (assignmentId/studentId/file) — list must recurse to find real
+  // object keys, since removing a "folder" path (an entry with no
+  // extension, really just a common prefix) removes nothing.
+  await removeAllUnder(db, 'class-resources', fx.classId)
+  await removeAllUnder(db, 'assignment-submissions', fx.assignmentId)
+
+  await db.from('teacher_classes').delete().eq('id', fx.classId) // cascades assignments/submissions/class_students/resources/materials
+  await db.from('students').delete().eq('id', fx.studentId)
+  await db.from('teachers').delete().eq('id', fx.teacherId)
+  await db.from('teachers').delete().eq('id', fx.otherTeacherId)
+  for (const authId of [fx.teacherAuthId, fx.otherTeacherAuthId, fx.studentAuthId, fx.outsiderAuthId]) {
+    await db.auth.admin.deleteUser(authId)
+  }
+})
+
+function cookie(session: SyntheticSession) {
+  return { Cookie: session.cookieHeader }
+}
+
+/** Recursively deletes every object under a Storage prefix — Supabase's `list()` returns folders as entries with `id: null`, so a one-level `remove()` silently no-ops on nested paths. */
+async function removeAllUnder(client: ReturnType<typeof createServiceClient>, bucket: string, prefix: string): Promise<void> {
+  const { data: entries } = await client.storage.from(bucket).list(prefix)
+  if (!entries?.length) return
+  const filePaths: string[] = []
+  for (const entry of entries) {
+    const path = `${prefix}/${entry.name}`
+    if (entry.id === null) {
+      await removeAllUnder(client, bucket, path)
+    } else {
+      filePaths.push(path)
+    }
+  }
+  if (filePaths.length) await client.storage.from(bucket).remove(filePaths)
+}
+
+// ── Gradebook ────────────────────────────────────────────────────────────
+
+test('GET /api/teacher/gradebook/[classId]: unauthenticated request is rejected', async () => {
+  const res = await fetch(`${BASE_URL}/api/teacher/gradebook/${fx.classId}`)
+  assert.equal(res.status, 401)
+})
+
+test('GET /api/teacher/gradebook/[classId]: a non-owning teacher is rejected', async () => {
+  const res = await fetch(`${BASE_URL}/api/teacher/gradebook/${fx.classId}`, { headers: cookie(fx.otherTeacherSession) })
+  assert.equal(res.status, 403)
+})
+
+test('GET /api/teacher/gradebook/[classId]: the owning teacher gets a gradebook back', async () => {
+  const res = await fetch(`${BASE_URL}/api/teacher/gradebook/${fx.classId}`, { headers: cookie(fx.teacherSession) })
+  assert.equal(res.status, 200)
+  const body = await res.json()
+  assert.ok(body.success)
+  assert.ok(Array.isArray(body.data.gradebook.rows))
+})
+
+// ── Assignment file upload ──────────────────────────────────────────────
+
+test('POST /api/student/submit-file: student uploads a file, submission is marked submitted with file metadata', async () => {
+  const form = new FormData()
+  form.set('assignmentId', fx.assignmentId)
+  form.set('studentId', fx.studentId)
+  form.set('file', new Blob([new TextEncoder().encode('synthetic homework photo bytes')], { type: 'application/pdf' }), 'homework.pdf')
+
+  const res = await fetch(`${BASE_URL}/api/student/submit-file`, {
+    method: 'POST', headers: cookie(fx.studentSession), body: form,
+  })
+  assert.equal(res.status, 200)
+  const body = await res.json()
+  assert.ok(body.success)
+  assert.equal(body.data.submission.status, 'submitted')
+  assert.equal(body.data.submission.file_name, 'homework.pdf')
+})
+
+test('POST /api/student/submit-file: a different student cannot submit on this student\'s behalf', async () => {
+  const form = new FormData()
+  form.set('assignmentId', fx.assignmentId)
+  form.set('studentId', fx.studentId) // impersonating fx.studentId as the outsider
+  form.set('file', new Blob([new TextEncoder().encode('x')], { type: 'application/pdf' }), 'x.pdf')
+
+  const res = await fetch(`${BASE_URL}/api/student/submit-file`, {
+    method: 'POST', headers: cookie(fx.outsiderSession), body: form,
+  })
+  assert.equal(res.status, 403)
+})
+
+test('GET /api/teacher/assignments/[id]/submissions/[submissionId]/file-url: owning teacher can mint a signed URL and fetch the real file', async () => {
+  const res = await fetch(
+    `${BASE_URL}/api/teacher/assignments/${fx.assignmentId}/submissions/${fx.submissionId}/file-url`,
+    { headers: cookie(fx.teacherSession) },
+  )
+  assert.equal(res.status, 200)
+  const body = await res.json()
+  assert.ok(body.data.url)
+
+  const fileRes = await fetch(body.data.url)
+  assert.equal(fileRes.status, 200)
+  const text = await fileRes.text()
+  assert.equal(text, 'synthetic homework photo bytes')
+})
+
+test('GET /api/teacher/assignments/[id]/submissions/[submissionId]/file-url: a non-owning teacher is rejected', async () => {
+  const res = await fetch(
+    `${BASE_URL}/api/teacher/assignments/${fx.assignmentId}/submissions/${fx.submissionId}/file-url`,
+    { headers: cookie(fx.otherTeacherSession) },
+  )
+  assert.equal(res.status, 403)
+})
+
+// ── Class Resources ──────────────────────────────────────────────────────
+
+let resourceId: string
+
+test('POST /api/teacher/resources/by-class/[classId]: teacher uploads a resource', async () => {
+  const form = new FormData()
+  form.set('title', 'Week 1 worksheet')
+  form.set('file', new Blob([new TextEncoder().encode('synthetic worksheet bytes')], { type: 'application/pdf' }), 'worksheet.pdf')
+
+  const res = await fetch(`${BASE_URL}/api/teacher/resources/by-class/${fx.classId}`, {
+    method: 'POST', headers: cookie(fx.teacherSession), body: form,
+  })
+  assert.equal(res.status, 201)
+  const body = await res.json()
+  assert.ok(body.success)
+  resourceId = body.data.resource.id
+})
+
+test('POST /api/teacher/resources/by-class/[classId]: a non-owning teacher cannot upload to this class', async () => {
+  const form = new FormData()
+  form.set('title', 'Intrusion attempt')
+  form.set('file', new Blob([new TextEncoder().encode('x')], { type: 'application/pdf' }), 'x.pdf')
+  const res = await fetch(`${BASE_URL}/api/teacher/resources/by-class/${fx.classId}`, {
+    method: 'POST', headers: cookie(fx.otherTeacherSession), body: form,
+  })
+  assert.equal(res.status, 403)
+})
+
+test('GET /api/student/resources: the enrolled student sees the uploaded resource', async () => {
+  const res = await fetch(`${BASE_URL}/api/student/resources`, { headers: cookie(fx.studentSession) })
+  assert.equal(res.status, 200)
+  const body = await res.json()
+  assert.ok(body.data.resources.some((r: { id: string }) => r.id === resourceId))
+})
+
+test('GET /api/student/resources: an unenrolled outsider sees an empty list, not an error', async () => {
+  const res = await fetch(`${BASE_URL}/api/student/resources`, { headers: cookie(fx.outsiderSession) })
+  assert.equal(res.status, 200)
+  const body = await res.json()
+  assert.deepEqual(body.data.resources, [])
+})
+
+test('GET /api/resources/[id]/file-url: enrolled student can download; outsider is forbidden', async () => {
+  const studentRes = await fetch(`${BASE_URL}/api/resources/${resourceId}/file-url`, { headers: cookie(fx.studentSession) })
+  assert.equal(studentRes.status, 200)
+  const studentBody = await studentRes.json()
+  const fileRes = await fetch(studentBody.data.url)
+  assert.equal(fileRes.status, 200)
+  assert.equal(await fileRes.text(), 'synthetic worksheet bytes')
+
+  const outsiderRes = await fetch(`${BASE_URL}/api/resources/${resourceId}/file-url`, { headers: cookie(fx.outsiderSession) })
+  assert.equal(outsiderRes.status, 403)
+})
+
+test('DELETE /api/teacher/resources/[id]: a non-owning teacher cannot delete; the owner can', async () => {
+  const denied = await fetch(`${BASE_URL}/api/teacher/resources/${resourceId}`, {
+    method: 'DELETE', headers: cookie(fx.otherTeacherSession),
+  })
+  assert.equal(denied.status, 403)
+
+  const listBefore = await fetch(`${BASE_URL}/api/teacher/resources/by-class/${fx.classId}`, { headers: cookie(fx.teacherSession) })
+  const bodyBefore = await listBefore.json()
+  assert.ok(bodyBefore.data.resources.some((r: { id: string }) => r.id === resourceId))
+
+  const allowed = await fetch(`${BASE_URL}/api/teacher/resources/${resourceId}`, {
+    method: 'DELETE', headers: cookie(fx.teacherSession),
+  })
+  assert.equal(allowed.status, 200)
+
+  const listAfter = await fetch(`${BASE_URL}/api/teacher/resources/by-class/${fx.classId}`, { headers: cookie(fx.teacherSession) })
+  const bodyAfter = await listAfter.json()
+  assert.ok(!bodyAfter.data.resources.some((r: { id: string }) => r.id === resourceId))
+})
+
+// ── Content Library (materials) ─────────────────────────────────────────
+
+let materialId: string
+
+test('POST /api/teacher/materials/by-class/[classId]: teacher publishes a note', async () => {
+  const res = await fetch(`${BASE_URL}/api/teacher/materials/by-class/${fx.classId}`, {
+    method: 'POST', headers: { ...cookie(fx.teacherSession), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: 'Photosynthesis', body: 'Plants convert light to energy.' }),
+  })
+  assert.equal(res.status, 201)
+  const body = await res.json()
+  materialId = body.data.material.id
+})
+
+test('GET /api/student/materials: the enrolled student sees the note; an outsider does not', async () => {
+  const studentRes = await fetch(`${BASE_URL}/api/student/materials`, { headers: cookie(fx.studentSession) })
+  const studentBody = await studentRes.json()
+  assert.ok(studentBody.data.materials.some((m: { id: string }) => m.id === materialId))
+
+  const outsiderRes = await fetch(`${BASE_URL}/api/student/materials`, { headers: cookie(fx.outsiderSession) })
+  const outsiderBody = await outsiderRes.json()
+  assert.deepEqual(outsiderBody.data.materials, [])
+})
+
+test('DELETE /api/teacher/materials/[id]: owning teacher can delete their own note', async () => {
+  const res = await fetch(`${BASE_URL}/api/teacher/materials/${materialId}`, {
+    method: 'DELETE', headers: cookie(fx.teacherSession),
+  })
+  assert.equal(res.status, 200)
+
+  const listAfter = await fetch(`${BASE_URL}/api/student/materials`, { headers: cookie(fx.studentSession) })
+  const bodyAfter = await listAfter.json()
+  assert.ok(!bodyAfter.data.materials.some((m: { id: string }) => m.id === materialId))
+})
