@@ -2233,3 +2233,30 @@ One gap surfaced and carried forward honestly, not silently worked around: no re
 **Tests added**: None (read-only, no code changed).
 
 **Rollback considerations**: None — no code, schema, or data was touched.
+
+---
+
+## 2026-07-18 — Sprint 12AA: Guardian Architecture Audit (READ-ONLY)
+
+**What changed**: nothing — a full architecture audit of every Blueprint-related domain built in Sprint 12A–12Z (Blueprint, Blueprint Snapshots, Parent Experience, Portfolio, Achievement, Projects) plus ADR-0003–0013, performed before Sprint 13. Full findings in `docs/architecture/sprint-12aa-guardian-architecture-audit.md`.
+
+**Method**: four parallel grounded research passes over live code (ownership/read-direction/composition; intelligence/constitution/ADR consistency; snapshots/parent/portfolio-achievement-projects; migration-readiness/tech-debt), each requiring file:line citations and cross-checked against `git log`, synthesized into a single 12-phase verdict document.
+
+**Key findings**:
+- The canonical composition path (`composeBlueprint()` in `lib/learnerBlueprint/`) is architecturally clean: strictly read-only (one sanctioned exception — the Snapshot freeze, gated to three named trigger sites and enforced immutable by a database trigger, not just convention), single-owner per section, no inline intelligence computation, evidence-first (`null`/`unavailable` on insufficient evidence rather than fabricated defaults), and proven extensible — three consecutive real domain additions (Portfolio, Achievement, Projects) each followed an identical, small, mechanical 5-file diff.
+- **CRITICAL, pre-existing (not Sprint-12-caused)**: `lib/learnerIntelligence/blueprint.ts` (`buildLearnerBlueprint()`) is a second, independently-computed "Learner Blueprint" that never migrated to call the canonical composer, still live behind `app/api/learner-intelligence/blueprint/route.ts` and rendered to both teachers (`app/teacher/reports/blueprint/[studentId]`) and students (`app/(student)/blueprint`) — meaning a teacher and a parent can see two different computed Blueprints for the same learner.
+- **HIGH**: six independently-built "tell the parent what to do" generators exist in the codebase (documented in `lib/parentExperience/actions.ts`'s own header comment); the new Sprint 12S Parent Action Centre is a sixth, none of the prior five were retired. `lib/parentPulse/` (WhatsApp cron) and `lib/parentExperience/` (portal) both run live in parallel with no consolidation plan.
+- **MEDIUM**: three parallel career-computation code paths live simultaneously (only one self-documented as deprecated in-code); Portfolio/Achievement/Projects each independently reimplement the same verify-lifecycle state-machine logic rather than sharing one helper; `deprecation-registry.md` has zero entries for any of the above despite its own stated policy to track duplications from the moment a canonical replacement is designated.
+- **LOW**: ADR-0013's status header still says "DRAFT — awaiting approval" despite Sprint 12Z having fully shipped and landed; an uncommitted worktree flagged by ADR-0005/0006 as needing reconciliation is still unreconciled.
+
+**Verdict**: **APPROVED WITH MINOR FIXES.** None of the findings sit inside the canonical composition path Sprint 13 would extend, and Phase 10 confirms Blueprint is safely, cheaply extensible independent of the legacy-engine problem. The Critical dual-Blueprint-engine finding does not block Sprint 13 technically, but is real scope (migrating live teacher/student-facing consumer routes) that exceeds this audit's "fix only if absolutely required" bar — recommended as its own dedicated, isolated follow-up sprint per the Post-Audit Operating Charter's small-trustworthy-fixes standing guidance, not folded into this audit or into Sprint 13.
+
+**Architectural documents referenced**: ADR-0003 through ADR-0013 (attendance, Blueprint ×5, parent experience, portfolio, achievement, projects), `docs/sprint-25-educational-constitution-and-migration-strategy.md`, `docs/architecture/deprecation-registry.md`.
+
+**ADR**: None — audit only, no ratified architecture changed.
+
+**Tests added**: None (read-only, no code changed).
+
+**Rollback considerations**: None — no code, schema, or data was touched.
+
+---
