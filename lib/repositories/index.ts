@@ -22,6 +22,7 @@ import { LearningSignalRepository } from './learning-signal.repository'
 import { NotificationRepository } from './notification.repository'
 import { OrganizationRepository } from './organization.repository'
 import { PortfolioRepository } from './portfolio.repository'
+import { ProjectRepository } from './project.repository'
 import { ProjectionRepository } from './projection.repository'
 import { PromotionRepository } from './promotion.repository'
 import { SchoolRepository } from './school.repository'
@@ -54,6 +55,11 @@ export const repos = {
   notifications:       new NotificationRepository(),
   organizations:       new OrganizationRepository(),
   portfolios:          new PortfolioRepository(),
+  // Note the deliberate naming distinction from `projections` below —
+  // "Projects" (learner-created work, ADR-0013) and "Projection" (the
+  // Learner Intelligence computed-state engine) are unrelated domains
+  // that happen to share five letters. See ADR-0013 Phase 1.
+  projects:            new ProjectRepository(),
   projections:         new ProjectionRepository(),
   promotions:          new PromotionRepository(),
   schools:             new SchoolRepository(),
@@ -87,6 +93,7 @@ export { LearningSignalRepository } from './learning-signal.repository'
 export { NotificationRepository } from './notification.repository'
 export { OrganizationRepository } from './organization.repository'
 export { PortfolioRepository } from './portfolio.repository'
+export { ProjectRepository } from './project.repository'
 export { ProjectionRepository } from './projection.repository'
 export { PromotionRepository } from './promotion.repository'
 export { SchoolRepository } from './school.repository'
