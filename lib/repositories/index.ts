@@ -31,6 +31,7 @@ import { SchoolRepository } from './school.repository'
 import { TeacherRepository } from './teacher.repository'
 import { TeacherReflectionRepository } from './teacherReflection.repository'
 import { WebhookRepository } from './webhook.repository'
+import { WellbeingRepository } from './wellbeing.repository'
 
 export const repos = {
   academy:             new AcademyRepository(),
@@ -78,6 +79,11 @@ export const repos = {
   teachers:            new TeacherRepository(),
   teacherReflections:  new TeacherReflectionRepository(),
   webhooks:            new WebhookRepository(),
+  // Access to this domain's tables is Support-Team-scoped, not the
+  // blanket school-staff-read pattern every other repository above relies
+  // on for RLS — lib/learnerWellbeing/ enforces this explicitly at the
+  // service layer; see ADR-0017 Phase 8.
+  wellbeing:           new WellbeingRepository(),
 }
 
 export type Repos = typeof repos
@@ -114,3 +120,4 @@ export { SchoolRepository } from './school.repository'
 export { TeacherRepository } from './teacher.repository'
 export { TeacherReflectionRepository } from './teacherReflection.repository'
 export { WebhookRepository } from './webhook.repository'
+export { WellbeingRepository } from './wellbeing.repository'
