@@ -23,6 +23,24 @@ Entries are never edited to rewrite history — if a change is later reverted or
 
 ---
 
+## 2026-07-18 — LMS Basics Phase 2: Class Calendar + Announcements
+
+**What changed**: shipped the next two gaps from the Wave 6 LMS audit — `docs/architecture/adr-0021-lms-calendar-and-announcements.md`. Class Calendar merges teacher-created events with `assignments.due_date` at read time (`lib/calendar/calendarPure.ts`'s `mergeCalendar()`), never copying due dates into a second table — one source of truth stays intact. Announcements is a deliberately one-way, class-scoped broadcast (no replies/threads), explicitly distinct from the automated WhatsApp/parent-pulse notification pipeline, which is untouched. Same identity space (`teacher_classes`/`class_students`), RLS pattern, and private-by-default posture as ADR-0020's Phase 1 tables.
+
+**Test-first process caught two real defects before they shipped**:
+1. A Next.js routing collision — `app/api/teacher/calendar` initially had the same `[classId]`-vs-`[id]` sibling-dynamic-segment problem the Phase 1 follow-up entry already found and fixed for `resources`/`materials`; caught this time by applying the by-class/ nesting pattern proactively during the build rather than after a broken dev server.
+2. The Calendar/Announcements DELETE routes initially deleted scoped only by `teacherId` with no prior ownership lookup — a non-owning teacher's DELETE request silently no-op'd (200, nothing actually deleted) instead of returning 403, inconsistent with the Resources DELETE route's explicit find-then-check-then-delete pattern from Phase 1. The route-level HTTP test (`DELETE /api/teacher/calendar/[id]: only the owning teacher can delete an event`) asserted 403 per the established convention, failed against the silent-no-op behavior, and drove the fix — added `findEventById`/`findAnnouncementById` to the repository and the missing ownership check to both routes.
+
+**Architectural documents referenced**: `docs/architecture/adr-0021-lms-calendar-and-announcements.md` (new), CLAUDE.md's evidence-access rule (RLS gated on current `class_students` membership, never the authoring teacher).
+
+**ADR**: `docs/architecture/adr-0021-lms-calendar-and-announcements.md` — Approved for implementation (user-directed).
+
+**Tests added**: 34 total for this phase — `lib/calendar/calendar.pure.test.ts` (4, merge logic), `lib/repositories/classCalendar.repository.integration.test.ts` (6, real synthetic data), 24 new cases appended to `lib/testing/lmsRoutes.http.integration.test.ts` (route-level HTTP, including the merged-calendar proof and the ownership-fix regression case). All pass; zero synthetic-row residue confirmed via direct SQL.
+
+**Rollback considerations**: Low. Both migrations purely additive (two new tables, no existing table altered). Code-side: all new files, two small additive edits to `app/dashboard/page.tsx`/`app/teacher/classes/page.tsx` (new nav tiles/buttons) fully revertible.
+
+---
+
 ## 2026-07-18 — LMS Basics Phase 0-1 follow-up: Route-Level HTTP Integration Tests
 
 **What changed**: closed the remaining gap named in the prior entry — no HTTP-route-level tests existed anywhere in this project (every existing `*.integration.test.ts` tests the repository/lib layer only). Built the missing test infrastructure and used it to test all eight LMS Basics routes end-to-end over real HTTP.
