@@ -68,6 +68,8 @@ export type LearnerEvidence = {
   strand?: string | null
   subStrand?: string | null
   knowledgeNodeId?: string | null
+  /** ADR-0024 Sprint B, additive — a real sow_substrands.id when the producer resolved one from a canonical curriculum picker (never fabricated/guessed from strand/subStrand text). Null on every row created before this sprint and on any producer whose source has no canonical anchor to offer. */
+  subStrandId?: string | null
 
   // ── Phase -1 (learner-record-layer-signoff.md), additive ────────────────
   // Both optional: no resolution heuristic (teacher-school-text -> schools.id,

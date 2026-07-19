@@ -103,6 +103,7 @@ function toNewEvidenceRow(e: LearnerEvidence, runId: string, supersedes: string 
     supersedes,
     strand: e.strand ?? null,
     sub_strand: e.subStrand ?? null,
+    sub_strand_id: e.subStrandId ?? null,
     knowledge_node_id: e.knowledgeNodeId ?? null,
     school_id: e.schoolId ?? null,
     curriculum_version_id: e.curriculumVersionId ?? null,

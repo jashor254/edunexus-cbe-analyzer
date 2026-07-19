@@ -38,7 +38,7 @@ function evidence(overrides: Partial<EvidenceRow>): EvidenceRow {
     supersedes: null, superseded_by: null,
     verification_state: 'unverified',
     updated_at: overrides.created_at ?? new Date().toISOString(),
-    strand: null, sub_strand: null, knowledge_node_id: null,
+    strand: null, sub_strand: null, sub_strand_id: null, knowledge_node_id: null,
     school_id: null, curriculum_version_id: null,
     erased_by: null, erased_at: null, erasure_reason: null,
     purpose_id: null,

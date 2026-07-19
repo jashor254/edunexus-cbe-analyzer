@@ -41,7 +41,7 @@ export async function POST(
     // Verify assignment belongs to this teacher
     const { data: assignment } = await db
       .from('assignments')
-      .select('id, title, max_score, class_id, subject, topic')
+      .select('id, title, max_score, class_id, subject, topic, substrand_id')
       .eq('id', assignmentId)
       .eq('teacher_id', teacher.id)
       .single()
@@ -96,6 +96,7 @@ export async function POST(
         assignmentId,
         subject:       assignment.subject as string,
         topic:         (assignment.topic as string | null) ?? null,
+        substrandId:   (assignment.substrand_id as string | null) ?? null,
         score,
         maxScore,
         academicYear:  new Date().getFullYear(),

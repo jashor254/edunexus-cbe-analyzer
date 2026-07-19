@@ -19,6 +19,17 @@
 // Reuses the platform's existing, already-canonical marks→CBC-level
 // converter (marksToLevelForSchool) rather than inventing a new threshold —
 // same school-specific grade boundaries every other assessment surface uses.
+//
+// ADR-0024 Sprint B — prefers canonical curriculum identity over free text.
+// When the assignment carries a real substrand_id (Sprint A: the KICD
+// picker now persists one), this resolves the real strand/sub-strand
+// titles via resolveCurriculumContext() — the same canonical resolver
+// Adaptive Learning v2 already uses, not a second lookup — and stores the
+// id itself on the evidence row. When no substrand_id exists (every
+// assignment created before Sprint A, and every custom/free-text
+// assignment), this falls back to exactly the prior behaviour
+// (subStrand: topic, strand: null, subStrandId: null) — unchanged,
+// verified by a dedicated test, not assumed.
 
 import { repos } from '@/lib/repositories'
 import type { LearnerEvidence } from '@/lib/intelligence/evidence'
@@ -26,6 +37,7 @@ import { EVIDENCE_SOURCE_TRUST_TIER } from '@/lib/intelligence/evidence'
 import { computeConfidence, resolveReviewStatus } from '@/lib/intelligence/confidence'
 import { persistEvidenceBatch } from '@/lib/intelligence/evidenceLifecycle'
 import { normaliseScore, marksToLevelForSchool } from '@/lib/assessments/gradeCalculator'
+import { resolveCurriculumContext } from '@/lib/curriculum/curriculumContext'
 
 const SOURCE = 'teacher_upload' as const
 
@@ -35,9 +47,13 @@ export type AssignmentMarkEvidenceInput = {
   teacherUserId: string   // auth user id — the ingestion run's initiator
   assignmentId:  string
   subject:       string
-  // assignments.topic — the closest real proxy for substrand (no dedicated
-  // strand/sub_strand column on assignments); never fabricated further.
+  // assignments.topic — the free-text fallback, used only when no
+  // canonical substrandId exists (legacy assignments, or custom/free-text
+  // mode). Never fabricated further.
   topic:         string | null
+  // assignments.substrand_id (Sprint A) — a real sow_substrands.id when
+  // the teacher used the KICD picker. Preferred over `topic` whenever set.
+  substrandId:   string | null
   score:         number
   maxScore:      number
   academicYear:  number
@@ -60,6 +76,16 @@ export async function recordAssignmentMarkEvidence(input: AssignmentMarkEvidence
   })
   const reviewStatus = resolveReviewStatus(confidence)
   const importedAt = new Date().toISOString()
+
+  // Prefer canonical curriculum identity (ADR-0024 Sprint B). Falls back to
+  // the free-text topic whenever no substrandId exists, or — defensively —
+  // if a substrandId somehow doesn't resolve to a real row (the FK
+  // constraint on assignments.substrand_id makes this unreachable in
+  // practice, but resolveCurriculumContext's own contract can return null,
+  // so this never crashes on it, it just falls back).
+  const curriculumContext = input.substrandId
+    ? await resolveCurriculumContext(input.substrandId)
+    : null
 
   const { id: runId } = await repos.evidence.createIngestionRun({
     source: SOURCE,
@@ -87,8 +113,9 @@ export async function recordAssignmentMarkEvidence(input: AssignmentMarkEvidence
     rawInputRef: `assignment:${input.assignmentId}:score=${input.score}/${input.maxScore}`,
     importedAt,
     issues: [],
-    strand: null,
-    subStrand: input.topic,
+    strand: curriculumContext?.strandTitle ?? null,
+    subStrand: curriculumContext?.subStrandTitle ?? input.topic,
+    subStrandId: curriculumContext?.subStrandId ?? null,
   }
 
   const result = await persistEvidenceBatch([evidence], runId)

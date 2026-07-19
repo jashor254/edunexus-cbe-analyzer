@@ -14,7 +14,7 @@ const EVIDENCE_COLS =
   'cbc_level, assessment_type, academic_year, term, evidence_source, extraction_method, raw_input_ref, ' +
   'ingestion_run_id, trust_tier, evidence_confidence, confidence_formula_version, issues, lifecycle_state, ' +
   'reviewed_by, reviewed_at, review_reason, retracted_by, retracted_at, retraction_reason, supersedes, ' +
-  'superseded_by, verification_state, updated_at, strand, sub_strand, knowledge_node_id, ' +
+  'superseded_by, verification_state, updated_at, strand, sub_strand, sub_strand_id, knowledge_node_id, ' +
   'school_id, curriculum_version_id, erased_by, erased_at, erasure_reason, purpose_id, payload'
 
 export type EvidenceRow = {
@@ -52,6 +52,8 @@ export type EvidenceRow = {
   /** Projection V2.1, additive — null on every row created before this sprint and on any source that doesn't know curriculum context. */
   strand: string | null
   sub_strand: string | null
+  /** ADR-0024 Sprint B, additive — a real sow_substrands.id, only when the producer resolved one from a canonical picker. Null on every row created before this sprint. */
+  sub_strand_id: string | null
   knowledge_node_id: string | null
   /** Phase -1 (learner-record-layer-signoff.md) — captured at write time; null on every row created before this phase, and on any writer not yet updated to resolve them. */
   school_id: string | null
