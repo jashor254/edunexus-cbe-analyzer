@@ -20,6 +20,8 @@ export type EvidenceSource =
   | 'national_dataset'
   | 'holiday_return'
   | 'teacher_remark'
+  /** ADR-0024 Sprint C — deterministic auto-grading of a teacher-authored MCQ quiz. See EVIDENCE_SOURCE_TRUST_TIER for why this is its own source, not a reuse of teacher_upload or compass_session. */
+  | 'quiz_auto_grade'
 
 export type EvidenceReviewStatus =
   | 'auto_confirmed'
@@ -130,4 +132,19 @@ export const EVIDENCE_SOURCE_TRUST_TIER: Record<EvidenceSource, 1 | 2 | 3> = {
   // teacher_upload — a teacher directly attests to this observation, same
   // epistemic standing as a mark they entered themselves.
   teacher_remark:          3,
+  // ADR-0024 Sprint C — deliberately its own tier, not a reuse of an
+  // existing one. Not tier 3 (teacher_upload/teacher_remark): no teacher
+  // looked at this specific answer and attested to it — the sprint's own
+  // non-negotiable invariant is that machine-scored evidence must stay
+  // distinguishable from teacher-verified evidence, and silently reusing
+  // tier 3 would erase that distinction. Not tier 1 (compass_session/
+  // report_card_*/parent_observation): those are probabilistic —
+  // AI-inferred judgment or unverified self-report. A quiz auto-grade is
+  // deterministic index equality against a correct_index a teacher
+  // personally authored and approved (Phase 3a's mandatory review gate) —
+  // categorically more reliable than an AI inference, even though no
+  // teacher reviewed this particular submission. Tier 2 — same standing as
+  // lms_api/csv_export: a trustworthy structured process, not a per-row
+  // human attestation.
+  quiz_auto_grade:         2,
 }

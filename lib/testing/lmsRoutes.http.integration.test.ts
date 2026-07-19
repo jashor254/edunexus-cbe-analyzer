@@ -558,3 +558,75 @@ test('POST /api/teacher/assignments: omitting substrand_id (custom mode) still s
   const body = await res.json()
   assert.equal(body.data.assignment.substrand_id, null)
 })
+
+// ── Quiz Evidence — ADR-0024 Sprint C ─────────────────────────────────────
+
+test('POST /api/student/submit-quiz: submitting produces a real quiz_auto_grade learner_evidence row', async () => {
+  const { data: substrand } = await db
+    .from('sow_substrands')
+    .select('id, title')
+    .limit(1)
+    .maybeSingle()
+  if (!substrand) throw new Error('No sow_substrands row available for this test')
+
+  const createRes = await fetch(`${BASE_URL}/api/teacher/assignments`, {
+    method: 'POST', headers: { ...cookie(fx.teacherSession), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      class_id: fx.classId, title: 'Evidence Quiz', subject: 'Mathematics', topic: substrand.title,
+      substrand_id: substrand.id, instructions: 'Answer all', max_score: 10,
+      due_date: new Date(Date.now() + 86400_000).toISOString(), is_quiz: true,
+    }),
+  })
+  const createBody = await createRes.json()
+  const evidenceQuizAssignmentId = createBody.data.assignment.id
+
+  const questionsRes = await fetch(`${BASE_URL}/api/teacher/assignments/${evidenceQuizAssignmentId}/questions`, {
+    method: 'PUT', headers: { ...cookie(fx.teacherSession), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ questions: [{ questionText: 'Q1', choices: ['A', 'B'], correctIndex: 0 }] }),
+  })
+  const questionsBody = await questionsRes.json()
+  const questionId = questionsBody.data.questions[0].id
+
+  const submitRes = await fetch(`${BASE_URL}/api/student/submit-quiz`, {
+    method: 'POST', headers: { ...cookie(fx.studentSession), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      assignmentId: evidenceQuizAssignmentId, studentId: fx.studentId,
+      answers: [{ questionId, selectedIndex: 0 }],
+    }),
+  })
+  assert.equal(submitRes.status, 200)
+
+  // Evidence emission is fire-and-forget — poll briefly rather than assume
+  // instant availability, matching how a real client would observe this.
+  let evidenceRow: { evidence_source: string; sub_strand_id: string; trust_tier: number } | null = null
+  for (let i = 0; i < 10 && !evidenceRow; i++) {
+    const { data } = await db
+      .from('learner_evidence')
+      .select('evidence_source, sub_strand_id, trust_tier')
+      .eq('learner_id', fx.studentId)
+      .like('raw_input_ref', `assignment:${evidenceQuizAssignmentId}%`)
+      .maybeSingle()
+    evidenceRow = data
+    if (!evidenceRow) await new Promise(r => setTimeout(r, 300))
+  }
+
+  assert.ok(evidenceRow, 'expected a learner_evidence row to appear for the quiz submission')
+  assert.equal(evidenceRow!.evidence_source, 'quiz_auto_grade')
+  assert.equal(evidenceRow!.sub_strand_id, substrand.id)
+  assert.equal(evidenceRow!.trust_tier, 2)
+
+  // Cleanup — this assignment/evidence isn't covered by fx's teardown since
+  // it was created mid-test, not in before(). Same non-cascading child
+  // tables as evidence.substrand.integration.test.ts / quizEvidence.integration.test.ts.
+  const { data: evRow } = await db
+    .from('learner_evidence')
+    .select('id')
+    .eq('learner_id', fx.studentId)
+    .like('raw_input_ref', `assignment:${evidenceQuizAssignmentId}%`)
+    .maybeSingle()
+  if (evRow) {
+    await db.from('evidence_projection_events').delete().eq('evidence_id', evRow.id)
+    await db.from('evidence_audit_log').delete().eq('evidence_id', evRow.id)
+    await db.from('learner_evidence').delete().eq('id', evRow.id)
+  }
+})

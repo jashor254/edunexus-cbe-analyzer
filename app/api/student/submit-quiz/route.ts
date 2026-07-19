@@ -11,6 +11,7 @@ import { publishEvent } from '@/lib/events'
 import { requireAuthentication, requireStudent } from '@/lib/core/permissions'
 import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
 import { gradeAndSubmitQuiz } from '@/lib/quiz/quiz'
+import { recordQuizAutoGradeEvidence } from '@/lib/quiz/quizEvidence'
 
 const SubmitQuizSchema = z.object({
   assignmentId: z.string().uuid(),
@@ -24,8 +25,9 @@ const SubmitQuizSchema = z.object({
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
+    let userId: string
     try {
-      await requireAuthentication(supabase)
+      userId = (await requireAuthentication(supabase)).id
     } catch (err) {
       if (err instanceof UnauthorizedError) return apiUnauthorized()
       throw err
@@ -45,7 +47,7 @@ export async function POST(req: Request) {
     const db = createServiceClient()
     const { data: assignment } = await db
       .from('assignments')
-      .select('id, class_id, status, is_quiz, max_score')
+      .select('id, class_id, status, is_quiz, max_score, subject, topic, substrand_id')
       .eq('id', assignmentId)
       .maybeSingle()
 
@@ -69,6 +71,23 @@ export async function POST(req: Request) {
       payload: { assignment_id: assignmentId, student_id: studentId, class_id: assignment.class_id },
       idempotency_key: `student.assignment.submitted:${submission.id}`,
     }).catch(err => console.error('[events] student.assignment.submitted:', err instanceof Error ? err.message : String(err)))
+
+    // Emit Evidence Domain observation — additive, fire and forget, never
+    // blocking the response. ADR-0024 Sprint C: closes the gap where quiz
+    // results generated zero learner Evidence, unlike manually-marked
+    // assignments (lib/assignments/evidence.ts, Sprint B).
+    recordQuizAutoGradeEvidence({
+      studentId,
+      initiatedBy:  userId,
+      assignmentId,
+      subject:      assignment.subject as string,
+      topic:        (assignment.topic as string | null) ?? null,
+      substrandId:  (assignment.substrand_id as string | null) ?? null,
+      score:        grade.score,
+      maxScore:     assignment.max_score ?? 100,
+      academicYear: new Date().getFullYear(),
+      term:         null,
+    }).catch(err => console.error('[submit-quiz] evidence emission failed:', err instanceof Error ? err.message : String(err)))
 
     return apiSuccess({ submission, grade })
   } catch (e: unknown) {
