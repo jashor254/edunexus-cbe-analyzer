@@ -28,6 +28,7 @@ function projection(overrides: {
           history: [],
         },
       },
+      bySubStrand: {},
     } as AcademicValue,
     supportingEvidenceIds: overrides.evidenceIds ?? ['ev-1', 'ev-2'],
     confidence: overrides.confidence ?? 80,

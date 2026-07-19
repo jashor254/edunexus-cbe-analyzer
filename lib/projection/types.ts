@@ -43,7 +43,34 @@ export type SubjectPerformance = {
   trend: Trend
   history: Array<{ level: 1 | 2 | 3 | 4; score: number | null; at: string; evidenceId: string }>
 }
-export type AcademicValue = { bySubject: Record<string, SubjectPerformance> }
+
+/**
+ * ADR-0024 Phase 2 — additive. Only exists for a sub-strand when at least
+ * one confirmed evidence row carries a real, resolved `sub_strand_id`
+ * (Sprint A/B/C's canonical curriculum identity). The ABSENCE of a
+ * sub-strand here is not a claim of "not ready" — it means Projection has
+ * no strand-level evidence for it yet, and any caller should read
+ * `bySubject` instead. Projection never gates on sufficiency (no minimum
+ * evidence count, no confidence threshold) — that judgment belongs to ARDS
+ * (ADR-0023) alone. Same "latest confirmed evidence wins" selection logic
+ * as SubjectPerformance, deliberately not a new algorithm.
+ */
+export type SubStrandPerformance = {
+  subStrandId: string
+  /** The canonically-resolved title at evidence-creation time (Sprint B/C) — display-only, never re-resolved here. */
+  subStrandTitle: string | null
+  strandTitle: string | null
+  subject: string
+  latestLevel: 1 | 2 | 3 | 4
+  trend: Trend
+  history: Array<{ level: 1 | 2 | 3 | 4; score: number | null; at: string; evidenceId: string }>
+}
+
+export type AcademicValue = {
+  bySubject: Record<string, SubjectPerformance>
+  /** ADR-0024 Phase 2, additive — see SubStrandPerformance's own doc comment for the graceful-fallback contract. */
+  bySubStrand: Record<string, SubStrandPerformance>
+}
 
 export type CapabilityValue = {
   overallLevel: CapabilityLevel
@@ -51,7 +78,11 @@ export type CapabilityValue = {
   bySubject: Record<string, { level: CapabilityLevel; score: number }>
 }
 
-export type KnowledgeValue = { bySubject: Record<string, { currentLevel: 1 | 2 | 3 | 4; asOf: string }> }
+export type KnowledgeValue = {
+  bySubject: Record<string, { currentLevel: 1 | 2 | 3 | 4; asOf: string }>
+  /** ADR-0024 Phase 2, additive — same graceful-fallback contract as AcademicValue.bySubStrand; see SubStrandPerformance's doc comment. */
+  bySubStrand: Record<string, { subStrandId: string; subStrandTitle: string | null; strandTitle: string | null; subject: string; currentLevel: 1 | 2 | 3 | 4; asOf: string }>
+}
 
 export type BehaviourValue = {
   observationCount: number
