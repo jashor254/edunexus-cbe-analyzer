@@ -521,3 +521,40 @@ test('POST /api/student/submit-quiz: a different student cannot submit on this s
   })
   assert.equal(res.status, 403)
 })
+
+// ── Curriculum identity — ADR-0024 Sprint A, Objective 3 ──────────────────
+
+test('POST /api/teacher/assignments: a real substrand_id from the KICD picker is persisted, not discarded', async () => {
+  const { data: substrand } = await db
+    .from('sow_substrands')
+    .select('id, title')
+    .limit(1)
+    .maybeSingle()
+
+  if (!substrand) throw new Error('No sow_substrands row available for this test')
+
+  const res = await fetch(`${BASE_URL}/api/teacher/assignments`, {
+    method: 'POST', headers: { ...cookie(fx.teacherSession), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      class_id: fx.classId, title: 'Curriculum-anchored assignment', subject: 'Mathematics',
+      topic: substrand.title, substrand_id: substrand.id, instructions: 'Solve the set',
+      due_date: new Date(Date.now() + 86400_000).toISOString(),
+    }),
+  })
+  assert.equal(res.status, 201)
+  const body = await res.json()
+  assert.equal(body.data.assignment.substrand_id, substrand.id)
+})
+
+test('POST /api/teacher/assignments: omitting substrand_id (custom mode) still succeeds — never blocks on a missing curriculum anchor', async () => {
+  const res = await fetch(`${BASE_URL}/api/teacher/assignments`, {
+    method: 'POST', headers: { ...cookie(fx.teacherSession), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      class_id: fx.classId, title: 'Free-form assignment', subject: 'Mathematics', topic: 'Custom',
+      instructions: 'Write a reflection', due_date: new Date(Date.now() + 86400_000).toISOString(),
+    }),
+  })
+  assert.equal(res.status, 201)
+  const body = await res.json()
+  assert.equal(body.data.assignment.substrand_id, null)
+})

@@ -196,9 +196,13 @@ function NewAssignmentForm() {
       if (!form.instructions.trim()) { setError('Assignment content is required'); return }
     }
 
+    // The KICD picker resolves a real sow_substrands.id when a teacher
+    // selects a sub-strand (substrandId local state, set at the dropdown
+    // onClick above) — carry it through so the assignment persists the
+    // canonical curriculum reference, not just the display title in `topic`.
     const payload = assignmentMode === 'custom'
-      ? { ...form, topic: 'Custom' }
-      : form
+      ? { ...form, topic: 'Custom', substrand_id: null }
+      : { ...form, substrand_id: substrandId || null }
 
     setLoading(true)
     try {

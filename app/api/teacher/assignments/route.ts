@@ -13,6 +13,11 @@ const CreateAssignmentSchema = z.object({
   title:                 z.string().min(1),
   subject:               z.string().min(1),
   topic:                 z.string().min(1),
+  // ADR-0024 Sprint A Objective 3 — the canonical curriculum reference the
+  // KICD picker already resolves. Null in custom mode or where no
+  // curriculum data exists for the grade/subject (free-text fallback) —
+  // never fabricated, per ADR-0024's "no silent guessing" invariant.
+  substrand_id:          z.string().uuid().nullable().optional(),
   instructions:          z.string().min(1),
   due_date:              z.string().min(1),
   type:                  z.string().optional(),
@@ -107,7 +112,7 @@ export async function POST(req: Request) {
 
     const parsed = CreateAssignmentSchema.safeParse(await req.json())
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
-    const { class_id, title, subject, topic, instructions, due_date, type, max_score, is_quiz, is_compass_guided, is_holiday_assignment, holiday_period, lesson_plan_id } = parsed.data
+    const { class_id, title, subject, topic, substrand_id, instructions, due_date, type, max_score, is_quiz, is_compass_guided, is_holiday_assignment, holiday_period, lesson_plan_id } = parsed.data
 
     // Verify class belongs to teacher
     try {
@@ -124,6 +129,7 @@ export async function POST(req: Request) {
         title,
         subject,
         topic,
+        substrand_id: substrand_id || null,
         instructions,
         due_date,
         type: type || 'practice',
