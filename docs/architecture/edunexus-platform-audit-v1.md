@@ -11,9 +11,9 @@
 
 | Metric | Value |
 |---|---|
-| **Overall Completion** | ~64% (was ~62% — Sprint 6 raised the Learner Portal further) |
+| **Overall Completion** | ~65% (was ~64% — Sprint 7 raised the Teacher Workspace) |
 | SMS Completion | ~40% |
-| Teacher Workspace / LMS Completion | ~63% |
+| Teacher Workspace / LMS Completion | ~65% (was ~63% — Sprint 7's Gradebook/submission cross-linking and re-verification found Adaptive Assignments Creation already fixed since this document was last written; the Review Dashboard's flat-list gap is now the single largest named Teacher Workspace friction point) |
 | Parent Portal Completion | ~38% |
 | Learner Portal Completion | ~72% (was ~67% — Sprint 6 activated Portfolio/Achievements/Timeline, previously dead code or teacher-only, and cross-linked the previously-disconnected journey. Also found and fixed a real regression Sprint 3 introduced without knowing it: the canonical Blueprint page 404'd/denied every real student — see Blocker #8) |
 | Intelligence Platform Completion | ~94% |
@@ -98,17 +98,17 @@
 | Lesson Planning | ✅ | 🟡 | ✅ | Zero test files | Medium |
 | Schemes of Work | ✅ | 🟡 | ✅ | Zero test files despite 11-file module | Medium |
 | Records of Work | ✅ | 🟡 | ✅ | Zero test files | Low |
-| Assignments (standard) | ✅ | ✅ | ✅ | — | — |
-| Adaptive Assignments — Creation | 🟡 | 🟡 | 🟡 | No draft-mode gate, no Adaptive sub-toggle | High |
-| Adaptive Assignments — Variant Generation | ✅ | ✅ | 🟡 | Synchronous only, no bulk/progress UI | Medium |
-| Adaptive Assignments — Review Dashboard | 🟡 | 🟡 | 🟡 | Flat list only, `editVariant()` has no UI | Medium |
+| Assignments (standard) | ✅ | ✅ | ✅ | Sprint 7 fixed a silent wrong-class default on "Create Assignment from this Lesson" | — |
+| Adaptive Assignments — Creation | ✅ | ✅ | ✅ | **Correction (Sprint 7 re-verification):** draft-mode gate and Adaptive sub-toggle both now exist (`app/api/teacher/assignments/route.ts`, `assignments/new/page.tsx`) — built after this row was last written, not by Sprint 7 itself | — |
+| Adaptive Assignments — Variant Generation | ✅ | ✅ | 🟡 | Synchronous only, no bulk/progress UI — re-confirmed Sprint 7 | Medium |
+| Adaptive Assignments — Review Dashboard | 🟡 | 🟡 | 🟡 | Flat list only, no filter/bulk-approve, `editVariant()` has no UI — re-confirmed Sprint 7, this is the single biggest remaining Adaptive Assignments friction point; a feature build, not a friction fix, so out of Sprint 7's scope | Medium |
 | Adaptive Assignments — Delivery/Grading | ✅ | ✅ | ✅ | — | — |
 | Adaptive Assignments — Analytics/Inspection | ❌ | ❌ | ❌ | Data exists, zero read surfaces | Medium |
 | Quizzes (MCQ, non-adaptive) | ✅ | ✅ | ✅ | — | — |
 | Rubrics | ❌ | ❌ | ❌ | Grading is MCQ/marks-only | Low |
 | Resources | ✅ | 🟡 | ✅ | No test coverage | Low |
 | Content Library | 🟡 | 🟡 | 🟡 | Folded into Resources, not distinct | Low |
-| Gradebook | ✅ | ✅ | ✅ | — | — |
+| Gradebook | ✅ | ✅ | ✅ | Sprint 7 fixed: was a dead end (plain-text names, zero outbound links) and unreachable from the class detail page — now cross-linked with Blueprint/Career and reachable from the roster | — |
 | Attendance | ✅ | ✅ | ✅ | — | — |
 | Calendar | ✅ | 🟡 | ✅ | — | Low |
 | Messaging | ❌ | ❌ | ❌ | No feature anywhere | Medium |
@@ -212,7 +212,7 @@ This treats **fixing/finishing what already exists** as strictly higher priority
 5. ~~**Wire Portfolio and Achievements into the (now genuinely reachable) student UI**~~ **DONE — Sprint 6, 2026-07-20.** Also wired the canonical Learner Timeline (previously teacher-API-only) and cross-linked the previously-disconnected journey (Blueprint/Progress/Career/Holiday/Portfolio/Achievements/Timeline). Found and fixed a real access bug along the way — see Blocker #8.
 6. **Close the Career Intelligence grade-gating gap at the source** — re-scoped Sprint 6: both routes already gate correctly today (not a live bug), but duplicate the same Junior/Senior predicate instead of sharing `buildCareerIntelligence()`, whose return shape is incompatible with both routes' current consumer UIs. Properly fixing this now means migrating the student Career Explorer UI and the Parent Career Intelligence UI to a shared shape in the same change — schedule as its own sprint, not a drop-in swap.
 7. **Parent LMS parity** — expose existing attendance/assignment-status/gradebook data (all already built for teachers) into `app/(parent)/`. Biggest completion-% gain for the Parent Portal, no new backend.
-8. **Finish Adaptive Assignments** — the five slices already scoped in `docs/architecture/sprint-10-lms-integration-audit-and-plan.md` (Slice A–E), reusing the existing job queue for bulk generation.
+8. **Finish Adaptive Assignments** — the five slices already scoped in `docs/architecture/sprint-10-lms-integration-audit-and-plan.md` (Slice A–E), reusing the existing job queue for bulk generation. Re-verified Sprint 7: Creation is now done (draft-gate + Adaptive toggle exist), so the remaining, now-sharpest gap is the Review Dashboard — flat list, no filter/bulk-approve, still one-click-per-question generation with no "generate all."
 9. **Timetable module** — the largest genuinely-greenfield SMS gap; schedule as its own multi-sprint effort once 1–8 are done.
 10. **Everything with zero prior art** (Messaging, Discussion Boards, Rubrics, Teacher AI Assistant, Fee management, Library/Transport/Inventory/Hostel) — lowest priority relative to the above; re-evaluate against actual pilot feedback before committing to any of these, per the "reduce decisions" and "start simple" standing principles.
 

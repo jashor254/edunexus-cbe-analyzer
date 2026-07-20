@@ -2696,3 +2696,35 @@ One gap surfaced and carried forward honestly, not silently worked around: no re
 **Tests added**: 14 (see above), across 3 new files.
 
 **Rollback considerations**: Low. All five changes are additive (new pages, new component, new permission function, new composer field values) except the `requireSchoolStaff` → `requireLearnerAccess` swap on the Blueprint page — reverting that one specific line would restore the original (broken) behavior, so it should not be reverted independently of the rest. Every other commit reverts cleanly and independently. No migration, no schema change, no existing route's contract changed.
+
+---
+
+## 2026-07-20 — Sprint 7: Teacher Workspace Pilot Readiness (Workflow Efficiency)
+
+**What changed**: no new teacher features, no new intelligence — per mission, this sprint reduced clicks/context-switching in existing teacher workflows. Four commits, each independently compiling and tested against a live dev server.
+
+**Phase 1 workflow mapping (mandatory, done first)**: three parallel research passes traced every workflow named in the mission that PRP-1→4 (`docs/architecture/sprint-prp{1,2,2a,3,4}-*.md`) hadn't already covered — Scheme of Work→Lesson Plans→Records of Work→Assignments→Adaptive Assignments, Submission Review→Gradebook→Report Generation→Academic Clinic→Blueprint→Career, and Resources/Calendar/Announcements/end-of-day — plus a re-verification of five specific PRP-1 findings against current code (files move fast in this codebase; stale claims are worse than no claim).
+
+**Phase 2 friction analysis — the dominant pattern found**: student/class selection is not shared across the grading/reporting cluster. A teacher grading a submission, then checking that student's Gradebook row, then their Blueprint, then generating a report card, had to re-pick the same student/class up to 4 separate times — Gradebook (plain-text names, zero outbound links, not reachable from the class detail page at all, only from the class *list*), graded submissions (zero links to Blueprint/Career/Gradebook for that student), Parent Reports and Official Report Cards (two more independent class pickers, only `core-term`'s persists). Also found a real correctness bug, not just friction: "Create Assignment from this Lesson" (`lesson-plans/[planId]/page.tsx`) carries subject/topic/week forward but no `classId` (Schemes of Work aren't tied to a specific class), so the assignment form silently defaulted to `classes[0]` with zero visual cue — a teacher with two same-grade/subject classes could publish to the wrong one without noticing.
+
+**Re-verification of PRP-1 findings** (Part B of the third research pass): nav taxonomy unification is now genuinely fixed (`lib/config/teacherWorkspaceNav.ts` is the sole source for both `TeacherSidebar`/`TeacherBottomNav`). `core-readiness` dead-redirect, orphaned `prerequisite-readiness`/`teaching-patterns` APIs, missing Teacher Reflection write path (not even an API route exists, not just missing UI), and missing `notification_log` read-back UI are all still true — named here, not fixed this sprint (each is either a bigger write-path build than "reduce friction," or low-value cleanup with real risk of breaking an old bookmark/URL, both out of this sprint's boundary).
+
+**What was built**:
+- Commit 1 (bug fix) — the silent wrong-class default now prefers a class whose subject actually matches the lesson's subject over blind `classes[0]`, and — since that's still only a guess when a teacher has more than one matching class — is visibly flagged (amber border + inline note) until the teacher confirms or changes it.
+- Commit 2 — Gradebook rows now carry the same Blueprint/Career link pattern (`Brain`/`Compass` icons) the class roster already established, reused verbatim rather than reinvented; class detail page gets a "Gradebook" button next to "Add Students" (Gradebook was previously only reachable from the class *list*, not the class *detail* page where Blueprint/Career links live); Gradebook's back-link now returns to the specific class instead of the generic class list.
+- Commit 3 — graded-submission rows (`assignments/[assignmentId]/page.tsx`) get the same three-link pattern (Blueprint/Career/Gradebook), closing the last silo in the redundant-selection chain.
+- Commit 4 — `TodayAtAGlance.tsx`'s "You're caught up" empty state (previously a bare, contentless phrase) now composes a real end-of-day recap from data the component already fetches for its gap-oriented cards (`attendanceTotal`, `pendingAssessmentCount`) — zero new data fetch, just a completion-oriented reading of the same facts, directly answering the mission's Primary Question ("can a teacher see they finished their day").
+
+**Deliberately not built**: Adaptive Review Dashboard bulk-approve/filtering (still a flat unfiltered list per the Platform Audit's Phase 2 table) — this is a feature build, not a friction fix, out of "no new teacher features." Teacher Reflection's write path — same reasoning, and the gap is bigger than described (no API route at all). Global nav entries for Resources/Calendar/Announcements — investigated and found unnecessary: they're correctly class-scoped (can't be a top-level nav item without a class first, same as Gradebook itself) and already consistently reachable via the class list card.
+
+**Tests**: full existing `lib/gradebook/gradebook.pure.test.ts` (7 tests) and `lib/teacherWorkflow/nextAction.test.ts` (6 tests) re-run, unaffected. Full `lib/testing/lmsRoutes.http.integration.test.ts` (38 tests, covers the Gradebook API and adaptive-assignment publish flow this sprint's UI changes sit on top of) re-run against a live dev server — zero regressions. No new test files this sprint (every change is additive UI composition over already-tested APIs/data; no new authorization boundary, no new route, nothing that isn't already covered by the existing suite reading the same underlying data).
+
+**Verification performed**: `npx tsc --noEmit -p .` clean; `npx eslint` clean (0 errors, only pre-existing unrelated warnings) on every touched file; 38 + 13 relevant tests passing against a live dev server (`next dev -p 3939`), plus manual unauthenticated-redirect smoke tests on every changed page.
+
+**Architectural documents referenced**: `docs/architecture/sprint-prp1-teacher-workspace-foundation.md` through `sprint-prp4-teacher-continuity.md` (this sprint's starting inventory for what PRP-1→4 already fixed vs. left open), `docs/architecture/edunexus-platform-audit-v1.md` Phase 2 table (Adaptive Assignments review-dashboard finding, re-confirmed still accurate).
+
+**ADR**: None required — every change is UI composition/cross-linking over existing routes and existing fetched data; no new identity, domain, or authorization pattern.
+
+**Tests added**: 0 new files — extended coverage via re-running existing suites against the same code paths this sprint's UI sits on.
+
+**Rollback considerations**: Very low. All four commits are purely additive UI (links, a warning state, a recap message) with zero backend/schema/route changes — each reverts independently and cleanly.
