@@ -10,7 +10,7 @@ import {
   FlaskConical, ChevronDown, ChevronRight,
   Upload, Sparkles, Target, Zap, ClipboardList, Layers,
   MessageSquare, CalendarDays, ThumbsUp, HelpCircle, AlertCircle, ClipboardCheck,
-  RefreshCw,
+  RefreshCw, Table2,
 } from 'lucide-react'
 import {
   SENIOR_PATHWAYS,
@@ -3158,12 +3158,20 @@ na kuwasaidia vizuri zaidi darasani.
             <p className="text-sm text-gray-500">
               {students.length} student{students.length !== 1 ? 's' : ''} · Add students directly and their parents get WhatsApp + email automatically.
             </p>
-            <button
-              onClick={() => setShowAddStudent(true)}
-              className="flex items-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-teal-700 transition"
-            >
-              <UserPlus className="w-4 h-4" /> Add Students
-            </button>
+            <div className="flex items-center gap-2">
+              <Link
+                href={`/teacher/gradebook/${classId}`}
+                className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-xl font-bold text-sm hover:bg-gray-200 transition"
+              >
+                <Table2 className="w-4 h-4" /> Gradebook
+              </Link>
+              <button
+                onClick={() => setShowAddStudent(true)}
+                className="flex items-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-teal-700 transition"
+              >
+                <UserPlus className="w-4 h-4" /> Add Students
+              </button>
+            </div>
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">

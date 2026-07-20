@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from 'react'
 import Link from 'next/link'
-import { Download } from 'lucide-react'
+import { Download, Brain, Compass } from 'lucide-react'
 import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 import { gradebookToCSV, type Gradebook } from '@/lib/gradebook/gradebookPure'
 
@@ -38,8 +38,8 @@ export default function GradebookPage({ params }: { params: Promise<{ classId: s
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
       <div className="mb-6">
-        <Link href="/teacher/classes" className="text-sm text-gray-400 hover:text-gray-600 font-medium">
-          ← My Classes
+        <Link href={`/teacher/classes/${classId}`} className="text-sm text-gray-400 hover:text-gray-600 font-medium">
+          ← Back to Class
         </Link>
         <div className="flex items-center justify-between mt-3">
           <h1 className="text-3xl font-black text-gray-900">Gradebook</h1>
@@ -91,7 +91,23 @@ export default function GradebookPage({ params }: { params: Promise<{ classId: s
             <tbody>
               {gradebook.rows.map(row => (
                 <tr key={row.studentId} className="border-b border-gray-100 last:border-0">
-                  <td className="px-4 py-3 font-bold text-gray-900 sticky left-0 bg-white">{row.studentName}</td>
+                  <td className="px-4 py-3 sticky left-0 bg-white">
+                    <div className="font-bold text-gray-900">{row.studentName}</div>
+                    <div className="text-xs text-gray-400 flex items-center gap-2 mt-0.5">
+                      <Link
+                        href={`/teacher/reports/blueprint/${row.studentId}`}
+                        className="flex items-center gap-1 text-teal-600 hover:text-teal-700 hover:underline"
+                      >
+                        <Brain className="w-3 h-3" /> Blueprint
+                      </Link>
+                      <Link
+                        href={`/teacher/reports/career-intelligence/${row.studentId}`}
+                        className="flex items-center gap-1 text-teal-600 hover:text-teal-700 hover:underline"
+                      >
+                        <Compass className="w-3 h-3" /> Career
+                      </Link>
+                    </div>
+                  </td>
                   {gradebook.columns.map(c => {
                     const score = row.scores[c.id]
                     return (
