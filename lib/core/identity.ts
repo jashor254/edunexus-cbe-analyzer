@@ -213,3 +213,21 @@ export async function resolveLegacyStudentId(coreLearnerId: string): Promise<str
   const existing = await repos.teachers.findLegacyStudentByExternalId(coreLearnerId)
   return existing?.id ?? null
 }
+
+/**
+ * Resolves the Core `learners.id` for the signed-in user's own,
+ * unambiguous student record — the "my own Blueprint" self-service lookup
+ * (`app/student/blueprint/page.tsx`'s original logic, promoted here Sprint
+ * 6 once three sibling pages — Portfolio, Achievements, Timeline — needed
+ * the exact same lookup rather than each re-implementing it). Returns
+ * `null` for "no owned record" and "ambiguous, more than one owned record"
+ * alike — the caller decides how to explain either case, this function
+ * only answers "is there exactly one, and what is it."
+ */
+export async function resolveOwnCoreLearnerId(userId: string): Promise<string | null> {
+  const owned = await repos.compass.findOwnedStudents(userId)
+  if (!owned || owned.length === 0 || owned.length >= 2) return null
+
+  const [row] = await repos.teachers.findExternalIdsByStudentIds([owned[0].id])
+  return row?.external_id ?? null
+}

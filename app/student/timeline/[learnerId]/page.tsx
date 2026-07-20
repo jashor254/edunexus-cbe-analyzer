@@ -18,8 +18,10 @@ import { requireAuthentication, requireLearnerAccess } from '@/lib/core/permissi
 import { ResourceOwnershipError, UnauthorizedError } from '@/lib/core/errors'
 import { repos } from '@/lib/repositories'
 import { resolveLegacyStudentId } from '@/lib/core/identity'
+import { getUserRoles } from '@/lib/auth/getRole'
 import { getLearnerTimeline } from '@/lib/learnerRecord/timeline'
 import Link from 'next/link'
+import JourneyLinks from '@/components/student/JourneyLinks'
 
 const EVIDENCE_SOURCE_LABEL: Record<string, string> = {
   teacher_remark: 'Teacher note',
@@ -33,8 +35,9 @@ export default async function StudentTimelinePage({
   const { learnerId } = await params
   const supabase = await createClient()
 
+  let userId: string
   try {
-    await requireAuthentication(supabase)
+    userId = (await requireAuthentication(supabase)).id
   } catch (err) {
     if (err instanceof UnauthorizedError) redirect('/login')
     throw err
@@ -65,6 +68,7 @@ export default async function StudentTimelinePage({
 
   const legacyStudentId = await resolveLegacyStudentId(learnerId)
   const entries = legacyStudentId ? await getLearnerTimeline(legacyStudentId) : []
+  const isSelfView = (await getUserRoles(userId)).primary === 'student'
 
   return (
     <div className="max-w-2xl mx-auto space-y-3 py-6 px-4">
@@ -111,6 +115,8 @@ export default async function StudentTimelinePage({
           ))}
         </div>
       )}
+
+      {isSelfView && <JourneyLinks current="timeline" />}
     </div>
   )
 }

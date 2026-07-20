@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import JourneyLinks from '@/components/student/JourneyLinks'
 import {
   Search, Sparkles, TrendingUp, ChevronRight, Star,
   Loader2, AlertCircle, Briefcase, Zap, RefreshCw, BookOpen,
@@ -844,6 +845,7 @@ export default function CareerPage() {
         </section>
 
       </div>
+      <JourneyLinks current="career" theme="dark" />
     </div>
   )
 }

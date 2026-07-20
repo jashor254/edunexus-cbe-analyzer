@@ -1,5 +1,11 @@
 import StudentHolidayPlan from '@/components/student/StudentHolidayPlan'
+import JourneyLinks from '@/components/student/JourneyLinks'
 
 export default function StudentHolidayPage() {
-  return <StudentHolidayPlan />
+  return (
+    <>
+      <StudentHolidayPlan />
+      <JourneyLinks current="holiday" />
+    </>
+  )
 }

@@ -23,9 +23,11 @@ import { createClient } from '@/utils/supabase/server'
 import { requireAuthentication, requireLearnerAccess } from '@/lib/core/permissions'
 import { ResourceOwnershipError, UnauthorizedError } from '@/lib/core/errors'
 import { repos } from '@/lib/repositories'
+import { getUserRoles } from '@/lib/auth/getRole'
 import { composeBlueprint } from '@/lib/learnerBlueprint/composeBlueprint'
 import BlueprintView from '@/components/blueprint/BlueprintView'
 import BlueprintStateMessage from '@/components/blueprint/BlueprintStateMessage'
+import JourneyLinks from '@/components/student/JourneyLinks'
 
 export default async function StudentBlueprintPage({
   params,
@@ -78,5 +80,19 @@ export default async function StudentBlueprintPage({
     return <BlueprintStateMessage kind="unavailable" />
   }
 
-  return <BlueprintView blueprint={blueprint} validation={validation} learnerId={learnerId} />
+  // Access was already granted above via requireLearnerAccess, whose
+  // self-branch (canViewLearner) is the only branch a `student`-role
+  // viewer can ever pass — so a granted access + primary role 'student'
+  // together mean this is the learner's own Blueprint, never a teacher/
+  // parent/admin viewing someone else's. Journey links are self-service
+  // routes only (Progress/Career/Holiday etc. resolve "my own record"
+  // server-side), so they're only correct to show here.
+  const { primary } = await getUserRoles(userId)
+
+  return (
+    <>
+      <BlueprintView blueprint={blueprint} validation={validation} learnerId={learnerId} />
+      {primary === 'student' && <JourneyLinks current="blueprint" />}
+    </>
+  )
 }

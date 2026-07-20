@@ -13,8 +13,10 @@ import { createClient } from '@/utils/supabase/server'
 import { requireAuthentication, requireLearnerAccess } from '@/lib/core/permissions'
 import { ResourceOwnershipError, UnauthorizedError } from '@/lib/core/errors'
 import { repos } from '@/lib/repositories'
+import { getUserRoles } from '@/lib/auth/getRole'
 import { listPublished } from '@/lib/learnerPortfolio/portfolio'
 import Link from 'next/link'
+import JourneyLinks from '@/components/student/JourneyLinks'
 
 export default async function StudentPortfolioPage({
   params,
@@ -24,8 +26,9 @@ export default async function StudentPortfolioPage({
   const { learnerId } = await params
   const supabase = await createClient()
 
+  let userId: string
   try {
-    await requireAuthentication(supabase)
+    userId = (await requireAuthentication(supabase)).id
   } catch (err) {
     if (err instanceof UnauthorizedError) redirect('/login')
     throw err
@@ -55,6 +58,7 @@ export default async function StudentPortfolioPage({
   }
 
   const items = await listPublished(learnerId, schoolId)
+  const isSelfView = (await getUserRoles(userId)).primary === 'student'
 
   return (
     <div className="max-w-2xl mx-auto space-y-3 py-6 px-4">
@@ -95,6 +99,8 @@ export default async function StudentPortfolioPage({
           ))}
         </div>
       )}
+
+      {isSelfView && <JourneyLinks current="portfolio" />}
     </div>
   )
 }
