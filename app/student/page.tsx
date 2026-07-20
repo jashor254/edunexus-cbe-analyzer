@@ -400,7 +400,7 @@ export default function StudentHomePage() {
 
           {/* Pathway / Career direction */}
           <Link
-            href="/career"
+            href="/student/career"
             className="group rounded-3xl p-5 border border-white/[0.07] bg-white/[0.03] hover:bg-white/[0.05] transition-all block"
           >
             <div className="flex items-center justify-between mb-4">

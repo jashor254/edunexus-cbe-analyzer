@@ -2,8 +2,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createServiceClient } from '@/utils/supabase/service'
 import { ADMIN_TIER_ROLES } from '@/lib/core/adminTierRoles'
 import type { SchoolUserRole } from '@/types/core'
+import { getRoleRedirect, type UserRole } from './roleRedirect'
 
-export type UserRole = 'teacher' | 'parent' | 'student'
+export type { UserRole }
+export { getRoleRedirect }
 
 export interface UserRoles {
   primary:          UserRole
@@ -65,11 +67,6 @@ export async function getUserRoles(userId: string, db?: SupabaseClient): Promise
 export async function getUserRole(userId: string): Promise<UserRole | null> {
   const { primary } = await getUserRoles(userId)
   return primary
-}
-
-/** Map primary role → post-login destination */
-export function getRoleRedirect(role: UserRole | null): string {
-  return role === 'teacher' ? '/teacher/dashboard' : '/dashboard'
 }
 
 export type SchoolAdminMembership = { schoolId: string; role: SchoolUserRole }

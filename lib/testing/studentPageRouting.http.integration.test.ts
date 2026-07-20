@@ -1,40 +1,26 @@
 // lib/testing/studentPageRouting.http.integration.test.ts
 //
-// Sprint 2 (Platform Audit v1.0, Blocker #4) — proves /resources and
-// /calendar (moved from app/dashboard/resources|calendar) are gated by
-// app/(student)/layout.tsx exactly like their siblings (/blueprint,
-// /progress, /holiday, /career) — unchanged behavior, verified rather than
-// assumed.
+// Sprint 3 (Platform Audit v1.0, Blocker #5) — proves the canonical learner
+// architecture end-to-end against real, signed-in HTTP clients:
+//   1. profiles.role now legally permits 'student' (migration
+//      20260720_sprint3_canonical_learner_role — additive, verified below).
+//   2. A real student account reaches every page in the canonical
+//      app/student/* tree; parent/teacher/anonymous are correctly denied,
+//      by the SAME middleware (proxy.ts) + layout (app/student/layout.tsx)
+//      gate every other role tree uses — no bespoke logic.
+//   3. The six old flat URLs (/blueprint, /career, /holiday, /progress,
+//      /resources, /calendar — the former (student) route group, now
+//      deleted) permanently redirect into their /student/* equivalents,
+//      so no external link silently breaks.
+//   4. A parent/teacher account is correctly denied /student/*, and a
+//      student account is correctly denied /teacher/* and treated as a
+//      /dashboard visitor is (i.e. gets bounced onward to /student, not
+//      shown the parent dashboard) — no bounce loops.
 //
-// ⚠️ MAJOR FINDING, discovered while writing this test, not introduced by
-// this sprint: there is currently no way to construct a real "self-login
-// student" fixture at all. `profiles.role`'s CHECK constraint only allows
-// ('parent','school_admin','teacher','admin') — 'student' has never been a
-// legal value (confirmed directly against the live database, not just
-// schema.sql). lib/auth/getRole.ts's getUserRoles() — documented as "THE
-// single canonical role lookup for the whole app" — checks
-// `profile?.role === 'student'`, which can therefore never be true; every
-// real `students` row in production today belongs to a profile with
-// role='parent' or role='teacher' (confirmed by querying production data),
-// never anything that resolves to primary:'student'. Consequently:
-//   - app/dashboard/layout.tsx's `if (roles.primary === 'student') redirect
-//     ('/student')` can never fire.
-//   - proxy.ts's /dashboard handling never checks for a student at all.
-//   - app/(student)/layout.tsx's gate (`if (roles.primary === 'parent')
-//     redirect('/dashboard')`) fires for EVERY real account that would
-//     conceptually be "a student," bouncing them straight back to
-//     /dashboard.
-// This means the entire (student) route group — /blueprint, /career,
-// /holiday, /progress, and now /resources, /calendar — is unreachable via
-// any real navigational path for any account in production today, not just
-// the two pages this sprint moved. This is a platform-wide, pre-existing
-// role-resolution defect, far larger than Blocker #4, and is NOT fixed here
-// — flagged per "if new work is discovered outside the audit, stop and
-// document it, don't implement it." The test below proves the constraint
-// directly (reproducible evidence for whoever picks this up), and separately
-// proves the one thing Sprint 2 actually changed: parent/teacher/anonymous
-// gating on the two moved pages still works correctly, unregressed by the
-// move.
+// Sprint 2's version of this file proved the OPPOSITE of point 1 (that
+// role='student' was rejected) — that was the bug; this is the fix,
+// verified the same rigorous way: real database, real signed-in clients,
+// not just reading the code.
 //
 // Run: LMS_TEST_BASE_URL=http://localhost:3939 npx tsx --env-file=.env.local --test lib/testing/studentPageRouting.http.integration.test.ts
 // (requires `next dev -p 3939 &` already running)
@@ -45,15 +31,16 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { signInForHttpTest, type SyntheticSession } from './httpAuthTestHelper'
 
 const BASE_URL = process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3939'
-const SYNTHETIC_MARKER = 'SYNTHETIC_STUDENT_ROUTING_TEST'
+const SYNTHETIC_MARKER = 'SYNTHETIC_SPRINT3_LEARNER_ARCH_TEST'
 const db = createServiceClient()
 
 const authUserIds: string[] = []
 
+let studentSession: SyntheticSession
 let parentSession: SyntheticSession
 let teacherSession: SyntheticSession
 
-async function createRoleUser(label: string, role: 'parent' | 'teacher'): Promise<SyntheticSession> {
+async function createRoleUser(label: string, role: 'student' | 'parent' | 'teacher'): Promise<SyntheticSession> {
   const email = `${SYNTHETIC_MARKER.toLowerCase()}-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`
   const password = `Test!${Math.random().toString(36).slice(2, 10)}`
   const { data, error } = await db.auth.admin.createUser({ email, password, email_confirm: true })
@@ -67,7 +54,8 @@ async function createRoleUser(label: string, role: 'parent' | 'teacher'): Promis
 }
 
 before(async () => {
-  parentSession = await createRoleUser('parent', 'parent')
+  studentSession = await createRoleUser('student', 'student')
+  parentSession  = await createRoleUser('parent', 'parent')
   teacherSession = await createRoleUser('teacher', 'teacher')
 })
 
@@ -76,32 +64,41 @@ after(async () => {
     await db.from('profiles').delete().eq('id', id)
     await db.auth.admin.deleteUser(id)
   }
-  console.log('[cleanup] synthetic student-routing fixtures removed')
+  console.log('[cleanup] synthetic Sprint 3 learner-architecture fixtures removed')
 })
 
 function cookie(session: SyntheticSession) {
   return { Cookie: session.cookieHeader }
 }
 
-// ── The major finding, proven directly and reproducibly ────────────────────
+// ── The fix, proven directly ────────────────────────────────────────────────
 
-test('MAJOR FINDING: profiles.role has no legal value that resolves to a "student" primary role', async () => {
-  const { error } = await db.from('profiles').upsert({ id: authUserIds[0], role: 'student' })
-  assert.ok(error, 'expected the DB to reject role=student — if this ever starts succeeding, the finding above needs re-verification, not silent deletion')
-  assert.equal(error?.code, '23514') // check_violation
-  assert.match(error?.message ?? '', /profiles_role_check/)
+test('profiles.role now legally permits student (the schema-level blocker is gone)', async () => {
+  const { error } = await db.from('profiles').update({ role: 'student' }).eq('id', authUserIds[0])
+  assert.equal(error, null, 'expected role=student to be accepted by the live database')
 })
 
-// ── What Sprint 2 actually changed: gating on the two moved pages ──────────
+// ── Canonical learner tree: student reaches every page ──────────────────────
 
-for (const path of ['/resources', '/calendar']) {
-  test(`GET ${path}: a parent account is redirected away, not shown the page — same gate as its siblings`, async () => {
+const STUDENT_PAGES = ['/student', '/student/blueprint', '/student/career', '/student/holiday', '/student/progress', '/student/resources', '/student/calendar']
+
+for (const path of STUDENT_PAGES) {
+  test(`GET ${path}: a student account reaches it (200, no redirect)`, async () => {
+    const res = await fetch(`${BASE_URL}${path}`, { headers: cookie(studentSession), redirect: 'manual' })
+    assert.equal(res.status, 200)
+  })
+}
+
+// ── Route protection: consistent, not page-by-page ──────────────────────────
+
+for (const path of ['/student', '/student/blueprint', '/student/resources', '/student/calendar']) {
+  test(`GET ${path}: a parent account is redirected to /dashboard, not shown the page`, async () => {
     const res = await fetch(`${BASE_URL}${path}`, { headers: cookie(parentSession), redirect: 'manual' })
     assert.equal(res.status, 307)
     assert.match(res.headers.get('location') ?? '', /\/dashboard$/)
   })
 
-  test(`GET ${path}: a teacher account is redirected away, not shown the page — same gate as its siblings`, async () => {
+  test(`GET ${path}: a teacher account is redirected to /teacher/dashboard, not shown the page`, async () => {
     const res = await fetch(`${BASE_URL}${path}`, { headers: cookie(teacherSession), redirect: 'manual' })
     assert.equal(res.status, 307)
     assert.match(res.headers.get('location') ?? '', /\/teacher\/dashboard$/)
@@ -113,3 +110,60 @@ for (const path of ['/resources', '/calendar']) {
     assert.match(res.headers.get('location') ?? '', /\/login\?/)
   })
 }
+
+// ── Cross-role denial, the other direction ──────────────────────────────────
+
+test('a student account is redirected away from /teacher/dashboard', async () => {
+  const res = await fetch(`${BASE_URL}/teacher/dashboard`, { headers: cookie(studentSession), redirect: 'manual' })
+  assert.equal(res.status, 307)
+  assert.match(res.headers.get('location') ?? '', /\/dashboard$/) // proxy.ts's /teacher branch sends non-teachers to /dashboard; app/dashboard/layout.tsx then sends the student on to /student — no loop, verified next
+})
+
+test('a student who lands on /dashboard is sent onward to /student, not shown the parent dashboard', async () => {
+  const res = await fetch(`${BASE_URL}/dashboard`, { headers: cookie(studentSession), redirect: 'manual' })
+  assert.equal(res.status, 307)
+  assert.match(res.headers.get('location') ?? '', /\/student$/)
+})
+
+// ── Old flat URLs permanently redirect, nothing 404s ─────────────────────────
+
+const OLD_TO_NEW: Record<string, string> = {
+  '/blueprint': '/student/blueprint',
+  '/career':    '/student/career',
+  '/holiday':   '/student/holiday',
+  '/progress':  '/student/progress',
+  '/resources': '/student/resources',
+  '/calendar':  '/student/calendar',
+}
+
+for (const [oldPath, newPath] of Object.entries(OLD_TO_NEW)) {
+  test(`GET ${oldPath}: permanently redirects to ${newPath}`, async () => {
+    const res = await fetch(`${BASE_URL}${oldPath}`, { headers: cookie(studentSession), redirect: 'manual' })
+    assert.equal(res.status, 308) // Next.js permanent redirects are 308
+    assert.match(res.headers.get('location') ?? '', new RegExp(`${newPath}$`))
+  })
+}
+
+// ── Signup/login contract: the API layer login/signup pages actually call ──
+// Rendering the real client-side login/signup React pages is out of scope
+// for an HTTP integration test; what's provable and load-bearing is the API
+// contract those pages depend on for the student case specifically.
+
+test('POST /api/auth/complete-profile accepts role=student and persists it', async () => {
+  const freshUser = await createRoleUser('freshsignup', 'parent') // arbitrary starting role
+  const res = await fetch(`${BASE_URL}/api/auth/complete-profile`, {
+    method: 'POST', headers: { ...cookie(freshUser), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role: 'student' }),
+  })
+  assert.equal(res.status, 200)
+
+  const { data } = await db.from('profiles').select('role').eq('id', freshUser.userId).single()
+  assert.equal(data?.role, 'student')
+})
+
+test('GET /api/auth/roles returns redirectTo=/student for a student profile — the exact value login/signup use to route post-auth', async () => {
+  const res = await fetch(`${BASE_URL}/api/auth/roles`, { headers: cookie(studentSession) })
+  const json = await res.json()
+  assert.equal(json.primary, 'student')
+  assert.equal(json.redirectTo, '/student')
+})

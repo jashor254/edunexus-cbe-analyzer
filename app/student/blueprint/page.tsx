@@ -1,4 +1,4 @@
-// app/(student)/blueprint/page.tsx
+// app/student/blueprint/page.tsx
 //
 // Sprint 12AB: retired the legacy, independently-computed Blueprint
 // (lib/learnerIntelligence/blueprint.ts) from this route. This is the

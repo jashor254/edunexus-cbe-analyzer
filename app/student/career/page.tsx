@@ -203,7 +203,7 @@ function CapabilityMatchCard({ match }: { match: CapabilityCareerMatch }) {
 
   return (
     <Link
-      href={`/career/${match.career_slug}`}
+      href={`/student/career/${match.career_slug}`}
       className={`group block bg-gradient-to-br ${style.glow} border ${style.border} rounded-2xl p-5 hover:opacity-90 transition-all space-y-3`}
     >
       <div className="flex items-center justify-between gap-2">
@@ -444,7 +444,7 @@ function CareerCard({ career }: { career: CareerSummary }) {
 
   return (
     <Link
-      href={`/career/${career.slug}`}
+      href={`/student/career/${career.slug}`}
       className="group block bg-white/5 border border-white/10 rounded-2xl p-5 hover:bg-white/10 hover:border-violet-500/40 transition-all"
     >
       <div className="flex items-start justify-between gap-3 mb-3">

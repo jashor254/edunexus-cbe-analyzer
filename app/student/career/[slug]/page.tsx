@@ -804,7 +804,7 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
   if (!career) return (
     <div className="min-h-screen bg-[#0a0a14] flex flex-col items-center justify-center gap-4">
       <p className="text-white/50">Career not found.</p>
-      <Link href="/career" className="text-violet-400 text-sm hover:text-violet-300">← Back to careers</Link>
+      <Link href="/student/career" className="text-violet-400 text-sm hover:text-violet-300">← Back to careers</Link>
     </div>
   )
 
@@ -822,7 +822,7 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
 
         {/* ── NAV ────────────────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between">
-          <Link href="/career" className="flex items-center gap-2 text-white/50 hover:text-white text-sm transition-colors">
+          <Link href="/student/career" className="flex items-center gap-2 text-white/50 hover:text-white text-sm transition-colors">
             <ArrowLeft className="w-4 h-4" /> All Careers
           </Link>
           <button
@@ -1284,7 +1284,7 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
           >
             {saved ? <><CheckCircle2 className="w-5 h-5" /> Saved!</> : <><Heart className="w-5 h-5" /> Save This Career</>}
           </button>
-          <Link href="/career" className="block mt-4 text-white/30 text-sm hover:text-white/50 transition-colors">
+          <Link href="/student/career" className="block mt-4 text-white/30 text-sm hover:text-white/50 transition-colors">
             ← Back to all careers
           </Link>
         </div>

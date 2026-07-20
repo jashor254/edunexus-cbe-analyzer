@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/utils/supabase/middleware'
 import { generateTraceId } from '@/lib/observability/tracing'
 import { SUPPORTED_LOCALES, DEFAULT_LOCALE } from '@/lib/i18n/config'
-import { getUserRoles, getSchoolAdminMembership } from '@/lib/auth/getRole'
+import { getUserRoles, getSchoolAdminMembership, getRoleRedirect } from '@/lib/auth/getRole'
 
 /** Pick the best supported locale from an Accept-Language header. */
 function detectLocale(acceptLang: string): string {
@@ -135,6 +135,18 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL('/teacher/setup', request.url))
     }
 
+    return response
+  }
+
+  // ── Student routes (Sprint 3, Platform Audit v1.0, Blocker #5) ────────────
+  // Mirrors the /teacher branch's shape — middleware handles the common
+  // case fast, app/student/layout.tsx's own getUserRoles() check remains the
+  // final authoritative gate (defense-in-depth, same pattern as /teacher).
+  if (pathname.startsWith('/student')) {
+    const roles = await getUserRoles(user.id, supabase)
+    if (roles.primary !== 'student') {
+      return NextResponse.redirect(new URL(getRoleRedirect(roles.primary), request.url))
+    }
     return response
   }
 

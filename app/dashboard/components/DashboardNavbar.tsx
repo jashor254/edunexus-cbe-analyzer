@@ -24,16 +24,19 @@ const BOTTOM_NAV = [
 
 // Student-only pages (Sprint 19) — appended rather than folded into the
 // shared arrays above so parent/teacher nav is completely unaffected.
+// Sprint 3 (Platform Audit v1.0, Blocker #5): moved from the flat (student)
+// route group into the canonical app/student/* tree — hrefs point directly
+// there rather than through the compatibility redirects in next.config.ts.
 const STUDENT_EXTRA_NAV_LINKS = [
-  { href: '/blueprint',                  label: 'Blueprint',   color: 'hover:text-indigo-600'  },
-  { href: '/holiday',                    label: 'Holiday',     color: 'hover:text-orange-600'  },
-  { href: '/progress',                   label: 'Progress',    color: 'hover:text-emerald-600' },
-  { href: '/resources',                  label: 'Resources',   color: 'hover:text-teal-600'    },
-  { href: '/calendar',                   label: 'Calendar',    color: 'hover:text-sky-600'     },
+  { href: '/student/blueprint',          label: 'Blueprint',   color: 'hover:text-indigo-600'  },
+  { href: '/student/holiday',            label: 'Holiday',     color: 'hover:text-orange-600'  },
+  { href: '/student/progress',           label: 'Progress',    color: 'hover:text-emerald-600' },
+  { href: '/student/resources',          label: 'Resources',   color: 'hover:text-teal-600'    },
+  { href: '/student/calendar',           label: 'Calendar',    color: 'hover:text-sky-600'     },
 ]
 
 const STUDENT_EXTRA_BOTTOM_NAV = [
-  { href: '/progress',                   label: 'Progress',    icon: '📈' },
+  { href: '/student/progress',           label: 'Progress',    icon: '📈' },
 ]
 
 // `/dashboard/assignments` is only reachable when app/dashboard/layout.tsx's
@@ -49,7 +52,7 @@ export default function DashboardNavbar({ isStudent = false }: { isStudent?: boo
   // Careers points students at their own explorer, everyone else at the
   // parent-facing career intelligence entry point (Sprint 19 — see
   // app/(parent)/career-intelligence for the consolidated parent flow).
-  const careersHref = isStudent ? '/career' : '/career-intelligence'
+  const careersHref = isStudent ? '/student/career' : '/career-intelligence'
   const applyOverrides = <T extends { label: string; href: string }>(link: T): T => {
     if (link.label === 'Assignments') return { ...link, href: assignmentsHref }
     if (link.label === 'Careers')     return { ...link, href: careersHref }

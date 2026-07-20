@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
+import { getUserRoles, getRoleRedirect } from '@/lib/auth/getRole'
 import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -31,21 +32,15 @@ async function resolveRoleDestination(
   const isPublic = PUBLIC_PATHS.some(p => requestedPath.startsWith(p))
   if (isPublic) return requestedPath
 
-  const { data: profile } = await db
-    .from('profiles')
-    .select('role')
-    .eq('id', userId)
-    .single()
-
-  const role = profile?.role as string | undefined
-
+  // Canonical role resolution + redirect mapping — lib/auth/getRole.ts's
+  // getUserRoles()/getRoleRedirect(). Previously a second, disagreeing
+  // inline implementation with no student branch — exactly the drift
+  // Blocker #5 was caused by.
+  const roles = await getUserRoles(userId, db)
   if (requestedPath.startsWith('/teacher')) {
-    if (role === 'teacher') return requestedPath
-    return '/dashboard'
+    return roles.primary === 'teacher' ? requestedPath : getRoleRedirect(roles.primary)
   }
-
-  if (role === 'teacher') return '/teacher/dashboard'
-  return '/dashboard'
+  return getRoleRedirect(roles.primary)
 }
 
 // ── Auth callback ─────────────────────────────────────────────────────────────
@@ -82,7 +77,7 @@ export async function GET(request: Request) {
   let resolvedPath = returnTo
 
   if (role === 'teacher') {
-    resolvedPath = '/teacher/dashboard'
+    resolvedPath = getRoleRedirect('teacher')
     if (user) {
       await db.from('profiles').upsert(
         {
@@ -96,7 +91,7 @@ export async function GET(request: Request) {
     }
 
   } else if (role === 'parent' || role === 'student') {
-    resolvedPath = '/dashboard'
+    resolvedPath = getRoleRedirect(role)
     if (user) {
       await db.from('profiles').upsert(
         {

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { Sparkles, Mail, Lock, Loader2, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
+import { getRoleRedirect, type UserRole } from '@/lib/auth/roleRedirect'
 
 const GoogleIcon = () => (
   <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
@@ -30,7 +31,7 @@ function SignupForm() {
 
   const productId = searchParams.get('product')
   const returnTo  = searchParams.get('returnTo') || '/dashboard'
-  const role      = searchParams.get('role')          // 'teacher' | 'parent' | null
+  const role      = searchParams.get('role')          // 'teacher' | 'parent' | 'student' | null
 
   // What secondary role the checkbox would grant
   const secondaryRole  = role === 'teacher' ? 'parent' : role === 'parent' ? 'teacher' : null
@@ -78,7 +79,12 @@ function SignupForm() {
       return
     }
 
-    const effectiveRole = role === 'teacher' ? 'teacher' : role === 'parent' ? 'parent' : 'parent'
+    // Canonical role mapping — lib/auth/roleRedirect.ts. Before this, a
+    // fourth disagreeing implementation lived right here, defaulting
+    // unrecognized (including 'student') roles to 'parent' and never
+    // routing anyone to /student — the drift behind Platform Audit v1.0
+    // Blocker #5.
+    const effectiveRole: UserRole = role === 'teacher' ? 'teacher' : role === 'student' ? 'student' : 'parent'
     await fetch('/api/auth/complete-profile', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -88,7 +94,7 @@ function SignupForm() {
       }),
     })
 
-    const destination = effectiveRole === 'teacher' ? '/teacher/dashboard' : '/dashboard'
+    const destination = getRoleRedirect(effectiveRole)
     router.push(productId ? `${destination}?product=${productId}` : destination)
   }
 

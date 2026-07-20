@@ -68,26 +68,15 @@ function LoginContent() {
         // Fall through to the profile-based resolution below.
       }
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      const role = profile?.role
-
-      if (!role) {
-        const { data: teacher } = await supabase
-          .from('teachers')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle()
-        if (teacher) return '/teacher/dashboard'
-        return '/dashboard'
-      }
-
-      if (role === 'teacher') return '/teacher/dashboard'
-      return '/dashboard'
+      // Canonical role resolution + redirect mapping — lib/auth/getRole.ts's
+      // getUserRoles()/getRoleRedirect(), via the existing /api/auth/roles
+      // endpoint (server-only, can't be imported directly into this client
+      // component). Replaces a second, disagreeing inline implementation
+      // that never had a student branch — exactly the drift Blocker #5 was
+      // caused by.
+      const res  = await fetch('/api/auth/roles', { credentials: 'include' })
+      const json = await res.json()
+      return json.redirectTo ?? '/dashboard'
     } catch {
       return '/dashboard'
     }

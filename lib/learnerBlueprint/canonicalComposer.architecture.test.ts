@@ -83,7 +83,7 @@ test('composeBlueprint is defined exactly once in the whole repository', () => {
 test('the two former legacy-consumer routes now redirect into the canonical route instead of composing anything themselves', () => {
   const migratedPages = [
     path.join(ROOT, 'app/teacher/reports/blueprint/[studentId]/page.tsx'),
-    path.join(ROOT, 'app/(student)/blueprint/page.tsx'),
+    path.join(ROOT, 'app/student/blueprint/page.tsx'), // moved from app/(student)/blueprint (Sprint 3, Blocker #5)
   ]
   for (const file of migratedPages) {
     const content = readFileSync(file, 'utf8')
