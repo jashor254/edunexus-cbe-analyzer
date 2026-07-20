@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState, use } from 'react'
+import { useEffect, useState, use, useMemo } from 'react'
 import Link from 'next/link'
-import { Plus, Trash2, Save, Sparkles, Check, X, RefreshCw } from 'lucide-react'
+import { Plus, Trash2, Save, Sparkles, Check, X, RefreshCw, Search } from 'lucide-react'
 import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 
 interface DraftQuestion {
@@ -18,6 +18,7 @@ interface DraftQuestion {
 // own "canonical question remains the editing surface" rule).
 interface VariantRow {
   id: string
+  question_id: string
   variant_type: 'foundation' | 'supported_practice' | 'extension'
   question_text: string
   choices: string[]
@@ -29,6 +30,12 @@ const TIER_LABEL: Record<VariantRow['variant_type'], string> = {
   supported_practice: 'Supported Practice',
   extension: 'Extension',
 }
+
+// Sprint 8 (Assessment Excellence) — the Review Dashboard's filter controls.
+// Client-side only: the batched variants fetch already returns every
+// status/tier in one call, so filtering here needs zero new API surface.
+type StatusFilter = 'all' | 'draft' | 'approved' | 'rejected'
+type TierFilter = 'all' | VariantRow['variant_type']
 
 function emptyQuestion(): DraftQuestion {
   return { questionText: '', choices: ['', ''], correctIndex: 0 }
@@ -47,6 +54,19 @@ export default function QuizBuilderPage({ params }: { params: Promise<{ assignme
   const [variantError, setVariantError] = useState<Record<string, string>>({})
   const [busyVariantId, setBusyVariantId] = useState<string | null>(null)
 
+  // Sprint 8 (Assessment Excellence) — Review Dashboard state. Filter/search
+  // are pure client-side reads of variantsByQuestion, already fetched in
+  // full; bulk selection/actions reuse the same approve/reject endpoints
+  // every single-variant action already calls, just batched server-side.
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [tierFilter, setTierFilter] = useState<TierFilter>('all')
+  const [searchText, setSearchText] = useState('')
+  const [selectedVariantIds, setSelectedVariantIds] = useState<Set<string>>(new Set())
+  const [bulkActing, setBulkActing] = useState(false)
+  const [bulkError, setBulkError] = useState('')
+  const [generatingAll, setGeneratingAll] = useState(false)
+  const [generateAllSummary, setGenerateAllSummary] = useState('')
+
   useEffect(() => {
     fetch(`/api/teacher/assignments/${assignmentId}/questions`)
       .then(r => r.json())
@@ -56,7 +76,7 @@ export default function QuizBuilderPage({ params }: { params: Promise<{ assignme
             id: q.id, questionText: q.question_text, choices: q.choices, correctIndex: q.correct_index,
           }))
           setQuestions(loaded)
-          for (const q of loaded) if (q.id) void loadVariants(q.id)
+          if (loaded.some(q => q.id)) void loadAllVariants()
         } else {
           setQuestions([emptyQuestion()])
         }
@@ -64,10 +84,16 @@ export default function QuizBuilderPage({ params }: { params: Promise<{ assignme
       .finally(() => setLoading(false))
   }, [assignmentId])
 
-  async function loadVariants(questionId: string) {
-    const res = await fetch(`/api/teacher/assignments/${assignmentId}/questions/${questionId}/variants`)
+  /** Sprint 8 — one request for every question's variants, replacing the prior one-fetch-per-question loop (N round trips for an N-question quiz). */
+  async function loadAllVariants() {
+    const res = await fetch(`/api/teacher/assignments/${assignmentId}/variants`)
     const data = await res.json()
-    if (data.success) setVariantsByQuestion(prev => ({ ...prev, [questionId]: data.data.variants }))
+    if (!data.success) return
+    const grouped: Record<string, VariantRow[]> = {}
+    for (const v of data.data.variants as VariantRow[]) {
+      ;(grouped[v.question_id] ??= []).push(v)
+    }
+    setVariantsByQuestion(grouped)
   }
 
   async function handleGenerate(questionId: string) {
@@ -83,9 +109,29 @@ export default function QuizBuilderPage({ params }: { params: Promise<{ assignme
           [questionId]: `${data.data.failed.length} tier(s) could not be generated: ${data.data.failed.map((f: { tier: string; reason: string }) => `${f.tier} — ${f.reason}`).join('; ')}`,
         }))
       }
-      await loadVariants(questionId)
+      await loadAllVariants()
     } finally {
       setGenerating(prev => ({ ...prev, [questionId]: false }))
+    }
+  }
+
+  /** Sprint 8 — loops the same per-question generate the single button calls, server-side, skipping questions that already have variants. Replaces "click Generate 10 times" with one click. */
+  async function handleGenerateAll() {
+    setGeneratingAll(true)
+    setGenerateAllSummary('')
+    try {
+      const res = await fetch(`/api/teacher/assignments/${assignmentId}/variants/generate-all`, { method: 'POST' })
+      const data = await res.json()
+      if (!data.success) { setGenerateAllSummary(data.error || 'Generation failed'); return }
+      const { processedCount, skippedCount } = data.data
+      setGenerateAllSummary(
+        processedCount === 0
+          ? (skippedCount > 0 ? 'Every question already has variants.' : 'No questions to generate for.')
+          : `Generated variants for ${processedCount} question${processedCount === 1 ? '' : 's'}${skippedCount > 0 ? ` (${skippedCount} already had variants, skipped)` : ''}.`
+      )
+      await loadAllVariants()
+    } finally {
+      setGeneratingAll(false)
     }
   }
 
@@ -95,10 +141,53 @@ export default function QuizBuilderPage({ params }: { params: Promise<{ assignme
       const res = await fetch(`/api/teacher/assignments/${assignmentId}/questions/${questionId}/variants/${variantId}/${action}`, { method: 'POST' })
       const data = await res.json()
       if (!data.success) { setVariantError(prev => ({ ...prev, [questionId]: data.error || `Failed to ${action}` })); return }
-      await loadVariants(questionId)
+      await loadAllVariants()
     } finally {
       setBusyVariantId(null)
     }
+  }
+
+  function toggleVariantSelected(variantId: string) {
+    setSelectedVariantIds(prev => {
+      const next = new Set(prev)
+      if (next.has(variantId)) next.delete(variantId)
+      else next.add(variantId)
+      return next
+    })
+  }
+
+  /** Sprint 8 — bulk approve/reject over every currently-selected variant, via the one batch endpoint (no new lifecycle logic — same approveVariant()/rejectVariant() every single click already calls). */
+  async function handleBulkAction(action: 'approve' | 'reject') {
+    if (selectedVariantIds.size === 0) return
+    setBulkActing(true)
+    setBulkError('')
+    try {
+      const res = await fetch(`/api/teacher/assignments/${assignmentId}/variants/bulk-action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ variantIds: [...selectedVariantIds], action }),
+      })
+      const data = await res.json()
+      if (!data.success) { setBulkError(data.error || `Bulk ${action} failed`); return }
+      if (data.data.failed?.length > 0) {
+        setBulkError(`${data.data.failed.length} variant(s) could not be ${action === 'approve' ? 'approved' : 'rejected'} — another tier may already be approved.`)
+      }
+      setSelectedVariantIds(new Set())
+      await loadAllVariants()
+    } finally {
+      setBulkActing(false)
+    }
+  }
+
+  const allVariants = useMemo(() => Object.values(variantsByQuestion).flat(), [variantsByQuestion])
+  const hasActiveFilter = statusFilter !== 'all' || tierFilter !== 'all' || searchText.trim() !== ''
+
+  function matchesFilter(v: VariantRow): boolean {
+    if (v.status === 'archived') return false
+    if (statusFilter !== 'all' && v.status !== statusFilter) return false
+    if (tierFilter !== 'all' && v.variant_type !== tierFilter) return false
+    if (searchText.trim() && !v.question_text.toLowerCase().includes(searchText.trim().toLowerCase())) return false
+    return true
   }
 
   function updateQuestion(index: number, patch: Partial<DraftQuestion>) {
@@ -192,6 +281,92 @@ export default function QuizBuilderPage({ params }: { params: Promise<{ assignme
         </div>
       )}
 
+      {/* ── Review Dashboard toolbar (Sprint 8, Assessment Excellence) ──────
+          Generate All + filter/search + bulk approve/reject, over the one
+          batched variants fetch — the "40+ clicks for a 10-question quiz"
+          friction finding this sprint set out to fix. Only shown once at
+          least one question is saved (variants can't exist before that). */}
+      {questions.some(q => q.id) && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 mb-6 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <span className="text-xs font-black text-gray-400">REVIEW DASHBOARD</span>
+            <button
+              onClick={handleGenerateAll}
+              disabled={generatingAll}
+              className="flex items-center gap-1.5 text-xs font-black text-purple-700 hover:text-purple-800 transition disabled:opacity-60"
+            >
+              {generatingAll
+                ? <span className="w-3.5 h-3.5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+                : <Sparkles className="w-3.5 h-3.5" />}
+              Generate All (questions with none yet)
+            </button>
+          </div>
+
+          {generateAllSummary && (
+            <p className="text-xs text-gray-500">{generateAllSummary}</p>
+          )}
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 flex-1 min-w-40 px-3 py-2 rounded-xl border border-gray-200 bg-gray-50">
+              <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              <input
+                value={searchText}
+                onChange={e => setSearchText(e.target.value)}
+                placeholder="Search variant text..."
+                className="flex-1 bg-transparent outline-none text-sm text-gray-700 min-w-0"
+              />
+            </div>
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value as StatusFilter)}
+              className="px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700 outline-none"
+            >
+              <option value="all">All statuses</option>
+              <option value="draft">Draft</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            <select
+              value={tierFilter}
+              onChange={e => setTierFilter(e.target.value as TierFilter)}
+              className="px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700 outline-none"
+            >
+              <option value="all">All tiers</option>
+              <option value="foundation">Foundation</option>
+              <option value="supported_practice">Supported Practice</option>
+              <option value="extension">Extension</option>
+            </select>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 flex-wrap text-xs">
+            <p className="text-gray-400">
+              {allVariants.filter(matchesFilter).length} of {allVariants.filter(v => v.status !== 'archived').length} variant{allVariants.length === 1 ? '' : 's'} shown
+              {hasActiveFilter ? ' (filtered)' : ''}
+            </p>
+            {selectedVariantIds.size > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-gray-500">{selectedVariantIds.size} selected</span>
+                <button
+                  onClick={() => handleBulkAction('approve')}
+                  disabled={bulkActing}
+                  className="flex items-center gap-1 font-black text-green-700 hover:text-green-800 disabled:opacity-60"
+                >
+                  <Check className="w-3.5 h-3.5" /> Approve selected
+                </button>
+                <button
+                  onClick={() => handleBulkAction('reject')}
+                  disabled={bulkActing}
+                  className="flex items-center gap-1 font-black text-red-600 hover:text-red-700 disabled:opacity-60"
+                >
+                  <X className="w-3.5 h-3.5" /> Reject selected
+                </button>
+              </div>
+            )}
+          </div>
+          {bulkError && <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{bulkError}</p>}
+        </div>
+      )}
+
       <div className="space-y-4 mb-6">
         {questions.map((q, qIndex) => (
           <div key={qIndex} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
@@ -270,10 +445,21 @@ export default function QuizBuilderPage({ params }: { params: Promise<{ assignme
                 )}
 
                 <div className="space-y-2">
-                  {(variantsByQuestion[q.id] ?? []).filter(v => v.status !== 'archived').map(v => (
-                    <div key={v.id} className="bg-gray-50 rounded-xl p-3 text-sm">
+                  {(variantsByQuestion[q.id] ?? []).filter(matchesFilter).map(v => (
+                    <div key={v.id} className={`bg-gray-50 rounded-xl p-3 text-sm ${selectedVariantIds.has(v.id) ? 'ring-2 ring-teal-400' : ''}`}>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-black text-xs text-gray-500">{TIER_LABEL[v.variant_type]}</span>
+                        <div className="flex items-center gap-2">
+                          {v.status === 'draft' && (
+                            <input
+                              type="checkbox"
+                              checked={selectedVariantIds.has(v.id)}
+                              onChange={() => toggleVariantSelected(v.id)}
+                              className="w-3.5 h-3.5 accent-teal-600"
+                              title="Select for bulk approve/reject"
+                            />
+                          )}
+                          <span className="font-black text-xs text-gray-500">{TIER_LABEL[v.variant_type]}</span>
+                        </div>
                         <span className={
                           v.status === 'approved' ? 'text-xs font-bold text-green-700'
                             : v.status === 'rejected' ? 'text-xs font-bold text-red-600'
@@ -310,6 +496,10 @@ export default function QuizBuilderPage({ params }: { params: Promise<{ assignme
                       </div>
                     </div>
                   ))}
+                  {(variantsByQuestion[q.id] ?? []).filter(v => v.status !== 'archived').length > 0
+                    && (variantsByQuestion[q.id] ?? []).filter(matchesFilter).length === 0 && (
+                    <p className="text-xs text-gray-400 italic">No variants match the current filter.</p>
+                  )}
                 </div>
               </div>
             )}
