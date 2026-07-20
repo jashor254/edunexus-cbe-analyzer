@@ -45,8 +45,8 @@ export default function TeacherResourcesPage({ params }: { params: Promise<{ cla
   function load() {
     setLoading(true)
     Promise.all([
-      fetch(`/api/teacher/resources/${classId}`).then(r => r.json()),
-      fetch(`/api/teacher/materials/${classId}`).then(r => r.json()),
+      fetch(`/api/teacher/resources/by-class/${classId}`).then(r => r.json()),
+      fetch(`/api/teacher/materials/by-class/${classId}`).then(r => r.json()),
     ]).then(([r, m]) => {
       if (r.success) setResources(r.data.resources)
       if (m.success) setMaterials(m.data.materials)
@@ -63,7 +63,7 @@ export default function TeacherResourcesPage({ params }: { params: Promise<{ cla
       const form = new FormData()
       form.set('title', fileTitle.trim())
       form.set('file', file)
-      const res = await fetch(`/api/teacher/resources/${classId}`, { method: 'POST', body: form })
+      const res = await fetch(`/api/teacher/resources/by-class/${classId}`, { method: 'POST', body: form })
       const data = await res.json()
       if (!data.success) { setError(data.error || 'Upload failed'); return }
       setFile(null)
@@ -90,7 +90,7 @@ export default function TeacherResourcesPage({ params }: { params: Promise<{ cla
     setError('')
     setSavingMaterial(true)
     try {
-      const res = await fetch(`/api/teacher/materials/${classId}`, {
+      const res = await fetch(`/api/teacher/materials/by-class/${classId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -5,6 +5,7 @@ import {
   listAttendanceSessionsForClass,
   listAttendanceSessionsForSchool,
   listAttendanceSessionsByDateRange,
+  listAttendanceSessionsForTeacherClassesOnDate,
 } from '@/lib/core/attendance'
 import { requireSchoolStaff } from '@/lib/core/permissions'
 import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
@@ -92,16 +93,25 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   const classId = req.nextUrl.searchParams.get('classId')
+  const classIds = req.nextUrl.searchParams.get('classIds')
+  const date = req.nextUrl.searchParams.get('date')
   const from = req.nextUrl.searchParams.get('from')
   const to = req.nextUrl.searchParams.get('to')
 
   try {
-    // Reuses the three existing list methods exactly as Sprint 11D built
-    // them — no combined/new query shape invented. classId takes
-    // precedence (a specific class's own sessions); otherwise a date range
-    // if both bounds are given; otherwise every session in the school.
+    // Reuses the existing list methods exactly as Sprint 11D built them —
+    // no combined/new query shape invented, except classIds+date (PRP-3,
+    // Phase 7), the teacher-scoped batched read My Day needed. classId
+    // takes precedence (a specific class's own sessions); then classIds+date
+    // (multiple of the caller's own classes, one day); otherwise a date
+    // range if both bounds are given; otherwise every session in the school.
     if (classId) {
       const data = await listAttendanceSessionsForClass(userId, schoolId, classId)
+      return NextResponse.json({ data })
+    }
+    if (classIds && date) {
+      const ids = classIds.split(',').map(s => s.trim()).filter(Boolean)
+      const data = await listAttendanceSessionsForTeacherClassesOnDate(userId, schoolId, ids, date)
       return NextResponse.json({ data })
     }
     if (from && to) {

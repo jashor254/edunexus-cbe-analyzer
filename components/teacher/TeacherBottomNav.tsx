@@ -5,37 +5,16 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, BookOpen, MoreHorizontal, X, PlusCircle,
-  GraduationCap, BarChart3, FileText, AlertTriangle, ClipboardList,
-  Settings, LogOut, BookMarked, Languages, Scroll, NotebookPen,
-  Presentation, FolderOpen, Building2, CalendarCheck, UserCheck,
+  AlertTriangle, LogOut,
 } from 'lucide-react'
 import { RoleSwitcher } from '@/components/layout/RoleSwitcher'
+import { createSheetItems, moreSheetItems } from '@/lib/config/teacherWorkspaceNav'
 
-// Teacher's daily production workflow — surfaced in one tap via the
-// "Create" tab instead of being scattered across the sidebar (Sprint 3A).
-const CREATE_NAV = [
-  { href: '/teacher/scheme-of-work', icon: Scroll,       label: 'Scheme of Work' },
-  { href: '/teacher/lesson-plans',   icon: NotebookPen,  label: 'Lesson Plans'   },
-  { href: '/teacher/record-of-work', icon: ClipboardList,label: 'Record of Work' },
-  { href: '/teacher/slides',         icon: Presentation, label: 'AI Slides'      },
-  { href: '/teacher/documents',      icon: FolderOpen,   label: 'All Documents', sub: 'Progress & downloads' },
-]
-
-// Secondary tools — everything that isn't part of the daily
-// prepare-and-teach loop or already promoted to a primary tab.
-const MORE_NAV = [
-  { href: '/teacher/booklets',        icon: BookMarked,    label: 'Booklets'       },
-  { href: '/teacher/academy',         icon: GraduationCap, label: 'AI Academy'     },
-  { href: '/teacher/analytics',       icon: BarChart3,     label: 'Analytics'      },
-  { href: '/teacher/kiswahili/insha', icon: Languages,     label: 'Insha Feedback' },
-  { href: '/teacher/assignments',     icon: FileText,      label: 'Assignments'    },
-  { href: '/teacher/reports',         icon: ClipboardList, label: 'Reports'        },
-  { href: '/teacher/core-term',       icon: CalendarCheck, label: 'End of Term'    },
-  { href: '/teacher/attendance',      icon: UserCheck,     label: 'Attendance'     },
-  { href: '/teacher/settings',        icon: Settings,      label: 'Settings'       },
-]
-
-const SCHOOL_OFFICE_NAV = { href: '/teacher/core-office', icon: Building2, label: 'School Office' }
+// PRP-2 — both sheets now pull from the same shared taxonomy the desktop
+// sidebar renders (lib/config/teacherWorkspaceNav.ts), replacing what used
+// to be two independently-maintained item lists (PRP-1 audit finding: the
+// bottom nav's grouping had drifted from the sidebar's).
+const CREATE_NAV = createSheetItems()
 
 function isRouteMatch(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + '/')
@@ -48,7 +27,7 @@ interface Props {
 
 export default function TeacherBottomNav({ isAdminTier }: Props = {}) {
   const pathname                        = usePathname()
-  const moreNav = isAdminTier ? [...MORE_NAV, SCHOOL_OFFICE_NAV] : MORE_NAV
+  const moreNav = moreSheetItems(isAdminTier)
   const [moreOpen, setMoreOpen]         = useState(false)
   const [createOpen, setCreateOpen]     = useState(false)
   const [pendingEvals, setPendingEvals] = useState(0)
@@ -209,7 +188,7 @@ export default function TeacherBottomNav({ isAdminTier }: Props = {}) {
                   <div className={`text-sm font-bold ${active ? 'text-teal-300' : 'text-slate-200'}`}>
                     {item.label}
                   </div>
-                  {item.sub && <div className="text-xs text-slate-500 mt-0.5">{item.sub}</div>}
+                  {item.hint && <div className="text-xs text-slate-500 mt-0.5">{item.hint}</div>}
                 </div>
                 {showBadge && (
                   <span className="shrink-0 text-[10px] font-black bg-amber-400 text-slate-900 px-1.5 py-0.5 rounded-full">

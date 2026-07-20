@@ -17,8 +17,15 @@ import {
   classLabel, type Membership, type ClassOption, type AttendanceSession,
 } from '@/components/attendance/attendanceClient'
 import { AttendanceHistoryTable } from '@/components/attendance/AttendanceHistoryTable'
+import { operatingModeLabel } from '@/lib/config/attendanceOperatingMode'
 
 const RECENT_SESSIONS_PER_CLASS = 3
+
+const MODE_STYLES: Record<'digital' | 'hybrid' | 'paper', string> = {
+  digital: 'bg-teal-50 text-teal-700 border-teal-200',
+  hybrid: 'bg-amber-50 text-amber-700 border-amber-200',
+  paper: 'bg-slate-100 text-slate-600 border-slate-200',
+}
 
 export default function AttendanceWorkspacePage() {
   const [membership, setMembership] = useState<Membership | null | undefined>(undefined)
@@ -66,9 +73,19 @@ export default function AttendanceWorkspacePage() {
   return (
     <div className="max-w-3xl mx-auto p-6 space-y-6">
       <header>
-        <h1 className="text-xl font-black text-slate-900 flex items-center gap-2">
-          <UserCheck className="w-5 h-5 text-teal-600" /> Attendance
-        </h1>
+        <div className="flex items-center gap-2 flex-wrap">
+          <h1 className="text-xl font-black text-slate-900 flex items-center gap-2">
+            <UserCheck className="w-5 h-5 text-teal-600" /> Attendance
+          </h1>
+          {classes !== null && classes.length > 0 && (() => {
+            const mode = operatingModeLabel(Object.values(sessionsByClass).flat().map(s => s.attendance_date))
+            return (
+              <span className={`text-[11px] font-bold border rounded-full px-2.5 py-1 ${MODE_STYLES[mode.tone]}`}>
+                {mode.label}
+              </span>
+            )
+          })()}
+        </div>
         <p className="text-sm text-slate-500">
           {membership ? `${membership.schoolName} — ${today}` : today}
         </p>

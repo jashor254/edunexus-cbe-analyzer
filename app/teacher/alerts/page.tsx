@@ -32,17 +32,49 @@ interface Alert {
   students: { name: string; grade: number } | null
 }
 
+// PRP-3 (Teacher Workflow Engine, Phase 5) — the WhatsApp deep-link opens
+// a real conversation with no delivery receipt EduNexus can ever see (no
+// notification engine, no new communication channel per this sprint's own
+// Forbidden list). What this sprint CAN honestly confirm is that the
+// teacher themselves clicked "send" — recorded client-side only, per
+// session, so a teacher who re-opens Alerts later in the same session
+// sees they already acted rather than wondering if they did. This is
+// deliberately not a delivery claim (the false-promise pattern PRP-1/
+// pilot-readiness audits already flagged elsewhere) — the label says
+// "You sent this", not "Delivered" or "Read".
+const SENT_STORAGE_KEY = 'edunexus_alert_whatsapp_sent'
+
+function loadSentMap(): Record<string, string> {
+  if (typeof window === 'undefined') return {}
+  try {
+    return JSON.parse(sessionStorage.getItem(SENT_STORAGE_KEY) ?? '{}')
+  } catch {
+    return {}
+  }
+}
+
 export default function AlertsPage() {
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [loading, setLoading] = useState(true)
   const [resolving, setResolving] = useState<string | null>(null)
+  const [sentAt, setSentAt] = useState<Record<string, string>>({})
 
   useEffect(() => {
+    setSentAt(loadSentMap())
     fetch('/api/teacher/alerts')
       .then(r => r.json())
       .then(d => { if (d.success) setAlerts(d.data.alerts) })
       .finally(() => setLoading(false))
   }, [])
+
+  function markSent(alertId: string) {
+    const iso = new Date().toISOString()
+    setSentAt(prev => {
+      const next = { ...prev, [alertId]: iso }
+      if (typeof window !== 'undefined') sessionStorage.setItem(SENT_STORAGE_KEY, JSON.stringify(next))
+      return next
+    })
+  }
 
   async function resolveAlert(alertId: string) {
     setResolving(alertId)
@@ -113,7 +145,7 @@ Asante! 🙏`
                 </span>
               </h2>
               <div className="space-y-3">
-                {critical.map(alert => <AlertCard key={alert.id} alert={alert} onResolve={resolveAlert} resolving={resolving} whatsappMsg={whatsappMsg} />)}
+                {critical.map(alert => <AlertCard key={alert.id} alert={alert} onResolve={resolveAlert} resolving={resolving} whatsappMsg={whatsappMsg} sentAt={sentAt[alert.id]} onSent={() => markSent(alert.id)} />)}
               </div>
             </section>
           )}
@@ -128,7 +160,7 @@ Asante! 🙏`
                 </span>
               </h2>
               <div className="space-y-3">
-                {warning.map(alert => <AlertCard key={alert.id} alert={alert} onResolve={resolveAlert} resolving={resolving} whatsappMsg={whatsappMsg} />)}
+                {warning.map(alert => <AlertCard key={alert.id} alert={alert} onResolve={resolveAlert} resolving={resolving} whatsappMsg={whatsappMsg} sentAt={sentAt[alert.id]} onSent={() => markSent(alert.id)} />)}
               </div>
             </section>
           )}
@@ -140,7 +172,7 @@ Asante! 🙏`
                 🔵 Info ({info.length})
               </h2>
               <div className="space-y-3">
-                {info.map(alert => <AlertCard key={alert.id} alert={alert} onResolve={resolveAlert} resolving={resolving} whatsappMsg={whatsappMsg} />)}
+                {info.map(alert => <AlertCard key={alert.id} alert={alert} onResolve={resolveAlert} resolving={resolving} whatsappMsg={whatsappMsg} sentAt={sentAt[alert.id]} onSent={() => markSent(alert.id)} />)}
               </div>
             </section>
           )}
@@ -155,11 +187,15 @@ function AlertCard({
   onResolve,
   resolving,
   whatsappMsg,
+  sentAt,
+  onSent,
 }: {
   alert: Alert
   onResolve: (id: string) => void
   resolving: string | null
   whatsappMsg: (student: Alert['students'], message: string) => string
+  sentAt?: string
+  onSent: () => void
 }) {
   const sev = alertSeverity(alert.alert_type)
   const style = severityStyle(sev)
@@ -175,15 +211,22 @@ function AlertCard({
               {student?.name} {student ? `— Grade ${student.grade}` : ''}
             </div>
             <p className="text-sm text-gray-600 mt-1">{alert.message}</p>
-            <div className="flex flex-wrap gap-2 mt-3">
+            <div className="flex flex-wrap items-center gap-2 mt-3">
               <a
                 href={`https://wa.me/?text=${whatsappMsg(student, alert.message)}`}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={onSent}
                 className="flex items-center gap-1.5 text-xs bg-green-500 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-green-600 transition"
               >
-                <Share2 className="w-3 h-3" /> Send Parent WhatsApp
+                <Share2 className="w-3 h-3" /> {sentAt ? 'Send Again' : 'Send Parent WhatsApp'}
               </a>
+              {sentAt && (
+                <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1">
+                  <CheckCircle2 className="w-3 h-3" />
+                  You sent this at {new Date(sentAt).toLocaleTimeString('en-KE', { hour: 'numeric', minute: '2-digit' })}
+                </span>
+              )}
               <a
                 href="/chat"
                 className="flex items-center gap-1.5 text-xs bg-teal-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-teal-700 transition"

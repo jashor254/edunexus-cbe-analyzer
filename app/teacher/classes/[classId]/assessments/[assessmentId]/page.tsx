@@ -12,6 +12,8 @@ import { openMarksheetPDF } from '@/lib/assessments/pdfRenderer'
 import { calculateMeanScore, calculateMeanGrade, GRADE_META } from '@/lib/assessments/gradeCalculator'
 import type { MeanGrade } from '@/lib/assessments/gradeCalculator'
 import { gradeLabel } from '@/lib/curriculum/gradeLabel'
+import { setLastWorkingContext } from '@/lib/config/teacherWorkspaceMemory'
+import { useUnsavedChangesWarning } from '@/lib/config/useUnsavedChangesWarning'
 
 // ── Types ──────────────────────────────────────────────────────────────
 type MarkRow = {
@@ -130,6 +132,13 @@ export default function MarksheetPage({
   } | null>(null)
   const [toast, setToast]           = useState<{ msg: string; ok: boolean } | null>(null)
   const [analysis, setAnalysis]     = useState<SubjectAnalysis[]>([])
+  // PRP-4 (Teacher Continuity, Phase 4/7) — true from the first cell edit
+  // until the next successful save; drives a native browser warning so a
+  // refresh/close doesn't silently discard typed-but-unsaved marks. Never
+  // itself persisted anywhere (see useUnsavedChangesWarning's own comment
+  // for why marks content isn't stored client-side).
+  const [dirty, setDirty] = useState(false)
+  useUnsavedChangesWarning(dirty)
 
   const cellRefs = useRef<(HTMLInputElement | null)[][]>([])
   const fileRef  = useRef<HTMLInputElement>(null)
@@ -143,6 +152,19 @@ export default function MarksheetPage({
         const { assessment: a, marks, class: cls, teacher } = data.data
         setAssessment(a)
         setClassInfo(cls)
+        // PRP-4 (Teacher Continuity, Phase 3) — remember only navigation
+        // context (class, assessment title, a link back here), never the
+        // marks/scores themselves. matchKey mirrors the Next Action
+        // Engine's own key shape (lib/teacherWorkflow/nextAction.ts) so My
+        // Day can cross-check this is still real outstanding work before
+        // ever showing it to the teacher.
+        setLastWorkingContext({
+          kind: 'assessment',
+          matchKey: `assessment-${assessmentId}`,
+          classId,
+          className: (cls?.display_name ?? cls?.class_name ?? cls?.name ?? 'this class') as string,
+          href: `/teacher/classes/${classId}/assessments/${assessmentId}`,
+        })
         setTeacher(teacher)
 
         const loaded = marksToRows(marks, a.subjects)
@@ -165,6 +187,7 @@ export default function MarksheetPage({
   // ── Cell change ───────────────────────────────────────────────────────
   const handleCellChange = useCallback(
     (rowKey: string, field: 'studentName' | 'admNo' | string, value: string) => {
+      setDirty(true)
       setRows((prev) => {
         const updated = prev.map((r) => {
           if (r.rowKey !== rowKey) return r
@@ -242,6 +265,7 @@ export default function MarksheetPage({
       const saved: LearnerMark[] = data.data.marks
       setRows(marksToRows(saved, assessment.subjects))
       setAnalysis(analyzeSubjects(saved, assessment.subjects, assessment.max_score))
+      setDirty(false)
       showToast(`Saved ${data.data.saved} learners — positions calculated`)
     } catch {
       showToast('Network error — please try again', false)

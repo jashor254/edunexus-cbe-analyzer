@@ -25,6 +25,10 @@ import Link from 'next/link'
 import { Loader2, AlertCircle, CheckCircle2, Circle, Lock } from 'lucide-react'
 import type { ClassWithDetails, SchoolReportCard, Term } from '@/types/core'
 import { OperationalBreadcrumb } from '@/components/core/OperationalBreadcrumb'
+import {
+  getPreferredClassId, setPreferredClassId,
+  getLastWorkingContext, setLastWorkingContext, clearLastWorkingContext,
+} from '@/lib/config/teacherWorkspaceMemory'
 
 type Membership = {
   schoolId: string
@@ -75,9 +79,24 @@ export default function TeacherCoreTermPage() {
   useEffect(() => {
     if (!membership) return
     fetchJson<{ classes: ClassWithDetails[] }>(`/api/core/classes?schoolId=${membership.schoolId}`)
-      .then(({ classes }) => setClasses(classes))
+      .then(({ classes }) => {
+        setClasses(classes)
+        // PRP-4 (Teacher Continuity, Phase 6) — restore the class a
+        // teacher last worked on here, but only if it still genuinely
+        // exists in this school's class list (never fabricate a
+        // selection); a teacher can always change it, this only saves
+        // re-picking the same class on a return visit (Phase 1's audit
+        // found this page reset its picker on every load).
+        const preferred = getPreferredClassId('core-term')
+        if (preferred && classes.some(c => c.id === preferred)) setClassId(preferred)
+      })
       .catch(e => setError(e instanceof Error ? e.message : 'Failed to load classes'))
   }, [membership])
+
+  function selectClass(id: string) {
+    setClassId(id)
+    if (id) setPreferredClassId('core-term', id)
+  }
 
   const termNumber = membership?.currentTerm?.term_number
   const termId = membership?.currentTerm?.id
@@ -163,6 +182,36 @@ export default function TeacherCoreTermPage() {
   const reportsGenerated   = reportCards.length > 0
   const reportsPublished   = reportsGenerated && reportCards.every(r => r.is_published)
 
+  // PRP-4 (Teacher Continuity, Phase 3/5) — remember only "I was working
+  // End of Term for class X", never any mark/comment/report content, and
+  // only while there's genuinely unfinished work here. Once published,
+  // the context is cleared immediately — Phase 5's rule that destructive
+  // actions (Publish) are never something Continuity re-offers; a
+  // finished term has nothing left to "resume".
+  useEffect(() => {
+    if (!classId || loadingClassData) return
+    const cls = classes.find(c => c.id === classId)
+    if (!cls) return
+    const matchKey = `core-term-${classId}`
+    if (reportsPublished) {
+      // Only clear if the stored context is actually this class's —
+      // never wipe out an unrelated remembered context (e.g. an
+      // in-progress assessment for a different class) just because this
+      // one finished.
+      if (getLastWorkingContext()?.matchKey === matchKey) clearLastWorkingContext()
+      return
+    }
+    if (assessments.length > 0) {
+      setLastWorkingContext({
+        kind: 'core-term',
+        matchKey,
+        classId,
+        className: cls.display_name ?? cls.class_name,
+        href: '/teacher/core-term',
+      })
+    }
+  }, [classId, classes, assessments.length, reportsPublished, loadingClassData])
+
   if (membership === undefined) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -173,12 +222,16 @@ export default function TeacherCoreTermPage() {
 
   return (
     <div className="max-w-3xl mx-auto p-6 space-y-6">
-      <OperationalBreadcrumb parent={{ label: 'Academic Office', href: '/teacher/core-office/academic' }} current="End of Term" />
+      <OperationalBreadcrumb parent={{ label: 'Academic Office', href: '/teacher/core-office/academic' }} current="Official Report Cards" />
 
       <header className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-black text-slate-900">End of Term</h1>
-          <p className="text-sm text-slate-500">Lock assessments, generate summaries, and publish report cards for your class.</p>
+          <h1 className="text-xl font-black text-slate-900">Official Report Cards</h1>
+          <p className="text-sm text-slate-500">
+            Lock assessments, generate summaries, and publish official report cards for your class. Looking for
+            parent WhatsApp/email/clinic reports instead? That&apos;s{' '}
+            <Link href="/teacher/reports" className="text-teal-600 font-bold hover:underline">Parent Reports</Link>.
+          </p>
         </div>
         {membership && ['school_admin', 'headteacher', 'deputy_headteacher'].includes(membership.role) && (
           <Link href="/teacher/core-term/status" className="text-xs text-teal-600 hover:text-teal-700 font-medium whitespace-nowrap">
@@ -209,7 +262,7 @@ export default function TeacherCoreTermPage() {
               <label className="block text-sm text-slate-600 mb-1.5">Class</label>
               <select
                 value={classId}
-                onChange={e => setClassId(e.target.value)}
+                onChange={e => selectClass(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-slate-900 focus:outline-none focus:border-teal-500 transition-colors"
               >
                 <option value="">Select a class…</option>
@@ -230,6 +283,20 @@ export default function TeacherCoreTermPage() {
 
           {classId && !loadingClassData && (
             <div className="space-y-4">
+              {/* PRP-3 (Teacher Workflow Engine, Phase 4: Momentum) — once
+                  everything below is done, say so plainly instead of
+                  leaving four checkmarks for the teacher to re-verify
+                  themselves. The four steps stay visible underneath for
+                  anyone who wants to review them; nothing is hidden. */}
+              {reportsPublished && (
+                <div className="flex items-center gap-3 border border-emerald-200 bg-emerald-50 rounded-2xl px-4 py-3">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <p className="text-sm font-bold text-emerald-800">
+                    Report cards are locked, generated, and published for this class. Nothing left to do here.
+                  </p>
+                </div>
+              )}
+
               {/* Progress (Phase 5): only existing state, no new calculations */}
               <div className="border border-slate-200 rounded-2xl p-4 bg-white space-y-2">
                 <StatusRow label="Assessments Locked" done={assessmentsLocked} />

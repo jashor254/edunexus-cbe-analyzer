@@ -242,6 +242,27 @@ export async function listAttendanceSessionsForClass(
   return repos.attendance.listSessionsForClass(classId, schoolId)
 }
 
+// PRP-3 (Teacher Workflow Engine, Phase 7) — a teacher-scoped batched read,
+// added because My Day's "Attendance Today" composition was making one
+// HTTP round-trip per class (the documented 2+N fetch pattern, PRP-2A).
+// Ownership is still checked per class, exactly as listAttendanceSessionsForClass
+// does — this does not weaken or bypass assertClassAccess for any class in
+// the list; it only replaces N separate queries with one `.in()` query
+// after every class has been individually authorized. Deliberately not
+// the existing listAttendanceSessionsForSchool/listAttendanceSessionsByDateRange
+// (both admin-only, per Sprint 11G) — this is the teacher-scoped
+// equivalent those two were never meant to serve.
+export async function listAttendanceSessionsForTeacherClassesOnDate(
+  actorUserId: string,
+  schoolId: string,
+  classIds: string[],
+  attendanceDate: string,
+): Promise<AttendanceSessionRow[]> {
+  const classes = await Promise.all(classIds.map(id => getClass(id, schoolId)))
+  await Promise.all(classes.map(cls => assertClassAccess(actorUserId, schoolId, cls)))
+  return repos.attendance.listSessionsForClassesOnDate(classIds, schoolId, attendanceDate)
+}
+
 /**
  * Sprint 12B — the one additive function Report Cards' Phase 1 audit found
  * missing: a bulk, per-learner breakdown of raw attendance status counts

@@ -317,8 +317,12 @@ export default function ReportsPage() {
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-black text-gray-900">Reports</h1>
-        <p className="text-gray-500 mt-1">Academic Clinic Reports and class data exports</p>
+        <h1 className="text-2xl sm:text-3xl font-black text-gray-900">Parent Reports</h1>
+        <p className="text-gray-500 mt-1">
+          WhatsApp/email clinic reports and class data exports for parents. Looking for official report cards
+          (lock, generate, publish)? That&apos;s{' '}
+          <Link href="/teacher/core-term" className="text-teal-600 font-bold hover:underline">Official Report Cards</Link>.
+        </p>
       </div>
 
       {/* Tab switcher */}

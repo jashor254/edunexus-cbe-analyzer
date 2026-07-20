@@ -28,6 +28,7 @@ import {
 } from '@/components/attendance/attendanceClient'
 import { AttendanceToolbar } from '@/components/attendance/AttendanceToolbar'
 import { AttendanceLearnerRow } from '@/components/attendance/AttendanceLearnerRow'
+import { setLastWorkingContext } from '@/lib/config/teacherWorkspaceMemory'
 
 function today(): string {
   return new Date().toISOString().slice(0, 10)
@@ -109,6 +110,18 @@ export default function TakeAttendancePage() {
       setRoster(learners)
       setStatuses({})
       setStep('marking')
+      // PRP-4 (Teacher Continuity, Phase 3) — navigation context only
+      // (class + a link back to this exact class/date), never roster
+      // names or marked statuses.
+      if (selectedClass) {
+        setLastWorkingContext({
+          kind: 'attendance',
+          matchKey: `attendance-${classId}`,
+          classId,
+          className: classLabel(selectedClass),
+          href: `/teacher/attendance/new?classId=${classId}`,
+        })
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load learners')
     } finally {

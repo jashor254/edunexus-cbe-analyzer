@@ -116,6 +116,13 @@ export function listSessionsForClass(schoolId: string, classId: string): Promise
   return fetchJson(`/api/core/attendance?schoolId=${schoolId}&classId=${classId}`)
 }
 
+// PRP-3 (Teacher Workflow Engine, Phase 7) — replaces what used to be one
+// listSessionsForClass call per class (the documented 2+N fetch pattern,
+// PRP-2A) with a single batched request.
+export function listSessionsForClassesOnDate(schoolId: string, classIds: string[], date: string): Promise<AttendanceSession[]> {
+  return fetchJson(`/api/core/attendance?schoolId=${schoolId}&classIds=${classIds.join(',')}&date=${date}`)
+}
+
 export function getSession(schoolId: string, sessionId: string): Promise<AttendanceSession> {
   return fetchJson(`/api/core/attendance/${sessionId}?schoolId=${schoolId}`)
 }

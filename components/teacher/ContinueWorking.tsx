@@ -18,7 +18,7 @@ function schemeLabel(s: SchemeWithProgress): string {
 
 type Track = 'lp' | 'row'
 
-interface ContinueItem {
+export interface ContinueItem {
   key:    string
   scheme: SchemeWithProgress
   track:  Track
@@ -31,7 +31,10 @@ interface ContinueItem {
   estimatedMinutes?: number
 }
 
-function buildContinueItems(schemes: SchemeWithProgress[]): ContinueItem[] {
+// Exported for PRP-3's Next Action Engine (TodayAtAGlance) — the same
+// already-fetched `schemes` data (via DashboardDataProvider, one fetch),
+// reused for a second, smaller presentation rather than fetched again.
+export function buildContinueItems(schemes: SchemeWithProgress[]): ContinueItem[] {
   const items: ContinueItem[] = []
   for (const s of schemes) {
     if (s.total_lessons > 0 && s.lesson_plans_count < s.total_lessons) {

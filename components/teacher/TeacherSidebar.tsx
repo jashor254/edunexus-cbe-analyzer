@@ -2,37 +2,11 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import {
-  LayoutDashboard, BookOpen, FileText, BarChart3,
-  AlertTriangle, ClipboardList, Settings,
-  LogOut, Scroll, NotebookPen, Sparkles, ChevronRight, FolderOpen, GraduationCap, BookMarked, Languages, Presentation,
-  Building2, CalendarCheck, UserCheck,
-} from 'lucide-react'
+import { Settings, LogOut, ChevronRight, Sparkles } from 'lucide-react'
 import { RoleSwitcher } from '@/components/layout/RoleSwitcher'
 import { Logo } from '@/components/ui/Logo'
 import TeacherBottomNav from '@/components/teacher/TeacherBottomNav'
-
-const NAV = [
-  { href: '/teacher/dashboard',      icon: LayoutDashboard, label: 'Dashboard'      },
-  { href: '/teacher/classes',        icon: BookOpen,        label: 'My Classes'     },
-  { href: '/teacher/scheme-of-work', icon: Scroll,          label: 'Scheme of Work' },
-  { href: '/teacher/lesson-plans',   icon: NotebookPen,     label: 'Lesson Plans'   },
-  { href: '/teacher/documents',      icon: FolderOpen,      label: 'Documents'      },
-  { href: '/teacher/booklets',       icon: BookMarked,      label: 'Booklets'       },
-  { href: '/teacher/record-of-work', icon: ClipboardList,   label: 'Record of Work' },
-  { href: '/teacher/assignments',    icon: FileText,        label: 'Assignments'    },
-  { href: '/teacher/slides',         icon: Presentation,    label: 'AI Slides'      },
-  { href: '/teacher/kiswahili/insha',icon: Languages,       label: 'Insha Feedback' },
-  { href: '/teacher/analytics',      icon: BarChart3,       label: 'Analytics'      },
-  { href: '/teacher/alerts',         icon: AlertTriangle,   label: 'Alerts'         },
-  { href: '/teacher/reports',        icon: ClipboardList,   label: 'Reports'        },
-  { href: '/teacher/academy',        icon: GraduationCap,   label: 'AI Academy'     },
-  { href: '/teacher/core-term',      icon: CalendarCheck,   label: 'End of Term'    },
-  { href: '/teacher/attendance',     icon: UserCheck,       label: 'Attendance'     },
-  { href: '/teacher/settings',       icon: Settings,        label: 'Settings'       },
-]
-
-const SCHOOL_OFFICE_NAV = { href: '/teacher/core-office', icon: Building2, label: 'School Office' }
+import { TEACHER_WORKSPACE_NAV, SCHOOL_OFFICE_NAV_ITEM } from '@/lib/config/teacherWorkspaceNav'
 
 interface Props {
   teacherName: string
@@ -45,7 +19,7 @@ interface Props {
 export default function TeacherSidebar({ teacherName, school, subject, isAdminTier }: Props) {
   const pathname = usePathname()
   const initials = teacherName.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
-  const nav = isAdminTier ? [...NAV, SCHOOL_OFFICE_NAV] : NAV
+  const nav = isAdminTier ? [...TEACHER_WORKSPACE_NAV, SCHOOL_OFFICE_NAV_ITEM] : TEACHER_WORKSPACE_NAV
 
   function isActive(href: string) {
     if (href === '/teacher/dashboard') return pathname === href
@@ -105,8 +79,11 @@ export default function TeacherSidebar({ teacherName, school, subject, isAdminTi
                   <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-teal-400 rounded-full" />
                 )}
                 <item.icon className={`w-4.5 h-4.5 shrink-0 transition-colors ${active ? 'text-teal-400' : 'text-slate-500 group-hover:text-slate-300'}`} />
-                <span className="flex-1">{item.label}</span>
-                {active && <ChevronRight className="w-3 h-3 text-teal-400/60" />}
+                <span className="flex-1 min-w-0">
+                  <span className="block truncate">{item.label}</span>
+                  {item.hint && <span className="block text-[10px] font-normal text-slate-500 truncate">{item.hint}</span>}
+                </span>
+                {active && <ChevronRight className="w-3 h-3 text-teal-400/60 shrink-0" />}
               </Link>
             )
           })}

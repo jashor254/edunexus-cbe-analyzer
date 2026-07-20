@@ -9,7 +9,9 @@ import AttentionFeed from '@/components/teacher/AttentionFeed'
 import TodaysMission from '@/components/teacher/TodaysMission'
 import ContinueWorking from '@/components/teacher/ContinueWorking'
 import WeeklyTeachingProgress from '@/components/teacher/WeeklyTeachingProgress'
+import TodayAtAGlance from '@/components/teacher/TodayAtAGlance'
 import { DashboardDataProvider } from '@/components/teacher/DashboardDataProvider'
+import { getPendingAssessments } from '@/lib/assessments/getters'
 
 function getTermInfo() {
   const month = new Date().getMonth() + 1
@@ -64,6 +66,7 @@ export default async function TeacherDashboardPage() {
     .eq('teacher_id', teacher.id)
 
   const activeClasses = (classes ?? []).length
+  const pendingAssessments = await getPendingAssessments(teacher.id)
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -80,10 +83,16 @@ export default async function TeacherDashboardPage() {
             activeClasses={activeClasses}
           />
 
-          {/* ── 2. Continue Working ──────────────────────────────────── */}
+          {/* ── 2. Today at a Glance ─────────────────────────────────── */}
+          <TodayAtAGlance
+            pendingAssessmentCount={pendingAssessments.length}
+            pendingAssessments={pendingAssessments.map(a => ({ id: a.id, class_id: a.class_id, title: a.title, class_name: a.class_name }))}
+          />
+
+          {/* ── 3. Continue Working ──────────────────────────────────── */}
           <ContinueWorking />
 
-          {/* ── 3. Teacher Intelligence ───────────────────────────────── */}
+          {/* ── 4. Teacher Intelligence ───────────────────────────────── */}
           {activeClasses > 0 && (
             <div>
               <h2 className="text-sm font-black text-slate-900 mb-3">Teacher Intelligence</h2>
@@ -91,7 +100,7 @@ export default async function TeacherDashboardPage() {
             </div>
           )}
 
-          {/* ── 4. Weekly Teaching Progress ───────────────────────────── */}
+          {/* ── 5. Weekly Teaching Progress ───────────────────────────── */}
           <WeeklyTeachingProgress />
 
         </DashboardDataProvider>

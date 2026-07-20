@@ -148,6 +148,24 @@ export class AttendanceRepository extends BaseRepository {
     return data ?? []
   }
 
+  // PRP-3 (Teacher Workflow Engine, Phase 7) — the one additive batched
+  // read My Day's "Attendance Today" composition needed: before this, a
+  // teacher's own client had to call listSessionsForClass once per class
+  // (N HTTP round-trips). One `.in()` query replaces that, matching the
+  // exact precedent of Sprint 12B's `listRecordsForSessions` (ADR-0004 §6
+  // rule 6: never loop a per-item query when a batched one is possible).
+  async listSessionsForClassesOnDate(classIds: string[], schoolId: string, attendanceDate: string): Promise<AttendanceSessionRow[]> {
+    if (classIds.length === 0) return []
+    const { data, error } = await this.db
+      .from('attendance_sessions')
+      .select(SESSION_COLS)
+      .in('class_id', classIds)
+      .eq('school_id', schoolId)
+      .eq('attendance_date', attendanceDate)
+    if (error) throw new Error(`listSessionsForClassesOnDate: ${error.message}`)
+    return data ?? []
+  }
+
   async listSessionsForSchool(schoolId: string): Promise<AttendanceSessionRow[]> {
     const { data, error } = await this.db
       .from('attendance_sessions')
