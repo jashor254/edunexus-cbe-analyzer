@@ -19,6 +19,8 @@ import type {
   TeacherReflectionData,
   ParentSummaryData,
   RecommendedNextStepsData,
+  PortfolioData,
+  AchievementData,
 } from '@/lib/learnerBlueprint/types'
 
 const TREND_ARROW: Record<string, string> = {
@@ -134,6 +136,52 @@ export function CareerSection({ data }: { data: CareerData }) {
       {data.notes.map((n, i) => (
         <p key={i} className="text-[11px] text-gray-400">{n}</p>
       ))}
+    </div>
+  )
+}
+
+export function PortfolioSection({ data }: { data: PortfolioData }) {
+  return (
+    <div className="space-y-2 text-sm text-gray-700">
+      <p><span className="font-bold">{data.publishedCount}</span> published item{data.publishedCount === 1 ? '' : 's'}</p>
+      {data.featuredItem && (
+        <div>
+          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Featured</p>
+          <p>{data.featuredItem.title} <span className="text-gray-400">— {data.featuredItem.category}</span></p>
+        </div>
+      )}
+      {data.latestItem && data.latestItem.title !== data.featuredItem?.title && (
+        <div>
+          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Latest</p>
+          <p>{data.latestItem.title} <span className="text-gray-400">— {data.latestItem.category}</span></p>
+        </div>
+      )}
+      {data.portfolioUrl && (
+        <a href={data.portfolioUrl} className="text-xs font-bold text-teal-700 hover:underline">View full Portfolio →</a>
+      )}
+    </div>
+  )
+}
+
+export function AchievementSection({ data }: { data: AchievementData }) {
+  return (
+    <div className="space-y-2 text-sm text-gray-700">
+      <p><span className="font-bold">{data.achievementCount}</span> achievement{data.achievementCount === 1 ? '' : 's'}</p>
+      {data.highestLevelAchievement && (
+        <div>
+          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Highest Level</p>
+          <p>{data.highestLevelAchievement.title} <span className="text-gray-400">— {data.highestLevelAchievement.achievementType}</span></p>
+        </div>
+      )}
+      {data.latestVerifiedAchievement && data.latestVerifiedAchievement.title !== data.highestLevelAchievement?.title && (
+        <div>
+          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Latest Verified</p>
+          <p>{data.latestVerifiedAchievement.title} <span className="text-gray-400">— {data.latestVerifiedAchievement.achievementType}</span></p>
+        </div>
+      )}
+      {data.profileUrl && (
+        <a href={data.profileUrl} className="text-xs font-bold text-teal-700 hover:underline">View all Achievements →</a>
+      )}
     </div>
   )
 }

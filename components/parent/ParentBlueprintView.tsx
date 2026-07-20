@@ -13,10 +13,12 @@
 //
 // Sections shown, per ADR-0010 Part 3's Visibility Matrix: Identity,
 // Academic Record, Attendance (already summary-only), Learning Compass,
-// Career (already cluster-only, Sprint 12N), Teacher Reflection, Parent
-// Summary. Never shown: Educational Identity, Growth Timeline (both
-// `not_implemented` — Part 3's "Future: shows nothing until the domain
-// exists"), Evidence Trail (Part 3: "No").
+// Career (already cluster-only, Sprint 12N), Portfolio, Achievements
+// (Sprint 6 — summary-only per ADR-0011 Phase 4 / ADR-0012 Phase 7's own
+// Parent Portal row, same discipline as every other section here), Teacher
+// Reflection, Parent Summary. Never shown: Educational Identity, Growth
+// Timeline (both `not_implemented` — Part 3's "Future: shows nothing until
+// the domain exists"), Evidence Trail (Part 3: "No").
 
 import Link from 'next/link'
 import type { LearnerBlueprint } from '@/lib/learnerBlueprint/types'
@@ -28,6 +30,8 @@ import {
   AttendanceSection,
   LearningCompassSection,
   CareerSection,
+  PortfolioSection,
+  AchievementSection,
   TeacherReflectionSection,
   ParentSummarySection,
   RecommendedNextStepsSection,
@@ -82,6 +86,14 @@ export default function ParentBlueprintView({
 
       <ParentSectionCard title="Career Exploration" section={blueprint.career}>
         {data => <CareerSection data={data} />}
+      </ParentSectionCard>
+
+      <ParentSectionCard title="Portfolio" section={blueprint.portfolio}>
+        {data => <PortfolioSection data={data} />}
+      </ParentSectionCard>
+
+      <ParentSectionCard title="Achievements" section={blueprint.achievement}>
+        {data => <AchievementSection data={data} />}
       </ParentSectionCard>
 
       <ParentSectionCard title="Teacher Reflection" section={blueprint.teacherReflection}>

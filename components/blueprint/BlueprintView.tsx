@@ -1,13 +1,14 @@
 // components/blueprint/BlueprintView.tsx
 //
-// Current Blueprint view — renders one composeBlueprint() result in the
-// frozen order (this sprint's mission, matching ADR-0005's section list):
+// Current Blueprint view — renders one composeBlueprint() result in order:
 // Identity, Academic Record, Attendance, Learning Compass, Career
-// Intelligence, Teacher Reflection, Parent Summary, Educational Identity,
-// Growth Timeline, Evidence Trail. Single scrolling document, expand/
-// collapse only — no tabs (ADR-0009 §4). Audience-neutral: every section
-// renders for every viewer this sprint; audience filtering is explicitly
-// deferred (mission: "Audience filtering belongs later").
+// Intelligence, Portfolio, Achievements (Sprint 6, ADR-0011/0012's own
+// "summary + link out" field budget — Blueprint never re-renders a full
+// Portfolio/Achievement record), Teacher Reflection, Parent Summary,
+// Educational Identity, Growth Timeline, Evidence Trail. Single scrolling
+// document, expand/collapse only — no tabs (ADR-0009 §4). Audience-neutral:
+// every section renders for every viewer this sprint; audience filtering is
+// explicitly deferred (mission: "Audience filtering belongs later").
 //
 // Sprint 12K: the same renderer also serves the Historical Snapshot viewer
 // — pass `historicalMeta` and it renders the HistoricalBanner + disables
@@ -29,6 +30,8 @@ import {
   AttendanceSection,
   LearningCompassSection,
   CareerSection,
+  PortfolioSection,
+  AchievementSection,
   TeacherReflectionSection,
   ParentSummarySection,
   RecommendedNextStepsSection,
@@ -116,23 +119,31 @@ export default function BlueprintView({
         {data => <CareerSection data={data} />}
       </BlueprintSectionCard>
 
-      <BlueprintSectionCard title="Teacher Reflection" sectionNumber={6} section={blueprint.teacherReflection} generatedAt={generatedAt}>
+      <BlueprintSectionCard title="Portfolio" sectionNumber={6} section={blueprint.portfolio} generatedAt={generatedAt}>
+        {data => <PortfolioSection data={data} />}
+      </BlueprintSectionCard>
+
+      <BlueprintSectionCard title="Achievements" sectionNumber={7} section={blueprint.achievement} generatedAt={generatedAt}>
+        {data => <AchievementSection data={data} />}
+      </BlueprintSectionCard>
+
+      <BlueprintSectionCard title="Teacher Reflection" sectionNumber={8} section={blueprint.teacherReflection} generatedAt={generatedAt}>
         {data => <TeacherReflectionSection data={data} />}
       </BlueprintSectionCard>
 
-      <BlueprintSectionCard title="Parent Summary" sectionNumber={7} section={blueprint.parentSummary} generatedAt={generatedAt}>
+      <BlueprintSectionCard title="Parent Summary" sectionNumber={9} section={blueprint.parentSummary} generatedAt={generatedAt}>
         {data => <ParentSummarySection data={data} />}
       </BlueprintSectionCard>
 
-      <BlueprintSectionCard title="Educational Identity" sectionNumber={8} section={blueprint.educationalIdentity} generatedAt={generatedAt}>
+      <BlueprintSectionCard title="Educational Identity" sectionNumber={10} section={blueprint.educationalIdentity} generatedAt={generatedAt}>
         {() => null}
       </BlueprintSectionCard>
 
-      <BlueprintSectionCard title="Growth Timeline" sectionNumber={9} section={blueprint.growthTimeline} generatedAt={generatedAt}>
+      <BlueprintSectionCard title="Growth Timeline" sectionNumber={11} section={blueprint.growthTimeline} generatedAt={generatedAt}>
         {() => null}
       </BlueprintSectionCard>
 
-      <BlueprintSectionCard title="Recommended Next Steps" sectionNumber={10} section={blueprint.recommendedNextSteps} generatedAt={generatedAt} defaultOpen>
+      <BlueprintSectionCard title="Recommended Next Steps" sectionNumber={12} section={blueprint.recommendedNextSteps} generatedAt={generatedAt} defaultOpen>
         {data => <RecommendedNextStepsSection data={data} />}
       </BlueprintSectionCard>
 

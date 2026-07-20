@@ -159,6 +159,12 @@ test('GET /student/blueprint/[learnerId]: the learner\'s own account sees the re
   const body = await res.text()
   assert.ok(!body.includes('You do not have access to this Blueprint'), 'the learner\'s own Blueprint must not show the permission-denied screen')
   assert.ok(body.includes('Learner Blueprint'), 'the real Blueprint heading must render')
+  // Sprint 6 — Portfolio/Achievement were fully built and tested
+  // (lib/learnerPortfolio, lib/learnerAchievement) but never rendered by
+  // any Blueprint view; this proves the section titles now actually reach
+  // the page, not just composeBlueprint()'s in-memory result.
+  assert.ok(body.includes('Portfolio'), 'the Portfolio section must render')
+  assert.ok(body.includes('Achievements'), 'the Achievements section must render')
 })
 
 test('GET /student/blueprint/[learnerId]: an unrelated student account sees the denial screen, not the real Blueprint', async () => {
