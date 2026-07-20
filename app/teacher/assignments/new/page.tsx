@@ -59,6 +59,14 @@ function NewAssignmentForm() {
   const [assignmentMode, setAssignmentMode] = useState<AssignmentMode>('kicd')
 
   const [classes, setClasses] = useState<{ id: string; name: string; grade: number; subject: string }[]>([])
+  // True whenever `class_id` was picked for the teacher rather than by them —
+  // e.g. "Create Assignment from this Lesson" (lesson-plans/[planId]/page.tsx)
+  // carries subject/topic/week forward but has no `class_id` to pass (Schemes
+  // of Work aren't tied to a specific class — a teacher can have more than
+  // one class at the same grade+subject). Silently picking classes[0] here
+  // used to be invisible; this surfaces it so the teacher notices and
+  // confirms instead of accidentally publishing to the wrong stream.
+  const [classAutoSelected, setClassAutoSelected] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [created, setCreated] = useState<CreatedAssignment | null>(null)
@@ -109,7 +117,15 @@ function NewAssignmentForm() {
         if (d.success) {
           setClasses(d.data.classes)
           if (!prefillClassId && d.data.classes.length > 0) {
-            setForm(p => ({ ...p, class_id: d.data.classes[0].id }))
+            // Prefer a class that actually teaches the lesson's subject over
+            // a blind classes[0] — still only a best guess when a teacher
+            // has more than one class at that subject/grade, which is
+            // exactly why classAutoSelected still gets set below regardless.
+            const bestGuess = planSubject
+              ? d.data.classes.find((c: { subject: string }) => c.subject.toLowerCase() === planSubject.toLowerCase()) ?? d.data.classes[0]
+              : d.data.classes[0]
+            setForm(p => ({ ...p, class_id: bestGuess.id }))
+            setClassAutoSelected(true)
           }
         }
       })
@@ -421,8 +437,8 @@ function NewAssignmentForm() {
             </label>
             <select
               value={form.class_id}
-              onChange={e => setForm(p => ({ ...p, class_id: e.target.value }))}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-teal-500 outline-none text-gray-900 bg-white"
+              onChange={e => { setForm(p => ({ ...p, class_id: e.target.value })); setClassAutoSelected(false) }}
+              className={`w-full px-4 py-3 rounded-xl border outline-none text-gray-900 bg-white ${classAutoSelected ? 'border-amber-300 focus:border-amber-500' : 'border-gray-200 focus:border-teal-500'}`}
               required
             >
               <option value="">Select a class...</option>
@@ -430,6 +446,11 @@ function NewAssignmentForm() {
                 <option key={c.id} value={c.id}>{c.name} (Grade {c.grade})</option>
               ))}
             </select>
+            {classAutoSelected && (
+              <p className="text-xs font-bold text-amber-600 mt-1.5">
+                We guessed this class — please confirm it&rsquo;s the right one before creating the assignment.
+              </p>
+            )}
           </div>
 
           {assignmentMode === 'kicd' ? (
