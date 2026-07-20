@@ -5,6 +5,7 @@ import Link from 'next/link'
 import {
   CheckCircle2, Clock, AlertTriangle, MessageSquare,
   ChevronDown, ChevronUp, Send, Users, FileText, Printer,
+  Brain, Compass, Table2,
 } from 'lucide-react'
 import { generateAssignmentPDF } from '@/lib/assignments/pdfRenderer'
 
@@ -678,6 +679,29 @@ export default function AssignmentMarkingPage({ params }: { params: Promise<{ as
                             {isMarked && sub.score !== null && (
                               <span className="ml-2 text-green-600 font-bold">· {sub.score}/{assignment.max_score} pts</span>
                             )}
+                          </div>
+                          <div className="text-xs text-gray-400 flex items-center gap-2 mt-0.5">
+                            <Link
+                              href={`/teacher/reports/blueprint/${sub.student_id}`}
+                              onClick={e => e.stopPropagation()}
+                              className="flex items-center gap-1 text-teal-600 hover:text-teal-700 hover:underline"
+                            >
+                              <Brain className="w-3 h-3" /> Blueprint
+                            </Link>
+                            <Link
+                              href={`/teacher/reports/career-intelligence/${sub.student_id}`}
+                              onClick={e => e.stopPropagation()}
+                              className="flex items-center gap-1 text-teal-600 hover:text-teal-700 hover:underline"
+                            >
+                              <Compass className="w-3 h-3" /> Career
+                            </Link>
+                            <Link
+                              href={`/teacher/gradebook/${assignment.class_id}`}
+                              onClick={e => e.stopPropagation()}
+                              className="flex items-center gap-1 text-teal-600 hover:text-teal-700 hover:underline"
+                            >
+                              <Table2 className="w-3 h-3" /> Gradebook
+                            </Link>
                           </div>
                         </div>
                       </div>
