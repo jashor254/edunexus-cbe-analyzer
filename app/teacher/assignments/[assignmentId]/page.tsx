@@ -45,6 +45,7 @@ interface Assignment {
   class_id: string
   is_compass_guided: boolean
   is_quiz: boolean
+  is_adaptive: boolean
   teacher_classes: { name: string; grade: number } | null
 }
 
@@ -182,6 +183,25 @@ export default function AssignmentMarkingPage({ params }: { params: Promise<{ as
   const [sentNotice, setSentNotice] = useState<Record<string, string>>({})
   const [printingLevel, setPrintingLevel] = useState<number | null>(null)
   const [strugglingAlerts, setStrugglingAlerts] = useState<{ name: string; studentId: string; score: number; maxScore: number }[]>([])
+  const [publishing, setPublishing] = useState(false)
+  const [publishError, setPublishError] = useState('')
+
+  async function publishAssignment() {
+    setPublishing(true)
+    setPublishError('')
+    try {
+      const res = await fetch(`/api/teacher/assignments/${assignmentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'active' }),
+      })
+      const d = await res.json()
+      if (!d.success) { setPublishError(d.error || 'Failed to publish'); return }
+      setData(prev => prev ? { ...prev, assignment: { ...prev.assignment, status: 'active' } } : prev)
+    } finally {
+      setPublishing(false)
+    }
+  }
 
   useEffect(() => {
     fetch(`/api/teacher/assignments/${assignmentId}`)
@@ -417,6 +437,11 @@ export default function AssignmentMarkingPage({ params }: { params: Promise<{ as
             }`}>
               {daysLeft < 0 ? 'Overdue' : `Due in ${daysLeft}d`}
             </span>
+            {assignment.status === 'draft' && (
+              <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-purple-100 text-purple-700">
+                Draft — not visible to students
+              </span>
+            )}
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-gray-900">{assignment.title}</h1>
           <p className="text-gray-500 mt-1">
@@ -429,6 +454,28 @@ export default function AssignmentMarkingPage({ params }: { params: Promise<{ as
             >
               Manage quiz questions
             </Link>
+          )}
+
+          {/* Sprint 10 Slice A (Part 3): the one place a Draft assignment
+              becomes visible to students — an explicit teacher action, never
+              automatic. Reuses the existing PATCH status endpoint. */}
+          {assignment.status === 'draft' && (
+            <div className="mt-3 bg-purple-50 border border-purple-200 rounded-2xl p-4">
+              <p className="text-sm text-purple-900 font-bold mb-1">This assignment isn&apos;t published yet.</p>
+              <p className="text-xs text-purple-700 mb-3">
+                {assignment.is_adaptive
+                  ? 'Review your generated variants on the quiz questions page, then publish when ready.'
+                  : 'Students won’t see this until you publish it.'}
+              </p>
+              {publishError && <p className="text-xs text-red-600 mb-2">{publishError}</p>}
+              <button
+                onClick={publishAssignment}
+                disabled={publishing}
+                className="bg-purple-600 text-white px-4 py-2 rounded-xl font-black text-sm hover:bg-purple-700 transition disabled:opacity-60"
+              >
+                {publishing ? 'Publishing…' : 'Publish to students'}
+              </button>
+            </div>
           )}
         </div>
       </div>

@@ -23,6 +23,12 @@ const CreateAssignmentSchema = z.object({
   type:                  z.string().optional(),
   max_score:             z.number().int().positive().optional(),
   is_quiz:               z.boolean().optional(),
+  // Sprint 10 Slice A — Part 1/3. Adaptive assignments always go through
+  // Draft -> Generate Variants -> Teacher Review -> Publish (created
+  // 'draft', is_quiz forced true) rather than today's immediate 'active'.
+  // Optional and defaulted false: every existing caller (the plain
+  // Standard/Quiz toggle) is completely unaffected.
+  is_adaptive:           z.boolean().optional(),
   is_compass_guided:     z.boolean().optional(),
   is_holiday_assignment: z.boolean().optional(),
   holiday_period:        z.string().optional(),
@@ -49,7 +55,7 @@ export async function GET() {
       .from('assignments')
       .select(`
         id, class_id, teacher_id, title, subject, topic, type, status,
-        due_date, max_score, is_quiz, is_compass_guided, is_holiday_assignment,
+        due_date, max_score, is_quiz, is_adaptive, is_compass_guided, is_holiday_assignment,
         holiday_period, lesson_plan_id, created_at, updated_at,
         teacher_classes(name, grade)
       `)
@@ -112,7 +118,7 @@ export async function POST(req: Request) {
 
     const parsed = CreateAssignmentSchema.safeParse(await req.json())
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
-    const { class_id, title, subject, topic, substrand_id, instructions, due_date, type, max_score, is_quiz, is_compass_guided, is_holiday_assignment, holiday_period, lesson_plan_id } = parsed.data
+    const { class_id, title, subject, topic, substrand_id, instructions, due_date, type, max_score, is_quiz, is_adaptive, is_compass_guided, is_holiday_assignment, holiday_period, lesson_plan_id } = parsed.data
 
     // Verify class belongs to teacher
     try {
@@ -120,6 +126,16 @@ export async function POST(req: Request) {
     } catch {
       return apiForbidden()
     }
+
+    // Sprint 10 Slice A: an adaptive assignment is always a quiz, and always
+    // starts 'draft' — invisible to students (the existing student-list
+    // route already filters to status='active' only) until the teacher
+    // explicitly publishes it via PATCH, after generating and reviewing
+    // variants. A Standard/plain-quiz assignment is completely unaffected:
+    // is_adaptive defaults false, status stays 'active' immediately, byte
+    // for byte the same as before this column existed.
+    const adaptive = is_adaptive === true
+    const quiz = adaptive ? true : is_quiz === true
 
     const { data: assignment, error } = await db
       .from('assignments')
@@ -134,13 +150,14 @@ export async function POST(req: Request) {
         due_date,
         type: type || 'practice',
         max_score: max_score || 100,
-        is_quiz: is_quiz === true,
+        is_quiz: quiz,
+        is_adaptive: adaptive,
         // Quizzes are self-contained MCQ, never Compass-guided.
-        is_compass_guided: is_quiz === true ? false : is_compass_guided !== false,
+        is_compass_guided: quiz ? false : is_compass_guided !== false,
         is_holiday_assignment: is_holiday_assignment === true,
         holiday_period: is_holiday_assignment ? (holiday_period || null) : null,
         lesson_plan_id: lesson_plan_id || null,
-        status: 'active',
+        status: adaptive ? 'draft' : 'active',
       })
       .select()
       .single()

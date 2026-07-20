@@ -3,12 +3,52 @@
 // Input:  substrand health + learner marks + learner models + knowledge graph
 // Output: 3-4 student groups with specific actions per group, teacher allocation,
 //         Compass assignments, peer pairings — based on real data, not guesses.
+//
+// Sprint 6A (ADR-0028 consolidation): classification is delegated entirely to
+// `classifyGroup()` (lib/adaptiveLearning/recommend.ts) — the one canonical
+// instructional classification function on this platform. This module
+// previously maintained its own independent mark→level rubric (a hardcoded
+// 75/50/25 threshold split, confirmed to diverge from the canonical
+// marksToLevel's real 75/50/30 thresholds — a genuine, silent bug at the
+// 25–29% boundary) and its own risk gate (the learner's platform-wide
+// overallRiskLevel, not the subject-specific risk flag classifyGroup checks
+// — meaning a learner could have been routed to "critical_gap" here because
+// of a completely unrelated subject's risk flag). Both are retired, not
+// wrapped. The only logic remaining here is `resolveRemedialGroupType`'s own
+// fallback for `insufficient_data` — a remedial-planning-specific business
+// rule ("never drop a student from the plan even with zero evidence yet"),
+// not a competing classification algorithm; see its own doc comment.
 
 import { repos } from '@/lib/repositories'
-import { callDeepSeek } from '@/lib/ai/deepseek'
+import { routedCompletion } from '@/lib/ai-orchestration/router'
 import { getClassLearnerProfiles } from '@/lib/learnerModel/queries'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
-import type { RemedialGroup, RemedialPlan, RemedialStudent, TeacherAllocation } from './types'
+import { classifyGroup } from '@/lib/adaptiveLearning/recommend'
+import type { LearnerIntelligenceProjection } from '@/lib/projection/types'
+import type { RemedialGroup, RemedialGroupType, RemedialPlan, RemedialStudent, TeacherAllocation } from './types'
+
+/**
+ * The one place this module decides a student's remedial band — delegates
+ * entirely to `classifyGroup()` (the canonical instructional classifier,
+ * ADR-0028). The only logic that belongs to this module specifically is the
+ * `insufficient_data` fallback: `classifyGroup` honestly reports "no academic
+ * evidence for this subject yet" rather than guessing a level, but a
+ * remedial plan's whole purpose is making sure no enrolled student falls
+ * through the cracks — so, for this feature only, a student with no academic
+ * signal is folded into `critical_gap` (if their platform-wide risk is
+ * already flagged critical) or `prerequisite_gap` (the conservative default
+ * otherwise), never dropped from the plan and never left unclassified. This
+ * mirrors the pre-Sprint-6A code's own intent (it defaulted an unmarked
+ * student to `level: 1`) without re-deriving a level from raw marks.
+ */
+export function resolveRemedialGroupType(
+  projection: LearnerIntelligenceProjection | undefined,
+  subject:    string,
+): RemedialGroupType | 'insufficient_data' {
+  const classified = projection ? classifyGroup(projection, subject) : 'insufficient_data'
+  if (classified !== 'insufficient_data') return classified
+  return projection?.risk?.value.overallRiskLevel === 'critical' ? 'critical_gap' : 'prerequisite_gap'
+}
 
 type PlannerInput = {
   sowId:      string
@@ -39,16 +79,16 @@ export async function generateRemedialPlan(input: PlannerInput): Promise<Remedia
   const profiles = await getClassLearnerProfiles(input.classId)
   const profileMap = new Map(profiles.map(p => [p.student_id, p]))
 
-  // Projection risk — same risk engine as Blueprint/Career Intelligence/
-  // Parent Intelligence/Monday Panel/Attention Feed — replaces the legacy
-  // risk_flags.length count used below to gate the "critical" group.
+  // Projection — same engine as Blueprint/Career Intelligence/Parent
+  // Intelligence/Monday Panel/Attention Feed/Adaptive Learning. Feeds
+  // resolveRemedialGroupType() below, which delegates classification to
+  // classifyGroup() (Sprint 6A, ADR-0028) instead of this module's own
+  // (retired) mark→level rubric.
   const projections = new Map(
     await Promise.all(
       profiles.map(async p => [p.student_id, await recomputeLearnerProjection(p.student_id)] as const)
     )
   )
-  const isProjectionCritical = (studentId: string | null): boolean =>
-    !!studentId && projections.get(studentId)?.risk?.value.overallRiskLevel === 'critical'
 
   // 4. Get prerequisite concepts from knowledge graph
   const currentNode = await repos.knowledgeGraph.findNodeByConceptLike(input.subStrand)
@@ -70,43 +110,44 @@ export async function generateRemedialPlan(input: PlannerInput): Promise<Remedia
   const enrollmentIds = await repos.learnerIntelligence.getClassEnrollment(input.classId)
   const enrolledIds = new Set(enrollmentIds)
 
-  // 6. Classify each student by their gap severity
-  const maxScore = latestAssessment?.max_score ?? 100
+  // 6. Classify each student by their gap severity — delegated entirely to
+  // resolveRemedialGroupType()/classifyGroup() (Sprint 6A, ADR-0028).
   const subjectKey = input.subject
 
   type StudentData = {
     name:       string
     student_id: string | null
-    score:      number | null   // 0–100 raw mark
-    level:      number          // 1–4 CBC level
     rootCause:  string | null
-    isCritical: boolean         // Projection risk === 'critical'
+    groupType:  RemedialGroupType | 'insufficient_data'
   }
 
-  const students: StudentData[] = marks.map(m => {
-    const raw     = (m.subject_scores[subjectKey] ?? m.subject_scores[Object.keys(m.subject_scores)[0]] ?? 0) as number
-    const pct     = maxScore > 0 ? (raw / maxScore) * 100 : raw
-    const level   = pct >= 75 ? 4 : pct >= 50 ? 3 : pct >= 25 ? 2 : 1
-    const rootCause = health?.root_cause ?? null
-
-    return { name: m.student_name, student_id: m.student_id, score: pct, level, rootCause, isCritical: isProjectionCritical(m.student_id) }
-  })
+  const students: StudentData[] = marks.map(m => ({
+    name:       m.student_name,
+    student_id: m.student_id,
+    rootCause:  health?.root_cause ?? null,
+    groupType:  resolveRemedialGroupType(m.student_id ? projections.get(m.student_id) : undefined, subjectKey),
+  }))
 
   // Also include enrolled students with no marks
   for (const id of enrolledIds) {
     if (!students.some(s => s.student_id === id)) {
       const profile = profileMap.get(id)
       if (profile) {
-        students.push({ name: `Student (${id.slice(-4)})`, student_id: id, score: null, level: 1, rootCause: null, isCritical: isProjectionCritical(id) })
+        students.push({
+          name:       `Student (${id.slice(-4)})`,
+          student_id: id,
+          rootCause:  null,
+          groupType:  resolveRemedialGroupType(projections.get(id), subjectKey),
+        })
       }
     }
   }
 
   // 7. Build groups based on classification
-  const criticalStudents  = students.filter(s => s.level === 1 && s.isCritical)
-  const prereqStudents    = students.filter(s => s.level <= 2 && !criticalStudents.includes(s))
-  const confusedStudents  = students.filter(s => s.level === 3)
-  const onTrackStudents   = students.filter(s => s.level === 4)
+  const criticalStudents  = students.filter(s => s.groupType === 'critical_gap')
+  const prereqStudents    = students.filter(s => s.groupType === 'prerequisite_gap')
+  const confusedStudents  = students.filter(s => s.groupType === 'concept_confusion')
+  const onTrackStudents   = students.filter(s => s.groupType === 'on_track')
 
   // Build peer pairs: match on-track students with prereq-gap students
   const peerPairs: [string, string][] = []
@@ -242,8 +283,29 @@ export async function generateRemedialPlan(input: PlannerInput): Promise<Remedia
 }
 
 // ── AI enrichment — improves the week-by-week plan language ──────────────────
-
-async function enrichWithAI(
+//
+// Sprint 6B (ADR-0028 activation): the sole production workflow migrated to
+// routedCompletion() as the first proof of the canonical AI invocation path.
+// Chosen specifically because it's the lowest-risk live AI call site on the
+// platform: single-shot, non-streaming, no conversation history, and already
+// best-effort (any failure — from either provider — falls back to the
+// structured plan with no AI narrative, exactly as before).
+//
+// mode: 'quality' (chain ['deepseek', 'gemini']) is deliberate, not
+// arbitrary: routedCompletion's callProviderCompletion() calls callDeepSeek()
+// for BOTH 'gemini' and 'deepseek' chain entries today (callDeepSeek has its
+// own fixed internal DeepSeek-first-then-Gemini-fallback ordering that the
+// router's chain currently cannot override — a real, verified router
+// limitation, not a redesign this sprint attempts to fix). 'quality' mode's
+// first attempt therefore produces the EXACT SAME call sequence this
+// function made directly before this migration (DeepSeek, with its own
+// internal retry-once and Gemini fallback, all still intact underneath).
+// 'fast' mode would be misleading here — its distinguishing "try Gemini
+// first" intent doesn't actually happen — so it's deliberately not used
+// until that router limitation is fixed in its own, separate sprint.
+// Exported for direct testability (mocking routedCompletion) — not called
+// externally; generateRemedialPlan is still the module's real public entry point.
+export async function enrichWithAI(
   groups:       RemedialGroup[],
   allocation:   TeacherAllocation,
   input:        PlannerInput,
@@ -271,12 +333,20 @@ Each week: one clear sentence telling the teacher exactly what to do and with wh
 Week ${allocation.check_in_week}: always ends with a re-assessment of all groups.
 Use plain English. No bullet sub-points. No markdown headers. Keep each sentence under 120 characters.`
 
-    const response = await callDeepSeek(prompt, undefined, {
-      maxTokens:   400,
+    // system left unset — matches the pre-migration call exactly (undefined
+    // systemPrompt), which lets callDeepSeek apply its own default. Not
+    // "fixed" here even though that default (a JSON-only instruction) is in
+    // tension with this prompt's own plain-English request — this sprint
+    // activates the router, it does not improve prompt quality.
+    const response = await routedCompletion({
+      prompt,
+      mode:       'quality',
+      max_tokens: 400,
       temperature: 0.3,
+      feature:    'remedial.enrich',
     })
 
-    const lines = response
+    const lines = response.text
       .split('\n')
       .map(l => l.replace(/^\d+\.\s*/, '').trim())
       .filter(l => l.length > 10)

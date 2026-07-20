@@ -522,6 +522,104 @@ test('POST /api/student/submit-quiz: a different student cannot submit on this s
   assert.equal(res.status, 403)
 })
 
+// ── Adaptive Assignment Status Flow — Sprint 10 Slice A (Parts 1, 3) ─────
+
+test('POST /api/teacher/assignments: is_adaptive=true is always created is_quiz + status=draft, regardless of is_quiz sent', async () => {
+  const res = await fetch(`${BASE_URL}/api/teacher/assignments`, {
+    method: 'POST', headers: { ...cookie(fx.teacherSession), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      class_id: fx.classId, title: 'Adaptive Fractions Quiz', subject: 'Mathematics', topic: 'Fractions',
+      instructions: 'Answer all questions', due_date: new Date(Date.now() + 86400_000).toISOString(),
+      max_score: 20, is_quiz: false, is_adaptive: true,
+    }),
+  })
+  assert.equal(res.status, 201)
+  const body = await res.json()
+  assert.equal(body.data.assignment.is_adaptive, true)
+  assert.equal(body.data.assignment.is_quiz, true)
+  assert.equal(body.data.assignment.status, 'draft')
+
+  // Not yet published — the existing student list route (`status=active`
+  // only) must not surface it, proving the visibility gate is real, not
+  // just a stored flag.
+  const studentRes = await fetch(`${BASE_URL}/api/student/assignments`, { headers: cookie(fx.studentSession) })
+  const studentBody = await studentRes.json()
+  assert.ok(!studentBody.data.assignments.some((a: { id: string }) => a.id === body.data.assignment.id))
+
+  // Cleanup — created mid-test, not covered by fx's teardown.
+  await db.from('assignments').delete().eq('id', body.data.assignment.id)
+})
+
+test('POST /api/teacher/assignments: omitting is_adaptive (Standard/plain quiz) is unaffected — status=active immediately', async () => {
+  const res = await fetch(`${BASE_URL}/api/teacher/assignments`, {
+    method: 'POST', headers: { ...cookie(fx.teacherSession), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      class_id: fx.classId, title: 'Standard Quiz', subject: 'Mathematics', topic: 'Fractions',
+      instructions: 'Answer all questions', due_date: new Date(Date.now() + 86400_000).toISOString(),
+      max_score: 20, is_quiz: true,
+    }),
+  })
+  assert.equal(res.status, 201)
+  const body = await res.json()
+  assert.equal(body.data.assignment.is_adaptive, false)
+  assert.equal(body.data.assignment.status, 'active')
+
+  await db.from('assignments').delete().eq('id', body.data.assignment.id)
+})
+
+test('PATCH /api/teacher/assignments/[id]: publishing a draft adaptive assignment (draft -> active) makes it visible to students', async () => {
+  const createRes = await fetch(`${BASE_URL}/api/teacher/assignments`, {
+    method: 'POST', headers: { ...cookie(fx.teacherSession), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      class_id: fx.classId, title: 'Adaptive Quiz To Publish', subject: 'Mathematics', topic: 'Fractions',
+      instructions: 'Answer all questions', due_date: new Date(Date.now() + 86400_000).toISOString(),
+      max_score: 20, is_adaptive: true,
+    }),
+  })
+  const createBody = await createRes.json()
+  const adaptiveAssignmentId = createBody.data.assignment.id
+  assert.equal(createBody.data.assignment.status, 'draft')
+
+  const beforePublish = await fetch(`${BASE_URL}/api/student/assignments`, { headers: cookie(fx.studentSession) })
+  const beforePublishBody = await beforePublish.json()
+  assert.ok(!beforePublishBody.data.assignments.some((a: { id: string }) => a.id === adaptiveAssignmentId))
+
+  const publishRes = await fetch(`${BASE_URL}/api/teacher/assignments/${adaptiveAssignmentId}`, {
+    method: 'PATCH', headers: { ...cookie(fx.teacherSession), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'active' }),
+  })
+  assert.equal(publishRes.status, 200)
+  const publishBody = await publishRes.json()
+  assert.equal(publishBody.data.assignment.status, 'active')
+
+  const afterPublish = await fetch(`${BASE_URL}/api/student/assignments`, { headers: cookie(fx.studentSession) })
+  const afterPublishBody = await afterPublish.json()
+  assert.ok(afterPublishBody.data.assignments.some((a: { id: string }) => a.id === adaptiveAssignmentId))
+
+  await db.from('assignments').delete().eq('id', adaptiveAssignmentId)
+})
+
+test('PATCH /api/teacher/assignments/[id]: a non-owning teacher cannot publish this assignment', async () => {
+  const createRes = await fetch(`${BASE_URL}/api/teacher/assignments`, {
+    method: 'POST', headers: { ...cookie(fx.teacherSession), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      class_id: fx.classId, title: 'Adaptive Quiz Intrusion Test', subject: 'Mathematics', topic: 'Fractions',
+      instructions: 'Answer all questions', due_date: new Date(Date.now() + 86400_000).toISOString(),
+      max_score: 20, is_adaptive: true,
+    }),
+  })
+  const createBody = await createRes.json()
+  const adaptiveAssignmentId = createBody.data.assignment.id
+
+  const res = await fetch(`${BASE_URL}/api/teacher/assignments/${adaptiveAssignmentId}`, {
+    method: 'PATCH', headers: { ...cookie(fx.otherTeacherSession), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'active' }),
+  })
+  assert.equal(res.status, 404) // ownership enforced via .eq('teacher_id', ...), a mismatched row looks not-found, not forbidden
+
+  await db.from('assignments').delete().eq('id', adaptiveAssignmentId)
+})
+
 // ── Curriculum identity — ADR-0024 Sprint A, Objective 3 ──────────────────
 
 test('POST /api/teacher/assignments: a real substrand_id from the KICD picker is persisted, not discarded', async () => {

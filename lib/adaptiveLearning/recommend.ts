@@ -26,7 +26,7 @@
 
 import { confidenceFromScore, insufficientEvidenceInsight, type Insight } from '@/lib/learnerIntelligence/insight'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
-import type { LearnerIntelligenceProjection } from '@/lib/projection/types'
+import type { LearnerIntelligenceProjection, Trend } from '@/lib/projection/types'
 import type { RemedialGroupType } from '@/lib/remedial/types'
 import { CurriculumService, type CurriculumContext } from '@/lib/curriculum/service'
 
@@ -47,6 +47,15 @@ export type AdaptiveTask = Insight & {
   curriculum:        CurriculumContext | null
   /** Set whenever curriculum grounding is incomplete — states the gap explicitly rather than hiding it. */
   curriculumNotice:  string | null
+  /**
+   * Which grain of Projection evidence backed this task's `level` — ADR-0024
+   * Phase 2/3. 'subStrand' only when Projection has real, resolved evidence
+   * for the assigned sub-strand (`academic.bySubStrand`); 'subject' is the
+   * conservative fallback (`academic.bySubject`), used whenever sub-strand
+   * evidence doesn't exist yet — never fabricated past what Projection
+   * actually resolved. `null` only for 'insufficient_data'.
+   */
+  academicGrain:     'subStrand' | 'subject' | null
 }
 
 export type LearnerContext = {
@@ -127,8 +136,43 @@ function buildGroundedAction(
   return { action: GROUP_ACTION_GROUNDED[groupType](outcome, curriculum), curriculumNotice: null }
 }
 
+type AcademicSignal = { level: 1 | 2 | 3 | 4; trend: Trend; grain: 'subStrand' | 'subject' }
+
+/**
+ * The one place Recommendation reads a learner's academic level from
+ * Projection — ADR-0024 Phase 3. Prefers `academic.bySubStrand[subStrandId]`
+ * when Projection actually has resolved evidence for that sub-strand;
+ * otherwise falls back to `academic.bySubject[subject]`. Never guesses a
+ * sub-strand and never treats its absence from `bySubStrand` as a signal in
+ * itself — Projection performs no instructional sufficiency judgment (that's
+ * ARDS's job, ADR-0023, not yet built), so the fallback here is
+ * unconditional, not confidence-gated.
+ */
+function resolveAcademicSignal(
+  projection:  LearnerIntelligenceProjection,
+  subject:     string,
+  subStrandId?: string | null,
+): AcademicSignal | null {
+  const academic = projection.academic?.value
+  if (!academic) return null
+
+  if (subStrandId) {
+    const subStrand = academic.bySubStrand[subStrandId]
+    if (subStrand && subStrand.subject === subject) {
+      return { level: subStrand.latestLevel, trend: subStrand.trend, grain: 'subStrand' }
+    }
+  }
+
+  const bySubject = academic.bySubject[subject]
+  if (!bySubject) return null
+  return { level: bySubject.latestLevel, trend: bySubject.trend, grain: 'subject' }
+}
+
 /**
  * Classifies a learner's group for one subject, from Projection alone.
+ * Curriculum-aware (ADR-0024 Phase 3): when `subStrandId` resolves to real
+ * evidence in `academic.bySubStrand`, the sub-strand-specific level drives
+ * classification; otherwise the subject-level level does, exactly as before.
  *
  * Ported shape from lib/remedial/planner.ts's four-way split, adapted
  * honestly to what Projection actually computes: the legacy planner used
@@ -136,14 +180,18 @@ function buildGroundedAction(
  * to detect "critical"; a subject-level RiskProjection carries at most
  * one flag per subject, so "critical" here means that one flag's own
  * `severity === 'critical'` (level 1 AND declining) — a more principled
- * signal than a count, not a weaker one.
+ * signal than a count, not a weaker one. Risk stays subject-scoped even
+ * when the level itself is sub-strand-scoped — Projection has no
+ * sub-strand-level risk to consume, so nothing here invents one.
  */
 export function classifyGroup(
   projection: LearnerIntelligenceProjection,
   subject: string,
+  subStrandId?: string | null,
 ): AdaptiveGroupType | 'insufficient_data' {
-  const level = projection.academic?.value.bySubject[subject]?.latestLevel ?? null
-  if (level === null) return 'insufficient_data'
+  const signal = resolveAcademicSignal(projection, subject, subStrandId)
+  if (!signal) return 'insufficient_data'
+  const level = signal.level
 
   const subjectFlag = projection.risk?.value.flags.find(f => f.subject === subject) ?? null
 
@@ -166,24 +214,26 @@ export function buildAdaptiveTask(
   projection:  LearnerIntelligenceProjection,
   context?:    { careerNote?: string | null; curriculumContext?: CurriculumContext | null },
 ): AdaptiveTask {
-  const groupType = classifyGroup(projection, subject)
   const curriculum = context?.curriculumContext ?? null
+  const groupType = classifyGroup(projection, subject, curriculum?.subStrandId)
 
   if (groupType === 'insufficient_data') {
     const base = insufficientEvidenceInsight(`${learnerName}'s ${subject} progress`)
-    return { ...base, learnerId, subject, groupType, level: null, taskStyle: 'reinforcement', curriculum: null, curriculumNotice: null }
+    return { ...base, learnerId, subject, groupType, level: null, taskStyle: 'reinforcement', curriculum: null, curriculumNotice: null, academicGrain: null }
   }
 
-  const academic = projection.academic!.value.bySubject[subject]
-  const level = academic.latestLevel
+  const signal = resolveAcademicSignal(projection, subject, curriculum?.subStrandId)!
+  const level = signal.level
   const confidence = confidenceFromScore(projection.academic!.confidence / 100)
 
   const { action: groundedAction, curriculumNotice } = buildGroundedAction(groupType, subject, curriculum)
   const action = context?.careerNote ? `${groundedAction} ${context.careerNote}` : groundedAction
 
   const observation = curriculum
-    ? `${learnerName} is currently at Level ${level} in ${subject} (${academic.trend}), working within ${curriculum.strandTitle} — ${curriculum.subStrandTitle}.`
-    : `${learnerName} is currently at Level ${level} in ${subject} (${academic.trend}).`
+    ? (signal.grain === 'subStrand'
+        ? `${learnerName} is currently at Level ${level} in ${curriculum.strandTitle} — ${curriculum.subStrandTitle} (${signal.trend}), based on evidence specific to this sub-strand.`
+        : `${learnerName} is currently at Level ${level} in ${subject} (${signal.trend}), working within ${curriculum.strandTitle} — ${curriculum.subStrandTitle}.`)
+    : `${learnerName} is currently at Level ${level} in ${subject} (${signal.trend}).`
 
   return {
     observation,
@@ -197,6 +247,7 @@ export function buildAdaptiveTask(
     taskStyle: TASK_STYLE_BY_GROUP[groupType],
     curriculum,
     curriculumNotice,
+    academicGrain: signal.grain,
   }
 }
 

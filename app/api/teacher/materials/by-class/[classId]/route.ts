@@ -1,4 +1,7 @@
-// app/api/teacher/materials/[classId]/route.ts
+// app/api/teacher/materials/by-class/[classId]/route.ts
+// Nested under by-class/ for the same reason as
+// app/api/teacher/resources/by-class/[classId]/route.ts — Next.js forbids
+// sibling dynamic segments with different param names at the same level.
 // List + create Content Library entries (structured notes/links) for a
 // class. Thin route — all DB access via repos.classResources.
 

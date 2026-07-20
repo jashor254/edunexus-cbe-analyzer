@@ -4,8 +4,11 @@
 
 import { createServiceClient } from '@/utils/supabase/service'
 import { gradeQuiz, type QuizAnswer, type QuizGradeResult } from './quizPure'
+import { resolveGradingQuestions } from './quizDelivery'
 
 export type QuestionInput = {
+  /** Present when editing an existing question — its id is preserved (Sprint 9 Slice 1 / ADR-0028). Absent (or unrecognized) means a new question. */
+  id?: string
   questionText: string
   choices: string[]
   correctIndex: number
@@ -26,24 +29,31 @@ export type StudentQuestionRow = {
   order_index: number
 }
 
-/** Replaces the full question set for an assignment (teacher edits recreate it — no per-question versioning in this slice). */
+/**
+ * Replaces an assignment's question set via an ID-preserving upsert — a
+ * question kept across edits (same `id` sent back) keeps its identity;
+ * removed questions are deleted explicitly; new ones are inserted. Delegates
+ * entirely to the `replace_assignment_questions` Postgres function
+ * (Sprint 9 Slice 1 / ADR-0028 / Sprint 4A.1) — one atomic transaction, not
+ * sequential delete-then-insert calls, so a mid-operation failure can never
+ * leave the assignment with a partial or empty question set. Throws (and
+ * leaves every row untouched) if the assignment is locked — real submission
+ * activity already exists against its current questions — enforced by a DB
+ * trigger inside the function, not by this caller.
+ */
 export async function replaceQuestions(assignmentId: string, questions: QuestionInput[]): Promise<TeacherQuestionRow[]> {
   const db = createServiceClient()
-  await db.from('assignment_questions').delete().eq('assignment_id', assignmentId)
 
-  if (!questions.length) return []
-
-  const { data, error } = await db
-    .from('assignment_questions')
-    .insert(questions.map((q, i) => ({
-      assignment_id: assignmentId,
+  const { data, error } = await db.rpc('replace_assignment_questions', {
+    p_assignment_id: assignmentId,
+    p_questions: questions.map(q => ({
+      ...(q.id ? { id: q.id } : {}),
       question_text: q.questionText,
       choices: q.choices,
       correct_index: q.correctIndex,
-      order_index: i,
-    })))
-    .select('id, question_text, choices, correct_index, order_index')
-  if (error) throw new Error('Failed to save quiz questions')
+    })),
+  })
+  if (error) throw new Error(`Failed to save quiz questions: ${error.message}`)
   return (data ?? []) as TeacherQuestionRow[]
 }
 
@@ -56,6 +66,18 @@ export async function findQuestionsForTeacher(assignmentId: string): Promise<Tea
     .order('order_index', { ascending: true })
   if (error) throw new Error('Failed to fetch quiz questions')
   return (data ?? []) as TeacherQuestionRow[]
+}
+
+/** One canonical question by id — the source a variant generation pass transforms. */
+export async function findQuestionById(questionId: string): Promise<TeacherQuestionRow | null> {
+  const db = createServiceClient()
+  const { data, error } = await db
+    .from('assignment_questions')
+    .select('id, question_text, choices, correct_index, order_index')
+    .eq('id', questionId)
+    .maybeSingle()
+  if (error) throw new Error('Failed to fetch question')
+  return (data as TeacherQuestionRow | null) ?? null
 }
 
 /** Never selects correct_index — this is the one path a student's own session can reach. */
@@ -91,7 +113,18 @@ export async function gradeAndSubmitQuiz(input: {
     .eq('assignment_id', input.assignmentId)
   if (qErr) throw new Error('Failed to load quiz questions for grading')
 
-  const questions = (questionRows ?? []).map(q => ({ id: q.id as string, choices: [], correctIndex: q.correct_index as number }))
+  // Sprint 9 Slice 3: grade against served_variant_map's own answer key when
+  // one is bound for this (assignment, student, question) — never the
+  // canonical key when a variant was actually served. Never re-resolves the
+  // map itself (that only ever happens at first open); an unresolved/absent
+  // map here simply means every question falls back to its canonical key,
+  // identical to this function's behavior before this slice existed.
+  const resolved = await resolveGradingQuestions(
+    input.assignmentId,
+    input.studentId,
+    (questionRows ?? []).map(q => ({ id: q.id as string, correct_index: q.correct_index as number })),
+  )
+  const questions = resolved.map(q => ({ id: q.id, choices: [], correctIndex: q.correctIndex }))
   const grade = gradeQuiz(questions, input.answers, input.maxScore)
 
   const now = new Date().toISOString()

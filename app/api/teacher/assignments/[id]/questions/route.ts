@@ -12,6 +12,7 @@ import { UnauthorizedError, ResourceOwnershipError } from '@/lib/core/errors'
 import { replaceQuestions, findQuestionsForTeacher } from '@/lib/quiz/quiz'
 
 const QuestionSchema = z.object({
+  id: z.string().uuid().optional(),
   questionText: z.string().min(1),
   choices: z.array(z.string().min(1)).min(2).max(6),
   correctIndex: z.number().int().min(0),

@@ -1,4 +1,8 @@
-// app/api/teacher/resources/[classId]/route.ts
+// app/api/teacher/resources/by-class/[classId]/route.ts
+// Nested under by-class/ (not directly under resources/) because Next.js
+// forbids sibling dynamic segments with different param names at the same
+// level — this collection route uses [classId], the item route
+// (../[id]/route.ts) uses [id].
 // List + upload class resources (files) for a class. Thin route — Storage
 // upload + DB row creation both delegate to repos.classResources /
 // service-role Storage client, matching app/api/student/submit-file's

@@ -82,6 +82,7 @@ function NewAssignmentForm() {
     type: 'practice' as 'practice' | 'graded' | 'exam',
     max_score: 100,
     is_quiz: false,
+    is_adaptive: false,
     is_compass_guided: true,
     is_holiday_assignment: false,
     holiday_period: '',
@@ -661,6 +662,7 @@ function NewAssignmentForm() {
                 onClick={() => setForm(p => ({
                   ...p,
                   is_quiz: !p.is_quiz,
+                  is_adaptive: p.is_quiz ? false : p.is_adaptive, // turning Quiz off always turns Adaptive off with it
                   is_compass_guided: p.is_quiz ? p.is_compass_guided : false,
                 }))}
                 className={`relative w-12 h-6 rounded-full transition-colors ${
@@ -676,6 +678,41 @@ function NewAssignmentForm() {
               <p className="text-xs text-amber-700 mt-3">
                 📝 After you create this assignment, you'll add multiple-choice questions. Students get their score the moment they submit.
               </p>
+            )}
+
+            {/* Assessment Mode — Sprint 10 Slice A (Part 1). Only meaningful
+                for quizzes: adaptive variants apply to MCQ questions only. */}
+            {form.is_quiz && (
+              <div className="mt-4 pt-4 border-t border-amber-200">
+                <div className="text-xs font-black text-gray-500 mb-2">ASSESSMENT MODE</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setForm(p => ({ ...p, is_adaptive: false }))}
+                    className={`text-left px-3 py-2.5 rounded-xl border text-sm font-bold transition ${
+                      !form.is_adaptive ? 'border-amber-500 bg-white text-gray-900' : 'border-gray-200 bg-white/50 text-gray-500'
+                    }`}
+                  >
+                    Standard
+                    <div className="text-xs font-normal text-gray-500 mt-0.5">Every student gets the same questions</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm(p => ({ ...p, is_adaptive: true }))}
+                    className={`text-left px-3 py-2.5 rounded-xl border text-sm font-bold transition ${
+                      form.is_adaptive ? 'border-purple-500 bg-white text-gray-900' : 'border-gray-200 bg-white/50 text-gray-500'
+                    }`}
+                  >
+                    Adaptive
+                    <div className="text-xs font-normal text-gray-500 mt-0.5">AI generates versions matched to each learner's readiness</div>
+                  </button>
+                </div>
+                {form.is_adaptive && (
+                  <p className="text-xs text-purple-700 mt-3">
+                    ✨ Saved as a draft first — you&apos;ll generate and review AI variants before publishing. Students never see it until you publish.
+                  </p>
+                )}
+              </div>
             )}
           </div>
 

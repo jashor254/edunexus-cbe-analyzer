@@ -7,7 +7,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound } from '@/lib/api/response'
 import { requireAuthentication } from '@/lib/core/permissions'
 import { UnauthorizedError } from '@/lib/core/errors'
-import { findQuestionsForStudent } from '@/lib/quiz/quiz'
+import { findServedQuestionsForStudent } from '@/lib/quiz/quizDelivery'
 
 export async function GET(
   _req: Request,
@@ -34,7 +34,7 @@ export async function GET(
     // ownership shape as every other student-portal read in this file family).
     const { data: student } = await db
       .from('students')
-      .select('id')
+      .select('id, name')
       .eq('user_id', userId)
       .maybeSingle()
     if (!student) return apiForbidden()
@@ -47,7 +47,14 @@ export async function GET(
       .maybeSingle()
     if (!link) return apiForbidden()
 
-    const questions = await findQuestionsForStudent(id)
+    // Sprint 9 Slice 3: resolves (once) and serves this student's bound
+    // adaptive variant per question, falling back to the canonical question
+    // exactly as findQuestionsForStudent always did when no variant applies.
+    const questions = await findServedQuestionsForStudent({
+      assignmentId: id,
+      studentId: student.id,
+      learnerName: student.name?.trim() || 'Student',
+    })
     return apiSuccess({ questions })
   } catch (e: unknown) {
     console.error('[student/assignments/questions GET]', e instanceof Error ? e.message : String(e))

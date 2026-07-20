@@ -2,13 +2,32 @@
 
 import { useEffect, useState, use } from 'react'
 import Link from 'next/link'
-import { Plus, Trash2, Save } from 'lucide-react'
+import { Plus, Trash2, Save, Sparkles, Check, X, RefreshCw } from 'lucide-react'
 import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 
 interface DraftQuestion {
+  /** Present for a question loaded from the server — preserved on save so its identity survives edits (Sprint 9 Slice 1). Absent for a newly added question. */
+  id?: string
   questionText: string
   choices: string[]
   correctIndex: number
+}
+
+// Adaptive Variant Generation Pipeline — variants are review artifacts over
+// the canonical question above, never a second quiz editor (see the sprint's
+// own "canonical question remains the editing surface" rule).
+interface VariantRow {
+  id: string
+  variant_type: 'foundation' | 'supported_practice' | 'extension'
+  question_text: string
+  choices: string[]
+  status: 'draft' | 'approved' | 'rejected' | 'archived'
+}
+
+const TIER_LABEL: Record<VariantRow['variant_type'], string> = {
+  foundation: 'Foundation',
+  supported_practice: 'Supported Practice',
+  extension: 'Extension',
 }
 
 function emptyQuestion(): DraftQuestion {
@@ -23,20 +42,64 @@ export default function QuizBuilderPage({ params }: { params: Promise<{ assignme
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
 
+  const [variantsByQuestion, setVariantsByQuestion] = useState<Record<string, VariantRow[]>>({})
+  const [generating, setGenerating] = useState<Record<string, boolean>>({})
+  const [variantError, setVariantError] = useState<Record<string, string>>({})
+  const [busyVariantId, setBusyVariantId] = useState<string | null>(null)
+
   useEffect(() => {
     fetch(`/api/teacher/assignments/${assignmentId}/questions`)
       .then(r => r.json())
       .then(d => {
         if (d.success && d.data.questions.length > 0) {
-          setQuestions(d.data.questions.map((q: { question_text: string; choices: string[]; correct_index: number }) => ({
-            questionText: q.question_text, choices: q.choices, correctIndex: q.correct_index,
-          })))
+          const loaded: DraftQuestion[] = d.data.questions.map((q: { id: string; question_text: string; choices: string[]; correct_index: number }) => ({
+            id: q.id, questionText: q.question_text, choices: q.choices, correctIndex: q.correct_index,
+          }))
+          setQuestions(loaded)
+          for (const q of loaded) if (q.id) void loadVariants(q.id)
         } else {
           setQuestions([emptyQuestion()])
         }
       })
       .finally(() => setLoading(false))
   }, [assignmentId])
+
+  async function loadVariants(questionId: string) {
+    const res = await fetch(`/api/teacher/assignments/${assignmentId}/questions/${questionId}/variants`)
+    const data = await res.json()
+    if (data.success) setVariantsByQuestion(prev => ({ ...prev, [questionId]: data.data.variants }))
+  }
+
+  async function handleGenerate(questionId: string) {
+    setVariantError(prev => ({ ...prev, [questionId]: '' }))
+    setGenerating(prev => ({ ...prev, [questionId]: true }))
+    try {
+      const res = await fetch(`/api/teacher/assignments/${assignmentId}/questions/${questionId}/variants/generate`, { method: 'POST' })
+      const data = await res.json()
+      if (!data.success) { setVariantError(prev => ({ ...prev, [questionId]: data.error || 'Generation failed' })); return }
+      if (data.data.failed?.length > 0) {
+        setVariantError(prev => ({
+          ...prev,
+          [questionId]: `${data.data.failed.length} tier(s) could not be generated: ${data.data.failed.map((f: { tier: string; reason: string }) => `${f.tier} — ${f.reason}`).join('; ')}`,
+        }))
+      }
+      await loadVariants(questionId)
+    } finally {
+      setGenerating(prev => ({ ...prev, [questionId]: false }))
+    }
+  }
+
+  async function handleVariantAction(questionId: string, variantId: string, action: 'approve' | 'reject' | 'regenerate') {
+    setBusyVariantId(variantId)
+    try {
+      const res = await fetch(`/api/teacher/assignments/${assignmentId}/questions/${questionId}/variants/${variantId}/${action}`, { method: 'POST' })
+      const data = await res.json()
+      if (!data.success) { setVariantError(prev => ({ ...prev, [questionId]: data.error || `Failed to ${action}` })); return }
+      await loadVariants(questionId)
+    } finally {
+      setBusyVariantId(null)
+    }
+  }
 
   function updateQuestion(index: number, patch: Partial<DraftQuestion>) {
     setQuestions(prev => prev.map((q, i) => (i === index ? { ...q, ...patch } : q)))
@@ -182,6 +245,73 @@ export default function QuizBuilderPage({ params }: { params: Promise<{ assignme
               >
                 + Add choice
               </button>
+            )}
+
+            {q.id && (
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-black text-gray-400">ADAPTIVE VARIANTS</span>
+                  <button
+                    onClick={() => handleGenerate(q.id!)}
+                    disabled={generating[q.id]}
+                    className="flex items-center gap-1.5 text-xs font-black text-purple-700 hover:text-purple-800 transition disabled:opacity-60"
+                  >
+                    {generating[q.id]
+                      ? <span className="w-3.5 h-3.5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+                      : <Sparkles className="w-3.5 h-3.5" />}
+                    Generate Adaptive Variants
+                  </button>
+                </div>
+
+                {variantError[q.id] && (
+                  <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
+                    {variantError[q.id]}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  {(variantsByQuestion[q.id] ?? []).filter(v => v.status !== 'archived').map(v => (
+                    <div key={v.id} className="bg-gray-50 rounded-xl p-3 text-sm">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-black text-xs text-gray-500">{TIER_LABEL[v.variant_type]}</span>
+                        <span className={
+                          v.status === 'approved' ? 'text-xs font-bold text-green-700'
+                            : v.status === 'rejected' ? 'text-xs font-bold text-red-600'
+                            : 'text-xs font-bold text-gray-500'
+                        }>{v.status}</span>
+                      </div>
+                      <p className="text-gray-700 mb-2">{v.question_text}</p>
+                      <div className="flex gap-3">
+                        {v.status === 'draft' && (
+                          <>
+                            <button
+                              onClick={() => handleVariantAction(q.id!, v.id, 'approve')}
+                              disabled={busyVariantId === v.id}
+                              className="flex items-center gap-1 text-xs font-bold text-green-700 hover:text-green-800 disabled:opacity-60"
+                            >
+                              <Check className="w-3.5 h-3.5" /> Approve
+                            </button>
+                            <button
+                              onClick={() => handleVariantAction(q.id!, v.id, 'reject')}
+                              disabled={busyVariantId === v.id}
+                              className="flex items-center gap-1 text-xs font-bold text-red-600 hover:text-red-700 disabled:opacity-60"
+                            >
+                              <X className="w-3.5 h-3.5" /> Reject
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={() => handleVariantAction(q.id!, v.id, 'regenerate')}
+                          disabled={busyVariantId === v.id}
+                          className="flex items-center gap-1 text-xs font-bold text-gray-500 hover:text-gray-700 disabled:opacity-60"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" /> Regenerate
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         ))}

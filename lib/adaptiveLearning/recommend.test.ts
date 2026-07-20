@@ -95,6 +95,31 @@ test('classifyGroup: a risk flag for a different subject is ignored', () => {
   assert.equal(classifyGroup(p, SUBJECT), 'prerequisite_gap')
 })
 
+// ── classifyGroup — curriculum-aware (ADR-0024 Phase 3) ───────────────────────
+
+test('classifyGroup: a resolved sub-strand level overrides the subject-level level', () => {
+  const p = projection({ level: 4 }) // subject-level says on_track
+  p.academic!.value.bySubStrand['ss-1'] = {
+    subStrandId: 'ss-1', subStrandTitle: 'Fractions', strandTitle: 'NUMBERS',
+    subject: SUBJECT, latestLevel: 1, trend: 'declining', history: [],
+  }
+  assert.equal(classifyGroup(p, SUBJECT, 'ss-1'), 'prerequisite_gap')
+})
+
+test('classifyGroup: an unresolved subStrandId falls back to subject-level, never guesses', () => {
+  const p = projection({ level: 2 })
+  assert.equal(classifyGroup(p, SUBJECT, 'ss-not-present'), 'prerequisite_gap')
+})
+
+test('classifyGroup: a sub-strand entry for a different subject is not used', () => {
+  const p = projection({ level: 4 })
+  p.academic!.value.bySubStrand['ss-1'] = {
+    subStrandId: 'ss-1', subStrandTitle: 'Grammar', strandTitle: 'LANGUAGE',
+    subject: 'english', latestLevel: 1, trend: 'declining', history: [],
+  }
+  assert.equal(classifyGroup(p, SUBJECT, 'ss-1'), 'on_track')
+})
+
 // ── buildAdaptiveTask (Insight shape) ─────────────────────────────────────────
 
 test('buildAdaptiveTask: insufficient data produces the shared insufficientEvidenceInsight, never a guess', () => {
@@ -161,6 +186,55 @@ test('buildAdaptiveTask: with real learning outcomes, the action is built from t
   assert.match(task.action, /Add fractions with different denominators/)
   assert.match(task.action, /Fractions/)
   assert.match(task.observation, /NUMBERS — Fractions/)
+  assert.equal(task.academicGrain, 'subject') // no bySubStrand evidence in this fixture — honest fallback
+})
+
+// ── buildAdaptiveTask — curriculum-aware academic grain (ADR-0024 Phase 3) ────
+
+test('buildAdaptiveTask: insufficient data carries a null academicGrain', () => {
+  const p = projection({ level: null })
+  const task = buildAdaptiveTask('learner-1', 'Amina', SUBJECT, p)
+  assert.equal(task.academicGrain, null)
+})
+
+test('buildAdaptiveTask: without a curriculum context, academicGrain is subject-level', () => {
+  const p = projection({ level: 2 })
+  const task = buildAdaptiveTask('learner-1', 'Amina', SUBJECT, p)
+  assert.equal(task.academicGrain, 'subject')
+})
+
+test('buildAdaptiveTask: when Projection has resolved sub-strand evidence, the task consumes it — level, trend, and grain all come from bySubStrand', () => {
+  const p = projection({ level: 4, trend: 'stable' }) // subject-level says on_track, improving would mislead
+  p.academic!.value.bySubStrand['ss1'] = {
+    subStrandId: 'ss1', subStrandTitle: 'Fractions', strandTitle: 'NUMBERS',
+    subject: SUBJECT, latestLevel: 1, trend: 'declining', history: [],
+  }
+  const curriculum = {
+    strandId: 's1', strandTitle: 'NUMBERS', subStrandId: 'ss1', subStrandTitle: 'Fractions',
+    learningOutcomes: ['Add fractions with different denominators'], unavailableFields: ['core_competencies'] as const,
+  }
+  const task = buildAdaptiveTask('learner-1', 'Amina', SUBJECT, p, { curriculumContext: curriculum })
+
+  assert.equal(task.academicGrain, 'subStrand')
+  assert.equal(task.level, 1)
+  assert.equal(task.groupType, 'prerequisite_gap') // driven by the sub-strand level, not the subject's on_track
+  assert.match(task.observation, /Level 1 in NUMBERS — Fractions \(declining\)/)
+  assert.match(task.observation, /specific to this sub-strand/)
+})
+
+test('buildAdaptiveTask: a sub-strand entry for a different subject never leaks into this task\'s grain', () => {
+  const p = projection({ level: 4 })
+  p.academic!.value.bySubStrand['ss-other'] = {
+    subStrandId: 'ss-other', subStrandTitle: 'Grammar', strandTitle: 'LANGUAGE',
+    subject: 'english', latestLevel: 1, trend: 'declining', history: [],
+  }
+  const curriculum = {
+    strandId: 'lang', strandTitle: 'LANGUAGE', subStrandId: 'ss-other', subStrandTitle: 'Grammar',
+    learningOutcomes: [], unavailableFields: ['core_competencies'] as const,
+  }
+  const task = buildAdaptiveTask('learner-1', 'Amina', SUBJECT, p, { curriculumContext: curriculum })
+  assert.equal(task.academicGrain, 'subject')
+  assert.equal(task.level, 4)
 })
 
 // ── neutralGroupLabel — must never leak internal taxonomy to a learner ────────
