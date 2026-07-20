@@ -1,12 +1,18 @@
 // app/student/blueprint/[learnerId]/page.tsx
 //
-// Current Blueprint view — Phase 1 (Sprint 12J). Teacher-first per this
-// sprint's explicit scope (no Parent Portal, no Employer/University
-// filtering, no learner personalization — audience filtering is deferred).
+// Current Blueprint view — Phase 1 (Sprint 12J), access fixed Sprint 6.
 // "[learnerId]" is the Core learner being viewed, not the viewing role —
-// this route is reached from Teacher Workspace, not a learner's own
-// session (see sprint-12j-blueprint-ui-phase1.md for the path-naming
-// rationale).
+// originally reached only from Teacher Workspace (see
+// sprint-12j-blueprint-ui-phase1.md), but this is also the page a real
+// student is redirected into from `/student/blueprint`. That self-access
+// path was gated on `requireSchoolStaff` (admin/headteacher/teacher only —
+// `student` is not a `school_users` role) until Sprint 6 found real student
+// accounts 404ing here despite Blocker #5 declaring the route reachable;
+// the routing test only ever exercised the "no owned student" empty state.
+// Fixed by switching to `requireLearnerAccess` (self/parent/teacher-of-
+// record/admin — the same read-visibility rule `canViewLearner` already
+// defines elsewhere, bridged into Core-learner-id space), not a new
+// authorization pattern.
 //
 // Uses ONLY the canonical composition engine (lib/learnerBlueprint) — no
 // lib/academicClinic, no lib/learnerIntelligence import. Thin page: auth
@@ -14,8 +20,8 @@
 
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
-import { requireAuthentication, requireSchoolStaff } from '@/lib/core/permissions'
-import { MembershipRequiredError, PermissionDeniedError, UnauthorizedError } from '@/lib/core/errors'
+import { requireAuthentication, requireLearnerAccess } from '@/lib/core/permissions'
+import { ResourceOwnershipError, UnauthorizedError } from '@/lib/core/errors'
 import { repos } from '@/lib/repositories'
 import { composeBlueprint } from '@/lib/learnerBlueprint/composeBlueprint'
 import BlueprintView from '@/components/blueprint/BlueprintView'
@@ -50,13 +56,12 @@ export default async function StudentBlueprintPage({
   }
 
   try {
-    await requireSchoolStaff(supabase, schoolId)
+    await requireLearnerAccess(supabase, schoolId, learnerId)
   } catch (err) {
-    if (err instanceof MembershipRequiredError) notFound()
-    if (err instanceof PermissionDeniedError) {
-      // The user IS a member of this school (membership already resolved
-      // above), so there's nothing left to hide — an explicit message is
-      // strictly more honest than a 404 here, without revealing any ID.
+    if (err instanceof ResourceOwnershipError) {
+      // The user is authenticated but is not this learner's self/parent/
+      // teacher-of-record/school-admin — an explicit message is strictly
+      // more honest than a 404 here, without revealing any ID.
       return <BlueprintStateMessage kind="permission-denied" />
     }
     throw err

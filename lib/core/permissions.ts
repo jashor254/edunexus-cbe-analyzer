@@ -29,6 +29,7 @@ import {
   resolveTeacher,
   resolveStudent,
   resolveParent,
+  resolveLegacyStudentId,
   type CurrentUser,
   type ResolvedMembership,
 } from '@/lib/core/identity'
@@ -213,4 +214,38 @@ export async function canViewLearner(client: SupabaseClient, schoolId: string, s
   }
 
   return false
+}
+
+/**
+ * {@link canViewLearner}, addressed by Core `learners.id` instead of legacy
+ * `students.id` — every page under `app/student/[section]/[learnerId]` and
+ * `app/(parent)/child/[learnerId]/*` is addressed this way, but the
+ * self/teacher-of-record checks `canViewLearner` performs only make sense
+ * once bridged into legacy space (Sprint 9F's `students.external_id`).
+ * Composes the existing bridge (`resolveLegacyStudentId`) with the existing
+ * check rather than duplicating any of `canViewLearner`'s logic — per the
+ * Ten Engineering Rules, "never duplicate authorization." Still returns
+ * `true` for a linked parent/admin even when no legacy bridge exists yet
+ * (Core-side parent links and school admin membership don't depend on the
+ * legacy bridge at all).
+ */
+export async function canViewLearnerRecord(client: SupabaseClient, schoolId: string, coreLearnerId: string): Promise<boolean> {
+  const legacyStudentId = await resolveLegacyStudentId(coreLearnerId)
+  if (legacyStudentId && await canViewLearner(client, schoolId, legacyStudentId)) return true
+
+  const user = await requireAuthentication(client)
+  const parent = await resolveParent(user.id)
+  if (parent.coreLearnerIds.includes(coreLearnerId)) return true
+
+  const membership = await resolveMembership(user.id, schoolId)
+  return !!membership && SCHOOL_ADMIN_ROLES.includes(membership.role)
+}
+
+/** Throws {@link ResourceOwnershipError} unless {@link canViewLearnerRecord} is true — the throwing counterpart for pages that need a hard gate, not a boolean. */
+export async function requireLearnerAccess(client: SupabaseClient, schoolId: string, coreLearnerId: string): Promise<CurrentUser> {
+  const user = await requireAuthentication(client)
+  if (!(await canViewLearnerRecord(client, schoolId, coreLearnerId))) {
+    throw new ResourceOwnershipError('You do not have access to this learner\'s record.')
+  }
+  return user
 }
