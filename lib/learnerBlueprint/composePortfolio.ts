@@ -35,7 +35,11 @@ export async function composePortfolio(coreLearnerId: string, schoolId: string):
       publishedCount: summary.publishedCount,
       latestItem: summary.latestItem,
       featuredItem: summary.featuredItem,
-      portfolioUrl: summary.portfolioUrl,
+      // Sprint 6 — app/student/portfolio/[learnerId] now exists; the
+      // summary itself still never carries a URL of its own (Portfolio
+      // stays "compose, never own" all the way through), so Blueprint is
+      // the one place that knows both the learner id and the real route.
+      portfolioUrl: `/student/portfolio/${coreLearnerId}`,
     }
 
     return { status: 'available', owner: OWNER, freshness: 'live', data }

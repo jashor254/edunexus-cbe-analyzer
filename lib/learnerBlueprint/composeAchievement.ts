@@ -37,7 +37,9 @@ export async function composeAchievement(coreLearnerId: string, schoolId: string
       achievementCount: summary.achievementCount,
       latestVerifiedAchievement: summary.latestVerifiedAchievement,
       highestLevelAchievement: summary.highestLevelAchievement,
-      profileUrl: summary.profileUrl,
+      // Sprint 6 — app/student/achievements/[learnerId] now exists; same
+      // reasoning as composePortfolio.ts's portfolioUrl.
+      profileUrl: `/student/achievements/${coreLearnerId}`,
     }
 
     return { status: 'available', owner: OWNER, freshness: 'live', data }
