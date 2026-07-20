@@ -49,8 +49,8 @@ export default function StudentResourcesPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
       <div className="mb-6">
-        <Link href="/dashboard" className="text-sm text-gray-400 hover:text-gray-600 font-medium">
-          ← Dashboard
+        <Link href="/student" className="text-sm text-gray-400 hover:text-gray-600 font-medium">
+          ← Home
         </Link>
         <h1 className="text-3xl font-black text-gray-900 mt-3">Class Resources</h1>
         <p className="text-gray-500 mt-1">Notes and files your teacher has shared</p>

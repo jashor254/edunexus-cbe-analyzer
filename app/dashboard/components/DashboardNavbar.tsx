@@ -28,6 +28,8 @@ const STUDENT_EXTRA_NAV_LINKS = [
   { href: '/blueprint',                  label: 'Blueprint',   color: 'hover:text-indigo-600'  },
   { href: '/holiday',                    label: 'Holiday',     color: 'hover:text-orange-600'  },
   { href: '/progress',                   label: 'Progress',    color: 'hover:text-emerald-600' },
+  { href: '/resources',                  label: 'Resources',   color: 'hover:text-teal-600'    },
+  { href: '/calendar',                   label: 'Calendar',    color: 'hover:text-sky-600'     },
 ]
 
 const STUDENT_EXTRA_BOTTOM_NAV = [

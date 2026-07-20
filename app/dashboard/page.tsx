@@ -8,7 +8,6 @@ import {
   Compass,
   ClipboardList,
   BarChart3,
-  BookOpen,
   Search,
   TrendingUp,
   PlusCircle,
@@ -1262,24 +1261,16 @@ export default function DashboardPage() {
                 href: '/dashboard/assignments',
                 badge: stats?.pendingAssignments && stats.pendingAssignments > 0 ? stats.pendingAssignments : null,
               },
-              {
-                icon: BookOpen,
-                title: 'Class Resources',
-                sub: 'Notes & files from your teacher',
-                gradient: 'from-teal-500 to-emerald-600',
-                shadow: 'shadow-teal-500/20',
-                href: '/dashboard/resources',
-                badge: null,
-              },
-              {
-                icon: Zap,
-                title: 'Calendar',
-                sub: 'Dates & announcements',
-                gradient: 'from-indigo-500 to-violet-600',
-                shadow: 'shadow-indigo-500/20',
-                href: '/dashboard/calendar',
-                badge: null,
-              },
+              // 'Class Resources' and 'Calendar' tiles were removed here
+              // (Sprint 2, Platform Audit v1.0 Blocker #4): they pointed at
+              // /dashboard/resources and /dashboard/calendar, which moved to
+              // /resources and /calendar (app/(student)/*) so students could
+              // reach them at all — but that route group redirects a parent
+              // straight back to /dashboard, turning this tile into a dead
+              // end for the parent audience this page actually serves. Their
+              // copy ("Notes & files from your teacher") was student-facing
+              // to begin with; a real parent-facing equivalent is Sprint 4
+              // (Parent LMS Parity), not a routing fix — not added here.
             ].map(({ icon: Icon, title, sub, gradient, shadow, href, badge }) => (
               <Link
                 key={href}

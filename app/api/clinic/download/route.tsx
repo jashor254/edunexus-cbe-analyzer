@@ -1,7 +1,7 @@
 // app/api/clinic/download/route.ts
 import { NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
+import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
 import {
   generateReport,
   calculateVitals,
@@ -11,7 +11,6 @@ import {
   formatSubjectName,
 } from '@/lib/academicClinic/reportGenerator'
 import { generateAcademicClinicPDF } from '@/lib/academicClinic/pdfGenerator'
-import { isAdmin } from '@/lib/auth/isAdmin'
 import type {
   SubjectProgress,
   StudentProfile,
@@ -21,12 +20,17 @@ import type { CBCLevel } from '@/lib/assessments/gradeCalculator'
 
 export async function POST(req: Request) {
   try {
-    // ── 1. Auth check ────────────────────────────────────────────────────────
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // ── 1. Check access — admin bypass, teacher tier, subscription, OR token balance ──
+    const access = await checkFeatureAccess('clinic_report')
+    if (access.allowed === false) {
+      return NextResponse.json(
+        {
+          error: access.reason === 'unauthenticated'
+            ? 'Unauthorized'
+            : 'No active subscription or tokens. Please upgrade.',
+        },
+        { status: access.reason === 'unauthenticated' ? 401 : 403 }
+      )
     }
 
     // ── 2. Parse request body ────────────────────────────────────────────────
@@ -46,7 +50,7 @@ export async function POST(req: Request) {
       .from('students')
       .select('id, user_id, name, grade, school, current_pathway')
       .eq('id', studentId)
-      .eq('user_id', user.id)
+      .eq('user_id', access.userId)
       .single()
 
     if (studentError || !student) {
@@ -56,65 +60,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // ── 4. Check access — admin bypass, subscription, OR token balance ────────
-    const adminAccess = await isAdmin(user.id, user.email)
-
-    if (!adminAccess) {
-      const [{ data: subscription }, { data: tokenBalance }] = await Promise.all([
-        db
-          .from('subscriptions')
-          .select('plan, expires_at')
-          .eq('user_id', user.id)
-          .eq('status', 'active')
-          .gt('expires_at', new Date().toISOString())
-          .single(),
-
-        db
-          .from('token_balances')
-          .select('balance')
-          .eq('user_id', user.id)
-          .single(),
-      ])
-
-      const hasSubscription = !!subscription
-      const tokens          = tokenBalance?.balance || 0
-      const hasTokens       = tokens > 0
-
-      if (!hasSubscription && !hasTokens) {
-        return NextResponse.json(
-          { error: 'No active subscription or tokens. Please upgrade.' },
-          { status: 403 }
-        )
-      }
-
-      // ── 5. Deduct token if not on subscription ─────────────────────────────
-      if (!hasSubscription && hasTokens) {
-        const { error: deductError } = await db
-          .from('token_balances')
-          .update({ balance: tokens - 1 })
-          .eq('user_id', user.id)
-
-        if (deductError) {
-          console.error('[clinic/download] token deduct error:', deductError)
-          return NextResponse.json(
-            { error: 'Could not deduct token. Try again.' },
-            { status: 500 }
-          )
-        }
-
-        await db.from('token_usage').insert({
-          user_id:     user.id,
-          action:      'clinic_report',
-          tokens_used: 1,
-          metadata: {
-            student_id:   studentId,
-            student_name: student.name,
-          }
-        })
-      }
-    }
-
-    // ── 6. Build subject progress from assessments ───────────────────────────
+    // ── 4. Build subject progress from assessments ───────────────────────────
     const latestAssessment  = assessments[assessments.length - 1]
 
     // Resolve teacher-wins per subject for the latest term/year
@@ -166,7 +112,7 @@ export async function POST(req: Request) {
       }
     })
 
-    // ── 7. Build report ──────────────────────────────────────────────────────
+    // ── 5. Build report ──────────────────────────────────────────────────────
     const vitals     = calculateVitals(subjectProgress)
     const actionPlan = generateActionPlan(subjectProgress)
     const isJunior   = student.grade >= 7 && student.grade <= 9  // Grade 7–9 = Junior School
@@ -196,11 +142,16 @@ export async function POST(req: Request) {
       seniorGuidance
     )
 
-    // ── 8. Generate PDF ──────────────────────────────────────────────────────
+    // ── 6. Generate PDF ──────────────────────────────────────────────────────
     const pdfBlob = await generateAcademicClinicPDF(report)
     const pdfBuffer = Buffer.from(await pdfBlob.arrayBuffer())
 
-    // ── 9. Return PDF ────────────────────────────────────────────────────────
+    // ── 7. Deduct tokens — only after report + PDF generation succeeded ───────
+    if (access.deductTokens) {
+      await deductFeatureTokens(access.userId, 'clinic_report', access.cost)
+    }
+
+    // ── 8. Return PDF ────────────────────────────────────────────────────────
     const filename = `${student.name.replace(/\s+/g, '_')}_Academic_Report.pdf`
 
     return new NextResponse(pdfBuffer, {
