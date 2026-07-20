@@ -186,6 +186,16 @@ export default function AssignmentMarkingPage({ params }: { params: Promise<{ as
   const [strugglingAlerts, setStrugglingAlerts] = useState<{ name: string; studentId: string; score: number; maxScore: number }[]>([])
   const [publishing, setPublishing] = useState(false)
   const [publishError, setPublishError] = useState('')
+  // Sprint 8 (Assessment Excellence) — the publish button previously had
+  // zero validation: an adaptive assignment could be published with no
+  // approved variants at all, silently falling every student back to the
+  // canonical question and defeating the entire point of "adaptive"
+  // without any visible sign that happened. `unapprovedQuestionCount` is
+  // computed from the same batched variants read the Review Dashboard
+  // uses (GET /api/teacher/assignments/[id]/variants) — no new data
+  // model, just checked before the button acts instead of never.
+  const [unapprovedQuestionCount, setUnapprovedQuestionCount] = useState<number | null>(null)
+  const [confirmPublishAnyway, setConfirmPublishAnyway] = useState(false)
 
   async function publishAssignment() {
     setPublishing(true)
@@ -225,6 +235,27 @@ export default function AssignmentMarkingPage({ params }: { params: Promise<{ as
       })
       .finally(() => setLoading(false))
   }, [assignmentId])
+
+  useEffect(() => {
+    if (!data || !data.assignment.is_adaptive || data.assignment.status !== 'draft') return
+    let cancelled = false
+
+    Promise.all([
+      fetch(`/api/teacher/assignments/${assignmentId}/questions`).then(r => r.json()),
+      fetch(`/api/teacher/assignments/${assignmentId}/variants`).then(r => r.json()),
+    ]).then(([questionsRes, variantsRes]) => {
+      if (cancelled || !questionsRes.success || !variantsRes.success) return
+      const questionIds: string[] = questionsRes.data.questions.map((q: { id: string }) => q.id)
+      const approvedQuestionIds = new Set(
+        variantsRes.data.variants
+          .filter((v: { status: string }) => v.status === 'approved')
+          .map((v: { question_id: string }) => v.question_id)
+      )
+      setUnapprovedQuestionCount(questionIds.filter(id => !approvedQuestionIds.has(id)).length)
+    })
+
+    return () => { cancelled = true }
+  }, [data, assignmentId])
 
   async function markSubmission(sub: Submission, status: 'marked' | 'needs_revision' = 'marked') {
     const ms = markingStates[sub.student_id]
@@ -459,7 +490,14 @@ export default function AssignmentMarkingPage({ params }: { params: Promise<{ as
 
           {/* Sprint 10 Slice A (Part 3): the one place a Draft assignment
               becomes visible to students — an explicit teacher action, never
-              automatic. Reuses the existing PATCH status endpoint. */}
+              automatic. Reuses the existing PATCH status endpoint.
+              Sprint 8 (Assessment Excellence): publishing an adaptive
+              assignment with unapproved-variant questions used to be a
+              single silent click — every such question falls back to
+              serving the canonical question to every student, quietly
+              defeating "adaptive." Now surfaced, not blocked (a teacher
+              may have a legitimate reason to publish partially adaptive),
+              via a named count + an explicit second confirmation. */}
           {assignment.status === 'draft' && (
             <div className="mt-3 bg-purple-50 border border-purple-200 rounded-2xl p-4">
               <p className="text-sm text-purple-900 font-bold mb-1">This assignment isn&apos;t published yet.</p>
@@ -468,10 +506,29 @@ export default function AssignmentMarkingPage({ params }: { params: Promise<{ as
                   ? 'Review your generated variants on the quiz questions page, then publish when ready.'
                   : 'Students won’t see this until you publish it.'}
               </p>
+              {assignment.is_adaptive && unapprovedQuestionCount !== null && unapprovedQuestionCount > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 mb-3">
+                  <p className="text-xs font-bold text-amber-800">
+                    {unapprovedQuestionCount} question{unapprovedQuestionCount === 1 ? '' : 's'} still {unapprovedQuestionCount === 1 ? 'has' : 'have'} no approved variant.
+                  </p>
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    Every student will see the standard question there instead of one matched to their level. Review it on the <Link href={`/teacher/assignments/${assignment.id}/quiz`} className="underline font-bold">quiz questions page</Link>, or publish anyway.
+                  </p>
+                  <label className="flex items-center gap-2 mt-2 text-xs font-bold text-amber-900">
+                    <input
+                      type="checkbox"
+                      checked={confirmPublishAnyway}
+                      onChange={e => setConfirmPublishAnyway(e.target.checked)}
+                      className="w-3.5 h-3.5 accent-amber-600"
+                    />
+                    Publish anyway, with the standard question for those {unapprovedQuestionCount === 1 ? 'one' : 'ones'}
+                  </label>
+                </div>
+              )}
               {publishError && <p className="text-xs text-red-600 mb-2">{publishError}</p>}
               <button
                 onClick={publishAssignment}
-                disabled={publishing}
+                disabled={publishing || (assignment.is_adaptive && !!unapprovedQuestionCount && !confirmPublishAnyway)}
                 className="bg-purple-600 text-white px-4 py-2 rounded-xl font-black text-sm hover:bg-purple-700 transition disabled:opacity-60"
               >
                 {publishing ? 'Publishing…' : 'Publish to students'}
