@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
+import { createServiceClient } from '@/utils/supabase/service'
 import { paystackClient } from '@/lib/payments/paystack'
 import { requireAuth } from '@/lib/api/middleware'
 import { fulfillPayment } from '@/lib/payments/fulfillment'
@@ -28,10 +28,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Transaction ID required' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    // DB writes below (payments status transitions, token_balances via
+    // fulfillPayment) use the service client, not the caller's own session
+    // client — matching the sibling app/api/payments/callback/route.ts.
+    // Authorization is already fully enforced above via requireAuth() +
+    // the explicit payment.user_id === auth.user.id check immediately below;
+    // it never rested on RLS, so this does not weaken authorization. It closes
+    // the one real dependency the permissive token_balances RLS policy had
+    // (Platform Audit v1.0, Blocker #1).
+    const service = createServiceClient()
 
     // 1. FIND PAYMENT RECORD
-    const { data: payment, error: paymentError } = await supabase
+    const { data: payment, error: paymentError } = await service
       .from('payments')
       .select('id, status, amount, user_id, transaction_id, created_at, product_id, metadata')
       .eq('transaction_id', transactionId)
@@ -66,7 +74,7 @@ export async function POST(request: NextRequest) {
       const message = verifyError instanceof Error ? verifyError.message : String(verifyError)
       console.error('[payments/verify] Paystack verification threw', { paymentId: payment.id, transactionId, message })
 
-      await supabase
+      await service
         .from('payments')
         .update({ status: 'failed', updated_at: new Date().toISOString() })
         .eq('id', payment.id)
@@ -76,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     if (!verifyResult.status || verifyResult.data.status !== 'success') {
       const newStatus = verifyResult.data.status === 'pending' ? 'pending' : 'failed'
-      await supabase
+      await service
         .from('payments')
         .update({ status: newStatus, updated_at: new Date().toISOString() })
         .eq('id', payment.id)
@@ -88,7 +96,7 @@ export async function POST(request: NextRequest) {
     // 4. VALIDATE AMOUNT
     const expectedKobo = paystackClient.toKobo(payment.amount)
     if (paystackData.amount < expectedKobo) {
-      await supabase
+      await service
         .from('payments')
         .update({ status: 'failed', updated_at: new Date().toISOString() })
         .eq('id', payment.id)
@@ -98,7 +106,7 @@ export async function POST(request: NextRequest) {
     // 5. ATOMIC FULFILLMENT — same guarded transition + crediting path used
     // by the webhook/browser callback route (lib/payments/fulfillment.ts),
     // so there is exactly one way a payment ever gets fulfilled.
-    await fulfillPayment(supabase, {
+    await fulfillPayment(service, {
       id:         payment.id,
       user_id:    payment.user_id,
       product_id: payment.product_id,
