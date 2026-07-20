@@ -93,6 +93,26 @@ export async function findVariantsForQuestion(questionId: string): Promise<Varia
   return (data ?? []) as VariantRow[]
 }
 
+/**
+ * Every variant (any status) across multiple questions in one query —
+ * Sprint 8 (Assessment Excellence), the Review Dashboard's batched read
+ * path. Replaces the page's prior pattern of one findVariantsForQuestion()
+ * call per question (an N-request round trip for an N-question quiz) with
+ * a single `.in()` query. Same shape, same ordering rule as the
+ * single-question version — callers group by `question_id` client-side.
+ */
+export async function findVariantsForQuestionIds(questionIds: string[]): Promise<VariantRow[]> {
+  if (!questionIds.length) return []
+  const db = createServiceClient()
+  const { data, error } = await db
+    .from('assignment_question_variants')
+    .select('*')
+    .in('question_id', questionIds)
+    .order('created_at', { ascending: true })
+  if (error) throw new Error(`Failed to fetch variants: ${error.message}`)
+  return (data ?? []) as VariantRow[]
+}
+
 /** The one row a serving/grading path (Sprint 4C, not built in this slice) may ever select fresh — approved only. */
 export async function findApprovedVariant(questionId: string, variantType: VariantType): Promise<VariantRow | null> {
   const db = createServiceClient()
