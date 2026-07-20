@@ -160,7 +160,20 @@ export default function TodayAtAGlance({ pendingAssessmentCount, pendingAssessme
       {suggestion === null && attendanceGaps !== null && (
         <div className="flex items-center gap-3 border border-emerald-200 bg-emerald-50 rounded-2xl px-5 py-3">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-          <p className="text-sm font-bold text-emerald-800">You&apos;re caught up — nothing urgent right now.</p>
+          <div>
+            <p className="text-sm font-bold text-emerald-800">You&apos;re caught up — nothing urgent right now.</p>
+            {/* End-of-day recap — composed entirely from facts this
+                component already fetched for the gap-oriented cards above
+                (attendanceLabel, pendingAssessmentCount); no new fetch,
+                just a second, completion-oriented reading of the same
+                data (mission: "can a teacher finish their day"). */}
+            {attendanceTotal !== null && attendanceTotal > 0 && (
+              <p className="text-xs text-emerald-600 mt-0.5">
+                Attendance marked for all {attendanceTotal} class{attendanceTotal === 1 ? '' : 'es'} today
+                {pendingAssessmentCount === 0 ? ' · no marks waiting to be entered.' : '.'}
+              </p>
+            )}
+          </div>
         </div>
       )}
 
