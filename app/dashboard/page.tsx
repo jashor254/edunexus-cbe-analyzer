@@ -8,6 +8,7 @@ import {
   Compass,
   ClipboardList,
   BarChart3,
+  BookOpen,
   Search,
   TrendingUp,
   PlusCircle,
@@ -1258,19 +1259,39 @@ export default function DashboardPage() {
                 sub: stats?.pendingAssignments ? `${stats.pendingAssignments} pending` : 'View all assignments',
                 gradient: 'from-amber-500 to-orange-600',
                 shadow: 'shadow-amber-500/20',
-                href: '/dashboard/assignments',
+                // Sprint 5 (Parent Experience Convergence): /dashboard/assignments
+                // never resolved to a specific child (Blocker #4/#5 background) —
+                // /child is the existing entry point that already resolves to the
+                // right destination (a single child's Home, or a picker), and a
+                // real per-child Assignments view now lives one tap from there.
+                href: '/child',
                 badge: stats?.pendingAssignments && stats.pendingAssignments > 0 ? stats.pendingAssignments : null,
               },
-              // 'Class Resources' and 'Calendar' tiles were removed here
-              // (Sprint 2, Platform Audit v1.0 Blocker #4): they pointed at
-              // /dashboard/resources and /dashboard/calendar, which moved to
-              // /resources and /calendar (app/(student)/*) so students could
-              // reach them at all — but that route group redirects a parent
-              // straight back to /dashboard, turning this tile into a dead
-              // end for the parent audience this page actually serves. Their
-              // copy ("Notes & files from your teacher") was student-facing
-              // to begin with; a real parent-facing equivalent is Sprint 4
-              // (Parent LMS Parity), not a routing fix — not added here.
+              // 'Class Resources' and 'Calendar' tiles were removed in Sprint 2
+              // (dead ends at the time — see that sprint's own note, preserved
+              // in git history). Sprint 5 (Parent Experience Convergence)
+              // re-adds them pointing at the new family-wide, parent-facing
+              // app/(parent)/resources and app/(parent)/calendar pages —
+              // real parent destinations this time, not the old student-scoped
+              // copy repointed at a redirect.
+              {
+                icon: BookOpen,
+                title: 'Class Resources',
+                sub: 'Notes & files from your children\'s teachers',
+                gradient: 'from-teal-500 to-emerald-600',
+                shadow: 'shadow-teal-500/20',
+                href: '/resources',
+                badge: null,
+              },
+              {
+                icon: Zap,
+                title: 'Calendar',
+                sub: 'Dates & announcements',
+                gradient: 'from-indigo-500 to-violet-600',
+                shadow: 'shadow-indigo-500/20',
+                href: '/calendar',
+                badge: null,
+              },
             ].map(({ icon: Icon, title, sub, gradient, shadow, href, badge }) => (
               <Link
                 key={href}
