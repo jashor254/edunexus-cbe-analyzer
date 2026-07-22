@@ -20,13 +20,18 @@ const nextConfig = {
       // group was consolidated into the canonical app/student/* tree.
       // These keep any existing external link (WhatsApp nudges, bookmarks)
       // working rather than 404ing.
+      //
+      // /resources and /calendar are deliberately NOT redirected here as of
+      // Sprint 5 (Parent Experience Convergence): those two flat paths now
+      // belong to real, family-wide parent pages (app/(parent)/resources,
+      // app/(parent)/calendar) — redirecting them to /student/* would shadow
+      // the new parent pages entirely (confirmed: a redirects() entry is
+      // checked before Next.js resolves an actual page route).
       { source: '/blueprint',  destination: '/student/blueprint',  permanent: true },
       { source: '/career',     destination: '/student/career',     permanent: true },
       { source: '/career/:slug', destination: '/student/career/:slug', permanent: true },
       { source: '/holiday',    destination: '/student/holiday',    permanent: true },
       { source: '/progress',   destination: '/student/progress',   permanent: true },
-      { source: '/resources',  destination: '/student/resources',  permanent: true },
-      { source: '/calendar',   destination: '/student/calendar',   permanent: true },
     ]
   },
 }

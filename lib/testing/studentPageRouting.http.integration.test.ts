@@ -126,14 +126,18 @@ test('a student who lands on /dashboard is sent onward to /student, not shown th
 })
 
 // ── Old flat URLs permanently redirect, nothing 404s ─────────────────────────
+// /resources and /calendar are deliberately EXCLUDED here as of Sprint 5
+// (Parent Experience Convergence): those two flat paths were repointed to
+// real, family-wide parent pages (app/(parent)/resources, app/(parent)/
+// calendar) instead of redirecting to /student/* — see next.config.ts's own
+// comment. Covered instead by
+// lib/testing/parentExperienceConvergence.http.integration.test.ts.
 
 const OLD_TO_NEW: Record<string, string> = {
   '/blueprint': '/student/blueprint',
   '/career':    '/student/career',
   '/holiday':   '/student/holiday',
   '/progress':  '/student/progress',
-  '/resources': '/student/resources',
-  '/calendar':  '/student/calendar',
 }
 
 for (const [oldPath, newPath] of Object.entries(OLD_TO_NEW)) {
