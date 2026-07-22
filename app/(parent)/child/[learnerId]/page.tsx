@@ -129,6 +129,41 @@ export default async function ParentHomePage({
         </p>
       </Link>
 
+      {/* Sprint 5 (Parent Experience Convergence) — surfaces existing,
+          already-built learner capabilities the parent never had a link to:
+          same card pattern as above, no new computation. */}
+      <Link
+        href={`/child/${learnerId}/assignments`}
+        className="block bg-white rounded-2xl border border-gray-100 p-4 hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:outline-none transition-colors"
+      >
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Assignments</p>
+        <p className="text-sm text-gray-900 mt-1">What&apos;s been assigned, and whether it&apos;s been submitted →</p>
+      </Link>
+
+      <Link
+        href={`/child/${learnerId}/gradebook`}
+        className="block bg-white rounded-2xl border border-gray-100 p-4 hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:outline-none transition-colors"
+      >
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Gradebook</p>
+        <p className="text-sm text-gray-900 mt-1">Assessment and assignment scores →</p>
+      </Link>
+
+      <Link
+        href={`/child/${learnerId}/progress`}
+        className="block bg-white rounded-2xl border border-gray-100 p-4 hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:outline-none transition-colors"
+      >
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Compass Progress</p>
+        <p className="text-sm text-gray-900 mt-1">Completed Compass sessions by subject →</p>
+      </Link>
+
+      <Link
+        href={`/child/${learnerId}/holiday`}
+        className="block bg-white rounded-2xl border border-gray-100 p-4 hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:outline-none transition-colors"
+      >
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Holiday Plan</p>
+        <p className="text-sm text-gray-900 mt-1">Includes what you can do to help, week by week →</p>
+      </Link>
+
       <Link
         href={`/child/${learnerId}/journey`}
         className="block bg-white rounded-2xl border border-gray-100 p-4 hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:outline-none transition-colors"

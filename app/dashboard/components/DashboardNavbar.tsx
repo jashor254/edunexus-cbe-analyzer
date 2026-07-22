@@ -39,16 +39,26 @@ const STUDENT_EXTRA_BOTTOM_NAV = [
   { href: '/student/progress',           label: 'Progress',    icon: '📈' },
 ]
 
-// `/dashboard/assignments` is only reachable when app/dashboard/layout.tsx's
-// own redirect doesn't apply — i.e. never for a student account, which that
-// layout always sends to /student instead. Student layouts pass isStudent so
-// this shared nav points "Assignments" at /learn instead, where a student's
-// assignments actually render (see app/learn/page.tsx's "Your Assignments"
-// section) — same component, correct destination per audience, no new
-// route, no new redirect. Default is unchanged for every existing caller.
+// Parent-only pages (Sprint 5, Parent Experience Convergence) — family-wide
+// (across every linked child), so these sit in nav rather than under a
+// specific /child/[learnerId]/* page the way Assignments/Gradebook/
+// Progress/Holiday do. Same additive pattern as STUDENT_EXTRA_NAV_LINKS.
+const PARENT_EXTRA_NAV_LINKS = [
+  { href: '/resources',                  label: 'Resources',   color: 'hover:text-teal-600'    },
+  { href: '/calendar',                   label: 'Calendar',    color: 'hover:text-sky-600'     },
+]
+
+// `/dashboard/assignments` was the old, wrong-scoped entry point (Platform
+// Audit v1.0 Blocker #4/#5 background) — it never resolved to a specific
+// child, so it either showed nothing or the wrong data for a multi-child
+// parent. Sprint 5 replaces it with /child, the existing entry point that
+// already resolves to the right destination (a single child's Home, or a
+// picker) — from there, Assignments is one tap away per child. Student
+// layouts still pass isStudent so this shared nav points "Assignments" at
+// /learn instead, where a student's assignments actually render.
 export default function DashboardNavbar({ isStudent = false }: { isStudent?: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const assignmentsHref = isStudent ? '/learn' : '/dashboard/assignments'
+  const assignmentsHref = isStudent ? '/learn' : '/child'
   // Careers points students at their own explorer, everyone else at the
   // parent-facing career intelligence entry point (Sprint 19 — see
   // app/(parent)/career-intelligence for the consolidated parent flow).
@@ -60,7 +70,7 @@ export default function DashboardNavbar({ isStudent = false }: { isStudent?: boo
   }
   const navLinks = [
     ...NAV_LINKS.map(applyOverrides),
-    ...(isStudent ? STUDENT_EXTRA_NAV_LINKS : []),
+    ...(isStudent ? STUDENT_EXTRA_NAV_LINKS : PARENT_EXTRA_NAV_LINKS),
   ]
   const bottomNav = [
     ...BOTTOM_NAV.map(applyOverrides),

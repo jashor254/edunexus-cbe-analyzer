@@ -23,6 +23,31 @@ Entries are never edited to rewrite history — if a change is later reverted or
 
 ---
 
+## 2026-07-22 — Sprint 5: Parent Experience Convergence
+
+**What changed**: surfaced LMS Basics capabilities (Assignments, Gradebook, Compass Progress, Holiday Plan, Calendar, Class Resources) to parents for the first time — every one of these already existed for teachers/students, none had a parent-facing entry point. Zero new grading/computation/authorization logic: every new page and route composes an existing `lib/` function (`buildGradebook()`, `StudentHolidayPlan`, `StudentProgress`, the existing `/api/student/calendar` and `/api/student/announcements` `.or(user_id.eq, parent_user_id.eq)` reads) behind the same `requireParent()` gate already used elsewhere in production (whatsapp-optin, career-intelligence).
+
+**What was built**:
+- Per-child pages under `app/(parent)/child/[learnerId]/`: `assignments`, `gradebook` (new `GET /api/parent/gradebook` — resolves the learner's classes via `class_students`/`teacher_classes`, calls the same `buildGradebook(classId, teacherId)` the teacher route calls, returns only this learner's row per class, no new scores/columns/recomputation), `progress` (reuses `components/student/StudentProgress.tsx`, extended with an optional `studentId`/theme prop, not forked), `holiday` (reuses `components/student/StudentHolidayPlan.tsx` verbatim, extended the same way — the plan's existing per-week `parent_action` field had never been shown to a parent until now).
+- Family-wide pages (span every linked child, not just one): `app/(parent)/calendar` and `app/(parent)/resources` — identical data/rendering to their student-facing equivalents, read-only, no write action stripped because none existed there either.
+- Parent Home (`app/(parent)/child/[learnerId]/page.tsx`) gained six new teaser cards linking to all of the above.
+- `DashboardNavbar.tsx`: fixed `/dashboard/assignments` as a wrong-scoped dead end for parents (never resolved to a specific child) — parent nav's Assignments link now points at `/child` (the existing entry point that already resolves to a single child's Home or a picker); added `Resources`/`Calendar` to parent nav for the two new family-wide pages.
+
+**Tests**: `lib/testing/parentExperienceConvergence.http.integration.test.ts`, 19 new tests against a real dev server and real signed-in synthetic accounts — reachability + 401/redirect for all 4 per-child pages, `requireParent()` authorization (linked parent allowed, unrelated parent denied, teacher denied), the new gradebook route (correct scoping, 403 for an unrelated parent, 400 on missing `studentId`), both family-wide pages, and cross-family isolation on the underlying data API. One known pre-existing, out-of-scope platform finding documented in the test file: this Next.js 16.2.7 app's `notFound()` doesn't reliably produce a 404 status/body for a direct `fetch()` (confirmed via production build, predates this sprint) — worked around by testing `requireParent()` directly against the live database rather than relying on HTTP status alone. Full pre-existing `lib/testing/studentPageRouting.http.integration.test.ts` (28 tests) re-run after these shared-component edits — zero regressions.
+
+**Verification performed**: `npx tsc --noEmit -p .` clean across the whole tree; `npx eslint` clean (0 errors, 0 warnings) on every touched/new file; 19 + 28 = 47 tests passing against a live dev server.
+
+**Architectural documents referenced**: none required a new decision — every page composes an existing, already-authorized primitive (`requireParent`, `buildGradebook`, `resolveParent`) rather than introducing a new identity, domain, or authorization pattern.
+
+**ADR**: None — no new table, no new authorization pattern, no schema change.
+
+**Tests added**: 19, one new file.
+
+**Rollback considerations**: Low. All per-child and family-wide pages, the new gradebook route, and the two extended shared components (`StudentHolidayPlan`, `StudentProgress`) are additive — the new optional props default to prior behavior for every existing (student-facing) caller. The `DashboardNavbar` change reverts to a dead-end parent nav link if rolled back independently; should not be reverted separately from the rest, since `/dashboard/assignments` was already broken for parents before this sprint.
+
+---
+
+
 ## 2026-07-18 — LMS Basics Phase 3a: Auto-Graded MCQ Quiz
 
 **What changed**: user asked directly whether Quiz was worth building given Assignments already exists — investigated before building anything. Found real overlap: Compass (`/learn`, `lib/learn/engine.ts`) already generates AI-adaptive MCQ/true-false/open-ended questions per session, auto-graded in real time, teacher-visible via `app/api/teacher/classes/[classId]/compass/route.ts`. What neither Assignments (manual grading) nor Compass (personalized, ever-different questions) covers: a uniform, fixed question set every student in a class answers identically, auto-graded, comparable side-by-side — the actual Kenyan-classroom pattern this closes is the CAT/revision quiz a teacher currently marks by hand. User then proposed a richer two-tier framing (teacher-custom questions + AI-generated strand/substrand revision banks); assessed and split: the custom-question half is this entry (small, safe, extends an existing domain); the AI-content half needs its own `TOKEN_COSTS` entry, cache-not-regenerate design, and a correctness/approval gate before real students see it — deferred to its own design pass, not built here.
