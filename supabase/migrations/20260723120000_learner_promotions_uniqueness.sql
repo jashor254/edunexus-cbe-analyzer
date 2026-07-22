@@ -1,0 +1,53 @@
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Sprint C0 Stabilization, Task 1 — Release Gate 1 finding (MAJOR):
+-- learner_promotions had no unique constraint of any kind beyond its own
+-- primary key. The "promotion cannot be replayed" protection
+-- (lib/core/promotions.ts::runAnnualPromotion, "Duplicate-promotion guard")
+-- is pure application-level check-then-insert: it reads
+-- listPromotionHistory() and refuses if a row already exists for
+-- (learner_id, from_academic_year_id) — but under genuine concurrency
+-- (two simultaneous submissions), both callers can read "no existing row"
+-- before either writes, and both then insert. This migration adds the
+-- database-level backstop that check never had.
+--
+-- Why (learner_id, from_academic_year_id) is the correct key, not
+-- (learner_id, to_academic_year_id) or a third column: it is the exact
+-- pair runAnnualPromotion's own existing guard already checks (see
+-- lib/core/promotions.ts line ~60, "history.some(p => p.from_academic_year_id
+-- === input.academic_year_id)") — this migration enforces the business
+-- rule the application already believes is true, it does not invent a new
+-- one. A learner can only ever be promoted/graduated ONCE out of a given
+-- source academic year; a later promotion out of a *different* (new
+-- current) academic year is correctly a second, distinct row.
+--
+-- Verified safe to add before writing this migration: a live query
+-- (`SELECT learner_id, from_academic_year_id, count(*) FROM
+-- learner_promotions GROUP BY 1,2 HAVING count(*) > 1`) against the real
+-- production data returned zero rows — every one of the 15 learners the
+-- Release Gate 1 certification found with corrupted enrollment state
+-- (docs/architecture/release-gate-1-pilot-readiness-certification.md) has
+-- exactly one learner_promotions row each; the corruption is in
+-- learner_enrollments (dangling active rows), not duplicate promotion
+-- audit rows. This constraint is therefore purely additive from the data's
+-- perspective — no existing row violates it.
+--
+-- No business logic in lib/core/promotions.ts is modified by this
+-- migration. The existing catch block (`} catch (err) { errors.push(...) }`,
+-- runAnnualPromotion's per-decision loop) already converts any thrown
+-- error from insertPromotion() — including a future unique_violation
+-- (Postgres code 23505) from a genuine race — into a per-learner error
+-- string in the batch's `errors[]` array, without crashing the request or
+-- corrupting the rest of the batch. That existing behavior is sufficient:
+-- the constraint's job is to guarantee the row-level invariant even when
+-- the request wins the race, not to produce a prettier error message.
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+ALTER TABLE learner_promotions
+  ADD CONSTRAINT learner_promotions_learner_from_year_key
+  UNIQUE (learner_id, from_academic_year_id);
+
+-- Rollback: DROP CONSTRAINT learner_promotions_learner_from_year_key ON
+-- learner_promotions. Safe to roll back at any time — the constraint adds
+-- no column, backfills no data, and no other object depends on it. Dropping
+-- it simply restores the pre-migration state (app-level guard only, no DB
+-- backstop) without touching any existing row.

@@ -75,12 +75,31 @@ test('missing term: a school with a year but no term reports term unresolved spe
   assert.ok(readiness.blockingReasons.some(r => r.includes('No term exists')))
 })
 
-test('resolveActiveAcademicYear/resolveActiveTerm: fall back to the first row when none is marked is_current (the documented schoolActivation.ts gap)', async () => {
+test('activateSchool now sets a real current academic year and term (Sprint 12 Wave 1, High 1 — was previously a documented gap; see schoolActivation.test.ts for the direct fix test)', async () => {
   const { schoolId } = await mkSchool()
   const activation = await activateSchool(schoolId, { gradeCodes: ['G7'] })
   assert.equal(activation.status, 'complete')
 
-  // Confirm the documented gap directly: activation never sets is_current.
+  const { data: years } = await db.from('academic_years').select('is_current').eq('school_id', schoolId)
+  assert.ok(years?.some(y => y.is_current === true), 'activation must leave a real current academic year set')
+
+  const year = await resolveActiveAcademicYear(schoolId)
+  assert.equal(year.resolved, true)
+  const term = await resolveActiveTerm(schoolId, year.value!.id)
+  assert.equal(term.resolved, true)
+})
+
+test('resolveActiveAcademicYear/resolveActiveTerm: still fall back to the first row for a school with no current row at all — defense-in-depth for any school activated before Sprint 12, or any other future gap', async () => {
+  const { schoolId } = await mkSchool()
+  const activation = await activateSchool(schoolId, { gradeCodes: ['G7'] })
+  assert.equal(activation.status, 'complete')
+
+  // Simulate the pre-Sprint-12 state directly, rather than relying on
+  // activation to (no longer) produce it — this is now a test of the
+  // fallback's own defensive behavior, not of activation's output.
+  await db.from('academic_years').update({ is_current: false }).eq('school_id', schoolId)
+  await db.from('terms').update({ is_current: false }).eq('school_id', schoolId)
+
   const { data: years } = await db.from('academic_years').select('is_current').eq('school_id', schoolId)
   assert.ok(years?.every(y => y.is_current === false))
 
@@ -102,7 +121,12 @@ test('missing subject source: an activated school with classes but no grade_subj
   assert.equal(readiness.subjects.allGradesInUseHaveSubjects, false)
   assert.equal(readiness.subjects.byGrade[0].hasSubjects, false)
   assert.equal(readiness.overallReady, false)
-  assert.ok(readiness.blockingReasons.some(r => r.includes('grade(s) in use have no subjects')))
+  // Sprint C0 Task 2 — reworded to remove internal function/file references
+  // (was: "call seedGradeSubjectsForSchool() or assignSubjectToGrade()
+  // (lib/core/subjects.ts)"), since this string reaches a school admin's
+  // screen directly, not just a log.
+  assert.ok(readiness.blockingReasons.some(r => r.includes("grade(s) in use don't have subjects set up")))
+  assert.ok(!readiness.blockingReasons.some(r => r.includes('seedGradeSubjectsForSchool')), 'reason string must not leak internal function names to the admin-facing UI')
 })
 
 test('no teachers: an activated school with subjects seeded but no teacher reports teachers unready with a clear reason', async () => {

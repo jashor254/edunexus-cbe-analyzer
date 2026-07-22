@@ -1340,6 +1340,7 @@ export type Database = {
           holiday_period: string | null
           id: string
           instructions: string
+          is_adaptive: boolean
           is_compass_guided: boolean | null
           is_holiday_assignment: boolean | null
           is_quiz: boolean
@@ -1361,6 +1362,7 @@ export type Database = {
           holiday_period?: string | null
           id?: string
           instructions: string
+          is_adaptive?: boolean
           is_compass_guided?: boolean | null
           is_holiday_assignment?: boolean | null
           is_quiz?: boolean
@@ -1382,6 +1384,7 @@ export type Database = {
           holiday_period?: string | null
           id?: string
           instructions?: string
+          is_adaptive?: boolean
           is_compass_guided?: boolean | null
           is_holiday_assignment?: boolean | null
           is_quiz?: boolean
@@ -3146,6 +3149,54 @@ export type Database = {
             columns: ["learner_id"]
             isOneToOne: false
             referencedRelation: "learners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      core_guardian_invites: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          learner_guardian_id: string
+          school_id: string
+          token: string
+          updated_at: string
+          used_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          learner_guardian_id: string
+          school_id: string
+          token?: string
+          updated_at?: string
+          used_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          learner_guardian_id?: string
+          school_id?: string
+          token?: string
+          updated_at?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "core_guardian_invites_learner_guardian_id_fkey"
+            columns: ["learner_guardian_id"]
+            isOneToOne: false
+            referencedRelation: "learner_guardians"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "core_guardian_invites_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
             referencedColumns: ["id"]
           },
         ]
@@ -5185,6 +5236,258 @@ export type Database = {
           id?: string
           level_order?: number
           name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      growth_activities: {
+        Row: {
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          occurred_at: string
+          school_id: string
+          type: string
+        }
+        Insert: {
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          occurred_at?: string
+          school_id: string
+          type: string
+        }
+        Update: {
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          occurred_at?: string
+          school_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "growth_activities_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "growth_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "growth_activities_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "growth_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "growth_activities_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "growth_schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      growth_contacts: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string
+          id: string
+          notes: string | null
+          phone: string | null
+          preferred_contact: string | null
+          relationship_score: number | null
+          role: string | null
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name: string
+          id?: string
+          notes?: string | null
+          phone?: string | null
+          preferred_contact?: string | null
+          relationship_score?: number | null
+          role?: string | null
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          id?: string
+          notes?: string | null
+          phone?: string | null
+          preferred_contact?: string | null
+          relationship_score?: number | null
+          role?: string | null
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "growth_contacts_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "growth_schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      growth_follow_ups: {
+        Row: {
+          completed: boolean
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          due_date: string
+          id: string
+          priority: string
+          school_id: string
+          task: string
+          updated_at: string
+        }
+        Insert: {
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          due_date: string
+          id?: string
+          priority?: string
+          school_id: string
+          task: string
+          updated_at?: string
+        }
+        Update: {
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          due_date?: string
+          id?: string
+          priority?: string
+          school_id?: string
+          task?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "growth_follow_ups_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "growth_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "growth_follow_ups_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "growth_schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      growth_schools: {
+        Row: {
+          category: string | null
+          county: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          last_contact_at: string | null
+          name: string
+          next_action: string | null
+          next_action_date: string | null
+          notes: string | null
+          owner_id: string | null
+          pipeline_stage: string
+          status: string
+          students_count: number | null
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          county?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_contact_at?: string | null
+          name: string
+          next_action?: string | null
+          next_action_date?: string | null
+          notes?: string | null
+          owner_id?: string | null
+          pipeline_stage?: string
+          status?: string
+          students_count?: number | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          county?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_contact_at?: string | null
+          name?: string
+          next_action?: string | null
+          next_action_date?: string | null
+          notes?: string | null
+          owner_id?: string | null
+          pipeline_stage?: string
+          status?: string
+          students_count?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "growth_schools_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "growth_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "growth_schools_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "growth_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      growth_users: {
+        Row: {
+          created_at: string
+          full_name: string
+          id: string
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          full_name: string
+          id: string
+          role?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string
+          id?: string
+          role?: string
           updated_at?: string
         }
         Relationships: []
@@ -12640,8 +12943,16 @@ export type Database = {
         Args: { p_tokens: number; p_user_id: string }
         Returns: undefined
       }
+      auth_is_direct_teacher_of_student: {
+        Args: { p_student_id: string }
+        Returns: boolean
+      }
       auth_is_group_member: { Args: { p_group_id: string }; Returns: boolean }
       auth_is_guardian_of: { Args: { p_student_id: string }; Returns: boolean }
+      auth_is_parent_of_student: {
+        Args: { p_student_id: string }
+        Returns: boolean
+      }
       auth_is_teacher_of_student: {
         Args: { p_student_id: string }
         Returns: boolean
@@ -12773,6 +13084,7 @@ export type Database = {
         Returns: undefined
       }
       is_admin: { Args: never; Returns: boolean }
+      is_growth_user: { Args: never; Returns: boolean }
       mark_users_for_deletion: { Args: never; Returns: undefined }
       regenerate_assignment_question_variant: {
         Args: { p_new_variant: Json; p_old_variant_id: string }
@@ -12823,6 +13135,10 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      resolve_served_variants_batch: {
+        Args: { p_assignment_id: string; p_pairs: Json; p_student_id: string }
+        Returns: Json
       }
       restore_user: { Args: { p_email: string }; Returns: boolean }
       show_limit: { Args: never; Returns: number }

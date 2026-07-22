@@ -70,6 +70,15 @@ export async function POST(
 
     const assessment = await getAssessmentById(assessmentId, teacher.id)
     if (!assessment) return apiNotFound('Assessment not found')
+    // Sprint 12 Wave 2 (High 2, Release Blocker Remediation) — "Lock
+    // Assessment" (is_published) previously didn't actually block further
+    // mark edits at all; a mark could be silently changed after the class
+    // was told assessments are locked. Reuses the already-fetched
+    // assessment row; no new query. Matches the report-cards publish-guard
+    // posture: refuse, don't silently overwrite.
+    if (assessment.is_published) {
+      return apiBadRequest('This assessment is locked — marks cannot be edited once published. Unpublish it first if a correction is genuinely needed.')
+    }
 
     const parsed = BulkSaveSchema.safeParse(await req.json())
     if (!parsed.success) {

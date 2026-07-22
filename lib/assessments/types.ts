@@ -17,6 +17,13 @@ export type ClassAssessment = {
   subjects: string[]
   curriculum_type: CurriculumType
   grade_scale_id: string | null
+  // Sprint 12 Wave 2 (High 2) — already selected by ASSESSMENT_COLS
+  // (lib/repositories/assessment.repository.ts) and already a real column
+  // (class_assessments.is_published); only this type was narrower than
+  // what the repository actually returns. Optional (not every internal
+  // select variant in that repository selects it) — the lock guards below
+  // that read it treat undefined the same as false (not yet published).
+  is_published?: boolean
   created_at: string
   updated_at: string
 }

@@ -46,6 +46,9 @@ import {
   createTerm,
   getSchoolSettingsOrNull,
   upsertSchoolSettings,
+  getCurrentTerm,
+  setCurrentAcademicYear,
+  setCurrentTerm,
 } from '@/lib/core/school'
 import {
   listGrades,
@@ -84,6 +87,7 @@ export type SchoolActivationInput = {
 export type ActivationStepName =
   | 'academic_year'
   | 'terms'
+  | 'current_term'
   | 'grades'
   | 'streams'
   | 'classes'
@@ -266,6 +270,48 @@ export async function ensureDefaultTerms(
   }
 }
 
+/**
+ * Sprint 12 Wave 1 (High 1) — closes the Release Candidate audit's finding
+ * that no school ever ends activation with a current academic year/term
+ * set, leaving every Core Administration screen that gates on
+ * `membership.currentTerm` (Structure, Admissions, Promotion, Transfer,
+ * core-term) permanently dead-ended for a fresh school. Reuses
+ * `setCurrentAcademicYear`/`setCurrentTerm` (lib/core/school.ts) —
+ * unchanged, already correct, already used by `runEndOfTerm` to advance a
+ * school's term at term-close.
+ *
+ * Guarded on absence, not on "was this just created": both setters are an
+ * unconditional clear-then-set, so calling them unconditionally here would
+ * silently reset an already-progressed school (now correctly in Term 2 via
+ * `runEndOfTerm`) back to Term 1 every time `activateSchool()` is
+ * idempotently re-run. Checking `getCurrentTerm(schoolId) === null` first
+ * makes this step a true no-op for any school that already has a current
+ * term, matching every other step in this pipeline's own idempotency
+ * contract (module header, "skips every already-created object").
+ */
+export async function ensureCurrentTerm(
+  schoolId: string,
+  academicYear: AcademicYear,
+  terms: Term[]
+): Promise<{ result: ActivationStepResult }> {
+  const existingCurrentTerm = await getCurrentTerm(schoolId)
+  if (existingCurrentTerm) {
+    return { result: { step: 'current_term', status: 'already_exists', detail: `Current term already set to "${existingCurrentTerm.name}" — left untouched.`, count: 1 } }
+  }
+
+  const firstTerm = [...terms].sort((a, b) => a.term_number - b.term_number)[0]
+  if (!firstTerm) {
+    // No terms to select from — leave activation to fail loudly at the
+    // terms step instead (this function is only ever called after
+    // ensureDefaultTerms), rather than silently skipping here.
+    throw new Error('ensureCurrentTerm: no terms available to select as current.')
+  }
+
+  await setCurrentAcademicYear(schoolId, academicYear.id)
+  await setCurrentTerm(schoolId, firstTerm.id)
+  return { result: { step: 'current_term', status: 'created', detail: `Set current academic year to "${academicYear.name}" and current term to "${firstTerm.name}".`, count: 1 } }
+}
+
 export async function ensureDefaultGrades(
   schoolType: School['school_type'] | string | null | undefined,
   gradeCodesOverride?: string[]
@@ -426,9 +472,11 @@ export async function activateSchool(
     const { result: yearResult, academicYear } = await ensureAcademicYear(schoolId, input.academicYear)
     steps.push(yearResult)
 
-    const { result: termsResult, terms: _terms } = await ensureDefaultTerms(schoolId, academicYear)
+    const { result: termsResult, terms } = await ensureDefaultTerms(schoolId, academicYear)
     steps.push(termsResult)
-    void _terms // terms aren't needed by any later step in this pipeline; kept for report symmetry only
+
+    const { result: currentTermResult } = await ensureCurrentTerm(schoolId, academicYear, terms)
+    steps.push(currentTermResult)
 
     const { result: gradesResult, grades } = await ensureDefaultGrades(school.school_type, input.gradeCodes)
     steps.push(gradesResult)
@@ -444,8 +492,8 @@ export async function activateSchool(
 
     return { schoolId, status: 'complete', steps }
   } catch (err) {
-    const failedStep = steps.length < 6
-      ? (['academic_year', 'terms', 'grades', 'streams', 'classes', 'school_settings'] as const)[steps.length]
+    const failedStep = steps.length < 7
+      ? (['academic_year', 'terms', 'current_term', 'grades', 'streams', 'classes', 'school_settings'] as const)[steps.length]
       : undefined
     const message = err instanceof Error ? err.message : String(err)
     if (failedStep) {

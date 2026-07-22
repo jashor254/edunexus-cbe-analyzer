@@ -106,7 +106,16 @@ export async function resolveSubjectReadiness(schoolId: string, classes: ClassWi
     allGradesInUseHaveSubjects,
     reason: allGradesInUseHaveSubjects
       ? undefined
-      : `${byGrade.filter(g => !g.hasSubjects).length} of ${byGrade.length} grade(s) in use have no subjects assigned — call seedGradeSubjectsForSchool() or assignSubjectToGrade() (lib/core/subjects.ts).`,
+      // Sprint C0 Task 2 — this string reaches a school admin's screen
+      // directly (app/teacher/core-office/academic/page.tsx's Subjects
+      // StructureRow, app/teacher/core-office/page.tsx's Startup
+      // checklist), not just a developer log. It previously named internal
+      // function/file references, which is exactly the "tribal knowledge"
+      // this task exists to remove — reworded to describe the required
+      // action in the admin's own terms; the UI now pairs this with a
+      // one-click "Set up default subjects" button rather than relying on
+      // the admin to know what to do with the message.
+      : `${byGrade.filter(g => !g.hasSubjects).length} of ${byGrade.length} grade(s) in use don't have subjects set up yet.`,
   }
 }
 

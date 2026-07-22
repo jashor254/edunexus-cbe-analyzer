@@ -66,6 +66,14 @@ export default function TeacherCoreTermPage() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState<string | null>(null) // action currently in flight
   const [loadingClassData, setLoadingClassData] = useState(false)
+  // Sprint 10 (Core Administration Completion, Phase 4 — Report Approval):
+  // publishing is parent-facing and irreversible in effect (generateReportCards
+  // refuses to regenerate over a published card — see that function's own
+  // guard comment), so this is now a deliberate two-click action instead of
+  // one click firing the request immediately. No backend change — the same
+  // publishReportCards() call, gated the same way (canPublishReport,
+  // admin-tier only); this only adds a client-side pause before it fires.
+  const [confirmingPublish, setConfirmingPublish] = useState(false)
 
   useEffect(() => {
     fetchJson<{ membership: Membership | null }>('/api/core/my-membership')
@@ -95,6 +103,7 @@ export default function TeacherCoreTermPage() {
 
   function selectClass(id: string) {
     setClassId(id)
+    setConfirmingPublish(false)
     if (id) setPreferredClassId('core-term', id)
   }
 
@@ -169,14 +178,17 @@ export default function TeacherCoreTermPage() {
       })
     )
 
-  const publishReportCards = () =>
-    runAction('publish-reports', () =>
+  const publishReportCards = () => {
+    if (!confirmingPublish) { setConfirmingPublish(true); return }
+    setConfirmingPublish(false)
+    return runAction('publish-reports', () =>
       fetchJson('/api/core/reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'publish', schoolId: membership!.schoolId, classId, termId }),
       })
     )
+  }
 
   const assessmentsLocked  = assessments.length > 0 && assessments.every(a => a.is_published)
   const reportsGenerated   = reportCards.length > 0
@@ -342,10 +354,25 @@ export default function TeacherCoreTermPage() {
                     disabled={!summaryReady} onClick={generateReportCards}
                   />
                   <ActionButton
-                    label="Publish Report Cards" busyLabel="Publishing…" busy={busy === 'publish-reports'}
+                    label={confirmingPublish ? 'Confirm Publish' : 'Publish Report Cards'}
+                    busyLabel="Publishing…" busy={busy === 'publish-reports'}
                     disabled={!reportsGenerated || reportsPublished} onClick={publishReportCards}
                   />
+                  {confirmingPublish && (
+                    <button
+                      onClick={() => setConfirmingPublish(false)}
+                      className="text-xs text-slate-400 hover:text-slate-600 px-2"
+                    >
+                      Cancel
+                    </button>
+                  )}
                 </div>
+                {confirmingPublish && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    This releases final grades to parents for every learner in this class and cannot be undone from
+                    here. Click &quot;Confirm Publish&quot; to proceed.
+                  </p>
+                )}
                 {reportCards.length > 0 && (
                   <p className="text-xs text-slate-400">
                     {reportCards.length} report card{reportCards.length === 1 ? '' : 's'}

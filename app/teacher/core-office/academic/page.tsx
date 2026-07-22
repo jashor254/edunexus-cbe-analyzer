@@ -30,13 +30,28 @@
 // (Sprint 10H): Attendance is a real, built domain now (Sprints 11B-11F),
 // so it moved out of the placeholder grid rather than being duplicated in
 // both places.
+//
+// Sprint 10 (Core Administration Completion, this session) — same
+// treatment for Classes/Subjects, Promotion and Transfer: all three had a
+// fully built backend with zero UI (see docs/architecture/
+// sprint9-school-operations-excellence-audit.md §2), confirmed by this
+// file rendering them as FutureModule placeholders despite the backend
+// already existing. Classes/Subjects rows in "Academic Structure" now link
+// to the new /academic/structure screen instead of being marked
+// `unavailable`; Promotion and Transfer moved out of the Future Modules
+// grid into real cards, same pattern as the Sprint 11G Attendance move.
+// Graduation is folded into the Promotion card (graduation is a
+// `promotion_type` value on the same decisions array, not a separate
+// backend) rather than kept as its own placeholder. Timetable and
+// Departments remain genuinely unbuilt — no schema, no lib, no API exists
+// for either — and correctly stay as Future Modules.
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
   Loader2, AlertCircle, CheckCircle2, Circle, ArrowRight,
   CalendarRange, BookOpen, ClipboardList, Lock, FileCheck, Send,
-  TrendingUp, Users2, ArrowLeftRight, GraduationCap, CalendarClock, Building, UserCheck,
+  TrendingUp, Users2, ArrowLeftRight, CalendarClock, Building, UserCheck,
 } from 'lucide-react'
 import type { Term, AcademicYear } from '@/types/core'
 import { ADMIN_TIER_ROLES } from '@/lib/core/adminTierRoles'
@@ -65,8 +80,8 @@ type SchoolAcademicReadiness = {
   blockingReasons: string[]
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { credentials: 'include' })
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, { credentials: 'include', ...init })
   const json = await res.json()
   if (!res.ok) throw new Error(json.error?.formErrors?.[0] ?? json.error ?? 'Request failed')
   return json.data as T
@@ -131,6 +146,25 @@ export default function AcademicOfficePage() {
   const [academicYears, setAcademicYears] = useState<AcademicYear[] | null>(null)
   const [terms, setTerms] = useState<Term[] | null>(null)
   const [error, setError] = useState('')
+  // Sprint 12 Wave 1 (High 1) — fresh schools now get a current term set
+  // automatically at activation (lib/core/schoolActivation.ts's new
+  // ensureCurrentTerm step); this control is the fallback for any school
+  // activated before that fix, or that otherwise ends up with none. Reuses
+  // the existing `type: 'set-current-term'` action on
+  // POST /api/core/academic-years (already requireSchoolAdmin-gated,
+  // already existed with zero UI caller before this fix) and the same
+  // fetchJson/select/button pattern already used throughout this page and
+  // structure/page.tsx — no new UI pattern invented.
+  const [selectedTermId, setSelectedTermId] = useState('')
+  const [settingCurrentTerm, setSettingCurrentTerm] = useState(false)
+  // Sprint C0 Task 2 — Release Gate 1 found subject seeding has no
+  // in-flow trigger: a fresh school's admin had to already know
+  // seedGradeSubjectsForSchool() exists and separately find
+  // /academic/structure to call it. This one-click action reuses the
+  // existing POST /api/core/subjects `action: 'seed'` route (already
+  // built, already requireSchoolAdmin-gated) directly from the readiness
+  // row that names the gap, instead of only linking to a separate screen.
+  const [seedingSubjects, setSeedingSubjects] = useState(false)
 
   useEffect(() => {
     fetchJson<{ membership: Membership | null }>('/api/core/my-membership')
@@ -140,12 +174,14 @@ export default function AcademicOfficePage() {
 
   const isAdminTier = !!membership && ADMIN_TIER_ROLES.includes(membership.role)
 
-  useEffect(() => {
+  const refreshReadiness = useCallback(() => {
     if (!membership || !isAdminTier) return
-    fetchJson<SchoolAcademicReadiness>(`/api/core/academic-readiness?schoolId=${membership.schoolId}`)
+    return fetchJson<SchoolAcademicReadiness>(`/api/core/academic-readiness?schoolId=${membership.schoolId}`)
       .then(setReadiness)
       .catch(e => setError(e instanceof Error ? e.message : 'Failed to load readiness'))
   }, [membership, isAdminTier])
+
+  useEffect(() => { refreshReadiness() }, [refreshReadiness])
 
   useEffect(() => {
     if (!membership?.currentTerm || !isAdminTier) return
@@ -173,9 +209,51 @@ export default function AcademicOfficePage() {
   const lockedAssessments = classStatuses?.filter(c => c.assessmentState === 'locked').length ?? 0
   const generatedReports = classStatuses?.filter(c => c.reportState === 'generated' || c.reportState === 'published').length ?? 0
   const publishedReports = classStatuses?.filter(c => c.reportState === 'published').length ?? 0
+  // Sprint C0 Task 2 — previously this row was marked "done" as soon as
+  // assessments were locked, which is a distinct, separate step from
+  // actually computing term_subject_summaries (see termStatus.ts's new
+  // `summariesComputed` field). A locked-but-not-computed school
+  // incorrectly showed "End of Term" complete before Report Generation
+  // could actually produce a real result.
+  const summarizedClasses = classStatuses?.filter(c => c.summariesComputed).length ?? 0
 
   const currentYear = academicYears?.find(y => y.is_current)
   const currentTermRow = membership.currentTerm
+
+  async function setCurrentTermNow() {
+    if (!membership || !selectedTermId) return
+    setSettingCurrentTerm(true)
+    setError('')
+    try {
+      await fetchJson('/api/core/academic-years', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schoolId: membership.schoolId, type: 'set-current-term', termId: selectedTermId }),
+      })
+      window.location.reload() // membership.currentTerm is derived server-side on the my-membership route; simplest correct refresh
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to set current term')
+      setSettingCurrentTerm(false)
+    }
+  }
+
+  async function seedSubjectsNow() {
+    if (!membership) return
+    setSeedingSubjects(true)
+    setError('')
+    try {
+      await fetchJson('/api/core/subjects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'seed', schoolId: membership.schoolId }),
+      })
+      await refreshReadiness()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to set up default subjects')
+    } finally {
+      setSeedingSubjects(false)
+    }
+  }
 
   // Section 3 — reuses only getSchoolAcademicReadiness() + fetchClassTermStatuses(); no new
   // readiness score is computed. "Completed" / "Needs attention" are the same fields already
@@ -189,6 +267,10 @@ export default function AcademicOfficePage() {
   ] : []
   const operationItems: Array<{ label: string; done: boolean; href: string }> = classStatuses ? [
     { label: 'Assessments locked for every class', done: totalClasses > 0 && lockedAssessments === totalClasses, href: '/teacher/core-term' },
+    // Sprint C0 Task 2 — previously missing entirely from this checklist:
+    // an admin could see "Report cards generated" as the very next step
+    // with no item ever naming that summaries must be computed first.
+    { label: 'Term summaries computed for every class', done: totalClasses > 0 && summarizedClasses === totalClasses, href: '/teacher/core-term' },
     { label: 'Report cards generated for every class', done: totalClasses > 0 && generatedReports === totalClasses, href: '/teacher/core-term' },
     { label: 'Report cards published for every class', done: totalClasses > 0 && publishedReports === totalClasses, href: '/teacher/core-term' },
   ] : []
@@ -231,19 +313,53 @@ export default function AcademicOfficePage() {
                 label="Terms"
                 status={terms === null ? 'Loading…' : currentTermRow ? `Current: ${currentTermRow.name}` : 'No current term set'}
               />
+              {!currentTermRow && terms && terms.length > 0 && (
+                <div className="flex items-center gap-2 py-2 -mt-1 pl-7">
+                  <select
+                    value={selectedTermId}
+                    onChange={e => setSelectedTermId(e.target.value)}
+                    className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-teal-500"
+                  >
+                    <option value="">Select a term to set as current…</option>
+                    {terms.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                  <button
+                    onClick={setCurrentTermNow}
+                    disabled={settingCurrentTerm || !selectedTermId}
+                    className="flex items-center gap-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors shrink-0"
+                  >
+                    {settingCurrentTerm && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    Set Current
+                  </button>
+                </div>
+              )}
               <StructureRow
                 icon={BookOpen}
                 label="Subjects"
                 status={readiness ? (readiness.subjects.reason ?? 'Every grade in use has subjects assigned.') : 'Loading…'}
-                unavailable
+                href="/teacher/core-office/academic/structure"
               />
+              {readiness && !readiness.subjects.allGradesInUseHaveSubjects && (
+                <div className="flex items-center gap-2 py-2 -mt-1 pl-7">
+                  <button
+                    onClick={seedSubjectsNow}
+                    disabled={seedingSubjects}
+                    className="flex items-center gap-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors shrink-0"
+                  >
+                    {seedingSubjects && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    Set Up Default Subjects
+                  </button>
+                </div>
+              )}
               <StructureRow
                 icon={Building}
                 label="Classes"
                 status={readiness ? `${readiness.classes.count} class(es), ${readiness.grades.inUse} of ${readiness.grades.count} grades in use` : 'Loading…'}
+                href="/teacher/core-office/academic/structure"
               />
               <p className="text-xs text-slate-400 pt-3 mt-1 border-t border-slate-100">
-                Academic years, terms and subjects are set up during school activation. Dedicated management screens for editing them are not yet available.
+                Academic years and terms are set up during school activation — no dedicated screen yet. Classes, streams and
+                subjects are managed from Academic Structure above.
               </p>
             </div>
           </div>
@@ -271,8 +387,13 @@ export default function AcademicOfficePage() {
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">Assessment Lock → End of Term → Report Generation → Report Publication</p>
                 <OperationRow icon={Lock} label="Assessment Lock" done={totalClasses > 0 && lockedAssessments === totalClasses}
                   detail={totalClasses === 0 ? 'No classes yet' : `${lockedAssessments} of ${totalClasses} classes locked`} />
-                <OperationRow icon={ClipboardList} label="End of Term" done={totalClasses > 0 && lockedAssessments === totalClasses}
-                  detail="Summaries computed once assessments are locked" />
+                <OperationRow icon={ClipboardList} label="End of Term" done={totalClasses > 0 && summarizedClasses === totalClasses}
+                  detail={
+                    totalClasses === 0 ? 'No classes yet'
+                      : summarizedClasses === totalClasses ? `${summarizedClasses} of ${totalClasses} classes summarized`
+                      : lockedAssessments === totalClasses ? `Ready — open End of Term below to generate summaries for ${totalClasses - summarizedClasses} class(es)`
+                      : `${summarizedClasses} of ${totalClasses} classes summarized (lock remaining assessments first)`
+                  } />
                 <OperationRow icon={FileCheck} label="Report Generation" done={totalClasses > 0 && generatedReports === totalClasses}
                   detail={totalClasses === 0 ? 'No classes yet' : `${generatedReports} of ${totalClasses} classes generated`} />
                 <OperationRow icon={Send} label="Report Publication" done={totalClasses > 0 && publishedReports === totalClasses}
@@ -340,13 +461,35 @@ export default function AcademicOfficePage() {
             </div>
           </div>
 
-          {/* Section 4 — Future Modules */}
+          {/* Section 3b — Learner Transitions (Sprint 10: activated from
+              FutureModule placeholders — see file header comment) */}
+          <div>
+            <h2 className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">Learner Transitions</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Link href="/teacher/core-office/academic/promotion" className="flex items-center gap-3 border border-slate-200 rounded-xl p-3 bg-white hover:border-teal-400 transition-colors">
+                <TrendingUp className="w-4 h-4 text-slate-400 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-slate-800">Promotion</p>
+                  <p className="text-xs text-slate-500">Promote, repeat, or graduate learners</p>
+                </div>
+                <ArrowRight className="w-4 h-4 text-slate-300 shrink-0" />
+              </Link>
+              <Link href="/teacher/core-office/academic/transfer" className="flex items-center gap-3 border border-slate-200 rounded-xl p-3 bg-white hover:border-teal-400 transition-colors">
+                <ArrowLeftRight className="w-4 h-4 text-slate-400 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-slate-800">Transfer</p>
+                  <p className="text-xs text-slate-500">Record a learner leaving the school</p>
+                </div>
+                <ArrowRight className="w-4 h-4 text-slate-300 shrink-0" />
+              </Link>
+            </div>
+          </div>
+
+          {/* Section 4 — Future Modules: genuinely unbuilt (no schema, no
+              lib, no API for either — confirmed in the Sprint 9 audit) */}
           <div>
             <h2 className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">Future Modules</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <FutureModule icon={TrendingUp} label="Promotion" />
-              <FutureModule icon={ArrowLeftRight} label="Transfer" />
-              <FutureModule icon={GraduationCap} label="Graduation" />
               <FutureModule icon={CalendarClock} label="Timetable" />
               <FutureModule icon={Users2} label="Departments" />
             </div>

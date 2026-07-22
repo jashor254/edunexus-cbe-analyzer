@@ -3,7 +3,8 @@ import { createClient } from '@/utils/supabase/server'
 import { transferLearner, getLearnerTransfers } from '@/lib/core/transfers'
 import { requireSchoolAdmin, requireAuthentication } from '@/lib/core/permissions'
 import { assertLearnerOwnership } from '@/lib/api/middleware'
-import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
+import { UnauthorizedError, isEduNexusError, PermissionDeniedError } from '@/lib/core/errors'
+import { repos } from '@/lib/repositories'
 import { z } from 'zod'
 
 const TransferSchema = z.object({
@@ -62,6 +63,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const ownershipFail = await assertLearnerOwnership(input.learner_id, schoolId)
   if (ownershipFail) return ownershipFail
 
-  const data = await transferLearner(userId, input)
+  // Same fix as app/api/core/promotions/route.ts this sprint:
+  // learner_transfers.processed_by is a FK to school_users(id), not
+  // auth.uid() — passing the raw userId would fail the FK constraint.
+  const processedBySchoolUser = await repos.teachers.findSchoolUser(userId, schoolId)
+  if (!processedBySchoolUser) return errorResponse(new PermissionDeniedError('No active school membership found for this admin action.'))
+
+  const data = await transferLearner(processedBySchoolUser.id, input)
   return NextResponse.json({ data }, { status: 201 })
 }

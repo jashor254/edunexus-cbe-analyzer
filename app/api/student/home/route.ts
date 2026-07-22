@@ -7,6 +7,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError } from '@/lib/api/response'
 import { requireAuthentication } from '@/lib/core/permissions'
 import { UnauthorizedError } from '@/lib/core/errors'
+import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 
 // Sprint 1B Batch G note: only the top-level auth check below is migrated.
 // The student-fetch query needs grade/school/current_pathway/curriculum_type
@@ -42,15 +43,6 @@ function computeStreak(sessions: { created_at: string }[]): number {
   return streak
 }
 
-function computeFRS(scores: Record<string, number>): number {
-  const vals = Object.values(scores).filter(v => typeof v === 'number' && v >= 1 && v <= 4)
-  if (!vals.length) return 0
-  const avg  = vals.reduce((a, b) => a + b, 0) / vals.length
-  const base = Math.round((avg / 4) * 100)
-  const l4   = vals.filter(v => v === 4).length
-  const l1   = vals.filter(v => v === 1).length
-  return Math.min(98, Math.max(5, base + l4 * 2 - l1 * 3))
-}
 
 export type StudentHomeData = {
   student: {
@@ -156,11 +148,19 @@ export async function GET(): Promise<Response> {
     const dow = weekStart.getDay()
     weekStart.setDate(weekStart.getDate() - (dow === 0 ? 6 : dow - 1))
 
-    // Parallel: latest assessment + compass sessions + class memberships
+    // Parallel: latest assessment + compass sessions + class memberships +
+    // canonical Projection (Sprint 12 Wave 1, High 7 — this route used to
+    // compute its own "Future Readiness Score" directly from raw
+    // subject_scores via a local computeFRS(), bypassing Projection
+    // entirely — a confirmed CLAUDE.md violation and a 4th independent
+    // "learner level" source alongside Blueprint/Career. Projection is now
+    // the sole source for futureReadiness below; no new calculation is
+    // introduced, only the input source changes.
     const [
       { data: assessments },
       { data: sessions },
       { data: classLinks },
+      projection,
     ] = await Promise.all([
       db.from('assessments')
         .select('subject_scores, term, year')
@@ -180,6 +180,8 @@ export async function GET(): Promise<Response> {
       db.from('class_students')
         .select('class_id')
         .eq('student_id', studentId),
+
+      recomputeLearnerProjection(studentId),
     ])
 
     // Latest assessment → subject levels
@@ -201,7 +203,11 @@ export async function GET(): Promise<Response> {
     const totalXp     = sessionsArr.reduce((s, x) => s + ((x.xp_earned as number) ?? 0), 0)
     const weekSessions = sessionsArr.filter(s => new Date(s.created_at as string) >= weekStart).length
     const streak       = computeStreak(sessionsArr.map(s => ({ created_at: s.created_at as string })))
-    const frs          = subjects.length ? computeFRS(latestScores) : 0
+    // capability.value.overallScore is already 0-1 normalized (lib/projection/types.ts) —
+    // the same 0-100 scale futureReadiness has always been on; null (no
+    // confirmed Evidence yet) maps to 0, matching this route's own
+    // pre-existing "no assessment yet" fallback.
+    const frs          = Math.round((projection.capability?.value.overallScore ?? 0) * 100)
 
     const recentSessions = sessionsArr.slice(0, 4).map(s => ({
       id:           s.id as string,

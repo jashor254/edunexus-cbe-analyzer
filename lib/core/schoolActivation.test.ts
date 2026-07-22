@@ -193,12 +193,22 @@ test('activateSchool: runs the full pipeline end-to-end on a fresh school', asyn
   try {
     const result = await activateSchool(freshId, { gradeCodes: ['G7'] })
     assert.equal(result.status, 'complete')
-    assert.equal(result.steps.length, 6)
-    assert.deepEqual(result.steps.map(s => s.step), ['academic_year', 'terms', 'grades', 'streams', 'classes', 'school_settings'])
+    // Sprint 12 Wave 1 (High 1): a new 'current_term' step, between 'terms'
+    // and 'grades', closes the Release Candidate audit's "no school ever
+    // ends activation with a current term set" finding.
+    assert.equal(result.steps.length, 7)
+    assert.deepEqual(result.steps.map(s => s.step), ['academic_year', 'terms', 'current_term', 'grades', 'streams', 'classes', 'school_settings'])
     assert.ok(result.steps.every(s => s.status !== 'failed'))
 
     const status = await getSchoolActivationStatus(freshId)
     assert.equal(status, 'ACTIVE')
+
+    // The actual fix, verified directly: a fresh school has a real current
+    // academic year and current term, not none.
+    const { getCurrentTerm } = await import('@/lib/core/school')
+    const currentTerm = await getCurrentTerm(freshId)
+    assert.ok(currentTerm, 'a freshly-activated school must have a current term set')
+    assert.equal(currentTerm!.term_number, 1)
   } finally {
     await db.from('schools').delete().eq('id', freshId)
   }

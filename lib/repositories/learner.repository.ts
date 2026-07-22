@@ -194,6 +194,25 @@ export class LearnerRepository extends BaseRepository {
     return data
   }
 
+  // Sprint 12 Wave 3 (Critical 1) — the two reads/writes the guardian-claim
+  // flow needs on learner_guardians itself, beyond insertGuardian above.
+  async findGuardianById(guardianId: string): Promise<LearnerGuardian | null> {
+    const { data } = await this.db
+      .from('learner_guardians')
+      .select(GUARDIAN_COLS)
+      .eq('id', guardianId)
+      .maybeSingle()
+    return data
+  }
+
+  async updateGuardianUserId(guardianId: string, userId: string): Promise<void> {
+    const { error } = await this.db
+      .from('learner_guardians')
+      .update({ user_id: userId })
+      .eq('id', guardianId)
+    if (error) throw new Error(`updateGuardianUserId: ${error.message}`)
+  }
+
   // ── Enrollments ────────────────────────────────────────────────────────────
 
   async upsertEnrollment(

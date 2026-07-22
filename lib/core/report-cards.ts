@@ -105,11 +105,19 @@ export async function generateReportCards(
   const toCbcLevel = (score: number): CbcLevel =>
     gradeScore(Math.min(100, Math.max(0, score)), 100, cbcScale).grade as CbcLevel
 
-  // Average score per learner, in enrollment order (ranking assigned below)
+  // Average score per learner, in enrollment order (ranking assigned below).
+  // `avg` is used for ranking (below) even for a no-summaries learner (an
+  // honest last-place tie, per the Sprint 3D comment below) — but a
+  // no-summaries learner's STORED overall_score/overall_cbc_level must never
+  // be a fabricated 0/BE (Sprint 12 Wave 1, High 3): `hasScores` tracks the
+  // distinction between "genuinely scored zero" (real, honest 0/BE) and "no
+  // summaries exist at all" (must store null, matching this same function's
+  // already-correct toReportCardAttendance() null-for-no-data pattern).
   const learnerAvgs = learnerIds.map((id) => {
     const agg = learnerAgg[id]
-    const avg = agg?.scores.length ? agg.scores.reduce((a, b) => a + b, 0) / agg.scores.length : 0
-    return { learner_id: id, avg }
+    const hasScores = !!agg?.scores.length
+    const avg = hasScores ? agg!.scores.reduce((a, b) => a + b, 0) / agg!.scores.length : 0
+    return { learner_id: id, avg, hasScores }
   })
 
   // Sprint 3D migration (docs/engineering/sprint-3-assessment-domain-audit.md
@@ -124,6 +132,7 @@ export async function generateReportCards(
   // report-card instance of that defect.
   const ranked = computeRankings(learnerAvgs.map((r) => ({ id: r.learner_id, score: r.avg })))
   const avgByLearnerId = new Map(learnerAvgs.map((r) => [r.learner_id, r.avg]))
+  const hasScoresByLearnerId = new Map(learnerAvgs.map((r) => [r.learner_id, r.hasScores]))
 
   // Sprint 12B — Attendance is the owner, Report Cards the consumer: one
   // bulk read for the whole class/term (never a per-learner loop against
@@ -134,13 +143,17 @@ export async function generateReportCards(
 
   const rows = ranked.map((r) => {
     const avg = avgByLearnerId.get(r.id) ?? 0
+    const hasScores = hasScoresByLearnerId.get(r.id) ?? false
     return {
       school_id: schoolId,
       learner_id: r.id,
       term_id: termId,
       class_id: classId,
-      overall_score: Math.round(avg * 100) / 100,
-      overall_cbc_level: toCbcLevel(avg),
+      // hasScores=false: no term_subject_summaries at all for this learner —
+      // null means "no data," never a fabricated 0/BE. hasScores=true: a
+      // real, honest computed score, even if it happens to be a genuine 0.
+      overall_score: hasScores ? Math.round(avg * 100) / 100 : null,
+      overall_cbc_level: hasScores ? toCbcLevel(avg) : null,
       position_in_class: r.position,
       total_learners: totalLearners,
       is_published: false,

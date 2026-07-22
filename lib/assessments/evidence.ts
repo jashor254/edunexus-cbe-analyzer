@@ -61,6 +61,17 @@ export async function recordAssessmentEvidence(
   ])
   if (!assessment || !marks.length) return
 
+  // Sprint 12 Wave 2 (High 2/6, Release Blocker Remediation) — defense in
+  // depth. In the normal flow this never fires: marks are saved (assessment
+  // still unpublished) before this function runs, and publishing happens
+  // later. This guards the hypothetical case of a caller reaching this
+  // function for an assessment that was locked in the meantime (or by a
+  // future caller that bypasses the marks-save guards this sprint added) —
+  // silently returns rather than throws, matching this function's own
+  // established fire-and-forget, no-evidence-to-produce contract
+  // immediately above (`if (!assessment || !marks.length) return`).
+  if (assessment.is_published) return
+
   // Phase G (learner-record-layer-decisions.md Decision 2): resolve a
   // purpose from this assessment's assessment_type_id (Phase B), when one
   // was set. Null on any assessment created before Phase B/G, or whose

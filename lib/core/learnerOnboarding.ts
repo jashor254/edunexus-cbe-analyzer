@@ -27,6 +27,7 @@
 // database — documented at the repository method, not assumed silently.
 
 import { getLearner, getLearnerHistory, admitLearner, addGuardian, enrollLearner, getClassRoster } from '@/lib/core/learners'
+import { createGuardianInvite } from '@/lib/core/guardianInvites'
 import { repos } from '@/lib/repositories'
 import type { Learner, LearnerGuardian, LearnerEnrollment, AdmitLearnerInput } from '@/types/core'
 
@@ -87,6 +88,12 @@ export async function ensureGuardianLinked(
   }
   const existing = await repos.learners.findGuardianByPhone(learnerId, guardian.phone)
   if (existing) {
+    // Sprint 12 Wave 3 (Critical 1) — an existing guardian row may still be
+    // unclaimed (user_id null) from before this fix, or from a previous
+    // admission attempt whose invite was never sent/claimed. createGuardianInvite
+    // is itself idempotent (returns 'already_linked'/'already_pending'
+    // without creating a duplicate row) — always safe to call.
+    fireGuardianInvite(schoolId, existing.id)
     return { guardian: existing, result: { step: 'guardian', status: 'already_exists', detail: `Guardian with phone "${guardian.phone}" already linked.` } }
   }
   const created = await addGuardian(schoolId, learnerId, {
@@ -99,7 +106,19 @@ export async function ensureGuardianLinked(
     is_primary: true,
     can_receive_reports: true,
   })
+  // Sprint 12 Wave 3 (Critical 1) — this is the fix's actual trigger point:
+  // learner_guardians.user_id was hardcoded null with nothing ever
+  // following up to link it to an authenticated account. Fire-and-forget,
+  // same posture as every other WhatsApp send in this codebase (never
+  // blocks or fails the admission the invite depends on).
+  fireGuardianInvite(schoolId, created.id)
   return { guardian: created, result: { step: 'guardian', status: 'created', detail: `Linked guardian "${created.full_name}".` } }
+}
+
+function fireGuardianInvite(schoolId: string, learnerGuardianId: string): void {
+  createGuardianInvite(schoolId, learnerGuardianId).catch(err =>
+    console.error('[learnerOnboarding] createGuardianInvite failed:', err instanceof Error ? err.message : String(err))
+  )
 }
 
 export async function ensureEnrolled(

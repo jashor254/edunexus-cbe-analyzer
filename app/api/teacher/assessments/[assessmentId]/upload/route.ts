@@ -41,6 +41,12 @@ export async function POST(
 
     const assessment = await getAssessmentById(assessmentId, teacher.id)
     if (!assessment) return apiNotFound('Assessment not found')
+    // Sprint 12 Wave 2 (High 2) — same lock guard as the manual bulk-save
+    // route (app/api/teacher/assessments/[assessmentId]/marks/route.ts);
+    // reuses the already-fetched assessment row, no new query.
+    if (assessment.is_published) {
+      return apiBadRequest('This assessment is locked — marks cannot be edited once published. Unpublish it first if a correction is genuinely needed.')
+    }
 
     const formData = await req.formData()
     const file = formData.get('file')

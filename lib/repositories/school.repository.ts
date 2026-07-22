@@ -326,8 +326,13 @@ export class SchoolRepository extends BaseRepository {
     learner_id: string
     term_id: string
     class_id: string
-    overall_score: number
-    overall_cbc_level: CbcLevel
+    // Sprint 12 Wave 1 (High 3) — nullable: a learner with no
+    // term_subject_summaries at all gets null here, never a fabricated 0/BE.
+    // Both columns were already nullable in the DB and in types/core.ts's
+    // SchoolReportCard; only this repository's local insert-shape type was
+    // narrower than reality.
+    overall_score: number | null
+    overall_cbc_level: CbcLevel | null
     position_in_class: number
     total_learners: number
     is_published: boolean

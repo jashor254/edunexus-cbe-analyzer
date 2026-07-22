@@ -150,6 +150,18 @@ export async function saveScores(
     mean_grade?: string
   }>
 ): Promise<void> {
+  // Sprint 12 Wave 2 (High 2, Release Blocker Remediation) — this is the
+  // Core-bridge marks-save path (lib/core/academicBridge.ts's
+  // recordBridgedMarks); the sibling legacy-teacher routes
+  // (app/api/teacher/assessments/[assessmentId]/marks and .../upload) got
+  // the same guard directly in their own route handlers, reusing an
+  // already-fetched assessment row. Here, no caller has already fetched
+  // the assessment row, so one cheap read is added — same "refuse, don't
+  // silently overwrite" posture as the report-cards publish-guard.
+  const assessment = await repos.assessments.findAssessmentById(assessmentId, teacherId)
+  if (assessment?.is_published) {
+    throw new Error('saveScores refused: this assessment is locked (published) — marks cannot be edited. Unpublish it first if a correction is genuinely needed.')
+  }
   return repos.assessments.saveScores(assessmentId, classId, teacherId, scores)
 }
 

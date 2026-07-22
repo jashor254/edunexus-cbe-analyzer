@@ -47,7 +47,6 @@ Entries are never edited to rewrite history — if a change is later reverted or
 
 ---
 
-
 ## 2026-07-22 — Sprint PE-8: Founder Communication Engine
 
 **What changed**: built the Communication Strategy Engine (WhatsApp > Call > Email > Visit, decided from real stored contact data with an explicit reason), a 14-template Message Library, dynamic personalization, a per-channel message generator, and a Communication Workspace card on the school detail page — full detail in `docs/growth-os/pilot-execution-sprint-pe8-communication-engine.md`. Zero new tables/columns: channel/template/edited-flag are notes tags on the existing `growth_activities.notes`, the same convention PE-7's `[replied]` tag established. "Send" only opens a `wa.me:`/`sms:`/`tel:`/`mailto:` link pre-filled with the draft — there is no code path that transmits a message without the founder's own client app in the loop.
@@ -193,6 +192,108 @@ Entries are never edited to rewrite history — if a change is later reverted or
 **Tests added**: 0.
 
 **Rollback considerations**: None — no code or schema changed this pass.
+
+---
+
+## 2026-07-21 — Sprint C0 Stabilization: Uniqueness Constraint, Onboarding Visibility, Recovery Plan
+
+**What changed**: three approved, scoped tasks under the Phase 1 CEO Plan's Foundation Freeze — implementation only, no redesign, no new modules. Task 1: added `UNIQUE(learner_id, from_academic_year_id)` to `learner_promotions` (`supabase/migrations/20260723120000_learner_promotions_uniqueness.sql`), closing Release Gate 1's MAJOR finding that the promotion-replay guard had no database backstop. Verified live with a real concurrency test (`Promise.all` of two simultaneous `runAnnualPromotion` calls, not just code reasoning) — new test in `lib/core/promotions.test.ts`, 7/7 passing. Task 2: removed two instances of onboarding tribal knowledge — `resolveSubjectReadiness()`'s reason string (`lib/core/academicActivation.ts`) no longer names internal function/file references to a school admin; the Academic Office page (`app/teacher/core-office/academic/page.tsx`) now has a one-click "Set Up Default Subjects" action and an accurate "End of Term" status (previously showed "done" the moment assessments locked, before term summaries were actually computed — a real, silent misrepresentation, now backed by a new `summariesComputed` field on `ClassTermStatus`, `lib/core/client/termStatus.ts`). Task 3: `docs/architecture/legacy-data-recovery-plan.md` — a recovery plan only, zero production data touched, covering the 579 unlinked guardians and 15 corrupted enrollments Release Gate 1 quantified.
+
+**Architectural documents referenced**: `docs/architecture/release-gate-1-pilot-readiness-certification.md` (the findings closed/planned-against), `docs/architecture/sprint13-pilot-readiness-validation.md`, CLAUDE.md.
+
+**ADR**: None — additive migration, UI-only changes, and a planning document; no new identity/domain/authorization pattern.
+
+**Tests added/updated**: `lib/core/promotions.test.ts` (+1 new concurrency test, +1 fixture learner, 2 pre-existing assertions updated for the new learner count — 7/7 passing); `lib/core/academicActivation.test.ts` (1 assertion updated for the reworded, admin-facing reason string, plus a new assertion that the string never leaks an internal function name — 10/10 passing); `lib/core/promotions.reenrollmentGap.test.ts` re-run as a regression check, unaffected (1/1 passing). `tsc --noEmit` and `eslint` both clean on every touched file.
+
+**Rollback considerations**: Task 1 — `DROP CONSTRAINT learner_promotions_learner_from_year_key` (documented in the migration file itself), safe at any time, no data affected. Task 2 — purely additive UI/string changes, revert restores the exact prior (functional but less clear) behavior. Task 3 — no rollback needed; nothing was executed against production data, only planned.
+
+---
+
+## 2026-07-21 — Release Gate 1: Pilot Readiness Certification
+
+**What changed**: no code changed — a stricter certification pass than Sprint 13, run as a formal gate rather than an audit. Nothing from Sprint 13 was accepted as proof; every reused claim was independently re-derived this session (live `pg_policies`/`pg_proc`/`pg_constraint` queries, fresh greps), and every claim not re-derived is explicitly marked carried/not-recertified rather than silently upgraded. Four planned parallel certification agents (Environments A/B/C, Performance/Documentation) all failed on the account's monthly spend limit; the user chose to have the certification completed sequentially in-session instead. Full report: `docs/architecture/release-gate-1-pilot-readiness-certification.md`.
+
+**Key results**: both previously-disputed/claimed-fixed Critical security bugs (`token_balances` self-grant, `learner_evidence` teacher-of-entry read gate) reconfirmed genuinely fixed by reading live policy text and the SQL body of every function each policy calls — this also definitively resolves a disagreement between two of Sprint 13's own research passes. Sprint 13's data-corruption counts (579/580 unlinked guardians, 15 corrupted promotion/graduation enrollments) were reconfirmed at the individual-row level. One new finding: `learner_promotions` has no unique constraint of any kind (pure app-level replay guard, no DB backstop) — partially mitigated by a real `UNIQUE(learner_id, term_id)` constraint already on `learner_enrollments`.
+
+**Architectural documents referenced**: `docs/architecture/sprint13-pilot-readiness-validation.md` (the claims re-derived, not trusted), CLAUDE.md.
+
+**ADR**: None — certification only.
+
+**Tests added**: 0. No fixtures created this round (all evidence came from read-only queries against the live schema/policies and existing data).
+
+**Rollback considerations**: None — no code or schema changed. Final decision: NO-GO platform-wide (live data defects unmitigated), PASS WITH CONDITIONS if scoped to a genuinely new pilot school only.
+
+---
+
+## 2026-07-21 — Sprint 13: Pilot Readiness Validation
+
+**What changed**: no code changed — verification-only sprint, per its own mandate. Four parallel passes re-derived every Sprint 12 fix claim directly against the live database and live code (real `execute_sql` counts, real `pg_policies` reads, real `eslint` runs, real function execution against a newly-created test school), rather than trusting Sprint 12's own test suite alone. Every Sprint 12 code fix held up. The headline finding: Sprint 12's two named backfills ("small, bounded") are actually total — 579/579 existing guardians have never received an invite, and 15 real learners have corrupted enrollment state from pre-fix promotions/graduations. Full report: `docs/architecture/sprint13-pilot-readiness-validation.md`.
+
+**Architectural documents referenced**: `docs/architecture/sprint12-release-blocker-remediation.md` (the claims being re-verified), `sprint11-release-candidate-audit.md`, CLAUDE.md (evidence immutability, RLS, teacher_id-not-a-read-gate rules — all re-checked against live policy text).
+
+**ADR**: None — verification only, no architectural change proposed.
+
+**Tests added**: 0. One real, disposable test school created directly in the live DB (`b3e56245-ee38-4e47-ad46-fec26ccc8503`) to exercise every fresh-school journey as running code; intentionally not deleted (schools with a Blueprint Snapshot cannot cascade-delete, confirmed as a new finding this sprint).
+
+**Rollback considerations**: None — no code or schema changed. Follow-up work is data-repair (the two backfills named in §5 of the report), not a code rollback risk.
+
+---
+
+## 2026-07-21 — Sprint 12: Release Blocker Remediation
+
+**What changed**: implemented, in three waves, fixes for all 2 Critical + 7 High findings from `docs/architecture/sprint11-release-candidate-audit.md`, exactly as designed in `docs/architecture/sprint12-release-blocker-investigation.md` (investigation-first, per that document's own gate). Full per-wave detail in `docs/architecture/sprint12-release-blocker-remediation.md`. Summary:
+
+**Wave 1** (`lib/core/report-cards.ts`, `lib/core/schoolActivation.ts`, `app/teacher/core-office/academic/page.tsx`, `app/api/student/home/route.ts`): a no-summaries learner now gets `overall_score`/`overall_cbc_level: null` instead of a fabricated `0`/`BE` (High 3); school activation now sets a real current academic year/term via a new, idempotency-guarded `ensureCurrentTerm` step, with a UI fallback control for pre-fix schools (High 1); the student Dashboard's "Future Readiness Score" now reads `recomputeLearnerProjection()`'s `capability` projection instead of computing its own, closing a direct CLAUDE.md violation (High 7).
+
+**Wave 2** (`lib/core/promotions.ts`, `app/api/core/promotions/route.ts`, `app/teacher/core-office/academic/promotion/page.tsx`, `lib/core/assessments.ts`, `lib/assessments/evidence.ts`, `app/api/teacher/assessments/[assessmentId]/{marks,upload}/route.ts`): `runAnnualPromotion()` now withdraws the old enrollment and creates a real new one via `enrollLearner()`/`withdrawActiveEnrollments()` (both pre-existing, reused unchanged) for every promotion/repeat decision, with a duplicate-promotion guard and required-destination validation (Critical 2); `previewPromotion()` gained a non-blocking `hasReportCard` warning field (High 4); assessment "lock" now actually blocks further mark edits in all three save paths (Core bridge + both legacy teacher routes), reusing the report-cards publish-guard's exact posture (High 2/6).
+
+**Two real bugs found by this wave's own tests, fixed before landing**: `runAnnualPromotion`'s destination-year term resolution would silently collide with the source enrollment's row when source and destination share an academic year (a test-fixture-revealed edge case, documented in `lib/core/promotions.test.ts`); the legacy `ASSESSMENT_COLS` repository column list never actually selected `is_published` at all, meaning the new lock guards would have silently never fired in production — caught only because `lib/core/assessmentLock.workflow.test.ts` asserted the guard's real behavior instead of just its presence.
+
+**Wave 3** (new table `core_guardian_invites`, `lib/core/guardianInvites.ts`, `app/api/parent/link-guardian/route.ts`, `app/(auth)/parent-join/page.tsx`, trigger points in `lib/core/learnerOnboarding.ts` and `lib/core/learners.ts`): a guardian created via Core Admissions now automatically receives a WhatsApp invite (reusing `sendWhatsApp()`, not the link-incapable `sendWelcomeMessage()`) and can claim their `learner_guardians.user_id` link through the existing `parent-join` page, extended to branch on invite type rather than forked (Critical 1). The new table exists only because the legacy `student_invites`/`link-student` flow is FK-bound to the legacy `students` table — everything else (token generation, expiry, claim-validation shape) is copied from that flow's own live, proven defaults. The claim's "mark used" write is deliberately race-safe (conditional update, checked row count) — stricter than the legacy flow it's modeled on, which has no such guard; not backported to the legacy flow (out of this blocker's scope).
+
+**Architectural documents referenced**: `docs/architecture/sprint12-release-blocker-investigation.md` (every design decision below traces to a specific section of it), CLAUDE.md's Projection-only rule (Wave 1, High 7), the Ten Engineering Rules ("never duplicate authorization/business logic" — every fix reuses an existing repository method or pattern; zero new repository methods were needed for Critical 2).
+
+**ADR**: None — every fix activates or extends existing architecture (reused repository methods, an existing lock-guard pattern, an existing invite-flow shape); no canonical-domain, ownership, or authorization-architecture change occurred. The one new table (`core_guardian_invites`) is additive Core schema, matching every other Core table's existing shape and RLS posture — not a new architectural layer.
+
+**Tests added**: 7 new test files, 50 tests total, all passing against real Supabase: `lib/core/reportCardsZeroMark.test.ts` (2), `lib/core/promotions.test.ts` (rewritten, 6, including duplicate-guard and missing-destination validation), `lib/core/promotions.reenrollmentGap.test.ts` (rewritten from documenting the gap to confirming the fix, 1), `lib/core/assessmentLock.workflow.test.ts` (3), `lib/core/guardianInvites.test.ts` (9, covering happy path, duplicate invite, cross-family isolation, idempotent re-claim, invalid/expired/replayed tokens, cross-school isolation), plus updates to `lib/core/schoolActivation.test.ts` and `lib/core/academicActivation.test.ts` for the new activation step. Full regression sweep (existing suites touched by these changes — onboarding, academic bridge, transfers, grading) confirmed zero new failures. `tsc --noEmit` clean; `eslint .` (whole repo): 0 errors, same 37 pre-existing warnings as before this sprint.
+
+**Rollback considerations**: Waves 1 and 2 are entirely code-only — revert per-file, no data migration involved. Wave 3's schema change is purely additive (`CREATE TABLE core_guardian_invites`); rollback is `DROP TABLE` plus removing the two fire-and-forget call sites in `learnerOnboarding.ts`/`learners.ts` — the `learner_guardians` table itself is never altered, so rollback cannot orphan or corrupt any existing guardian row.
+
+---
+
+## 2026-07-21 — Sprint 11: Release Candidate Audit
+
+**What changed**: audit-only sprint (per its own mandate — no features, no redesign). Six parallel research passes traced every major journey (School Onboarding, Teacher, Student, Parent, End-of-Term) as real running code, plus a dedicated Assessment→Evidence→Projection→Blueprint→Clinic→Report Cards→Promotion→Transfer data-flow trace. Full findings, severities, and release decision in `docs/architecture/sprint11-release-candidate-audit.md`.
+
+**Two Critical findings block Release Candidate status**: (1) `runAnnualPromotion()` (`lib/core/promotions.ts`) records a `learner_promotions` log row but never creates a new active `learner_enrollments` row for the destination class and never withdraws the old one — a "promoted" learner has no real enrollment anywhere until manually fixed. (2) Guardians linked through Core Admissions (Sprint 10) can never become authenticated parents — `learner_guardians.user_id` is hardcoded null at insert with no invite/claim mechanism anywhere; the only working parent-link flow targets the unrelated legacy `students.parent_user_id` instead. Seven High findings also found (no current-term set after school activation with no UI fix path; Academic Clinic diverges from canonical Blueprint; Promotion has no academic-evidence gate; assessment "lock" doesn't block further mark edits; report cards fabricate a real "BE" grade for zero-mark learners; no term-lock enforcement anywhere; student Dashboard computes its own capability score bypassing `recomputeLearnerProjection()`, violating CLAUDE.md's explicit rule).
+
+**The audit's most important positive finding**: the platform's central data flow — a Core-side assessment mark actually becoming real Evidence and a real Projection (i.e., Blueprint is not empty for a Core-only school) — is genuinely connected via `lib/core/academicBridge.ts`, confirmed for the first time end-to-end by a new test rather than assumed.
+
+**Architectural documents referenced**: `docs/architecture/reference-architecture-specification.md`, CLAUDE.md's Projection-only rule (directly cited as violated by Finding 9), all prior sprint audits this one either confirmed-fixed (Career grade-gate, Holiday publish-gate, "Parent Reports"/"Official Report Cards" naming) or confirmed-still-open (Academic Clinic/Blueprint divergence, disagreeing readiness formulas).
+
+**ADR**: None — audit only; the two Critical findings each require a product/design decision before any fix, deliberately not made this sprint.
+
+**Tests added**: `lib/core/academicBridge.assessmentToProjection.workflow.test.ts` (2 tests, confirms the Assessment→Evidence→Projection chain works end-to-end for a Core-bridged mark entry — first coverage of this path ever). `lib/core/promotions.reenrollmentGap.test.ts` (1 test, documents the Critical re-enrollment gap precisely — passes today by asserting the gap's exact symptom; designed to fail once Sprint 12 fixes it, which is the correct signal to update the assertion, not delete the test). Both run against real Supabase, both green. `tsc --noEmit` and `eslint` clean.
+
+**Rollback considerations**: none — no production code changed this sprint, only two new test files and this documentation.
+
+---
+
+## 2026-07-21 — Sprint 10: Core Administration Completion
+
+**What changed**: activated four backend-complete, zero-UI Core Administration capabilities identified by the Sprint 9 School Operations Excellence audit (`docs/architecture/sprint9-school-operations-excellence-audit.md`) instead of building anything new. New pages: `/teacher/core-office/academic/structure` (stream creation, class creation, subject→grade assignment, teacher→class-subject allocation — all four call pre-existing `lib/core/classes.ts`/`lib/core/subjects.ts` functions and their existing `requireSchoolAdmin`-gated routes), `/teacher/core-office/academic/promotion` (previewPromotion/runAnnualPromotion, with Graduation folded in as a `promotion_type` value rather than kept as its own placeholder), `/teacher/core-office/academic/transfer` (transferLearner, direction "out" only — "in" goes through the existing Admissions flow instead). The Academic Office page's Future Modules grid now only lists Timetable and Departments, the two capabilities confirmed to have no schema/lib/API at all — Promotion/Transfer/Graduation moved out since they now have real screens.
+
+**Two real production bugs found and fixed while testing the newly-activated Promotion/Transfer routes**: `app/api/core/promotions/route.ts` and `app/api/core/transfers/route.ts` both passed the raw authenticated `auth.uid()` as `processed_by`, but `learner_promotions.processed_by` and `learner_transfers.processed_by` are both FKs to `school_users(id)` (`supabase/migrations/20260629_core_foundation.sql:553,592`). Every promotion/transfer request would have returned HTTP 200 with `processed: 0` and a foreign-key-violation message buried in the per-decision `errors` array — silently doing nothing, with no visible failure, for every school that ever used the newly-activated UI. Neither route had test coverage before this sprint (confirmed dormant, per the Sprint 9 audit), so the bug was invisible until this sprint's own workflow tests exercised the real path. Fixed by resolving the acting admin's `school_users.id` via the existing `repos.teachers.findSchoolUser(userId, schoolId)` lookup before calling `runAnnualPromotion`/`transferLearner` — no schema change, no new repository method.
+
+**Report-card publish is now a deliberate two-click action** (`app/teacher/core-term/page.tsx`): first click arms a "Confirm Publish" state with an explicit warning that this releases final grades to parents and cannot be undone from that screen; second click fires the unchanged `publishReportCards()` call. No backend or authorization change — `canPublishReport`/`requireSchoolAdmin` gate the same as before; this only adds a client-side pause.
+
+**Architectural documents referenced**: `docs/architecture/sprint9-school-operations-excellence-audit.md` (source inventory for what to activate), `docs/architecture/reference-architecture-specification.md` §2 (thin routes, all logic in `lib/`), Ten Engineering Rules ("never duplicate authorization" — every new screen reuses `requireSchoolAdmin`/`canPublishReport`, adds none).
+
+**ADR**: None — this sprint activates existing Core Administration capabilities per its own mission ("do not build new administration systems, do not redesign School Core, do not introduce parallel implementations"); no canonical-domain, ownership, or authorization-architecture change occurred.
+
+**Tests added**: `lib/core/classes.workflow.test.ts` (9 tests — createStream/createClass/assignSubjectToGrade/assignSubjectTeacher round-trips, upsert-not-duplicate, plus 3 authorization tests reusing `requireSchoolAdmin` for cross-school and non-admin denial), `lib/core/promotions.test.ts` (4 tests — preview, promote, graduate, and unknown-learner-id-reported-not-thrown), `lib/core/transfers.test.ts` (2 tests — transfer-out side effects, transfer history read). All 15 pass against real Supabase (`npx tsx --env-file=.env.local --test <file>`). `tsc --noEmit` clean, `eslint` 0 errors on every touched file.
+
+**Rollback considerations**: the two route fixes (`promotions`/`transfers`) are the only behavior change to previously-shipped code — reverting them restores the pre-existing (silently broken) behavior, not a working prior state, so there is no reason to roll them back independently of the new UI. The five new pages are additive routes; deleting them and the two Academic Office edits fully reverts the UI-activation half of this sprint with no data migration involved (no schema changed).
 
 ---
 

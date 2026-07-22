@@ -10,6 +10,13 @@ function ParentJoinContent() {
   const searchParams = useSearchParams()
   const router       = useRouter()
   const studentId    = searchParams.get('student')
+  // Sprint 12 Wave 3 (Critical 1) — the Core guardian-claim path. Same page,
+  // same flow, branching only on which query param is present rather than
+  // duplicating this whole screen: a `guardian` link (from
+  // lib/core/guardianInvites.ts) claims via /api/parent/link-guardian
+  // (learner_guardians.user_id); a `student` link (legacy, unchanged) claims
+  // via /api/parent/link-student (students.parent_user_id).
+  const guardianId   = searchParams.get('guardian')
   const token        = searchParams.get('token')
 
   const [status, setStatus] = useState<'checking' | 'linking' | 'done' | 'error' | 'needs-signup'>('checking')
@@ -17,9 +24,9 @@ function ParentJoinContent() {
   const [errorMsg, setErrorMsg] = useState('')
 
   useEffect(() => {
-    if (!studentId || !token) {
+    if ((!studentId && !guardianId) || !token) {
       setStatus('error')
-      setErrorMsg('Invalid invite link — missing student or token.')
+      setErrorMsg('Invalid invite link — missing student/guardian or token.')
       return
     }
 
@@ -29,18 +36,26 @@ function ParentJoinContent() {
 
       if (!user) {
         // Not logged in — redirect to signup with returnTo pointing back here
-        const returnTo = `/parent-join?student=${studentId}&token=${token}`
+        const returnTo = studentId
+          ? `/parent-join?student=${studentId}&token=${token}`
+          : `/parent-join?guardian=${guardianId}&token=${token}`
         router.push(`/signup?returnTo=${encodeURIComponent(returnTo)}`)
         return
       }
 
       setStatus('linking')
 
-      const res = await fetch('/api/parent/link-student', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ student_id: studentId, token }),
-      })
+      const res = studentId
+        ? await fetch('/api/parent/link-student', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ student_id: studentId, token }),
+          })
+        : await fetch('/api/parent/link-guardian', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ token }),
+          })
       const json = await res.json()
 
       if (!res.ok || !json.success) {
@@ -49,7 +64,7 @@ function ParentJoinContent() {
         return
       }
 
-      setStudentName(json.data.student_name)
+      setStudentName(json.data.student_name ?? json.data.learnerName ?? '')
       setStatus('done')
 
       // Redirect to dashboard after a brief pause
@@ -57,7 +72,7 @@ function ParentJoinContent() {
     }
 
     run()
-  }, [studentId, token, router])
+  }, [studentId, guardianId, token, router])
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">

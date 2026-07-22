@@ -1,4 +1,5 @@
 import { repos } from '@/lib/repositories'
+import { createGuardianInvite } from '@/lib/core/guardianInvites'
 import type {
   Learner,
   LearnerWithGuardians,
@@ -30,6 +31,15 @@ export async function admitLearner(
     is_primary: true,
     can_receive_reports: true,
   })
+
+  // Sprint 12 Wave 3 (Critical 1) — same fix, same trigger point as
+  // lib/core/learnerOnboarding.ts::ensureGuardianLinked (this is the
+  // standalone AdmitSchema admission path, app/api/core/learners POST
+  // without class_id — a second, real, reachable place a guardian row is
+  // created with user_id hardcoded null). Fire-and-forget, non-blocking.
+  createGuardianInvite(schoolId, guardian.id).catch(err =>
+    console.error('[learners] createGuardianInvite failed:', err instanceof Error ? err.message : String(err))
+  )
 
   return { ...learner, learner_guardians: [guardian] }
 }
