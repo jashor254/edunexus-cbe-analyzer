@@ -4,7 +4,8 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiForbidden, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
-import { ADMIN_CONFIG } from '@/lib/config/api'
+import { requireGrowthUser } from '@/lib/growth/auth'
+import { UnauthorizedError, ForbiddenError } from '@/lib/core/errors'
 
 const GrantAccessSchema = z.object({
   email: z.string().email(),
@@ -14,15 +15,7 @@ const GrantAccessSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return apiUnauthorized()
-    }
-
-    if (!ADMIN_CONFIG.isAdmin(user.email ?? '')) {
-      return apiForbidden()
-    }
+    await requireGrowthUser(supabase)
 
     const parsed = GrantAccessSchema.safeParse(await request.json())
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
@@ -93,6 +86,8 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
+    if (error instanceof UnauthorizedError) return apiUnauthorized()
+    if (error instanceof ForbiddenError) return apiForbidden()
     console.error('Grant access error:', error)
     return apiError('Internal Server Error', 500)
   }

@@ -2,20 +2,13 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiForbidden, apiUnauthorized } from '@/lib/api/response'
-import { ADMIN_CONFIG } from '@/lib/config/api'
+import { requireGrowthUser } from '@/lib/growth/auth'
+import { UnauthorizedError, ForbiddenError } from '@/lib/core/errors'
 
 export async function GET() {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return apiUnauthorized()
-    }
-
-    if (!ADMIN_CONFIG.isAdmin(user.email ?? '')) {
-      return apiForbidden()
-    }
+    await requireGrowthUser(supabase)
 
     const service = createServiceClient()
 
@@ -55,6 +48,8 @@ export async function GET() {
     })
 
   } catch (error) {
+    if (error instanceof UnauthorizedError) return apiUnauthorized()
+    if (error instanceof ForbiddenError) return apiForbidden()
     console.error('Admin stats error:', error)
     return apiError('Internal Server Error', 500)
   }

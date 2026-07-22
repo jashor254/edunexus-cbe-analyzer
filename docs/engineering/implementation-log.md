@@ -48,6 +48,154 @@ Entries are never edited to rewrite history — if a change is later reverted or
 ---
 
 
+## 2026-07-22 — Sprint PE-8: Founder Communication Engine
+
+**What changed**: built the Communication Strategy Engine (WhatsApp > Call > Email > Visit, decided from real stored contact data with an explicit reason), a 14-template Message Library, dynamic personalization, a per-channel message generator, and a Communication Workspace card on the school detail page — full detail in `docs/growth-os/pilot-execution-sprint-pe8-communication-engine.md`. Zero new tables/columns: channel/template/edited-flag are notes tags on the existing `growth_activities.notes`, the same convention PE-7's `[replied]` tag established. "Send" only opens a `wa.me:`/`sms:`/`tel:`/`mailto:` link pre-filled with the draft — there is no code path that transmits a message without the founder's own client app in the loop.
+
+**Contradiction flagged before building, founder chose to proceed anyway**: this sprint's spec is exactly the kind of speculative Growth Engine work Sprint PE-1 said to stop doing until a pilot hits a real blocker, and `growth_schools` is still 0 rows (PE-7's own pending-review state, unchanged). Raised explicitly; founder chose the full build regardless. Recorded so this isn't presented as having passed the PE-1 filter when it plainly didn't.
+
+**Architectural documents referenced**: `docs/growth-os/pilot-execution-sprint-pe8-communication-engine.md` (this sprint's own doc, Pilot Critical/Helpful classification and deferred items inside), `docs/growth-os/pilot-execution-sprint-pe7-campaign-launch.md` (the notes-tag convention and Contact Workspace this sprint extends).
+
+**ADR**: None — composes existing `growth_activities`/`growth_follow_ups`/`growth_schools` reads and writes via new pure functions, no new identity/authorization/domain pattern.
+
+**Tests added**: 33, six new files (`lib/growth/messaging/{strategy,render,generate,templates,followUpSuggestion,links}.test.ts`), all pure-function unit tests — no DB-touching test was added, since there is no real school to verify `getCommunicationWorkspace()`'s composition against yet.
+
+**Rollback considerations**: Very low. No schema changes. All new files (`lib/growth/messaging/*`, `lib/growth/services/messaging.ts`, two new API routes) are additive. `lib/growth/services/activities.ts` gained one new export (`logMessageSent`) alongside the unchanged `logActivity`/`logQuickAction`. `schools/[id]/page.tsx` gained one new section — reverting to the PE-7 version of the file fully restores prior behavior.
+
+---
+
+## 2026-07-21 — Sprint PO-5: Founder Mission Control
+
+**What changed**: transformed the existing four-section Founder Dashboard ("Today matters" — Must Do / Waiting For / At Risk / Wins) into the five-section Mission Control page the mission specifies (Mission Today, Pipeline Health, At Risk, Recent Wins, This Week), entirely from existing Growth Engine tables — no new table, no new entity, no automation, no charts. `getFounderDashboard()` → `getMissionControl()` (`lib/growth/services/dashboard.ts`, full rewrite), `FounderDashboard` → `MissionControlData` plus 5 new supporting types (`lib/growth/types.ts`). `app/(growth)/growth/page.tsx` rebuilt as a dense grid (Mission Today full-width top, a 4-up card row below) instead of a long vertical stack, per the mission's "no scrolling on a laptop" requirement.
+
+**Two small additive repository methods** (no new tables): `GrowthContactRepository.listDistinctSchoolIdsWithContacts()` (one batched query, backs At Risk's "missing contact" reason) and `GrowthActivityRepository.listSince(iso)` (one query, backs This Week's counters and the Recent Wins testimonial/referral heuristic). Both are read-only additions to existing repositories over existing tables.
+
+**Threshold change, explicit**: At Risk's inactivity threshold moved from 6 days (a prior worked-example value) to 7 days, matching this sprint's own explicit "no activity for 7+ days" specification — the more recent, explicit instruction wins over an inherited example.
+
+**Honest approximations, documented in code comments, not hidden**: testimonial/referral "wins" have no dedicated field (forbidden — no new entities) and are detected by scanning already-logged Activity notes for the words themselves, a manual-logging convention also named in `docs/commercial-assets/pilot-success-playbook.md`. "First-week review due" and Recent Wins' "pilot accepted" both use `last_contact_at`/`updated_at` as proxies for a stage-transition timestamp that doesn't exist in the schema — reasonable at 5-school volume, named as an approximation rather than presented as exact.
+
+**Tests added/updated**: `lib/growth/services/dashboard.integration.test.ts` fully rewritten, 5 tests, all passing against real Supabase — Mission Today's urgency ranking and demo-vs-follow-up tagging, At Risk's three distinct reasons (no activity / missing contact / missing follow-up) each verified independently plus a healthy-school negative case, Pipeline Health counts, Recent Wins (demo_completed/pilot_accepted/new_school/testimonial/referral), and This Week's 7-day windowing. Pre-existing `school.repository.integration.test.ts` (3/3) and `auth.test.ts` (6/6) re-run unaffected. `tsc --noEmit` and `eslint` clean on every touched file.
+
+**Performance impact**: same number of top-level queries as before (5, via `Promise.all`) — one query added (`listSince`) and one added (`listDistinctSchoolIdsWithContacts`), both single batched reads, not per-school loops (CLAUDE.md's no-N+1 rule maintained). No new indexes required — existing indexes on `growth_schools.pipeline_stage`, `growth_activities.school_id`, `growth_contacts.school_id` already cover the new queries' filter columns.
+
+**Technical debt**: no stage-transition-timestamp table exists, so several sections (first-week-review-due, pilot-accepted win timing) approximate "when did this happen" from `updated_at`/`last_contact_at` rather than an exact event time — acceptable at 5-school volume, revisit if a future sprint needs precise stage-dwell-time reporting. The testimonial/referral notes-keyword heuristic will miss any activity logged without those exact words — a real but accepted limitation given the alternative (a new schema field) was explicitly out of scope.
+
+**Verification performed**: the mission's own question — "can the founder open this page every morning and know exactly what to do next" — checked by confirming every rendered section maps to a specific next action (Mission Today: click through to the school and act; At Risk: click through, reason is stated; Recent Wins/Pipeline Health/This Week: read-only context, no action implied, matching the mission's "celebrate progress, not activity" framing). No browser-rendering/scroll-height check was performed (no browser tool available this session) — the compact-grid layout is a best-effort design against the "no scrolling on a laptop" requirement, not verified pixel-for-pixel.
+
+**Rollback strategy**: revert `dashboard.ts`, `types.ts`'s `MissionControlData` section, the API route's one-line import change, and `page.tsx` — all mechanical, independent reverts. The two new repository methods can stay (harmless, unused) or revert alongside; no data migration involved either way, since nothing here touched schema.
+
+---
+
+## 2026-07-21 — Sprint PO-4: Founder Execution Readiness Audit
+
+**What changed**: no code, no schema, no UI, no authentication — a pure compilation/audit deliverable per this sprint's explicit mandate. Produced `docs/commercial-assets/founder-pilot-checklist.md`, 24 manual founder tasks spanning Acquisition (9), Onboarding (10), and Completion (5) phases, each with why/when/estimated-time/repeatable/stay-manual/automation-candidate fields, drawn entirely from what Sprints PO-1 through PO-3 and Release Gate 2 already established — no new task invented, no existing one omitted.
+
+**Automation filter applied** (frequent past 5 pilots + low risk + no auth/authz surface expansion + meaningful time saved — all four required): 21 of 24 tasks fail at least one criterion and stay fully manual for Phase 1. Only 3 pass: a read-only account-existence check before inviting someone (candidate, not built), and extending the Founder Dashboard's existing Must-Do/At-Risk reminder pattern to demos and first-week reviews (candidate, not built) — both explicitly named as Phase 2 recommendations only, consistent with this sprint's "do not build new software" instruction.
+
+**Consistency check with PO-3's flagged admin-invite gap**: task #12 (manual admin setup) explicitly fails the filter's criterion 3 (would expand the auth/authz surface) and is correctly kept out of the Phase 2 candidates list — same conclusion PO-3 reached independently, now cross-confirmed by a differently-framed audit rather than just repeated.
+
+**Architectural documents referenced**: `docs/growth-os/pilot-acquisition-engine.md`, `docs/commercial-assets/founder-outreach-playbook.md`, `docs/commercial-assets/pilot-success-playbook.md`, `docs/architecture/release-gate-2-pilot-experience-certification.md`.
+
+**ADR**: None — audit/compilation only.
+
+**Tests added**: 0.
+
+**Rollback strategy**: None needed; documentation-only.
+
+---
+
+## 2026-07-21 — Sprint PO-3: Pilot Success Playbook
+
+**What changed**: no code, no schema, no UI — pure operational-content deliverable per this sprint's explicit mandate. Produced `docs/commercial-assets/pilot-success-playbook.md`, the full six-stage pilot lifecycle (Pilot Accepted → Technical Setup → Teacher Orientation → First Classroom Use → First Week Review → Pilot Completion), each with founder/school checklists, evidence to capture, risk indicators, exit criteria, Growth Engine activity mapping, and Voice of Customer update routing. Grounded in real, previously-verified code (Release Gate 2's certified onboarding journey, `/admin/core-schools/new`, Sprint C0's subject-seeding and End-of-Term fixes) rather than generic SaaS-onboarding convention.
+
+**Real gap found while grounding the document, not silently built around**: there is no self-serve way to make a pilot school's own administrator a `school_admin` — `/admin/core-schools/new` makes the founder the sole admin, and `inviteTeacher()`/`acceptTeacherInvitation()` (`lib/core/teacherOnboarding.ts`) are hardcoded to `role: 'teacher'` with no admin equivalent, confirmed via `addSchoolUser()` having zero API route callers. Flagged explicitly in Stage 2 with a working manual workaround for August's five schools (founder performs admin actions directly rather than sharing credentials or inventing new auth mid-documentation-sprint); the minimal fix (extend `inviteTeacher`'s pattern with a role parameter) is recommended but deliberately **not implemented** this sprint — it touches authentication/authorization, which warrants an explicit decision rather than silent scope expansion inside a sprint classified as operational/documentation-only.
+
+**Also documented, not previously written down anywhere**: every teacher/admin account requires the invitee to already hold a personal EduNexus account (via the existing signup page) before `inviteTeacher()` can link them — a real, concrete "undocumented step" risk this sprint's own success bar exists to catch, now named explicitly in Stage 1/2.
+
+**Classification** (§7 of the doc): the playbook, the Growth Engine mapping, and documenting both real gaps above are Pilot Critical. A Founder-Dashboard "pilot health" section and a dedicated Voice of Customer file are Future (insufficient real pilot volume yet to justify their shape). A ticketing system, automated onboarding reminders, and structured testimonial tracking are Backlog with rationale, matching this sprint's "no new Customer Success software, no automation, no notifications" constraint.
+
+**Architectural documents referenced**: `docs/architecture/release-gate-2-pilot-experience-certification.md`, `docs/growth-os/pilot-acquisition-engine.md`, `docs/commercial-assets/founder-outreach-playbook.md`, `docs/growth-os/sales-playbook.md`.
+
+**ADR**: None — content only; the one recommended code change (admin-invite role parameter) is explicitly deferred pending a decision, not an ADR trigger yet.
+
+**Tests added**: 0 — no code changed.
+
+**Rollback strategy**: None needed; documentation-only, no code/schema/data impact.
+
+---
+
+## 2026-07-21 — Sprint PO-2: Founder Outreach Playbook
+
+**What changed**: no code, no schema, no UI — pure commercial-asset content per this sprint's explicit mandate. Produced `docs/commercial-assets/founder-outreach-playbook.md`, one master operational playbook (not split into multiple files) covering all six acquisition stages (First Contact, Discovery, Demo Booking, Demo Delivery, Follow-up, Pilot Invitation), each with purpose/objective/success outcome/objections/responses/evidence-to-capture/next-action. Every script and question with no real conversation behind it yet is explicitly labeled `[HYPOTHESIS]` — none are presented as validated.
+
+**Integration**: §7 maps each playbook stage to the existing Growth Engine `GrowthActivityType` enum and pipeline stages (`lib/growth/types.ts`) — no new Activity Type, no automation, purely a usage guide over what Sprint C0 already built.
+
+**Relationship to `docs/growth-os/sales-playbook.md`**: made explicit in the doc's own header — that file is the evidence log (filled only after real conversations happen); this playbook is the opposite direction (what to say before evidence exists). The stated discipline going forward: promote validated scripts from here into `sales-playbook.md`'s Messaging Library after real use, retire what fails.
+
+**Classification** (§8 of the doc): the playbook itself and its Growth Engine mapping are Pilot Critical (both shipped). A monthly revision cadence and a post-demo debrief template are Pilot Helpful (not built — tied to the existing Friday Learning Review instead of a new ritual). A pricing objection script is Future (pricing isn't finalized). Automated follow-up sequences, script A/B testing, and a Customer Success playbook are Backlog, each with rationale, none built — matches this sprint's "implement nothing unless genuinely Pilot Critical" rule.
+
+**Architectural documents referenced**: `docs/growth-os/edunexus-growth-engine-specification.md`, `docs/growth-os/sales-playbook.md`, `docs/growth-os/pilot-acquisition-engine.md`, `feedback_post-audit-operating-charter` (the no-overselling principle applied to the Demo Delivery and Pilot Invitation sections).
+
+**ADR**: None — content only.
+
+**Tests added**: 0 — no code changed.
+
+**Rollback strategy**: None needed; a documentation-only change with no code/schema/data impact.
+
+---
+
+## 2026-07-21 — Sprint PO-1: Pilot Acquisition Engine
+
+**What changed**: designed and partially implemented the Pilot Acquisition Engine (`docs/growth-os/pilot-acquisition-engine.md`) — the founder's daily workflow for keeping the Growth Engine's pipeline fed with qualified pilot-school opportunities. Classified every proposed item Pilot Critical/Helpful/Future/Backlog per Sprint PO-1's mandate; implemented only the 5 items classified Pilot Critical.
+
+**What shipped**: three new nullable research-capture fields on `growth_schools` (`contact_source`, `existing_ict_activity`, `selection_reason` — `supabase/migrations/20260724090000_growth_pilot_acquisition_fields.sql`, additive, no new table), wired through `lib/growth/types.ts`, `lib/growth/validation/schools.ts`, `lib/growth/services/schools.ts`, `lib/growth/repositories/school.repository.ts`; the fields on the Add School form and displayed on the school detail page; a new "Research Next" section on the Founder Dashboard (`FounderDashboard.researchQueue`, `lib/growth/services/dashboard.ts`) listing active schools still in the `research` pipeline stage, oldest first, flagging any with no `selection_reason` recorded — composed from the dashboard's existing schools read, no new query. The Qualification Checklist (deliverable §2) was deliberately implemented as documentation only, not a data model or UI, per its own stated rationale (avoid unnecessary complexity until a real need for tracking it emerges).
+
+**What did not ship, and why**: an edit UI for the research fields after initial creation, a one-click "defer" shortcut from the dashboard, a mandatory (non-optional) selection-reason prompt, bulk import, and any scoring/ranking — all recorded in the design doc's classification table as Pilot Helpful/Backlog/Future with rationale, not built.
+
+**Architectural documents referenced**: `docs/growth-os/edunexus-growth-engine-specification.md`, `docs/growth-os/edunexus-growth-engine-implementation-blueprint.md`, `docs/growth-os/pilot-acquisition-engine.md` (this sprint's own output).
+
+**ADR**: None — additive columns on an existing table, no new identity/domain/authorization pattern, Growth Engine's existing single-writer-per-concern pattern (`changeStage()`, `updateSchool()`) unchanged in shape.
+
+**Tests added/updated**: 1 new test in `lib/growth/services/dashboard.integration.test.ts` (research-stage school appears in the queue, a school moved past `research` doesn't, `hasSelectionReason` flags correctly) — all passing against real Supabase. Pre-existing `lib/growth/repositories/school.repository.integration.test.ts` (3/3) and the dashboard suite's original test (1/1) re-run unaffected. `tsc --noEmit` and `eslint` clean on every touched file.
+
+**Rollback strategy**: `ALTER TABLE growth_schools DROP COLUMN contact_source, DROP COLUMN existing_ict_activity, DROP COLUMN selection_reason` — safe at any time, no other object depends on these columns; the only cost is losing the research notes themselves, same as dropping any other free-text field. UI/service/type changes revert independently and mechanically alongside it.
+
+---
+
+## 2026-07-21 — Sprint PR-2: Founder Boundary Security
+
+**What changed**: closed Release Gate 2's one High-severity finding — `requireGrowthUser()` (`lib/growth/auth.ts`) previously self-registered ANY authenticated user (teacher, parent, school admin — same `auth.users` pool) as a full-access Growth OS user. Replaced with a fail-closed check: a caller with no existing `growth_users` row is now authorized only if their email matches the new `GROWTH_FOUNDER_EMAIL` env var; an existing founder row is still returned untouched regardless of that var's value. All 10 `app/api/growth/**/route.ts` files updated to map the resulting `ForbiddenError`/`PermissionDeniedError` to a real 403 (`apiForbidden()`, generic "Access denied" body — no information leakage) instead of falling through to a misleading 500. No new table, no permissions framework, no multi-user model — Mode 1 (solo founder) is unchanged in shape, only in who can become that one user.
+
+**Verification performed**: 6 new lib-level tests (`lib/growth/auth.test.ts`, all passing against real Supabase auth — real sign-ins, real `growth_users` rows) covering founder access, existing-founder-untouched, teacher-like denial with zero self-registration, the same denial for any non-founder role, and fail-closed behavior both when misconfigured for a new caller and when preserved for an existing founder. Additionally ran a real HTTP-level check against a live `next dev` server: unauthenticated request to `/api/growth/schools` → 401; authenticated non-founder request → 403 with body `{"error":"Access denied"}` and zero `growth_users` row created for that caller. `growth_users` table confirmed at 0 rows before and after this sprint (test fixtures cleaned up) — no production data touched. `tsc --noEmit` and `eslint` clean on every touched file. Pre-existing `lib/growth/repositories/school.repository.integration.test.ts` re-run unaffected (3/3 passing).
+
+**Architectural documents referenced**: `docs/release-gate-2-pilot-experience-certification.md` (§7/§8, the finding this closes).
+
+**ADR**: None — additive env-gated check, no new identity/domain/authorization pattern, Mode 1 preserved exactly as designed.
+
+**Database changes**: None. No migration, no schema change — `growth_users`/RLS were already correctly shaped; the gap was entirely in application-layer logic.
+
+**Rollback strategy**: revert `lib/growth/auth.ts` to call `ensure()` unconditionally and revert the 10 route files' catch blocks — each is an independent, mechanical revert with zero data implications, since no schema changed and the `growth_users` table remains empty either way.
+
+---
+
+## 2026-07-21 — Release Gate 2: Pilot Experience Certification
+
+**What changed**: no code changed — QA/audit pass only, per Pilot Readiness Sprint PR-1's mandate. Re-confirmed Sprint C0's three fixes (subject-seeding UI, End-of-Term real status, promotion uniqueness constraint) live and closed. Covered two areas neither Release Gate 1 nor Sprint 13 had touched: Growth Engine (`lib/growth/`, `app/(growth)/growth/`, `app/api/growth/`) and a fresh UX/dead-end pass. Full report: `docs/release-gate-2-pilot-experience-certification.md`.
+
+**Key new finding**: Growth OS has no founder-specific gate — `lib/growth/auth.ts`'s `requireGrowthUser()` self-registers any authenticated user (any teacher/parent/pilot account, same `auth.users` pool) as a full-access Growth OS user the moment they call any `/api/growth/*` route or visit `/growth`. Classified High — not yet exploited, no link from pilot-facing pages, but the mechanism is real and provable, not theoretical.
+
+**Verdict**: READY WITH CONDITIONS. A genuinely new pilot school's own journey (activation → teaching cycle → promotion) is fully certified with no founder intervention required. Conditions are about (1) the still-unexecuted legacy data backfill (`docs/architecture/legacy-data-recovery-plan.md`, unaffected by this sprint per its own instruction) and (2) the new Growth OS access gap — both scoped to *not* block a brand-new pilot school today.
+
+**Architectural documents referenced**: `docs/architecture/release-gate-1-pilot-readiness-certification.md`, `docs/architecture/sprint13-pilot-readiness-validation.md`, `docs/architecture/legacy-data-recovery-plan.md`.
+
+**ADR**: None — audit only.
+
+**Tests added**: 0.
+
+**Rollback considerations**: None — no code or schema changed this pass.
+
+---
+
 ## 2026-07-18 — LMS Basics Phase 3a: Auto-Graded MCQ Quiz
 
 **What changed**: user asked directly whether Quiz was worth building given Assignments already exists — investigated before building anything. Found real overlap: Compass (`/learn`, `lib/learn/engine.ts`) already generates AI-adaptive MCQ/true-false/open-ended questions per session, auto-graded in real time, teacher-visible via `app/api/teacher/classes/[classId]/compass/route.ts`. What neither Assignments (manual grading) nor Compass (personalized, ever-different questions) covers: a uniform, fixed question set every student in a class answers identically, auto-graded, comparable side-by-side — the actual Kenyan-classroom pattern this closes is the CAT/revision quiz a teacher currently marks by hand. User then proposed a richer two-tier framing (teacher-custom questions + AI-generated strand/substrand revision banks); assessed and split: the custom-question half is this entry (small, safe, extends an existing domain); the AI-content half needs its own `TOKEN_COSTS` entry, cache-not-regenerate design, and a correctness/approval gate before real students see it — deferred to its own design pass, not built here.

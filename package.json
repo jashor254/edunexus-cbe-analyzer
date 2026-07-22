@@ -12,6 +12,11 @@
     "sow:grade10-bio-t1": "tsx scripts/generateGrade10BiologyTerm1.ts",
     "seed:grade10": "tsx scripts/seedGrade10Subjects.ts",
     "scrape:kicd": "tsx scripts/scrapeKicdCurriculum.ts",
+    "growth:discover-schools": "tsx --env-file=.env.local scripts/growth/discover-schools.ts",
+    "growth:validate-schools": "tsx scripts/growth/validate-review-csv.ts",
+    "growth:prepare-import": "tsx scripts/growth/prepare-import.ts",
+    "growth:import-schools": "tsx --env-file=.env.local scripts/growth/import-schools-csv.ts",
+    "growth:enrich-contacts": "tsx scripts/growth/enrich-contacts.ts",
     "seed:demo": "node --env-file=.env.local node_modules/.bin/tsx scripts/seed-demo-teacher.ts",
     "seed:reference-school": "tsx --env-file=.env.local scripts/reference-school/run-all.ts",
     "test:reference-school": "tsx --env-file=.env.local --test scripts/reference-school/integration.test.ts"
