@@ -6,13 +6,15 @@
 // `sprint-12c-academic-clinic-hardening.md` found already open in the
 // older lib/academicClinic/ pipeline. This composer does not repeat it.
 
-import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import type { BlueprintSection, AcademicRecordData, SubjectRecord, CompetencyRecord } from './types'
+import type { ProjectionAccessResult } from './projectionAccess'
+import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 
 const OWNER = 'lib/projection/recompute.recomputeLearnerProjection'
 
 export async function composeAcademicRecord(
-  legacyStudentId: string | null
+  legacyStudentId: string | null,
+  projectionAccess?: ProjectionAccessResult
 ): Promise<BlueprintSection<AcademicRecordData>> {
   if (!legacyStudentId) {
     return {
@@ -25,7 +27,8 @@ export async function composeAcademicRecord(
   }
 
   try {
-    const projection = await recomputeLearnerProjection(legacyStudentId)
+    if (projectionAccess?.error) throw projectionAccess.error
+    const projection = projectionAccess?.projection ?? await recomputeLearnerProjection(legacyStudentId)
 
     const bySubject: SubjectRecord[] = projection.academic
       ? Object.values(projection.academic.value.bySubject).map(s => ({

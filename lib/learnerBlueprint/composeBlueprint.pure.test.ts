@@ -29,10 +29,11 @@ test('composeEducationalIdentity always returns not_implemented, never a guessed
   assert.equal(section.data, null)
 })
 
-test('composeGrowthTimeline always returns not_implemented with an empty array, never fabricated milestones', () => {
-  const section = composeGrowthTimeline()
-  assert.equal(section.status, 'not_implemented')
-  assert.deepEqual(section.data, [])
+test('composeGrowthTimeline is unavailable when no legacy student is bridged (no DB call attempted)', async () => {
+  const section = await composeGrowthTimeline(null)
+  assert.equal(section.status, 'unavailable')
+  assert.equal(section.data, null)
+  assert.match(section.unavailableReason ?? '', /bridged/)
 })
 
 // ── Missing legacy-student-identity short-circuits (no DB call attempted) ────
@@ -142,6 +143,8 @@ function fixtureBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlu
     parentSummary: na('not_implemented'),
     educationalIdentity: na('not_implemented'),
     growthTimeline: na('not_implemented', []),
+    risk: na('not_implemented'),
+    learningStory: na('not_implemented'),
     recommendedNextSteps: na('not_implemented'),
     ...overrides,
   }

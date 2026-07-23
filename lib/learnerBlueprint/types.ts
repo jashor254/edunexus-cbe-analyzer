@@ -20,6 +20,7 @@
 
 import type { ConfidenceLevel } from '@/lib/learnerIntelligence/insight'
 import type { ParentAction } from '@/lib/parentExperience/actions'
+import type { EvidenceCoverage, Trend, RiskValue as ProjectionRiskValue, CapabilityValue, CompletenessValue } from '@/lib/projection/types'
 
 export type BlueprintSectionStatus = 'available' | 'unavailable' | 'not_implemented'
 
@@ -319,9 +320,54 @@ export type EducationalIdentityData = {
 // ── Growth Timeline (placeholder — future sprint, ADR-0006 §10) ──────────────
 
 export type GrowthTimelineEntry = {
-  date: string
-  label: string
-  category: string
+  windowStart: string
+  windowEnd: string
+  direction: Trend
+  earliestScore: number
+  latestScore: number
+  delta: number
+  trajectory: string
+  supportingEvidenceIds: string[]
+  confidence: number
+  coverage: EvidenceCoverage
+}
+
+export type RiskData = ProjectionRiskValue & {
+  supportingEvidenceIds: string[]
+  confidence: number
+  coverage: EvidenceCoverage
+  lastComputed: string
+}
+
+export type LearningStoryData = {
+  narrative: string
+  evidence: string
+  interpretation: string
+  opportunity: string
+  trajectory: string
+  nextConcern: string
+  uncertainty: string
+  confidenceStatement: string
+  missingEvidence: string
+}
+
+export type LearningStoryInputs = {
+  identity: BlueprintSection<IdentityData>
+  academicRecord: BlueprintSection<AcademicRecordData>
+  learningCompass: BlueprintSection<LearningCompassData>
+  career: BlueprintSection<CareerData>
+  growthTimeline: BlueprintSection<GrowthTimelineEntry[]>
+  risk: BlueprintSection<RiskData>
+  capability: {
+    value: CapabilityValue
+    confidence: number
+    coverage: EvidenceCoverage
+  } | null
+  completeness: {
+    value: CompletenessValue
+    confidence: number
+    coverage: EvidenceCoverage
+  } | null
 }
 
 // ── Recommended Next Steps (Parent Action Centre — Sprint 12S) ───────────────
@@ -370,5 +416,7 @@ export type LearnerBlueprint = {
   parentSummary: BlueprintSection<ParentSummaryData>
   educationalIdentity: BlueprintSection<EducationalIdentityData>
   growthTimeline: BlueprintSection<GrowthTimelineEntry[]>
+  risk: BlueprintSection<RiskData>
+  learningStory: BlueprintSection<LearningStoryData>
   recommendedNextSteps: BlueprintSection<RecommendedNextStepsData>
 }

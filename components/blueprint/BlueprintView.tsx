@@ -35,6 +35,9 @@ import {
   TeacherReflectionSection,
   ParentSummarySection,
   RecommendedNextStepsSection,
+  GrowthTimelineSection,
+  RiskSection,
+  LearningStorySection,
 } from './sections'
 
 export default function BlueprintView({
@@ -103,47 +106,55 @@ export default function BlueprintView({
         {data => <IdentitySection data={data} />}
       </BlueprintSectionCard>
 
-      <BlueprintSectionCard title="Academic Record" sectionNumber={2} section={blueprint.academicRecord} generatedAt={generatedAt} defaultOpen>
+      <BlueprintSectionCard title="Learning Story" sectionNumber={2} section={blueprint.learningStory} generatedAt={generatedAt} defaultOpen>
+        {data => <LearningStorySection data={data} />}
+      </BlueprintSectionCard>
+
+      <BlueprintSectionCard title="Academic Record" sectionNumber={3} section={blueprint.academicRecord} generatedAt={generatedAt} defaultOpen>
         {data => <AcademicRecordSection data={data} />}
       </BlueprintSectionCard>
 
-      <BlueprintSectionCard title="Attendance" sectionNumber={3} section={blueprint.attendance} generatedAt={generatedAt}>
+      <BlueprintSectionCard title="Growth Timeline" sectionNumber={4} section={blueprint.growthTimeline} generatedAt={generatedAt}>
+        {data => <GrowthTimelineSection data={data} />}
+      </BlueprintSectionCard>
+
+      <BlueprintSectionCard title="Risk Exposure" sectionNumber={5} section={blueprint.risk} generatedAt={generatedAt}>
+        {data => <RiskSection data={data} />}
+      </BlueprintSectionCard>
+
+      <BlueprintSectionCard title="Attendance" sectionNumber={6} section={blueprint.attendance} generatedAt={generatedAt}>
         {data => <AttendanceSection data={data} />}
       </BlueprintSectionCard>
 
-      <BlueprintSectionCard title="Learning Compass" sectionNumber={4} section={blueprint.learningCompass} generatedAt={generatedAt}>
+      <BlueprintSectionCard title="Learning Compass" sectionNumber={7} section={blueprint.learningCompass} generatedAt={generatedAt}>
         {data => <LearningCompassSection data={data} />}
       </BlueprintSectionCard>
 
-      <BlueprintSectionCard title="Career Intelligence" sectionNumber={5} section={blueprint.career} generatedAt={generatedAt}>
+      <BlueprintSectionCard title="Career Intelligence" sectionNumber={8} section={blueprint.career} generatedAt={generatedAt}>
         {data => <CareerSection data={data} />}
       </BlueprintSectionCard>
 
-      <BlueprintSectionCard title="Portfolio" sectionNumber={6} section={blueprint.portfolio} generatedAt={generatedAt}>
+      <BlueprintSectionCard title="Portfolio" sectionNumber={9} section={blueprint.portfolio} generatedAt={generatedAt}>
         {data => <PortfolioSection data={data} />}
       </BlueprintSectionCard>
 
-      <BlueprintSectionCard title="Achievements" sectionNumber={7} section={blueprint.achievement} generatedAt={generatedAt}>
+      <BlueprintSectionCard title="Achievements" sectionNumber={10} section={blueprint.achievement} generatedAt={generatedAt}>
         {data => <AchievementSection data={data} />}
       </BlueprintSectionCard>
 
-      <BlueprintSectionCard title="Teacher Reflection" sectionNumber={8} section={blueprint.teacherReflection} generatedAt={generatedAt}>
+      <BlueprintSectionCard title="Teacher Reflection" sectionNumber={11} section={blueprint.teacherReflection} generatedAt={generatedAt}>
         {data => <TeacherReflectionSection data={data} />}
       </BlueprintSectionCard>
 
-      <BlueprintSectionCard title="Parent Summary" sectionNumber={9} section={blueprint.parentSummary} generatedAt={generatedAt}>
+      <BlueprintSectionCard title="Parent Summary" sectionNumber={12} section={blueprint.parentSummary} generatedAt={generatedAt}>
         {data => <ParentSummarySection data={data} />}
       </BlueprintSectionCard>
 
-      <BlueprintSectionCard title="Educational Identity" sectionNumber={10} section={blueprint.educationalIdentity} generatedAt={generatedAt}>
+      <BlueprintSectionCard title="Educational Identity" sectionNumber={13} section={blueprint.educationalIdentity} generatedAt={generatedAt}>
         {() => null}
       </BlueprintSectionCard>
 
-      <BlueprintSectionCard title="Growth Timeline" sectionNumber={11} section={blueprint.growthTimeline} generatedAt={generatedAt}>
-        {() => null}
-      </BlueprintSectionCard>
-
-      <BlueprintSectionCard title="Recommended Next Steps" sectionNumber={12} section={blueprint.recommendedNextSteps} generatedAt={generatedAt} defaultOpen>
+      <BlueprintSectionCard title="Recommended Next Steps" sectionNumber={14} section={blueprint.recommendedNextSteps} generatedAt={generatedAt} defaultOpen>
         {data => <RecommendedNextStepsSection data={data} />}
       </BlueprintSectionCard>
 

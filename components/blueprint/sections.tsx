@@ -21,6 +21,9 @@ import type {
   RecommendedNextStepsData,
   PortfolioData,
   AchievementData,
+  GrowthTimelineEntry,
+  RiskData,
+  LearningStoryData,
 } from '@/lib/learnerBlueprint/types'
 
 const TREND_ARROW: Record<string, string> = {
@@ -227,6 +230,98 @@ export function ParentSummarySection({ data }: { data: ParentSummaryData }) {
       {data.headline && <p className="font-bold">{data.headline}</p>}
       {data.detail && <p>{data.detail}</p>}
       {data.action && <p className="text-teal-700">{data.action}</p>}
+    </div>
+  )
+}
+
+const RISK_TONE: Record<RiskData['overallRiskLevel'], string> = {
+  normal: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+  watch: 'bg-amber-50 text-amber-700 border-amber-100',
+  at_risk: 'bg-orange-50 text-orange-700 border-orange-100',
+  critical: 'bg-red-50 text-red-700 border-red-100',
+}
+
+export function LearningStorySection({ data }: { data: LearningStoryData }) {
+  return (
+    <div className="space-y-3 text-sm text-gray-700">
+      <p className="text-base leading-6 text-gray-900">{data.narrative}</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+          <p className="text-[11px] font-black uppercase tracking-wide text-gray-400">Evidence</p>
+          <p className="mt-1">{data.evidence}</p>
+        </div>
+        <div className="rounded-xl border border-gray-100 bg-white p-3">
+          <p className="text-[11px] font-black uppercase tracking-wide text-gray-400">Interpretation</p>
+          <p className="mt-1">{data.interpretation}</p>
+        </div>
+        <div className="rounded-xl border border-teal-100 bg-teal-50/70 p-3">
+          <p className="text-[11px] font-black uppercase tracking-wide text-teal-700">Opportunity</p>
+          <p className="mt-1 text-teal-900">{data.opportunity}</p>
+        </div>
+        <div className="rounded-xl border border-amber-100 bg-amber-50/70 p-3">
+          <p className="text-[11px] font-black uppercase tracking-wide text-amber-700">Next Concern</p>
+          <p className="mt-1 text-amber-900">{data.nextConcern}</p>
+        </div>
+      </div>
+      <div className="space-y-2 text-xs text-gray-500">
+        <p><span className="font-bold text-gray-700">Direction:</span> {data.trajectory}</p>
+        <p><span className="font-bold text-gray-700">Uncertainty:</span> {data.uncertainty}</p>
+        <p><span className="font-bold text-gray-700">Confidence:</span> {data.confidenceStatement}</p>
+        <p><span className="font-bold text-gray-700">Missing Evidence:</span> {data.missingEvidence}</p>
+      </div>
+    </div>
+  )
+}
+
+export function GrowthTimelineSection({ data }: { data: GrowthTimelineEntry[] }) {
+  return (
+    <div className="space-y-3 text-sm text-gray-700">
+      {data.map((entry, i) => (
+        <div key={i} className="rounded-xl border border-gray-100 p-3 space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-bold text-gray-900 capitalize">{entry.direction.replace('_', ' ')}</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded border bg-gray-50 text-gray-600 border-gray-100">
+              confidence {entry.confidence}%
+            </span>
+          </div>
+          <p>{entry.trajectory}</p>
+          <p className="text-xs text-gray-500">
+            Evidence window: {new Date(entry.windowStart).toLocaleDateString('en-KE', { dateStyle: 'medium' })} to {new Date(entry.windowEnd).toLocaleDateString('en-KE', { dateStyle: 'medium' })}
+          </p>
+          <p className="text-xs text-gray-500">
+            Supporting evidence: {entry.supportingEvidenceIds.length} item{entry.supportingEvidenceIds.length === 1 ? '' : 's'} · latest evidence {entry.coverage.latestEvidenceAt ? new Date(entry.coverage.latestEvidenceAt).toLocaleDateString('en-KE', { dateStyle: 'medium' }) : 'unknown'}
+          </p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function RiskSection({ data }: { data: RiskData }) {
+  return (
+    <div className="space-y-3 text-sm text-gray-700">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className={`text-[10px] px-1.5 py-0.5 rounded border font-bold ${RISK_TONE[data.overallRiskLevel]}`}>
+          {data.overallRiskLevel.replace('_', ' ')}
+        </span>
+        <span className="text-xs text-gray-500">
+          confidence {data.confidence}% · {data.coverage.evidenceCount} evidence item{data.coverage.evidenceCount === 1 ? '' : 's'}
+        </span>
+      </div>
+      {data.flags.length === 0 ? (
+        <p>No active risk flag is supported across the available scored evidence.</p>
+      ) : (
+        data.flags.map((flag, i) => (
+          <div key={i} className="rounded-xl border border-gray-100 p-3">
+            <p className="font-bold text-gray-900">{flag.subject ?? 'General'} · {flag.severity.replace('_', ' ')}</p>
+            <p className="mt-1">{flag.reason}</p>
+            <p className="mt-1 text-xs text-gray-500">Evidence references: {flag.evidenceIds.length}</p>
+          </div>
+        ))
+      )}
+      <p className="text-xs text-gray-500">
+        Latest supporting evidence: {data.coverage.latestEvidenceAt ? new Date(data.coverage.latestEvidenceAt).toLocaleDateString('en-KE', { dateStyle: 'medium' }) : 'unknown'}
+      </p>
     </div>
   )
 }

@@ -28,8 +28,11 @@ import { composeTeacherReflection } from './composeTeacherReflection'
 import { composeParentSummary } from './composeParentSummary'
 import { composeEducationalIdentity } from './composeEducationalIdentity'
 import { composeGrowthTimeline } from './composeGrowthTimeline'
+import { composeRisk } from './composeRisk'
+import { composeLearningStory } from './composeLearningStory'
 import { composeRecommendedNextSteps } from './composeRecommendedNextSteps'
 import { composeMetadata } from './composeMetadata'
+import { loadProjectionAccess } from './projectionAccess'
 import { validateBlueprint, type BlueprintValidationResult } from './validation'
 import type { BlueprintIdentifiers, LearnerBlueprint } from './types'
 
@@ -46,9 +49,8 @@ export async function composeBlueprint(ids: BlueprintIdentifiers): Promise<Compo
   // exactly as before. No composer re-implements this lookup.
   const legacyStudentId = await resolveLegacyStudentId(ids.coreLearnerId)
 
-  const [identity, academicRecord, attendance, learningCompass, career, portfolio, achievement, projects, competitions, leadership, innovations, teacherReflection] = await Promise.all([
+  const [identity, attendance, learningCompass, career, portfolio, achievement, projects, competitions, leadership, innovations, teacherReflection, projectionAccess] = await Promise.all([
     composeIdentity(ids),
-    composeAcademicRecord(legacyStudentId),
     composeAttendance(ids.actorUserId, ids.schoolId, ids.coreLearnerId),
     composeLearningCompass(legacyStudentId),
     composeCareer(legacyStudentId),
@@ -59,11 +61,39 @@ export async function composeBlueprint(ids: BlueprintIdentifiers): Promise<Compo
     composeLeadership(ids.coreLearnerId, ids.schoolId),
     composeInnovation(ids.coreLearnerId, ids.schoolId),
     composeTeacherReflection(ids.coreLearnerId, ids.schoolId),
+    loadProjectionAccess(legacyStudentId),
+  ])
+
+  const [academicRecord, growthTimeline, risk] = await Promise.all([
+    composeAcademicRecord(legacyStudentId, projectionAccess),
+    composeGrowthTimeline(legacyStudentId, projectionAccess),
+    composeRisk(legacyStudentId, projectionAccess),
   ])
 
   const parentSummary = composeParentSummary(identity.data?.learnerName ?? null, academicRecord, attendance)
   const educationalIdentity = composeEducationalIdentity()
-  const growthTimeline = composeGrowthTimeline()
+  const learningStory = composeLearningStory({
+    identity,
+    academicRecord,
+    learningCompass,
+    career,
+    growthTimeline,
+    risk,
+    capability: projectionAccess.projection?.capability
+      ? {
+          value: projectionAccess.projection.capability.value,
+          confidence: projectionAccess.projection.capability.confidence,
+          coverage: projectionAccess.projection.capability.coverage,
+        }
+      : null,
+    completeness: projectionAccess.projection?.completeness
+      ? {
+          value: projectionAccess.projection.completeness.value,
+          confidence: projectionAccess.projection.completeness.confidence,
+          coverage: projectionAccess.projection.completeness.coverage,
+        }
+      : null,
+  })
   const recommendedNextSteps = await composeRecommendedNextSteps(
     ids.coreLearnerId, ids.schoolId, learningCompass, teacherReflection, attendance, career
   )
@@ -84,6 +114,8 @@ export async function composeBlueprint(ids: BlueprintIdentifiers): Promise<Compo
     parentSummary,
     educationalIdentity,
     growthTimeline,
+    risk,
+    learningStory,
     recommendedNextSteps,
   }
 

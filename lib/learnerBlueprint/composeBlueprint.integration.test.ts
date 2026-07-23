@@ -139,10 +139,20 @@ test('composeBlueprint produces a partial-but-valid Blueprint for a Core-only le
   assert.equal(blueprint.teacherReflection.status, 'unavailable')
   assert.ok(blueprint.teacherReflection.unavailableReason)
 
-  // Remaining placeholders, per explicit mission instruction.
+  // Educational Identity remains a placeholder, per explicit mission instruction.
   assert.equal(blueprint.educationalIdentity.status, 'not_implemented')
-  assert.equal(blueprint.growthTimeline.status, 'not_implemented')
-  assert.deepEqual(blueprint.growthTimeline.data, [])
+
+  // Growth Timeline and Risk Exposure both read the Projection Engine
+  // directly, so with no legacy student bridge they degrade explicitly.
+  assert.equal(blueprint.growthTimeline.status, 'unavailable')
+  assert.match(blueprint.growthTimeline.unavailableReason ?? '', /bridged/)
+  assert.equal(blueprint.risk.status, 'unavailable')
+  assert.match(blueprint.risk.unavailableReason ?? '', /bridged/)
+
+  // Learning Story remains honest about missing canonical evidence instead
+  // of improvising from attendance alone.
+  assert.equal(blueprint.learningStory.status, 'unavailable')
+  assert.match(blueprint.learningStory.unavailableReason ?? '', /canonical evidence/i)
 
   // Parent Summary degrades to using only what's available (Attendance),
   // never a generated paragraph.
@@ -237,6 +247,19 @@ test('composeBlueprint resolves a real bridged legacy identity via the canonical
 
   assert.equal(blueprint.learningCompass.status, 'available')
 
+  // With a real bridge but zero scored evidence, Growth and Risk remain
+  // explicitly unavailable for lack of evidence rather than fabricating a
+  // story from a successful-but-empty projection call.
+  assert.equal(blueprint.growthTimeline.status, 'unavailable')
+  assert.match(blueprint.growthTimeline.unavailableReason ?? '', /evidence/i)
+  assert.equal(blueprint.risk.status, 'unavailable')
+  assert.match(blueprint.risk.unavailableReason ?? '', /evidence/i)
+
+  // Learning Story can still compose a provisional summary from the
+  // available canonical sections while stating the missing evidence.
+  assert.equal(blueprint.learningStory.status, 'available')
+  assert.match(blueprint.learningStory.data?.uncertainty ?? '', /provisional/i)
+
   // Sprint 12N: with zero evidence, Career Intelligence itself reports
   // insufficient evidence (`buildCareerIntelligence`'s own `notice` branch)
   // — Blueprint must surface that as an explicit Unavailable state, never
@@ -305,6 +328,8 @@ test('composeBlueprint surfaces Career Intelligence as available, cluster-level 
   assert.equal(blueprint.career.status, 'available')
   const careerData = blueprint.career.data!
   assert.ok(careerData.careerCluster, 'a cluster label must be present once real evidence exists')
+  assert.equal(blueprint.learningStory.status, 'available')
+  assert.match(blueprint.learningStory.data?.narrative ?? '', /Current evidence suggests|Across the available evidence/)
   assert.ok(['Low', 'Medium', 'High'].includes(careerData.confidence!), 'confidence must be one of Career Intelligence\'s own canonical labels')
   assert.ok(careerData.futureDirection, 'a next-direction sentence must be present')
   // Never a specific career/job title — the type itself no longer has a
