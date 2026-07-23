@@ -35,6 +35,7 @@ function fixtureBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlu
     parentSummary: na(),
     educationalIdentity: na(),
     growthTimeline: na([]),
+    risk: na(),
     recommendedNextSteps: na(),
     ...overrides,
   }

@@ -85,7 +85,7 @@ function createBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlue
       strengthProfile: 'Pattern recognition and persistence are the strongest recurring signals.',
       futureDirection: 'Sustained strength in Mathematics could widen future STEM options.',
       aiOutlook: null,
-      confidence: 'moderate',
+      confidence: 'Medium',
       notes: [],
     }),
     portfolio: section({
