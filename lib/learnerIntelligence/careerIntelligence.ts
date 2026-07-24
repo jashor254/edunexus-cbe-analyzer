@@ -50,6 +50,22 @@ export type CareerMatchInsight = {
   insight:       Insight
 }
 
+// ── Career Principle grade gate ─────────────────────────────────────────────
+//
+// The ONE place the Junior/Senior boundary is decided. Junior (Grade 7-9)
+// always explores broad families, never a ranked/percentage career
+// prediction; Senior (Grade 10-12) sees specific alignment. Every consumer
+// that needs this decision (Career Explorer, Parent Career Intelligence,
+// the Career Intelligence Report, and this module itself) must call this
+// instead of re-deriving the boundary — see Sprint "Career Intelligence
+// Canonicalization" Phase 1, which replaced 4 independent
+// `grade >= 7 && grade <= 9` checks with this single export.
+export type CareerMode = 'exploration' | 'planning'
+
+export function careerModeForGrade(grade: number): CareerMode {
+  return grade >= 7 && grade <= 9 ? 'exploration' : 'planning'
+}
+
 export type CareerIntelligence = {
   studentId:   string
   studentName: string
@@ -163,8 +179,8 @@ export async function buildCareerIntelligence(studentId: string): Promise<Career
   if (!student) throw new Error(`buildCareerIntelligence: student ${studentId} not found`)
 
   const scoreHistory = projectionToScoreHistory(projection)
-  const isJunior     = student.grade >= 7 && student.grade <= 9
-  const mode: CareerIntelligence['mode'] = isJunior ? 'exploration' : 'planning'
+  const mode         = careerModeForGrade(student.grade)
+  const isJunior      = mode === 'exploration'
 
   const base: CareerIntelligence = {
     studentId,

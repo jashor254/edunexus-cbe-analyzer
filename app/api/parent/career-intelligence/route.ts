@@ -7,6 +7,7 @@ import { getAllCareersWithCOS } from '@/lib/career/careerEngine'
 import { computeCapabilityMatches } from '@/lib/career/capabilityMatchEngine'
 import { extractCapabilityProfile } from '@/lib/career/capabilityExtractor'
 import { buildParentIntelligence } from '@/lib/career/parentIntelligence'
+import { careerModeForGrade } from '@/lib/learnerIntelligence/careerIntelligence'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { projectionToScoreHistory } from '@/lib/learnerIntelligence/projectionAdapters'
 import { requireAuthentication } from '@/lib/core/permissions'
@@ -66,8 +67,10 @@ export async function GET(req: NextRequest) {
     const careers = await getAllCareersWithCOS()
     const matchReport = computeCapabilityMatches(studentId, profile, careers)
     // Career Principle: Junior (Grade 7-9) parents see broad exploration
-    // families, never a ranked/percentage career prediction.
-    const mode = student.grade >= 7 && student.grade <= 9 ? 'exploration' as const : 'planning' as const
+    // families, never a ranked/percentage career prediction. Grade boundary
+    // comes from careerModeForGrade() (lib/learnerIntelligence/
+    // careerIntelligence.ts) — the single canonical Career Principle gate.
+    const mode = careerModeForGrade(student.grade)
     const report = buildParentIntelligence(profile, matchReport, studentId, student.name, mode)
 
     return apiSuccess({ has_profile: true, report, match_report: mode === 'planning' ? matchReport : null })

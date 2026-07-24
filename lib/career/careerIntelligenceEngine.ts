@@ -11,7 +11,7 @@ import { getAllCareersWithCOS } from './careerEngine'
 import { computeCapabilityMatches, confidenceFromAssessmentCount } from './capabilityMatchEngine'
 import { CAPABILITY_LABELS, extractCapabilityProfile } from './capabilityExtractor'
 import { STANDARD_DISCLAIMER } from './types'
-import { familiesFromMatches } from '@/lib/learnerIntelligence/careerIntelligence'
+import { familiesFromMatches, careerModeForGrade } from '@/lib/learnerIntelligence/careerIntelligence'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { projectionToScoreHistory } from '@/lib/learnerIntelligence/projectionAdapters'
 import type { ConfidenceLevel } from '@/lib/learnerIntelligence/insight'
@@ -563,8 +563,9 @@ export async function buildCareerIntelligenceReport(
 
   // Career Principle: Junior (Grade 7-9) is exploring, never predicted —
   // gates the opportunity landscape and the AI narrative context below.
-  const mode: 'exploration' | 'planning' =
-    clinicReport.grade >= 7 && clinicReport.grade <= 9 ? 'exploration' : 'planning'
+  // Grade boundary comes from careerModeForGrade() (lib/learnerIntelligence/
+  // careerIntelligence.ts) — the single canonical Career Principle gate.
+  const mode = careerModeForGrade(clinicReport.grade)
 
   // 2. Capability profile — sourced live from Projection, the same
   // canonical path Blueprint/Career Intelligence/Parent Career

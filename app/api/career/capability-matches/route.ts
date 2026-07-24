@@ -16,7 +16,7 @@ import {
   recomputeAndSaveCapabilityProfile,
 } from '@/lib/career/careerEngine'
 import { computeCapabilityMatches } from '@/lib/career/capabilityMatchEngine'
-import { familiesFromMatches } from '@/lib/learnerIntelligence/careerIntelligence'
+import { familiesFromMatches, careerModeForGrade } from '@/lib/learnerIntelligence/careerIntelligence'
 import { extractCapabilityProfile } from '@/lib/career/capabilityExtractor'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { projectionToScoreHistory } from '@/lib/learnerIntelligence/projectionAdapters'
@@ -50,9 +50,11 @@ async function verifyStudent(userId: string, studentId: string) {
 // Career Principle requires exploration, not prediction, at this stage.
 // Same matcher, same data (computeCapabilityMatches, unchanged) — just
 // regrouped into broad families via the one shared helper every career
-// consumer uses for this gate.
+// consumer uses for this gate. Grade boundary itself comes from
+// careerModeForGrade() (lib/learnerIntelligence/careerIntelligence.ts) —
+// the single canonical Career Principle gate, never re-derived here.
 function shapeForGrade(grade: number, report: CapabilityMatchReport) {
-  const isJunior = grade >= 7 && grade <= 9
+  const isJunior = careerModeForGrade(grade) === 'exploration'
   if (!isJunior) return { ...report, mode: 'planning' as const }
 
   return {
