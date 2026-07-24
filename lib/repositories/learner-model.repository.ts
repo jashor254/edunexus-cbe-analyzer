@@ -185,6 +185,14 @@ export class LearnerModelRepository extends BaseRepository {
     studentId: string,
     signals:   Partial<CareerSignals>,
   ): Promise<void> {
+    // Must ensure the row exists first (like patchKnowledgeState/
+    // patchEngagementPatterns) — without this, a learner whose
+    // learner_profiles row hasn't been created yet gets a silent 0-row
+    // UPDATE (Postgrest doesn't error on that), so refreshCareerSignals()
+    // "succeeds" while never actually writing career_signals. Found via
+    // lib/projection/careerPropagation.integration.test.ts.
+    await this.getOrCreateLearnerProfile(studentId)
+
     const { error } = await this.db
       .from('learner_profiles')
       .update({ career_signals: signals })
