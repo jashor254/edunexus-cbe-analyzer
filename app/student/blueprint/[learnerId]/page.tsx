@@ -25,17 +25,22 @@ import { ResourceOwnershipError, UnauthorizedError } from '@/lib/core/errors'
 import { repos } from '@/lib/repositories'
 import { getUserRoles } from '@/lib/auth/getRole'
 import { composeBlueprint } from '@/lib/learnerBlueprint/composeBlueprint'
+import { BLUEPRINT_EXPORT_QUERY_KEY, isBlueprintPdfExportMode } from '@/lib/learnerBlueprint/pdfExport'
 import BlueprintView from '@/components/blueprint/BlueprintView'
 import BlueprintStateMessage from '@/components/blueprint/BlueprintStateMessage'
 import JourneyLinks from '@/components/student/JourneyLinks'
 
 export default async function StudentBlueprintPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ learnerId: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const { learnerId } = await params
   const supabase = await createClient()
+  const query = await searchParams
+  const exportMode = isBlueprintPdfExportMode(query[BLUEPRINT_EXPORT_QUERY_KEY]) ? 'pdf' : 'screen'
 
   let userId: string
   try {
@@ -91,8 +96,8 @@ export default async function StudentBlueprintPage({
 
   return (
     <>
-      <BlueprintView blueprint={blueprint} validation={validation} learnerId={learnerId} />
-      {primary === 'student' && <JourneyLinks current="blueprint" />}
+      <BlueprintView blueprint={blueprint} validation={validation} learnerId={learnerId} exportMode={exportMode} />
+      {primary === 'student' && exportMode !== 'pdf' && <JourneyLinks current="blueprint" />}
     </>
   )
 }

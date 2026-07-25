@@ -21,6 +21,7 @@ function fixtureBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlu
   return {
     metadata: composeMetadata({ sectionStatuses: ['available'], ownerVersions: {}, evidenceWindowStart: null }),
     identity: na(),
+    learningStory: na(),
     academicRecord: na(),
     attendance: na(),
     learningCompass: na(),

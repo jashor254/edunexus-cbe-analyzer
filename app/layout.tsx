@@ -159,7 +159,7 @@ export default function RootLayout({
           {children}
         </main>
 
-        <footer className="bg-slate-950 border-t border-white/5 py-4 text-center">
+        <footer data-blueprint-hide-in-pdf="true" className="bg-slate-950 border-t border-white/5 py-4 text-center">
           <p className="text-xs text-white/30">
             © 2026 EduNexus &middot; Developed by{' '}
             <span className="text-white/50 font-medium">Jashor Technologies</span>
@@ -172,9 +172,15 @@ export default function RootLayout({
           </div>
         </footer>
 
-        <WhatsAppButton />
-        <ToastProvider />
-        <Analytics />
+        <div data-blueprint-hide-in-pdf="true">
+          <WhatsAppButton />
+        </div>
+        <div data-blueprint-hide-in-pdf="true">
+          <ToastProvider />
+        </div>
+        <div data-blueprint-hide-in-pdf="true">
+          <Analytics />
+        </div>
       </body>
     </html>
   )

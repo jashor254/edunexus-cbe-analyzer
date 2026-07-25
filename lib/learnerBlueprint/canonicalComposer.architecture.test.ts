@@ -91,3 +91,20 @@ test('the two former legacy-consumer routes now redirect into the canonical rout
     assert.doesNotMatch(content, /composeBlueprint\(\{/, `${path.relative(ROOT, file)} should not compose Blueprint itself`)
   }
 })
+
+test('the canonical Blueprint PDF route stays on the live route/view path and never imports the legacy PDF generator', () => {
+  const route = path.join(ROOT, 'app/api/student/blueprint/[learnerId]/pdf/route.ts')
+  const helper = path.join(ROOT, 'lib/learnerBlueprint/pdfExport.ts')
+
+  const routeContent = readFileSync(route, 'utf8')
+  const helperContent = readFileSync(helper, 'utf8')
+  const canonicalRouteMatcher = /new URL\(\s*['"`]\/student\/blueprint\/\$\{learnerId\}['"`]\s*,\s*origin\s*\)/
+  const pdfModeMatcher = /searchParams\.set\(\s*BLUEPRINT_EXPORT_QUERY_KEY\s*,\s*BLUEPRINT_EXPORT_QUERY_VALUE\s*\)/
+  const legacyPdfMatcher = /lib\/learnerIntelligence\/pdfGenerator\.tsx|generateLearnerBlueprintPDF|buildLearnerBlueprint/
+
+  assert.match(routeContent, /renderBlueprintPdf/, 'the PDF route should delegate browser rendering to the canonical export helper')
+  assert.doesNotMatch(routeContent, legacyPdfMatcher, 'the PDF route must not call or import the legacy learnerIntelligence PDF stack')
+  assert.match(helperContent, canonicalRouteMatcher, 'the export helper should target the canonical live Blueprint route')
+  assert.match(helperContent, pdfModeMatcher, 'the export helper should force PDF mode through the export query parameter')
+  assert.doesNotMatch(helperContent, legacyPdfMatcher, 'the export helper must not import or reference the legacy learnerIntelligence PDF stack')
+})

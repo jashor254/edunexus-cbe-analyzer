@@ -40,15 +40,24 @@ function PageShell({
   question,
   children,
   transition,
+  exportMode,
 }: {
   pageNumber: number
   title: string
   question: string
   children: ReactNode
   transition: string
+  exportMode: 'screen' | 'pdf'
 }) {
   return (
-    <section className="rounded-3xl border border-gray-100 bg-white p-5 sm:p-6">
+    <section
+      data-blueprint-page-shell="true"
+      data-blueprint-print-break={pageNumber > 1 ? 'before' : 'none'}
+      className="rounded-3xl border border-gray-100 bg-white p-5 sm:p-6"
+      style={exportMode === 'pdf'
+        ? { breakInside: 'avoid-page', pageBreakInside: 'avoid' }
+        : undefined}
+    >
       <div className="mb-5 space-y-2">
         <p className="text-[11px] font-black uppercase tracking-[0.18em] text-teal-700">Page {pageNumber}</p>
         <div className="space-y-1">
@@ -285,11 +294,13 @@ export default function BlueprintView({
   validation,
   learnerId,
   historicalMeta,
+  exportMode = 'screen',
 }: {
   blueprint: LearnerBlueprint
   validation: BlueprintValidationResult
   learnerId: string
   historicalMeta?: HistoricalMeta
+  exportMode?: 'screen' | 'pdf'
 }) {
   const generatedAt = blueprint.metadata.generatedAt
   const gradeBand = getGradeBand(blueprint.identity.data?.currentClassName ?? null)
@@ -358,7 +369,12 @@ export default function BlueprintView({
           : 'The current Blueprint can point toward possibilities, but its future-facing interpretation should stay cautious until stronger evidence accumulates.'
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 px-4 py-6">
+    <div
+      data-blueprint-root="true"
+      data-blueprint-ready="true"
+      data-blueprint-export-mode={exportMode}
+      className={`mx-auto max-w-4xl space-y-4 px-4 py-6 ${exportMode === 'pdf' ? 'bg-white text-slate-900' : ''}`}
+    >
       {historicalMeta && <HistoricalBanner meta={historicalMeta} />}
 
       <div className="mb-2 rounded-3xl border border-gray-100 bg-white p-5 sm:p-6">
@@ -385,23 +401,29 @@ export default function BlueprintView({
             ))}
           </div>
         )}
-        <nav aria-label="Blueprint history navigation" className="mt-3">
-          {historicalMeta ? (
-            <Link
-              href={`/student/blueprint/${learnerId}/history`}
-              className="text-xs font-bold text-teal-700 hover:underline focus-visible:underline focus-visible:outline-none"
-            >
-              ← Back to History
-            </Link>
-          ) : (
-            <Link
-              href={`/student/blueprint/${learnerId}/history`}
-              className="text-xs font-bold text-teal-700 hover:underline focus-visible:underline focus-visible:outline-none"
-            >
-              View History →
-            </Link>
-          )}
-        </nav>
+        {exportMode !== 'pdf' && (
+          <nav
+            aria-label="Blueprint history navigation"
+            data-blueprint-nav="true"
+            className="mt-3"
+          >
+            {historicalMeta ? (
+              <Link
+                href={`/student/blueprint/${learnerId}/history`}
+                className="text-xs font-bold text-teal-700 hover:underline focus-visible:underline focus-visible:outline-none"
+              >
+                ← Back to History
+              </Link>
+            ) : (
+              <Link
+                href={`/student/blueprint/${learnerId}/history`}
+                className="text-xs font-bold text-teal-700 hover:underline focus-visible:underline focus-visible:outline-none"
+              >
+                View History →
+              </Link>
+            )}
+          </nav>
+        )}
       </div>
 
       <PageShell
@@ -409,6 +431,7 @@ export default function BlueprintView({
         title="Learner Direction"
         question="Who is this learner becoming?"
         transition="If this interpretation is sound, what evidence supports it?"
+        exportMode={exportMode}
       >
         {blueprint.learningStory.status === 'available' && blueprint.learningStory.data ? (
           <div className="space-y-4">
@@ -465,6 +488,7 @@ export default function BlueprintView({
         title="Evidence for the Judgment"
         question="Why do we believe this?"
         transition="What, if unattended, could weaken or distort this growth?"
+        exportMode={exportMode}
       >
         <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-4">
@@ -562,6 +586,7 @@ export default function BlueprintView({
         title="Conditions Requiring Response"
         question="What must the school respond to now?"
         transition="So what must each person do differently next?"
+        exportMode={exportMode}
       >
         {blueprint.learningStory.status === 'available' && blueprint.learningStory.data && (
           <EvidenceBox title="Supported concern" tone="amber">
@@ -630,6 +655,7 @@ export default function BlueprintView({
         title="Coordinated Action Plan"
         question="What should the school do next?"
         transition="If we respond well, what future becomes more possible?"
+        exportMode={exportMode}
       >
         {blueprint.parentSummary.status === 'available' && blueprint.parentSummary.data && (
           <div className="rounded-2xl border border-gray-100 bg-white px-4 py-4">
@@ -702,6 +728,7 @@ export default function BlueprintView({
         title="Future Opened"
         question="What future does this make possible?"
         transition="This future is still a possibility, not a fixed destination."
+        exportMode={exportMode}
       >
         <EvidenceBox title="Future-facing interpretation" tone="teal">
           <p>{futureIntro}</p>

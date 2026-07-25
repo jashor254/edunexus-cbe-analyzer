@@ -174,12 +174,13 @@ function createBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlue
   }
 }
 
-function render(blueprint: LearnerBlueprint) {
+function render(blueprint: LearnerBlueprint, exportMode: 'screen' | 'pdf' = 'screen') {
   return renderToStaticMarkup(
     <BlueprintView
       blueprint={blueprint}
       validation={{ valid: true, errors: [] }}
       learnerId="learner-1"
+      exportMode={exportMode}
     />
   )
 }
@@ -347,4 +348,23 @@ test('BlueprintView preserves honest unavailable states without inventing substi
   assert.match(html, /Academic evidence is unavailable without a bridged learner record\./)
   assert.match(html, /Growth evidence is unavailable until more scored evidence exists\./)
   assert.match(html, /Career Intelligence is currently unavailable for this learner\./)
+})
+
+test('BlueprintView print export mode keeps the five acts but drops interactive navigation chrome', () => {
+  const html = render(createBlueprint(), 'pdf')
+
+  for (const heading of [
+    'Learner Direction',
+    'Evidence for the Judgment',
+    'Conditions Requiring Response',
+    'Coordinated Action Plan',
+    'Future Opened',
+  ]) {
+    assert.match(html, new RegExp(heading))
+  }
+
+  assert.match(html, /data-blueprint-ready="true"/)
+  assert.match(html, /data-blueprint-print-break="before"/)
+  assert.doesNotMatch(html, /data-blueprint-nav="true"/)
+  assert.doesNotMatch(html, /View History →/)
 })

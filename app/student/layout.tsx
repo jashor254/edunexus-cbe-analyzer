@@ -20,9 +20,13 @@ export default async function StudentLayout({ children }: { children: React.Reac
 
   return (
     <div className="min-h-screen bg-[#07070f] text-white">
-      <DashboardNavbar isStudent />
+      <div data-blueprint-hide-in-pdf="true">
+        <DashboardNavbar isStudent />
+      </div>
       <main>{children}</main>
-      <VideoOnboardingModal userId={user.id} role="student" />
+      <div data-blueprint-hide-in-pdf="true">
+        <VideoOnboardingModal userId={user.id} role="student" />
+      </div>
     </div>
   )
 }
