@@ -45,8 +45,8 @@ function createBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlue
     academicRecord: section({
       overallTrend: 'improving',
       bySubject: [
-        { subject: 'English', latestLevel: 3, trend: 'improving' },
-        { subject: 'Mathematics', latestLevel: 2, trend: 'declining' },
+        { subject: 'English', latestLevel: 3, trend: 'improving', evidenceCount: 2, latestEvidenceAt: '2026-07-01T00:00:00Z' },
+        { subject: 'Mathematics', latestLevel: 2, trend: 'declining', evidenceCount: 1, latestEvidenceAt: '2026-06-15T00:00:00Z' },
       ],
       competencies: [],
       confidence: 70,
@@ -185,41 +185,64 @@ function render(blueprint: LearnerBlueprint, exportMode: 'screen' | 'pdf' = 'scr
   )
 }
 
-test('BlueprintView exposes exactly the five approved page questions and maps evidence into the new educational argument', () => {
+const PAGE_TITLES = [
+  'Learner Overview',
+  'Academic Evidence Matrix',
+  'Growth, Risk and Conditions',
+  'Pathway and Future Intelligence',
+  'Coordinated Action Plan',
+  'School and Family Review',
+]
+
+test('BlueprintView renders exactly seven report pages (one cover + six body pages) in order', () => {
   const html = render(createBlueprint())
 
-  for (const question of [
-    'Who is this learner becoming?',
-    'Why do we believe this?',
-    'What must the school respond to now?',
-    'What should the school do next?',
-    'What future does this make possible?',
-  ]) {
-    assert.equal((html.match(new RegExp(question.replace(/[?]/g, '\\?'), 'g')) ?? []).length, 1, `${question} should appear exactly once`)
+  const pageShellCount = (html.match(/data-blueprint-page-shell="true"/g) ?? []).length
+  assert.equal(pageShellCount, 7, 'expected exactly 7 page-shell elements: 1 cover + 6 body pages')
+
+  let cursor = -1
+  for (const title of PAGE_TITLES) {
+    const index = html.indexOf(title)
+    assert.ok(index > cursor, `${title} should appear, in order, after the previous page`)
+    cursor = index
   }
 
-  assert.match(html, /Learner Direction/)
-  assert.match(html, /Current evidence suggests Brian Matthias is developing through a mixed but improving pattern\./)
-  assert.match(html, /Learner context/)
-  assert.ok(html.indexOf('Current educational judgment') < html.indexOf('Learner context'), 'Learning Story should govern Page 1 ahead of identity context')
+  assert.match(html, /Learner Blueprint/)
+  assert.match(html, /Educational Intelligence Report/)
+})
 
-  assert.match(html, /Academic evidence/)
-  assert.match(html, /Evidence of movement/)
-  assert.match(html, /Current evidence suggests a moderate-confidence picture\./)
-  assert.match(html, /Evidence is still missing across more subjects or independent sources\./)
+test('BlueprintView cover page shows learner context, current snapshot, direction, subject count, and a report ID — no fabricated data', () => {
+  const html = render(createBlueprint())
 
-  assert.match(html, /Conditions Requiring Response/)
-  assert.match(html, /Current severity/)
-  assert.match(html, /Approaching Expectation in Mathematics but declining from prior evidence/)
-
-  assert.match(html, /Coordinated Action Plan/)
-  assert.match(html, /School \/ Teacher/)
-  assert.match(html, /Learner/)
-  assert.match(html, /Parent \/ Guardian/)
-
-  assert.match(html, /Future Opened/)
+  assert.match(html, /Brian Matthias/)
+  assert.match(html, /Current Snapshot/)
+  assert.match(html, /Across the available evidence, current capability is stronger in English and less secure in Mathematics\./)
+  assert.match(html, /Learning Direction/)
   assert.match(html, /STEM and design exploration/)
-  assert.match(html, /Supporting evidence of future direction/)
+  assert.match(html, /Subjects Represented/)
+  assert.match(html, />2</, 'two subjects have confirmed evidence in the fixture')
+  assert.match(html, /Report ID: BP-LEARNER-/)
+  assert.match(html, /CONFIDENTIAL/)
+})
+
+test('BlueprintView academic evidence matrix acknowledges confirmed assessments — never "insufficient data" beside one', () => {
+  const html = render(createBlueprint())
+
+  assert.match(html, /Meeting Expectations/, 'Level 3 should map to the real CBC label')
+  assert.match(html, /Approaching Expectations/, 'Level 2 should map to the real CBC label')
+  assert.match(html, /Based on 2 confirmed evidence items/)
+  assert.match(html, /Based on 1 confirmed evidence item\b/)
+  assert.match(html, /Current recorded snapshot/)
+  assert.match(html, /Trend improving/)
+  assert.match(html, /Trend declining/)
+  assert.doesNotMatch(html, /insufficient data/i)
+})
+
+test('BlueprintView distinguishes snapshot language (Page 3) from trend language (Page 4)', () => {
+  const html = render(createBlueprint())
+  const snapshotIndex = html.indexOf('Current recorded snapshot')
+  const trendIndex = html.indexOf('Movement over time (trend, not a new snapshot)')
+  assert.ok(snapshotIndex > -1 && trendIndex > -1 && snapshotIndex < trendIndex)
 })
 
 test('BlueprintView keeps normal risk calm rather than alarming', () => {
@@ -232,22 +255,11 @@ test('BlueprintView keeps normal risk calm rather than alarming', () => {
       coverage: { evidenceCount: 1, evidenceDiversity: 1, latestEvidenceAt: '2026-07-10T00:00:00.000Z', oldestEvidenceAt: '2026-07-10T00:00:00.000Z', freshnessDays: 13 },
       lastComputed: '2026-07-23T10:00:00.000Z',
     }),
-    learningStory: section({
-      narrative: 'Current evidence suggests Brian Matthias is stable and still building a fuller picture.',
-      evidence: 'The current evidence is limited but does not indicate a significant concern.',
-      interpretation: 'The learner appears stable while more evidence accumulates.',
-      opportunity: 'Continue broad learning exposure while watching for stronger patterns.',
-      trajectory: 'There is not yet enough growth evidence to state a stronger directional claim.',
-      nextConcern: 'No active supported concern is currently visible.',
-      uncertainty: 'This conclusion remains provisional because evidence is still limited.',
-      confidenceStatement: 'Current evidence suggests a low-to-moderate confidence picture.',
-      missingEvidence: 'More subject coverage would make the picture stronger.',
-    }),
   }))
 
-  assert.match(html, /stable/)
+  assert.match(html, /Stable/)
   assert.match(html, /No active supported concern is currently being flagged across the available scored evidence\./)
-  assert.doesNotMatch(html, /urgent support/)
+  assert.doesNotMatch(html, /Needs Urgent Support/)
 })
 
 test('BlueprintView dedupes repeated recommendations and degrades missing audience-specific actions honestly', () => {
@@ -275,56 +287,34 @@ test('BlueprintView dedupes repeated recommendations and degrades missing audien
   }))
 
   assert.equal((html.match(/Practice ratio and fraction fluency three times each week\./g) ?? []).length, 1)
-  assert.match(html, /No teacher-specific action is currently supported clearly enough to state separately in this Blueprint\./)
-  assert.match(html, /No learner-specific action is currently supported clearly enough to state separately in this Blueprint\./)
-  assert.match(html, /No leadership-specific enablement is supported distinctly by the current Blueprint\./)
+  assert.match(html, /No teacher-specific action is currently supported clearly enough by evidence\./)
+  assert.match(html, /No learner-specific action is currently supported clearly enough by evidence\./)
+  assert.match(html, /Learning Compass has no distinct next step recorded yet\./)
 })
 
 test('BlueprintView changes future framing by grade band and stays honest when future evidence is thin', () => {
   const grade78 = render(createBlueprint({
     identity: section({
-      learnerName: 'Brian Matthias',
-      admissionNumber: 'ADM-1',
-      schoolName: 'Test School',
-      currentClassName: 'Grade 8',
-      academicYearLabel: '2026',
-      termLabel: 'Term 2',
-      guardians: [],
+      learnerName: 'Brian Matthias', admissionNumber: 'ADM-1', schoolName: 'Test School',
+      currentClassName: 'Grade 8', academicYearLabel: '2026', termLabel: 'Term 2', guardians: [],
     }),
   }))
-  assert.match(grade78, /widen exploration, notice emerging strengths, and resist narrowing the future too early/)
+  assert.match(grade78, /widens exploration and notices emerging strengths/)
 
   const grade9 = render(createBlueprint({
     identity: section({
-      learnerName: 'Brian Matthias',
-      admissionNumber: 'ADM-1',
-      schoolName: 'Test School',
-      currentClassName: 'Grade 9',
-      academicYearLabel: '2026',
-      termLabel: 'Term 2',
-      guardians: [],
+      learnerName: 'Brian Matthias', admissionNumber: 'ADM-1', schoolName: 'Test School',
+      currentClassName: 'Grade 9', academicYearLabel: '2026', termLabel: 'Term 2', guardians: [],
     }),
   }))
-  assert.match(grade9, /test pathway readiness, show what evidence is strengthening, and clarify what still needs to grow/)
+  assert.match(grade9, /tests pathway readiness and clarifies what still needs to grow/)
 
   const senior = render(createBlueprint({
     identity: section({
-      learnerName: 'Brian Matthias',
-      admissionNumber: 'ADM-1',
-      schoolName: 'Test School',
-      currentClassName: 'Grade 11',
-      academicYearLabel: '2026',
-      termLabel: 'Term 2',
-      guardians: [],
+      learnerName: 'Brian Matthias', admissionNumber: 'ADM-1', schoolName: 'Test School',
+      currentClassName: 'Grade 11', academicYearLabel: '2026', termLabel: 'Term 2', guardians: [],
     }),
-    career: section({
-      careerCluster: null,
-      strengthProfile: null,
-      futureDirection: null,
-      aiOutlook: null,
-      confidence: null,
-      notes: [],
-    }),
+    career: section({ careerCluster: null, strengthProfile: null, futureDirection: null, aiOutlook: null, confidence: null, notes: [] }),
     portfolio: section({ publishedCount: 0, latestItem: null, featuredItem: null, portfolioUrl: null }),
     achievement: section({ achievementCount: 0, latestVerifiedAchievement: null, highestLevelAchievement: null, profileUrl: null }),
     projects: section({ projectCount: 0, latestPublishedProject: null, currentActiveProject: null, featuredProject: null, projectsUrl: null }),
@@ -350,21 +340,31 @@ test('BlueprintView preserves honest unavailable states without inventing substi
   assert.match(html, /Career Intelligence is currently unavailable for this learner\./)
 })
 
-test('BlueprintView print export mode keeps the five acts but drops interactive navigation chrome', () => {
+test('BlueprintView Page 7 offers writable review space and signature lines, never fabricated parent/action text', () => {
+  const html = render(createBlueprint())
+
+  assert.match(html, /Parent observations/)
+  assert.match(html, /Action agreed at this meeting/)
+  assert.match(html, /Teacher signature \/ date/)
+  assert.match(html, /Parent \/ guardian signature \/ date/)
+  assert.match(html, /Recorded by Teacher Njeri/)
+  assert.match(html, /Evidence traceability/)
+})
+
+test('BlueprintView PDF export mode keeps all seven pages, the branded report header, but no interactive navigation', () => {
   const html = render(createBlueprint(), 'pdf')
 
-  for (const heading of [
-    'Learner Direction',
-    'Evidence for the Judgment',
-    'Conditions Requiring Response',
-    'Coordinated Action Plan',
-    'Future Opened',
-  ]) {
-    assert.match(html, new RegExp(heading))
+  for (const title of PAGE_TITLES) {
+    assert.match(html, new RegExp(title))
   }
+
+  const pageShellCount = (html.match(/data-blueprint-page-shell="true"/g) ?? []).length
+  assert.equal(pageShellCount, 7)
 
   assert.match(html, /data-blueprint-ready="true"/)
   assert.match(html, /data-blueprint-print-break="before"/)
+  assert.match(html, /data-blueprint-report-header="true"/, 'the branded header band must still render in PDF mode')
   assert.doesNotMatch(html, /data-blueprint-nav="true"/)
   assert.doesNotMatch(html, /View History →/)
+  assert.doesNotMatch(html, /data-blueprint-hide-in-pdf="true"/)
 })

@@ -70,10 +70,23 @@ body {
     padding: 0 !important;
   }
 
+  /* Cancel Tailwind's space-y-4 gap between the top-level page sections —
+     a leftover top margin landing right at a forced page-break can spill
+     a sliver of whitespace onto the next page. Physical page breaks alone
+     provide separation in print; the screen-only gap isn't needed here. */
+  body:has([data-blueprint-export-mode="pdf"]) [data-blueprint-root="true"] > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0 !important;
+  }
+
   body:has([data-blueprint-export-mode="pdf"]) [data-blueprint-page-shell="true"] {
     break-inside: avoid-page;
     page-break-inside: avoid;
     box-shadow: none !important;
+    /* Chrome's print pipeline can desaturate backgrounds for ink-saving
+       even with Playwright's printBackground:true — this keeps the navy
+       cover/header and gold accents true-color in the exported PDF. */
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
   }
 
   body:has([data-blueprint-export-mode="pdf"]) [data-blueprint-page-shell="true"][data-blueprint-print-break="before"] {

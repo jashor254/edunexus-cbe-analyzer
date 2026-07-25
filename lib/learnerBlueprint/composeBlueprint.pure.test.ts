@@ -99,7 +99,7 @@ test('composeParentSummary produces a headline from Academic Record trend when a
     status: 'available',
     owner: 'academic',
     freshness: 'live',
-    data: { overallTrend: 'improving', bySubject: [{ subject: 'Mathematics', latestLevel: 3, trend: 'improving' }], competencies: [], confidence: 80, lastComputed: '2026-07-17T00:00:00Z' },
+    data: { overallTrend: 'improving', bySubject: [{ subject: 'Mathematics', latestLevel: 3, trend: 'improving', evidenceCount: 2, latestEvidenceAt: '2026-07-10T00:00:00Z' }], competencies: [], confidence: 80, lastComputed: '2026-07-17T00:00:00Z' },
   }
   const section = composeParentSummary('Amani', academic, unavailable<AttendanceData>('attendance'))
   assert.equal(section.status, 'available')

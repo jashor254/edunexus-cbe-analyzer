@@ -35,6 +35,11 @@ export async function composeAcademicRecord(
           subject: s.subject,
           latestLevel: s.latestLevel,
           trend: s.trend,
+          // Already computed by Projection (SubjectPerformance.history) —
+          // composed here, not re-derived, so "based on N confirmed
+          // evidence items" is always a real count, never invented.
+          evidenceCount: s.history.length,
+          latestEvidenceAt: s.history.length > 0 ? s.history[s.history.length - 1].at : null,
         }))
       : []
 

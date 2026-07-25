@@ -81,6 +81,10 @@ export type SubjectRecord = {
   subject: string
   latestLevel: 1 | 2 | 3 | 4
   trend: 'improving' | 'declining' | 'stable' | 'insufficient_data'
+  /** Count of confirmed evidence points behind this subject's level — Projection's own `SubjectPerformance.history.length`, never re-derived. Lets a consumer say "based on N confirmed evidence items" instead of a bare level. */
+  evidenceCount: number
+  /** Timestamp of the most recent confirmed evidence for this subject, or null if evidenceCount is 0. */
+  latestEvidenceAt: string | null
 }
 
 export type CompetencyRecord = {

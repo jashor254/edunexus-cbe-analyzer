@@ -25,8 +25,8 @@ function baseInputs(): LearningStoryInputs {
     academicRecord: available<AcademicRecordData>({
       overallTrend: 'improving',
       bySubject: [
-        { subject: 'Mathematics', latestLevel: 2, trend: 'declining' },
-        { subject: 'English', latestLevel: 4, trend: 'improving' },
+        { subject: 'Mathematics', latestLevel: 2, trend: 'declining', evidenceCount: 1, latestEvidenceAt: '2026-06-15T00:00:00Z' },
+        { subject: 'English', latestLevel: 4, trend: 'improving', evidenceCount: 3, latestEvidenceAt: '2026-07-01T00:00:00Z' },
       ],
       competencies: [],
       confidence: 76,

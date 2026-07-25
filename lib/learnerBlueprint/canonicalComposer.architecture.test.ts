@@ -108,3 +108,37 @@ test('the canonical Blueprint PDF route stays on the live route/view path and ne
   assert.match(helperContent, pdfModeMatcher, 'the export helper should force PDF mode through the export query parameter')
   assert.doesNotMatch(helperContent, legacyPdfMatcher, 'the export helper must not import or reference the legacy learnerIntelligence PDF stack')
 })
+
+// Career Intelligence Canonicalization / Blueprint premium redesign sprint —
+// the redesign was explicitly instructed never to restore the legacy
+// Academic Clinic computation pipeline (lib/academicClinic/*) or read the
+// legacy `assessments` table directly, even though its PDF was used as a
+// visual reference. These tests prove the whole Blueprint PDF surface
+// (view, export helper, route) stays clean of that pipeline.
+test('the Blueprint PDF surface (view, export helper, route) never imports the legacy Academic Clinic pipeline', () => {
+  const files = [
+    path.join(ROOT, 'components/blueprint/BlueprintView.tsx'),
+    path.join(ROOT, 'lib/learnerBlueprint/pdfExport.ts'),
+    path.join(ROOT, 'app/api/student/blueprint/[learnerId]/pdf/route.ts'),
+    path.join(ROOT, 'app/student/blueprint/[learnerId]/page.tsx'),
+  ]
+  // Matches only a real import/require path (quoted), never a prose mention
+  // of "lib/academicClinic" in a comment — several of these files already
+  // carry an honest "we don't import this" comment that would otherwise
+  // false-positive against a naive substring match.
+  const academicClinicMatcher = /from\s+['"][^'"]*academicClinic[^'"]*['"]|require\(\s*['"][^'"]*academicClinic[^'"]*['"]\s*\)/
+
+  for (const file of files) {
+    const content = readFileSync(file, 'utf8')
+    assert.doesNotMatch(content, academicClinicMatcher, `${path.relative(ROOT, file)} must not import lib/academicClinic`)
+  }
+})
+
+test('BlueprintView is presentation-only — it never calls composeBlueprint itself, only the live page composes once', () => {
+  const viewContent = readFileSync(path.join(ROOT, 'components/blueprint/BlueprintView.tsx'), 'utf8')
+  assert.doesNotMatch(viewContent, /composeBlueprint\(/, 'BlueprintView must receive an already-composed blueprint as a prop, never compose its own')
+
+  const pageContent = readFileSync(path.join(ROOT, 'app/student/blueprint/[learnerId]/page.tsx'), 'utf8')
+  const composeCalls = pageContent.match(/composeBlueprint\(\{/g) ?? []
+  assert.equal(composeCalls.length, 1, 'the live Blueprint page must call composeBlueprint() exactly once per render — no duplicate composition tree')
+})
