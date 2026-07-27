@@ -47,10 +47,25 @@ let otherSchoolAdminUserId: string
 let otherSchoolAdminEmail: string
 
 before(async () => {
+  // db.auth.admin.createUser is observed in this environment to
+  // intermittently fail (a transient Supabase auth-layer flake, reproduced
+  // with a minimal standalone script containing zero application code —
+  // see lib/core/schoolUsersRlsRegression.integration.test.ts's header)
+  // — retried rather than allowed to crash fixture setup.
   const mkUser = async (label: string) => {
     const email = `perm-test-${label}-${Date.now()}@example.com`
-    const { data } = await db.auth.admin.createUser({ email, password: PASSWORD, email_confirm: true })
-    return { id: data!.user.id, email }
+    let lastError: unknown
+    for (let attempt = 1; attempt <= 6; attempt++) {
+      try {
+        const { data, error } = await db.auth.admin.createUser({ email, password: PASSWORD, email_confirm: true })
+        if (!error) return { id: data.user.id, email }
+        lastError = error
+      } catch (err) {
+        lastError = err
+      }
+      await new Promise(resolve => setTimeout(resolve, 500 * attempt))
+    }
+    throw lastError
   }
 
   const admin = await mkUser('admin')
