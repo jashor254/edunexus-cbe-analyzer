@@ -182,17 +182,66 @@ export async function canManageClass(client: SupabaseClient, schoolId: string): 
 }
 
 /**
+ * True if `teacherId` (the legacy `teachers.id`, not the auth user id)
+ * currently teaches `studentId` — either through `class_students ->
+ * teacher_classes` (primary, canonical rule) or the legacy
+ * `students.teacher_id`-of-record compatibility column. Factored out of
+ * `canViewLearner` (Phase 0 correction) so `canManageLearnerRecord` below
+ * can reuse the exact same relationship check for a staff-only (no self/
+ * parent) capability, instead of re-deriving it — "never duplicate
+ * authorization." See `canViewLearner`'s own doc comment for the full
+ * rationale (RLS parity, no school-id cross-check needed, legacy
+ * compatibility deprecation note).
+ */
+async function isCurrentTeacherOfStudent(teacherId: string, studentId: string): Promise<boolean> {
+  const db = createServiceClient()
+
+  const { data: taughtClasses } = await db.from('teacher_classes').select('id').eq('teacher_id', teacherId)
+  if (taughtClasses && taughtClasses.length > 0) {
+    const { data: enrollment } = await db
+      .from('class_students')
+      .select('id')
+      .eq('student_id', studentId)
+      .in('class_id', taughtClasses.map(c => c.id))
+      .limit(1)
+      .maybeSingle()
+    if (enrollment) return true // current class teacher
+  }
+
+  const { data: legacyRecord } = await db.from('students').select('id').eq('id', studentId).eq('teacher_id', teacherId).maybeSingle()
+  return !!legacyRecord // teacher-of-record (legacy)
+}
+
+/**
  * True if the user may view `studentId`'s records — admin-tier school member,
  * the learner's own teacher, the learner's own parent/guardian, or the
  * learner themself. Broad by design (this is a read-visibility check, not a
  * write gate) — per CLAUDE.md's rule that `teacher_id` is attribution, not an
  * access gate, this does NOT restrict a teacher's read access to only the
  * exact learner they most recently graded; any teacher currently teaching
- * the learner (per `class_students`) qualifies. Class-membership-based
- * visibility is intentionally left to the caller for now — this function
- * covers the three unambiguous cases (admin, self, parent) plus the
- * `teacher_id`-of-record case; a full class-roster check is Sprint 1B scope
- * once `ClassRepository` exists.
+ * the learner (per `class_students`) qualifies.
+ *
+ * Phase 0 correction (`docs/architecture/blueprint-living-action-plan-audit.md`
+ * §6): this used to check only the legacy `students.teacher_id`-of-record
+ * column, while the DB-level RLS policy (`auth_is_teacher_of_student`,
+ * `supabase/migrations/20260525_rls_policies.sql`) already correctly derives
+ * teacher access via `class_students -> teacher_classes -> teachers`. A
+ * teacher who currently teaches a learner only through class membership
+ * (not the legacy of-record column) was therefore denied at this layer even
+ * though RLS would have let the underlying query through — a fail-closed
+ * inconsistency, not a leak, but still a real bug for any real class teacher.
+ * This now checks both, mirroring RLS's `auth_is_teacher_of_student OR
+ * auth_is_direct_teacher_of_student` exactly (`20260720130000_sprint1_evidence_rls_bypass_fix.sql`).
+ *
+ * No additional school-id cross-check is added for either branch: neither
+ * `class_students`/`teacher_classes`/`teachers` nor legacy `students` carries
+ * a Core `schools.id` foreign key (they predate Core's multi-tenant schema
+ * and are scoped only by a free-text `school` column), and the RLS functions
+ * this mirrors don't check one either — the join/lookup itself IS the
+ * isolation boundary: it only succeeds for a class or teacher_id row that
+ * genuinely names this exact teacher and this exact student, which can't be
+ * satisfied by a teacher at a different school. Isolation for the Core-space
+ * branches above (self/admin/parent) is unaffected by this change.
  */
 export async function canViewLearner(client: SupabaseClient, schoolId: string, studentId: string): Promise<boolean> {
   const user = await requireAuthentication(client)
@@ -207,13 +256,56 @@ export async function canViewLearner(client: SupabaseClient, schoolId: string, s
   if (parent.studentIds.includes(studentId) || parent.coreLearnerIds.includes(studentId)) return true // guardian
 
   const teacher = await resolveTeacher(user.id)
-  if (teacher) {
-    const db = createServiceClient()
-    const { data } = await db.from('students').select('id').eq('id', studentId).eq('teacher_id', teacher.id).maybeSingle()
-    if (data) return true // teacher-of-record
-  }
+  if (teacher && await isCurrentTeacherOfStudent(teacher.id, studentId)) return true
 
   return false
+}
+
+/**
+ * Staff-only counterpart to {@link canViewLearner} — true for admin-tier
+ * school members or the learner's current teacher (same relationship rule
+ * `isCurrentTeacherOfStudent` implements), but explicitly **excludes** the
+ * learner's own self-access and parent/guardian access, which
+ * `canViewLearner` deliberately includes for read-visibility. Written for
+ * the Blueprint action-plan domain (`lib/learnerBlueprint/actionPlan/`,
+ * Phase 1 of `docs/architecture/blueprint-living-action-plan-audit.md`):
+ * proposing/editing/approving/rejecting/deferring an action item is a
+ * staff *capability*, not a read-visibility question — a learner or parent
+ * must never pass this check, only ever `canViewLearner`'s broader one.
+ * Reuses the exact same underlying primitives as `canViewLearner`
+ * (`resolveMembership`, `resolveTeacher`, `isCurrentTeacherOfStudent`) —
+ * this is proper factoring of a shared capability, not a second,
+ * independently-derived authorization query.
+ */
+export async function canManageLearnerRecord(client: SupabaseClient, schoolId: string, studentId: string): Promise<boolean> {
+  const user = await requireAuthentication(client)
+
+  const membership = await resolveMembership(user.id, schoolId)
+  if (membership && SCHOOL_ADMIN_ROLES.includes(membership.role)) return true // admin-tier
+
+  const teacher = await resolveTeacher(user.id)
+  if (teacher && await isCurrentTeacherOfStudent(teacher.id, studentId)) return true
+
+  return false
+}
+
+/**
+ * {@link canManageLearnerRecord}, addressed by Core `learners.id` instead of
+ * legacy `students.id` — mirrors {@link canViewLearnerRecord}'s exact
+ * bridge-composition shape (`resolveLegacyStudentId` + the legacy-space
+ * check), but staff-only: when no legacy bridge exists yet for a Core
+ * learner (a newly-enrolled learner with no assessment history — a
+ * legitimate, common state, never an error), only admin-tier membership
+ * can manage the record; there is no legacy teacher relationship to check
+ * yet, so a teacher who would otherwise qualify simply cannot be verified
+ * against anything and is denied until a bridge exists.
+ */
+export async function canManageLearnerRecordCore(client: SupabaseClient, schoolId: string, coreLearnerId: string): Promise<boolean> {
+  const legacyStudentId = await resolveLegacyStudentId(coreLearnerId)
+  if (legacyStudentId && await canManageLearnerRecord(client, schoolId, legacyStudentId)) return true
+
+  const membership = await resolveMembership((await requireAuthentication(client)).id, schoolId)
+  return !!membership && SCHOOL_ADMIN_ROLES.includes(membership.role)
 }
 
 /**
