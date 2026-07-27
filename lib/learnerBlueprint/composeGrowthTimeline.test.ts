@@ -30,11 +30,13 @@ mock.module('@/lib/projection/recompute', {
           growth: {
             value: {
               trend: 'insufficient_data',
+              sourceSubject: null,
               earliestScore: null,
               latestScore: null,
               delta: null,
               windowStart: null,
               windowEnd: null,
+              bySubject: {},
             },
             supportingEvidenceIds: ['e1'],
             confidence: 42,
@@ -62,11 +64,15 @@ mock.module('@/lib/projection/recompute', {
         growth: {
           value: {
             trend: 'improving',
+            sourceSubject: 'mathematics',
             earliestScore: 0.35,
             latestScore: 0.7,
             delta: 0.35,
             windowStart: '2026-01-10T00:00:00.000Z',
             windowEnd: '2026-07-10T00:00:00.000Z',
+            bySubject: {
+              mathematics: { trend: 'improving', earliestScore: 0.35, latestScore: 0.7, delta: 0.35, windowStart: '2026-01-10T00:00:00.000Z', windowEnd: '2026-07-10T00:00:00.000Z' },
+            },
           },
           supportingEvidenceIds: ['e1', 'e2', 'e3'],
           confidence: 81,

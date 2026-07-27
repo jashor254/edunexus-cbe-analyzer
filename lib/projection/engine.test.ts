@@ -147,15 +147,34 @@ test('risk projector produces no flags for consistently strong evidence', () => 
 
 // ── Growth Projector ──────────────────────────────────────────────────────────
 
-test('growth projector detects overall decline across all subjects combined', () => {
+// Phase 4B.1 (docs/architecture/comparable-context-growth-correction-
+// phase4b1.md) — this test previously named itself "across all subjects
+// combined," asserting the exact cross-subject-pooling algorithm that
+// correction removed (it produced false "declining" verdicts for learners
+// whose every individual subject was actually fine — see the doc's Victor
+// Gitau case study). Rewritten to assert the corrected, honest behavior:
+// decline is only ever asserted when it is real within at least one
+// comparable context (here, both subjects genuinely decline, across
+// genuinely distinct terms, which is why 'declining' is still the correct
+// answer for this particular fixture).
+test('growth projector detects overall decline when multiple subjects each genuinely decline across distinct terms', () => {
   const ev = [
-    evidence({ id: 'a', subject: 'mathematics', cbc_level: 4, created_at: '2026-01-01T00:00:00Z' }),
-    evidence({ id: 'b', subject: 'english', cbc_level: 4, created_at: '2026-01-02T00:00:00Z' }),
-    evidence({ id: 'c', subject: 'mathematics', cbc_level: 1, created_at: '2026-05-01T00:00:00Z' }),
-    evidence({ id: 'd', subject: 'english', cbc_level: 1, created_at: '2026-05-02T00:00:00Z' }),
+    evidence({ id: 'a', subject: 'mathematics', cbc_level: 4, term: 1, created_at: '2026-01-01T00:00:00Z' }),
+    evidence({ id: 'b', subject: 'english', cbc_level: 4, term: 1, created_at: '2026-01-02T00:00:00Z' }),
+    evidence({ id: 'c', subject: 'mathematics', cbc_level: 1, term: 2, created_at: '2026-05-01T00:00:00Z' }),
+    evidence({ id: 'd', subject: 'english', cbc_level: 1, term: 2, created_at: '2026-05-02T00:00:00Z' }),
   ]
   const p = computeLearnerProjection(LEARNER_ID, ev)
   assert.equal(p.growth!.value.trend, 'declining')
+})
+
+test('growth projector does NOT detect decline when subjects only differ from each other, not across time (the pre-4B.1 pooling bug)', () => {
+  const ev = [
+    evidence({ id: 'a', subject: 'mathematics', cbc_level: 4, term: 1, created_at: '2026-01-01T00:00:00Z' }),
+    evidence({ id: 'b', subject: 'english', cbc_level: 1, term: 1, created_at: '2026-05-02T00:00:00Z' }),
+  ]
+  const p = computeLearnerProjection(LEARNER_ID, ev)
+  assert.notEqual(p.growth!.value.trend, 'declining')
 })
 
 // ── Completeness Projector ───────────────────────────────────────────────────

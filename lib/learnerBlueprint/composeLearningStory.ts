@@ -33,22 +33,62 @@ function describeCapability(inputs: LearningStoryInputs): {
   }
 
   const subjects = Object.entries(capability.value.bySubject)
+
+  // A "weakest subject" claim requires at least two subjects to compare —
+  // the minimum of a one-item (or empty) set is not a weakness, it is the
+  // only data point. Naming a learner's only recorded subject "least
+  // secure" purely because it is alone in the set was a real, reproduced
+  // bug (docs/architecture/educational-intelligence-validation-report.md
+  // §6 Finding 2; independently caught by lib/learnerBlueprint/coherence's
+  // narrative_alignment rule) — fixed at the source here, not just
+  // diagnosed after the fact.
+  if (subjects.length <= 1) {
+    const only = subjects[0]
+    const opportunityBase = only
+      ? `There is not yet a second subject with recorded evidence to compare ${only[0]} against, so no weakest subject can be identified yet — the greatest current opportunity is to build evidence in additional subjects.`
+      : 'The greatest current opportunity is to gather more subject evidence before narrowing the next step.'
+    return {
+      evidence: only
+        ? `Across the available evidence, current capability is most consistently described as ${capability.value.overallLevel}, based on ${only[0]} alone so far.`
+        : `Across the available evidence, current capability is most consistently described as ${capability.value.overallLevel}.`,
+      interpretation: only
+        ? `Current evidence suggests a relatively consistent capability profile at the moment — with only one subject recorded, this is not yet a comparison across subjects.`
+        : `Current evidence suggests a relatively consistent capability profile at the moment.`,
+      opportunity: nextAction ? `${opportunityBase} The live learning recommendation points to this next step: ${nextAction}.` : opportunityBase,
+    }
+  }
+
   const strongest = [...subjects].sort((a, b) => b[1].score - a[1].score)[0]
   const weakest = [...subjects].sort((a, b) => a[1].score - b[1].score)[0]
-  const spread = strongest && weakest ? strongest[1].score - weakest[1].score : 0
-  const mixed = spread >= 0.25 && strongest && weakest && strongest[0] !== weakest[0]
+  const spread = strongest[1].score - weakest[1].score
+  const mixed = spread >= 0.25 && strongest[0] !== weakest[0]
+
+  // Phase 4B.1 (docs/architecture/comparable-context-growth-correction-
+  // phase4b1.md) — a real, reproduced bug: `opportunityCore` used to name
+  // `weakest` "least secure" unconditionally, even when `mixed` was false
+  // (no meaningful gap) and even when the weakest subject was itself
+  // `capable`/`strong`/`exceptional` — a relatively-lower-but-still-strong
+  // subject is not insecure, and calling it so directly contradicted this
+  // same narrative's own "relatively consistent capability profile" line.
+  // `belowThreshold` is the one distinction that actually justifies
+  // remediation-style language: the weakest subject being genuinely
+  // early-stage (`emerging`/`developing`), not merely lower than an
+  // even-stronger sibling subject.
+  const belowThreshold = weakest[1].level === 'emerging' || weakest[1].level === 'developing'
 
   const evidence = mixed
-    ? `Across the available evidence, current capability is stronger in ${strongest[0]} and less secure in ${weakest[0]}.`
+    ? `Across the available evidence, current capability is stronger in ${strongest[0]} and comparatively lower in ${weakest[0]}.`
     : `Across the available evidence, current capability is most consistently described as ${capability.value.overallLevel}.`
 
   const interpretation = mixed
     ? `Current evidence suggests the learner is developing unevenly rather than moving uniformly, which makes targeted support more useful than a broad label.`
     : `Current evidence suggests a relatively consistent capability profile at the moment.`
 
-  const opportunityCore = weakest
-    ? `The greatest current opportunity is to strengthen ${weakest[0]}, where the present capability evidence is least secure.`
-    : 'The greatest current opportunity is to deepen the current strongest area with more evidence.'
+  const opportunityCore = mixed
+    ? (belowThreshold
+        ? `The greatest current opportunity is to strengthen ${weakest[0]}, where the present capability evidence is least secure.`
+        : `${weakest[0]} is relatively lower than ${strongest[0]} in the current evidence, but remains ${weakest[1].level} — this reads as an enrichment opportunity in ${strongest[0]} or continued challenge in ${weakest[0]}, not a gap needing remediation.`)
+    : `Current evidence does not show one subject standing out as needing particular attention right now — the clearest opportunity is to deepen evidence across the board.`
 
   return {
     evidence,

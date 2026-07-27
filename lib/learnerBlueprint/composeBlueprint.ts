@@ -34,11 +34,24 @@ import { composeRecommendedNextSteps } from './composeRecommendedNextSteps'
 import { composeMetadata } from './composeMetadata'
 import { loadProjectionAccess } from './projectionAccess'
 import { validateBlueprint, type BlueprintValidationResult } from './validation'
+import { composeBlueprintCoherence } from './coherence'
+import type { CoherenceReport } from './coherence'
 import type { BlueprintIdentifiers, LearnerBlueprint } from './types'
 
 export type ComposeBlueprintResult = {
   blueprint: LearnerBlueprint
   validation: BlueprintValidationResult
+  /**
+   * Phase 4A — the Blueprint Intelligence Coherence Engine's diagnosis:
+   * whether every educational claim/recommendation/action in this
+   * composition is internally consistent with the learner's own Evidence/
+   * Projection. Distinct from `validation` above, which only checks
+   * structural completeness (every section present, owner declared) — a
+   * Blueprint can be `validation.valid === true` and still
+   * `coherence.result === 'FAIL'`. Never mutates `blueprint` — diagnosis
+   * only, per this phase's own rule.
+   */
+  coherence: CoherenceReport
 }
 
 export async function composeBlueprint(ids: BlueprintIdentifiers): Promise<ComposeBlueprintResult> {
@@ -129,6 +142,7 @@ export async function composeBlueprint(ids: BlueprintIdentifiers): Promise<Compo
 
   const blueprint: LearnerBlueprint = { metadata, ...sections }
   const validation = validateBlueprint(blueprint)
+  const coherence = await composeBlueprintCoherence(ids.coreLearnerId, ids.schoolId, blueprint)
 
-  return { blueprint, validation }
+  return { blueprint, validation, coherence }
 }

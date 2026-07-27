@@ -69,6 +69,8 @@ export type IdentityData = {
   learnerName: string
   admissionNumber: string
   schoolName: string
+  /** School's own crest/logo (schools.logo_url), for cover/header branding — null until a school admin uploads one. */
+  schoolLogoUrl: string | null
   currentClassName: string | null
   academicYearLabel: string | null
   termLabel: string | null
@@ -80,7 +82,11 @@ export type IdentityData = {
 export type SubjectRecord = {
   subject: string
   latestLevel: 1 | 2 | 3 | 4
-  trend: 'improving' | 'declining' | 'stable' | 'insufficient_data'
+  // Per-subject, single-context trend — 'mixed' is structurally part of the
+  // shared Trend type (a 2+-context aggregate concept) but can never occur
+  // here; kept type-aligned with academicProjector.ts's own SubjectPerformance.trend
+  // rather than narrowed with a cast.
+  trend: 'improving' | 'declining' | 'stable' | 'insufficient_data' | 'mixed'
   /** Count of confirmed evidence points behind this subject's level — Projection's own `SubjectPerformance.history.length`, never re-derived. Lets a consumer say "based on N confirmed evidence items" instead of a bare level. */
   evidenceCount: number
   /** Timestamp of the most recent confirmed evidence for this subject, or null if evidenceCount is 0. */
@@ -93,7 +99,10 @@ export type CompetencyRecord = {
 }
 
 export type AcademicRecordData = {
-  overallTrend: 'improving' | 'declining' | 'stable' | 'insufficient_data' | null
+  // Phase 4B.1 — sourced from the corrected, comparable-context growth
+  // projection (lib/projection/growthProjector.ts); 'mixed' is a real,
+  // reachable state here (opposing valid subject trends), not decorative.
+  overallTrend: 'improving' | 'declining' | 'stable' | 'insufficient_data' | 'mixed' | null
   bySubject: SubjectRecord[]
   competencies: CompetencyRecord[]
   /** Projection's own confidence (0-100) — carried through, never re-derived. */

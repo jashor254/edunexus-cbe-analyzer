@@ -120,6 +120,37 @@ test('composeParentSummary surfaces an attendance-based action when attendance i
   assert.match(section.data?.action ?? '', /attendance/i)
 })
 
+// ── Phase 4B.1 — Parent Summary grammar, every supported trend state ────────
+
+function academicRecordWithTrend(overallTrend: AcademicRecordData['overallTrend']): BlueprintSection<AcademicRecordData> {
+  return {
+    status: 'available',
+    owner: 'academic',
+    freshness: 'live',
+    data: { overallTrend, bySubject: [], competencies: [], confidence: 80, lastComputed: '2026-07-17T00:00:00Z' },
+  }
+}
+
+test('composeParentSummary produces a grammatically correct headline for every supported trend state', () => {
+  const expected: Record<NonNullable<AcademicRecordData['overallTrend']>, string> = {
+    improving: 'Amani is showing improving progress this term.',
+    declining: "Amani's progress this term needs attention.",
+    stable: 'Amani is showing steady progress this term.',
+    insufficient_data: 'Amani is still building a fuller evidence picture this term.',
+    mixed: 'Amani is showing a mixed picture this term — improving in some areas, needing attention in others.',
+  }
+  for (const [trend, headline] of Object.entries(expected) as Array<[NonNullable<AcademicRecordData['overallTrend']>, string]>) {
+    const section = composeParentSummary('Amani', academicRecordWithTrend(trend), unavailable<AttendanceData>('attendance'))
+    assert.equal(section.data?.headline, headline, `trend "${trend}" produced an unexpected headline`)
+  }
+})
+
+test('no phrase equivalent to "showing an area needing attention progress" can render for the declining state', () => {
+  const section = composeParentSummary('Victor Gitau', academicRecordWithTrend('declining'), unavailable<AttendanceData>('attendance'))
+  assert.doesNotMatch(section.data?.headline ?? '', /showing an? .*progress/i)
+  assert.equal(section.data?.headline, "Victor Gitau's progress this term needs attention.")
+})
+
 // ── validateBlueprint ─────────────────────────────────────────────────────────
 
 function fixtureBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlueprint {
@@ -158,14 +189,14 @@ test('validateBlueprint fails when Identity is not available ("required sections
 
 test('validateBlueprint passes for "identity only" — every other section not_implemented/unavailable is valid, not an error', () => {
   const result = validateBlueprint(fixtureBlueprint({
-    identity: { status: 'available', owner: 'core', freshness: 'live', data: { learnerName: 'Amani', admissionNumber: '001', schoolName: 'Test', currentClassName: null, academicYearLabel: null, termLabel: null, guardians: [] } },
+    identity: { status: 'available', owner: 'core', freshness: 'live', data: { learnerName: 'Amani', admissionNumber: '001', schoolName: 'Test', schoolLogoUrl: null, currentClassName: null, academicYearLabel: null, termLabel: null, guardians: [] } },
   }))
   assert.equal(result.valid, true, JSON.stringify(result.errors))
 })
 
 test('validateBlueprint fails when a section is missing its owner declaration', () => {
   const bp = fixtureBlueprint({
-    identity: { status: 'available', owner: '', freshness: 'live', data: { learnerName: 'Amani', admissionNumber: '001', schoolName: 'Test', currentClassName: null, academicYearLabel: null, termLabel: null, guardians: [] } },
+    identity: { status: 'available', owner: '', freshness: 'live', data: { learnerName: 'Amani', admissionNumber: '001', schoolName: 'Test', schoolLogoUrl: null, currentClassName: null, academicYearLabel: null, termLabel: null, guardians: [] } },
   })
   const result = validateBlueprint(bp)
   assert.equal(result.valid, false)
@@ -174,7 +205,7 @@ test('validateBlueprint fails when a section is missing its owner declaration', 
 
 test('validateBlueprint fails if metadata.snapshotState is not "current" (composition engine never produces snapshots)', () => {
   const bp = fixtureBlueprint({
-    identity: { status: 'available', owner: 'core', freshness: 'live', data: { learnerName: 'Amani', admissionNumber: '001', schoolName: 'Test', currentClassName: null, academicYearLabel: null, termLabel: null, guardians: [] } },
+    identity: { status: 'available', owner: 'core', freshness: 'live', data: { learnerName: 'Amani', admissionNumber: '001', schoolName: 'Test', schoolLogoUrl: null, currentClassName: null, academicYearLabel: null, termLabel: null, guardians: [] } },
   })
   bp.metadata.snapshotState = 'snapshot'
   const result = validateBlueprint(bp)
@@ -184,7 +215,7 @@ test('validateBlueprint fails if metadata.snapshotState is not "current" (compos
 
 test('validateBlueprint passes for a "partial blueprint" — identity + attendance available, rest unavailable/not_implemented', () => {
   const result = validateBlueprint(fixtureBlueprint({
-    identity: { status: 'available', owner: 'core', freshness: 'live', data: { learnerName: 'Amani', admissionNumber: '001', schoolName: 'Test', currentClassName: null, academicYearLabel: null, termLabel: null, guardians: [] } },
+    identity: { status: 'available', owner: 'core', freshness: 'live', data: { learnerName: 'Amani', admissionNumber: '001', schoolName: 'Test', schoolLogoUrl: null, currentClassName: null, academicYearLabel: null, termLabel: null, guardians: [] } },
     attendance: { status: 'available', owner: 'attendance', freshness: 'snapshot', data: { presentCount: 1, absentCount: 0, lateCount: 0, excusedCount: 0, totalSessions: 1, attendancePercentage: 100, notes: [] } },
     academicRecord: { status: 'unavailable', owner: 'projection', freshness: 'live', data: null, unavailableReason: 'no legacy student' },
   }))
@@ -193,7 +224,7 @@ test('validateBlueprint passes for a "partial blueprint" — identity + attendan
 
 test('validateBlueprint passes for a "full blueprint" — every section available', () => {
   const result = validateBlueprint(fixtureBlueprint({
-    identity: { status: 'available', owner: 'core', freshness: 'live', data: { learnerName: 'Amani', admissionNumber: '001', schoolName: 'Test', currentClassName: 'G7 East', academicYearLabel: '2026', termLabel: 'Term 2', guardians: [] } },
+    identity: { status: 'available', owner: 'core', freshness: 'live', data: { learnerName: 'Amani', admissionNumber: '001', schoolName: 'Test', schoolLogoUrl: null, currentClassName: 'G7 East', academicYearLabel: '2026', termLabel: 'Term 2', guardians: [] } },
     academicRecord: { status: 'available', owner: 'projection', freshness: 'live', data: { overallTrend: 'stable', bySubject: [], competencies: [], confidence: 70, lastComputed: '2026-07-17T00:00:00Z' } },
     attendance: { status: 'available', owner: 'attendance', freshness: 'snapshot', data: { presentCount: 10, absentCount: 0, lateCount: 0, excusedCount: 0, totalSessions: 10, attendancePercentage: 100, notes: [] } },
     learningCompass: { status: 'available', owner: 'compass', freshness: 'live', data: { currentLearningFocus: null, nextRecommendedAction: null, holidayProgrammeAvailable: false, learningReadiness: null, notes: [] } },

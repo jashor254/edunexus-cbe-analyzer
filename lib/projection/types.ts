@@ -31,7 +31,15 @@ export type ProjectorType =
   | 'academic' | 'capability' | 'knowledge' | 'behaviour' | 'growth' | 'risk' | 'completeness'
   | 'capabilityV2' | 'trendV2' | 'knowledgeV2'
 
-export type Trend = 'improving' | 'declining' | 'stable' | 'insufficient_data'
+// 'mixed' (Phase 4B.1, comparable-context growth correction) — the only
+// honest label when two or more comparable contexts (subjects) have
+// genuinely opposing valid trends (one improving, one declining). Adding
+// this rather than forcing 'improving'/'declining' on conflicting evidence
+// is required by the comparable-context invariant: an overall trend must
+// never assert a direction that isn't actually true across the learner's
+// real per-context evidence. See docs/architecture/comparable-context-
+// growth-correction-phase4b1.md.
+export type Trend = 'improving' | 'declining' | 'stable' | 'insufficient_data' | 'mixed'
 
 export type CapabilityLevel = 'emerging' | 'developing' | 'capable' | 'strong' | 'exceptional'
 
@@ -89,13 +97,41 @@ export type BehaviourValue = {
   distinctSources: string[]
 }
 
-export type GrowthValue = {
+/** One comparable context's (subject's) own trend — never compared against a different context's raw score. */
+export type GrowthContextTrend = {
   trend: Trend
   earliestScore: number | null
   latestScore: number | null
   delta: number | null
   windowStart: string | null
   windowEnd: string | null
+}
+
+export type GrowthValue = {
+  trend: Trend
+  /**
+   * Only populated when `trend` is directly traceable to exactly one
+   * comparable context's own trend (the "one subject has a valid trend"
+   * case) — the subject key into `bySubject` that `trend`/`earliestScore`/
+   * `latestScore`/`delta`/`windowStart`/`windowEnd` were copied from. Null
+   * whenever `trend` is an aggregate across 2+ contexts (nothing single to
+   * point at) or `insufficient_data`.
+   */
+  sourceSubject: string | null
+  /**
+   * Null whenever the overall trend is derived by aggregating 2+ contexts —
+   * a single scalar score/delta across genuinely different subjects would
+   * itself be the same cross-subject-pooling error this correction removes.
+   * Populated (copied from the one qualifying context) only in the
+   * single-valid-context case.
+   */
+  earliestScore: number | null
+  latestScore: number | null
+  delta: number | null
+  windowStart: string | null
+  windowEnd: string | null
+  /** Per-subject trend, computed independently within each subject — never compared across subjects. Comparable-context correction, Phase 4B.1. */
+  bySubject: Record<string, GrowthContextTrend>
 }
 
 export type RiskFlag = {

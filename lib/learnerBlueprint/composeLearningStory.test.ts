@@ -17,6 +17,7 @@ function baseInputs(): LearningStoryInputs {
       learnerName: 'Brian Matthias',
       admissionNumber: 'ADM-1',
       schoolName: 'Test School',
+      schoolLogoUrl: null,
       currentClassName: 'Grade 7',
       academicYearLabel: '2026',
       termLabel: 'Term 2',
@@ -167,6 +168,59 @@ test('composeLearningStory identifies mixed capability evidence without destiny 
   assert.equal(section.status, 'available')
   assert.match(section.data?.interpretation ?? '', /developing unevenly/)
   assert.doesNotMatch(section.data?.narrative ?? '', /\b(destined|always|will become)\b/i)
+})
+
+// ── Phase 4B.1 — comparable-context / weakest-subject-language regressions ──
+
+test('two strong subjects (both "strong"/"exceptional") with a real gap do not produce a "least secure" weakness claim', () => {
+  const inputs = baseInputs()
+  inputs.capability!.value = {
+    overallLevel: 'exceptional',
+    overallScore: 0.9,
+    bySubject: {
+      Mathematics: { level: 'strong', score: 0.70 },
+      English: { level: 'exceptional', score: 0.98 }, // spread 0.28 -> a real, "meaningful" gap by this file's own threshold
+    },
+  }
+  const section = composeLearningStory(inputs)
+  assert.doesNotMatch(section.data?.opportunity ?? '', /least secure/i)
+  assert.match(section.data?.opportunity ?? '', /enrichment|continued challenge/i)
+})
+
+test('a genuinely lower, below-threshold subject can still be named a priority ("least secure" remains legitimate when true)', () => {
+  const section = composeLearningStory(baseInputs()) // Mathematics: developing/0.33 vs English: strong/0.83
+  assert.match(section.data?.opportunity ?? '', /least secure/i)
+  assert.match(section.data?.opportunity ?? '', /Mathematics/)
+})
+
+test('no meaningful gap between subjects does not single out either as an opportunity to strengthen', () => {
+  const inputs = baseInputs()
+  inputs.capability!.value = {
+    overallLevel: 'capable',
+    overallScore: 0.6,
+    bySubject: {
+      Mathematics: { level: 'capable', score: 0.6 },
+      English: { level: 'capable', score: 0.62 }, // spread well under the 0.25 "meaningful gap" threshold
+    },
+  }
+  const section = composeLearningStory(inputs)
+  assert.doesNotMatch(section.data?.opportunity ?? '', /least secure/i)
+  assert.doesNotMatch(section.data?.opportunity ?? '', /Mathematics|English/)
+})
+
+test('enrichment language remains possible for a relatively-lower-but-still-strong subject', () => {
+  const inputs = baseInputs()
+  inputs.capability!.value = {
+    overallLevel: 'strong',
+    overallScore: 0.85,
+    bySubject: {
+      Mathematics: { level: 'capable', score: 0.55 }, // still "capable", not below-threshold, but a real 0.4 spread
+      English: { level: 'exceptional', score: 0.95 },
+    },
+  }
+  const section = composeLearningStory(inputs)
+  assert.doesNotMatch(section.data?.opportunity ?? '', /least secure/i)
+  assert.match(section.data?.opportunity ?? '', /enrichment|continued challenge/i)
 })
 
 test('composeLearningStory is unavailable when there is no canonical evidence to synthesize', () => {

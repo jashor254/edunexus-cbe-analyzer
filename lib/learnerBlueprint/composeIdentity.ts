@@ -33,6 +33,7 @@ export async function composeIdentity(
       learnerName: [learner.first_name, learner.middle_name, learner.last_name].filter(Boolean).join(' '),
       admissionNumber: learner.admission_number,
       schoolName: school.school_name,
+      schoolLogoUrl: school.logo_url,
       currentClassName: activeEnrollment?.classes.display_name ?? null,
       academicYearLabel: academicYear?.name ?? null,
       termLabel: term?.name ?? null,
