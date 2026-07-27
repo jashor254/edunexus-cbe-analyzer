@@ -13,6 +13,7 @@ import {
   BookOpen,
   AlertCircle,
 } from 'lucide-react'
+import { CURRICULA, FOCUS_RING } from './constants'
 
 const AcademicClinicDemo = dynamic(
   () => import('@/components/demo/AcademicClinicDemo'),
@@ -145,7 +146,7 @@ export default function LandingPage() {
               <button
                 key={r.id}
                 onClick={() => setSelectedRole(selectedRole === r.id ? null : r.id)}
-                className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-semibold border transition-all whitespace-nowrap ${
+                className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-semibold border transition-all whitespace-nowrap ${FOCUS_RING} ${
                   selectedRole === r.id
                     ? r.id === 'school'
                       ? 'bg-violet-500/15 border-violet-500/35 text-violet-300'
@@ -181,7 +182,7 @@ export default function LandingPage() {
 
           {/* Curriculum pills */}
           <div className="flex flex-wrap justify-center gap-2 mb-10">
-            {['CBC', 'Cambridge IGCSE', '8-4-4', 'Grade 7–12'].map((pill) => (
+            {CURRICULA.map((pill) => (
               <span
                 key={pill}
                 className="bg-white/5 border border-white/10 text-white/40 px-4 py-1.5 rounded-full text-sm font-semibold"
@@ -194,7 +195,7 @@ export default function LandingPage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
             <Link
               href={hero.ctaHref}
-              className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-600 text-white px-8 py-4 rounded-xl font-bold hover:scale-105 transition-all shadow-2xl shadow-violet-600/30"
+              className={`inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-600 text-white px-8 py-4 rounded-xl font-bold hover:scale-105 transition-all shadow-2xl shadow-violet-600/30 ${FOCUS_RING}`}
             >
               {hero.ctaLabel}
               <ArrowRight className="w-4 h-4" />
@@ -203,14 +204,14 @@ export default function LandingPage() {
               hero.secondary.action === 'demo' ? (
                 <button
                   onClick={() => setDemoOpen(true)}
-                  className="text-violet-400 hover:text-violet-300 font-semibold transition-colors"
+                  className={`text-violet-400 hover:text-violet-300 font-semibold transition-colors rounded ${FOCUS_RING}`}
                 >
                   {hero.secondary.label}
                 </button>
               ) : (
                 <a
                   href={hero.secondary.href}
-                  className="text-violet-400 hover:text-violet-300 font-semibold transition-colors"
+                  className={`text-violet-400 hover:text-violet-300 font-semibold transition-colors rounded ${FOCUS_RING}`}
                 >
                   {hero.secondary.label}
                 </a>
@@ -256,7 +257,7 @@ export default function LandingPage() {
           <p className="text-center text-sm font-semibold text-white/40 uppercase tracking-widest mb-1">
             Trusted by CBC and 8-4-4 teachers across Kenya
           </p>
-          <p className="text-center text-xs text-white/25">
+          <p className="text-center text-xs text-white/50">
             50+ pioneer teachers &nbsp;·&nbsp; Nairobi, Kisumu, Nakuru &nbsp;·&nbsp; CBC · 8-4-4 · Cambridge IGCSE
           </p>
         </div>
@@ -276,7 +277,10 @@ export default function LandingPage() {
                     EDUNEXUS
                   </div>
                   <div className="text-xl font-extrabold text-white mb-0.5">Learner Blueprint</div>
-                  <div className="text-xs text-white/60 mb-5">Living Learner Intelligence Profile</div>
+                  <div className="text-xs text-white/60 mb-2">Living Learner Intelligence Profile</div>
+                  <div className="inline-block text-[10px] font-semibold text-white/45 bg-white/5 border border-white/10 rounded-full px-2 py-0.5 mb-3">
+                    Illustrative example
+                  </div>
 
                   <div className="border-t border-white/15 mb-4" />
 
@@ -319,7 +323,7 @@ export default function LandingPage() {
                   </div>
 
                   <div className="border-t border-white/15 pt-3">
-                    <div className="text-[10px] text-white/25">edunexus.co.ke · CONFIDENTIAL · Sample</div>
+                    <div className="text-[10px] text-white/45">edunexus.co.ke · CONFIDENTIAL · Sample</div>
                   </div>
                 </div>
               </div>
@@ -366,7 +370,7 @@ export default function LandingPage() {
               <div className="flex flex-wrap gap-3 mb-6">
                 <button
                   onClick={() => setDemoOpen(true)}
-                  className="flex items-center gap-2.5 bg-white/5 border border-white/10 rounded-xl px-4 py-3 hover:bg-white/8 transition-all text-left"
+                  className={`flex items-center gap-2.5 bg-white/5 border border-white/10 rounded-xl px-4 py-3 hover:bg-white/8 transition-all text-left ${FOCUS_RING}`}
                 >
                   <div className="w-2.5 h-2.5 rounded-full bg-violet-400 shrink-0" />
                   <div>
@@ -377,7 +381,7 @@ export default function LandingPage() {
 
                 <button
                   onClick={() => setKcseDemoOpen(true)}
-                  className="flex items-center gap-2.5 bg-white/5 border border-white/10 rounded-xl px-4 py-3 hover:bg-white/8 transition-all text-left"
+                  className={`flex items-center gap-2.5 bg-white/5 border border-white/10 rounded-xl px-4 py-3 hover:bg-white/8 transition-all text-left ${FOCUS_RING}`}
                 >
                   <div className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
                   <div>
@@ -389,7 +393,7 @@ export default function LandingPage() {
 
               <Link
                 href="/signup?role=parent"
-                className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-600 text-white px-7 py-3.5 rounded-xl font-bold hover:scale-105 transition-all shadow-2xl shadow-violet-600/30"
+                className={`inline-flex items-center gap-2 bg-white/8 border border-white/10 hover:bg-white/14 text-white px-7 py-3.5 rounded-xl font-bold transition-all ${FOCUS_RING}`}
               >
                 Get My Child&apos;s Free Report
                 <ArrowRight className="w-4 h-4" />
@@ -480,7 +484,7 @@ export default function LandingPage() {
                         style={{ width: `${pct}%` }}
                       />
                     </div>
-                    <div className="text-[10px] text-white/25 mt-0.5">{subject}</div>
+                    <div className="text-[10px] text-white/50 mt-0.5">{subject}</div>
                   </div>
                 ))}
               </div>
@@ -598,7 +602,7 @@ export default function LandingPage() {
               </ul>
               <Link
                 href="/signup?role=parent"
-                className="text-violet-400 hover:text-violet-300 font-semibold transition-colors"
+                className={`text-violet-400 hover:text-violet-300 font-semibold transition-colors rounded ${FOCUS_RING}`}
               >
                 Try your child&apos;s first free session →
               </Link>
@@ -616,6 +620,9 @@ export default function LandingPage() {
                   <span className="text-xs font-semibold bg-teal-500/20 text-teal-300 px-2.5 py-1 rounded-full whitespace-nowrap">
                     Maths · Level 2
                   </span>
+                </div>
+                <div className="flex items-center gap-1.5 px-4 py-1.5 border-b border-white/10 bg-white/3">
+                  <span className="text-xs font-semibold text-white/40">Illustrative example</span>
                 </div>
 
                 <div className="p-4 space-y-3">
@@ -713,7 +720,7 @@ export default function LandingPage() {
 
           {/* Automation timeline */}
           <div className="mb-10">
-            <p className="text-center text-[10px] font-semibold text-white/25 uppercase tracking-widest mb-4">
+            <p className="text-center text-[10px] font-semibold text-white/50 uppercase tracking-widest mb-4">
               From classroom record to family insight
             </p>
             <div
@@ -737,7 +744,7 @@ export default function LandingPage() {
           <div className="text-center">
             <Link
               href="/signup?role=teacher"
-              className="text-amber-400 hover:text-amber-300 font-semibold transition-colors"
+              className={`text-amber-400 hover:text-amber-300 font-semibold transition-colors rounded ${FOCUS_RING}`}
             >
               Start planning your term for free →
             </Link>
@@ -832,7 +839,7 @@ export default function LandingPage() {
 
           <div className="grid md:grid-cols-2 gap-6">
             <div className="bg-white/3 border border-white/8 rounded-2xl p-7">
-              <p className="text-[11px] font-black text-white/25 uppercase tracking-widest mb-5">
+              <p className="text-[11px] font-black text-white/50 uppercase tracking-widest mb-5">
                 Your SMS manages
               </p>
               <ul className="space-y-3">
@@ -899,7 +906,7 @@ export default function LandingPage() {
 
           <Link
             href="/early-access"
-            className="inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-600 text-white px-10 py-4 rounded-xl font-bold text-lg hover:scale-105 transition-all shadow-2xl shadow-violet-600/30"
+            className={`inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-600 text-white px-10 py-4 rounded-xl font-bold text-lg hover:scale-105 transition-all shadow-2xl shadow-violet-600/30 ${FOCUS_RING}`}
           >
             Book a School Demo
             <ArrowRight className="w-5 h-5" />
@@ -907,20 +914,20 @@ export default function LandingPage() {
 
           {/* Secondary paths */}
           <div className="mt-10 pt-8 border-t border-white/10">
-            <p className="text-xs font-bold text-white/30 uppercase tracking-widest mb-5">
+            <p className="text-xs font-bold text-white/50 uppercase tracking-widest mb-5">
               Or start individually
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
                 href="/signup?role=teacher"
-                className="inline-flex items-center gap-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 hover:text-white px-6 py-3 rounded-xl font-semibold text-sm transition-all"
+                className={`inline-flex items-center gap-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 hover:text-white px-6 py-3 rounded-xl font-semibold text-sm transition-all ${FOCUS_RING}`}
               >
                 👨‍🏫 Start planning free — for teachers
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
               <Link
                 href="/signup?role=parent"
-                className="inline-flex items-center gap-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 hover:text-white px-6 py-3 rounded-xl font-semibold text-sm transition-all"
+                className={`inline-flex items-center gap-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 hover:text-white px-6 py-3 rounded-xl font-semibold text-sm transition-all ${FOCUS_RING}`}
               >
                 👨‍👩‍👧 Get your child&apos;s free report
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -928,12 +935,12 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <p className="text-sm text-white/30 mt-8">
+          <p className="text-sm text-white/50 mt-8">
             ✓ No contract required &nbsp;·&nbsp; ✓ School pricing available &nbsp;·&nbsp; ✓ M-PESA accepted
           </p>
           <p className="text-xs text-white/20 mt-2">
             Your school&apos;s data never trains our models. &nbsp;·&nbsp;{' '}
-            <Link href="/pricing" className="text-violet-400/60 hover:text-violet-300 transition-colors">
+            <Link href="/pricing" className={`text-violet-400/60 hover:text-violet-300 transition-colors rounded ${FOCUS_RING}`}>
               View pricing →
             </Link>
           </p>
