@@ -2,11 +2,11 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
-import { publishEvent } from '@/lib/events'
 import { timedQuery } from '@/lib/observability/queryTiming'
-import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissions'
+import { requireAuthentication } from '@/lib/core/permissions'
 import { resolveTeacher } from '@/lib/core/identity'
-import { UnauthorizedError } from '@/lib/core/errors'
+import { UnauthorizedError, ForbiddenError } from '@/lib/core/errors'
+import { createAssignment } from '@/lib/assignments/create'
 
 const CreateAssignmentSchema = z.object({
   class_id:              z.string().uuid(),
@@ -103,103 +103,33 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
-    let userId: string
-    try {
-      userId = (await requireAuthentication(supabase)).id
-    } catch (err) {
-      if (err instanceof UnauthorizedError) return apiUnauthorized()
-      throw err
-    }
-
-    const teacher = await resolveTeacher(userId)
-    if (!teacher) return apiForbidden()
-
-    const db = createServiceClient()
 
     const parsed = CreateAssignmentSchema.safeParse(await req.json())
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
     const { class_id, title, subject, topic, substrand_id, instructions, due_date, type, max_score, is_quiz, is_adaptive, is_compass_guided, is_holiday_assignment, holiday_period, lesson_plan_id } = parsed.data
 
-    // Verify class belongs to teacher
-    try {
-      await requireClassTeacher(supabase, class_id)
-    } catch {
-      return apiForbidden()
-    }
-
-    // Sprint 10 Slice A: an adaptive assignment is always a quiz, and always
-    // starts 'draft' — invisible to students (the existing student-list
-    // route already filters to status='active' only) until the teacher
-    // explicitly publishes it via PATCH, after generating and reviewing
-    // variants. A Standard/plain-quiz assignment is completely unaffected:
-    // is_adaptive defaults false, status stays 'active' immediately, byte
-    // for byte the same as before this column existed.
-    const adaptive = is_adaptive === true
-    const quiz = adaptive ? true : is_quiz === true
-
-    const { data: assignment, error } = await db
-      .from('assignments')
-      .insert({
-        class_id,
-        teacher_id: teacher.id,
-        title,
-        subject,
-        topic,
-        substrand_id: substrand_id || null,
-        instructions,
-        due_date,
-        type: type || 'practice',
-        max_score: max_score || 100,
-        is_quiz: quiz,
-        is_adaptive: adaptive,
-        // Quizzes are self-contained MCQ, never Compass-guided.
-        is_compass_guided: quiz ? false : is_compass_guided !== false,
-        is_holiday_assignment: is_holiday_assignment === true,
-        holiday_period: is_holiday_assignment ? (holiday_period || null) : null,
-        lesson_plan_id: lesson_plan_id || null,
-        status: adaptive ? 'draft' : 'active',
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error('[teacher/assignments POST]', error)
-      return apiError('Failed to create assignment')
-    }
-
-    // Pre-create pending submissions for all class students
-    const { data: classStudents } = await db
-      .from('class_students')
-      .select('student_id')
-      .eq('class_id', class_id)
-
-    if (classStudents && classStudents.length > 0) {
-      const submissions = classStudents.map((cs: { student_id: string }) => ({
-        assignment_id: assignment.id,
-        student_id:    cs.student_id,
-        class_id,
-        status:        'pending',
-      }))
-
-      await db.from('assignment_submissions').insert(submissions)
-    }
-
-    void publishEvent({
-      event_type:      'teacher.assignment.created',
-      resource_type:   'assignment',
-      resource_id:     assignment.id,
-      actor_id:        teacher.id,
-      payload: {
-        assignment_id: assignment.id,
-        class_id,
-        title,
-        due_date,
-      },
-      idempotency_key: `teacher.assignment.created:${assignment.id}`,
-    }).catch(err => console.error('[events] teacher.assignment.created:', err instanceof Error ? err.message : String(err)))
+    const { assignment } = await createAssignment(supabase, {
+      classId: class_id,
+      title,
+      subject,
+      topic,
+      substrandId: substrand_id ?? null,
+      instructions,
+      dueDate: due_date,
+      type,
+      maxScore: max_score,
+      isQuiz: is_quiz,
+      isAdaptive: is_adaptive,
+      isCompassGuided: is_compass_guided,
+      isHolidayAssignment: is_holiday_assignment,
+      holidayPeriod: holiday_period,
+      lessonPlanId: lesson_plan_id,
+    })
 
     return apiSuccess({ assignment }, 201)
   } catch (e: unknown) {
+    if (e instanceof UnauthorizedError) return apiUnauthorized()
+    if (e instanceof ForbiddenError) return apiForbidden()
     console.error('[teacher/assignments POST]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')
   }

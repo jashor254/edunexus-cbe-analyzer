@@ -46,12 +46,28 @@ type Fixture = {
 
 let fx: Fixture
 
+// This session's environment has shown sustained, intermittent network
+// flakiness against Supabase Auth's admin endpoints (documented identically
+// in lib/learnerBlueprint/actionPlan/lifecycle.integration.test.ts's header)
+// — bounded setup retries only, never around an authorization assertion.
+async function retryAsync<T>(fn: () => Promise<T>, attempts = 6): Promise<T> {
+  let lastError: unknown
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try { return await fn() } catch (err) { lastError = err }
+    await new Promise(resolve => setTimeout(resolve, 500 * attempt))
+  }
+  throw lastError
+}
+
 async function createSyntheticUser(label: string): Promise<{ authId: string; session: SyntheticSession }> {
   const email = `${SYNTHETIC_MARKER.toLowerCase()}-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.com`
   const password = `Test!${Math.random().toString(36).slice(2, 10)}`
-  const { data, error } = await db.auth.admin.createUser({ email, password, email_confirm: true })
-  if (error) throw error
-  const session = await signInForHttpTest(email, password)
+  const { data } = await retryAsync(async () => {
+    const res = await db.auth.admin.createUser({ email, password, email_confirm: true })
+    if (res.error) throw res.error
+    return res
+  })
+  const session = await retryAsync(() => signInForHttpTest(email, password))
   return { authId: data.user.id, session }
 }
 
