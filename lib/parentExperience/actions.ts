@@ -45,6 +45,15 @@ export type ParentActionType =
   | 'view_report_card'
   | 'explore_career_journey'
   | 'no_action_needed'
+  // Phase 1 of docs/architecture/blueprint-living-action-plan-audit.md —
+  // a teacher-approved Blueprint action item, projected for the parent
+  // audience via lib/learnerBlueprint/actionPlan/projections.ts's
+  // `toParentView`. Only ever produced by the cutover in
+  // composeRecommendedNextSteps.ts, never by composeParentActions() below
+  // — kept as its own type (not shoehorned into one of the six above) so
+  // a canonical action item is never mislabeled as one of the legacy
+  // hardcoded categories.
+  | 'canonical_action_item'
 
 /** Phase 7's frozen four-tier order — categorical only, never a numeric score. */
 export type ParentActionPriority = 'critical' | 'important' | 'suggested' | 'completed'
