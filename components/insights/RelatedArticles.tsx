@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import type { InsightArticleCard } from '@/lib/insights/types'
 import { ArticleCard } from './ArticleCard'
+import { FOCUS_RING } from '@/app/(marketing)/constants'
 
 type Props = { articles: InsightArticleCard[] }
 
@@ -12,7 +13,7 @@ export function RelatedArticles({ articles }: Props) {
     <section>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-extrabold text-white">Related Insights</h2>
-        <Link href="/insights" className="flex items-center gap-1 text-sm text-violet-400 hover:text-violet-300 font-semibold transition-colors">
+        <Link href="/insights" className={`flex items-center gap-1 text-sm text-violet-400 hover:text-violet-300 font-semibold transition-colors rounded ${FOCUS_RING}`}>
           All insights <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>

@@ -1,4 +1,5 @@
 import type { InsightAuthor } from '@/lib/insights/types'
+import { FOCUS_RING } from '@/app/(marketing)/constants'
 
 type Props = { author: InsightAuthor; compact?: boolean }
 
@@ -43,7 +44,7 @@ export function AuthorCard({ author, compact = false }: Props) {
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs font-semibold text-violet-400 hover:text-violet-300 capitalize transition-colors"
+                  className={`text-xs font-semibold text-violet-400 hover:text-violet-300 capitalize transition-colors rounded ${FOCUS_RING}`}
                 >
                   {platform} →
                 </a>

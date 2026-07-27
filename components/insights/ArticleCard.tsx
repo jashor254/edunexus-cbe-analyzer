@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Clock, Eye } from 'lucide-react'
 import type { InsightArticleCard } from '@/lib/insights/types'
 import { CategoryBadge } from './CategoryBadge'
+import { FOCUS_RING } from '@/app/(marketing)/constants'
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return ''
@@ -20,7 +21,7 @@ export function ArticleCard({ article, variant = 'default' }: Props) {
 
   if (variant === 'compact') {
     return (
-      <Link href={href} className="group flex items-start gap-4 py-4 border-b border-white/8 last:border-0 hover:bg-white/2 -mx-4 px-4 rounded-xl transition-colors">
+      <Link href={href} className={`group flex items-start gap-4 py-4 border-b border-white/8 last:border-0 hover:bg-white/2 -mx-4 px-4 rounded-xl transition-colors ${FOCUS_RING}`}>
         <div className="flex-1 min-w-0">
           <CategoryBadge name={article.category.name} color={article.category.color} />
           <h3 className="text-sm font-bold text-white/90 group-hover:text-white mt-1.5 leading-snug line-clamp-2 transition-colors">
@@ -39,7 +40,7 @@ export function ArticleCard({ article, variant = 'default' }: Props) {
   }
 
   return (
-    <Link href={href} className="group flex flex-col bg-white/3 border border-white/8 rounded-2xl overflow-hidden hover:bg-white/5 hover:border-white/15 transition-all">
+    <Link href={href} className={`group flex flex-col bg-white/3 border border-white/8 rounded-2xl overflow-hidden hover:bg-white/5 hover:border-white/15 transition-all ${FOCUS_RING}`}>
       {/* Cover placeholder */}
       <div className="aspect-[16/9] bg-gradient-to-br from-white/5 to-white/2 border-b border-white/8 relative overflow-hidden flex items-center justify-center">
         <div className="text-4xl opacity-20 select-none">

@@ -15,6 +15,7 @@ import {
   Clock,
   Shield,
 } from 'lucide-react'
+import { FOCUS_RING } from '../constants'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -125,7 +126,7 @@ export default function EarlyAccessPage() {
   const [hovered, setHovered] = useState<PlanId | null>(null)
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white overflow-hidden pb-20">
+    <div data-page="early-access" className="min-h-screen bg-slate-950 text-white overflow-hidden pb-20">
 
       {/* Ambient background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
@@ -147,7 +148,7 @@ export default function EarlyAccessPage() {
       {/* Nav */}
       <nav className="border-b border-white/5 bg-slate-950/70 backdrop-blur-xl sticky top-10 z-40">
         <div className="max-w-5xl mx-auto px-6 py-4 flex justify-between items-center">
-          <Link href="/" className="flex items-center gap-2.5 group">
+          <Link href="/" className={`flex items-center gap-2.5 group rounded ${FOCUS_RING}`}>
             <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition">
               <Sparkles className="w-4 h-4 text-white" />
             </div>
@@ -155,7 +156,7 @@ export default function EarlyAccessPage() {
           </Link>
           <Link
             href="/"
-            className="text-sm text-white/50 hover:text-white flex items-center gap-1.5 transition font-bold"
+            className={`text-sm text-white/50 hover:text-white flex items-center gap-1.5 transition font-bold rounded ${FOCUS_RING}`}
           >
             <ArrowLeft className="w-4 h-4" /> Back
           </Link>
@@ -255,7 +256,7 @@ export default function EarlyAccessPage() {
                   <div className="mb-5">
                     {'originalPrice' in plan && plan.originalPrice && (
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm text-white/30 line-through">
+                        <span className="text-sm text-white/50 line-through">
                           KES {plan.originalPrice.toLocaleString()}
                         </span>
                         <span className="text-xs bg-green-500/20 text-green-400 border border-green-500/20 px-2 py-0.5 rounded-full font-black">
@@ -290,7 +291,7 @@ export default function EarlyAccessPage() {
                     href={waLink(plan.id)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`w-full py-3.5 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg hover:scale-105 bg-gradient-to-r ${plan.color} text-white`}
+                    className={`w-full py-3.5 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg hover:scale-105 bg-gradient-to-r ${plan.color} text-white ${FOCUS_RING}`}
                   >
                     <MessageCircle className="w-4 h-4" />
                     Join via WhatsApp
@@ -317,7 +318,7 @@ export default function EarlyAccessPage() {
                 <div className={`w-12 h-12 bg-gradient-to-br ${color} rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg`}>
                   <Icon className="w-5 h-5 text-white" />
                 </div>
-                <div className="text-xs font-black text-white/30 uppercase tracking-wider mb-1">Step {step}</div>
+                <div className="text-xs font-black text-white/50 uppercase tracking-wider mb-1">Step {step}</div>
                 <p className="text-sm text-white/70 font-medium leading-snug">{text}</p>
               </div>
             ))}
@@ -355,7 +356,7 @@ export default function EarlyAccessPage() {
               Founding pricing locked for life.
             </p>
           </div>
-          <p className="text-white/30 text-xs">
+          <p className="text-white/50 text-xs">
             Full M-PESA + card payments launching soon.
           </p>
           <p className="text-white/20 text-xs">

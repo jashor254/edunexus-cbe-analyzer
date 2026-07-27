@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { FOCUS_RING } from '../constants'
 
 export const metadata = {
   title: 'About | EduNexus',
@@ -27,10 +28,10 @@ export default function AboutPage() {
       <div className="mt-10 bg-white/5 border border-white/10 rounded-2xl p-6">
         <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-3">Contact EduNexus Kenya</p>
         <div className="flex flex-wrap gap-x-8 gap-y-2 text-white/70 text-base">
-          <a href="tel:+254710798030" className="hover:text-white transition-colors">
+          <a href="tel:+254710798030" className={`hover:text-white transition-colors rounded ${FOCUS_RING}`}>
             Phone: +254 710 798 030
           </a>
-          <a href="mailto:support@edunexus.co.ke" className="hover:text-white transition-colors">
+          <a href="mailto:support@edunexus.co.ke" className={`hover:text-white transition-colors rounded ${FOCUS_RING}`}>
             support@edunexus.co.ke
           </a>
           <span>Nairobi, Kenya</span>
@@ -38,9 +39,9 @@ export default function AboutPage() {
       </div>
 
       <div className="mt-8 pt-8 border-t border-white/10 flex flex-wrap gap-4 text-sm text-white/40">
-        <Link href="/legal/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
+        <Link href="/legal/privacy" className={`hover:text-white transition-colors rounded ${FOCUS_RING}`}>Privacy Policy</Link>
         <span>•</span>
-        <Link href="/legal/terms" className="hover:text-white transition-colors">Terms of Service</Link>
+        <Link href="/legal/terms" className={`hover:text-white transition-colors rounded ${FOCUS_RING}`}>Terms of Service</Link>
       </div>
     </div>
   )

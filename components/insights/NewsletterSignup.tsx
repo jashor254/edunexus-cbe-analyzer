@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from 'react'
 import { ArrowRight, CheckCircle2 } from 'lucide-react'
+import { FOCUS_RING } from '@/app/(marketing)/constants'
 
 export function NewsletterSignup() {
   const [email,   setEmail]   = useState('')
@@ -59,7 +60,7 @@ export function NewsletterSignup() {
       <button
         type="submit"
         disabled={status === 'loading' || !email.trim()}
-        className="flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white px-5 py-3 rounded-xl text-sm font-bold transition-colors whitespace-nowrap"
+        className={`flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white px-5 py-3 rounded-xl text-sm font-bold transition-colors whitespace-nowrap ${FOCUS_RING}`}
       >
         Subscribe
         <ArrowRight className="w-4 h-4" />

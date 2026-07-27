@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { ShieldCheck, FileText, RefreshCcw, ArrowRight } from 'lucide-react'
+import { FOCUS_RING_ON_LIGHT } from '../constants'
 
 export default function LegalHubPage() {
   const legalLinks = [
@@ -43,7 +44,7 @@ export default function LegalHubPage() {
             <Link 
               key={link.href} 
               href={link.href}
-              className="group bg-white border-2 border-slate-200 p-8 rounded-2xl hover:border-blue-500 hover:shadow-xl transition-all duration-300 flex flex-col md:flex-row items-center gap-6"
+              className={`group bg-white border-2 border-slate-200 p-8 rounded-2xl hover:border-blue-500 hover:shadow-xl transition-all duration-300 flex flex-col md:flex-row items-center gap-6 ${FOCUS_RING_ON_LIGHT}`}
             >
               <div className={`${link.color} p-4 rounded-xl group-hover:scale-110 transition-transform`}>
                 {link.icon}

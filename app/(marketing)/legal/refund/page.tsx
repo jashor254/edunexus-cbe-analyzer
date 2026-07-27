@@ -1,6 +1,7 @@
 // app/(marketing)/legal/refund/page.tsx
 import Link from 'next/link'
 import { ArrowLeft, CheckCircle, XCircle } from 'lucide-react'
+import { FOCUS_RING } from '../../constants'
 
 export default function RefundPage() {
   return (
@@ -8,9 +9,9 @@ export default function RefundPage() {
       {/* Header */}
       <div className="bg-slate-900 text-white py-8">
         <div className="max-w-4xl mx-auto px-6">
-          <Link 
-            href="/" 
-            className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 mb-4 font-semibold"
+          <Link
+            href="/"
+            className={`inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 mb-4 font-semibold ${FOCUS_RING}`}
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Home

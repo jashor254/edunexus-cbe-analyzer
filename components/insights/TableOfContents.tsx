@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { FOCUS_RING } from '@/app/(marketing)/constants'
 
 type Heading = { id: string; text: string; level: number }
 
@@ -51,7 +52,7 @@ export function TableOfContents({ content }: { content: string }) {
           <li key={h.id}>
             <a
               href={`#${h.id}`}
-              className={`block text-xs leading-relaxed transition-colors py-0.5 ${
+              className={`block text-xs leading-relaxed transition-colors py-0.5 ${FOCUS_RING} ${
                 h.level === 3 ? 'pl-3' : ''
               } ${
                 active === h.id

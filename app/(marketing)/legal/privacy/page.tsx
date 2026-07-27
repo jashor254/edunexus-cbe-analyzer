@@ -4,6 +4,7 @@ import {
   Lock, Scale, Cookie, Bell, Mail, Clock, FileText,
   Globe, AlertTriangle, CheckCircle, Gavel,
 } from 'lucide-react'
+import { FOCUS_RING, FOCUS_RING_ON_LIGHT } from '../../constants'
 
 export const metadata = {
   title: 'Privacy Policy | EduNexus',
@@ -58,9 +59,9 @@ export default function PrivacyPage() {
       <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white py-12">
         <div className="max-w-5xl mx-auto px-6">
           <nav className="flex items-center gap-2 text-xs text-slate-400 mb-5">
-            <Link href="/" className="hover:text-white transition">Home</Link>
+            <Link href="/" className={`hover:text-white transition rounded ${FOCUS_RING}`}>Home</Link>
             <span>/</span>
-            <Link href="/legal" className="hover:text-white transition">Legal</Link>
+            <Link href="/legal" className={`hover:text-white transition rounded ${FOCUS_RING}`}>Legal</Link>
             <span>/</span>
             <span className="text-white">Privacy Policy</span>
           </nav>
@@ -98,7 +99,7 @@ export default function PrivacyPage() {
                   <a
                     key={s.id}
                     href={`#${s.id}`}
-                    className="block text-sm text-slate-500 hover:text-teal-600 hover:translate-x-1 transition-all py-0.5"
+                    className={`block text-sm text-slate-500 hover:text-teal-600 hover:translate-x-1 transition-all py-0.5 rounded ${FOCUS_RING_ON_LIGHT}`}
                   >
                     {s.label}
                   </a>
@@ -115,7 +116,7 @@ export default function PrivacyPage() {
               <p className="text-teal-800 text-base leading-relaxed">
                 We wrote this in plain language so every Kenyan parent, teacher, and student understands exactly what
                 data we collect and why. If anything is unclear, email us at{' '}
-                <a href="mailto:support@edunexus.co.ke" className="font-bold underline">
+                <a href="mailto:support@edunexus.co.ke" className={`font-bold underline rounded ${FOCUS_RING_ON_LIGHT}`}>
                   support@edunexus.co.ke
                 </a>{' '}
                 — we will respond within 7 business days.
@@ -474,7 +475,7 @@ export default function PrivacyPage() {
                     are bound by that agreement. If you are a parent whose child's school uses EduNexus Core, please
                     contact your school administration regarding how your child's data is managed at school level. You
                     may also contact us at{' '}
-                    <a href="mailto:support@edunexus.co.ke" className="font-bold underline">support@edunexus.co.ke</a>{' '}
+                    <a href="mailto:support@edunexus.co.ke" className={`font-bold underline rounded ${FOCUS_RING_ON_LIGHT}`}>support@edunexus.co.ke</a>{' '}
                     and we will direct your request to the appropriate school.
                   </p>
                 </div>
@@ -757,7 +758,7 @@ export default function PrivacyPage() {
                 <p className="font-black text-teal-900 mb-2">How to exercise your rights</p>
                 <p className="text-sm text-teal-800 leading-relaxed">
                   Email{' '}
-                  <a href="mailto:support@edunexus.co.ke" className="font-bold underline">
+                  <a href="mailto:support@edunexus.co.ke" className={`font-bold underline rounded ${FOCUS_RING_ON_LIGHT}`}>
                     support@edunexus.co.ke
                   </a>{' '}
                   with the subject line <strong>"Data Rights Request"</strong> and your name. We will acknowledge within
@@ -891,13 +892,13 @@ export default function PrivacyPage() {
                   <div className="grid sm:grid-cols-2 gap-3 text-sm text-slate-300">
                     <div>
                       <p className="text-slate-500 text-xs mb-1">Email</p>
-                      <a href="mailto:support@edunexus.co.ke" className="text-teal-400 font-semibold hover:text-teal-300">
+                      <a href="mailto:support@edunexus.co.ke" className={`text-teal-400 font-semibold hover:text-teal-300 rounded ${FOCUS_RING}`}>
                         support@edunexus.co.ke
                       </a>
                     </div>
                     <div>
                       <p className="text-slate-500 text-xs mb-1">WhatsApp</p>
-                      <a href="https://wa.me/254710798030" className="text-green-400 font-semibold hover:text-green-300">
+                      <a href="https://wa.me/254710798030" className={`text-green-400 font-semibold hover:text-green-300 rounded ${FOCUS_RING}`}>
                         +254 710 798 030
                       </a>
                     </div>
@@ -926,7 +927,7 @@ export default function PrivacyPage() {
                   <div className="bg-white/70 rounded-xl p-4 text-sm text-red-700 space-y-1">
                     <p><strong>Office:</strong> Office of the Data Protection Commissioner</p>
                     <p><strong>Website:</strong>{' '}
-                      <a href="https://www.odpc.go.ke" target="_blank" rel="noopener noreferrer" className="underline font-semibold">
+                      <a href="https://www.odpc.go.ke" target="_blank" rel="noopener noreferrer" className={`underline font-semibold rounded ${FOCUS_RING_ON_LIGHT}`}>
                         www.odpc.go.ke
                       </a>
                     </p>
@@ -946,13 +947,13 @@ export default function PrivacyPage() {
             <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
               <Link
                 href="/"
-                className="inline-flex items-center gap-2 text-sm text-teal-600 font-bold hover:text-teal-700"
+                className={`inline-flex items-center gap-2 text-sm text-teal-600 font-bold hover:text-teal-700 ${FOCUS_RING_ON_LIGHT}`}
               >
                 <ArrowLeft className="w-4 h-4" /> Back to Home
               </Link>
               <div className="flex gap-4 text-xs text-slate-400">
-                <Link href="/legal/terms"  className="hover:text-slate-700">Terms of Use</Link>
-                <Link href="/legal/refund" className="hover:text-slate-700">Refund Policy</Link>
+                <Link href="/legal/terms"  className={`hover:text-slate-700 rounded ${FOCUS_RING_ON_LIGHT}`}>Terms of Use</Link>
+                <Link href="/legal/refund" className={`hover:text-slate-700 rounded ${FOCUS_RING_ON_LIGHT}`}>Refund Policy</Link>
               </div>
             </div>
 

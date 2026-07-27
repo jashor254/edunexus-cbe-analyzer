@@ -1,6 +1,7 @@
 // app/(marketing)/legal/terms/page.tsx
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import { FOCUS_RING, FOCUS_RING_ON_LIGHT } from '../../constants'
 
 export default function TermsPage() {
   return (
@@ -8,9 +9,9 @@ export default function TermsPage() {
       {/* Header */}
       <div className="bg-slate-900 text-white py-8">
         <div className="max-w-4xl mx-auto px-6">
-          <Link 
-            href="/" 
-            className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 mb-4 font-semibold"
+          <Link
+            href="/"
+            className={`inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 mb-4 font-semibold ${FOCUS_RING}`}
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Home
@@ -103,7 +104,7 @@ export default function TermsPage() {
             For refund requests, email: <strong>kariukidennis092@gmail.com</strong>
           </p>
           <p>
-            <Link href="/legal/refund" className="text-blue-600 hover:underline font-semibold">
+            <Link href="/legal/refund" className={`text-blue-600 hover:underline font-semibold ${FOCUS_RING_ON_LIGHT}`}>
               View full Refund Policy →
             </Link>
           </p>
@@ -184,7 +185,7 @@ export default function TermsPage() {
           <h2>Data Privacy</h2>
           <p>
             Your privacy is important. Please review our{' '}
-            <Link href="/legal/privacy" className="text-blue-600 hover:underline font-semibold">
+            <Link href="/legal/privacy" className={`text-blue-600 hover:underline font-semibold ${FOCUS_RING_ON_LIGHT}`}>
               Privacy Policy →
             </Link>
             {' '}which explains how we collect, use, and protect your data.

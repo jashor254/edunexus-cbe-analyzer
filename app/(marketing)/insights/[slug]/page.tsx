@@ -2,6 +2,7 @@ import { notFound }          from 'next/navigation'
 import type { Metadata }     from 'next'
 import Link                  from 'next/link'
 import { ArrowLeft, Clock, Calendar, Eye, Tag } from 'lucide-react'
+import { FOCUS_RING } from '../../constants'
 import { getArticleBySlug, getRelatedArticles } from '@/lib/insights/articles'
 import { ArticleBody }        from '@/components/insights/ArticleBody'
 import { TableOfContents }    from '@/components/insights/TableOfContents'
@@ -109,7 +110,7 @@ export default async function ArticlePage({ params }: PageProps) {
           {/* Back link */}
           <Link
             href="/insights"
-            className="inline-flex items-center gap-2 text-sm text-white/35 hover:text-white/70 font-medium transition-colors mb-8"
+            className={`inline-flex items-center gap-2 text-sm text-white/35 hover:text-white/70 font-medium transition-colors mb-8 ${FOCUS_RING}`}
           >
             <ArrowLeft className="w-4 h-4" />
             EduNexus Insights
@@ -165,7 +166,7 @@ export default async function ArticlePage({ params }: PageProps) {
             </span>
 
             {article.view_count > 0 && (
-              <span className="flex items-center gap-1.5 text-xs text-white/25">
+              <span className="flex items-center gap-1.5 text-xs text-white/50">
                 <Eye className="w-3.5 h-3.5" />
                 {article.view_count.toLocaleString()} views
               </span>
@@ -179,7 +180,7 @@ export default async function ArticlePage({ params }: PageProps) {
               {article.tags.map((tag) => (
                 <span
                   key={tag.id}
-                  className="text-[11px] font-semibold text-white/30 bg-white/5 border border-white/8 px-2.5 py-0.5 rounded-full"
+                  className="text-[11px] font-semibold text-white/50 bg-white/5 border border-white/8 px-2.5 py-0.5 rounded-full"
                 >
                   {tag.name}
                 </span>
@@ -205,7 +206,7 @@ export default async function ArticlePage({ params }: PageProps) {
 
               <Link
                 href="/insights"
-                className="text-sm text-violet-400 hover:text-violet-300 font-semibold transition-colors"
+                className={`text-sm text-violet-400 hover:text-violet-300 font-semibold transition-colors rounded ${FOCUS_RING}`}
               >
                 ← All insights
               </Link>
@@ -243,13 +244,13 @@ export default async function ArticlePage({ params }: PageProps) {
               <div className="flex flex-wrap gap-3">
                 <Link
                   href="/signup"
-                  className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors"
+                  className={`inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors ${FOCUS_RING}`}
                 >
                   Get started free
                 </Link>
                 <Link
                   href="/#school"
-                  className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
+                  className={`inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors ${FOCUS_RING}`}
                 >
                   Learn more →
                 </Link>
@@ -267,7 +268,7 @@ export default async function ArticlePage({ params }: PageProps) {
 
               {/* Quick links */}
               <div>
-                <p className="text-[10px] font-bold text-white/25 uppercase tracking-widest mb-4">
+                <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-4">
                   Quick links
                 </p>
                 <div className="space-y-2">
@@ -279,7 +280,7 @@ export default async function ArticlePage({ params }: PageProps) {
                     <Link
                       key={link.href}
                       href={link.href}
-                      className="block text-xs text-white/35 hover:text-white/70 transition-colors py-0.5"
+                      className={`block text-xs text-white/35 hover:text-white/70 transition-colors py-0.5 ${FOCUS_RING}`}
                     >
                       {link.label} →
                     </Link>

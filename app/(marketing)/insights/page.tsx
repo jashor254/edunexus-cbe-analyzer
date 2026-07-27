@@ -9,6 +9,7 @@ import { TopicsGrid }          from '@/components/insights/TopicsGrid'
 import { NewsletterSignup }    from '@/components/insights/NewsletterSignup'
 import { InsightsSearchBar }   from '@/components/insights/InsightsSearchBar'
 import { CategoryFilterBar }   from '@/components/insights/CategoryFilterBar'
+import { FOCUS_RING } from '../constants'
 
 export const metadata: Metadata = {
   title:       'EduNexus Insights — Ideas shaping the future of education',
@@ -82,7 +83,7 @@ export default async function InsightsPage({ searchParams }: PageProps) {
               { icon: <Users className="w-4 h-4" />,    label: 'Research & Founder Notes' },
               { icon: <Zap className="w-4 h-4" />,      label: 'Weekly insights' },
             ].map((stat) => (
-              <div key={stat.label} className="flex items-center gap-2 text-xs text-white/30">
+              <div key={stat.label} className="flex items-center gap-2 text-xs text-white/50">
                 <span className="text-white/20">{stat.icon}</span>
                 {stat.label}
               </div>
@@ -122,7 +123,7 @@ export default async function InsightsPage({ searchParams }: PageProps) {
                    : 'Latest Insights'}
               </h2>
               {latest.total > 0 && (
-                <p className="text-xs text-white/30 mt-1">{latest.total} article{latest.total !== 1 ? 's' : ''}</p>
+                <p className="text-xs text-white/50 mt-1">{latest.total} article{latest.total !== 1 ? 's' : ''}</p>
               )}
             </div>
           </div>
@@ -135,7 +136,7 @@ export default async function InsightsPage({ searchParams }: PageProps) {
             </div>
           ) : (
             <div className="text-center py-20">
-              <p className="text-white/30 text-lg">No articles yet in this category.</p>
+              <p className="text-white/50 text-lg">No articles yet in this category.</p>
               <p className="text-white/20 text-sm mt-2">Check back soon — we publish regularly.</p>
             </div>
           )}
@@ -146,18 +147,18 @@ export default async function InsightsPage({ searchParams }: PageProps) {
               {page > 1 && (
                 <a
                   href={`/insights?page=${page - 1}${categorySlug ? `&category=${categorySlug}` : ''}`}
-                  className="px-5 py-2.5 text-sm font-semibold bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-all"
+                  className={`px-5 py-2.5 text-sm font-semibold bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-all ${FOCUS_RING}`}
                 >
                   ← Previous
                 </a>
               )}
-              <span className="text-sm text-white/30">
+              <span className="text-sm text-white/50">
                 Page {page} of {Math.ceil(latest.total / latest.perPage)}
               </span>
               {page < Math.ceil(latest.total / latest.perPage) && (
                 <a
                   href={`/insights?page=${page + 1}${categorySlug ? `&category=${categorySlug}` : ''}`}
-                  className="px-5 py-2.5 text-sm font-semibold bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-all"
+                  className={`px-5 py-2.5 text-sm font-semibold bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-all ${FOCUS_RING}`}
                 >
                   Next →
                 </a>
@@ -198,7 +199,7 @@ export default async function InsightsPage({ searchParams }: PageProps) {
         <section className="py-10 border-t border-white/8 mb-12">
           <div className="grid md:grid-cols-2 gap-10">
             <div>
-              <p className="text-[10px] font-bold text-white/25 uppercase tracking-widest mb-4">About EduNexus Insights</p>
+              <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-4">About EduNexus Insights</p>
               <p className="text-sm text-white/50 leading-relaxed mb-3">
                 EduNexus Insights is the public knowledge hub of EduNexus — Kenya&apos;s Learning Intelligence Platform.
                 We publish original thinking on the systems, architectures, and ideas shaping the future of education.
@@ -209,7 +210,7 @@ export default async function InsightsPage({ searchParams }: PageProps) {
               </p>
             </div>
             <div className="flex flex-col justify-center">
-              <p className="text-[10px] font-bold text-white/25 uppercase tracking-widest mb-4">Explore EduNexus</p>
+              <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-4">Explore EduNexus</p>
               <div className="space-y-3">
                 {[
                   { label: 'Learner Blueprint',                  href: '/#evidence',     desc: 'See how EduNexus notices a learning problem early' },
@@ -220,11 +221,11 @@ export default async function InsightsPage({ searchParams }: PageProps) {
                   <a
                     key={link.href}
                     href={link.href}
-                    className="group flex items-start justify-between gap-3 py-2 border-b border-white/5 last:border-0 hover:border-white/15 transition-colors"
+                    className={`group flex items-start justify-between gap-3 py-2 border-b border-white/5 last:border-0 hover:border-white/15 transition-colors ${FOCUS_RING}`}
                   >
                     <div>
                       <p className="text-sm font-semibold text-white/70 group-hover:text-white transition-colors">{link.label}</p>
-                      <p className="text-xs text-white/30">{link.desc}</p>
+                      <p className="text-xs text-white/50">{link.desc}</p>
                     </div>
                     <ArrowRight className="w-4 h-4 text-white/20 group-hover:text-white/50 mt-0.5 shrink-0 transition-colors" />
                   </a>

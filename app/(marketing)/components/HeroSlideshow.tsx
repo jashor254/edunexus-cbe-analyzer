@@ -9,6 +9,7 @@ import {
   CareerExplorerMockup,
   SchemeOfWorkMockup,
 } from './ProductMockups'
+import { FOCUS_RING } from '../constants'
 
 const SLIDES = [
   {
@@ -152,7 +153,7 @@ export default function HeroSlideshow() {
                 onClick={() => goTo(s.id)}
                 className={`
                   relative flex flex-col items-start text-left px-4 py-3 min-h-15
-                  rounded-2xl border transition-all duration-300
+                  rounded-2xl border transition-all duration-300 ${FOCUS_RING}
                   ${isActive
                     ? `${s.activeBg} ${s.activeBorder}`
                     : 'bg-transparent border-transparent hover:bg-white/5 hover:border-white/10'
@@ -166,7 +167,7 @@ export default function HeroSlideshow() {
                 <span className={`text-sm font-black leading-tight transition-colors ${isActive ? s.activeText : 'text-white/55'}`}>
                   {s.label}
                 </span>
-                <span className={`text-xs mt-0.5 transition-colors ${isActive ? 'text-white/55' : 'text-white/25'}`}>
+                <span className={`text-xs mt-0.5 transition-colors ${isActive ? 'text-white/55' : 'text-white/50'}`}>
                   {s.sublabel}
                 </span>
               </button>
@@ -181,7 +182,7 @@ export default function HeroSlideshow() {
                 onClick={() => goTo(s.id)}
                 aria-label={`Go to ${s.label}`}
                 className={`
-                  rounded-full transition-all duration-300
+                  rounded-full transition-all duration-300 ${FOCUS_RING}
                   ${s.id === active
                     ? `w-4 h-2 ${s.activeDot}`
                     : 'w-2 h-2 bg-white/20 hover:bg-white/40'
@@ -219,7 +220,7 @@ export default function HeroSlideshow() {
                 onClick={() => goTo(s.id)}
                 className={`
                   flex-shrink-0 px-3 py-2 rounded-2xl border
-                  transition-all duration-300
+                  transition-all duration-300 ${FOCUS_RING}
                   ${isActive
                     ? `${s.activeBg} ${s.activeBorder}`
                     : 'bg-transparent border-white/10 hover:bg-white/5'
@@ -255,7 +256,7 @@ export default function HeroSlideshow() {
               onClick={() => goTo(s.id)}
               aria-label={`Go to ${s.label}`}
               className={`
-                rounded-full transition-all duration-300
+                rounded-full transition-all duration-300 ${FOCUS_RING}
                 ${s.id === active
                   ? `w-5 h-2 ${s.activeDot}`
                   : 'w-2 h-2 bg-white/20 hover:bg-white/40'

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Link2, Twitter, Check } from 'lucide-react'
+import { FOCUS_RING } from '@/app/(marketing)/constants'
 
 type Props = { title: string; url: string }
 
@@ -24,7 +25,7 @@ export function ShareButtons({ title, url }: Props) {
         href={twitterUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-1.5 text-xs font-semibold text-white/40 hover:text-white/70 bg-white/5 hover:bg-white/10 border border-white/8 px-3 py-1.5 rounded-lg transition-all"
+        className={`flex items-center gap-1.5 text-xs font-semibold text-white/40 hover:text-white/70 bg-white/5 hover:bg-white/10 border border-white/8 px-3 py-1.5 rounded-lg transition-all ${FOCUS_RING}`}
         aria-label="Share on X / Twitter"
       >
         <Twitter className="w-3.5 h-3.5" />
@@ -33,7 +34,7 @@ export function ShareButtons({ title, url }: Props) {
 
       <button
         onClick={() => void copyLink()}
-        className="flex items-center gap-1.5 text-xs font-semibold text-white/40 hover:text-white/70 bg-white/5 hover:bg-white/10 border border-white/8 px-3 py-1.5 rounded-lg transition-all"
+        className={`flex items-center gap-1.5 text-xs font-semibold text-white/40 hover:text-white/70 bg-white/5 hover:bg-white/10 border border-white/8 px-3 py-1.5 rounded-lg transition-all ${FOCUS_RING}`}
         aria-label="Copy link"
       >
         {copied

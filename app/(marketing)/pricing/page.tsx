@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import type { User } from '@supabase/supabase-js'
+import { FOCUS_RING } from '../constants'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -310,11 +311,11 @@ function FAQAccordion() {
         <div key={i}>
           <button
             onClick={() => setOpen(open === i ? null : i)}
-            className="w-full flex items-center justify-between px-6 py-5 text-left hover:bg-white/5 transition-colors"
+            className={`w-full flex items-center justify-between px-6 py-5 text-left hover:bg-white/5 transition-colors ${FOCUS_RING}`}
           >
             <span className="font-bold text-white text-sm pr-6 leading-snug">{item.q}</span>
             <ChevronDown
-              className={`w-4 h-4 text-white/30 shrink-0 transition-transform duration-200 ${
+              className={`w-4 h-4 text-white/50 shrink-0 transition-transform duration-200 ${
                 open === i ? 'rotate-180' : ''
               }`}
             />
@@ -413,11 +414,11 @@ function SchoolSection() {
                 ))}
               </ul>
 
-              <p className="text-xs text-white/25 italic mb-5">{plan.note}</p>
+              <p className="text-xs text-white/50 italic mb-5">{plan.note}</p>
 
               <Link
                 href="/early-access"
-                className={`block text-center py-4 rounded-2xl font-black text-sm transition-all ${
+                className={`block text-center py-4 rounded-2xl font-black text-sm transition-all ${FOCUS_RING} ${
                   plan.highlight
                     ? 'bg-blue-500 hover:bg-blue-400 text-white shadow-lg shadow-blue-500/20'
                     : 'bg-white/8 hover:bg-white/14 text-white'
@@ -499,7 +500,7 @@ function SchoolSection() {
         </p>
         <Link
           href="/early-access"
-          className="inline-flex items-center gap-2 mt-5 bg-blue-500 hover:bg-blue-400 text-white px-7 py-3 rounded-xl font-black text-sm transition-all shadow-lg shadow-blue-500/20"
+          className={`inline-flex items-center gap-2 mt-5 bg-blue-500 hover:bg-blue-400 text-white px-7 py-3 rounded-xl font-black text-sm transition-all shadow-lg shadow-blue-500/20 ${FOCUS_RING}`}
         >
           Book a 20-minute School Demo <ArrowRight className="w-4 h-4" />
         </Link>
@@ -535,11 +536,11 @@ function TeacherSection({
         </p>
         <Link
           href="/signup?role=teacher"
-          className="inline-flex items-center gap-2 mt-6 bg-amber-500 hover:bg-amber-400 text-white px-8 py-3.5 rounded-xl font-black text-sm transition-all shadow-lg shadow-amber-500/20"
+          className={`inline-flex items-center gap-2 mt-6 bg-amber-500 hover:bg-amber-400 text-white px-8 py-3.5 rounded-xl font-black text-sm transition-all shadow-lg shadow-amber-500/20 ${FOCUS_RING}`}
         >
           Generate My First SOW — Free <ArrowRight className="w-4 h-4" />
         </Link>
-        <p className="text-xs text-white/30 mt-3">After that, choose how you continue below.</p>
+        <p className="text-xs text-white/50 mt-3">After that, choose how you continue below.</p>
       </div>
 
       {/* Wallet model */}
@@ -559,7 +560,7 @@ function TeacherSection({
             <div className="shrink-0 text-center bg-white/5 border border-white/10 rounded-xl px-5 py-4">
               <p className="text-3xl font-black text-amber-400 leading-none">KES 100</p>
               <p className="text-xs text-white/40 mt-1.5 font-semibold">per planning bundle</p>
-              <p className="text-[10px] text-white/25 mt-0.5">SOW + Lesson Plans + ROW</p>
+              <p className="text-[10px] text-white/50 mt-0.5">SOW + Lesson Plans + ROW</p>
             </div>
           </div>
         </div>
@@ -567,7 +568,7 @@ function TeacherSection({
         {/* What gets deducted */}
         <h3 className="text-sm font-black text-white uppercase tracking-widest mb-4">Wallet deductions</h3>
         <div className="bg-white/3 border border-white/8 rounded-2xl overflow-hidden mb-4">
-          <div className="grid grid-cols-3 px-5 py-3 border-b border-white/8 text-[10px] font-black uppercase tracking-widest text-white/30">
+          <div className="grid grid-cols-3 px-5 py-3 border-b border-white/8 text-[10px] font-black uppercase tracking-widest text-white/50">
             <span className="col-span-2">Action</span>
             <span className="text-right">Deducted</span>
           </div>
@@ -594,17 +595,17 @@ function TeacherSection({
             <button
               key={opt.amount}
               onClick={() => onSelect({ ...TEACHER_WALLET_PRODUCT, id: opt.id, price: opt.amount, billing: 'wallet top-up' })}
-              className={`bg-white/4 border rounded-xl p-4 text-center transition-all cursor-pointer hover:border-amber-500/40 ${
+              className={`bg-white/4 border rounded-xl p-4 text-center transition-all cursor-pointer hover:border-amber-500/40 ${FOCUS_RING} ${
                 selected.id === opt.id ? 'border-amber-500/60 bg-amber-500/8' : 'border-white/10'
               }`}
             >
               <p className="text-xl font-black text-white leading-none">KES {opt.amount.toLocaleString()}</p>
               <p className={`text-xs font-bold mt-1.5 ${selected.id === opt.id ? 'text-amber-400' : 'text-amber-400/60'}`}>{opt.label}</p>
-              <p className="text-[10px] text-white/25 mt-0.5 leading-tight">{opt.sub}</p>
+              <p className="text-[10px] text-white/50 mt-0.5 leading-tight">{opt.sub}</p>
             </button>
           ))}
         </div>
-        <p className="text-xs text-white/25 text-center">Wallet credit never expires · Top up any time · Pay just what you need</p>
+        <p className="text-xs text-white/50 text-center">Wallet credit never expires · Top up any time · Pay just what you need</p>
       </div>
 
       {/* Plan cards */}
@@ -659,11 +660,11 @@ function TeacherSection({
                 })}
               </ul>
 
-              <p className="text-xs text-white/25 italic mb-5">{plan.note}</p>
+              <p className="text-xs text-white/50 italic mb-5">{plan.note}</p>
 
               <button
                 onClick={(e) => { e.stopPropagation(); onSelect(plan) }}
-                className={`w-full py-4 rounded-2xl font-black text-sm transition-all ${
+                className={`w-full py-4 rounded-2xl font-black text-sm transition-all ${FOCUS_RING} ${
                   selected.id === plan.id
                     ? plan.highlight
                       ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20 hover:bg-amber-400'
@@ -686,7 +687,7 @@ function TeacherSection({
         </p>
         <Link
           href="/early-access"
-          className="inline-flex items-center gap-2 mt-4 text-amber-400 hover:text-amber-300 font-bold text-sm transition-colors"
+          className={`inline-flex items-center gap-2 mt-4 text-amber-400 hover:text-amber-300 font-bold text-sm transition-colors rounded ${FOCUS_RING}`}
         >
           Tell your school about EduNexus →
         </Link>
@@ -725,12 +726,12 @@ function FamilySection({
       {/* Value comparison */}
       <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-14 max-w-120 mx-auto">
         <div className="w-full sm:flex-1 bg-white/4 border border-white/10 rounded-2xl px-6 py-6 text-center">
-          <p className="text-[11px] font-black text-white/25 uppercase tracking-widest mb-3">5 remedial teachers</p>
+          <p className="text-[11px] font-black text-white/50 uppercase tracking-widest mb-3">5 remedial teachers</p>
           <p className="text-3xl font-black text-white/40">KES 15,000<span className="text-base font-bold text-white/20">+</span></p>
           <p className="text-xs text-white/20 mt-2 leading-relaxed">per month · one subject each<br/>different teaching styles · no shared picture</p>
         </div>
         <div className="w-8 h-8 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center shrink-0">
-          <span className="text-[10px] font-black text-white/30">vs</span>
+          <span className="text-[10px] font-black text-white/50">vs</span>
         </div>
         <div className="w-full sm:flex-1 bg-teal-500/8 border-2 border-teal-500/35 rounded-2xl px-6 py-6 text-center">
           <p className="text-[11px] font-black text-teal-400 uppercase tracking-widest mb-3">EduNexus term plan</p>
@@ -804,11 +805,11 @@ function FamilySection({
                 })}
               </ul>
 
-              <p className="text-xs text-white/25 mb-5 italic">{product.note}</p>
+              <p className="text-xs text-white/50 mb-5 italic">{product.note}</p>
 
               <button
                 onClick={(e) => { e.stopPropagation(); onSelect(product) }}
-                className={`w-full py-4 rounded-2xl font-black text-sm transition-all ${
+                className={`w-full py-4 rounded-2xl font-black text-sm transition-all ${FOCUS_RING} ${
                   selected.id === product.id
                     ? product.highlight
                       ? 'bg-teal-500 text-white shadow-lg shadow-teal-500/20 hover:bg-teal-400'
@@ -834,18 +835,18 @@ function FamilySection({
               <div key={item.action} className="bg-white/5 rounded-xl p-4 text-center">
                 <p className="text-2xl font-black text-white leading-none">KES {item.kes}</p>
                 <p className="text-xs text-white/50 font-bold mt-1.5">{item.action}</p>
-                <p className="text-[10px] text-white/25 mt-0.5 leading-tight">{item.detail.split(' ').slice(0, 4).join(' ')}…</p>
+                <p className="text-[10px] text-white/50 mt-0.5 leading-tight">{item.detail.split(' ').slice(0, 4).join(' ')}…</p>
               </div>
             ))}
           </div>
 
-          <p className="text-xs text-white/25 text-center mb-5">
+          <p className="text-xs text-white/50 text-center mb-5">
             1 token = KES 100 · Starter pack: KES 500 for 5 tokens · Credit never expires
           </p>
 
           <button
             onClick={() => onSelect(TOKEN_PRODUCT)}
-            className="block w-full text-center bg-white/8 hover:bg-white/12 text-white/65 hover:text-white font-bold py-3 rounded-xl text-sm transition-colors"
+            className={`block w-full text-center bg-white/8 hover:bg-white/12 text-white/65 hover:text-white font-bold py-3 rounded-xl text-sm transition-colors ${FOCUS_RING}`}
           >
             Start with 5 tokens — KES 500 →
           </button>
@@ -856,7 +857,7 @@ function FamilySection({
       <div className="max-w-2xl mx-auto bg-white/3 border border-white/8 rounded-2xl px-8 py-5 text-center">
         <p className="text-sm text-white/50 leading-relaxed">
           If your child&apos;s school is on EduNexus, family access is included automatically.{' '}
-          <Link href="/early-access" className="text-violet-400 hover:text-violet-300 font-semibold transition-colors">
+          <Link href="/early-access" className={`text-violet-400 hover:text-violet-300 font-semibold transition-colors rounded ${FOCUS_RING}`}>
             Tell your school about EduNexus →
           </Link>
         </p>
@@ -998,7 +999,7 @@ function PricingContent() {
   ]
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white overflow-hidden">
+    <div data-page="pricing" className="min-h-screen bg-slate-950 text-white overflow-hidden">
 
       {/* Ambient glow */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden>
@@ -1009,7 +1010,7 @@ function PricingContent() {
       {/* Nav */}
       <nav className="border-b border-white/5 bg-slate-950/80 backdrop-blur-xl sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-6 py-4 flex justify-between items-center">
-          <Link href="/" className="flex items-center gap-2.5 group">
+          <Link href="/" className={`flex items-center gap-2.5 group rounded ${FOCUS_RING}`}>
             <div className="w-9 h-9 bg-linear-to-br from-teal-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
               <Sparkles className="w-4 h-4 text-white" />
             </div>
@@ -1017,7 +1018,7 @@ function PricingContent() {
           </Link>
           <Link
             href={dashboardHref}
-            className="text-sm text-white/45 hover:text-white flex items-center gap-1.5 transition-colors font-bold"
+            className={`text-sm text-white/45 hover:text-white flex items-center gap-1.5 transition-colors font-bold rounded ${FOCUS_RING}`}
           >
             <ArrowLeft className="w-4 h-4" />
             {user ? 'Dashboard' : 'Home'}
@@ -1034,7 +1035,7 @@ function PricingContent() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all ${
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all ${FOCUS_RING} ${
                   activeTab === tab.id
                     ? tab.id === 'school'
                       ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20'
@@ -1087,14 +1088,14 @@ function PricingContent() {
         <div className="fixed bottom-0 inset-x-0 bg-slate-900/97 backdrop-blur-xl border-t border-white/8 z-50 shadow-2xl">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center gap-3">
             <div className="flex-1 text-center sm:text-left">
-              <p className="text-[10px] font-black text-white/30 uppercase tracking-widest">School Edition</p>
+              <p className="text-[10px] font-black text-white/50 uppercase tracking-widest">School Edition</p>
               <p className="text-sm text-white/65">
                 From KES 129 per learner per term · Teacher Pro included for all teachers
               </p>
             </div>
             <Link
               href="/early-access"
-              className="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-400 text-white px-8 py-3 rounded-xl font-black text-sm transition-all whitespace-nowrap shadow-lg shadow-blue-500/20"
+              className={`inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-400 text-white px-8 py-3 rounded-xl font-black text-sm transition-all whitespace-nowrap shadow-lg shadow-blue-500/20 ${FOCUS_RING}`}
             >
               Book a School Demo <ArrowRight className="w-4 h-4" />
             </Link>
@@ -1108,7 +1109,7 @@ function PricingContent() {
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3">
             <div className="flex flex-col sm:flex-row items-center gap-3">
               <div className="w-full sm:w-auto text-center sm:text-left sm:pr-4 sm:border-r sm:border-white/10 shrink-0">
-                <p className="text-[10px] font-black text-white/30 uppercase tracking-widest leading-none mb-1">
+                <p className="text-[10px] font-black text-white/50 uppercase tracking-widest leading-none mb-1">
                   {TEACHER_PAY_PLANS.some(p => p.id === teacherSel.id)
                     ? teacherSel.name
                     : 'Wallet top-up'
@@ -1121,7 +1122,7 @@ function PricingContent() {
               </div>
               <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full">
                 <div className="relative flex-1">
-                  <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 w-4 h-4 pointer-events-none" />
+                  <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 w-4 h-4 pointer-events-none" />
                   <input
                     type="tel"
                     inputMode="numeric"
@@ -1134,7 +1135,7 @@ function PricingContent() {
                 <button
                   onClick={handleTeacherPay}
                   disabled={loading}
-                  className="bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-3 rounded-xl font-black transition-colors flex items-center justify-center gap-2 text-sm whitespace-nowrap shadow-lg shadow-amber-500/20"
+                  className={`bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-3 rounded-xl font-black transition-colors flex items-center justify-center gap-2 text-sm whitespace-nowrap shadow-lg shadow-amber-500/20 ${FOCUS_RING}`}
                 >
                   {loading
                     ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -1156,7 +1157,7 @@ function PricingContent() {
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
             <div className="flex flex-col sm:flex-row items-center gap-3">
               <div className="w-full sm:w-auto text-center sm:text-left sm:pr-4 sm:border-r sm:border-white/10 shrink-0">
-                <p className="text-[10px] font-black text-white/30 uppercase tracking-widest leading-none mb-1">
+                <p className="text-[10px] font-black text-white/50 uppercase tracking-widest leading-none mb-1">
                   {familySel.name}
                 </p>
                 <p className="text-xl font-black text-white leading-none">
@@ -1166,7 +1167,7 @@ function PricingContent() {
               </div>
               <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full">
                 <div className="relative flex-1">
-                  <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 w-4 h-4 pointer-events-none" />
+                  <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 w-4 h-4 pointer-events-none" />
                   <input
                     type="tel"
                     inputMode="numeric"
@@ -1179,7 +1180,7 @@ function PricingContent() {
                 <button
                   onClick={handleFamilyPay}
                   disabled={loading}
-                  className="bg-teal-500 hover:bg-teal-400 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-3 rounded-xl font-black transition-colors flex items-center justify-center gap-2 text-sm whitespace-nowrap shadow-lg shadow-teal-500/20"
+                  className={`bg-teal-500 hover:bg-teal-400 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-3 rounded-xl font-black transition-colors flex items-center justify-center gap-2 text-sm whitespace-nowrap shadow-lg shadow-teal-500/20 ${FOCUS_RING}`}
                 >
                   {loading
                     ? <Loader2 className="w-4 h-4 animate-spin" />

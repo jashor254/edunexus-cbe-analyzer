@@ -43,6 +43,7 @@ export function ArticleBody({ content, slug }: Props) {
       prose-blockquote:text-white/65
       prose-hr:border-white/10
       prose-a:text-violet-400 prose-a:no-underline hover:prose-a:text-violet-300
+      focus-visible:prose-a:outline-2 focus-visible:prose-a:outline-offset-2 focus-visible:prose-a:outline-white/70
       prose-code:text-violet-300 prose-code:bg-white/8 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-mono
       prose-pre:bg-white/5 prose-pre:border prose-pre:border-white/10 prose-pre:rounded-2xl
       [&_h2]:scroll-mt-20 [&_h3]:scroll-mt-20
