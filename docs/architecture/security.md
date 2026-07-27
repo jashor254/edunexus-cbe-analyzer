@@ -163,6 +163,8 @@ RLS is the last line of defence. Even if application code has a bug that omits a
 
 It is never used in route handlers that handle user-initiated requests.
 
+**Core school RLS regression audit (2026-07-26/27):** the Core school-membership table (`school_users`, distinct from the `organization_members` table shown above) had two real defects found and fixed via real-session testing — an infinite-recursion bug in its own policy, and a privilege-escalation gap where any authenticated user could self-insert an admin row for an arbitrary school (`docs/architecture/school-users-rls-regression-audit.md`). The same defect shape (a `FOR ALL` policy with no explicit `WITH CHECK`) was then found and fixed across 12 further Core/Learner-Intelligence tables, plus one unrelated, previously-non-functional read policy on `learner_projections` (`docs/architecture/core-academic-rls-write-hardening-phase1.6.md`). Every real-session RLS check in this codebase now passes.
+
 ---
 
 ## API Key Scopes
