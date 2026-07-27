@@ -3,6 +3,7 @@ import type { School, SchoolSettings, AcademicYear, Term, SchoolUser } from '@/t
 import { REFERENCE_SCHOOL_NAME } from '@/lib/config/referenceSchool'
 import { logger } from '@/lib/observability/logger'
 import { publishEvent } from '@/lib/events'
+import { createServiceClient } from '@/utils/supabase/service'
 import { addSchoolUser } from './school-users'
 
 // Creates a new Core school and makes the creator its school_admin — same
@@ -90,6 +91,30 @@ export async function updateSchool(
   updates: Partial<Pick<School, 'school_name' | 'nemis_code' | 'school_type' | 'county' | 'sub_county' | 'ward' | 'address' | 'contact_phone' | 'contact_email' | 'logo_url' | 'motto'>>
 ): Promise<School> {
   return repos.schools.update(schoolId, updates)
+}
+
+// Uploads a school's crest/logo to the public `school-logos` Storage
+// bucket and points `schools.logo_url` at it — this is what the Learner
+// Blueprint cover/header renders instead of generic EduNexus branding.
+// Storage writes go through the service-role client (same posture as
+// class-resources/assignment-submissions); the caller route is what
+// enforces requireSchoolAdmin before this runs.
+export async function uploadSchoolLogo(
+  schoolId: string,
+  bytes: Uint8Array,
+  contentType: string,
+  fileExtension: string
+): Promise<School> {
+  const db = createServiceClient()
+  const objectPath = `${schoolId}/logo-${Date.now()}.${fileExtension}`
+
+  const { error: uploadError } = await db.storage
+    .from('school-logos')
+    .upload(objectPath, bytes, { contentType, upsert: true })
+  if (uploadError) throw new Error(`uploadSchoolLogo: ${uploadError.message}`)
+
+  const { data: publicUrl } = db.storage.from('school-logos').getPublicUrl(objectPath)
+  return repos.schools.update(schoolId, { logo_url: publicUrl.publicUrl })
 }
 
 export async function getSchoolSettings(schoolId: string): Promise<SchoolSettings> {
