@@ -159,16 +159,20 @@ export default function RootLayout({
           {children}
         </main>
 
-        <footer data-blueprint-hide-in-pdf="true" className="bg-slate-950 border-t border-white/5 py-4 text-center">
+        {/* Site-wide fallback footer for routes that don't provide their own
+            (dashboard/teacher/student/parent/etc). Suppressed via CSS on the
+            marketing route group, which renders a richer footer of its own —
+            see the `data-site-footer` rule in globals.css. */}
+        <footer data-blueprint-hide-in-pdf="true" data-site-footer="true" className="bg-slate-950 border-t border-white/5 py-4 text-center">
           <p className="text-xs text-white/30">
             © 2026 EduNexus &middot; Developed by{' '}
             <span className="text-white/50 font-medium">Jashor Technologies</span>
             {' '}&middot; Kenya
           </p>
           <div className="flex justify-center gap-4 mt-2">
-            <a href="/legal/privacy" className="text-xs text-white/30 hover:text-white/60 transition-colors">Privacy Policy</a>
-            <a href="/legal/terms" className="text-xs text-white/30 hover:text-white/60 transition-colors">Terms of Use</a>
-            <a href="/legal/refund" className="text-xs text-white/30 hover:text-white/60 transition-colors">Refund Policy</a>
+            <a href="/legal/privacy" className="text-xs text-white/30 hover:text-white/60 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 rounded">Privacy Policy</a>
+            <a href="/legal/terms" className="text-xs text-white/30 hover:text-white/60 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 rounded">Terms of Use</a>
+            <a href="/legal/refund" className="text-xs text-white/30 hover:text-white/60 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 rounded">Refund Policy</a>
           </div>
         </footer>
 
