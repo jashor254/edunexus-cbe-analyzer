@@ -26,6 +26,7 @@ function createBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlue
       learnerName: 'Brian Matthias',
       admissionNumber: 'ADM-1',
       schoolName: 'Test School',
+      schoolLogoUrl: null,
       currentClassName: 'Grade 7',
       academicYearLabel: '2026',
       termLabel: 'Term 2',
@@ -295,7 +296,7 @@ test('BlueprintView dedupes repeated recommendations and degrades missing audien
 test('BlueprintView changes future framing by grade band and stays honest when future evidence is thin', () => {
   const grade78 = render(createBlueprint({
     identity: section({
-      learnerName: 'Brian Matthias', admissionNumber: 'ADM-1', schoolName: 'Test School',
+      learnerName: 'Brian Matthias', admissionNumber: 'ADM-1', schoolName: 'Test School', schoolLogoUrl: null,
       currentClassName: 'Grade 8', academicYearLabel: '2026', termLabel: 'Term 2', guardians: [],
     }),
   }))
@@ -303,7 +304,7 @@ test('BlueprintView changes future framing by grade band and stays honest when f
 
   const grade9 = render(createBlueprint({
     identity: section({
-      learnerName: 'Brian Matthias', admissionNumber: 'ADM-1', schoolName: 'Test School',
+      learnerName: 'Brian Matthias', admissionNumber: 'ADM-1', schoolName: 'Test School', schoolLogoUrl: null,
       currentClassName: 'Grade 9', academicYearLabel: '2026', termLabel: 'Term 2', guardians: [],
     }),
   }))
@@ -311,7 +312,7 @@ test('BlueprintView changes future framing by grade band and stays honest when f
 
   const senior = render(createBlueprint({
     identity: section({
-      learnerName: 'Brian Matthias', admissionNumber: 'ADM-1', schoolName: 'Test School',
+      learnerName: 'Brian Matthias', admissionNumber: 'ADM-1', schoolName: 'Test School', schoolLogoUrl: null,
       currentClassName: 'Grade 11', academicYearLabel: '2026', termLabel: 'Term 2', guardians: [],
     }),
     career: section({ careerCluster: null, strengthProfile: null, futureDirection: null, aiOutlook: null, confidence: null, notes: [] }),

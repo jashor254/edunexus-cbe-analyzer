@@ -17,8 +17,10 @@
     "growth:prepare-import": "tsx scripts/growth/prepare-import.ts",
     "growth:import-schools": "tsx --env-file=.env.local scripts/growth/import-schools-csv.ts",
     "growth:enrich-contacts": "tsx scripts/growth/enrich-contacts.ts",
+    "growth:build-outreach-buckets": "tsx scripts/growth/build-town-outreach-buckets.ts",
     "seed:demo": "node --env-file=.env.local node_modules/.bin/tsx scripts/seed-demo-teacher.ts",
     "seed:reference-school": "tsx --env-file=.env.local scripts/reference-school/run-all.ts",
+    "seed:blueprint-demo": "tsx --env-file=.env.local scripts/reference-school/07-seed-blueprint-demo.ts",
     "test:reference-school": "tsx --env-file=.env.local --test scripts/reference-school/integration.test.ts"
   },
   "dependencies": {

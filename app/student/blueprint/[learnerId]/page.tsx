@@ -26,9 +26,12 @@ import { repos } from '@/lib/repositories'
 import { getUserRoles } from '@/lib/auth/getRole'
 import { composeBlueprint } from '@/lib/learnerBlueprint/composeBlueprint'
 import { BLUEPRINT_EXPORT_QUERY_KEY, isBlueprintPdfExportMode } from '@/lib/learnerBlueprint/pdfExport'
+import { listReviewableBlueprintActionsForLearner, type ReviewableActionListItem } from '@/lib/learnerBlueprint/actionPlan/reviewWorkspace'
 import BlueprintView from '@/components/blueprint/BlueprintView'
 import BlueprintStateMessage from '@/components/blueprint/BlueprintStateMessage'
+import BlueprintActionPlanSection from '@/components/blueprint/actionPlan/BlueprintActionPlanSection'
 import JourneyLinks from '@/components/student/JourneyLinks'
+import Link from 'next/link'
 
 export default async function StudentBlueprintPage({
   params,
@@ -74,15 +77,24 @@ export default async function StudentBlueprintPage({
     throw err
   }
 
-  let blueprint, validation
+  let blueprint, validation, coherence
   try {
-    ;({ blueprint, validation } = await composeBlueprint({
+    ;({ blueprint, validation, coherence } = await composeBlueprint({
       actorUserId: userId,
       coreLearnerId: learnerId,
       schoolId,
     }))
   } catch {
     return <BlueprintStateMessage kind="unavailable" />
+  }
+
+  // Phase 4A — the Blueprint Intelligence Coherence Engine. A FAIL means a
+  // critical contradiction between a claim/recommendation/action and the
+  // learner's own Evidence/Projection was found; withheld rather than
+  // shown with the contradiction visible. PASS_WITH_WARNINGS renders
+  // normally — warnings never mutate or block Blueprint content.
+  if (coherence.result === 'FAIL') {
+    return <BlueprintStateMessage kind="coherence-failed" />
   }
 
   // Access was already granted above via requireLearnerAccess, whose
@@ -94,8 +106,47 @@ export default async function StudentBlueprintPage({
   // server-side), so they're only correct to show here.
   const { primary } = await getUserRoles(userId)
 
+  // Blueprint Action Plan (Phase 3A) — staff-only, the one coherent
+  // teacher workflow surface: inspect an approved action, deliver it, see
+  // its status, jump to the existing Review Workspace. Fetched only for a
+  // teacher viewer — `listReviewableBlueprintActionsForLearner` requires
+  // `canManageLearnerRecordCore` (teacher/admin-tier), narrower than the
+  // `requireLearnerAccess` check above (which also admits the learner
+  // themself and a parent) — so this call is never made for those viewers,
+  // and its own `ResourceOwnershipError` (e.g. a `teacher`-role account
+  // that doesn't actually manage THIS learner) is caught here and simply
+  // omits the section rather than breaking a Blueprint page that already
+  // legitimately rendered via the broader access check.
+  let actionPlanItems: ReviewableActionListItem[] | null = null
+  if (primary === 'teacher' && exportMode !== 'pdf') {
+    try {
+      actionPlanItems = await listReviewableBlueprintActionsForLearner(supabase, learnerId)
+    } catch (err) {
+      if (!(err instanceof ResourceOwnershipError)) throw err
+    }
+  }
+
   return (
     <>
+      {/* Teacher Review Workspace entry point (Phase 2E) — staff-only,
+          smallest useful link into the review workspace from the Blueprint
+          a teacher is already looking at. Never shown to the learner or
+          parent viewing their own/their child's Blueprint. */}
+      {primary === 'teacher' && exportMode !== 'pdf' && (
+        <div className="max-w-4xl mx-auto px-4 pt-4 flex items-center justify-between gap-2 flex-wrap">
+          <Link
+            href={`/teacher/learners/${learnerId}/blueprint/review`}
+            className="inline-block bg-teal-600 text-white px-4 py-2 rounded-xl font-black text-sm hover:bg-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+          >
+            Review Actions
+          </Link>
+        </div>
+      )}
+      {actionPlanItems !== null && (
+        <div className="max-w-4xl mx-auto px-4 pt-4">
+          <BlueprintActionPlanSection learnerId={learnerId} items={actionPlanItems} />
+        </div>
+      )}
       <BlueprintView blueprint={blueprint} validation={validation} learnerId={learnerId} exportMode={exportMode} />
       {primary === 'student' && exportMode !== 'pdf' && <JourneyLinks current="blueprint" />}
     </>

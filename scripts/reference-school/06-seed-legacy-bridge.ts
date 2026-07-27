@@ -419,7 +419,11 @@ async function bridgeStudents(
   console.log(`[C bridgeStudents] ${created} created, ${legacyByExternalId.size} total bridged students`)
 
   // ── Seed-then-verify: resolve a student by teacher_id + name, like a Blueprint lookup ──
-  const sample = learners.slice(0, 5)
+  // Sampled from enrolled learners only — a learner with no class enrollment
+  // is already, correctly, skipped by the bridging loop above (logged, not
+  // an error); sampling from the unfiltered `learners` array could draw one
+  // of those and fail this check for a reason unrelated to bridging itself.
+  const sample = learners.filter((l) => enrollmentByLearnerId.has(l.id)).slice(0, 5)
   let verifyOk = true
   for (const learner of sample) {
     const legacyStudentId = legacyByExternalId.get(learner.id)

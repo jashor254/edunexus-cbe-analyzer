@@ -14,6 +14,13 @@ export type BlueprintStateKind =
   | 'snapshot-not-found'
   | 'permission-denied'
   | 'unavailable'
+  // Phase 4A — the Blueprint Intelligence Coherence Engine found a
+  // critical contradiction between this Blueprint's claims and the
+  // learner's own Evidence/Projection (composeBlueprint()'s `coherence`
+  // report). Withheld rather than shown with the contradiction visible,
+  // per the phase's own rule: failures prevent publication, warnings do
+  // not (a PASS_WITH_WARNINGS Blueprint still renders normally).
+  | 'coherence-failed'
 
 const COPY: Record<BlueprintStateKind, { title: string; message: string }> = {
   'learner-not-found': {
@@ -31,6 +38,10 @@ const COPY: Record<BlueprintStateKind, { title: string; message: string }> = {
   unavailable: {
     title: 'Blueprint temporarily unavailable',
     message: 'We couldn\'t load this Blueprint right now. Please try again in a moment.',
+  },
+  'coherence-failed': {
+    title: 'This Blueprint needs review before it can be shown',
+    message: 'An automated check found a recommendation that does not match this learner\'s current evidence. It has been withheld until a teacher or school administrator reviews and corrects it.',
   },
 }
 

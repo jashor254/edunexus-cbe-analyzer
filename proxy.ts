@@ -143,6 +143,50 @@ export async function proxy(request: NextRequest) {
   // case fast, app/student/layout.tsx's own getUserRoles() check remains the
   // final authoritative gate (defense-in-depth, same pattern as /teacher).
   if (pathname.startsWith('/student')) {
+    // `/student/blueprint/**` (Phase 3A, docs/architecture/blueprint-
+    // execution-experience-phase3a.md) is a confirmed exception, not a
+    // relaxation of the rule above: `app/student/blueprint/[learnerId]/
+    // page.tsx` is deliberately the ONE shared Blueprint render for
+    // teacher/parent/student/admin viewers alike (its own header comment:
+    // "originally reached only from Teacher Workspace"), gated by its own
+    // `requireLearnerAccess` (self/parent/teacher-of-record/admin) — a
+    // strictly finer-grained, already-authoritative check than this
+    // middleware's coarse role gate. Before this carve-out, ANY teacher
+    // (and admin-tier staff) hitting this route — including the existing
+    // "Review Actions" link and the legacy `/teacher/reports/blueprint/
+    // [studentId]` redirect shim, both already shipped — was silently
+    // bounced to `/teacher/dashboard` before the page ever rendered,
+    // confirmed by real HTTP testing while building Phase 3A. Mirrors the
+    // exact carve-out shape the `/teacher/core-office` branch above
+    // already uses for admin-tier staff — not a new pattern.
+    // Trailing slash is deliberate: the bare `/student/blueprint` route
+    // (no id — a self-service "redirect me to my own Blueprint" route,
+    // meaningless for a teacher, who has no "own" Blueprint) must stay
+    // blocked exactly as before; only `/student/blueprint/<learnerId>`
+    // and its subpaths are the shared, teacher-eligible render.
+    if (pathname.startsWith('/student/blueprint/')) {
+      const roles = await getUserRoles(user.id, supabase)
+      const isTeacher = roles.primary === 'teacher' || roles.secondary === 'teacher'
+      const adminMembership = isTeacher ? null : await getSchoolAdminMembership(user.id, supabase)
+      if (isTeacher || adminMembership) {
+        // `app/student/layout.tsx` (wrapping this entire route tree) is a
+        // SECOND, independent gate that also redirects any `teacher`-role
+        // viewer away — middleware alone can't clear this route for a
+        // teacher; the layout needs to know this specific request was
+        // already authorized for the one carved-out path. Forwarded as a
+        // request header, the standard Next.js way to pass computed
+        // middleware state into a Server Component that has no direct
+        // pathname access otherwise.
+        const teacherHeaders = new Headers(request.headers)
+        teacherHeaders.set('x-blueprint-teacher-viewer', '1')
+        return NextResponse.next({ request: { headers: teacherHeaders } })
+      }
+      if (roles.primary !== 'student') {
+        return NextResponse.redirect(new URL(getRoleRedirect(roles.primary), request.url))
+      }
+      return response
+    }
+
     const roles = await getUserRoles(user.id, supabase)
     if (roles.primary !== 'student') {
       return NextResponse.redirect(new URL(getRoleRedirect(roles.primary), request.url))

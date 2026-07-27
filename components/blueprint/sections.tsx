@@ -31,6 +31,7 @@ const TREND_ARROW: Record<string, string> = {
   declining: '↓',
   stable: '→',
   insufficient_data: '·',
+  mixed: '↕',
 }
 
 export function IdentitySection({ data }: { data: IdentityData }) {

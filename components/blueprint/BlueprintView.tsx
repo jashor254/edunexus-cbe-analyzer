@@ -50,6 +50,7 @@ const TREND_LABEL: Record<SubjectRecord['trend'], string> = {
   declining: 'Trend declining',
   stable: 'Trend steady',
   insufficient_data: 'Trend developing',
+  mixed: 'Trend mixed',
 }
 
 const RISK_LABEL: Record<RiskData['overallRiskLevel'], string> = {
@@ -68,15 +69,33 @@ const RISK_ACCENT: Record<RiskData['overallRiskLevel'], string> = {
 
 // ── Shared report chrome ─────────────────────────────────────────────────────
 
-function ReportHeader({ pageNumber, learnerName }: { pageNumber: number; learnerName: string | null }) {
+function ReportHeader({
+  pageNumber,
+  learnerName,
+  schoolName,
+  schoolLogoUrl,
+}: {
+  pageNumber: number
+  learnerName: string | null
+  schoolName?: string | null
+  schoolLogoUrl?: string | null
+}) {
   return (
     <div
       data-blueprint-report-header="true"
       className="flex items-center justify-between border-b-4 border-amber-500 bg-[#0b1530] px-6 py-3 text-white print:px-8"
     >
-      <div>
-        <p className="text-[10px] font-black uppercase tracking-[0.28em] text-amber-400">EduNexus · Learner Blueprint</p>
-        <p className="mt-0.5 text-xs font-semibold text-white/70">{learnerName ?? 'Learner Blueprint'} — Educational Intelligence Report</p>
+      <div className="flex items-center gap-3">
+        {schoolLogoUrl && (
+          // eslint-disable-next-line @next/next/no-img-element -- printed into a PDF via headless Chromium, not served through next/image's optimizer
+          <img src={schoolLogoUrl} alt={`${schoolName ?? 'School'} crest`} className="h-8 w-8 rounded-md object-cover" />
+        )}
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-amber-400">
+            {schoolName ? `${schoolName} · Learner Blueprint` : 'EduNexus · Learner Blueprint'}
+          </p>
+          <p className="mt-0.5 text-xs font-semibold text-white/70">{learnerName ?? 'Learner Blueprint'} — Educational Intelligence Report</p>
+        </div>
       </div>
       <p className="text-xs font-bold text-white/60">Page {pageNumber} of {TOTAL_PAGES}</p>
     </div>
@@ -102,6 +121,8 @@ function PageShell({
   learnerName,
   reportId,
   generatedAtLabel,
+  schoolName,
+  schoolLogoUrl,
 }: {
   pageNumber: number
   title: string
@@ -112,6 +133,8 @@ function PageShell({
   learnerName: string | null
   reportId: string
   generatedAtLabel: string
+  schoolName?: string | null
+  schoolLogoUrl?: string | null
 }) {
   return (
     <section
@@ -120,7 +143,7 @@ function PageShell({
       className="overflow-hidden rounded-3xl border border-gray-100 bg-white print:rounded-none print:border-0"
       style={exportMode === 'pdf' ? { breakInside: 'avoid-page', pageBreakInside: 'avoid' } : undefined}
     >
-      <ReportHeader pageNumber={pageNumber} learnerName={learnerName} />
+      <ReportHeader pageNumber={pageNumber} learnerName={learnerName} schoolName={schoolName} schoolLogoUrl={schoolLogoUrl} />
 
       <div className="space-y-5 px-5 py-6 sm:px-6 print:px-8">
         <div className="space-y-1 border-b border-slate-100 pb-4">
@@ -413,7 +436,15 @@ function CoverPage({
       style={exportMode === 'pdf' ? { breakInside: 'avoid-page', pageBreakInside: 'avoid' } : undefined}
     >
       <div className="border-b-4 border-amber-500 px-8 pb-8 pt-10 sm:px-12">
-        <p className="text-xs font-black uppercase tracking-[0.32em] text-amber-400">EduNexus</p>
+        <div className="flex items-center gap-3">
+          {identity?.schoolLogoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element -- printed into a PDF via headless Chromium, not served through next/image's optimizer
+            <img src={identity.schoolLogoUrl} alt={`${identity.schoolName} crest`} className="h-10 w-10 rounded-lg object-cover" />
+          )}
+          <p className="text-xs font-black uppercase tracking-[0.32em] text-amber-400">
+            {identity?.schoolName ?? 'EduNexus'}
+          </p>
+        </div>
         <h1 className="mt-3 text-3xl font-black sm:text-4xl">Learner Blueprint</h1>
         <p className="mt-1 text-sm font-semibold text-white/60">Educational Intelligence Report</p>
       </div>
@@ -547,7 +578,14 @@ export default function BlueprintView({
           ? 'At senior level, the Blueprint connects demonstrated evidence to further education, TVET, entrepreneurship, or work-related opportunities when the record supports it.'
           : 'The current Blueprint can point toward possibilities, but its future-facing interpretation stays cautious until stronger evidence accumulates.'
 
-  const shellProps = { exportMode, learnerName, reportId, generatedAtLabel }
+  const shellProps = {
+    exportMode,
+    learnerName,
+    reportId,
+    generatedAtLabel,
+    schoolName: blueprint.identity.data?.schoolName ?? null,
+    schoolLogoUrl: blueprint.identity.data?.schoolLogoUrl ?? null,
+  }
 
   return (
     <div
@@ -969,7 +1007,7 @@ export default function BlueprintView({
 
         <div className="rounded-3xl border border-slate-100 bg-white p-4">
           <p className="text-sm font-black text-slate-900">Evidence traceability</p>
-          <p className="mt-1 text-xs text-slate-500">Every statement in this report traces to a named, canonical source — see metadata.ownerVersions on the live Blueprint.</p>
+          <p className="mt-1 text-xs text-slate-500">Every statement in this report traces to a named, canonical source, recorded internally on the live Blueprint.</p>
           <div className="mt-3">
             <EvidenceTrailPlaceholder />
           </div>
