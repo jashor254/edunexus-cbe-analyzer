@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { X, Menu } from 'lucide-react'
 import { Sora } from 'next/font/google'
 import { Logo } from '@/components/ui/Logo'
+import { CURRICULA_COMPACT, FOCUS_RING } from './constants'
 
 const sora = Sora({ subsets: ['latin'], weight: ['400', '600', '700', '800'] })
 
@@ -21,6 +22,7 @@ function MarketingNav() {
 
   return (
     <nav
+      data-marketing-nav="true"
       className={`sticky top-0 z-40 transition-all duration-300 ${
         scrolled
           ? 'bg-black/80 backdrop-blur-xl border-b border-white/10'
@@ -31,28 +33,28 @@ function MarketingNav() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5">
           <Logo variant="dark" size="sm" />
-          <span className="text-[11px] font-bold bg-violet-500/20 text-violet-300 px-2 py-0.5 rounded-full">Beta</span>
+          <span className="text-[11px] font-bold bg-white/5 border border-white/10 text-white/40 px-2 py-0.5 rounded-full">Beta</span>
         </Link>
 
         {/* Desktop links */}
         <div className="hidden md:flex items-center gap-6">
-          <a href="#school" className="text-sm font-semibold text-white/60 hover:text-white transition-colors">
+          <a href="#school" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
             For Schools
           </a>
-          <a href="#teachers" className="text-sm font-semibold text-white/60 hover:text-white transition-colors">
+          <a href="#teachers" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
             For Teachers
           </a>
-          <a href="#evidence" className="text-sm font-semibold text-white/60 hover:text-white transition-colors">
+          <a href="#evidence" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
             Learner Blueprint
           </a>
-          <Link href="/pricing" className="text-sm font-semibold text-white/60 hover:text-white transition-colors">
+          <Link href="/pricing" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
             Pricing
           </Link>
-          <Link href="/insights" className="text-sm font-semibold text-white/60 hover:text-white transition-colors flex items-center gap-1.5">
+          <Link href="/insights" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors flex items-center gap-1.5 rounded ${FOCUS_RING}`}>
             Insights
-            <span className="text-[9px] font-bold bg-violet-500/20 text-violet-400 px-1.5 py-0.5 rounded-full">New</span>
+            <span className="text-[9px] font-bold bg-white/5 border border-white/10 text-white/40 px-1.5 py-0.5 rounded-full">New</span>
           </Link>
-          <Link href="/about" className="text-sm font-semibold text-white/60 hover:text-white transition-colors">
+          <Link href="/about" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
             About
           </Link>
         </div>
@@ -61,13 +63,13 @@ function MarketingNav() {
         <div className="hidden md:flex items-center gap-3">
           <Link
             href="/login"
-            className="text-sm font-semibold text-white/60 hover:text-white transition-colors"
+            className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}
           >
             Log in
           </Link>
           <Link
             href="/signup"
-            className="text-sm font-bold bg-white/10 hover:bg-white/20 text-white px-5 py-2.5 rounded-xl border border-white/10 transition-colors"
+            className={`text-sm font-bold bg-white/10 hover:bg-white/20 text-white px-5 py-2.5 rounded-xl border border-white/10 transition-colors ${FOCUS_RING}`}
           >
             Get Started Free
           </Link>
@@ -76,7 +78,7 @@ function MarketingNav() {
         {/* Mobile hamburger */}
         <button
           onClick={() => setMenuOpen((o) => !o)}
-          className="md:hidden w-10 h-10 flex items-center justify-center border border-white/10 rounded-xl text-white/60 hover:text-white transition-colors"
+          className={`md:hidden w-10 h-10 flex items-center justify-center border border-white/10 rounded-xl text-white/60 hover:text-white transition-colors ${FOCUS_RING}`}
           aria-label={menuOpen ? 'Close menu' : 'Open menu'}
         >
           {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -100,7 +102,7 @@ function MarketingNav() {
                 key={item.href}
                 href={item.href}
                 onClick={() => setMenuOpen(false)}
-                className="text-sm font-semibold text-white/60 hover:text-white py-3 border-b border-white/10 last:border-0 transition-colors"
+                className={`text-sm font-semibold text-white/60 hover:text-white py-3 border-b border-white/10 last:border-0 transition-colors ${FOCUS_RING}`}
               >
                 {item.label}
               </a>
@@ -109,7 +111,7 @@ function MarketingNav() {
               <Link
                 href="/signup"
                 onClick={() => setMenuOpen(false)}
-                className="block text-center text-sm font-bold bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl border border-white/10 transition-colors"
+                className={`block text-center text-sm font-bold bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl border border-white/10 transition-colors ${FOCUS_RING}`}
               >
                 Get Started Free
               </Link>
@@ -139,21 +141,24 @@ function MarketingFooter() {
 
           {/* Center — links */}
           <div className="flex flex-col gap-3">
-            <Link href="/about" className="text-sm text-white/50 hover:text-white transition-colors">
+            <Link href="/about" className={`text-sm text-white/50 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
               About
             </Link>
-            <Link href="/insights" className="text-sm text-white/50 hover:text-white transition-colors">
+            <Link href="/insights" className={`text-sm text-white/50 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
               Insights
             </Link>
-            <Link href="/legal/privacy" className="text-sm text-white/50 hover:text-white transition-colors">
+            <Link href="/legal/privacy" className={`text-sm text-white/50 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
               Privacy Policy
             </Link>
-            <Link href="/legal/terms" className="text-sm text-white/50 hover:text-white transition-colors">
+            <Link href="/legal/terms" className={`text-sm text-white/50 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
               Terms of Use
+            </Link>
+            <Link href="/legal/refund" className={`text-sm text-white/50 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
+              Refund Policy
             </Link>
             <a
               href="mailto:hello@edunexus.co.ke"
-              className="text-sm text-white/50 hover:text-white transition-colors"
+              className={`text-sm text-white/50 hover:text-white transition-colors rounded ${FOCUS_RING}`}
             >
               Contact
             </a>
@@ -161,7 +166,7 @@ function MarketingFooter() {
 
           {/* Right — curriculum pills */}
           <div className="flex flex-wrap gap-2 content-start">
-            {['CBC', 'IGCSE', '8-4-4'].map((pill) => (
+            {CURRICULA_COMPACT.map((pill) => (
               <span
                 key={pill}
                 className="text-xs font-semibold bg-white/5 border border-white/10 text-white/40 px-3 py-1.5 rounded-full"
@@ -173,7 +178,7 @@ function MarketingFooter() {
         </div>
 
         <div className="border-t border-white/10 pt-6 text-center space-y-1">
-          <p className="text-xs text-white/30">© 2026 EduNexus Kenya. All rights reserved.</p>
+          <p className="text-xs text-white/50">© 2026 EduNexus Kenya. All rights reserved.</p>
           <p className="text-xs text-white/20">Developed by Jashor Technologies</p>
           <p className="text-xs text-white/15">AI-assisted · edunexus.co.ke</p>
         </div>
@@ -185,7 +190,7 @@ function MarketingFooter() {
 // ─── Layout ────────────────────────────────────────────────────────────────────
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`min-h-screen bg-black text-white ${sora.className}`}>
+    <div data-marketing-shell="true" className={`min-h-screen bg-black text-white ${sora.className}`}>
       <MarketingNav />
       <div className="relative">
         {children}
