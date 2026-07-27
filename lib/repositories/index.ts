@@ -3,8 +3,13 @@ import { AchievementRepository } from './achievement.repository'
 import { AnalyticsRepository } from './analytics.repository'
 import { AssessmentRepository } from './assessment.repository'
 import { AssessmentTypeRepository } from './assessmentType.repository'
+import { AssignmentRepository } from './assignment.repository'
 import { AttendanceRepository } from './attendance.repository'
 import { BillingRepository } from './billing.repository'
+import { BlueprintActionItemRepository } from './blueprintActionItem.repository'
+import { BlueprintActionItemHistoryRepository } from './blueprintActionItemHistory.repository'
+import { BlueprintActionReviewRepository } from './blueprintActionReview.repository'
+import { BlueprintCompassDeliveryRepository } from './blueprintCompassDelivery.repository'
 import { BlueprintSnapshotRepository } from './blueprintSnapshot.repository'
 import { CareerRepository } from './career.repository'
 import { ClassCalendarRepository } from './classCalendar.repository'
@@ -42,8 +47,13 @@ export const repos = {
   analytics:           new AnalyticsRepository(),
   assessments:         new AssessmentRepository(),
   assessmentTypes:     new AssessmentTypeRepository(),
+  assignments:         new AssignmentRepository(),
   attendance:          new AttendanceRepository(),
   billing:             new BillingRepository(),
+  blueprintActionItems:        new BlueprintActionItemRepository(),
+  blueprintActionItemHistory:  new BlueprintActionItemHistoryRepository(),
+  blueprintActionReviews:      new BlueprintActionReviewRepository(),
+  blueprintCompassDeliveries:  new BlueprintCompassDeliveryRepository(),
   blueprintSnapshots:  new BlueprintSnapshotRepository(),
   careers:             new CareerRepository(),
   compass:             new CompassRepository(),
@@ -101,6 +111,9 @@ export { AssessmentRepository } from './assessment.repository'
 export { AssessmentTypeRepository } from './assessmentType.repository'
 export { AttendanceRepository } from './attendance.repository'
 export { BillingRepository } from './billing.repository'
+export { BlueprintActionItemRepository } from './blueprintActionItem.repository'
+export { BlueprintActionItemHistoryRepository } from './blueprintActionItemHistory.repository'
+export { BlueprintActionReviewRepository } from './blueprintActionReview.repository'
 export { CareerRepository } from './career.repository'
 export { ClassCalendarRepository } from './classCalendar.repository'
 export { ClassResourceRepository } from './classResource.repository'

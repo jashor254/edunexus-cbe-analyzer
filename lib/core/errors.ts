@@ -104,6 +104,53 @@ export class IdentityResolutionError extends EduNexusError {
   }
 }
 
+/**
+ * A requested domain resource (not an identity — see
+ * {@link IdentityResolutionError}) does not exist, e.g. a Blueprint action
+ * item id with no matching row. Distinct from `ResourceOwnershipError`
+ * (403): this means the row itself isn't there, not "it's there but not
+ * yours."
+ */
+export class NotFoundError extends EduNexusError {
+  readonly code = 'NOT_FOUND'
+  readonly statusCode = 404
+
+  constructor(message = 'The requested resource was not found.') {
+    super(message)
+  }
+}
+
+/**
+ * The caller is authenticated and authorized, but the request itself is
+ * malformed or fails a business-rule check — e.g. a required confirmation
+ * flag missing, a payload field absent. Distinct from Zod's route-level
+ * shape validation: this is validation a domain service performs on an
+ * already-shape-valid input (Blueprint Living Action Plan Phase 2B).
+ */
+export class ValidationError extends EduNexusError {
+  readonly code = 'VALIDATION_FAILED'
+  readonly statusCode = 400
+
+  constructor(message = 'The request is invalid.') {
+    super(message)
+  }
+}
+
+/**
+ * The request is well-formed and authorized, but conflicts with the
+ * resource's current state — e.g. acting on a Blueprint action item that
+ * isn't `approved`, or a concurrent duplicate-creation race resolved by a
+ * database unique constraint (Blueprint Living Action Plan Phase 2B).
+ */
+export class ConflictError extends EduNexusError {
+  readonly code = 'CONFLICT'
+  readonly statusCode = 409
+
+  constructor(message = 'This action conflicts with the current state of the resource.') {
+    super(message)
+  }
+}
+
 /** True for any error this module defines — useful for a single catch-and-map in a route. */
 export function isEduNexusError(err: unknown): err is EduNexusError {
   return err instanceof EduNexusError

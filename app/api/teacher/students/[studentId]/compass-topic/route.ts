@@ -3,9 +3,9 @@
 
 import { NextRequest } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
 import { resolveTeacherOwnership } from '@/lib/compass/ownership'
+import { setTeacherSuggestedTopic } from '@/lib/compass/objective'
 import { z } from 'zod'
 import { requireAuthentication } from '@/lib/core/permissions'
 import { UnauthorizedError } from '@/lib/core/errors'
@@ -44,41 +44,10 @@ export async function PATCH(
 
     const { subject, concept, strandName } = parsed.data
 
-    const db = createServiceClient()
-
     const ownership = await resolveTeacherOwnership(userId, studentId)
     if (!ownership.allowed) return apiForbidden()
 
-    // Upsert student_learning_context with updated compass_bridge
-    const { data: existing } = await db
-      .from('student_learning_context')
-      .select('compass_bridge')
-      .eq('student_id', studentId)
-      .maybeSingle()
-
-    const currentBridge = (existing?.compass_bridge as Record<string, unknown>) ?? {}
-
-    const updatedBridge = {
-      ...currentBridge,
-      firstSubject:        subject,
-      firstConcept:        concept,
-      strandName:          strandName ?? null,
-      teacherSuggested:    true,
-      teacherSuggestedAt:  new Date().toISOString(),
-    }
-
-    const { error } = await db
-      .from('student_learning_context')
-      .upsert(
-        {
-          student_id:    studentId,
-          compass_bridge: updatedBridge,
-          updated_at:    new Date().toISOString(),
-        },
-        { onConflict: 'student_id' }
-      )
-
-    if (error) throw error
+    await setTeacherSuggestedTopic({ studentId, subject, concept, strandName })
 
     return apiSuccess({ ok: true })
   } catch (err) {

@@ -290,6 +290,37 @@ export class CompassRepository extends BaseRepository {
     }
   }
 
+  /**
+   * Merges `patch` into the student's existing `compass_bridge` JSON and
+   * upserts `student_learning_context` — the exact merge-not-replace
+   * semantics `PATCH /api/teacher/students/[studentId]/compass-topic`
+   * already relied on before this was extracted (Blueprint Living Action
+   * Plan Phase 2C). Never creates a `compass_sessions` row and never invokes
+   * a model — this only steers what `getNextSubject()` returns the next
+   * time this student starts a session.
+   */
+  async mergeTeacherSuggestedTopic(studentId: string, patch: Record<string, unknown>): Promise<void> {
+    const { data: existing } = await this.db
+      .from('student_learning_context')
+      .select('compass_bridge')
+      .eq('student_id', studentId)
+      .maybeSingle()
+
+    const currentBridge = (existing?.compass_bridge as Record<string, unknown>) ?? {}
+
+    const { error } = await this.db
+      .from('student_learning_context')
+      .upsert(
+        {
+          student_id: studentId,
+          compass_bridge: { ...currentBridge, ...patch },
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'student_id' }
+      )
+    if (error) throw new Error(`mergeTeacherSuggestedTopic: ${error.message}`)
+  }
+
   async getSubjectRestUntil(studentId: string): Promise<string | null> {
     const { data, error } = await this.db
       .from('student_learning_context')
@@ -377,5 +408,40 @@ export class CompassRepository extends BaseRepository {
       subject: row.subject as string | null,
       status:  row.status  as string | null,
     }))
+  }
+
+  /**
+   * Read-only session-count summary for one learner+subject — Phase 2D's
+   * Teacher Review needs "did the learner engage with this Compass
+   * delivery," never Compass's own session/tutoring logic. Counts every
+   * session regardless of status (active/completed/abandoned); never
+   * writes anything.
+   */
+  async summarizeSessionsForSubject(studentId: string, subject: string): Promise<{
+    sessionCount: number
+    activeCount: number
+    completedCount: number
+    abandonedCount: number
+    lastActivityAt: string | null
+  }> {
+    const { data, error } = await this.db
+      .from('compass_sessions')
+      .select('status, updated_at')
+      .eq('learner_id', studentId)
+      .eq('subject', subject)
+    if (error) throw new Error(`summarizeSessionsForSubject: ${error.message}`)
+    const rows = (data ?? []) as Array<{ status: string; updated_at: string | null }>
+    const lastActivityAt = rows.reduce<string | null>((latest, r) => {
+      if (!r.updated_at) return latest
+      if (!latest || r.updated_at > latest) return r.updated_at
+      return latest
+    }, null)
+    return {
+      sessionCount: rows.length,
+      activeCount: rows.filter(r => r.status === 'active').length,
+      completedCount: rows.filter(r => r.status === 'completed').length,
+      abandonedCount: rows.filter(r => r.status === 'abandoned').length,
+      lastActivityAt,
+    }
   }
 }

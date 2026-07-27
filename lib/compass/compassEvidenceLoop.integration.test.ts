@@ -33,13 +33,29 @@ let teacherId: string
 let studentId: string
 let ingestionRunIds: string[] = []
 
+// This session's environment has shown sustained, intermittent network
+// flakiness against Supabase Auth's admin endpoints (documented identically
+// in lib/learnerBlueprint/actionPlan/lifecycle.integration.test.ts's header)
+// — bounded setup retries only, never around an assertion.
+async function retryAsync<T>(fn: () => Promise<T>, attempts = 6): Promise<T> {
+  let lastError: unknown
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try { return await fn() } catch (err) { lastError = err }
+    await new Promise(resolve => setTimeout(resolve, 500 * attempt))
+  }
+  throw lastError
+}
+
 before(async () => {
-  const { data: authUser, error: authErr } = await db.auth.admin.createUser({
-    email: `compass-evidence-loop-test-${Date.now()}@example.com`,
-    password: `Test!${Math.random().toString(36).slice(2, 10)}`,
-    email_confirm: true,
+  const { data: authUser } = await retryAsync(async () => {
+    const res = await db.auth.admin.createUser({
+      email: `compass-evidence-loop-test-${Date.now()}@example.com`,
+      password: `Test!${Math.random().toString(36).slice(2, 10)}`,
+      email_confirm: true,
+    })
+    if (res.error) throw res.error
+    return res
   })
-  if (authErr) throw authErr
   authUserId = authUser.user.id
 
   const { data: teacher, error: teacherErr } = await db
