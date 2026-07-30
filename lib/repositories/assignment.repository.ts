@@ -94,6 +94,17 @@ export class AssignmentRepository extends BaseRepository {
     return data as unknown as AssignmentRow
   }
 
+  /** One assignment by id, full canonical content — Printable Adaptive Assignments pilot loads this before any ownership check, then re-verifies ownership via requireClassTeacher(assignment.class_id) itself; this method performs no authorization. */
+  async findById(assignmentId: string): Promise<AssignmentRow | null> {
+    const { data, error } = await this.db
+      .from('assignments')
+      .select(ASSIGNMENT_COLS)
+      .eq('id', assignmentId)
+      .maybeSingle()
+    if (error) throw new Error(`findById: ${error.message}`)
+    return data as unknown as AssignmentRow | null
+  }
+
   /** The assignment already delivered from this Blueprint action item, if any — the natural-key idempotency lookup Phase 2B uses instead of title/date matching. */
   async findByBlueprintActionItemId(actionItemId: string): Promise<AssignmentRow | null> {
     const { data, error } = await this.db
@@ -113,6 +124,18 @@ export class AssignmentRepository extends BaseRepository {
       .eq('class_id', classId)
     if (error) throw new Error(`listClassStudentIds: ${error.message}`)
     return (data ?? []).map(row => row.student_id as string)
+  }
+
+  /** Current roster of `classId` with display names — Printable Adaptive Assignments pilot needs both id and name (id for Projection lookup, name for the teacher routing sheet and per-copy content). */
+  async listClassRoster(classId: string): Promise<Array<{ id: string; name: string }>> {
+    const { data, error } = await this.db
+      .from('class_students')
+      .select('students(id, name)')
+      .eq('class_id', classId)
+    if (error) throw new Error(`listClassRoster: ${error.message}`)
+    return (data ?? [])
+      .map(row => row.students as unknown as { id: string; name: string } | null)
+      .filter((s): s is { id: string; name: string } => !!s)
   }
 
   /** No-ops on an empty array — callers do not need to branch on roster size before calling. */

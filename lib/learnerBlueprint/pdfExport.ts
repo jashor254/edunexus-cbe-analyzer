@@ -6,12 +6,10 @@ export const BLUEPRINT_EXPORT_QUERY_KEY = 'export'
 export const BLUEPRINT_EXPORT_QUERY_VALUE = 'pdf'
 export const BLUEPRINT_PDF_READY_SELECTOR = '[data-blueprint-ready="true"]'
 export const BLUEPRINT_PDF_HEADINGS = [
-  'Learner Overview',
-  'Academic Evidence Matrix',
-  'Growth, Risk and Conditions',
-  'Pathway and Future Intelligence',
-  'Coordinated Action Plan',
-  'School and Family Review',
+  'Where We Stand Today',
+  'What the Evidence Suggests',
+  'How We Help Next',
+  'What May Be Emerging',
 ] as const
 
 type PdfBrowserContext = Pick<BrowserContext, 'addCookies' | 'close'> & {

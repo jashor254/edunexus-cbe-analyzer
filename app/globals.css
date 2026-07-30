@@ -70,8 +70,10 @@ nav[data-marketing-nav]:has(~ div [data-page="pricing"]) {
   }
 
   body:has([data-blueprint-export-mode="pdf"]) [data-blueprint-page-shell="true"] {
-    break-inside: avoid-page;
-    page-break-inside: avoid;
+    /* Deliberately no break-inside/page-break-inside: avoid here — a page
+       whose content genuinely exceeds one sheet must flow onto a
+       continuation sheet, never be silently clipped at the page edge.
+       break-before below still guarantees each logical page starts fresh. */
     box-shadow: none !important;
     /* Chrome's print pipeline can desaturate backgrounds for ink-saving
        even with Playwright's printBackground:true — this keeps the navy

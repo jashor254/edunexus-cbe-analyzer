@@ -12,6 +12,7 @@ function unavailable<T>(reason: string) {
   return { status: 'unavailable' as const, owner: 'test', freshness: 'live' as const, data: null, unavailableReason: reason }
 }
 
+// Rich, multi-round fixture — the "well-supported" evidence case.
 function createBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlueprint {
   return {
     metadata: {
@@ -47,7 +48,7 @@ function createBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlue
       overallTrend: 'improving',
       bySubject: [
         { subject: 'English', latestLevel: 3, trend: 'improving', evidenceCount: 2, latestEvidenceAt: '2026-07-01T00:00:00Z' },
-        { subject: 'Mathematics', latestLevel: 2, trend: 'declining', evidenceCount: 1, latestEvidenceAt: '2026-06-15T00:00:00Z' },
+        { subject: 'Mathematics', latestLevel: 2, trend: 'declining', evidenceCount: 3, latestEvidenceAt: '2026-06-15T00:00:00Z' },
       ],
       competencies: [],
       confidence: 70,
@@ -87,6 +88,15 @@ function createBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlue
       futureDirection: 'Sustained strength in Mathematics could widen future STEM options.',
       aiOutlook: null,
       confidence: 'Medium',
+      doorsPreview: [
+        { type: 'employment', summary: 'Work in engineering or design teams across manufacturing, construction, or product development.' },
+        { type: 'self_employment', summary: 'Offer design or technical consulting services directly to small businesses.' },
+        { type: 'entrepreneurship', summary: 'Build a product or workshop business around a specific technical niche.' },
+        { type: 'ai_era', summary: 'Use AI-assisted design tools to prototype and iterate far faster than before.' },
+      ],
+      aiChangeSummary: 'Routine drafting and repetitive calculations are increasingly automated, but the bar for original design thinking has risen, not fallen.',
+      humanAdvantageSummary: 'Judgement under real-world constraints, client trust and creative problem-solving remain valuable — the kind of judgment only a person can offer.',
+      explorationSuggestions: ['Mathematics', 'Design And Technology'],
       notes: [],
     }),
     portfolio: section({
@@ -175,6 +185,107 @@ function createBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlue
   }
 }
 
+// Kevin Otieno — a real composed Blueprint from a single Opener Term 3
+// assessment (Mwatate Ridge Senior School reference school, seeded live
+// during the redesign session). This is the primary thin-evidence test
+// case the four-page redesign brief specified: one genuine assessment,
+// trend "insufficient_data" on every subject, academicRecord.confidence
+// and risk.confidence both 100, career.confidence "Low" — exactly the
+// combination the interpretation-discipline rules exist to handle.
+function createKevinBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlueprint {
+  return createBlueprint({
+    identity: section({
+      learnerName: 'Kevin Otieno',
+      admissionNumber: 'MRSS-G10-1785317634545',
+      schoolName: 'Mwatate Ridge Senior School',
+      schoolLogoUrl: null,
+      currentClassName: 'Grade 10 East',
+      academicYearLabel: '2026',
+      termLabel: 'Term 2 2026',
+      guardians: [],
+    }),
+    academicRecord: section({
+      overallTrend: 'insufficient_data',
+      bySubject: [
+        { subject: 'biology', latestLevel: 4, trend: 'insufficient_data', evidenceCount: 1, latestEvidenceAt: '2026-07-29T09:34:02.453Z' },
+        { subject: 'chemistry', latestLevel: 3, trend: 'insufficient_data', evidenceCount: 1, latestEvidenceAt: '2026-07-29T09:34:02.453Z' },
+        { subject: 'kiswahili_fasihi', latestLevel: 3, trend: 'insufficient_data', evidenceCount: 1, latestEvidenceAt: '2026-07-29T09:34:02.453Z' },
+        { subject: 'kiswahili_lugha', latestLevel: 4, trend: 'insufficient_data', evidenceCount: 1, latestEvidenceAt: '2026-07-29T09:34:02.453Z' },
+        { subject: 'mathematics', latestLevel: 3, trend: 'insufficient_data', evidenceCount: 1, latestEvidenceAt: '2026-07-29T09:34:02.453Z' },
+        { subject: 'physics', latestLevel: 3, trend: 'insufficient_data', evidenceCount: 1, latestEvidenceAt: '2026-07-29T09:34:02.453Z' },
+      ],
+      competencies: [],
+      confidence: 100,
+      lastComputed: '2026-07-29T09:34:14.813Z',
+    }),
+    attendance: unavailable("Only school admins may read a learner's full attendance history in this sprint."),
+    learningCompass: section({
+      currentLearningFocus: { subject: 'mathematics', subtopic: null },
+      nextRecommendedAction: 'Continue with mathematics',
+      holidayProgrammeAvailable: false,
+      learningReadiness: null,
+      notes: [],
+    }),
+    career: section({
+      careerCluster: 'Finance',
+      strengthProfile: 'Current evidence suggests Accountant / Financial Analyst is within reach with focused development. The main gap is Communication.',
+      futureDirection: 'Focus on communication — one more step of consistent progress will close this gap.',
+      aiOutlook: null,
+      confidence: 'Low',
+      // Real doors/AI-impact data for the matched career (Accountant / Financial
+      // Analyst), pulled during this feature's implementation — the door
+      // summaries never mention that job title, only the generic activity.
+      doorsPreview: [
+        { type: 'employment', summary: 'Work in finance departments across industries — banking, manufacturing, NGOs, government, tech.' },
+        { type: 'self_employment', summary: 'Provide bookkeeping, tax filing, audit, and financial advisory services to SMEs.' },
+        { type: 'entrepreneurship', summary: 'Build a financial technology or advisory business.' },
+        { type: 'ai_era', summary: 'Use AI tools to analyze financial data, build models faster, and provide strategic advisory that previously required a team.' },
+      ],
+      // Matches the real, live output of getCareerBlueprintSummary()'s
+      // consolidated derivation (lib/learnerIntelligence/careerIntelligence.ts)
+      // — built only from ai_impact.replacing/human_advantage, never
+      // honest_summary verbatim, so it never contains "low-skill" or
+      // "cannot replace" regardless of what that career's own free-text
+      // honest_summary field says.
+      aiChangeSummary: 'AI and similar tools are automating manual ledger bookkeeping and bank reconciliation by hand. The field is not disappearing, but the bar is rising: complex tax planning requiring judgment, audit work requiring professional skepticism and forensic accounting investigations continue to depend heavily on human judgement.',
+      humanAdvantageSummary: null,
+      explorationSuggestions: ['Mathematics', 'English', 'Business Studies', 'Economics'],
+      notes: [],
+    }),
+    portfolio: section({ publishedCount: 0, latestItem: null, featuredItem: null, portfolioUrl: null }),
+    achievement: section({ achievementCount: 0, latestVerifiedAchievement: null, highestLevelAchievement: null, profileUrl: null }),
+    projects: section({ projectCount: 0, latestPublishedProject: null, currentActiveProject: null, featuredProject: null, projectsUrl: null }),
+    competitions: section({ totalCompetitions: 0, verifiedCompetitions: 0, latestCompetition: null, currentParticipation: null, competitionsUrl: null }),
+    leadership: section({ currentRole: null, completedRoleCount: 0, latestCompletedRole: null, leadershipUrl: null }),
+    innovations: section({ currentStage: null, iterationCount: 0, latestMilestone: null, latestImplementationDate: null, innovationsUrl: null }),
+    teacherReflection: unavailable("This learner's teacher has not yet published a reflection."),
+    parentSummary: section({ headline: 'Kevin Otieno is still building a fuller evidence picture this term.', detail: '6 subjects currently tracked.', action: null }),
+    growthTimeline: unavailable('Growth direction remains provisional until at least two scored evidence points are available.'),
+    risk: section({
+      overallRiskLevel: 'normal',
+      flags: [],
+      supportingEvidenceIds: ['e181c261-5b19-4c29-9e27-3b0856c5998a'],
+      confidence: 100,
+      coverage: { evidenceCount: 6, evidenceDiversity: 1, latestEvidenceAt: '2026-07-29T09:34:02.453Z', oldestEvidenceAt: '2026-07-29T09:34:02.453Z', freshnessDays: 0 },
+      lastComputed: '2026-07-29T09:34:14.813Z',
+    }),
+    recommendedNextSteps: section({
+      actions: [{
+        title: 'Explore Career Journey',
+        description: 'Your child is showing interest in Finance — explore this together.',
+        actionType: 'explore_career_journey',
+        priority: 'suggested',
+        sourceDomain: 'Career Intelligence',
+        destination: '/career-intelligence',
+        available: true,
+        reasonUnavailable: null,
+        generatedAt: '2026-07-29T09:34:16.767Z',
+      }],
+    }),
+    ...overrides,
+  })
+}
+
 function render(blueprint: LearnerBlueprint, exportMode: 'screen' | 'pdf' = 'screen') {
   return renderToStaticMarkup(
     <BlueprintView
@@ -187,19 +298,30 @@ function render(blueprint: LearnerBlueprint, exportMode: 'screen' | 'pdf' = 'scr
 }
 
 const PAGE_TITLES = [
-  'Learner Overview',
-  'Academic Evidence Matrix',
-  'Growth, Risk and Conditions',
-  'Pathway and Future Intelligence',
-  'Coordinated Action Plan',
-  'School and Family Review',
+  'Where We Stand Today',
+  'What the Evidence Suggests',
+  'How We Help Next',
+  'What May Be Emerging',
 ]
 
-test('BlueprintView renders exactly seven report pages (one cover + six body pages) in order', () => {
+const BANNED_PHRASES = [
+  /no data/i,
+  /insufficient data/i,
+  /\bunavailable\b/i,
+  /\bN\/A\b/,
+  /high.confidence/i,
+  /\bowner:/i,
+  /\bfreshness:/i,
+  /\bADR-\d/,
+  /\blib\//,
+  /composeBlueprint/i,
+]
+
+test('BlueprintView renders exactly four report pages, in order', () => {
   const html = render(createBlueprint())
 
   const pageShellCount = (html.match(/data-blueprint-page-shell="true"/g) ?? []).length
-  assert.equal(pageShellCount, 7, 'expected exactly 7 page-shell elements: 1 cover + 6 body pages')
+  assert.equal(pageShellCount, 4)
 
   let cursor = -1
   for (const title of PAGE_TITLES) {
@@ -209,44 +331,215 @@ test('BlueprintView renders exactly seven report pages (one cover + six body pag
   }
 
   assert.match(html, /Learner Blueprint/)
-  assert.match(html, /Educational Intelligence Report/)
 })
 
-test('BlueprintView cover page shows learner context, current snapshot, direction, subject count, and a report ID — no fabricated data', () => {
+test('Kevin (one assessment, trend insufficient_data): never says no data / insufficient data / unavailable / high-confidence, anywhere in the document', () => {
+  const html = render(createKevinBlueprint())
+
+  for (const phrase of BANNED_PHRASES) {
+    assert.doesNotMatch(html, phrase, `banned phrase ${phrase} should not appear anywhere in the rendered document`)
+  }
+})
+
+test('Kevin: Page 1 opens with an honest, human snapshot — strengths named, single-assessment maturity stated in prose', () => {
+  const html = render(createKevinBlueprint())
+
+  assert.match(html, /real strength in Biology and Kiswahili Lugha/)
+  assert.match(html, /Exceeding Expectations/)
+  assert.match(html, /Meeting Expectations/)
+  assert.match(html, /early snapshot, based on one assessment across 6 subjects/)
+  assert.match(html, /Future assessments will show how this picture changes over time/)
+  assert.match(html, /active learning focus is.*Mathematics/)
+})
+
+test('An all-caps legacy name ("TUCYLA NYAWIRA") is displayed and used in prose as proper case, never shouting — a real mixed-case name is left untouched', () => {
+  const allCaps = render(createKevinBlueprint({
+    identity: section({
+      learnerName: 'TUCYLA NYAWIRA', admissionNumber: 'X', schoolName: 'Test School', schoolLogoUrl: null,
+      currentClassName: 'Grade 9', academicYearLabel: '2026', termLabel: 'Term 2', guardians: [],
+    }),
+  }))
+  assert.match(allCaps, />Tucyla Nyawira</, 'masthead should show proper case')
+  assert.match(allCaps, /Tucyla.+current picture shows real strength/)
+  assert.doesNotMatch(allCaps, /TUCYLA/)
+
+  const mixedCase = render(createKevinBlueprint())
+  assert.match(mixedCase, /Kevin.+current picture shows real strength/, 'a real mixed-case name must be left exactly as-is')
+})
+
+test('Irregular CBC subject labels render correctly — "CRE" stays an acronym, "Agriculture & Nutrition" keeps its conjunction, "Pre-Technical Studies" and "Creative Arts & Sports" match curriculum naming', () => {
+  const html = render(createKevinBlueprint({
+    academicRecord: section({
+      overallTrend: 'insufficient_data',
+      bySubject: [
+        { subject: 'cre', latestLevel: 3, trend: 'insufficient_data', evidenceCount: 1, latestEvidenceAt: '2026-07-29T00:00:00Z' },
+        { subject: 'agriculture_nutrition', latestLevel: 3, trend: 'insufficient_data', evidenceCount: 1, latestEvidenceAt: '2026-07-29T00:00:00Z' },
+        { subject: 'pre_technical_studies', latestLevel: 3, trend: 'insufficient_data', evidenceCount: 1, latestEvidenceAt: '2026-07-29T00:00:00Z' },
+        { subject: 'creative_arts_sports', latestLevel: 4, trend: 'insufficient_data', evidenceCount: 1, latestEvidenceAt: '2026-07-29T00:00:00Z' },
+      ],
+      competencies: [], confidence: 100, lastComputed: '2026-07-29T00:00:00Z',
+    }),
+  }))
+  assert.match(html, />CRE</)
+  assert.doesNotMatch(html, />Cre</)
+  assert.match(html, /Agriculture &amp; Nutrition/)
+  assert.match(html, /Pre-Technical Studies/)
+  assert.match(html, /Creative Arts &amp; Sports/)
+})
+
+test('Kevin: Level 3 subjects are described as secure, never as a deficit relative to Level 4', () => {
+  const html = render(createKevinBlueprint())
+  assert.doesNotMatch(html, /weak/i)
+  assert.doesNotMatch(html, /deficien/i)
+  assert.match(html, /stay just as real and capable/)
+})
+
+test('Kevin: Page 2 never claims a stable trend or "developing unevenly" from one assessment', () => {
+  const html = render(createKevinBlueprint())
+  assert.match(html, /first assessment shows some variation across subjects/)
+  assert.doesNotMatch(html, /developing unevenly/)
+  assert.match(html, /No reliable trend can be described yet/)
+})
+
+test('Kevin: risk is framed as "no current concern pattern", never exposes confidence, coverage, or evidence IDs', () => {
+  const html = render(createKevinBlueprint())
+  assert.match(html, /No current concern pattern is visible in this first snapshot\./)
+  assert.doesNotMatch(html, /e181c261-5b19-4c29-9e27-3b0856c5998a/)
+  assert.doesNotMatch(html, /100%/)
+  assert.doesNotMatch(html, /coverage/i)
+})
+
+test('Kevin: career is framed as an early exploration signal, in one compact sentence, never a settled recommendation — "within reach" and "main gap" language is not repeated verbatim', () => {
+  const html = render(createKevinBlueprint())
+  assert.match(html, /current record suggests Finance as one direction worth exploring/)
+  assert.match(html, /early signal that future assessments, projects and experiences may sharpen or change/)
+  assert.doesNotMatch(html, /is within reach/)
+  assert.doesNotMatch(html, /main gap/i)
+})
+
+test('Kevin: no specific occupation title ever appears on Page 4, even though the underlying career data contains one', () => {
+  const html = render(createKevinBlueprint())
+  assert.doesNotMatch(html, /Accountant/i)
+  assert.doesNotMatch(html, /Financial Analyst/i)
+  assert.doesNotMatch(html, /Finance Manager/i)
+  assert.match(html, /\bFinance\b/, 'the cluster label itself must still appear — only the specific job title is hidden')
+})
+
+test('Kevin: the four real doors render as one generic-activity sentence each, under their plain labels, never the door’s own job-title-flavored heading', () => {
+  const html = render(createKevinBlueprint())
+  assert.match(html, /Four ways this direction could open/)
+  assert.match(html, />Employment</)
+  assert.match(html, />Self-employment</)
+  assert.match(html, />Entrepreneurship</)
+  assert.match(html, />AI-augmented work</)
+  assert.match(html, /Work in finance departments across industries/)
+  assert.doesNotMatch(html, /Accountant \/ Finance Manager/) // the door's own `title` field, never rendered
+})
+
+test('Kevin: AI-change is one consolidated paragraph, never raw level/replacing/creating/timeline data, never "low-skill" or "AI cannot replace" wording, and the human-advantage claim appears only once', () => {
+  const html = render(createKevinBlueprint())
+  assert.match(html, /How this field is changing/)
+  assert.match(html, /bar is rising/)
+  assert.match(html, /complex tax planning requiring judgment/)
+  assert.doesNotMatch(html, /"level"|"replacing"|"creating"|"timeline"/)
+  assert.doesNotMatch(html, /low-skill/i)
+  assert.doesNotMatch(html, /AI cannot replace/i)
+  assert.equal((html.match(/complex tax planning requiring judgment/g) ?? []).length, 1, 'the human-advantage claim must not be duplicated as a second paragraph')
+})
+
+test('Kevin: exploration suggestions come from the career’s real required subjects, and the deeper-journey link reuses the existing recommendedNextSteps destination', () => {
+  const html = render(createKevinBlueprint())
+  assert.match(html, /Worth exploring next: Mathematics, English, Business Studies and Economics\./)
+  assert.match(html, /href="\/career-intelligence"/)
+  assert.match(html, /full Career Intelligence journey/)
+})
+
+test('Junior/exploration-mode learner: doorsPreview is null by design — no four-door grid, no AI-change box, cluster-only framing, never a crash', () => {
+  const html = render(createKevinBlueprint({
+    identity: section({
+      learnerName: 'Amina Wafula', admissionNumber: 'X', schoolName: 'Test School', schoolLogoUrl: null,
+      currentClassName: 'Grade 8', academicYearLabel: '2026', termLabel: 'Term 2', guardians: [],
+    }),
+    career: section({
+      careerCluster: 'Engineering & Technology',
+      strengthProfile: 'Current evidence suggests an emerging capability alignment with Engineering & Technology.',
+      futureDirection: 'Explore this field through subjects, clubs, or projects related to: Software Developer, Civil Engineer, Electrician.',
+      aiOutlook: null,
+      confidence: 'Medium',
+      doorsPreview: null,
+      aiChangeSummary: null,
+      humanAdvantageSummary: null,
+      explorationSuggestions: null,
+      notes: [],
+    }),
+  }))
+
+  assert.match(html, /current record suggests Engineering &amp; Technology as one direction worth exploring/)
+  assert.doesNotMatch(html, /Four ways this direction could open/)
+  assert.doesNotMatch(html, /How this field is changing/)
+  assert.doesNotMatch(html, /Worth exploring next/)
+  assert.doesNotMatch(html, /Software Developer/) // the specific example titles inside futureDirection are never rendered on Page 4 either
+})
+
+test('No canonical career match at all: empty-state fallback sentence, never an empty four-door grid', () => {
+  const html = render(createKevinBlueprint({
+    career: unavailable('More learning evidence is needed before Career Intelligence can provide reliable guidance.'),
+  }))
+
+  assert.match(html, /interests and strengths are still coming into focus/)
+  assert.doesNotMatch(html, /Four ways this direction could open/)
+})
+
+test('A career with a low AI-impact level and doors that differ from Finance renders generically — nothing hardcoded to Finance leaks through', () => {
+  const html = render(createKevinBlueprint({
+    career: section({
+      careerCluster: 'Education',
+      strengthProfile: 'x', futureDirection: 'x', aiOutlook: null, confidence: 'Medium',
+      doorsPreview: [
+        { type: 'employment', summary: 'Teach in public or private schools, from primary through university level.' },
+        { type: 'self_employment', summary: 'Offer private tutoring or exam-preparation coaching directly to families.' },
+        { type: 'entrepreneurship', summary: 'Build an education content business, tutoring centre, or online course.' },
+        { type: 'ai_era', summary: 'Use AI tutoring tools to personalise learning for many students at once.' },
+      ],
+      aiChangeSummary: 'AI tutoring tools are automating basic drill and practice, but mentorship, motivation, and classroom management remain deeply human.',
+      humanAdvantageSummary: 'Building trust with learners, reading the room, and adapting to a real classroom remain valuable — the kind of judgment only a person can offer.',
+      explorationSuggestions: ['English', 'Education'],
+      notes: [],
+    }),
+  }))
+
+  assert.match(html, /Teach in public or private schools/)
+  assert.match(html, /mentorship, motivation, and classroom management remain deeply human/)
+  assert.doesNotMatch(html, /Work in finance departments/)
+  assert.doesNotMatch(html, /\bFinance\b/)
+})
+
+test('Kevin: the priority action is Mathematics learning support, not "Explore Career Journey" — career is present but demoted to a secondary, non-binding step', () => {
+  const html = render(createKevinBlueprint())
+
+  const priorityIndex = html.indexOf('The one thing that matters most right now')
+  const mathIndex = html.indexOf('Mathematics learning focus with targeted practice and feedback')
+  const careerIndex = html.indexOf('Career exploration')
+
+  assert.ok(priorityIndex > -1 && mathIndex > -1 && careerIndex > -1)
+  assert.ok(mathIndex > priorityIndex && mathIndex < careerIndex, 'Mathematics must be the priority action, appearing before the career follow-on')
+  assert.match(html, /one early, non-binding signal among many/)
+})
+
+test('Kevin: empty future-evidence categories (Portfolio/Achievement/Projects/Competitions/Leadership/Innovation) render no empty cards — the closing line covers it once, in the page transition, not as a third paragraph', () => {
+  const html = render(createKevinBlueprint())
+  assert.match(html, /As Kevin adds projects, interests and experiences, this direction — and the wider strengths behind it — will become clearer\./)
+  assert.doesNotMatch(html, /Portfolio<\/p>/)
+  assert.equal((html.match(/will become clearer/g) ?? []).length, 1, 'the "wider strengths" idea must appear exactly once, not duplicated')
+})
+
+test('BlueprintView (rich fixture): with real future evidence present, Page 4 closes with the generic growth line, not the redundant "wider strengths" line', () => {
   const html = render(createBlueprint())
-
-  assert.match(html, /Brian Matthias/)
-  assert.match(html, /Current Snapshot/)
-  assert.match(html, /Across the available evidence, current capability is stronger in English and less secure in Mathematics\./)
-  assert.match(html, /Learning Direction/)
-  assert.match(html, /STEM and design exploration/)
-  assert.match(html, /Subjects Represented/)
-  assert.match(html, />2</, 'two subjects have confirmed evidence in the fixture')
-  assert.match(html, /Report ID: BP-LEARNER-/)
-  assert.match(html, /CONFIDENTIAL/)
+  assert.match(html, /This picture will keep growing — new evidence will sharpen and expand it over time\./)
+  assert.doesNotMatch(html, /wider strengths behind it/)
 })
 
-test('BlueprintView academic evidence matrix acknowledges confirmed assessments — never "insufficient data" beside one', () => {
-  const html = render(createBlueprint())
-
-  assert.match(html, /Meeting Expectations/, 'Level 3 should map to the real CBC label')
-  assert.match(html, /Approaching Expectations/, 'Level 2 should map to the real CBC label')
-  assert.match(html, /Based on 2 confirmed evidence items/)
-  assert.match(html, /Based on 1 confirmed evidence item\b/)
-  assert.match(html, /Current recorded snapshot/)
-  assert.match(html, /Trend improving/)
-  assert.match(html, /Trend declining/)
-  assert.doesNotMatch(html, /insufficient data/i)
-})
-
-test('BlueprintView distinguishes snapshot language (Page 3) from trend language (Page 4)', () => {
-  const html = render(createBlueprint())
-  const snapshotIndex = html.indexOf('Current recorded snapshot')
-  const trendIndex = html.indexOf('Movement over time (trend, not a new snapshot)')
-  assert.ok(snapshotIndex > -1 && trendIndex > -1 && snapshotIndex < trendIndex)
-})
-
-test('BlueprintView keeps normal risk calm rather than alarming', () => {
+test('BlueprintView (rich fixture) keeps normal risk calm rather than alarming', () => {
   const html = render(createBlueprint({
     risk: section({
       overallRiskLevel: 'normal',
@@ -258,24 +551,24 @@ test('BlueprintView keeps normal risk calm rather than alarming', () => {
     }),
   }))
 
-  assert.match(html, /Stable/)
-  assert.match(html, /No active supported concern is currently being flagged across the available scored evidence\./)
+  assert.match(html, /No current concern pattern is visible/)
   assert.doesNotMatch(html, /Needs Urgent Support/)
 })
 
-test('BlueprintView dedupes repeated recommendations and degrades missing audience-specific actions honestly', () => {
+test('BlueprintView (rich fixture) names the watched subject when a risk flag is present, without exposing severity or evidence IDs', () => {
+  const html = render(createBlueprint())
+  assert.match(html, /Mathematics — Approaching Expectation in Mathematics but declining from prior evidence/)
+  assert.doesNotMatch(html, /\bwatch\b/i)
+  assert.doesNotMatch(html, /"e1"|'e1'|>e1</)
+})
+
+test('BlueprintView dedupes repeated recommendations across the action list', () => {
   const html = render(createBlueprint({
-    teacherReflection: unavailable('No published teacher reflection yet.'),
     learningCompass: unavailable('No current learning focus yet.'),
-    parentSummary: section({
-      headline: null,
-      detail: null,
-      action: 'Practice ratio and fraction fluency three times each week.',
-    }),
     recommendedNextSteps: section({
       actions: [{
         title: 'Continue Holiday Learning',
-        description: 'Practice ratio and fraction fluency three times each week.',
+        description: 'Keep Mathematics support short, regular, and closely monitored.',
         actionType: 'continue_holiday_learning',
         priority: 'important',
         sourceDomain: 'Learning Compass',
@@ -287,10 +580,7 @@ test('BlueprintView dedupes repeated recommendations and degrades missing audien
     }),
   }))
 
-  assert.equal((html.match(/Practice ratio and fraction fluency three times each week\./g) ?? []).length, 1)
-  assert.match(html, /No teacher-specific action is currently supported clearly enough by evidence\./)
-  assert.match(html, /No learner-specific action is currently supported clearly enough by evidence\./)
-  assert.match(html, /Learning Compass has no distinct next step recorded yet\./)
+  assert.equal((html.match(/Keep Mathematics support short, regular, and closely monitored\./g) ?? []).length, 1)
 })
 
 test('BlueprintView changes future framing by grade band and stays honest when future evidence is thin', () => {
@@ -300,7 +590,7 @@ test('BlueprintView changes future framing by grade band and stays honest when f
       currentClassName: 'Grade 8', academicYearLabel: '2026', termLabel: 'Term 2', guardians: [],
     }),
   }))
-  assert.match(grade78, /widens exploration and notices emerging strengths/)
+  assert.match(grade78, /still early to narrow things down/)
 
   const grade9 = render(createBlueprint({
     identity: section({
@@ -308,51 +598,29 @@ test('BlueprintView changes future framing by grade band and stays honest when f
       currentClassName: 'Grade 9', academicYearLabel: '2026', termLabel: 'Term 2', guardians: [],
     }),
   }))
-  assert.match(grade9, /tests pathway readiness and clarifies what still needs to grow/)
+  assert.match(grade9, /testing readiness for different pathways/)
 
-  const senior = render(createBlueprint({
+  const senior = render(createKevinBlueprint({
     identity: section({
-      learnerName: 'Brian Matthias', admissionNumber: 'ADM-1', schoolName: 'Test School', schoolLogoUrl: null,
+      learnerName: 'Kevin Otieno', admissionNumber: 'MRSS-G10-1785317634545', schoolName: 'Mwatate Ridge Senior School', schoolLogoUrl: null,
       currentClassName: 'Grade 11', academicYearLabel: '2026', termLabel: 'Term 2', guardians: [],
     }),
-    career: section({ careerCluster: null, strengthProfile: null, futureDirection: null, aiOutlook: null, confidence: null, notes: [] }),
-    portfolio: section({ publishedCount: 0, latestItem: null, featuredItem: null, portfolioUrl: null }),
-    achievement: section({ achievementCount: 0, latestVerifiedAchievement: null, highestLevelAchievement: null, profileUrl: null }),
-    projects: section({ projectCount: 0, latestPublishedProject: null, currentActiveProject: null, featuredProject: null, projectsUrl: null }),
-    competitions: section({ totalCompetitions: 0, verifiedCompetitions: 0, latestCompetition: null, currentParticipation: null, competitionsUrl: null }),
-    leadership: section({ currentRole: null, completedRoleCount: 0, latestCompletedRole: null, leadershipUrl: null }),
-    innovations: section({ currentStage: null, iterationCount: 0, latestMilestone: null, latestImplementationDate: null, innovationsUrl: null }),
   }))
-  assert.match(senior, /further education, TVET, entrepreneurship, or work-related opportunities/)
-  assert.match(senior, /The current career signal is still too thin for a more specific future interpretation\./)
-  assert.match(senior, /Future evidence is still limited, so this page should guide exploration more than it suggests any firm direction\./)
-  assert.doesNotMatch(senior, /Emerging direction:/)
+  assert.match(senior, /further education, technical training, entrepreneurship, or work/)
 })
 
-test('BlueprintView preserves honest unavailable states without inventing substitute content', () => {
+test('BlueprintView preserves honest, interpretive handling when core sections are unavailable — never fabricates, never crashes', () => {
   const html = render(createBlueprint({
-    academicRecord: unavailable('Academic evidence is unavailable without a bridged learner record.'),
+    academicRecord: unavailable('No legacy student identity bridged for this learner.'),
     growthTimeline: unavailable('Growth evidence is unavailable until more scored evidence exists.'),
     career: unavailable('Career Intelligence is currently unavailable for this learner.'),
   }))
 
-  assert.match(html, /Academic evidence is unavailable without a bridged learner record\./)
-  assert.match(html, /Growth evidence is unavailable until more scored evidence exists\./)
-  assert.match(html, /Career Intelligence is currently unavailable for this learner\./)
+  assert.match(html, /We don’t yet have enough set up to build/)
+  assert.match(html, /interests and strengths are still coming into focus/)
 })
 
-test('BlueprintView Page 7 offers writable review space and signature lines, never fabricated parent/action text', () => {
-  const html = render(createBlueprint())
-
-  assert.match(html, /Parent observations/)
-  assert.match(html, /Action agreed at this meeting/)
-  assert.match(html, /Teacher signature \/ date/)
-  assert.match(html, /Parent \/ guardian signature \/ date/)
-  assert.match(html, /Recorded by Teacher Njeri/)
-  assert.match(html, /Evidence traceability/)
-})
-
-test('BlueprintView PDF export mode keeps all seven pages, the branded report header, but no interactive navigation', () => {
+test('BlueprintView PDF export mode keeps all four pages, the branded report header, but no interactive navigation', () => {
   const html = render(createBlueprint(), 'pdf')
 
   for (const title of PAGE_TITLES) {
@@ -360,7 +628,7 @@ test('BlueprintView PDF export mode keeps all seven pages, the branded report he
   }
 
   const pageShellCount = (html.match(/data-blueprint-page-shell="true"/g) ?? []).length
-  assert.equal(pageShellCount, 7)
+  assert.equal(pageShellCount, 4)
 
   assert.match(html, /data-blueprint-ready="true"/)
   assert.match(html, /data-blueprint-print-break="before"/)

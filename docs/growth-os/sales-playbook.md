@@ -8,7 +8,9 @@
 
 *(one entry per real conversation — date, school, county, role spoken to, contact method, purpose, outcome, key questions asked, objections raised, positive signals, concerns, requested features, follow-up agreed, founder reflection, confidence level)*
 
-No entries yet.
+**2026-07-27 — New Era Complex, Kirinyaga.** Contact method: WhatsApp (universal cold-intro message, Dennis/EduNexus Kenya). Purpose: first-contact pitch. Outcome so far: message delivered (single grey tick, not yet read) — no reply yet. Positive signal: the WhatsApp number has the school's own logo as its profile photo, suggesting an actively-monitored, legitimate school WhatsApp Business line rather than a stale/abandoned number — a good sign for reachability on this channel going forward. No response, objection, or founder reflection to log yet; update this entry once it's read/replied to.
+
+**2026-07-27 — Kerugoya Municipality Boarding Schools, Kirinyaga.** Contact method: WhatsApp (universal cold-intro message, Dennis/EduNexus Kenya). Outcome so far: message delivered (single grey tick, not yet read) — no reply yet. Unlike New Era, this WhatsApp number shows no school branding/logo on the profile — inconclusive on its own (could just be a personal number used for admin, or a less actively maintained line); not treated as a bad signal yet, just a difference worth tracking if a pattern emerges across more schools.
 
 ---
 

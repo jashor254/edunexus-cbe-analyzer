@@ -57,6 +57,10 @@ export async function composeCareer(
       futureDirection: summary.futureDirection,
       aiOutlook: summary.aiOutlook,
       confidence: summary.confidence,
+      doorsPreview: summary.doorsPreview,
+      aiChangeSummary: summary.aiChangeSummary,
+      humanAdvantageSummary: summary.humanAdvantageSummary,
+      explorationSuggestions: summary.explorationSuggestions,
       notes: [
         ...(summary.aiOutlook === null ? ['AI Outlook has no canonical cluster-level source yet — left null, not guessed.'] : []),
         ...(summary.version === null ? ['No canonical algorithm-version export exists yet for Career Intelligence matching — left null, not invented.'] : []),

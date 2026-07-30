@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { FileText, ChevronRight, Compass, Home, Search, Copy, Check, MessageCircle, ArrowRight } from 'lucide-react'
+import { FileText, ChevronRight, Home, Search, Copy, Check, MessageCircle, ArrowRight } from 'lucide-react'
 import { SENIOR_PATHWAY_ELECTIVES, getSeniorCompulsorySubjects, SENIOR_PATHWAYS } from '@/lib/curriculum/subjects'
 import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 
@@ -91,7 +91,10 @@ function NewAssignmentForm() {
     max_score: 100,
     is_quiz: false,
     is_adaptive: false,
-    is_compass_guided: true,
+    // Compass Guided toggle removed from the UI — "Start with Compass"
+    // linked to a route that doesn't exist. Always submit false until a
+    // real bridge is built. See docs/architecture/ (Compass constraint).
+    is_compass_guided: false,
     is_holiday_assignment: false,
     holiday_period: '',
     lesson_plan_id: '',
@@ -684,7 +687,6 @@ function NewAssignmentForm() {
                   ...p,
                   is_quiz: !p.is_quiz,
                   is_adaptive: p.is_quiz ? false : p.is_adaptive, // turning Quiz off always turns Adaptive off with it
-                  is_compass_guided: p.is_quiz ? p.is_compass_guided : false,
                 }))}
                 className={`relative w-12 h-6 rounded-full transition-colors ${
                   form.is_quiz ? 'bg-amber-500' : 'bg-gray-200'
@@ -736,42 +738,6 @@ function NewAssignmentForm() {
               </div>
             )}
           </div>
-
-          {/* Compass Guided toggle */}
-          {!form.is_quiz && (
-          <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-teal-600 rounded-xl flex items-center justify-center">
-                  <Compass className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <div className="font-black text-gray-900 text-sm">Compass Guided</div>
-                  <div className="text-xs text-gray-500">
-                    Compass delivers assignment Socratically & tracks performance
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setForm(p => ({ ...p, is_compass_guided: !p.is_compass_guided }))}
-                className={`relative w-12 h-6 rounded-full transition-colors ${
-                  form.is_compass_guided ? 'bg-teal-600' : 'bg-gray-200'
-                }`}
-              >
-                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${
-                  form.is_compass_guided ? 'left-7' : 'left-1'
-                }`} />
-              </button>
-            </div>
-            {form.is_compass_guided && (
-              <p className="text-xs text-teal-700 mt-3">
-                ✅ Students click "Start with Compass 🧭" and Compass guides them Socratically.
-                Performance is automatically summarized for marking.
-              </p>
-            )}
-          </div>
-          )}
 
           {/* Holiday Assignment toggle */}
           <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">

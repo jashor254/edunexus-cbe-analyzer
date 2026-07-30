@@ -9,9 +9,9 @@
 import { getStudentBasicInfo } from '@/lib/learnerModel'
 import { extractCapabilityProfile } from '@/lib/career/capabilityExtractor'
 import { computeCapabilityMatches, alignmentToPercent } from '@/lib/career/capabilityMatchEngine'
-import { getAllCareersWithCOS } from '@/lib/career/careerEngine'
+import { getAllCareersWithCOS, getCareerBySlugWithCOS } from '@/lib/career/careerEngine'
 import { COS_DISCLAIMER } from '@/lib/career/types'
-import type { CapabilityCareerMatch, CareerCategory } from '@/lib/career/types'
+import type { CapabilityCareerMatch, CareerCategory, CareerDoor, DoorType } from '@/lib/career/types'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { projectionToScoreHistory } from './projectionAdapters'
 import { insufficientEvidenceInsight } from './insight'
@@ -215,6 +215,12 @@ export async function buildCareerIntelligence(studentId: string): Promise<Career
 // no specific career/job title, no full families/matches list, no
 // evidence/gap detail — Blueprint answers "what direction," never "which
 // job," per this sprint's Architectural Goal.
+/** One door, reduced to a single generic-activity sentence — never the door's own `title` (job-title-flavored) and never salary/employer/startup-cost detail. */
+export type CareerDoorPreview = {
+  type: DoorType
+  summary: string
+}
+
 export type CareerBlueprintSummary = {
   /** Broad cluster label (e.g. "Engineering & Technology") — never a specific career/job title. */
   careerCluster: string
@@ -236,6 +242,59 @@ export type CareerBlueprintSummary = {
    * documented gap, never invented. See sprint-12n doc §5.
    */
   version: string | null
+  /**
+   * A four-door preview of the matched career's real, canonical door data
+   * (`Career.doors`) — Senior/planning mode only. `null` for Junior/
+   * exploration mode (families never resolve to one specific career, by
+   * design — the Career Principle grade gate), when the underlying career
+   * lookup fails (fails soft, never makes the whole section unavailable),
+   * or when no door has a usable description to summarize.
+   */
+  doorsPreview: CareerDoorPreview[] | null
+  /** `Career.ai_impact.honest_summary`, verbatim — already a single, non-fear-based sentence per career. Senior-only, same null rules as `doorsPreview`. */
+  aiChangeSummary: string | null
+  /** Templated from `Career.ai_impact.human_advantage` (first 2-3 items) into one sentence — never the raw array. Senior-only, same null rules. */
+  humanAdvantageSummary: string | null
+  /** From `Career.required_subjects` — real, canonical, per-career field. Never derived from gap/weakness narrative text. Senior-only, same null rules. */
+  explorationSuggestions: string[] | null
+}
+
+const DOOR_ORDER: DoorType[] = ['employment', 'self_employment', 'entrepreneurship', 'ai_era']
+
+function titleCaseSlug(slug: string): string {
+  return slug
+    .split('_')
+    .map((word) => (word.length > 0 ? word[0].toUpperCase() + word.slice(1) : word))
+    .join(' ')
+}
+
+function lowercaseFirst(value: string): string {
+  return value.length > 0 ? value[0].toLowerCase() + value.slice(1) : value
+}
+
+function joinNatural(items: string[]): string {
+  if (items.length === 0) return ''
+  if (items.length === 1) return items[0]
+  if (items.length === 2) return `${items[0]} and ${items[1]}`
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`
+}
+
+/** First sentence of a door's `description` only — real per-career content, generic activity level, never the door's `title`. */
+function summarizeDoor(door: CareerDoor): CareerDoorPreview | null {
+  if (!door.description) return null
+  const firstSentence = door.description.split(/(?<=[.!?])\s/)[0]?.trim()
+  if (!firstSentence) return null
+  return { type: door.type, summary: firstSentence }
+}
+
+function buildDoorsPreview(doors: CareerDoor[]): CareerDoorPreview[] | null {
+  const byType = new Map(doors.map((d) => [d.type, d]))
+  const previews = DOOR_ORDER
+    .map((type) => byType.get(type))
+    .filter((d): d is CareerDoor => !!d)
+    .map(summarizeDoor)
+    .filter((p): p is CareerDoorPreview => !!p)
+  return previews.length > 0 ? previews : null
 }
 
 /**
@@ -254,6 +313,53 @@ export async function getCareerBlueprintSummary(studentId: string): Promise<Care
     ? top.categoryLabel
     : (CATEGORY_LABEL[top.careerCategory] ?? top.careerCategory)
 
+  // Senior/planning mode only — `top` is a CareerMatchInsight (has
+  // `careerSlug`) exactly when it resolved to one specific matched career.
+  // Junior/exploration mode's `top` is a CareerFamilyInsight (category-level,
+  // no slug) — that's the Career Principle grade gate working as designed,
+  // not a gap: Junior never resolves to one specific career, so a door
+  // preview genuinely cannot exist for it.
+  let doorsPreview: CareerDoorPreview[] | null = null
+  let aiChangeSummary: string | null = null
+  // Always null — its content is folded into `aiChangeSummary` as one
+  // consolidated paragraph (see below). Field kept for type stability.
+  const humanAdvantageSummary: string | null = null
+  let explorationSuggestions: string[] | null = null
+
+  if ('careerSlug' in top) {
+    try {
+      const career = await getCareerBySlugWithCOS(top.careerSlug)
+      if (career) {
+        doorsPreview = buildDoorsPreview(career.doors ?? [])
+        // One consolidated paragraph, built only from the structured
+        // `replacing`/`human_advantage` arrays — deliberately never
+        // `ai_impact.honest_summary` verbatim, since that per-career
+        // free-text field's exact wording ("low-skill," "cannot replace,"
+        // etc.) is authored independently for every career and can't be
+        // relied on to stay within this consumer's editorial register.
+        // `humanAdvantageSummary` is folded into this one paragraph rather
+        // than kept as a second field, so the reader never sees the same
+        // "what stays human" claim twice.
+        if (career.ai_impact) {
+          const routine = career.ai_impact.replacing.slice(0, 2).map(lowercaseFirst)
+          const advantage = career.ai_impact.human_advantage.slice(0, 3).map(lowercaseFirst)
+          if (routine.length > 0 && advantage.length > 0) {
+            aiChangeSummary = `AI and similar tools are automating ${joinNatural(routine)}. The field is not disappearing, but the bar is rising: ${joinNatural(advantage)} continue to depend heavily on human judgement.`
+          } else if (advantage.length > 0) {
+            aiChangeSummary = `The bar in this field is rising: ${joinNatural(advantage)} continue to depend heavily on human judgement.`
+          }
+        }
+        if (career.required_subjects && career.required_subjects.length > 0) {
+          explorationSuggestions = career.required_subjects.map(titleCaseSlug)
+        }
+      }
+    } catch {
+      // Fail soft — the four preview fields stay null, the rest of the
+      // summary (already fully computed above) is returned unaffected.
+      // The career section must never become unavailable over this lookup.
+    }
+  }
+
   return {
     careerCluster,
     strengthProfile: top.insight.observation,
@@ -261,5 +367,9 @@ export async function getCareerBlueprintSummary(studentId: string): Promise<Care
     aiOutlook: null,
     confidence: top.insight.confidence,
     version: null,
+    doorsPreview,
+    aiChangeSummary,
+    humanAdvantageSummary,
+    explorationSuggestions,
   }
 }

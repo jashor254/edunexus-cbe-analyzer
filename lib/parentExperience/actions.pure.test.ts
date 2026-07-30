@@ -56,7 +56,7 @@ const ATTENDANCE_HEALTHY = available<AttendanceData>({
 })
 
 const CAREER = available<CareerData>({
-  careerCluster: 'Engineering & Technology', strengthProfile: 'x', futureDirection: 'y', aiOutlook: null, confidence: 'Medium', notes: [],
+  careerCluster: 'Engineering & Technology', strengthProfile: 'x', futureDirection: 'y', aiOutlook: null, confidence: 'Medium', doorsPreview: null, aiChangeSummary: null, humanAdvantageSummary: null, explorationSuggestions: null, notes: [],
 })
 
 function fixtureSnapshot(type: BlueprintSnapshotType, id = 'snap-1'): BlueprintSnapshotRow {

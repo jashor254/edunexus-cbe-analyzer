@@ -8,6 +8,7 @@ import {
   Brain, Compass, Table2,
 } from 'lucide-react'
 import { generateAssignmentPDF } from '@/lib/assignments/pdfRenderer'
+import PrintableRoutesPanel from '@/components/teacher/PrintableRoutesPanel'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -598,6 +599,9 @@ export default function AssignmentMarkingPage({ params }: { params: Promise<{ as
           ))}
         </div>
       </div>
+
+      {/* ── Printable Adaptive Assignments pilot ──────────────────────────── */}
+      <PrintableRoutesPanel assignmentId={assignment.id} />
 
       {/* ── Struggling students alert ───────────────────────────────────── */}
       {strugglingAlerts.length > 0 && (

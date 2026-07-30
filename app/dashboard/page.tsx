@@ -1413,14 +1413,10 @@ export default function DashboardPage() {
                           {a.isOverdue ? '⚠ Overdue' : `${a.daysLeft}d left`}
                         </span>
                       </div>
-                      {a.is_compass_guided && (
-                        <Link
-                          href={`/chat?assignmentId=${a.id}&topic=${encodeURIComponent(a.topic)}&instructions=${encodeURIComponent(a.instructions)}`}
-                          className="inline-flex items-center gap-1.5 text-xs bg-gradient-to-r from-violet-500 to-purple-500 text-white px-3 py-1.5 rounded-lg font-black hover:scale-105 transition-all"
-                        >
-                          <Compass className="w-3.5 h-3.5" /> Start with Compass
-                        </Link>
-                      )}
+                      {/* "Start with Compass" removed — is_compass_guided has no
+                          real learner-facing bridge yet (linked to a route that
+                          doesn't exist). Do not re-add until a real Compass
+                          session bridge is built. */}
                     </div>
                   ))}
                 </div>

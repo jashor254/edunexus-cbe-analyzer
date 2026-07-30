@@ -391,14 +391,10 @@ function AssignmentCard({
           </div>
         )}
 
-        {item.is_compass_guided && (
-          <Link
-            href={`/chat?topic=${encodeURIComponent(item.topic)}&subject=${encodeURIComponent(item.subject)}`}
-            className="inline-flex items-center gap-2 text-xs font-black text-teal-700 bg-teal-50 border border-teal-200 px-3 py-2 rounded-xl hover:bg-teal-100 transition"
-          >
-            <Compass className="w-3.5 h-3.5" /> Practice weak areas
-          </Link>
-        )}
+        {/* "Practice weak areas" removed — is_compass_guided has no real
+            learner-facing bridge yet (linked to a route that doesn't
+            exist). Do not re-add until a real Compass session bridge is
+            built. */}
       </div>
     )
   }
@@ -468,14 +464,10 @@ function AssignmentCard({
             </button>
           ) : (
             <>
-              {item.is_compass_guided && (
-                <Link
-                  href={`/chat?topic=${encodeURIComponent(item.topic)}&subject=${encodeURIComponent(item.subject)}&assignmentId=${item.id}`}
-                  className="flex items-center gap-2 bg-teal-600 text-white px-4 py-2.5 rounded-xl font-black text-sm hover:bg-teal-700 transition"
-                >
-                  <Compass className="w-4 h-4" /> Start with Compass
-                </Link>
-              )}
+              {/* "Start with Compass" removed — is_compass_guided has no
+                  real learner-facing bridge yet (linked to a route that
+                  doesn't exist). Do not re-add until a real Compass
+                  session bridge is built. */}
               <button
                 onClick={() => setShowSubmit(true)}
                 className="flex items-center gap-2 border border-gray-200 text-gray-700 bg-gray-50 px-4 py-2.5 rounded-xl font-black text-sm hover:bg-gray-100 transition"

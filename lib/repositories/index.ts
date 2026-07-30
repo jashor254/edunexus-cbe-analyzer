@@ -4,6 +4,7 @@ import { AnalyticsRepository } from './analytics.repository'
 import { AssessmentRepository } from './assessment.repository'
 import { AssessmentTypeRepository } from './assessmentType.repository'
 import { AssignmentRepository } from './assignment.repository'
+import { AssignmentPrintRunRepository } from './assignmentPrintRun.repository'
 import { AttendanceRepository } from './attendance.repository'
 import { BillingRepository } from './billing.repository'
 import { BlueprintActionItemRepository } from './blueprintActionItem.repository'
@@ -48,6 +49,7 @@ export const repos = {
   assessments:         new AssessmentRepository(),
   assessmentTypes:     new AssessmentTypeRepository(),
   assignments:         new AssignmentRepository(),
+  assignmentPrintRuns: new AssignmentPrintRunRepository(),
   attendance:          new AttendanceRepository(),
   billing:             new BillingRepository(),
   blueprintActionItems:        new BlueprintActionItemRepository(),

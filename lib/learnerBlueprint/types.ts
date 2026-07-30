@@ -157,12 +157,23 @@ export type LearningCompassData = {
  * documented gap, see sprint-12n doc §5 for what's still a gap (`aiOutlook`,
  * `version`).
  */
+/** One door, reduced to a single generic-activity sentence — mirrors `lib/learnerIntelligence/careerIntelligence.ts`'s `CareerDoorPreview`. Never a specific job title, never salary/employer/startup-cost detail. */
+export type CareerDoorPreview = {
+  type: 'employment' | 'self_employment' | 'entrepreneurship' | 'ai_era'
+  summary: string
+}
+
 export type CareerData = {
   careerCluster: string | null
   strengthProfile: string | null
   futureDirection: string | null
   aiOutlook: string | null
   confidence: ConfidenceLevel | null
+  /** Senior/planning mode only — null for Junior/exploration mode, thin evidence, or a failed-soft lookup. See composeCareer.ts. */
+  doorsPreview: CareerDoorPreview[] | null
+  aiChangeSummary: string | null
+  humanAdvantageSummary: string | null
+  explorationSuggestions: string[] | null
   notes: string[]
 }
 

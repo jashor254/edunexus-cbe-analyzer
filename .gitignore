@@ -67,3 +67,6 @@ e2e-edunexus.mjs
 generated-reports/*.pdf
 !generated-reports/.gitkeep
 /*-test.pdf
+
+# growth outreach data — real school contact PII / campaign logs, not source
+scripts/growth/output/
