@@ -12,12 +12,13 @@ import { apiSuccess, apiError, apiForbidden, getErrorMessage } from '@/lib/api/r
 
 const FEATURE: FeatureKey = 'learning_compass'
 
+// Note: the client still sends `genuineProgress` for backward compatibility,
+// but it is intentionally never read here — see the comment on calcXp below.
 const EndSessionSchema = z.object({
   sessionId:       z.string().uuid(),
   studentId:       z.string().uuid(),
   status:          z.enum(['completed', 'abandoned']),
   durationSeconds: z.number().min(0),
-  genuineProgress: z.boolean().optional().default(false),
 })
 
 // No confirmed Evidence exists yet at the point XP is awarded — this session's
@@ -25,7 +26,11 @@ const EndSessionSchema = z.object({
 // mastery claims are never auto-confirmed (lib/compass/evidence.ts), so there is
 // nothing confirmed to derive XP from synchronously. Formula unchanged; gated on
 // the actual completion event so XP reflects finishing a session, not just
-// exchanging messages and abandoning it.
+// exchanging messages and abandoning it. `genuineProgress` here must be the
+// server-derived value (session_state.masteredConcepts, written by the AI
+// streaming route) — never the client-supplied request-body flag, which a
+// client can set unconditionally and would otherwise buy an unearned +60 XP /
+// level-up shown to the student before any human or evidence review.
 function calcXp(exchanges: number, completed: boolean, genuineProgress: boolean): number {
   if (!completed) return 0
   const base     = Math.min(exchanges, 15) * 10
@@ -63,7 +68,6 @@ export async function POST(req: Request): Promise<Response> {
       studentId,
       status,
       durationSeconds,
-      genuineProgress,
     } = parsed.data
 
     const access = await checkFeatureAccess(FEATURE)
@@ -80,7 +84,7 @@ export async function POST(req: Request): Promise<Response> {
 
     const [sessionRes, contextRes] = await Promise.all([
       db.from('compass_sessions')
-        .select('exchange_count, starting_level')
+        .select('exchange_count, starting_level, subject, session_state')
         .eq('id', sessionId)
         .maybeSingle(),
       db.from('student_learning_context')
@@ -90,9 +94,15 @@ export async function POST(req: Request): Promise<Response> {
     ])
 
     const session       = sessionRes.data
+    const sessionRow    = session
     const ctx           = contextRes.data
     const exchanges     = (session?.exchange_count  as number | null) ?? 0
     const startingLevel = (session?.starting_level  as number | null) ?? null
+
+    const sessionState     = (session?.session_state as Record<string, unknown> | null) ?? null
+    const masteredConcepts = (sessionState?.masteredConcepts as string[] | null) ?? []
+    // Server-derived, never the client-supplied request-body flag — see calcXp comment.
+    const genuineProgress  = masteredConcepts.length > 0
 
     const prevTotal     = (ctx?.total_sessions     as number | null) ?? 0
     const prevWeekly    = (ctx?.sessions_this_week as number | null) ?? 0
@@ -104,16 +114,6 @@ export async function POST(req: Request): Promise<Response> {
     const isSameWeek     = prevWeekStart === thisWeekMonday
     const newWeekly      = isSameWeek ? prevWeekly + 1 : 1
     const newTotal       = prevTotal + 1
-
-    // Resolve subject for group-points bonus, and session_state for Learner Model evidence
-    const { data: sessionRow } = await db
-      .from('compass_sessions')
-      .select('subject, session_state')
-      .eq('id', sessionId)
-      .maybeSingle()
-
-    const sessionState    = (sessionRow?.session_state as Record<string, unknown> | null) ?? null
-    const masteredConcepts = (sessionState?.masteredConcepts as string[] | null) ?? []
 
     // Ending level — same tier→level lookup used at session start (app/api/learn/route.ts),
     // read fresh here since it's what changed (if anything) during the session.

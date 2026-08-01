@@ -30,6 +30,7 @@ import { listReviewableBlueprintActionsForLearner, type ReviewableActionListItem
 import BlueprintView from '@/components/blueprint/BlueprintView'
 import BlueprintStateMessage from '@/components/blueprint/BlueprintStateMessage'
 import BlueprintActionPlanSection from '@/components/blueprint/actionPlan/BlueprintActionPlanSection'
+import BlueprintCandidateQueue from '@/components/blueprint/actionPlan/BlueprintCandidateQueue'
 import JourneyLinks from '@/components/student/JourneyLinks'
 import Link from 'next/link'
 
@@ -143,7 +144,8 @@ export default async function StudentBlueprintPage({
         </div>
       )}
       {actionPlanItems !== null && (
-        <div className="max-w-4xl mx-auto px-4 pt-4">
+        <div className="max-w-4xl mx-auto px-4 pt-4 space-y-4">
+          <BlueprintCandidateQueue learnerId={learnerId} schoolId={schoolId} />
           <BlueprintActionPlanSection learnerId={learnerId} items={actionPlanItems} />
         </div>
       )}

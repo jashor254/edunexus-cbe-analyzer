@@ -119,6 +119,13 @@ export async function addGrowthMilestone(
   return repos.learnerModel.addGrowthMilestone(studentId, milestone)
 }
 
+export async function markGrowthMilestonesNotified(
+  studentId:  string,
+  milestones: GrowthMilestone[],
+): Promise<void> {
+  return repos.learnerModel.markGrowthMilestonesNotified(studentId, milestones)
+}
+
 export async function updateRiskProfile(
   studentId:   string,
   flags:       RiskFlag[],

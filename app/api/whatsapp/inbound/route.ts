@@ -13,6 +13,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { processInboundReply, buildAcknowledgement } from '@/lib/parentPulse/observationPipeline'
 import { sendWhatsApp } from '@/lib/whatsapp/sender'
 import { createServiceClient } from '@/utils/supabase/service'
+import { getLearnerProfile } from '@/lib/learnerModel/queries'
 
 // ── GET — Meta webhook verification ──────────────────────────────────────────
 // Meta sends a GET with hub.mode=subscribe + hub.verify_token + hub.challenge.
@@ -212,21 +213,15 @@ async function buildAcknowledgementForPhone(
     const firstName = studentRow?.profiles?.first_name ?? 'your child'
 
     // Get last known substrand from the learner profile
-    const { data: profile } = await db
-      .from('learner_profiles')
-      .select('parent_observations, confirmed_gaps')
-      .eq('student_id', studentId)
-      .maybeSingle()
+    const profile = await getLearnerProfile(studentId)
 
-    const observations = (profile?.parent_observations ?? []) as Array<{
-      substrand: string
-    }>
+    const observations = profile?.parent_observations ?? []
 
     let substrand = 'this topic'
     if (observations.length > 0) {
       substrand = observations[observations.length - 1].substrand
     } else {
-      const gaps = (profile?.confirmed_gaps ?? []) as string[]
+      const gaps = profile?.confirmed_gaps ?? []
       if (gaps[0]) {
         const gapKey = gaps[0]
         substrand = gapKey.includes(':') ? gapKey.split(':')[1] : gapKey

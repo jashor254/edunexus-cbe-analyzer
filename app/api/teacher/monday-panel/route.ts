@@ -13,7 +13,7 @@
 import { createClient }        from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
-import { getClassLearnerProfiles } from '@/lib/learnerModel/queries'
+import { getClassLearnerProfiles, markGrowthMilestonesNotified } from '@/lib/learnerModel/queries'
 import { findPrerequisiteAlerts } from '@/lib/knowledgeGraph/prerequisiteAlerts'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import type {
@@ -270,11 +270,7 @@ export async function GET(req: Request): Promise<Response> {
         const updatedMilestones = profile.growth_milestones.map(m =>
           m === milestone ? { ...m, notified: true, notified_at: new Date().toISOString() } : m
         )
-        void Promise.resolve(
-          db.from('learner_profiles')
-            .update({ growth_milestones: updatedMilestones })
-            .eq('student_id', profile.student_id)
-        ).catch(() => {})
+        void markGrowthMilestonesNotified(profile.student_id, updatedMilestones).catch(() => {})
       }
     }
 

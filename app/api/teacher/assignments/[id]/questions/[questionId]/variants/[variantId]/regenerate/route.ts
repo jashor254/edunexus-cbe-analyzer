@@ -4,6 +4,8 @@ import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound } from
 import { requireClassTeacher } from '@/lib/core/permissions'
 import { UnauthorizedError, ResourceOwnershipError } from '@/lib/core/errors'
 import { repos } from '@/lib/repositories'
+import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
+import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
 import { regenerateOneVariant } from '@/lib/assignments/variantGeneration'
 
 async function loadAssignment(variantId: string): Promise<{ classId: string; subject: string } | null> {
@@ -22,6 +24,19 @@ export async function POST(
   { params }: { params: Promise<{ id: string; questionId: string; variantId: string }> }
 ) {
   try {
+    const access = await checkFeatureAccess('adaptive_variant_generate')
+    if (access.allowed === false) {
+      return apiError(
+        access.reason === 'insufficient_tokens' ? 'Insufficient tokens. Please top up to regenerate this variant.' : 'Access denied',
+        access.reason === 'unauthenticated' ? 401 : 403,
+      )
+    }
+
+    const rateLimit = await checkDailyCallLimit(access.userId, 'adaptive_variant_generate')
+    if (rateLimit.allowed === false) {
+      return apiError(`Daily limit of ${rateLimit.limit} variant generations reached. Resets at ${rateLimit.resetAt}`, 429)
+    }
+
     const { variantId } = await params
     const assignment = await loadAssignment(variantId)
     if (!assignment) return apiNotFound('Variant not found')
@@ -42,6 +57,10 @@ export async function POST(
 
     const result = await regenerateOneVariant({ variantId, learners, subject: assignment.subject })
     if ('error' in result) return apiError(result.error, 422)
+
+    if (access.deductTokens) {
+      await deductFeatureTokens(access.userId, 'adaptive_variant_generate', access.cost)
+    }
 
     return apiSuccess({ variant: result.variant })
   } catch (e: unknown) {

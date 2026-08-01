@@ -5,11 +5,8 @@ import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized, apiBadRequest, apiNotFound } from '@/lib/api/response'
 import { getAllCareersWithCOS } from '@/lib/career/careerEngine'
 import { computeCapabilityMatches } from '@/lib/career/capabilityMatchEngine'
-import { extractCapabilityProfile } from '@/lib/career/capabilityExtractor'
 import { buildParentIntelligence } from '@/lib/career/parentIntelligence'
-import { careerModeForGrade } from '@/lib/learnerIntelligence/careerIntelligence'
-import { recomputeLearnerProjection } from '@/lib/projection/recompute'
-import { projectionToScoreHistory } from '@/lib/learnerIntelligence/projectionAdapters'
+import { careerModeForGrade, resolveFreshCapabilityProfile } from '@/lib/learnerIntelligence/careerIntelligence'
 import { requireAuthentication } from '@/lib/core/permissions'
 import { UnauthorizedError } from '@/lib/core/errors'
 
@@ -54,15 +51,15 @@ export async function GET(req: NextRequest) {
     const isParent = student.parent_user_id === user.id
     if (!isOwner && !isParent) return apiUnauthorized()
 
-    // Sourced live from Projection — the same path Blueprint and Career
-    // Intelligence use — instead of the separately-stored, potentially stale
-    // `career_capability_profiles` snapshot. See docs/architecture/migration-ledger.md.
-    const projection   = await recomputeLearnerProjection(studentId)
-    const scoreHistory = projectionToScoreHistory(projection)
-    if (scoreHistory.length === 0) {
+    // Sourced live from Projection via the one canonical resolver — the same
+    // path Blueprint and Career Intelligence use — instead of the
+    // separately-stored, potentially stale `career_capability_profiles`
+    // snapshot. See docs/architecture/migration-ledger.md.
+    const resolved = await resolveFreshCapabilityProfile(studentId)
+    if (!resolved) {
       return apiSuccess({ has_profile: false, report: null })
     }
-    const profile = extractCapabilityProfile(scoreHistory)
+    const profile = resolved.profile
 
     const careers = await getAllCareersWithCOS()
     const matchReport = computeCapabilityMatches(studentId, profile, careers)

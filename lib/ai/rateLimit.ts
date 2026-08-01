@@ -18,6 +18,7 @@ export const DAILY_CALL_LIMITS: Record<TokenFeature, number> = {
   clinic_report:              5,
   learning_compass:           30,
   career_intelligence_report: 2,
+  adaptive_variant_generate:  40,
 }
 
 export type RateLimitResult =

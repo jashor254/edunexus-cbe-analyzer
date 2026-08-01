@@ -16,10 +16,7 @@ import {
   recomputeAndSaveCapabilityProfile,
 } from '@/lib/career/careerEngine'
 import { computeCapabilityMatches } from '@/lib/career/capabilityMatchEngine'
-import { familiesFromMatches, careerModeForGrade } from '@/lib/learnerIntelligence/careerIntelligence'
-import { extractCapabilityProfile } from '@/lib/career/capabilityExtractor'
-import { recomputeLearnerProjection } from '@/lib/projection/recompute'
-import { projectionToScoreHistory } from '@/lib/learnerIntelligence/projectionAdapters'
+import { familiesFromMatches, careerModeForGrade, resolveFreshCapabilityProfile } from '@/lib/learnerIntelligence/careerIntelligence'
 import type { CapabilityMatchReport } from '@/lib/career/types'
 
 export const dynamic = 'force-dynamic'
@@ -85,21 +82,19 @@ export async function GET(req: NextRequest) {
     const student = await verifyStudent(user.id, studentId)
     if (!student) return apiForbidden()
 
-    // Sourced live from Projection — the same canonical path Blueprint,
-    // Career Intelligence, and Parent Career Intelligence already use
-    // (lib/learnerIntelligence/projectionAdapters.ts), instead of the
-    // separately-stored, potentially-diverging `students.capability_profile`
-    // snapshot — so the matches shown here always agree with what those
-    // other surfaces conclude from the same evidence.
-    const projection   = await recomputeLearnerProjection(studentId)
-    const scoreHistory = projectionToScoreHistory(projection)
-    if (scoreHistory.length === 0) {
+    // Sourced live from Projection via the one canonical resolver — the same
+    // path Blueprint, Career Intelligence, and Parent Career Intelligence
+    // already use — instead of the separately-stored, potentially-diverging
+    // `students.capability_profile` snapshot, so the matches shown here
+    // always agree with what those other surfaces conclude from the same
+    // evidence.
+    const resolved = await resolveFreshCapabilityProfile(studentId)
+    if (!resolved) {
       return apiBadRequest('No evidence found for this student yet. Add an assessment first.')
     }
-    const profile = extractCapabilityProfile(scoreHistory)
 
     const careers = await getAllCareersWithCOS()
-    const report  = computeCapabilityMatches(studentId, profile, careers)
+    const report  = computeCapabilityMatches(studentId, resolved.profile, careers)
 
     return apiSuccess(shapeForGrade(student.grade, report))
   } catch (err) {
@@ -137,15 +132,13 @@ export async function POST(req: NextRequest) {
       return apiBadRequest('No assessments found for this student — add assessments first.')
     }
 
-    const projection   = await recomputeLearnerProjection(studentId)
-    const scoreHistory = projectionToScoreHistory(projection)
-    if (scoreHistory.length === 0) {
+    const resolved = await resolveFreshCapabilityProfile(studentId)
+    if (!resolved) {
       return apiBadRequest('No evidence found for this student yet. Add an assessment first.')
     }
-    const profile = extractCapabilityProfile(scoreHistory)
 
     const careers = await getAllCareersWithCOS()
-    const report  = computeCapabilityMatches(studentId, profile, careers)
+    const report  = computeCapabilityMatches(studentId, resolved.profile, careers)
 
     return apiSuccess({ ...shapeForGrade(student.grade, report), profile_recomputed: true })
   } catch (err) {

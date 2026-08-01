@@ -291,6 +291,18 @@ export class LearnerModelRepository extends BaseRepository {
     if (error) throw new Error(`addGrowthMilestone: ${error.message}`)
   }
 
+  async markGrowthMilestonesNotified(
+    studentId:   string,
+    milestones:  GrowthMilestone[],
+  ): Promise<void> {
+    const { error } = await this.db
+      .from('learner_profiles')
+      .update({ growth_milestones: milestones })
+      .eq('student_id', studentId)
+
+    if (error) throw new Error(`markGrowthMilestonesNotified: ${error.message}`)
+  }
+
   async updateRiskProfile(
     studentId:   string,
     flags:       RiskFlag[],

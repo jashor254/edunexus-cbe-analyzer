@@ -226,6 +226,7 @@ function buildHiddenStrengths(
   if (profile) {
     const sorted = [...DIMS].sort((a, b) => profile[b].raw_score - profile[a].raw_score)
     for (const dim of sorted.slice(0, 3)) {
+      if (profile[dim].confidence <= 0) continue
       if (profile[dim].raw_score < 0.35) break
       const evidence = profile[dim].evidence[0] ?? `${CAPABILITY_LABELS[dim] ?? dim} capability`
       const trend    = profile[dim].trend
@@ -266,6 +267,7 @@ function buildGrowthBarriers(
   if (profile) {
     const sorted = [...DIMS].sort((a, b) => profile[a].raw_score - profile[b].raw_score)
     for (const dim of sorted.slice(0, 2)) {
+      if (profile[dim].confidence <= 0) continue
       if (profile[dim].raw_score > 0.60) break
       const ctx = DIM_BARRIER[dim]
       barriers.push({

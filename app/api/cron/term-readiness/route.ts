@@ -13,6 +13,7 @@ import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
 import { sendWhatsApp } from '@/lib/whatsapp/sender'
 import { timingSafeEqualString } from '@/lib/api/secretCompare'
 import { publishEvent } from '@/lib/events'
+import { repos } from '@/lib/repositories'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -136,22 +137,14 @@ export async function GET(req: Request): Promise<Response> {
 
     const uniqueLearnerIds = [...tally.keys()]
 
-    // ── 5. Get risk levels and class membership in parallel ───────────────────
-    const [profilesRes, enrollmentRes] = await Promise.all([
-      db.from('learner_profiles')
-        .select('student_id, overall_risk_level')
-        .in('student_id', uniqueLearnerIds),
-      db.from('class_students')
-        .select('student_id, class_id')
-        .in('student_id', uniqueLearnerIds),
-    ])
+    // ── 5. Get class membership ────────────────────────────────────────────────
+    const { data: enrollmentData, error: enrollmentErr } = await db
+      .from('class_students')
+      .select('student_id, class_id')
+      .in('student_id', uniqueLearnerIds)
 
-    if (profilesRes.error) throw new Error(`learner_profiles: ${profilesRes.error.message}`)
-    if (enrollmentRes.error) throw new Error(`class_students: ${enrollmentRes.error.message}`)
-
-    const riskMap = new Map(
-      (profilesRes.data ?? []).map(p => [p.student_id as string, p.overall_risk_level as string])
-    )
+    if (enrollmentErr) throw new Error(`class_students: ${enrollmentErr.message}`)
+    const enrollmentRes = { data: enrollmentData }
 
     // Build: class_id → student_ids (holiday participants only)
     const classToStudents = new Map<string, Set<string>>()
@@ -195,16 +188,14 @@ export async function GET(req: Request): Promise<Response> {
     // Get student names
     const allStudentIds = [...new Set((allEnrollments ?? []).map(e => e.student_id as string))]
 
-    const [namesRes, teachersRes, allProfilesRes] = await Promise.all([
+    const [namesRes, teachersRes, allProjections] = await Promise.all([
       db.from('students')
         .select('id, first_name, last_name')
         .in('id', allStudentIds),
       db.from('teachers')
         .select('id, full_name, phone')
         .in('id', teacherIds),
-      db.from('learner_profiles')
-        .select('student_id, overall_risk_level')
-        .in('student_id', allStudentIds),
+      repos.projections.findProjectionsForLearners(allStudentIds),
     ])
 
     const nameMap = new Map(
@@ -218,9 +209,16 @@ export async function GET(req: Request): Promise<Response> {
       (teachersRes.data ?? []).map(t => [t.id as string, t])
     )
 
-    // Merge risk info (include all students, not just holiday participants)
+    // Merge risk info (include all students, not just holiday participants) —
+    // read via the canonical projection layer, never learner_profiles directly
+    // (see CLAUDE.md's Learner Intelligence architecture rule). A student with
+    // no persisted 'risk' projection (no supporting evidence) reads as 'normal',
+    // matching the same fallback the old direct read implicitly had for a
+    // missing row.
     const fullRiskMap = new Map(
-      (allProfilesRes.data ?? []).map(p => [p.student_id as string, p.overall_risk_level as string])
+      allProjections
+        .filter(p => p.projector_type === 'risk')
+        .map(p => [p.learner_id, (p.value as { overallRiskLevel: string }).overallRiskLevel])
     )
 
     // Build class_id → all student_ids map

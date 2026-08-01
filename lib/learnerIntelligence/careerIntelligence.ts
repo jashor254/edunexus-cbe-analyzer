@@ -169,18 +169,48 @@ export function familiesFromMatches(all: CapabilityCareerMatch[]): CareerFamilyI
   })
 }
 
+// ── Canonical capability-profile resolution ─────────────────────────────────
+//
+// The one place that turns a studentId into a fresh, Projection-sourced
+// CapabilityProfile. Every consumer that needs to run computeCapabilityMatches
+// (Career Intelligence itself, the Capability Matches API, Parent Career
+// Intelligence, and the per-career detail route) must call this instead of
+// re-deriving recomputeLearnerProjection → projectionToScoreHistory →
+// extractCapabilityProfile independently — three of those four call sites
+// had drifted into copy-pasting this exact sequence (Sprint 31 §8 flagged
+// two; the per-career detail route was a third, undiscovered one that used
+// the separately-stored `career_capability_profiles` snapshot instead of
+// live Projection data, meaning it could disagree with the other three).
+// Returns null when there isn't yet enough evidence to build a profile at
+// all — callers render their own "not enough data" state, never a fabricated
+// default.
+export type ResolvedCapabilityProfile = {
+  profile: ReturnType<typeof extractCapabilityProfile>
+  evidenceFreshnessDays: number | null
+}
+
+export async function resolveFreshCapabilityProfile(studentId: string): Promise<ResolvedCapabilityProfile | null> {
+  const projection   = await recomputeLearnerProjection(studentId)
+  const scoreHistory = projectionToScoreHistory(projection)
+  if (scoreHistory.length === 0) return null
+
+  return {
+    profile: extractCapabilityProfile(scoreHistory),
+    evidenceFreshnessDays: projection.completeness?.coverage.freshnessDays ?? null,
+  }
+}
+
 export async function buildCareerIntelligence(studentId: string): Promise<CareerIntelligence> {
-  const [student, projection, careers] = await Promise.all([
+  const [student, resolved, careers] = await Promise.all([
     getStudentBasicInfo(studentId),
-    recomputeLearnerProjection(studentId),
+    resolveFreshCapabilityProfile(studentId),
     getAllCareersWithCOS(),
   ])
 
   if (!student) throw new Error(`buildCareerIntelligence: student ${studentId} not found`)
 
-  const scoreHistory = projectionToScoreHistory(projection)
-  const mode         = careerModeForGrade(student.grade)
-  const isJunior      = mode === 'exploration'
+  const mode     = careerModeForGrade(student.grade)
+  const isJunior = mode === 'exploration'
 
   const base: CareerIntelligence = {
     studentId,
@@ -189,14 +219,14 @@ export async function buildCareerIntelligence(studentId: string): Promise<Career
     mode,
     disclaimer:  COS_DISCLAIMER,
     generatedAt: new Date().toISOString(),
-    evidenceFreshnessDays: projection.completeness?.coverage.freshnessDays ?? null,
+    evidenceFreshnessDays: resolved?.evidenceFreshnessDays ?? null,
   }
 
-  if (scoreHistory.length === 0) {
+  if (!resolved) {
     return { ...base, notice: insufficientEvidenceInsight('this learner’s career direction') }
   }
 
-  const profile = extractCapabilityProfile(scoreHistory)
+  const { profile } = resolved
 
   if (isJunior) {
     const report = computeCapabilityMatches(studentId, profile, careers)

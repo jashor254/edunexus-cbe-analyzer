@@ -63,6 +63,10 @@ export const TOKEN_COSTS = {
   clinic_report:        5,
   learning_compass:     1,
   career_intelligence_report: 3,
+
+  // Adaptive assignment variants — per canonical question, per generate call
+  // (single or "Generate All", charged once per question actually generated)
+  adaptive_variant_generate: 1,
 } as const
 
 export type TokenFeature = keyof typeof TOKEN_COSTS
@@ -81,6 +85,7 @@ export const FEATURE_ACCESS = {
   clinic_report:              { teacher: 'token', subscriber: 'full',  token: 'token' },
   learning_compass:           { teacher: 'token', subscriber: 'full',  token: 'token' },
   career_intelligence_report: { teacher: 'token', subscriber: 'full',  token: 'token' },
+  adaptive_variant_generate:  { teacher: 'free',  subscriber: 'full',  token: 'token' },
 } as const
 
 export type FeatureKey = keyof typeof FEATURE_ACCESS

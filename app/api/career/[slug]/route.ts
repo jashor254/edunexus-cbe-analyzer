@@ -6,9 +6,9 @@ import {
   getCareerBySlugWithCOS,
   getMatchesForStudent,
   searchOrGenerateCareer,
-  getCapabilityProfile,
 } from '@/lib/career/careerEngine'
 import { computeCapabilityMatches } from '@/lib/career/capabilityMatchEngine'
+import { resolveFreshCapabilityProfile } from '@/lib/learnerIntelligence/careerIntelligence'
 import type { CapabilityCareerMatch } from '@/lib/career/types'
 import { buildCareerReadinessChains, buildCapabilityReadinessChains } from '@/lib/knowledgeGraph/careerReadiness'
 import type { CareerReadinessReport } from '@/lib/knowledgeGraph/careerReadiness'
@@ -58,11 +58,16 @@ export async function GET(
         const matches = await getMatchesForStudent(studentId)
         studentMatch = matches.find((m) => m.career.slug === slug) ?? null
 
-        // Capability match — fast, deterministic, no tokens
+        // Capability match — fast, deterministic, no tokens. Sourced live
+        // from Projection via the one canonical resolver (same path Career
+        // Intelligence, Capability Matches, and Parent Career Intelligence
+        // use) rather than the separately-stored `career_capability_profiles`
+        // snapshot, which could disagree with what those other surfaces
+        // conclude from the same evidence.
         if (career.required_capabilities) {
-          const profile = await getCapabilityProfile(studentId)
-          if (profile) {
-            const report = computeCapabilityMatches(studentId, profile, [career])
+          const resolved = await resolveFreshCapabilityProfile(studentId)
+          if (resolved) {
+            const report = computeCapabilityMatches(studentId, resolved.profile, [career])
             const allMatches = [
               ...report.primary,
               ...report.stretch,
