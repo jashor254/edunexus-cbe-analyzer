@@ -176,7 +176,7 @@ export default function RootLayout({
           </div>
         </footer>
 
-        <div data-blueprint-hide-in-pdf="true">
+        <div data-blueprint-hide-in-pdf="true" data-global-whatsapp="true">
           <WhatsAppButton />
         </div>
         <div data-blueprint-hide-in-pdf="true">

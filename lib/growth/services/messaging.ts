@@ -1,10 +1,12 @@
 import { growthRepos } from '@/lib/growth/repositories'
-import type { GrowthSchool } from '@/lib/growth/types'
+import type { GrowthActivity, GrowthPipelineStage, GrowthSchool } from '@/lib/growth/types'
 import type { ChannelStrategy, GeneratedDraft, MessageChannel, MessageTemplate, FollowUpSuggestion } from '@/lib/growth/messaging/types'
 import { determineChannelStrategy } from '@/lib/growth/messaging/strategy'
 import { MESSAGE_TEMPLATES, coldIntroTemplateForCategory } from '@/lib/growth/messaging/templates'
 import { generateMessage } from '@/lib/growth/messaging/generate'
 import { suggestFollowUp } from '@/lib/growth/messaging/followUpSuggestion'
+import { sendWhatsAppDraft } from '@/lib/growth/messaging/send'
+import { logMessageSent } from '@/lib/growth/services/activities'
 
 export type CommunicationWorkspaceData = {
   strategy: ChannelStrategy
@@ -58,6 +60,47 @@ export async function getCommunicationWorkspace(
     draft,
     followUpSuggestion: suggestFollowUp(school.last_contact_at),
   }
+}
+
+/**
+ * Founder-approved automated send: the founder has already reviewed and
+ * possibly edited the draft in the Communication Workspace and clicked
+ * "Approve & Send" — this is the one server-side path that actually calls
+ * the WhatsApp Cloud API, and it only ever fires for that one explicit click,
+ * never on a schedule or in response to a school being discovered/imported.
+ * WhatsApp-only: Meta's Cloud API can't deliver a business-initiated message
+ * over any other channel this way, and every other channel here still goes
+ * out through the founder's own app via lib/growth/messaging/links.ts.
+ */
+export async function sendApprovedMessage(
+  schoolId: string,
+  founderId: string,
+  input: { contactId?: string | null; templateId: string; body: string; edited: boolean },
+): Promise<{ activity: GrowthActivity; newStage: GrowthPipelineStage | null }> {
+  const [school, contacts] = await Promise.all([
+    growthRepos.schools.findById(schoolId),
+    growthRepos.contacts.listBySchool(schoolId),
+  ])
+  if (!school) throw new Error(`School ${schoolId} not found`)
+
+  const contact = input.contactId ? contacts.find((c) => c.id === input.contactId) ?? null : null
+  const phone = contact?.phone ?? school.whatsapp_number ?? school.phone
+  if (!phone) throw new Error('No phone or WhatsApp number on file for this school — nothing to send to.')
+
+  const sendResult = await sendWhatsAppDraft(phone, input.body)
+  if (!sendResult.success) throw new Error(sendResult.error ?? 'WhatsApp send failed')
+
+  return logMessageSent(
+    {
+      schoolId,
+      contactId: contact?.id ?? null,
+      channel: 'whatsapp',
+      templateId: input.templateId,
+      edited: input.edited,
+      currentStage: school.pipeline_stage,
+    },
+    founderId,
+  )
 }
 
 /**

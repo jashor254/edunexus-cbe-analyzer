@@ -241,6 +241,8 @@ function MessageWorkspace({ schoolId, school, contacts, onLogged }: { schoolId: 
   const [copied, setCopied] = useState(false)
   const [preview, setPreview] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sending, setSending] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
 
   const contact = contacts[0] ?? null
 
@@ -278,6 +280,24 @@ function MessageWorkspace({ schoolId, school, contacts, onLogged }: { schoolId: 
     await navigator.clipboard.writeText(subject ? `${subject}\n\n${body}` : body)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  async function approveAndSend() {
+    if (!templateId) return
+    setSending(true)
+    setSendError(null)
+    try {
+      const res = await fetch(`/api/growth/schools/${schoolId}/messages/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactId: contact?.id ?? null, templateId, body, edited }),
+      })
+      const json = (await res.json()) as ApiResponse<unknown>
+      if (!json.success) { setSendError(json.error ?? 'Send failed'); return }
+      onLogged()
+    } finally {
+      setSending(false)
+    }
   }
 
   async function markSent() {
@@ -405,7 +425,18 @@ function MessageWorkspace({ schoolId, school, contacts, onLogged }: { schoolId: 
         >
           {logging ? '…' : '✅ Log as Sent'}
         </button>
+        {activeChannel === 'whatsapp' && recipientPhone && (
+          <button
+            onClick={approveAndSend}
+            disabled={sending}
+            title="Sends via the WhatsApp Cloud API using the approved edunexus_school_outreach template — requires it to be approved in Meta Business Manager first."
+            className="rounded-lg bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-40"
+          >
+            {sending ? '…' : '🚀 Approve & Send'}
+          </button>
+        )}
       </div>
+      {sendError && <p className="mb-3 text-sm text-red-600">{sendError}</p>}
       <input
         placeholder="Outcome (optional)"
         value={outcomeNote}

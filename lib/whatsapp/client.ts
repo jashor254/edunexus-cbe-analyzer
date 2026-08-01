@@ -14,7 +14,7 @@ type TemplateComponent =
 type SendTemplateOptions = {
   to: string               // E.164 format, e.g. "254712345678" (no leading +)
   templateName: string
-  languageCode?: string    // defaults to "en"
+  languageCode?: string    // defaults to "en_US" — Meta registers templates under this code, not "en"
   components?: TemplateComponent[]
 }
 
@@ -44,7 +44,7 @@ export async function sendWhatsAppTemplate(
     type: 'template',
     template: {
       name: opts.templateName,
-      language: { code: opts.languageCode ?? 'en' },
+      language: { code: opts.languageCode ?? 'en_US' },
       ...(opts.components ? { components: opts.components } : {}),
     },
   }
