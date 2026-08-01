@@ -30,6 +30,16 @@ body:has(main [data-marketing-shell]) > footer[data-site-footer] {
   display: none;
 }
 
+/* /school-concepts/[schoolSlug] renders a standalone school-branded site
+   (own header/footer, own concept disclaimer) inside the root layout's
+   <main>. Suppress the site-wide fallback footer and the EduNexus
+   WhatsApp widget there so the demo doesn't show EduNexus chrome on what
+   is meant to read as the school's own website. */
+body:has(main [data-school-concept-shell]) > footer[data-site-footer],
+body:has(main [data-school-concept-shell]) > div[data-global-whatsapp] {
+  display: none;
+}
+
 /* /early-access and /pricing each ship their own self-contained nav (logo +
    Back/Dashboard link) predating their move into the marketing route
    group. Suppress the shared MarketingNav on those routes so they don't

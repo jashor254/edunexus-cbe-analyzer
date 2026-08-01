@@ -35,6 +35,7 @@ const PUBLIC_PREFIXES = [
   '/join',
   '/shared',
   '/preview',
+  '/school-concepts',
   '/payment',
   '/_next',
   '/favicon',
