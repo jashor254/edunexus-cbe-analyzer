@@ -235,16 +235,21 @@ const FAMILY_PAY_PLANS: PayProduct[] = [
   },
 ]
 
+// Token count and KES/token below must match lib/payments/config.ts's
+// TOKEN_PACK — that file is the canonical source (per CLAUDE.md), and the
+// API route that actually charges this purchase (app/api/payments/initialize)
+// reads TOKEN_PACK directly. This page previously said "5 tokens" while the
+// real purchase granted 10 — found and fixed 2026-08-01.
 const TOKEN_PRODUCT: PayProduct = {
   id:        'starter',
   name:      'Pay-As-You-Go',
   price:     500,
   billing:   'one-time · never expires',
-  tagline:   'Not ready to commit? Start with 5 tokens.',
+  tagline:   'Not ready to commit? Start with 10 tokens.',
   badge:     '',
   highlight: false,
   features:  [],
-  cta:       'Buy 5 Tokens — KES 500',
+  cta:       'Buy 10 Tokens — KES 500',
   note:      '',
 }
 
@@ -833,9 +838,9 @@ function FamilySection({
           onClick={() => onSelect(TOKEN_PRODUCT)}
           className={`underline decoration-white/20 hover:text-white/70 hover:decoration-white/40 transition-colors rounded ${FOCUS_RING}`}
         >
-          Start with 5 tokens for KES 500
+          Start with 10 tokens for KES 500
         </button>
-        {' '}(1 token = KES 100, never expires).
+        {' '}(1 token = KES 50, never expires).
       </p>
 
       {/* School nudge */}
