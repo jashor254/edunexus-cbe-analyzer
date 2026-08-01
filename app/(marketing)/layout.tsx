@@ -38,9 +38,9 @@ function MarketingNav() {
 
         {/* Desktop links */}
         <div className="hidden md:flex items-center gap-6">
-          <a href="#school" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
+          <Link href="/schools" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
             For Schools
-          </a>
+          </Link>
           <a href="#teachers" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
             For Teachers
           </a>
@@ -90,7 +90,7 @@ function MarketingNav() {
         <div className="md:hidden bg-black/95 border-b border-white/10">
           <div className="max-w-[1100px] mx-auto px-6 py-4 flex flex-col gap-1">
             {[
-              { href: '#school',    label: 'For Schools'      },
+              { href: '/schools',   label: 'For Schools'      },
               { href: '#teachers',  label: 'For Teachers'     },
               { href: '#evidence',  label: 'Learner Blueprint' },
               { href: '/pricing',   label: 'Pricing'          },
