@@ -13,7 +13,13 @@ import {
   BookOpen,
   AlertCircle,
 } from 'lucide-react'
-import { CURRICULA, FOCUS_RING } from './constants'
+import { CURRICULA, FOCUS_RING, SCHOOL_DEMO_WA_LINK } from './constants'
+// Canonical demonstration learner — the same record the real interactive
+// sample-report demo uses (components/demo/AcademicClinicDemo.tsx). Every
+// illustrative mockup on this page reads name/grade from here so they can
+// never silently drift out of sync with the actual demo, the way they did
+// before (this page said "Grade 8", the real demo data says Grade 9).
+import { STUDENT as DEMO_STUDENT } from '@/components/demo/mockData'
 
 const AcademicClinicDemo = dynamic(
   () => import('@/components/demo/AcademicClinicDemo'),
@@ -85,7 +91,7 @@ export default function LandingPage() {
       ctaHref:       '/signup?role=parent',
       ctaLabel:      'Get Your Child\'s Free Report',
       trust:         '✓ Free first report  ·  ✓ M-PESA accepted  ·  ✓ Works on any phone',
-      secondary:     { label: 'See a sample report →', action: 'demo' },
+      secondary:     { label: 'Try a real sample report →', action: 'demo' },
       roleColor:     'teal',
     }
     : {
@@ -99,7 +105,7 @@ export default function LandingPage() {
       ctaHref:       '#evidence',
       ctaLabel:      'See How EduNexus Notices Early',
       trust:         '✓ CBC · Cambridge IGCSE · 8-4-4  ·  ✓ Grades 7–12  ·  ✓ 50+ pioneer teachers',
-      secondary:     { label: 'See a sample report →', action: 'demo' },
+      secondary:     { label: 'Try a real sample report →', action: 'demo' },
       roleColor:     'violet',
     }
 
@@ -284,9 +290,9 @@ export default function LandingPage() {
 
                   <div className="border-t border-white/15 mb-4" />
 
-                  <div className="text-base font-extrabold text-white mb-0.5">Brian Otieno</div>
-                  <div className="text-xs text-white/50 mb-0.5">Grade 8 · Junior School</div>
-                  <div className="text-xs text-white/50 mb-5">Term 1, 2026</div>
+                  <div className="text-base font-extrabold text-white mb-0.5">{DEMO_STUDENT.name}</div>
+                  <div className="text-xs text-white/50 mb-0.5">Grade {DEMO_STUDENT.grade} · Junior School</div>
+                  <div className="text-xs text-white/50 mb-5">Term {DEMO_STUDENT.term}, {DEMO_STUDENT.year}</div>
 
                   <div className="border-t border-white/15 mb-4" />
 
@@ -374,8 +380,8 @@ export default function LandingPage() {
                 >
                   <div className="w-2.5 h-2.5 rounded-full bg-violet-400 shrink-0" />
                   <div>
-                    <div className="text-sm font-bold text-white">Brian Otieno</div>
-                    <div className="text-xs text-white/40">CBC · Grade 8</div>
+                    <div className="text-sm font-bold text-white">{DEMO_STUDENT.name}</div>
+                    <div className="text-xs text-white/40">CBC · Grade {DEMO_STUDENT.grade}</div>
                   </div>
                 </button>
 
@@ -615,7 +621,7 @@ export default function LandingPage() {
                 <div className="bg-white/8 border-b border-white/10 px-4 py-3 flex items-center justify-between gap-3">
                   <div>
                     <div className="text-sm font-bold text-white">🧭 Learning Compass</div>
-                    <div className="text-xs text-white/40">Brian, Grade 8</div>
+                    <div className="text-xs text-white/40">{DEMO_STUDENT.name.split(' ')[0]}, Grade {DEMO_STUDENT.grade}</div>
                   </div>
                   <span className="text-xs font-semibold bg-teal-500/20 text-teal-300 px-2.5 py-1 rounded-full whitespace-nowrap">
                     Maths · Level 2
@@ -623,6 +629,12 @@ export default function LandingPage() {
                 </div>
                 <div className="flex items-center gap-1.5 px-4 py-1.5 border-b border-white/10 bg-white/3">
                   <span className="text-xs font-semibold text-white/40">Illustrative example</span>
+                </div>
+                <div className="px-4 py-2 border-b border-white/10 bg-teal-500/5">
+                  <span className="text-[11px] text-teal-300/80 leading-snug">
+                    Same learner as the Blueprint above — this session opens on his diagnosed
+                    gap directly, not a generic topic menu.
+                  </span>
                 </div>
 
                 <div className="p-4 space-y-3">
@@ -681,11 +693,11 @@ export default function LandingPage() {
               None of this works without the teacher.
               <br /><br />
               Every assessment marked, every scheme of work built, every lesson taught — that is
-              the raw material EduNexus reads to find the strand that&apos;s slipping before it
-              becomes a pattern. The documentation is handled for you — CBC-aligned schemes of
-              work, lesson plans formatted exactly as TSC expects — so there is more room left to
-              notice the things a form can&apos;t capture. Walk into Monday&apos;s lesson
-              prepared, not exhausted.
+              the raw material behind the Blueprint and Compass you just saw. EduNexus reads it to
+              find the strand that&apos;s slipping before it becomes a pattern. The documentation
+              is handled for you — CBC-aligned schemes of work, lesson plans formatted exactly as
+              TSC expects — so there is more room left to notice the things a form can&apos;t
+              capture. Walk into Monday&apos;s lesson prepared, not exhausted.
             </p>
           </div>
 
@@ -831,16 +843,18 @@ export default function LandingPage() {
               Does this replace our school system?
             </h2>
             <p className="text-white/55 leading-relaxed max-w-140 mx-auto text-sm">
-              No. Your existing School Management System handles registration, timetabling, fee
-              collection, and attendance. It is good at that. What it does not do is notice a
-              learning problem early enough to change the outcome — that is what EduNexus adds.
+              Most schools already have a reliable way to handle registration, timetabling, fee
+              collection, and attendance — that operational layer matters, and it&apos;s not what
+              EduNexus is built to compete on. What EduNexus adds is a different, higher-order
+              capability: noticing a learning problem early enough to change the outcome, before
+              it shows up in a report card.
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 gap-6">
             <div className="bg-white/3 border border-white/8 rounded-2xl p-7">
               <p className="text-[11px] font-black text-white/50 uppercase tracking-widest mb-5">
-                Your SMS manages
+                Administration alone
               </p>
               <ul className="space-y-3">
                 {[
@@ -860,7 +874,7 @@ export default function LandingPage() {
 
             <div className="bg-violet-500/5 border border-violet-500/20 rounded-2xl p-7">
               <p className="text-[11px] font-black text-violet-400 uppercase tracking-widest mb-5">
-                EduNexus manages
+                Educational Intelligence adds
               </p>
               <ul className="space-y-3">
                 {[
@@ -904,13 +918,20 @@ export default function LandingPage() {
             Book a 20-minute demo and we will show you exactly how EduNexus would work in your school.
           </p>
 
-          <Link
-            href="/early-access"
+          <a
+            href={SCHOOL_DEMO_WA_LINK}
+            target="_blank"
+            rel="noopener noreferrer"
             className={`inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-600 text-white px-10 py-4 rounded-xl font-bold text-lg hover:scale-105 transition-all shadow-2xl shadow-violet-600/30 ${FOCUS_RING}`}
           >
             Book a School Demo
             <ArrowRight className="w-5 h-5" />
-          </Link>
+          </a>
+          <p className="text-xs text-white/40 mt-4 max-w-100 mx-auto leading-relaxed">
+            Opens a real WhatsApp conversation with our team — no forms, no call center. We&apos;ll
+            ask a few questions about your school first, then recommend where to start (most
+            schools begin with a pilot on one grade or stream before rolling out further).
+          </p>
 
           {/* Secondary paths */}
           <div className="mt-10 pt-8 border-t border-white/10">

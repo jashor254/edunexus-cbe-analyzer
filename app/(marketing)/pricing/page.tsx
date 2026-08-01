@@ -19,7 +19,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import type { User } from '@supabase/supabase-js'
-import { FOCUS_RING } from '../constants'
+import { FOCUS_RING, SCHOOL_DEMO_WA_LINK } from '../constants'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -248,12 +248,6 @@ const TOKEN_PRODUCT: PayProduct = {
   note:      '',
 }
 
-const LEARNER_TOKENS = [
-  { action: 'Learner Blueprint', detail: 'Full strand-by-strand diagnostic + career intelligence', tokens: 6, kes: 600 },
-  { action: 'Learning Compass',  detail: 'One personalised adaptive session, any subject',         tokens: 2, kes: 200 },
-  { action: 'Career Intelligence Report', detail: 'Detailed career pathway report for parent',     tokens: 4, kes: 400 },
-]
-
 const ALL_FAMILY_PRODUCTS = [TOKEN_PRODUCT, ...FAMILY_PAY_PLANS]
 
 // ─── FAQ ──────────────────────────────────────────────────────────────────────
@@ -416,8 +410,10 @@ function SchoolSection() {
 
               <p className="text-xs text-white/50 italic mb-5">{plan.note}</p>
 
-              <Link
-                href="/early-access"
+              <a
+                href={SCHOOL_DEMO_WA_LINK}
+                target="_blank"
+                rel="noopener noreferrer"
                 className={`block text-center py-4 rounded-2xl font-black text-sm transition-all ${FOCUS_RING} ${
                   plan.highlight
                     ? 'bg-blue-500 hover:bg-blue-400 text-white shadow-lg shadow-blue-500/20'
@@ -425,7 +421,7 @@ function SchoolSection() {
                 }`}
               >
                 {plan.cta} →
-              </Link>
+              </a>
             </div>
           </div>
         ))}
@@ -498,12 +494,14 @@ function SchoolSection() {
           school first — learner count, curriculum, current systems, reporting needs — then recommend
           the right plan. Onboarding, teacher training, and data setup are included from Growth and above.
         </p>
-        <Link
-          href="/early-access"
+        <a
+          href={SCHOOL_DEMO_WA_LINK}
+          target="_blank"
+          rel="noopener noreferrer"
           className={`inline-flex items-center gap-2 mt-5 bg-blue-500 hover:bg-blue-400 text-white px-7 py-3 rounded-xl font-black text-sm transition-all shadow-lg shadow-blue-500/20 ${FOCUS_RING}`}
         >
           Book a 20-minute School Demo <ArrowRight className="w-4 h-4" />
-        </Link>
+        </a>
       </div>
 
     </div>
@@ -685,12 +683,14 @@ function TeacherSection({
         <p className="text-sm text-white/50 leading-relaxed">
           When your school adopts EduNexus, Teacher Pro is unlocked automatically — at no cost to you.
         </p>
-        <Link
-          href="/early-access"
+        <a
+          href={SCHOOL_DEMO_WA_LINK}
+          target="_blank"
+          rel="noopener noreferrer"
           className={`inline-flex items-center gap-2 mt-4 text-amber-400 hover:text-amber-300 font-bold text-sm transition-colors rounded ${FOCUS_RING}`}
         >
           Tell your school about EduNexus →
-        </Link>
+        </a>
       </div>
 
     </div>
@@ -824,42 +824,32 @@ function FamilySection({
         ))}
       </div>
 
-      {/* Learner token table */}
-      <div className="max-w-3xl mx-auto mb-14">
-        <div className="bg-white/4 border border-white/10 rounded-2xl p-7">
-          <p className="font-black text-white mb-0.5">Not ready to commit to a full term?</p>
-          <p className="text-sm text-white/50 mb-6">Pay per report or per session — no subscription needed.</p>
-
-          <div className="grid grid-cols-3 gap-3 mb-6">
-            {LEARNER_TOKENS.map((item) => (
-              <div key={item.action} className="bg-white/5 rounded-xl p-4 text-center">
-                <p className="text-2xl font-black text-white leading-none">KES {item.kes}</p>
-                <p className="text-xs text-white/50 font-bold mt-1.5">{item.action}</p>
-                <p className="text-[10px] text-white/50 mt-0.5 leading-tight">{item.detail.split(' ').slice(0, 4).join(' ')}…</p>
-              </div>
-            ))}
-          </div>
-
-          <p className="text-xs text-white/50 text-center mb-5">
-            1 token = KES 100 · Starter pack: KES 500 for 5 tokens · Credit never expires
-          </p>
-
-          <button
-            onClick={() => onSelect(TOKEN_PRODUCT)}
-            className={`block w-full text-center bg-white/8 hover:bg-white/12 text-white/65 hover:text-white font-bold py-3 rounded-xl text-sm transition-colors ${FOCUS_RING}`}
-          >
-            Start with 5 tokens — KES 500 →
-          </button>
-        </div>
-      </div>
+      {/* Pay-per-use, demoted — most families now arrive through a school;
+          this is the residual path for a learner with no attached school
+          or parent, not the primary offer. */}
+      <p className="max-w-3xl mx-auto text-center text-xs text-white/40 mb-14">
+        Prefer to pay per report instead of a full term?{' '}
+        <button
+          onClick={() => onSelect(TOKEN_PRODUCT)}
+          className={`underline decoration-white/20 hover:text-white/70 hover:decoration-white/40 transition-colors rounded ${FOCUS_RING}`}
+        >
+          Start with 5 tokens for KES 500
+        </button>
+        {' '}(1 token = KES 100, never expires).
+      </p>
 
       {/* School nudge */}
       <div className="max-w-2xl mx-auto bg-white/3 border border-white/8 rounded-2xl px-8 py-5 text-center">
         <p className="text-sm text-white/50 leading-relaxed">
           If your child&apos;s school is on EduNexus, family access is included automatically.{' '}
-          <Link href="/early-access" className={`text-violet-400 hover:text-violet-300 font-semibold transition-colors rounded ${FOCUS_RING}`}>
+          <a
+            href={SCHOOL_DEMO_WA_LINK}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`text-violet-400 hover:text-violet-300 font-semibold transition-colors rounded ${FOCUS_RING}`}
+          >
             Tell your school about EduNexus →
-          </Link>
+          </a>
         </p>
       </div>
 
@@ -1093,12 +1083,14 @@ function PricingContent() {
                 From KES 129 per learner per term · Teacher Pro included for all teachers
               </p>
             </div>
-            <Link
-              href="/early-access"
+            <a
+              href={SCHOOL_DEMO_WA_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
               className={`inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-400 text-white px-8 py-3 rounded-xl font-black text-sm transition-all whitespace-nowrap shadow-lg shadow-blue-500/20 ${FOCUS_RING}`}
             >
               Book a School Demo <ArrowRight className="w-4 h-4" />
-            </Link>
+            </a>
           </div>
         </div>
       )}

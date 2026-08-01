@@ -21,3 +21,27 @@ export const CURRICULA_COMPACT = ['CBC', 'IGCSE', '8-4-4'] as const
 // theme /legal/* actually belongs to.
 export const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70'
 export const FOCUS_RING_ON_LIGHT = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900/70'
+
+// The one real-time human contact channel the business actually operates —
+// used by both /early-access's family flow and any school-facing "talk to
+// us" CTA. Single source so a phone-number change never has to be hunted
+// down page by page.
+export const WHATSAPP_NUMBER = '254710798030'
+
+function buildWaLink(message: string): string {
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`
+}
+
+// School-demo request CTA destination. EduNexus has no dedicated demo-
+// booking page or form — WhatsApp is the real, already-in-use contact
+// channel (see /early-access), so a "Book a School Demo" button should
+// open a real conversation there instead of pointing at the unrelated
+// family early-access funnel.
+export const SCHOOL_DEMO_WA_LINK = buildWaLink(
+  `Habari EduNexus! 👋
+I'd like to book a school demo.
+School name: [school name]
+Role: [principal / deputy / ICT coordinator / other]
+Approx. number of learners: [number]
+Best time to reach me: [day/time]`
+)

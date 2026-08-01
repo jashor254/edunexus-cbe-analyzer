@@ -15,13 +15,7 @@ import {
   Clock,
   Shield,
 } from 'lucide-react'
-import { FOCUS_RING } from '../constants'
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const WA_NUMBER = '254710798030'
-const SPOTS_REMAINING = 17
-const TOTAL_SPOTS = 20
+import { FOCUS_RING, WHATSAPP_NUMBER } from '../constants'
 
 // ─── WhatsApp messages per plan ───────────────────────────────────────────────
 
@@ -36,7 +30,7 @@ Niambie hatua za kulipa. Asante!`,
 
   term: `Habari EduNexus! 👋
 Nataka kujiunga Early Access.
-Plan: Term Plan — KES 3,200
+Plan: Term Plan — KES 2,499
 Jina: [jina lako]
 Namba: [namba yako]
 Grade ya mtoto: [grade]
@@ -75,9 +69,7 @@ const PLANS = [
   {
     id: 'term' as PlanId,
     name: 'Term Plan',
-    price: 3200,
-    originalPrice: 4500,
-    savings: 1300,
+    price: 2499,
     billing: 'per term',
     badge: 'MOST POPULAR',
     highlight: true,
@@ -117,7 +109,7 @@ const PLANS = [
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
 function waLink(plan: PlanId) {
-  return `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(WA_MESSAGES[plan])}`
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WA_MESSAGES[plan])}`
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -140,7 +132,7 @@ export default function EarlyAccessPage() {
         <div className="max-w-5xl mx-auto px-4 flex items-center justify-center gap-2">
           <Zap className="w-4 h-4 animate-pulse flex-shrink-0" />
           <span className="text-sm font-black tracking-wide text-center">
-            ⚡ {SPOTS_REMAINING} of {TOTAL_SPOTS} founding spots remaining — Pay via M-PESA today
+            ⚡ Founding member pricing — Pay via M-PESA today
           </span>
         </div>
       </div>
@@ -182,7 +174,7 @@ export default function EarlyAccessPage() {
           </h1>
 
           <p className="text-lg text-white/60 max-w-xl mx-auto leading-relaxed mb-5">
-            First {TOTAL_SPOTS} families lock in founding pricing before full launch.
+            Founding families lock in early pricing before full launch.
             Your rate is locked — it never goes up.
           </p>
 
@@ -197,14 +189,6 @@ export default function EarlyAccessPage() {
             <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 rounded-full text-sm font-black">
               🌍 Cambridge IGCSE
             </span>
-          </div>
-
-          {/* Spots counter */}
-          <div className="inline-flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl px-6 py-4">
-            <div className="w-2.5 h-2.5 bg-amber-400 rounded-full animate-pulse flex-shrink-0" />
-            <p className="text-base text-amber-300 font-black">
-              ⚡ {SPOTS_REMAINING} of {TOTAL_SPOTS} spots remaining
-            </p>
           </div>
         </div>
 
@@ -341,7 +325,7 @@ export default function EarlyAccessPage() {
                   We personally ensure your child's best experience."
                 </p>
                 <p className="text-white/50 text-sm font-bold">
-                  — EduNexus Team, Nairobi 🇰🇪
+                  — Dennis, Founder, EduNexus Kenya 🇰🇪
                 </p>
               </div>
             </div>
