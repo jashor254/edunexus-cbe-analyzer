@@ -214,8 +214,8 @@ export default async function InsightsPage({ searchParams }: PageProps) {
               <div className="space-y-3">
                 {[
                   { label: 'Learner Blueprint',                  href: '/#evidence',     desc: 'See how EduNexus notices a learning problem early' },
-                  { label: 'For Schools',                        href: '/#school',       desc: 'Whole-school learning intelligence' },
-                  { label: 'For Teachers',                       href: '/#teachers',     desc: 'Plans, insights, and class intelligence' },
+                  { label: 'For Schools',                        href: '/schools',       desc: 'Whole-school learning intelligence' },
+                  { label: 'For Teachers',                       href: '/teachers',      desc: 'Plans, insights, and class intelligence' },
                   { label: 'Career Intelligence',                href: '/#career',       desc: 'Where a learner is heading if we keep acting early' },
                 ].map((link) => (
                   <a

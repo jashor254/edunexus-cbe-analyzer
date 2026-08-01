@@ -32,13 +32,6 @@ const ROLES: { id: Exclude<SelectedRole, null>; label: string }[] = [
   { id: 'family',  label: '👨‍👩‍👧 For Families' },
 ]
 
-const TEACHER_TIMELINE = [
-  { icon: '📋', label: 'SOW generated'     },
-  { icon: '📖', label: 'Lesson plans sent' },
-  { icon: '📊', label: 'Insights updated'  },
-  { icon: '💬', label: 'Parents notified'  },
-]
-
 export default function LandingPage() {
   const [demoOpen,     setDemoOpen]     = useState(false)
   const [kcseDemoOpen, setKcseDemoOpen] = useState(false)
@@ -539,93 +532,27 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── MECHANISM: TEACHER WORKSPACE ──────────────────────────────────────── */}
+      {/* ── TEACHER SUMMARY — full experience lives at /teachers ──────────────── */}
       <section id="teachers" className="py-20 md:py-28">
-        <div className="max-w-275 mx-auto px-6">
-
-          <div className="text-center mb-12">
-            <span className="text-xs font-bold text-amber-400 uppercase tracking-widest mb-3 block">
-              How The Noticing Happens
-            </span>
-            <h2 className="text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5">
-              Every lesson<br />becomes evidence.
-            </h2>
-            <p className="text-white/60 leading-relaxed max-w-150 mx-auto">
-              None of this works without the teacher.
-              <br /><br />
-              Every assessment marked, every scheme of work built, every lesson taught — that is
-              the raw material behind the Blueprint and Compass you just saw. EduNexus reads it to
-              find the strand that&apos;s slipping before it becomes a pattern. The documentation
-              is handled for you — CBC-aligned schemes of work, lesson plans formatted exactly as
-              TSC expects — so there is more room left to notice the things a form can&apos;t
-              capture. Walk into Monday&apos;s lesson prepared, not exhausted.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6 mb-10">
-            {[
-              {
-                icon: '📋',
-                title: 'Schemes of Work',
-                body: 'Your full term planned before it begins — CBC-aligned, TSC inspection ready. This is the structure the Blueprint reads against.',
-              },
-              {
-                icon: '📖',
-                title: 'Lesson Plans',
-                body: "Every Friday, next week's plans land automatically. Objectives, activities, assessments — the record that becomes evidence.",
-              },
-              {
-                icon: '📊',
-                title: 'Class Intelligence',
-                body: "See every learner's level at a glance. Know who needs support before the end-of-term results force the conversation.",
-              },
-            ].map((card) => (
-              <div
-                key={card.title}
-                className="bg-white/3 border border-white/10 rounded-2xl p-6 hover:bg-white/5 hover:scale-[1.02] transition-all"
-              >
-                <div className="text-3xl mb-4">{card.icon}</div>
-                <h3 className="text-base font-bold text-white mb-2">{card.title}</h3>
-                <p className="text-sm text-white/45 leading-relaxed">{card.body}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Automation timeline */}
-          <div className="mb-10">
-            <p className="text-center text-[10px] font-semibold text-white/50 uppercase tracking-widest mb-4">
-              From classroom record to family insight
-            </p>
-            <div
-              className="flex items-center justify-center overflow-x-auto [&::-webkit-scrollbar]:hidden pb-1"
-              style={{ scrollbarWidth: 'none' }}
-            >
-              {TEACHER_TIMELINE.map((step, i) => (
-                <div key={step.label} className="flex items-center shrink-0">
-                  <div className="flex flex-col items-center gap-1.5">
-                    <span className="text-base">{step.icon}</span>
-                    <span className="text-[10px] text-teal-400 font-medium whitespace-nowrap">{step.label}</span>
-                  </div>
-                  {i < TEACHER_TIMELINE.length - 1 && (
-                    <div className="w-8 md:w-14 shrink-0 mx-2 border-t border-dashed border-teal-500/30" />
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="text-center">
-            <Link
-              href="/signup?role=teacher"
-              className={`text-amber-400 hover:text-amber-300 font-semibold transition-colors rounded ${FOCUS_RING}`}
-            >
-              Start planning your term for free →
-            </Link>
-            <p className="text-xs text-white/40 mt-2">
-              Trusted by CBC teachers from Nairobi to Mombasa to Kisumu.
-            </p>
-          </div>
-
+        <div className="max-w-170 mx-auto px-6 text-center">
+          <span className="text-xs font-bold text-amber-400 uppercase tracking-widest mb-3 block">
+            How The Noticing Happens
+          </span>
+          <h2 className="text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5">
+            Every lesson<br />becomes evidence.
+          </h2>
+          <p className="text-white/60 leading-relaxed max-w-150 mx-auto mb-8">
+            None of this works without the teacher. Every assessment marked, every scheme of work
+            built, every lesson taught is the raw material behind the Blueprint and Compass you
+            just saw — with the documentation handled for you, CBC-aligned and TSC-ready.
+          </p>
+          <Link
+            href="/teachers"
+            className={`inline-flex items-center gap-2 bg-white/8 border border-white/10 hover:bg-white/14 text-white px-7 py-3.5 rounded-xl font-bold transition-all ${FOCUS_RING}`}
+          >
+            Explore the Teacher Experience
+            <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
       </section>
 
