@@ -44,9 +44,9 @@ function MarketingNav() {
           <Link href="/teachers" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
             For Teachers
           </Link>
-          <a href="#evidence" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
+          <Link href="/blueprint" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
             Learner Blueprint
-          </a>
+          </Link>
           <Link href="/pricing" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
             Pricing
           </Link>
@@ -92,7 +92,7 @@ function MarketingNav() {
             {[
               { href: '/schools',   label: 'For Schools'      },
               { href: '/teachers',  label: 'For Teachers'     },
-              { href: '#evidence',  label: 'Learner Blueprint' },
+              { href: '/blueprint', label: 'Learner Blueprint' },
               { href: '/pricing',   label: 'Pricing'          },
               { href: '/insights',  label: 'Insights ✦'       },
               { href: '/about',     label: 'About'            },

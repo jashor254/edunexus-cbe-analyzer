@@ -14,6 +14,7 @@ import { CURRICULA, FOCUS_RING, SCHOOL_DEMO_WA_LINK } from './constants'
 // never silently drift out of sync with the actual demo, the way they did
 // before (this page said "Grade 8", the real demo data says Grade 9).
 import { STUDENT as DEMO_STUDENT } from '@/components/demo/mockData'
+import { BlueprintCardMockup } from './components/BlueprintCard'
 
 const AcademicClinicDemo = dynamic(
   () => import('@/components/demo/AcademicClinicDemo'),
@@ -89,7 +90,7 @@ export default function LandingPage() {
       gradientLine:  'EduNexus shortens that gap.',
       gradientClass: 'from-violet-400 via-purple-400 to-indigo-400',
       subtitle:      'EduNexus shortens the distance between when a learning problem begins and when someone notices — while there is still time to act on it.',
-      ctaHref:       '#evidence',
+      ctaHref:       '/blueprint',
       ctaLabel:      'See How EduNexus Notices Early',
       trust:         '✓ CBC · Cambridge IGCSE · 8-4-4  ·  ✓ Grades 7–12  ·  ✓ 50+ pioneer teachers',
       secondary:     { label: 'Try a real sample report →', action: 'demo' },
@@ -256,73 +257,15 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── EVIDENCE: LEARNER BLUEPRINT (centerpiece) ─────────────────────────── */}
+      {/* ── BLUEPRINT SUMMARY — full experience lives at /blueprint ───────────── */}
       <section id="evidence" className="bg-white/5 py-20 md:py-28">
         <div className="max-w-275 mx-auto px-6">
           <div className="grid md:grid-cols-2 gap-16 items-center">
 
-            {/* Report card mockup */}
             <div className="order-2 md:order-1 flex justify-center">
-              <div className="relative">
-                <div className="absolute inset-0 bg-white/5 border border-white/10 rounded-2xl rotate-1 translate-x-2 translate-y-1" />
-                <div className="relative bg-white/8 border border-white/15 rounded-2xl -rotate-2 w-64 p-7">
-                  <div className="text-[10px] font-bold text-teal-400 tracking-[0.15em] uppercase mb-1">
-                    EDUNEXUS
-                  </div>
-                  <div className="text-xl font-extrabold text-white mb-0.5">Learner Blueprint</div>
-                  <div className="text-xs text-white/60 mb-2">Living Learner Intelligence Profile</div>
-                  <div className="inline-block text-[10px] font-semibold text-white/45 bg-white/5 border border-white/10 rounded-full px-2 py-0.5 mb-3">
-                    Illustrative example
-                  </div>
-
-                  <div className="border-t border-white/15 mb-4" />
-
-                  <div className="text-base font-extrabold text-white mb-0.5">{DEMO_STUDENT.name}</div>
-                  <div className="text-xs text-white/50 mb-0.5">Grade {DEMO_STUDENT.grade} · Junior School</div>
-                  <div className="text-xs text-white/50 mb-5">Term {DEMO_STUDENT.term}, {DEMO_STUDENT.year}</div>
-
-                  <div className="border-t border-white/15 mb-4" />
-
-                  <div className="text-xs text-white/50 mb-2">
-                    Overall Competency:{' '}
-                    <span className="font-bold text-white">DEVELOPING</span>
-                  </div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold px-3 py-1 rounded-full">
-                      Level 2
-                    </span>
-                  </div>
-                  <div className="text-xs text-green-400 font-semibold mb-4">
-                    Trajectory: IMPROVING ↑
-                  </div>
-
-                  {/* Mini strand bars */}
-                  <div className="space-y-2 mb-5">
-                    {[
-                      { label: 'Number Patterns', pct: 43, color: 'bg-red-400/70'   },
-                      { label: 'Algebra',          pct: 67, color: 'bg-amber-400/70' },
-                      { label: 'Geometry',         pct: 81, color: 'bg-green-400/70' },
-                    ].map(({ label, pct, color }) => (
-                      <div key={label}>
-                        <div className="flex justify-between text-[10px] text-white/35 mb-0.5">
-                          <span>{label}</span>
-                          <span>{pct}%</span>
-                        </div>
-                        <div className="h-1 bg-white/8 rounded-full overflow-hidden">
-                          <div className={`h-1 rounded-full ${color}`} style={{ width: `${pct}%` }} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="border-t border-white/15 pt-3">
-                    <div className="text-[10px] text-white/45">edunexus.co.ke · CONFIDENTIAL · Sample</div>
-                  </div>
-                </div>
-              </div>
+              <BlueprintCardMockup />
             </div>
 
-            {/* Text */}
             <div className="order-1 md:order-2">
               <span className="text-xs font-bold text-amber-400 uppercase tracking-widest mb-3 block">
                 The Evidence
@@ -330,65 +273,16 @@ export default function LandingPage() {
               <h2 className="text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5">
                 Discovered while there<br />was still time to fix it.
               </h2>
-              <p className="text-white/60 leading-relaxed mb-6">
-                This is what noticing early actually looks like.
-                <br /><br />
-                Marks tell you what happened. The Learner Blueprint tells you why.
-                Every term, each learner receives a strand-by-strand intelligence profile — not a
-                general &ldquo;Mathematics is weak&rdquo; summary, but the specific concept holding
-                them back and the precise path to close it, while it&apos;s still one strand wide
-                and not a whole subject wide.
-                <br /><br />
-                Teachers, parents, and school leadership each see the same picture. One learner.
-                One truth. Everyone informed early enough to act on it.
+              <p className="text-white/60 leading-relaxed mb-8">
+                Marks tell you what happened. The Learner Blueprint tells you why — a strand-by-
+                strand intelligence profile every term, visible to the teacher, parent, and school
+                leadership, all reading the same evidence.
               </p>
-              <ul className="space-y-3 mb-8">
-                {[
-                  'Strand-level diagnosis per subject — not just overall marks',
-                  'Trajectory tracking — improving, plateauing, or declining',
-                  '3-week targeted study plan included',
-                  'Visible to the teacher, parent, and school leadership',
-                  'Career and pathway guidance built in for CBC learners',
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-3 text-sm text-white/60">
-                    <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-
-              <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-3">
-                Sample reports
-              </p>
-              <div className="flex flex-wrap gap-3 mb-6">
-                <button
-                  onClick={() => setDemoOpen(true)}
-                  className={`flex items-center gap-2.5 bg-white/5 border border-white/10 rounded-xl px-4 py-3 hover:bg-white/8 transition-all text-left ${FOCUS_RING}`}
-                >
-                  <div className="w-2.5 h-2.5 rounded-full bg-violet-400 shrink-0" />
-                  <div>
-                    <div className="text-sm font-bold text-white">{DEMO_STUDENT.name}</div>
-                    <div className="text-xs text-white/40">CBC · Grade {DEMO_STUDENT.grade}</div>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => setKcseDemoOpen(true)}
-                  className={`flex items-center gap-2.5 bg-white/5 border border-white/10 rounded-xl px-4 py-3 hover:bg-white/8 transition-all text-left ${FOCUS_RING}`}
-                >
-                  <div className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
-                  <div>
-                    <div className="text-sm font-bold text-white">James Kamau</div>
-                    <div className="text-xs text-white/40">8-4-4 · Form 3</div>
-                  </div>
-                </button>
-              </div>
-
               <Link
-                href="/signup?role=parent"
+                href="/blueprint"
                 className={`inline-flex items-center gap-2 bg-white/8 border border-white/10 hover:bg-white/14 text-white px-7 py-3.5 rounded-xl font-bold transition-all ${FOCUS_RING}`}
               >
-                Get My Child&apos;s Free Report
+                Explore the Learner Blueprint
                 <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
