@@ -65,6 +65,23 @@ export class BillingRepository extends BaseRepository {
   }
 
   /**
+   * Resolve the teachers.id row (distinct from auth user id) for a user.
+   * schemes_of_work.teacher_id references this, not the auth id directly —
+   * used by access.ts to check first-SOW trial eligibility.
+   */
+  async findTeacherIdByUserId(userId: string): Promise<string | null> {
+    return timedQuery('teachers', 'findTeacherIdByUserId', async () => {
+      const { data } = await this.db
+        .from('teachers')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle()
+
+      return data?.id ?? null
+    })
+  }
+
+  /**
    * Find an active, non-expired subscription for a user.
    * Used by the legacy subscriptions table (cookie-auth path in access.ts).
    */

@@ -73,11 +73,21 @@ export async function checkFeatureAccess(
   // A parent who is also a teacher gets teacher privileges on teacher-tier features
   const isTeacherRole = primaryRole === 'teacher' || secondaryRole === 'teacher'
 
-  // 5. Teacher tier — free for teacher-designated features
+  // 5. Teacher tier — free for teacher-designated features, but ONLY when
+  //    that teacher's school has an active EduNexus subscription. Role
+  //    alone ('teacher' in profiles) is not sufficient — a self-teacher
+  //    with no attached school pays per service like any token user, same
+  //    as everyone else. This is checked here, not inferred from role,
+  //    because role is set at signup and never re-verified against
+  //    whether a real, paying organization stands behind it.
   if (isTeacherRole) {
     const teacherAccess = FEATURE_ACCESS[feature].teacher
     if (teacherAccess === 'free') {
-      return cacheAndReturn({ allowed: true, tier: 'teacher', deductTokens: false, userId: user.id })
+      const organizations = await repos.organizations.findUserOrganizations(user.id)
+      if (organizations.length > 0) {
+        return cacheAndReturn({ allowed: true, tier: 'teacher', deductTokens: false, userId: user.id })
+      }
+      // Teacher role, no school affiliation → falls through to token pricing below.
     }
     // Teacher accessing a parent-tier feature (clinic, compass, career) → falls through
   }
@@ -91,6 +101,21 @@ export async function checkFeatureAccess(
 
   if (subscription) {
     return cacheAndReturn({ allowed: true, tier: 'subscriber', deductTokens: false, userId: user.id })
+  }
+
+  // 6b. First-SOW trial — a genuinely first-ever Scheme of Work is free,
+  //     for any teacher, affiliated or not (affiliated teachers already
+  //     returned free at step 5; this specifically covers the self-teacher
+  //     path). Checked against real SOW history, never a flag that could
+  //     go stale — "first" means zero rows in schemes_of_work, checked now.
+  if (feature === 'sow_generate') {
+    const teacherId = await repos.billing.findTeacherIdByUserId(user.id)
+    if (teacherId) {
+      const priorSOWCount = await repos.curriculum.countByTeacher(teacherId)
+      if (priorSOWCount === 0) {
+        return cacheAndReturn({ allowed: true, tier: 'teacher', deductTokens: false, userId: user.id })
+      }
+    }
   }
 
   // 7. Token balance — last resort

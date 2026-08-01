@@ -110,6 +110,18 @@ export class CurriculumRepository extends BaseRepository {
     return data as SOWMeta
   }
 
+  // Used to decide whether this teacher's next SOW generation is their
+  // genuinely-first (free trial) or a subsequent one (bundle-priced).
+  async countByTeacher(teacherId: string): Promise<number> {
+    const { count, error } = await this.db
+      .from('schemes_of_work')
+      .select('id', { count: 'exact', head: true })
+      .eq('teacher_id', teacherId)
+
+    if (error) throw new Error(`Failed to count SOWs for teacher: ${error.message}`)
+    return count ?? 0
+  }
+
   async findActiveSOW(
     teacherId: string,
     grade: number,

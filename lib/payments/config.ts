@@ -37,11 +37,22 @@ export const TOKEN_PACK = {
 
 // ===== TOKEN COSTS PER FEATURE (for pay-as-you-go users) =====
 // career_guidance is now embedded in clinic_report — no separate gate.
+//
+// Teacher tools are free ONLY for teachers whose school has an active
+// EduNexus subscription (checked via real organization membership in
+// checkFeatureAccess — role: 'teacher' alone is no longer sufficient).
+// A self-teacher with no attached school pays per service, individually —
+// EXCEPT the SOW → lesson plans → Record of Work chain, which is priced
+// as one Planning Bundle (2 tokens = KES 100), charged once at SOW
+// generation; a teacher's genuinely first SOW ever is free (checked in
+// access.ts against real SOW history, not inferred from role). Other
+// services (slides, remedial planner, holiday plan, Compass, etc.) are
+// unrelated to this chain and stay individually priced below — no
+// bundling beyond SOW/lesson-plan/ROW specifically.
 export const TOKEN_COSTS = {
-  // Teacher tools (free for teachers, token for non-subscribers)
-  sow_generate:         5,
-  lesson_plan_generate: 3,
-  row_generate:         2,
+  sow_generate:         2,
+  lesson_plan_generate: 0,
+  row_generate:         0,
   slides_generate:      2,
   // Remedial Planner — differentiated class plan — 2 tokens = KES 100
   remedial_planner:     2,
