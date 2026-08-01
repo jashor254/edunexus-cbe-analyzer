@@ -14,6 +14,7 @@ import {
   apiFallback,
 } from '@/lib/api/response'
 import { generateSpecificWeekPlans } from '@/lib/lessonPlan/weeklyGenerator'
+import { repos } from '@/lib/repositories'
 
 const FEATURE: FeatureKey = 'lesson_plan_generate'
 
@@ -95,7 +96,11 @@ export async function POST(req: Request) {
       })
     }
 
-    const result = await generateSpecificWeekPlans(sowId, access.userId, weekNumber)
+    const [organization] = await repos.organizations.findUserOrganizations(access.userId)
+    const costContext = organization
+      ? { organizationId: organization.id, feature: 'lesson_plan_generate' }
+      : undefined
+    const result = await generateSpecificWeekPlans(sowId, access.userId, weekNumber, costContext)
 
     const { data: plans } = await db
       .from('lesson_plans')

@@ -73,7 +73,7 @@ export async function POST(req: Request) {
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
 
     const {
-      context,
+      context: parsedContext,
       lessonStructure,
       selectedSubstrands,
       breaks,
@@ -84,6 +84,15 @@ export async function POST(req: Request) {
       selectedSubstrands: SelectedSubstrand[]
       breaks?: BreakItem[]
       timeline?: TimelineSlot[]
+    }
+
+    // costContext is resolved server-side, never trusted from the request —
+    // teachers with no organization (individual, not school-affiliated) get
+    // no costContext, which is a no-op per lib/ai/deepseek.ts's contract.
+    const [organization] = await repos.organizations.findUserOrganizations(access.userId)
+    const context: SOWContext = {
+      ...parsedContext,
+      costContext: organization ? { organizationId: organization.id, feature: 'sow_generate' } : undefined,
     }
 
     // ── Build or use pre-built timeline ───────────────────────────────────────

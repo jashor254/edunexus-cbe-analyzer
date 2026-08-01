@@ -1,3 +1,5 @@
+import type { AICostContext } from '@/lib/ai/deepseek'
+
 export interface LessonPlanContext {
   // From SOW
   teacherName: string
@@ -28,6 +30,7 @@ export interface LessonPlanContext {
   conclusion?: string
   extendedActivities?: string
   reflection?: string
+  costContext?: AICostContext
 }
 
 export interface GeneratedLessonPlan {

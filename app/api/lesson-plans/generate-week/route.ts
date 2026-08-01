@@ -11,6 +11,7 @@ import {
   apiBadRequest,
 } from '@/lib/api/response'
 import { generateSpecificWeekPlans } from '@/lib/lessonPlan/weeklyGenerator'
+import { repos } from '@/lib/repositories'
 
 const FEATURE: FeatureKey = 'lesson_plan_generate'
 
@@ -63,7 +64,11 @@ export async function POST(req: Request) {
 
     let result
     try {
-      result = await generateSpecificWeekPlans(sowId, access.userId, weekNumber)
+      const [organization] = await repos.organizations.findUserOrganizations(access.userId)
+      const costContext = organization
+        ? { organizationId: organization.id, feature: 'lesson_plan_generate' }
+        : undefined
+      result = await generateSpecificWeekPlans(sowId, access.userId, weekNumber, costContext)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Generation failed'
       console.error('[lesson-plans/generate-week]', message)

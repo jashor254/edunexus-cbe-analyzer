@@ -184,6 +184,7 @@ export async function generateSchemePipeline(
           diversitySeed,
           textbook:       context.textbook ?? 'Class textbook',
           kicdContext:    context.kicdContext,
+          costContext:    context.costContext,
         }).then(result => ({ slot, result }))
       })
     )

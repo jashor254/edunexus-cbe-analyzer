@@ -223,7 +223,7 @@ export async function generateLessonPlan(
   for (let attempt = 0; attempt < 3; attempt++) {
     let raw: string
     try {
-      raw = await callAI(prompt, LESSON_PLAN_SYSTEM, { temperature: 0.3, maxTokens: 2000 })
+      raw = await callAI(prompt, LESSON_PLAN_SYSTEM, { temperature: 0.3, maxTokens: 2000, costContext: ctx.costContext })
     } catch (err: unknown) {
       lastError = err instanceof Error ? err.message : 'Unknown AI error'
       continue
@@ -387,7 +387,7 @@ Return JSON only:
 
   let raw: string
   try {
-    raw = await callAI(prompt, LESSON_PLAN_SYSTEM, { temperature: 0.3, maxTokens: 2000 })
+    raw = await callAI(prompt, LESSON_PLAN_SYSTEM, { temperature: 0.3, maxTokens: 2000, costContext: context.costContext })
   } catch {
     return fallback
   }

@@ -4,7 +4,7 @@
 
 import { validateLesson } from './validators'
 import { isKiswahiliSubject } from '@/lib/curriculum/subjectUtils'
-import { callDeepSeek as callAI } from '@/lib/ai/deepseek'
+import { callDeepSeek as callAI, type AICostContext } from '@/lib/ai/deepseek'
 import type { CurriculumMode } from './types'
 import type { DiversitySeed } from './diversityEngine'
 
@@ -110,10 +110,11 @@ NEVER: page numbers, "pp.", descriptions after the name, community resource pers
 
 // ─── AI call — routes through shared lib/ai/deepseek.ts ─────────────────────
 
-function callSowAI(prompt: string, isKiswahili = false): Promise<string> {
+function callSowAI(prompt: string, isKiswahili = false, costContext?: AICostContext): Promise<string> {
   return callAI(prompt, getDiversitySystemRules(isKiswahili), {
     temperature: TEMPERATURE,
     maxTokens:   1200,
+    costContext,
   })
 }
 
@@ -404,6 +405,7 @@ export interface LessonGenerationContext {
     strandData:   Array<{ title: string; kicd_data: Record<string, unknown>[] }>
     subtopicMap?: Record<string, string[]>
   }
+  costContext?: AICostContext
 }
 
 export interface ValidatedLessonResult {
@@ -456,7 +458,7 @@ ${isMathsRetry && lastError.includes('progress') ? 'MATHS REMINDER: a)=recall/id
 
     let aiResponse: string
     try {
-      aiResponse = await callSowAI(prompt, isKiswahiliCtx)
+      aiResponse = await callSowAI(prompt, isKiswahiliCtx, context.costContext)
     } catch (err: unknown) {
       lastError = `AI request failed: ${err instanceof Error ? err.message : String(err)}`
       continue

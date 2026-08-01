@@ -1,6 +1,7 @@
 import { repos } from '@/lib/repositories'
 import { generateLessonPlan } from './generator'
 import { publishEvent } from '@/lib/events'
+import type { AICostContext } from '@/lib/ai/deepseek'
 import type { LessonPlanContext, WeeklyGenerationResult } from './types'
 import type { GeneratedLesson } from '@/lib/sow/types'
 import type { TimelineSlot } from '@/lib/sow/types'
@@ -147,7 +148,8 @@ export async function generateWeeklyPlans(
 export async function generateSpecificWeekPlans(
   sowId: string,
   teacherId: string,
-  weekNumber: number
+  weekNumber: number,
+  costContext?: AICostContext
 ): Promise<WeeklyGenerationResult> {
   const sow = await repos.curriculum.findSOWWithTimeline(sowId) as unknown as SavedSOW
 
@@ -177,6 +179,7 @@ export async function generateSpecificWeekPlans(
         keyInquiryQuestions: lesson.keyInquiryQuestions,
         learningResources: lesson.learningResources,
         assessmentMethods: lesson.assessmentMethods,
+        costContext,
       }
       const plan = await generateLessonPlan(ctx)
       return { plan, lesson }

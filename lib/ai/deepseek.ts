@@ -280,12 +280,38 @@ async function fetchDeepSeekStream(
   return response.body
 }
 
+// Records real streamed usage the same way callDeepSeek's recordUsage does —
+// unconditionally logged for observability, additionally recorded per-org
+// when costContext is supplied. Never throws — a cost-recording failure
+// must not break a learner's Compass session.
+async function recordStreamUsage(
+  usageTokens: number | null,
+  provider: string,
+  costContext?: AICostContext
+): Promise<void> {
+  logger.info('AI stream completed', { service: 'deepseek.stream', provider, usage_tokens: usageTokens })
+  if (costContext && usageTokens !== null) {
+    try {
+      await repos.developers.insertAICostEvent({
+        organization_id: costContext.organizationId,
+        event_type:       'ai.completion',
+        resource:         costContext.feature,
+        quantity:         1,
+        cost_tokens:      usageTokens,
+      })
+    } catch (err) {
+      logger.error('Failed to record AI stream cost event', { service: 'deepseek.stream' }, err)
+    }
+  }
+}
+
 // Emits DeepSeek-compatible SSE so the route's TransformStream needs no changes.
 async function streamGeminiFallback(
   systemPrompt: string,
   userMessage: string,
   history: { role: 'user' | 'assistant'; content: string }[],
-  temperature: number
+  temperature: number,
+  costContext?: AICostContext
 ): Promise<ReadableStream<Uint8Array>> {
   const key = process.env.GOOGLE_GEMINI_API_KEY
   if (!key) throw new Error('Missing GOOGLE_GEMINI_API_KEY — cannot fall back to Gemini')
@@ -335,6 +361,15 @@ async function streamGeminiFallback(
           }
         }
         controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+        // Stream is fully drained — result.response now resolves with the
+        // aggregated response, including real usage metadata.
+        try {
+          const final = await result.response
+          const totalTokens = final.usageMetadata?.totalTokenCount ?? null
+          await recordStreamUsage(totalTokens, 'gemini', costContext)
+        } catch (usageErr) {
+          logger.warn('Could not read Gemini stream usage metadata', { service: 'deepseek.stream' }, usageErr)
+        }
       } finally {
         controller.close()
       }
@@ -346,15 +381,28 @@ export async function streamDeepSeek(
   systemPrompt: string,
   userMessage: string,
   history: { role: 'user' | 'assistant'; content: string }[],
-  options?: { temperature?: number }
+  options?: { temperature?: number; costContext?: AICostContext }
 ): Promise<ReadableStream<Uint8Array>> {
   const temperature = options?.temperature ?? 0.7
   const trimmedHistory = history.slice(-MAX_HISTORY)
   try {
     logger.info('Attempting Gemini stream', { service: 'ai.stream' })
-    return await streamGeminiFallback(systemPrompt, userMessage, trimmedHistory, temperature)
+    return await streamGeminiFallback(systemPrompt, userMessage, trimmedHistory, temperature, options?.costContext)
   } catch (geminiErr) {
     logger.warn('Gemini stream failed — falling back to DeepSeek', { service: 'ai.stream' }, geminiErr)
+    // KNOWN GAP: the DeepSeek fallback path does not yet capture usage —
+    // it passes the raw SSE stream straight through to the caller. Logged
+    // explicitly here (not silently dropped) so cost data has a visible,
+    // countable hole instead of an invisible one. Capturing it requires
+    // tee-ing a live stream without disrupting what reaches the client —
+    // real work, deliberately not rushed into this change.
+    if (options?.costContext) {
+      logger.warn('AI stream cost NOT recorded — DeepSeek fallback path has no usage capture yet', {
+        service: 'deepseek.stream',
+        organization_id: options.costContext.organizationId,
+        resource: options.costContext.feature,
+      })
+    }
     return fetchDeepSeekStream(systemPrompt, userMessage, trimmedHistory, options)
   }
 }

@@ -1,6 +1,8 @@
 // lib/sow/types.ts
 // Shared TypeScript interfaces for the Scheme of Work generator
 
+import type { AICostContext } from '@/lib/ai/deepseek'
+
 export type CurriculumMode =
   | 'cbc_junior'
   | 'cbc_senior'
@@ -24,6 +26,11 @@ export interface SOWContext {
     strandData: Array<{ title: string; kicd_data: Record<string, unknown>[] }>
     subtopicMap?: Record<string, string[]>
   }
+  // Optional — when the caller resolved an organization for this teacher,
+  // every AI call in the pipeline records its real token cost against it.
+  // Omitted entirely for teachers with no resolvable organization (no
+  // behavior change, per lib/ai/deepseek.ts's costContext contract).
+  costContext?: AICostContext
 }
 
 export interface LessonStructure {

@@ -10,6 +10,7 @@ import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
 import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
 import { type FeatureKey } from '@/lib/payments/config'
 import { apiError } from '@/lib/api/response'
+import { repos } from '@/lib/repositories'
 
 const FEATURE: FeatureKey = 'learning_compass'
 
@@ -368,7 +369,14 @@ export async function POST(req: Request) {
       : []
 
     // ── Stream from DeepSeek ──────────────────────────────────────────────────
-    const rawStream = await streamDeepSeek(systemPrompt, message as string, history, { temperature: 0.3 })
+    // costContext resolved server-side (never trusted from the request);
+    // a student/parent with no resolvable organization gets no costContext,
+    // which is a no-op per lib/ai/deepseek.ts's contract.
+    const [compassOrg] = await repos.organizations.findUserOrganizations(access.userId)
+    const costContext = compassOrg
+      ? { organizationId: compassOrg.id, feature: FEATURE }
+      : undefined
+    const rawStream = await streamDeepSeek(systemPrompt, message as string, history, { temperature: 0.3, costContext })
 
     type CompassEval = {
       genuine_progress: boolean
