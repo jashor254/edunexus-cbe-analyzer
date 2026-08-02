@@ -62,7 +62,7 @@ export default function TeachersPage() {
             <p className="text-white/60 leading-relaxed max-w-150 mx-auto">
               None of this works without the teacher. Every assessment marked, every scheme of work
               built, every lesson taught is the raw material behind a learner&apos;s{' '}
-              <Link href="/blueprint" className={`text-amber-400 hover:text-amber-300 font-semibold rounded ${FOCUS_RING}`}>Blueprint</Link>{' '}
+              <Link href="/learner-blueprint" className={`text-amber-400 hover:text-amber-300 font-semibold rounded ${FOCUS_RING}`}>Blueprint</Link>{' '}
               and their{' '}
               <Link href="/compass" className={`text-amber-400 hover:text-amber-300 font-semibold rounded ${FOCUS_RING}`}>Learning Compass</Link>{' '}
               sessions. The documentation is handled for you — CBC-aligned

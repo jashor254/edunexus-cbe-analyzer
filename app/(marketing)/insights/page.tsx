@@ -213,11 +213,11 @@ export default async function InsightsPage({ searchParams }: PageProps) {
               <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-4">Explore EduNexus</p>
               <div className="space-y-3">
                 {[
-                  { label: 'Learner Blueprint',                  href: '/blueprint',     desc: 'See how EduNexus notices a learning problem early' },
+                  { label: 'Learner Blueprint',                  href: '/learner-blueprint',     desc: 'See how EduNexus notices a learning problem early' },
                   { label: 'Learning Compass',                   href: '/compass',       desc: 'A session that starts from the exact gap, not a generic menu' },
                   { label: 'For Schools',                        href: '/schools',       desc: 'Whole-school learning intelligence' },
                   { label: 'For Teachers',                       href: '/teachers',      desc: 'Plans, insights, and class intelligence' },
-                  { label: 'Career Intelligence',                href: '/career', desc: 'Where a learner is heading if we keep acting early' },
+                  { label: 'Career Intelligence',                href: '/career-pathways', desc: 'Where a learner is heading if we keep acting early' },
                 ].map((link) => (
                   <a
                     key={link.href}

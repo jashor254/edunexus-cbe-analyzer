@@ -161,11 +161,11 @@ export default function CompassPage() {
           </h2>
           <p className="text-white/55 leading-relaxed mb-8">
             Compass doesn&apos;t work in isolation. It starts from a gap identified in the{' '}
-            <Link href="/blueprint" className={`text-amber-400 hover:text-amber-300 font-semibold rounded ${FOCUS_RING}`}>Learner Blueprint</Link>,
+            <Link href="/learner-blueprint" className={`text-amber-400 hover:text-amber-300 font-semibold rounded ${FOCUS_RING}`}>Learner Blueprint</Link>,
             which is itself built from evidence generated in the{' '}
             <Link href="/teachers" className={`text-amber-400 hover:text-amber-300 font-semibold rounded ${FOCUS_RING}`}>Teacher Workspace</Link>.
             Over time, the same mastery record feeds a learner&apos;s{' '}
-            <Link href="/career" className={`text-indigo-400 hover:text-indigo-300 font-semibold rounded ${FOCUS_RING}`}>Career Intelligence</Link>{' '}
+            <Link href="/career-pathways" className={`text-indigo-400 hover:text-indigo-300 font-semibold rounded ${FOCUS_RING}`}>Career Intelligence</Link>{' '}
             picture, and rolled up across a school, it&apos;s part of what{' '}
             <Link href="/schools" className={`text-blue-400 hover:text-blue-300 font-semibold rounded ${FOCUS_RING}`}>School Intelligence</Link>{' '}
             shows leadership. Same evidence, same system, different vantage points.

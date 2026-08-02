@@ -109,7 +109,7 @@ export default function CareerIntelligencePage() {
             the{' '}
             <Link href="/teachers" className={`text-amber-400 hover:text-amber-300 font-semibold rounded ${FOCUS_RING}`}>Teacher Workspace</Link>,
             the strand-level picture in a learner&apos;s{' '}
-            <Link href="/blueprint" className={`text-amber-400 hover:text-amber-300 font-semibold rounded ${FOCUS_RING}`}>Blueprint</Link>,
+            <Link href="/learner-blueprint" className={`text-amber-400 hover:text-amber-300 font-semibold rounded ${FOCUS_RING}`}>Blueprint</Link>,
             and the mastery record built through{' '}
             <Link href="/compass" className={`text-teal-400 hover:text-teal-300 font-semibold rounded ${FOCUS_RING}`}>Learning Compass</Link>{' '}
             sessions — carried forward, term after term, into a picture no single exam produces.

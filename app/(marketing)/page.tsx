@@ -84,7 +84,7 @@ export default function LandingPage() {
       gradientLine:  'EduNexus shortens that gap.',
       gradientClass: 'from-violet-400 via-purple-400 to-indigo-400',
       subtitle:      'EduNexus shortens the distance between when a learning problem begins and when someone notices — while there is still time to act on it.',
-      ctaHref:       '/blueprint',
+      ctaHref:       '/learner-blueprint',
       ctaLabel:      'See How EduNexus Notices Early',
       trust:         '✓ CBC · Cambridge IGCSE · 8-4-4  ·  ✓ Grades 7–12  ·  ✓ 50+ pioneer teachers',
       secondary:     { label: 'Try a real sample report →', action: 'demo' },
@@ -273,7 +273,7 @@ export default function LandingPage() {
                 leadership, all reading the same evidence.
               </p>
               <Link
-                href="/blueprint"
+                href="/learner-blueprint"
                 className={`inline-flex items-center gap-2 bg-white/8 border border-white/10 hover:bg-white/14 text-white px-7 py-3.5 rounded-xl font-bold transition-all ${FOCUS_RING}`}
               >
                 Explore the Learner Blueprint
@@ -382,7 +382,7 @@ export default function LandingPage() {
             into EduNexus from Grade 7 with no separate subscription.
           </p>
           <Link
-            href="/career"
+            href="/career-pathways"
             className={`inline-flex items-center gap-2 bg-white/8 border border-white/10 hover:bg-white/14 text-white px-7 py-3.5 rounded-xl font-bold transition-all ${FOCUS_RING}`}
           >
             Explore Career Intelligence

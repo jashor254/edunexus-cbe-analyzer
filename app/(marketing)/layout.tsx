@@ -44,13 +44,13 @@ function MarketingNav() {
           <Link href="/teachers" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
             For Teachers
           </Link>
-          <Link href="/blueprint" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
+          <Link href="/learner-blueprint" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
             Learner Blueprint
           </Link>
           <Link href="/compass" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
             Learning Compass
           </Link>
-          <Link href="/career" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
+          <Link href="/career-pathways" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
             Career Intelligence
           </Link>
           <Link href="/pricing" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
@@ -98,9 +98,9 @@ function MarketingNav() {
             {[
               { href: '/schools',   label: 'For Schools'      },
               { href: '/teachers',  label: 'For Teachers'     },
-              { href: '/blueprint', label: 'Learner Blueprint' },
+              { href: '/learner-blueprint', label: 'Learner Blueprint' },
               { href: '/compass',   label: 'Learning Compass'  },
-              { href: '/career', label: 'Career Intelligence' },
+              { href: '/career-pathways', label: 'Career Intelligence' },
               { href: '/pricing',   label: 'Pricing'          },
               { href: '/insights',  label: 'Insights ✦'       },
               { href: '/about',     label: 'About'            },

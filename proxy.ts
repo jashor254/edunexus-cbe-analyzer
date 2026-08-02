@@ -43,6 +43,24 @@ const PUBLIC_PREFIXES = [
   '/manifest.json',
   '/robots.txt',
   '/sitemap.xml',
+  // Public marketing destinations (Website Architecture Transformation) —
+  // distinct from the protected app routes they resemble: /schools here is
+  // the public product page, not /admin/core-schools; /teachers here is
+  // marketing content, not the logged-in /teacher/* Workspace.
+  //
+  // Note: /blueprint and /career are deliberately NOT public marketing
+  // routes — next.config.ts has pre-existing permanent redirects at those
+  // exact paths (/blueprint → /student/blueprint, /career → /student/career)
+  // preserving real external links (WhatsApp nudges, bookmarks) already
+  // sent to real users. Those redirects are resolved before this middleware
+  // even runs, so the marketing pages for Blueprint and Career Intelligence
+  // live at /learner-blueprint and /career-pathways instead — found by a
+  // live 308 during manual verification, not assumed.
+  '/schools',
+  '/teachers',
+  '/learner-blueprint',
+  '/compass',
+  '/career-pathways',
 ]
 
 export async function proxy(request: NextRequest) {
