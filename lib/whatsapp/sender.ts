@@ -35,7 +35,7 @@ const TEMPLATE_STUDENT_ALERT     = 'edunexus_student_alert'
 const TEMPLATE_ACADEMY_REFLECT   = 'edunexus_academy_reflect'
 
 // Owner phone for internal platform alerts (milestone hits, health issues)
-const OWNER_PHONE = process.env.OWNER_WHATSAPP_NUMBER ?? '254141799322'
+const OWNER_PHONE = process.env.OWNER_WHATSAPP_NUMBER ?? '254710798030'
 
 const CBC_LEVEL_LABELS: Record<1 | 2 | 3 | 4, string> = {
   1: 'L1 - Below Expectation',
