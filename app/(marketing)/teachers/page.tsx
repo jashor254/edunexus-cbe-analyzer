@@ -63,7 +63,9 @@ export default function TeachersPage() {
               None of this works without the teacher. Every assessment marked, every scheme of work
               built, every lesson taught is the raw material behind a learner&apos;s{' '}
               <Link href="/blueprint" className={`text-amber-400 hover:text-amber-300 font-semibold rounded ${FOCUS_RING}`}>Blueprint</Link>{' '}
-              and their Learning Compass sessions. The documentation is handled for you — CBC-aligned
+              and their{' '}
+              <Link href="/compass" className={`text-amber-400 hover:text-amber-300 font-semibold rounded ${FOCUS_RING}`}>Learning Compass</Link>{' '}
+              sessions. The documentation is handled for you — CBC-aligned
               schemes of work, lesson plans formatted exactly as TSC expects — so there&apos;s more
               room left to notice the things a form can&apos;t. Walk into Monday&apos;s lesson
               prepared, not exhausted.

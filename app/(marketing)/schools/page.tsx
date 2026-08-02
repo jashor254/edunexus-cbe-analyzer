@@ -165,8 +165,8 @@ export default function SchoolsPage() {
             Starter, Growth, and Institution scale by learner count and by how much implementation
             support your school wants — not by how much Educational Intelligence any single learner
             receives. Every learner at a subscribed school gets the full{' '}
-            <Link href="/blueprint" className={`text-blue-400 hover:text-blue-300 font-semibold rounded ${FOCUS_RING}`}>Blueprint</Link>,
-            Compass, and Career Intelligence experience regardless of plan.
+            <Link href="/blueprint" className={`text-blue-400 hover:text-blue-300 font-semibold rounded ${FOCUS_RING}`}>Blueprint</Link>,{' '}
+            <Link href="/compass" className={`text-blue-400 hover:text-blue-300 font-semibold rounded ${FOCUS_RING}`}>Compass</Link>, and Career Intelligence experience regardless of plan.
           </p>
           <Link
             href="/pricing?tab=school"

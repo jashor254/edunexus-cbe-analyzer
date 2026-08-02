@@ -188,7 +188,9 @@ export default function BlueprintPage() {
           <p className="text-white/55 leading-relaxed mb-8">
             Blueprint doesn&apos;t exist on its own. It&apos;s built from evidence generated in the{' '}
             <Link href="/teachers" className={`text-amber-400 hover:text-amber-300 font-semibold rounded ${FOCUS_RING}`}>Teacher Workspace</Link>,
-            it&apos;s what a Learning Compass session starts from once a gap is identified, and over
+            it&apos;s what a{' '}
+            <Link href="/compass" className={`text-teal-400 hover:text-teal-300 font-semibold rounded ${FOCUS_RING}`}>Learning Compass</Link>{' '}
+            session starts from once a gap is identified, and over
             time the same evidence becomes a learner&apos;s Career Intelligence picture. Seen at
             school scale, it&apos;s the{' '}
             <Link href="/schools" className={`text-blue-400 hover:text-blue-300 font-semibold rounded ${FOCUS_RING}`}>School Intelligence</Link>{' '}
