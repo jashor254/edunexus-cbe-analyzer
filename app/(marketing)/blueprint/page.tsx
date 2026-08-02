@@ -191,8 +191,9 @@ export default function BlueprintPage() {
             it&apos;s what a{' '}
             <Link href="/compass" className={`text-teal-400 hover:text-teal-300 font-semibold rounded ${FOCUS_RING}`}>Learning Compass</Link>{' '}
             session starts from once a gap is identified, and over
-            time the same evidence becomes a learner&apos;s Career Intelligence picture. Seen at
-            school scale, it&apos;s the{' '}
+            time the same evidence becomes a learner&apos;s{' '}
+            <Link href="/career" className={`text-indigo-400 hover:text-indigo-300 font-semibold rounded ${FOCUS_RING}`}>Career Intelligence</Link>{' '}
+            picture. Seen at school scale, it&apos;s the{' '}
             <Link href="/schools" className={`text-blue-400 hover:text-blue-300 font-semibold rounded ${FOCUS_RING}`}>School Intelligence</Link>{' '}
             dashboard leadership sees. Same evidence, same system, different vantage points.
           </p>

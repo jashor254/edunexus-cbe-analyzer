@@ -217,7 +217,7 @@ export default async function InsightsPage({ searchParams }: PageProps) {
                   { label: 'Learning Compass',                   href: '/compass',       desc: 'A session that starts from the exact gap, not a generic menu' },
                   { label: 'For Schools',                        href: '/schools',       desc: 'Whole-school learning intelligence' },
                   { label: 'For Teachers',                       href: '/teachers',      desc: 'Plans, insights, and class intelligence' },
-                  { label: 'Career Intelligence',                href: '/#career',       desc: 'Where a learner is heading if we keep acting early' },
+                  { label: 'Career Intelligence',                href: '/career', desc: 'Where a learner is heading if we keep acting early' },
                 ].map((link) => (
                   <a
                     key={link.href}

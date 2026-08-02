@@ -166,7 +166,8 @@ export default function SchoolsPage() {
             support your school wants — not by how much Educational Intelligence any single learner
             receives. Every learner at a subscribed school gets the full{' '}
             <Link href="/blueprint" className={`text-blue-400 hover:text-blue-300 font-semibold rounded ${FOCUS_RING}`}>Blueprint</Link>,{' '}
-            <Link href="/compass" className={`text-blue-400 hover:text-blue-300 font-semibold rounded ${FOCUS_RING}`}>Compass</Link>, and Career Intelligence experience regardless of plan.
+            <Link href="/compass" className={`text-blue-400 hover:text-blue-300 font-semibold rounded ${FOCUS_RING}`}>Compass</Link>, and{' '}
+            <Link href="/career" className={`text-blue-400 hover:text-blue-300 font-semibold rounded ${FOCUS_RING}`}>Career Intelligence</Link> experience regardless of plan.
           </p>
           <Link
             href="/pricing?tab=school"
