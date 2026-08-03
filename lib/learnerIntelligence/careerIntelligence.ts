@@ -11,7 +11,7 @@ import { extractCapabilityProfile } from '@/lib/career/capabilityExtractor'
 import { computeCapabilityMatches, alignmentToPercent } from '@/lib/career/capabilityMatchEngine'
 import { getAllCareersWithCOS, getCareerBySlugWithCOS } from '@/lib/career/careerEngine'
 import { COS_DISCLAIMER } from '@/lib/career/types'
-import type { CapabilityCareerMatch, CareerCategory, CareerDoor, DoorType } from '@/lib/career/types'
+import type { CapabilityCareerMatch, CareerCategory, CareerDoor, DoorType, CareerMatchWithDetail, CareerSummary } from '@/lib/career/types'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { projectionToScoreHistory } from './projectionAdapters'
 import { insufficientEvidenceInsight } from './insight'
@@ -402,4 +402,98 @@ export async function getCareerBlueprintSummary(studentId: string): Promise<Care
     humanAdvantageSummary,
     explorationSuggestions,
   }
+}
+
+// ── Canonical Career Match List (Contradiction Closure Sprint) ─────────────
+//
+// The one canonical result contract every legacy Career-matching consumer
+// (formerly `getMatchesForStudent()`, an AI-generated, persisted-table read
+// that could disagree with this evidence-first pipeline) migrates onto.
+// Calls `buildCareerIntelligence()` — never re-derives Junior/Senior gating,
+// never calls `computeCapabilityMatches` directly — so this function cannot
+// drift from the same grade-mode boundary Blueprint/Career Explorer/Parent
+// Career Intelligence/Holiday Planner already obey.
+//
+// Junior (`exploration` mode) always returns an empty `matches` list — never
+// a fabricated specific-career match — per the Career Principle
+// (`careerModeForGrade`'s own doc comment, ADR-0006 §4). This is a
+// deliberate behavior change from the deprecated `getMatchesForStudent()`
+// path, which had no grade awareness at all and could return specific AI
+// matches to a Junior learner's parent; that was never correct, and this
+// migration is what actually closes it, not a regression.
+//
+// Shaped as `CareerMatchWithDetail[]` (the pre-existing legacy shape) so
+// migrated callers can keep their current response contracts/UI field names
+// without a second parallel type — per this sprint's Part 2 instruction to
+// prefer adapting callers to canonical output over inventing a new shape.
+// Fields the canonical engine has no equivalent for (`subject_gaps`,
+// `skill_gaps` — dimension-based capability gaps, not CBC-subject gaps) are
+// left `null` rather than fabricated; UI call sites already treat both as
+// optional.
+export type CanonicalCareerMatches = {
+  matches: CareerMatchWithDetail[]
+  mode: CareerMode
+  insufficientEvidence: boolean
+  generatedAt: string | null
+}
+
+export async function resolveCanonicalCareerMatches(studentId: string): Promise<CanonicalCareerMatches> {
+  const intelligence = await buildCareerIntelligence(studentId)
+
+  if (intelligence.notice || intelligence.mode === 'exploration' || !intelligence.matches?.length) {
+    return {
+      matches: [],
+      mode: intelligence.mode,
+      insufficientEvidence: !!intelligence.notice,
+      generatedAt: intelligence.generatedAt,
+    }
+  }
+
+  const allCareers = await getAllCareersWithCOS()
+  const careerBySlug = new Map(allCareers.map((c) => [c.slug, c]))
+
+  const matches: CareerMatchWithDetail[] = intelligence.matches.map((m) => {
+    const career = careerBySlug.get(m.careerSlug)
+    const careerSummary: CareerSummary = career
+      ? {
+          id: career.id,
+          slug: career.slug,
+          title: career.title,
+          category: career.category,
+          kenya_market_outlook: career.kenya_market_outlook,
+          salary_range_kes: career.salary_range_kes,
+          required_subjects: career.required_subjects,
+          pathway: career.pathway,
+          description: career.description,
+          ai_impact: { level: career.ai_impact.level },
+        }
+      // Defensive only — every `careerSlug` here was scored against `allCareers`
+      // by computeCapabilityMatches, so this branch should be unreachable.
+      : {
+          id: m.careerSlug,
+          slug: m.careerSlug,
+          title: m.careerTitle,
+          category: m.careerCategory,
+          kenya_market_outlook: '',
+          salary_range_kes: null,
+          required_subjects: [],
+          pathway: 'STEM',
+          description: '',
+          ai_impact: { level: 'medium' },
+        }
+
+    return {
+      id: m.careerSlug,
+      student_id: studentId,
+      career_id: career?.id ?? m.careerSlug,
+      match_score: Math.round(m.alignmentPct),
+      match_reasoning: m.insight.observation,
+      subject_gaps: null,
+      skill_gaps: null,
+      generated_at: intelligence.generatedAt,
+      career: careerSummary,
+    }
+  })
+
+  return { matches, mode: intelligence.mode, insufficientEvidence: false, generatedAt: intelligence.generatedAt }
 }
