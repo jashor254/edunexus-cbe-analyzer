@@ -249,7 +249,7 @@ export default async function ArticlePage({ params }: PageProps) {
                   Get started free
                 </Link>
                 <Link
-                  href="/#school"
+                  href="/schools"
                   className={`inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors ${FOCUS_RING}`}
                 >
                   Learn more →
