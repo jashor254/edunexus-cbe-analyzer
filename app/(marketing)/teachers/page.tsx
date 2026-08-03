@@ -119,7 +119,7 @@ export default function TeachersPage() {
       {/* ── TEACHER ACADEMY ────────────────────────────────────────────────────── */}
       <section className="py-16 md:py-20">
         <div className="max-w-140 mx-auto px-6 text-center">
-          <span className="text-xs font-bold text-violet-400 uppercase tracking-widest mb-3 block">
+          <span className="text-xs font-bold text-trustblue-300 uppercase tracking-widest mb-3 block">
             EduNexus Academy
           </span>
           <h2 className="text-2xl md:text-3xl font-extrabold text-white leading-tight mb-5">

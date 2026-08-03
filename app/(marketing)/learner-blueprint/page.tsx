@@ -215,7 +215,7 @@ export default function BlueprintPage() {
           </p>
           <Link
             href="/signup?role=parent"
-            className={`inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-600 text-white px-10 py-4 rounded-xl font-bold text-lg hover:scale-105 transition-all shadow-2xl shadow-violet-600/30 ${FOCUS_RING}`}
+            className={`inline-flex items-center gap-2 bg-nexusteal-600 text-white px-10 py-4 rounded-full font-bold text-lg hover:bg-nexusteal-500 hover:scale-105 transition-all shadow-2xl shadow-nexusteal-600/30 ${FOCUS_RING}`}
           >
             Get My Child&apos;s Free Report
             <ArrowRight className="w-5 h-5" />
