@@ -44,8 +44,15 @@ export function toDisplayName(rawName: string | null): string | null {
     .join(' ')
 }
 
+// 'This learner' — not "Your learner" — because BlueprintView is the one
+// shared render for every viewer (principal, teacher, parent, student
+// self-view; see this file's header). "Your learner" only reads correctly
+// for a parent; a principal or teacher viewing someone else's Blueprint
+// would see language addressed to a stranger. Matches the same
+// audience-neutral fallback composeLearningStory.ts already uses
+// ('This learner' ?? inputs.identity.data?.learnerName).
 export function firstName(fullName: string | null): string {
-  if (!fullName) return 'Your learner'
+  if (!fullName) return 'This learner'
   return fullName.trim().split(/\s+/)[0] || fullName
 }
 

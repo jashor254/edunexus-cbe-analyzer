@@ -2,6 +2,42 @@ import type { BlueprintSection, LearningStoryData, LearningStoryInputs } from '.
 
 const OWNER = 'lib/learnerBlueprint/composeLearningStory'
 
+// ─────────────────────────────────────────────────────────────────────────
+// Editorial Polish Sprint (2026-08-03) — this file's prose was rewritten to
+// remove repetitive stock openers ("Current evidence suggests...", "Across
+// the available evidence...") that previously started 4-6 of this
+// narrative's 8 sentences back to back. No fact, threshold, or branching
+// condition changed — every case below fires under exactly the same
+// condition it did before this pass; only the sentence construction did.
+//
+// Two literal-substring constraints carry over unchanged and must not
+// drift, because other modules pattern-match this file's own output text:
+//   1. lib/learnerBlueprint/coherence/rules/textSignals.ts's
+//      DEFICIENCY_MARKERS/STRENGTH_MARKERS word lists — "least secure" is
+//      used, and only used, in the one branch below where a genuinely
+//      below-threshold weakest subject is being named (see
+//      describeCapability's mixed+belowThreshold case). Every other branch
+//      deliberately avoids every marker word ("weak", "behind", "gap in",
+//      "not meeting", "needs attention", etc.) so the Coherence Engine's
+//      narrativeAlignment/frictionDetection rules can't misfire against
+//      prose that was never asserting a deficiency.
+//   2. narrativeAlignment.ts's own literal-phrase checks: `nextConcern`
+//      must contain "no current risk flag is active" verbatim when there
+//      are no risk flags (NA1), and `trajectory`/`nextConcern` combined
+//      must contain "declin" when the overall trend is declining (NA3).
+//
+// growthTimeline's `entry.trajectory` string itself is Projection-owned
+// (lib/projection/growthProjector.ts), not composed here — this file only
+// wraps it in one framing sentence and never rewrites the trajectory text
+// itself, per this sprint's explicit "do not touch Educational Intelligence
+// logic" boundary.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** `nextRecommendedAction` (learningCompass, a different composer) isn't guaranteed to end in sentence punctuation — appending it as the tail of a sentence without checking produced a missing trailing period for real recommendation text like "Continue with mathematics". Adds one only when it's actually missing. */
+function withSentenceEnd(text: string): string {
+  return /[.!?]$/.test(text.trim()) ? text : `${text}.`
+}
+
 function confidenceBand(score: number | null): 'low' | 'moderate' | 'high' {
   if (score === null) return 'low'
   if (score >= 70) return 'high'
@@ -22,13 +58,13 @@ function describeCapability(inputs: LearningStoryInputs): {
     return {
       evidence: academic && academic.bySubject.length > 0
         ? `Across the available evidence, the current academic record covers ${academic.bySubject.length} subject${academic.bySubject.length === 1 ? '' : 's'}.`
-        : 'Across the available evidence, capability coverage is still thin.',
+        : 'Capability evidence is still thin at this stage.',
       interpretation: academic?.overallTrend
-        ? `Current evidence suggests a ${academic.overallTrend} academic pattern, but capability coverage is still too limited for a stronger claim.`
-        : 'There is not yet enough evidence to describe a stable capability pattern.',
+        ? `The pattern so far points toward a ${academic.overallTrend} trajectory, though there isn't yet enough capability evidence to say more.`
+        : 'There isn\'t yet enough evidence to describe a stable capability pattern.',
       opportunity: nextAction
-        ? `The clearest current opportunity is to act on the live learning recommendation: ${nextAction}.`
-        : 'The greatest current opportunity is to gather more subject evidence before narrowing the next step.',
+        ? `Gathering more subject evidence would sharpen the picture — starting point: ${withSentenceEnd(nextAction)}`
+        : 'Gathering more subject evidence would sharpen the next step.',
     }
   }
 
@@ -45,16 +81,16 @@ function describeCapability(inputs: LearningStoryInputs): {
   if (subjects.length <= 1) {
     const only = subjects[0]
     const opportunityBase = only
-      ? `There is not yet a second subject with recorded evidence to compare ${only[0]} against, so no weakest subject can be identified yet — the greatest current opportunity is to build evidence in additional subjects.`
-      : 'The greatest current opportunity is to gather more subject evidence before narrowing the next step.'
+      ? `There isn't yet a second subject recorded to compare ${only[0]} against, so the clearest opportunity is simply building evidence in additional subjects.`
+      : 'The clearest opportunity is to gather more subject evidence before narrowing the next step.'
     return {
       evidence: only
-        ? `Across the available evidence, current capability is most consistently described as ${capability.value.overallLevel}, based on ${only[0]} alone so far.`
-        : `Across the available evidence, current capability is most consistently described as ${capability.value.overallLevel}.`,
+        ? `${capability.value.overallLevel[0].toUpperCase()}${capability.value.overallLevel.slice(1)} is the most consistent description of capability so far, based on ${only[0]} alone.`
+        : `${capability.value.overallLevel[0].toUpperCase()}${capability.value.overallLevel.slice(1)} is the most consistent description of capability so far.`,
       interpretation: only
-        ? `Current evidence suggests a relatively consistent capability profile at the moment — with only one subject recorded, this is not yet a comparison across subjects.`
-        : `Current evidence suggests a relatively consistent capability profile at the moment.`,
-      opportunity: nextAction ? `${opportunityBase} The live learning recommendation points to this next step: ${nextAction}.` : opportunityBase,
+        ? 'With only one subject recorded, this is a single data point rather than a comparison across subjects.'
+        : 'The evidence points to a fairly consistent profile at the moment.',
+      opportunity: nextAction ? `${opportunityBase} The current recommendation: ${withSentenceEnd(nextAction)}` : opportunityBase,
     }
   }
 
@@ -77,23 +113,23 @@ function describeCapability(inputs: LearningStoryInputs): {
   const belowThreshold = weakest[1].level === 'emerging' || weakest[1].level === 'developing'
 
   const evidence = mixed
-    ? `Across the available evidence, current capability is stronger in ${strongest[0]} and comparatively lower in ${weakest[0]}.`
-    : `Across the available evidence, current capability is most consistently described as ${capability.value.overallLevel}.`
+    ? `Across the available evidence, capability is stronger in ${strongest[0]} and comparatively lower in ${weakest[0]}.`
+    : `${capability.value.overallLevel[0].toUpperCase()}${capability.value.overallLevel.slice(1)} best describes the current capability picture across the board.`
 
   const interpretation = mixed
-    ? `Current evidence suggests the learner is developing unevenly rather than moving uniformly, which makes targeted support more useful than a broad label.`
-    : `Current evidence suggests a relatively consistent capability profile at the moment.`
+    ? 'This is a picture developing unevenly rather than moving as one, which makes targeted support more useful than a single overall label.'
+    : 'The evidence points to a fairly consistent profile at the moment.'
 
   const opportunityCore = mixed
     ? (belowThreshold
-        ? `The greatest current opportunity is to strengthen ${weakest[0]}, where the present capability evidence is least secure.`
-        : `${weakest[0]} is relatively lower than ${strongest[0]} in the current evidence, but remains ${weakest[1].level} — this reads as an enrichment opportunity in ${strongest[0]} or continued challenge in ${weakest[0]}, not a gap needing remediation.`)
-    : `Current evidence does not show one subject standing out as needing particular attention right now — the clearest opportunity is to deepen evidence across the board.`
+        ? `${weakest[0]} is where the present evidence is least secure, and the clearest place to focus support.`
+        : `${weakest[0]} sits below ${strongest[0]} in the current evidence but remains ${weakest[1].level} — read this as an enrichment opportunity in ${strongest[0]}, or continued challenge in ${weakest[0]}, rather than a deficit to correct.`)
+    : 'No single subject stands out as needing particular focus right now — the clearest opportunity is deepening evidence across the board.'
 
   return {
     evidence,
     interpretation,
-    opportunity: nextAction ? `${opportunityCore} The live learning recommendation points to this next step: ${nextAction}.` : opportunityCore,
+    opportunity: nextAction ? `${opportunityCore} Next step: ${withSentenceEnd(nextAction)}` : opportunityCore,
   }
 }
 
@@ -103,7 +139,8 @@ function describeTrajectory(inputs: LearningStoryInputs): string {
   }
 
   const entry = inputs.growthTimeline.data[0]
-  return `${entry.trajectory} This direction is based on ${entry.supportingEvidenceIds.length} scored evidence point${entry.supportingEvidenceIds.length === 1 ? '' : 's'}.`
+  const pointWord = entry.supportingEvidenceIds.length === 1 ? 'point' : 'points'
+  return `${entry.trajectory} (Based on ${entry.supportingEvidenceIds.length} scored evidence ${pointWord}.)`
 }
 
 function describeRisk(inputs: LearningStoryInputs): { nextConcern: string; uncertainty: string } {
@@ -116,15 +153,15 @@ function describeRisk(inputs: LearningStoryInputs): { nextConcern: string; uncer
 
   if (inputs.risk.data.flags.length === 0) {
     return {
-      nextConcern: 'Across the available evidence, no current risk flag is active.',
-      uncertainty: 'This conclusion remains provisional because risk can change as new evidence arrives.',
+      nextConcern: 'No current risk flag is active.',
+      uncertainty: 'This can change as new evidence arrives, so it is read as the present picture, not a permanent one.',
     }
   }
 
   const topFlag = inputs.risk.data.flags[0]
   return {
-    nextConcern: `The main concern that deserves attention now is ${topFlag.reason.toLowerCase()}.`,
-    uncertainty: 'This conclusion remains provisional because the current risk picture only reflects the evidence recorded so far.',
+    nextConcern: `The concern most worth attention right now is ${topFlag.reason.toLowerCase()}.`,
+    uncertainty: 'This reflects only the evidence recorded so far, and will be revisited as more arrives.',
   }
 }
 
@@ -143,14 +180,14 @@ function describeConfidence(inputs: LearningStoryInputs): { confidenceStatement:
   const freshnessText = freshnessDays === null ? 'unknown freshness' : `${freshnessDays} day${freshnessDays === 1 ? '' : 's'} since the latest supporting evidence`
 
   const confidenceStatement = band === 'high'
-    ? `Current evidence suggests a high-confidence picture: coverage spans ${subjectCount} subject${subjectCount === 1 ? '' : 's'} with ${freshnessText}.`
+    ? `Confidence in this picture is high: coverage spans ${subjectCount} subject${subjectCount === 1 ? '' : 's'}, with ${freshnessText}.`
     : band === 'moderate'
-      ? `Current evidence suggests a moderate-confidence picture: the pattern is visible, but coverage is still incomplete (${subjectCount} subject${subjectCount === 1 ? '' : 's'}, ${freshnessText}).`
-      : `Current evidence suggests a low-confidence picture: the story is still provisional (${subjectCount} subject${subjectCount === 1 ? '' : 's'}, ${freshnessText}).`
+      ? `This remains a moderate-confidence picture — the pattern is visible, but coverage is still incomplete (${subjectCount} subject${subjectCount === 1 ? '' : 's'}, ${freshnessText}).`
+      : `This remains a low-confidence picture — the story is still provisional (${subjectCount} subject${subjectCount === 1 ? '' : 's'}, ${freshnessText}).`
 
   const missingEvidence = completeness.value.subjectsCovered.length < 5 || completeness.value.sourceDiversity < 2
-    ? 'Evidence is still missing across more subjects or independent sources, so this story should be read as provisional.'
-    : 'The clearest missing evidence is more recent confirmation that the current pattern is holding.'
+    ? 'What is still missing is evidence across more subjects or independent sources, so this remains a provisional read.'
+    : 'What would sharpen this further is more recent confirmation that the current pattern is holding.'
 
   return { confidenceStatement, missingEvidence }
 }
@@ -181,15 +218,20 @@ export function composeLearningStory(inputs: LearningStoryInputs): BlueprintSect
   const riskDescription = describeRisk(inputs)
   const confidenceDescription = describeConfidence(inputs)
 
+  // Editorial flow (Part 2 of the Editorial Polish Sprint): current picture
+  // -> observed strengths/pattern -> current challenges -> trajectory ->
+  // confidence and limitations -> next educational priority, last. Every
+  // fragment below is still independently exposed on `data` for any
+  // consumer that reads a single field rather than the assembled prose.
   const narrative = [
-    `${learnerName} is still emerging through the current evidence rather than a fixed label.`,
+    `${learnerName}'s story is still unfolding — this is a snapshot from the evidence gathered so far, not a fixed verdict.`,
     capabilityDescription.evidence,
     capabilityDescription.interpretation,
-    capabilityDescription.opportunity,
     riskDescription.nextConcern,
     trajectory,
     confidenceDescription.confidenceStatement,
     confidenceDescription.missingEvidence,
+    capabilityDescription.opportunity,
   ].join(' ')
 
   return {

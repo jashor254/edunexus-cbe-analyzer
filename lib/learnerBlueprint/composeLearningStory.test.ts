@@ -223,6 +223,70 @@ test('enrichment language remains possible for a relatively-lower-but-still-stro
   assert.match(section.data?.opportunity ?? '', /enrichment|continued challenge/i)
 })
 
+// ── Editorial Polish Sprint (2026-08-03) — anti-repetition regression guard ──
+
+test('editorial: the narrative does not open more than one sentence with the same stock phrase', () => {
+  const section = composeLearningStory(baseInputs())
+  const narrative = section.data?.narrative ?? ''
+  const sentences = narrative.split(/(?<=[.!?])\s+/)
+  const openers = sentences.map(s => s.split(/\s+/).slice(0, 3).join(' ').toLowerCase())
+  const counts = new Map<string, number>()
+  for (const opener of openers) counts.set(opener, (counts.get(opener) ?? 0) + 1)
+  for (const [opener, count] of counts) {
+    assert.ok(count <= 1, `sentence opener "${opener}" repeats ${count} times in the narrative — expected each opener to be used at most once`)
+  }
+})
+
+test('editorial: known robotic template phrases do not appear more than once each', () => {
+  const section = composeLearningStory(baseInputs())
+  const narrative = section.data?.narrative ?? ''
+  const acrossCount = (narrative.match(/Across the available evidence/g) ?? []).length
+  const currentEvidenceCount = (narrative.match(/Current evidence suggests/g) ?? []).length
+  assert.ok(acrossCount <= 1, `"Across the available evidence" appears ${acrossCount} times`)
+  assert.ok(currentEvidenceCount <= 1, `"Current evidence suggests" appears ${currentEvidenceCount} times`)
+})
+
+test('editorial: non-deficient branches never trip the Coherence Engine\'s deficiency-marker vocabulary', () => {
+  // Mirrors lib/learnerBlueprint/coherence/rules/textSignals.ts's
+  // DEFICIENCY_MARKERS list directly, so a future wording change that
+  // accidentally reintroduces one of these words in a non-deficient branch
+  // fails here, at the source, rather than surfacing later as a confusing
+  // coherence FAIL on an unrelated Blueprint.
+  const inputs = baseInputs()
+  inputs.capability!.value = {
+    overallLevel: 'strong',
+    overallScore: 0.85,
+    bySubject: {
+      Mathematics: { level: 'capable', score: 0.55 },
+      English: { level: 'exceptional', score: 0.95 },
+    },
+  }
+  const section = composeLearningStory(inputs)
+  const markers = ['below the level expected', 'below expectation', 'struggl', 'weak', 'needs improvement', 'needs support', 'behind', 'not meeting', 'underperform', 'gap in', 'comprehension gap', 'insecure', 'needing attention', 'needs attention']
+  const opportunity = (section.data?.opportunity ?? '').toLowerCase()
+  for (const marker of markers) {
+    assert.ok(!opportunity.includes(marker), `opportunity text unexpectedly contains deficiency marker "${marker}": "${opportunity}"`)
+  }
+})
+
+test('editorial: no second-person address ("you"/"your") leaks into the narrative — the learner\'s name carries the voice instead, so the same text reads correctly for a principal, teacher, or parent', () => {
+  const section = composeLearningStory(baseInputs())
+  const narrative = section.data?.narrative ?? ''
+  assert.doesNotMatch(narrative, /\byour\b|\byou\b/i)
+})
+
+test('editorial: opportunity ends with proper sentence punctuation even when nextRecommendedAction has none of its own', () => {
+  const inputs = baseInputs()
+  inputs.learningCompass.data = {
+    ...inputs.learningCompass.data!,
+    nextRecommendedAction: 'Continue with mathematics', // no trailing period, matches real production data
+  }
+  const section = composeLearningStory(inputs)
+  const opportunity = section.data?.opportunity ?? ''
+  assert.match(opportunity, /[.!?]$/, `opportunity should end with sentence punctuation, got: "${opportunity}"`)
+  assert.doesNotMatch(opportunity, /mathematics\.\./i, 'should never produce a double period when the source text already ends in one')
+})
+
 test('composeLearningStory is unavailable when there is no canonical evidence to synthesize', () => {
   const inputs = baseInputs()
   inputs.academicRecord = unavailable<AcademicRecordData>('no academic evidence')
