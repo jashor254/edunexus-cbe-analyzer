@@ -8,6 +8,22 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  /* Nexus Glass — marketing site identity (Trust Blue / Innovation Teal).
+     Named distinctly from Tailwind's built-in blue/teal so this doesn't
+     redefine those defaults for the rest of the app. */
+  --color-trustblue-300: #9db8e8;
+  --color-trustblue-400: #6690d9;
+  --color-trustblue-500: #3d72c9;
+  --color-trustblue-600: #1a56be;
+  --color-trustblue-700: #15459a;
+
+  --color-nexusteal-300: #7ee9da;
+  --color-nexusteal-400: #33d1bb;
+  --color-nexusteal-500: #00a896;
+  --color-nexusteal-600: #00897a;
+
+  --color-nexus-ink: #0e1322;
 }
 
 @media (prefers-color-scheme: dark) {
