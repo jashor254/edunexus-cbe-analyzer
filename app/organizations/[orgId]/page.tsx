@@ -8,7 +8,7 @@ import { getOrgSubscription } from '@/lib/billing/plans'
 import { getUsageSummary, getCurrentMonthStart } from '@/lib/billing/usage'
 import {
   Users, Key, BarChart3, Crown, AlertCircle,
-  TrendingUp, Receipt, Globe, Building2,
+  TrendingUp, Receipt, Globe, Building2, Sparkles,
 } from 'lucide-react'
 
 function StatCard({ label, value, sub, icon: Icon, accent = 'teal' }: {
@@ -16,8 +16,8 @@ function StatCard({ label, value, sub, icon: Icon, accent = 'teal' }: {
   icon: React.ElementType; accent?: string
 }) {
   const colors: Record<string, string> = {
-    teal:   'bg-teal-500/20 text-teal-400',
-    blue:   'bg-blue-500/20 text-blue-400',
+    teal:   'bg-nexusteal-500/20 text-nexusteal-400',
+    blue:   'bg-trustblue-500/20 text-trustblue-400',
     purple: 'bg-purple-500/20 text-purple-400',
     amber:  'bg-amber-500/20 text-amber-400',
   }
@@ -35,12 +35,19 @@ function StatCard({ label, value, sub, icon: Icon, accent = 'teal' }: {
   )
 }
 
-export default async function OrgOverviewPage({ params }: { params: Promise<{ orgId: string }> }) {
+export default async function OrgOverviewPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ orgId: string }>
+  searchParams: Promise<{ welcome?: string; setup?: string }>
+}) {
+  const { orgId } = await params
+  const { welcome, setup } = await searchParams
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { orgId } = await params
+  if (!user) redirect(`/login?returnTo=/organizations/${orgId}`)
   const [org, members, subscription] = await Promise.all([
     getOrganization(orgId, user.id),
     getOrganizationMembers(orgId, user.id),
@@ -57,10 +64,45 @@ export default async function OrgOverviewPage({ params }: { params: Promise<{ or
   return (
     <div className="px-6 py-8 max-w-5xl mx-auto">
 
+      {/* Welcome banner — shown once, right after a school signs up and creates its org */}
+      {welcome === '1' && setup !== 'incomplete' && (
+        <div className="mb-8 flex items-center gap-4 bg-nexusteal-500/10 border border-nexusteal-500/25 rounded-2xl px-6 py-5">
+          <div className="w-11 h-11 rounded-xl bg-nexusteal-500/20 flex items-center justify-center shrink-0">
+            <Sparkles className="w-5 h-5 text-nexusteal-400" />
+          </div>
+          <div>
+            <p className="text-white font-bold">Welcome to {org.name}&apos;s dashboard.</p>
+            <p className="text-white/55 text-sm mt-0.5">
+              This is home base — invite your team, track usage, and manage billing from here.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Honest failure state — org billing was created, but the academic
+          side (Core school: classes, terms, the actual teaching workspace)
+          didn't finish setting up. Never claim "welcome, you're ready"
+          when part of setup failed. */}
+      {setup === 'incomplete' && (
+        <div className="mb-8 flex items-center gap-4 bg-amber-500/10 border border-amber-500/25 rounded-2xl px-6 py-5">
+          <div className="w-11 h-11 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
+            <AlertCircle className="w-5 h-5 text-amber-400" />
+          </div>
+          <div>
+            <p className="text-white font-bold">Your organization is ready, but school setup didn&apos;t finish.</p>
+            <p className="text-white/55 text-sm mt-0.5">
+              Billing and members work from here, but your teaching workspace (classes, terms) needs
+              another try. Message us on WhatsApp and we&apos;ll sort it out — don&apos;t retry account
+              creation, it may create a duplicate.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-start gap-4 mb-8">
-        <div className="w-14 h-14 rounded-xl bg-teal-500/20 flex items-center justify-center flex-shrink-0">
-          <Building2 className="w-7 h-7 text-teal-400" />
+        <div className="w-14 h-14 rounded-xl bg-nexusteal-500/20 flex items-center justify-center flex-shrink-0">
+          <Building2 className="w-7 h-7 text-nexusteal-400" />
         </div>
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold text-white">{org.name}</h1>
@@ -68,7 +110,7 @@ export default async function OrgOverviewPage({ params }: { params: Promise<{ or
             <span className="text-white/40 text-sm">{org.slug}</span>
             {org.website && (
               <a href={org.website} target="_blank" rel="noopener noreferrer"
-                 className="flex items-center gap-1 text-teal-400 hover:text-teal-300 text-sm transition-colors">
+                 className="flex items-center gap-1 text-nexusteal-400 hover:text-nexusteal-300 text-sm transition-colors">
                 <Globe className="w-3.5 h-3.5" />
                 Website
               </a>
@@ -118,9 +160,9 @@ export default async function OrgOverviewPage({ params }: { params: Promise<{ or
           { href: `/organizations/${orgId}/billing`,   label: 'Billing & Usage', sub: planName,                       icon: Receipt },
         ].map(({ href, label, sub, icon: Icon }) => (
           <Link key={href} href={href}
-                className="flex items-center gap-4 p-4 bg-white/5 hover:bg-white/8 border border-white/10 hover:border-teal-500/30 rounded-xl transition-all group">
-            <div className="w-10 h-10 rounded-lg bg-teal-500/20 flex items-center justify-center flex-shrink-0">
-              <Icon className="w-5 h-5 text-teal-400" />
+                className="flex items-center gap-4 p-4 bg-white/5 hover:bg-white/8 border border-white/10 hover:border-nexusteal-500/30 rounded-xl transition-all group">
+            <div className="w-10 h-10 rounded-lg bg-nexusteal-500/20 flex items-center justify-center flex-shrink-0">
+              <Icon className="w-5 h-5 text-nexusteal-400" />
             </div>
             <div>
               <p className="text-white font-medium text-sm">{label}</p>
@@ -134,7 +176,7 @@ export default async function OrgOverviewPage({ params }: { params: Promise<{ or
       <div className="mt-8">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-white font-semibold">Recent Members</h2>
-          <Link href={`/organizations/${orgId}/members`} className="text-teal-400 hover:text-teal-300 text-sm transition-colors">
+          <Link href={`/organizations/${orgId}/members`} className="text-nexusteal-400 hover:text-nexusteal-300 text-sm transition-colors">
             View all
           </Link>
         </div>
@@ -144,7 +186,7 @@ export default async function OrgOverviewPage({ params }: { params: Promise<{ or
               .split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()
             return (
               <div key={m.id} className="flex items-center gap-3 p-3 bg-white/5 border border-white/10 rounded-lg">
-                <div className="w-8 h-8 rounded-full bg-teal-500/20 flex items-center justify-center text-teal-400 text-xs font-semibold flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-nexusteal-500/20 flex items-center justify-center text-nexusteal-400 text-xs font-semibold flex-shrink-0">
                   {initials}
                 </div>
                 <div className="flex-1 min-w-0">

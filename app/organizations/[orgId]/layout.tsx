@@ -11,11 +11,11 @@ export default async function OrgLayout({
   children: React.ReactNode
   params: Promise<{ orgId: string }>
 }) {
+  const { orgId } = await params
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { orgId } = await params
+  if (!user) redirect(`/login?returnTo=/organizations/${orgId}`)
 
   let org
   try {
@@ -27,7 +27,7 @@ export default async function OrgLayout({
   const role = await getUserRole(user.id, orgId)
 
   return (
-    <div className="min-h-screen bg-[#060d18] text-white">
+    <div className="min-h-screen bg-nexus-ink text-white">
       <OrgSidebar
         orgId={org.id}
         orgName={org.name}

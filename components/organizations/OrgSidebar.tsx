@@ -49,8 +49,8 @@ export default function OrgSidebar({ orgId, orgName, orgType, userRole }: Props)
   return (
     <>
       {/* Desktop */}
-      <aside className="hidden lg:flex flex-col w-64 fixed inset-y-0 left-0 z-30 bg-[#0c1929]">
-        <div className="h-0.5 bg-gradient-to-r from-teal-500 via-cyan-400 to-blue-500" />
+      <aside className="hidden lg:flex flex-col w-64 fixed inset-y-0 left-0 z-30 bg-nexus-ink">
+        <div className="h-0.5 bg-gradient-to-r from-trustblue-600 via-trustblue-400 to-nexusteal-500" />
 
         <div className="px-5 py-5">
           <Link href="/organizations">
@@ -61,8 +61,8 @@ export default function OrgSidebar({ orgId, orgName, orgType, userRole }: Props)
         {/* Org badge */}
         <div className="mx-4 mb-4 p-3 rounded-lg bg-white/5 border border-white/10">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-md bg-teal-500/20 flex items-center justify-center flex-shrink-0">
-              <Building2 className="w-4 h-4 text-teal-400" />
+            <div className="w-8 h-8 rounded-md bg-nexusteal-500/20 flex items-center justify-center flex-shrink-0">
+              <Building2 className="w-4 h-4 text-nexusteal-400" />
             </div>
             <div className="min-w-0">
               <p className="text-white text-sm font-semibold truncate">{orgName}</p>
@@ -78,7 +78,7 @@ export default function OrgSidebar({ orgId, orgName, orgType, userRole }: Props)
               href={href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
                 isActive(href)
-                  ? 'bg-teal-500/20 text-teal-300 font-medium'
+                  ? 'bg-nexusteal-500/20 text-nexusteal-300 font-medium'
                   : 'text-white/60 hover:text-white hover:bg-white/5'
               }`}
             >
@@ -100,13 +100,13 @@ export default function OrgSidebar({ orgId, orgName, orgType, userRole }: Props)
       </aside>
 
       {/* Mobile bottom bar */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0c1929] border-t border-white/10 flex">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-nexus-ink border-t border-white/10 flex">
         {nav.slice(0, 5).map(({ href, icon: Icon, label }) => (
           <Link
             key={href}
             href={href}
             className={`flex-1 flex flex-col items-center py-2 text-xs gap-1 transition-colors ${
-              isActive(href) ? 'text-teal-400' : 'text-white/40'
+              isActive(href) ? 'text-nexusteal-400' : 'text-white/40'
             }`}
           >
             <Icon className="w-5 h-5" />

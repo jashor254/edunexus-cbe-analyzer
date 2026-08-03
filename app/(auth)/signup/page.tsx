@@ -30,8 +30,12 @@ function SignupForm() {
   const supabase     = createClient()
 
   const productId = searchParams.get('product')
-  const returnTo  = searchParams.get('returnTo') || '/dashboard'
-  const role      = searchParams.get('role')          // 'teacher' | 'parent' | 'student' | null
+  const role       = searchParams.get('role')          // 'teacher' | 'parent' | 'student' | 'school' | null
+  // 'school' isn't a personal profile role — a school signup creates and
+  // owns an Organization (lib/organizations), so there's no profiles.role
+  // write for it. Land them straight in org creation instead of a personal
+  // dashboard that doesn't apply to them.
+  const returnTo  = searchParams.get('returnTo') || (role === 'school' ? '/organizations/new?type=school' : '/dashboard')
 
   // What secondary role the checkbox would grant
   const secondaryRole  = role === 'teacher' ? 'parent' : role === 'parent' ? 'teacher' : null
@@ -79,6 +83,14 @@ function SignupForm() {
       return
     }
 
+    // 'school' signups don't get a profiles.role write — org membership
+    // (created next, at returnTo) is what governs their access, not a
+    // personal teacher/parent/student role. Skip straight to org creation.
+    if (role === 'school') {
+      router.push(returnTo)
+      return
+    }
+
     // Canonical role mapping — lib/auth/roleRedirect.ts. Before this, a
     // fourth disagreeing implementation lived right here, defaulting
     // unrecognized (including 'student') roles to 'parent' and never
@@ -116,7 +128,7 @@ function SignupForm() {
             Create your account
           </h1>
           <p className="text-sm text-white/40 text-center mb-8">
-            {role === 'teacher' ? 'Join as a teacher 🏫' : 'First Compass session on us 🎁'}
+            {role === 'teacher' ? 'Join as a teacher 🏫' : role === 'school' ? 'Set up your school 🏫' : 'First Compass session on us 🎁'}
           </p>
 
           {error && (

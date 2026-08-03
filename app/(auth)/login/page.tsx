@@ -44,6 +44,11 @@ function LoginContent() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return '/login'
 
+      // /organizations governs access via org membership, not profiles.role —
+      // always honor it directly instead of falling through to the personal
+      // teacher/parent/student redirect below.
+      if (_returnTo && _returnTo.startsWith('/organizations')) return _returnTo
+
       // Honor saved role preference first
       const savedPreference =
         typeof window !== 'undefined'

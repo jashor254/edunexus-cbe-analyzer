@@ -26,9 +26,14 @@ const TYPE_COLOR: Record<string, string> = {
 export default async function OrganizationsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  if (!user) redirect('/login?returnTo=/organizations')
 
   const orgs = await getUserOrganizations(user.id)
+
+  // A school owner with exactly one org just wants their dashboard, not a
+  // list of one — skip straight there. Multi-org users (district/county
+  // staff) still see the picker.
+  if (orgs.length === 1) redirect(`/organizations/${orgs[0].id}`)
 
   return (
     <div className="min-h-screen bg-[#060d18] text-white">

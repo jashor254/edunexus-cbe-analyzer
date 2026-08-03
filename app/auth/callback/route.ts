@@ -22,7 +22,10 @@ function sanitizeReturnTo(raw: string | null): string {
 
 // ── Role-aware path resolver ──────────────────────────────────────────────────
 
-const PUBLIC_PATHS = ['/pricing', '/legal', '/join', '/shared', '/payment']
+// Paths whose returnTo is always honored as-is, skipping the role-based
+// override below — either genuinely public, or (for /organizations) because
+// org membership, not profiles.role, is what actually governs access there.
+const PUBLIC_PATHS = ['/pricing', '/legal', '/join', '/shared', '/payment', '/organizations']
 
 async function resolveRoleDestination(
   db: SupabaseClient,
