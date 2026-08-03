@@ -3,11 +3,18 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { X, Menu } from 'lucide-react'
-import { Sora } from 'next/font/google'
+import { Montserrat, Inter } from 'next/font/google'
 import { Logo } from '@/components/ui/Logo'
 import { CURRICULA_COMPACT, FOCUS_RING } from './constants'
 
-const sora = Sora({ subsets: ['latin'], weight: ['400', '600', '700', '800'] })
+export const montserrat = Montserrat({
+  subsets: ['latin'],
+  weight: ['600', '700', '800'],
+})
+const inter = Inter({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+})
 
 // ─── Navigation ────────────────────────────────────────────────────────────────
 function MarketingNav() {
@@ -29,53 +36,53 @@ function MarketingNav() {
           : 'bg-transparent border-b border-white/10'
       }`}
     >
-      <div className="max-w-[1100px] mx-auto px-6 py-4 flex justify-between items-center">
+      <div className="max-w-[1280px] mx-auto px-6 py-4 flex justify-between items-center">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2.5">
+        <Link href="/" className="flex items-center gap-2.5 shrink-0">
           <Logo variant="dark" size="sm" />
           <span className="text-[11px] font-bold bg-white/5 border border-white/10 text-white/40 px-2 py-0.5 rounded-full">Beta</span>
         </Link>
 
         {/* Desktop links */}
-        <div className="hidden md:flex items-center gap-6">
-          <Link href="/schools" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
+        <div className="hidden lg:flex items-center gap-5">
+          <Link href="/schools" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded whitespace-nowrap ${FOCUS_RING}`}>
             For Schools
           </Link>
-          <Link href="/teachers" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
+          <Link href="/teachers" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded whitespace-nowrap ${FOCUS_RING}`}>
             For Teachers
           </Link>
-          <Link href="/learner-blueprint" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
+          <Link href="/learner-blueprint" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded whitespace-nowrap ${FOCUS_RING}`}>
             Learner Blueprint
           </Link>
-          <Link href="/compass" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
+          <Link href="/compass" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded whitespace-nowrap ${FOCUS_RING}`}>
             Learning Compass
           </Link>
-          <Link href="/career-pathways" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
+          <Link href="/career-pathways" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded whitespace-nowrap ${FOCUS_RING}`}>
             Career Intelligence
           </Link>
-          <Link href="/pricing" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
+          <Link href="/pricing" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded whitespace-nowrap ${FOCUS_RING}`}>
             Pricing
           </Link>
-          <Link href="/insights" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors flex items-center gap-1.5 rounded ${FOCUS_RING}`}>
+          <Link href="/insights" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors flex items-center gap-1.5 rounded whitespace-nowrap ${FOCUS_RING}`}>
             Insights
             <span className="text-[9px] font-bold bg-white/5 border border-white/10 text-white/40 px-1.5 py-0.5 rounded-full">New</span>
           </Link>
-          <Link href="/about" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
+          <Link href="/about" className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded whitespace-nowrap ${FOCUS_RING}`}>
             About
           </Link>
         </div>
 
         {/* Desktop right */}
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden lg:flex items-center gap-3 shrink-0 ml-6">
           <Link
             href="/login"
-            className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded ${FOCUS_RING}`}
+            className={`text-sm font-semibold text-white/60 hover:text-white transition-colors rounded whitespace-nowrap ${FOCUS_RING}`}
           >
             Log in
           </Link>
           <Link
             href="/signup"
-            className={`text-sm font-bold bg-white/10 hover:bg-white/20 text-white px-5 py-2.5 rounded-xl border border-white/10 transition-colors ${FOCUS_RING}`}
+            className={`text-sm font-bold bg-nexusteal-600 hover:bg-nexusteal-500 text-white px-5 py-2.5 rounded-full transition-colors ${FOCUS_RING}`}
           >
             Get Started Free
           </Link>
@@ -84,7 +91,7 @@ function MarketingNav() {
         {/* Mobile hamburger */}
         <button
           onClick={() => setMenuOpen((o) => !o)}
-          className={`md:hidden w-10 h-10 flex items-center justify-center border border-white/10 rounded-xl text-white/60 hover:text-white transition-colors ${FOCUS_RING}`}
+          className={`lg:hidden w-10 h-10 flex items-center justify-center border border-white/10 rounded-xl text-white/60 hover:text-white transition-colors ${FOCUS_RING}`}
           aria-label={menuOpen ? 'Close menu' : 'Open menu'}
         >
           {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -93,7 +100,7 @@ function MarketingNav() {
 
       {/* Mobile dropdown */}
       {menuOpen && (
-        <div className="md:hidden bg-black/95 border-b border-white/10">
+        <div className="lg:hidden bg-black/95 border-b border-white/10">
           <div className="max-w-[1100px] mx-auto px-6 py-4 flex flex-col gap-1">
             {[
               { href: '/schools',   label: 'For Schools'      },
@@ -119,7 +126,7 @@ function MarketingNav() {
               <Link
                 href="/signup"
                 onClick={() => setMenuOpen(false)}
-                className={`block text-center text-sm font-bold bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl border border-white/10 transition-colors ${FOCUS_RING}`}
+                className={`block text-center text-sm font-bold bg-nexusteal-600 hover:bg-nexusteal-500 text-white py-3 rounded-full transition-colors ${FOCUS_RING}`}
               >
                 Get Started Free
               </Link>
@@ -198,7 +205,10 @@ function MarketingFooter() {
 // ─── Layout ────────────────────────────────────────────────────────────────────
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div data-marketing-shell="true" className={`min-h-screen bg-black text-white ${sora.className}`}>
+    <div
+      data-marketing-shell="true"
+      className={`min-h-screen bg-nexus-ink text-white ${inter.className}`}
+    >
       <MarketingNav />
       <div className="relative">
         {children}
