@@ -10277,6 +10277,7 @@ export type Database = {
           logo_url: string | null
           motto: string | null
           nemis_code: string | null
+          provisioning_source: string | null
           school_name: string
           school_type: string | null
           sub_county: string | null
@@ -10296,6 +10297,7 @@ export type Database = {
           logo_url?: string | null
           motto?: string | null
           nemis_code?: string | null
+          provisioning_source?: string | null
           school_name: string
           school_type?: string | null
           sub_county?: string | null
@@ -10315,6 +10317,7 @@ export type Database = {
           logo_url?: string | null
           motto?: string | null
           nemis_code?: string | null
+          provisioning_source?: string | null
           school_name?: string
           school_type?: string | null
           sub_county?: string | null
@@ -11437,6 +11440,7 @@ export type Database = {
           parent_phone: string | null
           parent_user_id: string | null
           school: string | null
+          school_id: string | null
           selected_subjects: string[] | null
           teacher_id: string | null
           term: number | null
@@ -11472,6 +11476,7 @@ export type Database = {
           parent_phone?: string | null
           parent_user_id?: string | null
           school?: string | null
+          school_id?: string | null
           selected_subjects?: string[] | null
           teacher_id?: string | null
           term?: number | null
@@ -11507,6 +11512,7 @@ export type Database = {
           parent_phone?: string | null
           parent_user_id?: string | null
           school?: string | null
+          school_id?: string | null
           selected_subjects?: string[] | null
           teacher_id?: string | null
           term?: number | null
@@ -11531,6 +11537,13 @@ export type Database = {
             columns: ["teacher_id"]
             isOneToOne: false
             referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
             referencedColumns: ["id"]
           },
         ]
@@ -11912,6 +11925,7 @@ export type Database = {
           id: string
           integration_connection_id: string | null
           name: string
+          school_id: string | null
           selected_subjects: string[] | null
           status: string
           stream: string | null
@@ -11932,6 +11946,7 @@ export type Database = {
           id?: string
           integration_connection_id?: string | null
           name: string
+          school_id?: string | null
           selected_subjects?: string[] | null
           status?: string
           stream?: string | null
@@ -11952,6 +11967,7 @@ export type Database = {
           id?: string
           integration_connection_id?: string | null
           name?: string
+          school_id?: string | null
           selected_subjects?: string[] | null
           status?: string
           stream?: string | null
@@ -11973,6 +11989,13 @@ export type Database = {
             columns: ["teacher_id"]
             isOneToOne: false
             referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teacher_classes_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
             referencedColumns: ["id"]
           },
         ]
@@ -13086,6 +13109,10 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       is_growth_user: { Args: never; Returns: boolean }
       mark_users_for_deletion: { Args: never; Returns: undefined }
+      provision_teacher_school: {
+        Args: { p_school_name: string; p_user_id: string }
+        Returns: Database["public"]["Tables"]["schools"]["Row"]
+      }
       regenerate_assignment_question_variant: {
         Args: { p_new_variant: Json; p_old_variant_id: string }
         Returns: {

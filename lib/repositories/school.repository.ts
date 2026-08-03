@@ -9,7 +9,7 @@ import type {
 } from '@/lib/school/types'
 
 const SCHOOL_COLS =
-  'id, school_name, nemis_code, school_type, county, sub_county, ward, address, contact_phone, contact_email, logo_url, motto, subscription_tier, is_active, created_by, created_at, updated_at'
+  'id, school_name, nemis_code, school_type, county, sub_county, ward, address, contact_phone, contact_email, logo_url, motto, subscription_tier, is_active, created_by, provisioning_source, created_at, updated_at'
 
 const SCHOOL_USER_COLS =
   'id, school_id, user_id, role, is_active, invited_by, joined_at, created_at, updated_at'

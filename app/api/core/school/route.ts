@@ -9,7 +9,13 @@ import { z } from 'zod'
 
 const CreateSchoolSchema = z.object({
   school_name: z.string().min(1),
-  school_type: z.enum(['public_primary', 'private_primary', 'public_comprehensive', 'private_comprehensive']).optional(),
+  // Matches the live `schools_school_type_check` constraint (primary /
+  // secondary / mixed / special) — previously a disjoint set
+  // ('public_primary' etc.) that could never pass the DB constraint, so
+  // every real request silently fell through to the column's own default
+  // ('secondary') regardless of what was sent. See types/core.ts.
+  school_type: z.enum(['primary', 'secondary', 'mixed', 'special']).optional(),
+  grade_codes: z.array(z.string()).optional(),
   nemis_code: z.string().optional(),
   county: z.string().optional(),
   sub_county: z.string().optional(),
@@ -60,9 +66,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return errorResponse(err)
   }
 
+  // grade_codes is an activation input, not a `schools` row column — split
+  // it out before handing the rest to createSchool().
+  const { grade_codes: gradeCodes, ...schoolInput } = parsed.data
+
   // No existing schoolId to check membership against yet — any authenticated
   // user may create a school, and becomes its first school_admin (unchanged).
-  const { school, schoolUser } = await createSchool(parsed.data, userId)
+  const { school, schoolUser } = await createSchool(schoolInput, userId)
 
   // Sprint 9C: activation runs exactly once, immediately after creation —
   // composed here at the route (not inside createSchool() itself) to avoid
@@ -76,7 +86,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // treating the school as ready — this is what "never leave ambiguous
   // success" means: the school-creation HTTP status (201) and the
   // activation outcome are reported separately, not conflated.
-  const activation = await activateSchool(school.id)
+  const activation = await activateSchool(school.id, gradeCodes ? { gradeCodes } : {})
 
   return NextResponse.json({ data: { school, schoolUser, activation } }, { status: 201 })
 }

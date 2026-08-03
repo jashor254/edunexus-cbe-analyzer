@@ -3,6 +3,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
 import { requireAuthentication } from '@/lib/core/permissions'
 import { resolveTeacher } from '@/lib/core/identity'
+import { resolveOwningSchool } from '@/lib/core/institutionOwnership'
 import { UnauthorizedError } from '@/lib/core/errors'
 import { getTeacherClassListProjection } from '@/lib/teacherWorkspace/classListProjection'
 
@@ -52,6 +53,12 @@ export async function POST(req: Request) {
     const teacher = await resolveTeacher(userId)
     if (!teacher) return apiForbidden()
 
+    // Institution Ownership Enforcement (Phase 0) — every new class must
+    // resolve to a real school before it's created. Never derived from
+    // free-text school-name matching here; see resolveOwningSchool's own
+    // doc comment for why.
+    const { schoolId } = await resolveOwningSchool(userId, `${teacher.fullName}'s School (pending setup)`)
+
     const db = createServiceClient()
 
     const body = await req.json()
@@ -79,6 +86,7 @@ export async function POST(req: Request) {
       .from('teacher_classes')
       .insert({
         teacher_id: teacher.id,
+        school_id: schoolId,
         name,
         grade,
         subject,

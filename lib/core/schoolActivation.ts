@@ -120,24 +120,24 @@ export type ActivationResult = {
 // module invents: every category referenced here already exists as a real,
 // seeded `grades.category` value.
 //
-// Defensive against a discovered, out-of-scope schema/type drift
-// (documented in docs/engineering/implementation-log.md's Sprint 9B
-// entry): the live `schools_school_type_check` constraint only allows
-// 'primary' | 'secondary' | 'mixed' | 'special', but types/core.ts's
-// SchoolType and the CreateSchoolSchema Zod validator both use a different
-// set ('public_primary', etc.) that would fail that constraint if ever
-// inserted. This map covers both sets so it keeps working regardless of
-// which side of that mismatch eventually gets fixed, and any other value —
-// including 'special', where guessing is unsafe — falls through to
-// "no default, caller must pass gradeCodes explicitly."
+// 'primary' includes junior_secondary (PP1 through Grade 9) rather than
+// stopping at upper_primary: in practice, a Kenyan "Primary School" and its
+// Junior School (Grades 7-9) are almost always one institution, not two.
+// 'secondary' here means a standalone Senior School (Grade 10-12) — the
+// direct equivalent of an 8-4-4 secondary school — since Junior Secondary
+// already belongs to 'primary' above. A school spanning Junior through
+// Senior with no primary section (a real, distinct pattern) or any other
+// non-default combination should pass gradeCodes explicitly rather than
+// rely on this table — it only covers the two dominant single-band shapes.
+//
+// types/core.ts's SchoolType now matches the live
+// `schools_school_type_check` constraint exactly ('primary' | 'secondary' |
+// 'mixed' | 'special') — this map no longer needs to carry the old,
+// DB-incompatible 'public_primary' etc. keys.
 const SCHOOL_TYPE_GRADE_CATEGORIES: Record<string, string[]> = {
-  primary:                ['pre_primary', 'lower_primary', 'upper_primary'],
-  public_primary:         ['pre_primary', 'lower_primary', 'upper_primary'],
-  private_primary:        ['pre_primary', 'lower_primary', 'upper_primary'],
-  secondary:              ['junior_secondary', 'senior_secondary'],
-  mixed:                  ['pre_primary', 'lower_primary', 'upper_primary', 'junior_secondary', 'senior_secondary'],
-  public_comprehensive:   ['pre_primary', 'lower_primary', 'upper_primary', 'junior_secondary', 'senior_secondary'],
-  private_comprehensive:  ['pre_primary', 'lower_primary', 'upper_primary', 'junior_secondary', 'senior_secondary'],
+  primary:   ['pre_primary', 'lower_primary', 'upper_primary', 'junior_secondary'],
+  secondary: ['senior_secondary'],
+  mixed:     ['pre_primary', 'lower_primary', 'upper_primary', 'junior_secondary', 'senior_secondary'],
 }
 
 /**

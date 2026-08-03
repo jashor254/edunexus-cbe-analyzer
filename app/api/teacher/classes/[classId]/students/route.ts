@@ -11,6 +11,7 @@ import {
 import { sendWelcomeMessage } from '@/lib/whatsapp/sender'
 import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissions'
 import { resolveTeacher } from '@/lib/core/identity'
+import { resolveOwningSchool } from '@/lib/core/institutionOwnership'
 import { UnauthorizedError } from '@/lib/core/errors'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://edunexus.co.ke'
@@ -62,6 +63,30 @@ export async function POST(
       return apiNotFound('Class not found')
     }
 
+    // Institution Ownership Enforcement (Phase 0) — every teacher-enrolled
+    // learner must carry the same school_id as the class they're enrolled
+    // into. Case A: the class already has a school_id (created after this
+    // enforcement shipped) — reuse it. Case B: a historical class predating
+    // this migration (school_id still NULL) — resolve the teacher's owning
+    // school and repair the class's ownership in the same request, so the
+    // gap can't be re-created by the very act of adding a learner to it.
+    const { data: classRow } = await db
+      .from('teacher_classes')
+      .select('id, school_id')
+      .eq('id', classId)
+      .single()
+
+    let classSchoolId = classRow?.school_id ?? null
+    if (!classSchoolId) {
+      const { schoolId } = await resolveOwningSchool(userId, `${teacher.full_name}'s School (pending setup)`)
+      classSchoolId = schoolId
+      await db
+        .from('teacher_classes')
+        .update({ school_id: classSchoolId })
+        .eq('id', classId)
+        .is('school_id', null) // defense-in-depth: never clobber a value another concurrent repair already set
+    }
+
     const parsed = BodySchema.safeParse(await req.json())
     if (!parsed.success) {
       return apiBadRequest(parsed.error.issues.map(i => i.message).join(', '))
@@ -80,6 +105,7 @@ export async function POST(
             grade:           s.grade,
             curriculum_type: s.curriculum_type,
             school:          teacher.school ?? null,
+            school_id:       classSchoolId,
             added_by:        'teacher',
             teacher_id:      teacher.id,
             parent_first_name: s.parent_name?.trim() ?? null,

@@ -5,11 +5,12 @@
 
 // ── Enums ────────────────────────────────────────────────────────────────────
 
-export type SchoolType =
-  | 'public_primary'
-  | 'private_primary'
-  | 'public_comprehensive'
-  | 'private_comprehensive'
+// Matches the live `schools_school_type_check` DB constraint exactly
+// (confirmed via direct query — the previous 'public_primary' etc. set here
+// and in CreateSchoolSchema had never matched the database: every school
+// ever created through the validated API path silently fell through to the
+// column's own default, 'secondary', regardless of what was requested).
+export type SchoolType = 'primary' | 'secondary' | 'mixed' | 'special'
 
 export type SubscriptionTier = 'free' | 'standard' | 'premium'
 
@@ -83,6 +84,8 @@ export type School = {
   subscription_tier: SubscriptionTier
   is_active: boolean
   created_by: string | null
+  /** Provenance tag for how this school came to exist — e.g. 'teacher_first_write_auto_provision' (lib/core/institutionOwnership.ts). Null for every normally-created school. */
+  provisioning_source: string | null
   created_at: string
   updated_at: string
 }

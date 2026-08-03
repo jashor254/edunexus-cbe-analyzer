@@ -53,14 +53,20 @@ async function freshSchool(schoolType: string = 'secondary'): Promise<string> {
 
 // ── Pure functions — no database required ───────────────────────────────────
 
-test('resolveDefaultGrades: filters the global catalogue by school_type default (secondary → junior + senior)', () => {
+test('resolveDefaultGrades: filters the global catalogue by school_type default (secondary → senior only; junior belongs to primary)', () => {
+  // A Kenyan "Primary School" and its Junior School (Grades 7-9) are almost
+  // always one institution — 'primary' below includes junior_secondary,
+  // 'secondary' means a standalone Senior School (Grade 10-12).
   const grades = [
     { id: '1', name: 'Grade 6',  code: 'G6',  level_order: 8,  category: 'upper_primary' as const,     created_at: '', updated_at: '' },
     { id: '2', name: 'Grade 7',  code: 'G7',  level_order: 9,  category: 'junior_secondary' as const,  created_at: '', updated_at: '' },
     { id: '3', name: 'Grade 10', code: 'G10', level_order: 12, category: 'senior_secondary' as const,  created_at: '', updated_at: '' },
   ]
   const resolved = resolveDefaultGrades(grades, 'secondary')
-  assert.deepEqual(resolved.map(g => g.code), ['G7', 'G10'])
+  assert.deepEqual(resolved.map(g => g.code), ['G10'])
+
+  const primaryResolved = resolveDefaultGrades(grades, 'primary')
+  assert.deepEqual(primaryResolved.map(g => g.code), ['G6', 'G7'])
 })
 
 test('resolveDefaultGrades: an explicit gradeCodes override wins over the school_type default', () => {
@@ -123,7 +129,9 @@ test('ensureDefaultGrades: resolves grades without writing any row', async () =>
   const { result, grades } = await ensureDefaultGrades('secondary')
   assert.equal(result.status, 'skipped')
   assert.ok(grades.length > 0)
-  assert.ok(grades.every(g => g.category === 'junior_secondary' || g.category === 'senior_secondary'))
+  // 'secondary' = standalone Senior School only — junior_secondary now
+  // belongs to 'primary' (see resolveDefaultGrades test above).
+  assert.ok(grades.every(g => g.category === 'senior_secondary'))
 })
 
 test('ensureStreams: skips cleanly when none requested; creates + is idempotent when requested', async () => {

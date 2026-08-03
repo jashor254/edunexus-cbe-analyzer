@@ -8,11 +8,14 @@ import { ChevronLeft, CheckCircle2, XCircle, ArrowRight } from 'lucide-react'
 
 const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS ?? '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
 
+// Matches the live schools_school_type_check constraint. 'primary' includes
+// Junior School (Grades 7-9) — see lib/core/schoolActivation.ts's
+// SCHOOL_TYPE_GRADE_CATEGORIES comment for why.
 const SCHOOL_TYPES = [
-  { value: 'public_primary',          label: 'Public Primary' },
-  { value: 'private_primary',         label: 'Private Primary' },
-  { value: 'public_comprehensive',    label: 'Public Comprehensive' },
-  { value: 'private_comprehensive',   label: 'Private Comprehensive' },
+  { value: 'primary',   label: 'Primary & Junior School (PP1 – Grade 9)' },
+  { value: 'secondary', label: 'Senior School (Grade 10 – 12)' },
+  { value: 'mixed',     label: 'Full school (PP1 – Grade 12)' },
+  { value: 'special',   label: 'Special needs school' },
 ] as const
 
 type ActivationStepResult = {
