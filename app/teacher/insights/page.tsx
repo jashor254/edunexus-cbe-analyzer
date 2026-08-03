@@ -2,15 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { BarChart3, Users, TrendingUp, TrendingDown } from 'lucide-react'
+import { getStandingLabel, getStandingColorClasses } from '@/lib/teacherWorkspace/standing'
 
 interface TeacherClass { id: string; name: string; grade: number; subject: string }
 
-function levelLabel(avg: number) {
-  if (avg >= 3.5) return 'Exceeds'
-  if (avg >= 2.5) return 'Meets'
-  if (avg >= 1.5) return 'Approaching'
-  return 'Below'
-}
+const levelLabel = (avg: number) => getStandingLabel(avg, 'short')
 
 export default function InsightsPage() {
   const [classes, setClasses] = useState<TeacherClass[]>([])
@@ -101,8 +97,7 @@ export default function InsightsPage() {
             <div className="space-y-4">
               {subjectInsights.map((si: any) => {
                 const pct = (si.avg / 4) * 100
-                const barColor = si.avg >= 3.5 ? 'bg-purple-500' : si.avg >= 2.5 ? 'bg-green-500' : si.avg >= 1.5 ? 'bg-amber-500' : 'bg-red-500'
-                const badgeColor = si.avg >= 3.5 ? 'bg-purple-100 text-purple-700' : si.avg >= 2.5 ? 'bg-green-100 text-green-700' : si.avg >= 1.5 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                const { bar: barColor, badge: badgeColor } = getStandingColorClasses(si.avg)
                 return (
                   <div key={si.subject} className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
                     <div className="flex items-center justify-between mb-3">

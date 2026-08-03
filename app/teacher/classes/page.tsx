@@ -6,20 +6,10 @@ import {
   BookOpen, PlusCircle, Users, ChevronRight, Copy, Check, X,
 } from 'lucide-react'
 import { friendlyMessage } from '@/lib/errors/friendlyMessage'
+import { getStandingLabel, getStandingColorClasses } from '@/lib/teacherWorkspace/standing'
 
-function levelLabel(avg: number) {
-  if (avg >= 3.5) return 'Exceeds'
-  if (avg >= 2.5) return 'Meets'
-  if (avg >= 1.5) return 'Approaching'
-  return 'Below'
-}
-
-function levelColor(avg: number) {
-  if (avg >= 3.5) return 'text-purple-700 bg-purple-100'
-  if (avg >= 2.5) return 'text-green-700 bg-green-100'
-  if (avg >= 1.5) return 'text-amber-700 bg-amber-100'
-  return 'text-red-700 bg-red-100'
-}
+const levelLabel = (avg: number) => getStandingLabel(avg, 'short')
+const levelColor = (avg: number) => getStandingColorClasses(avg).badge
 
 const SUBJECTS = [
   'Mathematics','English','Kiswahili','Integrated Science','Geography',
@@ -163,11 +153,7 @@ export default function TeacherClassesPage() {
               {cls.avg_level !== null && (
                 <div className="w-full bg-gray-100 rounded-full h-2 mb-4">
                   <div
-                    className={`h-2 rounded-full ${
-                      cls.avg_level >= 3.5 ? 'bg-purple-500' :
-                      cls.avg_level >= 2.5 ? 'bg-green-500' :
-                      cls.avg_level >= 1.5 ? 'bg-amber-500' : 'bg-red-500'
-                    }`}
+                    className={`h-2 rounded-full ${getStandingColorClasses(cls.avg_level).bar}`}
                     style={{ width: `${(cls.avg_level / 4) * 100}%` }}
                   />
                 </div>
