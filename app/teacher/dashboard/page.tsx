@@ -1,7 +1,6 @@
 export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/utils/supabase/server'
-import { createServiceClient } from '@/utils/supabase/service'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Scroll, NotebookPen, ClipboardList, Presentation, ArrowRight } from 'lucide-react'
@@ -12,6 +11,7 @@ import WeeklyTeachingProgress from '@/components/teacher/WeeklyTeachingProgress'
 import TodayAtAGlance from '@/components/teacher/TodayAtAGlance'
 import { DashboardDataProvider } from '@/components/teacher/DashboardDataProvider'
 import { getPendingAssessments } from '@/lib/assessments/getters'
+import { getTeacherDashboardProjection } from '@/lib/teacherWorkspace/dashboardProjection'
 
 function getTermInfo() {
   const month = new Date().getMonth() + 1
@@ -45,13 +45,7 @@ export default async function TeacherDashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const db = createServiceClient()
-
-  const { data: teacher } = await db
-    .from('teachers')
-    .select('id, full_name, school, subject, pioneer_number, is_verified')
-    .eq('user_id', user.id)
-    .single()
+  const { teacher, activeClasses } = await getTeacherDashboardProjection(user.id)
 
   if (!teacher) redirect('/teacher/setup')
 
@@ -60,12 +54,6 @@ export default async function TeacherDashboardPage() {
   const weekOfTerm  = getWeekOfTerm(termNumber)
   const today       = new Date().toLocaleDateString('en-KE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
-  const { data: classes } = await db
-    .from('teacher_classes')
-    .select('id')
-    .eq('teacher_id', teacher.id)
-
-  const activeClasses = (classes ?? []).length
   const pendingAssessments = await getPendingAssessments(teacher.id)
 
   return (
