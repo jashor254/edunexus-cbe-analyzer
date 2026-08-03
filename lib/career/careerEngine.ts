@@ -13,9 +13,7 @@ import type {
   CareerSearchFilters,
   CareerSummary,
   StudentCareerInterest,
-  CareerMatchWithDetail,
   SkillTimelineItem,
-  ParentCareerSummary,
   CapabilityProfile,
 } from './types'
 
@@ -223,42 +221,6 @@ export function getNextSkillsForAge(timeline: SkillTimelineItem[], age: number):
   return timeline.find(t => t.age_range === ranges[idx + 1]) ?? null
 }
 
-// ── STUDENT MATCHES ───────────────────────────────────────────────────────────
-
-export async function getMatchesForStudent(studentId: string): Promise<CareerMatchWithDetail[]> {
-  return repos.careers.findMatchesForStudent(studentId)
-}
-
-export async function saveCareerMatches(
-  studentId: string,
-  matches: Array<{
-    career_slug: string
-    match_score: number
-    match_reasoning: string
-    subject_gaps: unknown
-    skill_gaps: unknown
-  }>
-): Promise<void> {
-  const slugs = matches.map(m => m.career_slug)
-  const careerIds = await repos.careers.findCareerIdsBySlug(slugs)
-
-  const slugToId = Object.fromEntries(careerIds.map(c => [c.slug, c.id]))
-
-  const rows = matches
-    .filter(m => slugToId[m.career_slug])
-    .map(m => ({
-      student_id:      studentId,
-      career_id:       slugToId[m.career_slug],
-      match_score:     m.match_score,
-      match_reasoning: m.match_reasoning,
-      subject_gaps:    m.subject_gaps,
-      skill_gaps:      m.skill_gaps,
-      generated_at:    new Date().toISOString(),
-    }))
-
-  await repos.careers.upsertCareerMatches(rows)
-}
-
 // ── STUDENT INTERESTS ─────────────────────────────────────────────────────────
 
 export async function getInterestsForStudent(studentId: string): Promise<StudentCareerInterest[]> {
@@ -281,53 +243,6 @@ export async function saveCareerInterest(
     notes:          notes ?? null,
     explored_at:    new Date().toISOString(),
   })
-}
-
-// ── PARENT SUMMARY ────────────────────────────────────────────────────────────
-
-export async function generateParentSummary(studentId: string): Promise<ParentCareerSummary> {
-  const student = await repos.careers.findStudentBasicInfo(studentId)
-  if (!student) throw new Error('Student not found')
-
-  const studentAge = student.date_of_birth
-    ? Math.floor((Date.now() - new Date(student.date_of_birth).getTime()) / (365.25 * 24 * 3600 * 1000))
-    : 14
-
-  const topCareers = await getMatchesForStudent(studentId)
-
-  const currentAgeSkills: Record<string, string[]> = {}
-  const nextAgeSkills: Record<string, string[]> = {}
-
-  for (const match of topCareers) {
-    const careerFull = await getCareerBySlug(match.career.slug)
-    if (!careerFull) continue
-    const current = getCurrentSkillsForAge(careerFull.skill_timeline, studentAge)
-    const next = getNextSkillsForAge(careerFull.skill_timeline, studentAge)
-    if (current) currentAgeSkills[match.career.title] = current.skills
-    if (next) nextAgeSkills[match.career.title] = next.skills
-  }
-
-  const overallReadiness = topCareers.length > 0
-    ? `${student.name} shows strongest alignment with ${topCareers[0]?.career.title ?? 'multiple careers'} based on current subject performance.`
-    : 'No career matches generated yet. Add assessment scores to see career alignment.'
-
-  const parentActions = [
-    'Ensure strong performance in core subjects (especially Mathematics and English).',
-    `Explore extracurricular activities aligned with ${topCareers[0]?.career.title ?? 'areas of interest'}.`,
-    'Discuss the skill age timeline with your child so they understand what to learn now.',
-    'Visit a professional in their top career field if possible.',
-    'Review subject gaps and consider tutoring in weak areas.',
-  ]
-
-  return {
-    student_name: student.name,
-    student_age: studentAge,
-    top_careers: topCareers,
-    current_age_skills: currentAgeSkills,
-    next_age_skills: nextAgeSkills,
-    overall_readiness: overallReadiness,
-    parent_actions: parentActions,
-  }
 }
 
 // ── SUBJECT STRENGTH SUGGESTIONS ─────────────────────────────────────────────
