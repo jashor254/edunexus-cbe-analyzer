@@ -2,8 +2,8 @@
 // Builds the in-page clinic report data from student profile + assessments + career matches.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { getCareerBySlug, getMatchesForStudent, getCurrentSkillsForAge, getNextSkillsForAge, getAgeRangeLabel } from './careerEngine'
-import { generateCareerMatches } from './matchEngine'
+import { getCareerBySlug, getCurrentSkillsForAge, getNextSkillsForAge, getAgeRangeLabel } from './careerEngine'
+import { resolveCanonicalCareerMatches } from '@/lib/learnerIntelligence/careerIntelligence'
 import { STANDARD_DISCLAIMER } from './types'
 import type {
   ClinicReport, SubjectScoreRow, Career, SkillTimelineItem,
@@ -75,37 +75,6 @@ function calcAge(dob: string | null | undefined, grade: number): number {
   return Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 3600 * 1000))
 }
 
-// ─── Subject cluster detection ────────────────────────────────────────────────
-
-// Essential Mathematics is NOT a STEM/science subject — students with emat are on Arts/Social pathway
-const SCIENCE_SUBJECTS   = ['biology', 'chemistry', 'physics', 'mathematics', 'core_mathematics', 'integrated_science']
-const HUMANITIES_SUBJECTS = [
-  'history', 'geography', 'geo', 'social_studies',
-  'cre', 'christian_religious_education', 'islamic_religious_education',
-  'home_science', 'hisc',
-  'community_service_learning', 'csl',
-]
-const BUSINESS_SUBJECTS  = ['business_studies', 'economics', 'accounting', 'commerce']
-const ARTS_SUBJECTS      = ['creative_arts', 'music', 'art_design', 'creative_arts_sports']
-
-function detectSubjectCluster(
-  scores: Record<string, number>
-): 'science' | 'humanities' | 'business' | 'arts' | 'general' {
-  const keys = Object.keys(scores)
-  if (keys.filter(s => SCIENCE_SUBJECTS.includes(s)).length >= 2)   return 'science'
-  if (keys.filter(s => HUMANITIES_SUBJECTS.includes(s)).length >= 2) return 'humanities'
-  if (keys.filter(s => BUSINESS_SUBJECTS.includes(s)).length >= 1)  return 'business'
-  if (keys.filter(s => ARTS_SUBJECTS.includes(s)).length >= 1)      return 'arts'
-  return 'general'
-}
-
-const CLUSTER_CAREER_CANDIDATES: Record<string, string[]> = {
-  science:    ['medical-doctor', 'environmental-scientist', 'agricultural-scientist', 'civil-engineer', 'software-engineer'],
-  humanities: ['journalist-content-creator', 'teacher-education-technologist', 'accountant-financial-analyst', 'entrepreneur-business'],
-  business:   ['accountant-financial-analyst', 'entrepreneur-business', 'journalist-content-creator'],
-  arts:       ['graphic-designer-creative-technologist', 'journalist-content-creator', 'teacher-education-technologist'],
-  general:    ['teacher-education-technologist', 'entrepreneur-business', 'journalist-content-creator'],
-}
 
 // ─── Fix 1: Pathway-based skill timeline defaults ──────────────────────────────
 // Used for junior students when no career match exists.
@@ -760,33 +729,22 @@ export async function buildClinicReport(
 
   const dream_career = dreamCareerFreeText ?? careerInterests?.[0]?.career_slug ?? null
 
-  // 5. Top career match (senior only) — generate fresh if missing
+  // 5. Top career match (senior only) — canonical, deterministic, computed
+  // live from current Projection every time (no persisted "on file" match
+  // to regenerate). Career Contradiction Closure Sprint (2026-08-03):
+  // previously called the deprecated, AI-generated `getMatchesForStudent()`/
+  // `generateCareerMatches()` path, which could disagree with the
+  // deterministic match the Learner Progress Report/Career Explorer/Parent
+  // Career Intelligence/Holiday Planner already show for the same learner —
+  // Academic Clinic now consumes the same canonical result they do.
+  // `resolveCanonicalCareerMatches` also independently enforces the Career
+  // Principle grade gate, so a Junior learner's Clinic report never gets a
+  // specific-career match even if `section` were ever passed incorrectly.
   let top_career = null
   let top_career_detail: Career | null = null
 
   if (section === 'senior') {
-    let matches = await getMatchesForStudent(studentId)
-
-    if (matches.length === 0 && Object.keys(subjectMap).length > 0) {
-      // No match on file — generate one now via AI
-      try {
-        const cluster = detectSubjectCluster(subjectMap)
-        const candidateSlugs = CLUSTER_CAREER_CANDIDATES[cluster]
-        await generateCareerMatches({
-          student_id:      studentId,
-          student_name:    student.name as string,
-          grade,
-          age,
-          subject_scores:  subjectMap,
-          interests:       [],
-          dream_career:    dream_career ?? undefined,
-          candidate_slugs: candidateSlugs,
-        })
-        matches = await getMatchesForStudent(studentId)
-      } catch (err) {
-        console.error('[clinicReportBuilder] Career match generation failed:', (err as Error).message)
-      }
-    }
+    const { matches } = await resolveCanonicalCareerMatches(studentId)
 
     if (matches.length > 0) {
       top_career = matches[0]
