@@ -1,14 +1,22 @@
 // app/api/career/[slug]/route.ts
+//
+// Career Contradiction Closure Sprint (2026-08-03) — the legacy
+// `student_match` field (backed by the deprecated, AI-generated
+// `getMatchesForStudent()`) is removed: it had zero UI consumers (confirmed
+// by direct search), so this is dead-weight removal, not a behavior change
+// for anyone. `capability_match` — already the canonical, deterministic
+// `computeCapabilityMatches()` path `app/student/career/[slug]/page.tsx`
+// actually renders — is preserved, and now additionally respects the
+// Career Principle grade gate (`careerModeForGrade`) it was previously
+// missing: a Junior learner no longer receives a specific-career alignment
+// score, matching the same Junior/Senior boundary every other Career
+// surface already obeys.
 import { NextRequest } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized, apiNotFound } from '@/lib/api/response'
-import {
-  getCareerBySlugWithCOS,
-  getMatchesForStudent,
-  searchOrGenerateCareer,
-} from '@/lib/career/careerEngine'
+import { getCareerBySlugWithCOS, searchOrGenerateCareer } from '@/lib/career/careerEngine'
 import { computeCapabilityMatches } from '@/lib/career/capabilityMatchEngine'
-import { resolveFreshCapabilityProfile } from '@/lib/learnerIntelligence/careerIntelligence'
+import { resolveFreshCapabilityProfile, careerModeForGrade } from '@/lib/learnerIntelligence/careerIntelligence'
 import type { CapabilityCareerMatch } from '@/lib/career/types'
 import { buildCareerReadinessChains, buildCapabilityReadinessChains } from '@/lib/knowledgeGraph/careerReadiness'
 import type { CareerReadinessReport } from '@/lib/knowledgeGraph/careerReadiness'
@@ -41,30 +49,33 @@ export async function GET(
     const { searchParams } = new URL(req.url)
     const studentId = searchParams.get('studentId')
 
-    let studentMatch      = null
     let capabilityMatch:   CapabilityCareerMatch | null = null
     let readinessReport:   CareerReadinessReport | null = null
 
     if (studentId) {
       const { data: student } = await supabase
         .from('students')
-        .select('id')
+        .select('id, grade')
         .eq('id', studentId)
         .eq('user_id', user.id)
         .maybeSingle()
 
       if (student) {
-        // Legacy AI match (kept for backward compat)
-        const matches = await getMatchesForStudent(studentId)
-        studentMatch = matches.find((m) => m.career.slug === slug) ?? null
-
         // Capability match — fast, deterministic, no tokens. Sourced live
         // from Projection via the one canonical resolver (same path Career
         // Intelligence, Capability Matches, and Parent Career Intelligence
         // use) rather than the separately-stored `career_capability_profiles`
         // snapshot, which could disagree with what those other surfaces
         // conclude from the same evidence.
-        if (career.required_capabilities) {
+        //
+        // Career Principle gate: a Junior learner (`exploration` mode) never
+        // receives a specific-career alignment score — only Senior
+        // (`planning` mode) resolves to one specific matched career. This
+        // mirrors `careerModeForGrade`'s own boundary, never re-derived.
+        const grade = student.grade as number | null
+        const isJunior = grade !== null && careerModeForGrade(grade) === 'exploration'
+
+        if (!isJunior && career.required_capabilities) {
           const resolved = await resolveFreshCapabilityProfile(studentId)
           if (resolved) {
             const report = computeCapabilityMatches(studentId, resolved.profile, [career])
@@ -104,7 +115,7 @@ export async function GET(
       }
     }
 
-    return apiSuccess({ career, student_match: studentMatch, capability_match: capabilityMatch, readiness_report: readinessReport })
+    return apiSuccess({ career, capability_match: capabilityMatch, readiness_report: readinessReport })
   } catch (err) {
     console.error('[career/slug]', err)
     return apiError('Failed to load career')
