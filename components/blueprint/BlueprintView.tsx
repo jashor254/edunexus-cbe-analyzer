@@ -620,7 +620,7 @@ export default function BlueprintView({
           {careerJourneyLink && (
             <p className="text-sm">
               <Link href={careerJourneyLink} className="font-semibold text-teal-700 hover:underline focus-visible:underline focus-visible:outline-none">
-                Explore the full Career Intelligence journey →
+                Explore career pathways and next steps →
               </Link>
             </p>
           )}

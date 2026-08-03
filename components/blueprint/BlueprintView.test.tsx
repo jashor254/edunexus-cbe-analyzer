@@ -451,7 +451,11 @@ test('Kevin: exploration suggestions come from the career’s real required subj
   const html = render(createKevinBlueprint())
   assert.match(html, /Worth exploring next: Mathematics, English, Business Studies and Economics\./)
   assert.match(html, /href="\/career-intelligence"/)
-  assert.match(html, /full Career Intelligence journey/)
+  // Public Document Identity audit (2026-08-03) — "Career Intelligence" is
+  // internal architecture vocabulary; the reader-facing link text must
+  // describe the destination instead.
+  assert.match(html, /Explore career pathways and next steps/)
+  assert.doesNotMatch(html, /Career Intelligence journey/i)
 })
 
 test('Junior/exploration-mode learner: doorsPreview is null by design — no four-door grid, no AI-change box, cluster-only framing, never a crash', () => {
