@@ -1,14 +1,63 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
   ArrowRight,
+  Search,
+  School,
+  GraduationCap,
+  Users,
+  Compass,
+  Briefcase,
 } from 'lucide-react'
-import { CURRICULA, FOCUS_RING, SCHOOL_DEMO_WA_LINK } from './constants'
+import { FOCUS_RING, SCHOOL_DEMO_WA_LINK } from './constants'
 import { BlueprintCardMockup } from './components/BlueprintCard'
-import { CompassChatMockup } from './components/CompassChatMockup'
+import { montserrat } from './layout'
+
+const OVERVIEW_CARDS = [
+  {
+    icon: School,
+    title: 'Every classroom, one picture.',
+    body: "Not just end-of-term averages — what's happening in every class, every week.",
+    href: '/schools',
+    label: 'For school leaders',
+    tag: 'Schools',
+    tagClass: 'text-trustblue-300 bg-trustblue-500/10',
+    iconClass: 'text-trustblue-400',
+  },
+  {
+    icon: Compass,
+    title: "Knowing isn't enough.",
+    body: 'Targeted practice at exactly the gap that\'s holding a learner back.',
+    href: '/compass',
+    label: 'Learning Compass',
+    tag: 'Families',
+    tagClass: 'text-teal-300 bg-teal-500/10',
+    iconClass: 'text-teal-400',
+  },
+  {
+    icon: GraduationCap,
+    title: 'Every lesson becomes evidence.',
+    body: 'CBC-aligned planning, TSC-ready — done for you.',
+    href: '/teachers',
+    label: 'For teachers',
+    tag: 'Teachers',
+    tagClass: 'text-amber-300 bg-amber-500/10',
+    iconClass: 'text-amber-400',
+  },
+  {
+    icon: Briefcase,
+    title: 'Prepares learners for life, not just exams.',
+    body: 'Career readiness built in from Grade 7, no extra subscription.',
+    href: '/career-pathways',
+    label: 'Career Intelligence',
+    tag: 'Families',
+    tagClass: 'text-teal-300 bg-teal-500/10',
+    iconClass: 'text-teal-400',
+  },
+] as const
 
 const AcademicClinicDemo = dynamic(
   () => import('@/components/demo/AcademicClinicDemo'),
@@ -21,10 +70,10 @@ const KcseClinicDemo = dynamic(
 
 type SelectedRole = 'school' | 'teacher' | 'family' | null
 
-const ROLES: { id: Exclude<SelectedRole, null>; label: string }[] = [
-  { id: 'school',  label: '🏫 For Schools'  },
-  { id: 'teacher', label: '👨‍🏫 For Teachers' },
-  { id: 'family',  label: '👨‍👩‍👧 For Families' },
+const ROLES: { id: Exclude<SelectedRole, null>; label: string; icon: typeof School }[] = [
+  { id: 'school',  label: 'For Schools',  icon: School },
+  { id: 'teacher', label: 'For Teachers', icon: GraduationCap },
+  { id: 'family',  label: 'For Families', icon: Users },
 ]
 
 export default function LandingPage() {
@@ -33,12 +82,13 @@ export default function LandingPage() {
   const [selectedRole, setSelectedRole] = useState<SelectedRole>(null)
 
   type HeroVariant = {
+    badgeIcon:     typeof Search
     badge:         string
     badgeClass:    string
     line1:         string
     line2:         string
     gradientLine:  string
-    gradientClass: string
+    lineClass:     string
     subtitle:      string
     ctaHref:       string
     ctaLabel:      string
@@ -49,12 +99,13 @@ export default function LandingPage() {
 
   const hero: HeroVariant =
     selectedRole === 'teacher' ? {
-      badge:         '👨‍🏫 For Teachers',
+      badgeIcon:     GraduationCap,
+      badge:         'For Teachers',
       badgeClass:    'bg-amber-500/10 border-amber-500/20 text-amber-300',
       line1:         'Plan your full term.',
       line2:         'Before the bell rings Monday.',
       gradientLine:  'EduNexus handles the paperwork.',
-      gradientClass: 'from-amber-400 via-orange-400 to-yellow-400',
+      lineClass:     'text-amber-400',
       subtitle:      'Schemes of work, lesson plans, and class insights — ready when you need them, formatted the way TSC expects.',
       ctaHref:       '/signup?role=teacher',
       ctaLabel:      'Start Planning for Free',
@@ -63,12 +114,13 @@ export default function LandingPage() {
       roleColor:     'amber',
     }
     : selectedRole === 'family' ? {
-      badge:         '👨‍👩‍👧 For Families',
+      badgeIcon:     Users,
+      badge:         'For Families',
       badgeClass:    'bg-teal-500/10 border-teal-500/20 text-teal-300',
       line1:         'Finally know',
       line2:         'where your child truly stands.',
       gradientLine:  'Not just their marks. Their potential.',
-      gradientClass: 'from-teal-400 via-cyan-400 to-blue-400',
+      lineClass:     'text-teal-400',
       subtitle:      "The Learner Blueprint shows you exactly which strands are holding your child back — and a precise plan to close the gap before next term.",
       ctaHref:       '/signup?role=parent',
       ctaLabel:      'Get Your Child\'s Free Report',
@@ -77,53 +129,69 @@ export default function LandingPage() {
       roleColor:     'teal',
     }
     : {
-      badge:         '🔎 Catch it early. Change the outcome.',
-      badgeClass:    'bg-violet-500/10 border-violet-500/20 text-violet-300',
+      badgeIcon:     Search,
+      badge:         'Catch it early. Change the outcome.',
+      badgeClass:    'bg-trustblue-500/10 border-trustblue-500/20 text-trustblue-300',
       line1:         'Schools should never',
       line2:         'discover a problem too late.',
       gradientLine:  'EduNexus shortens that gap.',
-      gradientClass: 'from-violet-400 via-purple-400 to-indigo-400',
+      lineClass:     'text-nexusteal-400',
       subtitle:      'EduNexus shortens the distance between when a learning problem begins and when someone notices — while there is still time to act on it.',
-      ctaHref:       '/learner-blueprint',
-      ctaLabel:      'See How EduNexus Notices Early',
+      ctaHref:       '/signup?role=school',
+      ctaLabel:      'Create Your School Account',
       trust:         '✓ CBC · Cambridge IGCSE · 8-4-4  ·  ✓ Grades 7–12  ·  ✓ 50+ pioneer teachers',
       secondary:     { label: 'Try a real sample report →', action: 'demo' },
-      roleColor:     'violet',
+      roleColor:     'trustblue',
+    }
+
+  type ClosingCta = {
+    kicker:      string
+    heading:     ReactNode
+    subtitle:    string
+    label:       string
+    href:        string
+    external:    boolean
+    altLabel?:   string
+    altHref?:    string
+  }
+
+  const closing: ClosingCta =
+    selectedRole === 'teacher' ? {
+      kicker:   'We are not building more paperwork. We are building your term plan.',
+      heading:  <>Ready to plan your term<br />the easy way?</>,
+      subtitle: 'Schemes of work, lesson plans, and class insights — ready when you need them.',
+      label:    hero.ctaLabel,
+      href:     hero.ctaHref,
+      external: false,
+    }
+    : selectedRole === 'family' ? {
+      kicker:   'Not just their marks. Their potential.',
+      heading:  <>Ready to see what&apos;s really<br />holding your child back?</>,
+      subtitle: 'Get a free first Learner Blueprint report — no card needed.',
+      label:    hero.ctaLabel,
+      href:     hero.ctaHref,
+      external: false,
+    }
+    : {
+      kicker:   'We are not building a smarter exam. We are building a smarter school.',
+      heading:  <>Ready to see what your school&apos;s<br />learning intelligence looks like?</>,
+      subtitle: 'Create your school\'s account and you\'re straight into your dashboard — no forms, no waiting.',
+      label:    'Create Your School Account',
+      href:     '/signup?role=school',
+      external: false,
+      altLabel: 'Prefer to talk first? Book a 20-min call →',
+      altHref:  SCHOOL_DEMO_WA_LINK,
     }
 
   return (
     <>
-      {/* ── HUMAN PROBLEM ─────────────────────────────────────────────────────── */}
-      <section className="py-24 md:py-32">
-        <div className="max-w-170 mx-auto px-6 text-center">
-
-          <p
-            className="font-extrabold text-white leading-snug tracking-[-0.01em] mb-8"
-            style={{ fontSize: 'clamp(26px, 4.5vw, 40px)' }}
-          >
-            Every learner has potential<br />that marks alone cannot measure.
-          </p>
-
-          <div className="space-y-2 text-white/45 text-lg leading-relaxed mb-8">
-            <p>Some need more time.</p>
-            <p>Some need a different explanation.</p>
-            <p>Some need someone to believe they will get there.</p>
-            <p>Some need to see where they are going<br className="hidden sm:block" /> before they commit to the journey.</p>
-          </div>
-
-          <p className="text-white/65 leading-relaxed max-w-125 mx-auto">
-            A learning problem rarely announces itself. It starts small — one concept in one
-            subject that didn&apos;t quite land — and for a while, nothing looks wrong.
-            By the time it shows up in a report card, it&apos;s often already three terms old.
-            By exam time, it can be too late to be the easy fix it once was.
-          </p>
-
-        </div>
-      </section>
-
       {/* ── TRANSFORMATION (HERO) ─────────────────────────────────────────────── */}
-      <section className="py-16 md:py-24 bg-white/3">
+      <section className="pt-16 md:pt-24 pb-16 md:pb-24 bg-white/3">
         <div className="max-w-[820px] mx-auto px-6 text-center">
+
+          <p className="text-white/40 text-sm font-semibold tracking-wide mb-8">
+            Every learner has potential that marks alone cannot measure.
+          </p>
 
           {/* Role selector */}
           <div
@@ -134,32 +202,34 @@ export default function LandingPage() {
               <button
                 key={r.id}
                 onClick={() => setSelectedRole(selectedRole === r.id ? null : r.id)}
-                className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-semibold border transition-all whitespace-nowrap ${FOCUS_RING} ${
+                className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold border transition-all whitespace-nowrap ${FOCUS_RING} ${
                   selectedRole === r.id
                     ? r.id === 'school'
-                      ? 'bg-violet-500/15 border-violet-500/35 text-violet-300'
+                      ? 'bg-trustblue-500/15 border-trustblue-500/35 text-trustblue-300'
                       : r.id === 'teacher'
                       ? 'bg-amber-500/15 border-amber-500/35 text-amber-300'
                       : 'bg-teal-500/15 border-teal-500/35 text-teal-300'
                     : 'bg-white/5 border-white/10 text-white/40 hover:border-white/20 hover:text-white/60'
                 }`}
               >
+                <r.icon className="w-3.5 h-3.5" />
                 {r.label}
               </button>
             ))}
           </div>
 
           <div className={`inline-flex items-center gap-2 ${hero.badgeClass} border px-4 py-1.5 rounded-full text-sm font-semibold mb-8 transition-all`}>
+            <hero.badgeIcon className="w-3.5 h-3.5" />
             {hero.badge}
           </div>
 
           <h1
-            className="font-extrabold leading-[1.05] tracking-[-0.02em] mb-6"
+            className={`${montserrat.className} font-extrabold leading-[1.05] tracking-[-0.02em] mb-6`}
             style={{ fontSize: 'clamp(44px, 7vw, 72px)' }}
           >
             <span className="block text-white">{hero.line1}</span>
             <span className="block text-white">{hero.line2}</span>
-            <span className={`block bg-linear-to-r ${hero.gradientClass} bg-clip-text text-transparent mt-1 transition-all`}>
+            <span className={`block ${hero.lineClass} mt-1 transition-all`}>
               {hero.gradientLine}
             </span>
           </h1>
@@ -168,22 +238,10 @@ export default function LandingPage() {
             {hero.subtitle}
           </p>
 
-          {/* Curriculum pills */}
-          <div className="flex flex-wrap justify-center gap-2 mb-10">
-            {CURRICULA.map((pill) => (
-              <span
-                key={pill}
-                className="bg-white/5 border border-white/10 text-white/40 px-4 py-1.5 rounded-full text-sm font-semibold"
-              >
-                {pill}
-              </span>
-            ))}
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6 mt-2">
             <Link
               href={hero.ctaHref}
-              className={`inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-600 text-white px-8 py-4 rounded-xl font-bold hover:scale-105 transition-all shadow-2xl shadow-violet-600/30 ${FOCUS_RING}`}
+              className={`inline-flex items-center gap-2 bg-nexusteal-600 text-white px-8 py-4 rounded-full font-bold hover:bg-nexusteal-500 hover:scale-105 transition-all shadow-2xl shadow-nexusteal-600/30 ${FOCUS_RING}`}
             >
               {hero.ctaLabel}
               <ArrowRight className="w-4 h-4" />
@@ -192,14 +250,14 @@ export default function LandingPage() {
               hero.secondary.action === 'demo' ? (
                 <button
                   onClick={() => setDemoOpen(true)}
-                  className={`text-violet-400 hover:text-violet-300 font-semibold transition-colors rounded ${FOCUS_RING}`}
+                  className={`text-trustblue-300 hover:text-trustblue-400 font-semibold transition-colors rounded ${FOCUS_RING}`}
                 >
                   {hero.secondary.label}
                 </button>
               ) : (
                 <a
                   href={hero.secondary.href}
-                  className={`text-violet-400 hover:text-violet-300 font-semibold transition-colors rounded ${FOCUS_RING}`}
+                  className={`text-trustblue-300 hover:text-trustblue-400 font-semibold transition-colors rounded ${FOCUS_RING}`}
                 >
                   {hero.secondary.label}
                 </a>
@@ -209,31 +267,59 @@ export default function LandingPage() {
 
           <p className="text-sm text-white/40">{hero.trust}</p>
 
-          {/* Audience benefit cards */}
+          {/* Audience benefit cards — each is the direct entry point for that audience */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-14 max-w-190 mx-auto text-left">
             {[
               {
-                icon: '🏫',
+                icon: School,
                 who: 'For Schools',
                 body: 'One platform showing every learner\'s progress, every teacher\'s planning, every classroom\'s performance.',
+                href: '/signup?role=school',
+                external: false,
+                cta: 'Get started',
+                iconClass: 'text-trustblue-400',
               },
               {
-                icon: '👨‍🏫',
+                icon: GraduationCap,
                 who: 'For Teachers',
                 body: 'Plan your full term before Monday. Teach knowing exactly where every learner is.',
+                href: '/signup?role=teacher',
+                external: false,
+                cta: 'Get started',
+                iconClass: 'text-amber-400',
               },
               {
-                icon: '👨‍👩‍👧',
+                icon: Users,
                 who: 'For Families',
                 body: 'Stop guessing. Know exactly which strand is holding your child back — and what to do about it.',
+                href: '/signup?role=parent',
+                external: false,
+                cta: 'Get started',
+                iconClass: 'text-teal-400',
               },
-            ].map((card) => (
-              <div key={card.who} className="bg-white/4 border border-white/10 rounded-2xl px-5 py-4">
-                <div className="text-2xl mb-2">{card.icon}</div>
-                <div className="text-xs font-bold text-white/40 uppercase tracking-widest mb-1">{card.who}</div>
-                <p className="text-sm text-white/65 leading-relaxed">{card.body}</p>
-              </div>
-            ))}
+            ].map((card) => {
+              const cardClass = `group bg-white/4 border border-white/10 hover:border-white/25 hover:bg-white/6 rounded-2xl px-5 py-4 transition-all block ${FOCUS_RING}`
+              const inner = (
+                <>
+                  <card.icon className={`w-6 h-6 ${card.iconClass} mb-2`} />
+                  <div className="text-xs font-bold text-white/40 uppercase tracking-widest mb-1">{card.who}</div>
+                  <p className="text-sm text-white/65 leading-relaxed mb-2">{card.body}</p>
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-white/50 group-hover:text-white/80">
+                    {card.cta}
+                    <ArrowRight className="w-3 h-3" />
+                  </span>
+                </>
+              )
+              return card.external ? (
+                <a key={card.who} href={card.href} target="_blank" rel="noopener noreferrer" className={cardClass}>
+                  {inner}
+                </a>
+              ) : (
+                <Link key={card.who} href={card.href} className={cardClass}>
+                  {inner}
+                </Link>
+              )
+            })}
           </div>
 
         </div>
@@ -251,143 +337,58 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── BLUEPRINT SUMMARY — full experience lives at /blueprint ───────────── */}
+      {/* ── EVIDENCE HIGHLIGHT + COMPACT OVERVIEW GRID ─────────────────────────── */}
       <section id="evidence" className="bg-white/5 py-20 md:py-28">
         <div className="max-w-275 mx-auto px-6">
-          <div className="grid md:grid-cols-2 gap-16 items-center">
 
+          <div className="grid md:grid-cols-2 gap-16 items-center mb-20 md:mb-24">
             <div className="order-2 md:order-1 flex justify-center">
               <BlueprintCardMockup />
             </div>
-
             <div className="order-1 md:order-2">
-              <span className="text-xs font-bold text-amber-400 uppercase tracking-widest mb-3 block">
-                The Evidence
+              <span className="text-xs font-bold text-nexusteal-400 uppercase tracking-widest mb-3 block">
+                The Evidence — Schools, Teachers &amp; Families
               </span>
-              <h2 className="text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5">
+              <h2 className={`${montserrat.className} text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5`}>
                 Discovered while there<br />was still time to fix it.
               </h2>
               <p className="text-white/60 leading-relaxed mb-8">
-                Marks tell you what happened. The Learner Blueprint tells you why — a strand-by-
-                strand intelligence profile every term, visible to the teacher, parent, and school
-                leadership, all reading the same evidence.
+                A strand-by-strand intelligence profile every term — teacher, parent, and school
+                leadership all reading the same evidence.
               </p>
               <Link
                 href="/learner-blueprint"
-                className={`inline-flex items-center gap-2 bg-white/8 border border-white/10 hover:bg-white/14 text-white px-7 py-3.5 rounded-xl font-bold transition-all ${FOCUS_RING}`}
+                className={`inline-flex items-center gap-2 bg-white/8 border border-nexusteal-500/25 hover:bg-white/14 hover:border-nexusteal-400/40 text-white px-7 py-3.5 rounded-full font-bold transition-all ${FOCUS_RING}`}
               >
                 Explore the Learner Blueprint
                 <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
-
           </div>
-        </div>
-      </section>
 
-      {/* ── SCHOOL SUMMARY — full experience lives at /schools ────────────────── */}
-      <section id="school" className="py-20 md:py-28">
-        <div className="max-w-170 mx-auto px-6 text-center">
-          <span className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-3 block">
-            For School Leaders
-          </span>
-          <h2 className="text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5">
-            The same evidence.<br />Every learner. Every classroom.
-          </h2>
-          <p className="text-white/60 leading-relaxed max-w-150 mx-auto mb-8">
-            EduNexus gives school leadership the same early-noticing picture — not just
-            end-of-term averages, but what is happening inside every classroom, every week,
-            while there is still time to respond.
-          </p>
-          <Link
-            href="/schools"
-            className={`inline-flex items-center gap-2 bg-white/8 border border-white/10 hover:bg-white/14 text-white px-7 py-3.5 rounded-xl font-bold transition-all ${FOCUS_RING}`}
-          >
-            Explore the School Experience
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-      </section>
-
-      {/* ── COMPASS SUMMARY — full experience lives at /compass ────────────────── */}
-      <section id="compass" className="bg-white/3 py-20 md:py-28">
-        <div className="max-w-275 mx-auto px-6">
-          <div className="grid md:grid-cols-2 gap-16 items-center">
-
-            <div>
-              <span className="text-xs font-bold text-teal-400 uppercase tracking-widest mb-3 block">
-                Learning Compass
-              </span>
-              <h2 className="text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5">
-                Knowing isn&apos;t enough.
-              </h2>
-              <p className="text-white/60 leading-relaxed mb-8">
-                Once the Blueprint identifies exactly which concept is holding a learner back,
-                the Learning Compass starts there — not a generic tutoring session, but that exact
-                gap, met at the level the learner is actually at.
-              </p>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {OVERVIEW_CARDS.map((card) => (
               <Link
-                href="/compass"
-                className={`inline-flex items-center gap-2 bg-white/8 border border-white/10 hover:bg-white/14 text-white px-7 py-3.5 rounded-xl font-bold transition-all ${FOCUS_RING}`}
+                key={card.href}
+                href={card.href}
+                className={`group bg-white/4 border border-white/10 hover:border-white/25 hover:bg-white/6 rounded-2xl p-6 transition-all ${FOCUS_RING}`}
               >
-                Explore the Learning Compass
-                <ArrowRight className="w-4 h-4" />
+                <div className="flex items-center justify-between mb-4">
+                  <card.icon className={`w-6 h-6 ${card.iconClass}`} />
+                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${card.tagClass}`}>
+                    {card.tag}
+                  </span>
+                </div>
+                <h3 className="text-white font-bold leading-snug mb-2">{card.title}</h3>
+                <p className="text-sm text-white/55 leading-relaxed mb-4">{card.body}</p>
+                <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-white/70 group-hover:text-white">
+                  {card.label}
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </span>
               </Link>
-            </div>
-
-            <div className="flex justify-center">
-              <CompassChatMockup />
-            </div>
-
+            ))}
           </div>
-        </div>
-      </section>
 
-      {/* ── TEACHER SUMMARY — full experience lives at /teachers ──────────────── */}
-      <section id="teachers" className="py-20 md:py-28">
-        <div className="max-w-170 mx-auto px-6 text-center">
-          <span className="text-xs font-bold text-amber-400 uppercase tracking-widest mb-3 block">
-            How The Noticing Happens
-          </span>
-          <h2 className="text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5">
-            Every lesson<br />becomes evidence.
-          </h2>
-          <p className="text-white/60 leading-relaxed max-w-150 mx-auto mb-8">
-            None of this works without the teacher. Every assessment marked, every scheme of work
-            built, every lesson taught is the raw material behind the Blueprint and Compass you
-            just saw — with the documentation handled for you, CBC-aligned and TSC-ready.
-          </p>
-          <Link
-            href="/teachers"
-            className={`inline-flex items-center gap-2 bg-white/8 border border-white/10 hover:bg-white/14 text-white px-7 py-3.5 rounded-xl font-bold transition-all ${FOCUS_RING}`}
-          >
-            Explore the Teacher Experience
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-      </section>
-
-      {/* ── CAREER SUMMARY — full experience lives at /career ────── */}
-      <section id="career" className="bg-white/3 py-20 md:py-28">
-        <div className="max-w-170 mx-auto px-6 text-center">
-          <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-3 block">
-            Career Intelligence
-          </span>
-          <h2 className="text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5">
-            Education that prepares learners for life.<br />Not only examinations.
-          </h2>
-          <p className="text-white/60 leading-relaxed max-w-150 mx-auto mb-8">
-            Notice early, act early, term after term — and by the time a learner sits their final
-            exam, the platform has been building their career intelligence picture for years, built
-            into EduNexus from Grade 7 with no separate subscription.
-          </p>
-          <Link
-            href="/career-pathways"
-            className={`inline-flex items-center gap-2 bg-white/8 border border-white/10 hover:bg-white/14 text-white px-7 py-3.5 rounded-xl font-bold transition-all ${FOCUS_RING}`}
-          >
-            Explore Career Intelligence
-            <ArrowRight className="w-4 h-4" />
-          </Link>
         </div>
       </section>
 
@@ -403,11 +404,8 @@ export default function LandingPage() {
               Does this replace our school system?
             </h2>
             <p className="text-white/55 leading-relaxed max-w-140 mx-auto text-sm">
-              Most schools already have a reliable way to handle registration, timetabling, fee
-              collection, and attendance — that operational layer matters, and it&apos;s not what
-              EduNexus is built to compete on. What EduNexus adds is a different, higher-order
-              capability: noticing a learning problem early enough to change the outcome, before
-              it shows up in a report card.
+              No. Registration, fees, and timetabling stay with your existing system. EduNexus adds
+              one thing they don&apos;t: noticing a learning problem early enough to change the outcome.
             </p>
           </div>
 
@@ -418,10 +416,8 @@ export default function LandingPage() {
               </p>
               <ul className="space-y-3">
                 {[
-                  'Registration and enrolment',
-                  'Fees and finance',
-                  'Timetabling',
-                  'Attendance tracking',
+                  'Registration and fees',
+                  'Timetabling and attendance',
                   'Reporting to Ministry',
                 ].map((item) => (
                   <li key={item} className="flex items-center gap-3 text-sm text-white/40">
@@ -432,21 +428,19 @@ export default function LandingPage() {
               </ul>
             </div>
 
-            <div className="bg-violet-500/5 border border-violet-500/20 rounded-2xl p-7">
-              <p className="text-[11px] font-black text-violet-400 uppercase tracking-widest mb-5">
+            <div className="bg-nexusteal-500/5 border border-nexusteal-500/20 rounded-2xl p-7">
+              <p className="text-[11px] font-black text-nexusteal-400 uppercase tracking-widest mb-5">
                 Educational Intelligence adds
               </p>
               <ul className="space-y-3">
                 {[
-                  'Learning intelligence across every classroom',
-                  'Learner progress and trajectory tracking',
+                  'Learner progress and trajectory, every classroom',
                   'Teacher planning insights',
-                  'Parent communication and engagement',
                   'Career readiness data',
                 ].map((item) => (
                   <li key={item} className="flex items-center gap-3 text-sm text-white/70">
-                    <div className="w-4 h-4 rounded-full bg-violet-500/20 border border-violet-500/40 flex items-center justify-center shrink-0">
-                      <div className="w-1.5 h-1.5 rounded-full bg-violet-400" />
+                    <div className="w-4 h-4 rounded-full bg-nexusteal-500/20 border border-nexusteal-500/40 flex items-center justify-center shrink-0">
+                      <div className="w-1.5 h-1.5 rounded-full bg-nexusteal-400" />
                     </div>
                     {item}
                   </li>
@@ -463,65 +457,56 @@ export default function LandingPage() {
         <div className="max-w-190 mx-auto px-6 text-center">
 
           <p className="text-white/35 text-sm font-semibold tracking-wide mb-6">
-            We are not building a smarter exam.
-            <br />
-            We are building a smarter school.
+            {closing.kicker}
           </p>
 
           <h2
-            className="font-extrabold leading-tight tracking-[-0.02em] text-white mb-4"
+            className={`${montserrat.className} font-extrabold leading-tight tracking-[-0.02em] text-white mb-4`}
             style={{ fontSize: 'clamp(30px, 5vw, 50px)' }}
           >
-            Ready to see what your school&apos;s<br />learning intelligence looks like?
+            {closing.heading}
           </h2>
           <p className="text-white/55 text-lg mb-10 leading-relaxed max-w-120 mx-auto">
-            Book a 20-minute demo and we will show you exactly how EduNexus would work in your school.
+            {closing.subtitle}
           </p>
 
-          <a
-            href={SCHOOL_DEMO_WA_LINK}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`inline-flex items-center gap-2 bg-linear-to-r from-violet-600 to-purple-600 text-white px-10 py-4 rounded-xl font-bold text-lg hover:scale-105 transition-all shadow-2xl shadow-violet-600/30 ${FOCUS_RING}`}
-          >
-            Book a School Demo
-            <ArrowRight className="w-5 h-5" />
-          </a>
-          <p className="text-xs text-white/40 mt-4 max-w-100 mx-auto leading-relaxed">
-            Opens a real WhatsApp conversation with our team — no forms, no call center. We&apos;ll
-            ask a few questions about your school first, then recommend where to start (most
-            schools begin with a pilot on one grade or stream before rolling out further).
-          </p>
-
-          {/* Secondary paths */}
-          <div className="mt-10 pt-8 border-t border-white/10">
-            <p className="text-xs font-bold text-white/50 uppercase tracking-widest mb-5">
-              Or start individually
+          {closing.external ? (
+            <a
+              href={closing.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`inline-flex items-center gap-2 bg-nexusteal-600 text-white px-10 py-4 rounded-full font-bold text-lg hover:bg-nexusteal-500 hover:scale-105 transition-all shadow-2xl shadow-nexusteal-600/30 ${FOCUS_RING}`}
+            >
+              {closing.label}
+              <ArrowRight className="w-5 h-5" />
+            </a>
+          ) : (
+            <Link
+              href={closing.href}
+              className={`inline-flex items-center gap-2 bg-nexusteal-600 text-white px-10 py-4 rounded-full font-bold text-lg hover:bg-nexusteal-500 hover:scale-105 transition-all shadow-2xl shadow-nexusteal-600/30 ${FOCUS_RING}`}
+            >
+              {closing.label}
+              <ArrowRight className="w-5 h-5" />
+            </Link>
+          )}
+          {closing.altLabel && closing.altHref && (
+            <p className="mt-5">
+              <a
+                href={closing.altHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`text-sm text-white/40 hover:text-white/70 transition-colors rounded ${FOCUS_RING}`}
+              >
+                {closing.altLabel}
+              </a>
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link
-                href="/signup?role=teacher"
-                className={`inline-flex items-center gap-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 hover:text-white px-6 py-3 rounded-xl font-semibold text-sm transition-all ${FOCUS_RING}`}
-              >
-                👨‍🏫 Start planning free — for teachers
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-              <Link
-                href="/signup?role=parent"
-                className={`inline-flex items-center gap-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 hover:text-white px-6 py-3 rounded-xl font-semibold text-sm transition-all ${FOCUS_RING}`}
-              >
-                👨‍👩‍👧 Get your child&apos;s free report
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-          </div>
+          )}
 
-          <p className="text-sm text-white/50 mt-8">
-            ✓ No contract required &nbsp;·&nbsp; ✓ School pricing available &nbsp;·&nbsp; ✓ M-PESA accepted
+          <p className="text-sm text-white/50 mt-10">
+            ✓ No contract required &nbsp;·&nbsp; ✓ Fair, transparent pricing &nbsp;·&nbsp; ✓ M-PESA accepted
           </p>
           <p className="text-xs text-white/20 mt-2">
-            Your school&apos;s data never trains our models. &nbsp;·&nbsp;{' '}
-            <Link href="/pricing" className={`text-violet-400/60 hover:text-violet-300 transition-colors rounded ${FOCUS_RING}`}>
+            <Link href="/pricing" className={`text-trustblue-400/70 hover:text-trustblue-300 transition-colors rounded ${FOCUS_RING}`}>
               View pricing →
             </Link>
           </p>
