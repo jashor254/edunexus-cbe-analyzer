@@ -329,7 +329,15 @@ test('composeBlueprint surfaces Career Intelligence as available, cluster-level 
   const careerData = blueprint.career.data!
   assert.ok(careerData.careerCluster, 'a cluster label must be present once real evidence exists')
   assert.equal(blueprint.learningStory.status, 'available')
-  assert.match(blueprint.learningStory.data?.narrative ?? '', /Current evidence suggests|Across the available evidence/)
+  // Editorial Polish Sprint (2026-08-03) rewrote composeLearningStory.ts's
+  // prose to remove the repetitive "Current evidence suggests"/"Across the
+  // available evidence" openers this assertion used to require verbatim —
+  // neither phrase is guaranteed to appear in every branch anymore (this
+  // fixture hits the single-subject branch, which doesn't use either). The
+  // substantive thing this test actually needs to prove — the narrative is
+  // real, evidence-bound prose derived from this learner's actual capability
+  // data, not a placeholder — is checked directly instead.
+  assert.match(blueprint.learningStory.data?.narrative ?? '', /mathematics|Exceptional/i)
   assert.ok(['Low', 'Medium', 'High'].includes(careerData.confidence!), 'confidence must be one of Career Intelligence\'s own canonical labels')
   assert.ok(careerData.futureDirection, 'a next-direction sentence must be present')
   // Never a specific career/job title — the type itself no longer has a
