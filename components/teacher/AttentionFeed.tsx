@@ -17,11 +17,11 @@ const SEVERITY_META: Record<AttentionSeverity, { label: string; icon: typeof Ale
 }
 
 export default function AttentionFeed() {
-  const { attentionItems } = useDashboardData()
+  const { attentionItems, attentionError, retryAttentionFeed } = useDashboardData()
   const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(new Set())
   const [dismissing, setDismissing]       = useState<string | null>(null)
 
-  const loading = attentionItems === null
+  const loading = attentionItems === null && !attentionError
 
   // Today's Mission already surfaces the top priorities up front — don't
   // repeat them here (no duplicate recommendations across the dashboard).
@@ -50,6 +50,20 @@ export default function AttentionFeed() {
     return (
       <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-6 flex items-center justify-center">
         <Loader2 className="w-5 h-5 text-gray-300 animate-spin" />
+      </div>
+    )
+  }
+
+  if (attentionError) {
+    return (
+      <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-6 text-center space-y-2">
+        <p className="text-gray-500 text-sm">Couldn&apos;t load your attention feed.</p>
+        <button
+          onClick={retryAttentionFeed}
+          className="text-sm font-bold text-trustblue-600 hover:underline"
+        >
+          Retry
+        </button>
       </div>
     )
   }

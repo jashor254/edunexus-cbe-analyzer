@@ -13,10 +13,9 @@ import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissio
 import { resolveTeacher } from '@/lib/core/identity'
 import { resolveOwningSchool } from '@/lib/core/institutionOwnership'
 import { UnauthorizedError } from '@/lib/core/errors'
+import { SENIOR_PATHWAYS } from '@/lib/curriculum/subjects'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://edunexus.co.ke'
-
-const SENIOR_PATHWAY_VALUES = ['STEM', 'Social Sciences', 'Arts & Sports Science'] as const
 
 const StudentSchema = z.object({
   name:              z.string().min(1).max(100),
@@ -25,7 +24,7 @@ const StudentSchema = z.object({
   parent_name:       z.string().min(1).max(100).optional(),
   parent_phone:      z.string().max(20).optional(),
   parent_email:      z.string().email().optional(),
-  current_pathway:   z.enum(SENIOR_PATHWAY_VALUES).optional(),
+  current_pathway:   z.enum(SENIOR_PATHWAYS).optional(),
   selected_subjects: z.array(z.string()).optional(),
 })
 

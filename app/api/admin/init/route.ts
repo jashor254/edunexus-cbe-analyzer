@@ -5,6 +5,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
 import { ADMIN_CONFIG } from '@/lib/config/api'
 import { timingSafeEqualString } from '@/lib/api/secretCompare'
+import { logger } from '@/lib/observability/logger'
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,13 +54,32 @@ export async function POST(request: NextRequest) {
       ),
     ])
 
-    if (tokenError) console.error('Token init error:', tokenError)
-    if (subError) console.error('Subscription init error:', subError)
+    // token_balances/subscriptions are best-effort setup, not a required
+    // invariant: every downstream reader (lib/payments/access.ts, billing.repository.ts,
+    // app/api/students/create) treats a missing row as balance=0/plan='free'
+    // rather than crashing. But that default silently defeats this route's
+    // entire purpose — an admin who "initialized" successfully but got a
+    // free-tier default would have no way to know something failed. Report
+    // an honest partial-success via `warnings` instead of a bare `success:true`.
+    const warnings: string[] = []
 
-    return apiSuccess({ message: 'Admin initialized', adminId: adminUser.id })
+    if (tokenError) {
+      logger.error('Admin init: token balance upsert failed', { operation: 'admin.init.tokenBalance', admin_id: adminUser.id }, tokenError)
+      warnings.push('Token balance was not initialized — grant it manually.')
+    }
+    if (subError) {
+      logger.error('Admin init: subscription upsert failed', { operation: 'admin.init.subscription', admin_id: adminUser.id }, subError)
+      warnings.push('Subscription was not initialized — grant it manually.')
+    }
+
+    return apiSuccess({
+      message: warnings.length ? 'Admin initialized with warnings' : 'Admin initialized',
+      adminId: adminUser.id,
+      warnings,
+    })
 
   } catch (error) {
-    console.error('Admin init error:', error)
+    logger.error('Admin init failed', { operation: 'admin.init' }, error)
     return apiError('Internal Server Error', 500)
   }
 }

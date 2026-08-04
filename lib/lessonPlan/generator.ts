@@ -1,6 +1,7 @@
 import type { LessonPlanContext, GeneratedLessonPlan } from './types'
 import { isKiswahiliSubject, isPlaceBasedSubject, getSubjectContextHint } from '@/lib/curriculum/subjectUtils'
 import { callDeepSeek as callAI } from '@/lib/ai/deepseek'
+import { logger } from '@/lib/observability/logger'
 
 const LESSON_PLAN_SYSTEM =
   'You are an experienced Kenyan CBC teacher. ' +
@@ -388,7 +389,11 @@ Return JSON only:
   let raw: string
   try {
     raw = await callAI(prompt, LESSON_PLAN_SYSTEM, { temperature: 0.3, maxTokens: 2000, costContext: context.costContext })
-  } catch {
+  } catch (err) {
+    // Fallback is an intentional user-resilience mechanism (a teacher always
+    // gets 3 reflection options, even if DeepSeek is down) — logged so a
+    // provider outage is diagnosable, without logging the prompt itself.
+    logger.warn('Reflection suggestion AI call failed, using fallback', { operation: 'lessonPlan.generateReflectionSuggestions', learningArea: context.learningArea, grade: context.grade }, err)
     return fallback
   }
 
@@ -398,8 +403,9 @@ Return JSON only:
     if (Array.isArray(suggestions) && suggestions.length === 3) {
       return suggestions as string[]
     }
-  } catch {
-    // fall through to fallback
+    logger.warn('Reflection suggestion AI response malformed, using fallback', { operation: 'lessonPlan.generateReflectionSuggestions', learningArea: context.learningArea, grade: context.grade })
+  } catch (err) {
+    logger.warn('Reflection suggestion AI response failed to parse, using fallback', { operation: 'lessonPlan.generateReflectionSuggestions', learningArea: context.learningArea, grade: context.grade }, err)
   }
 
   return fallback

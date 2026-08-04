@@ -1,6 +1,7 @@
 import { readCsvTable } from '@/scripts/growth/lib/csv'
 import { isReadyForImport } from '@/scripts/growth/lib/schema'
 import { growthRepos } from '@/lib/growth/repositories'
+import { logger } from '@/lib/observability/logger'
 
 /**
  * Sprint PE-7 (Pilot Campaign Launch) Parts 1-2 — the shared CSV-import
@@ -88,7 +89,11 @@ export async function listOutputCsvFiles(): Promise<string[]> {
   try {
     const files = await fs.readdir(outputDir)
     return files.filter((f) => f.endsWith('.csv')).sort().reverse()
-  } catch {
+  } catch (err) {
+    // ENOENT (output dir doesn't exist yet — no discovery run performed) is
+    // a genuinely valid empty state. Any other readdir failure (e.g.
+    // permissions) would look identical to the founder without this log.
+    logger.warn('listOutputCsvFiles: readdir failed, returning empty list', { operation: 'growth.csvImport.listOutputCsvFiles' }, err)
     return []
   }
 }

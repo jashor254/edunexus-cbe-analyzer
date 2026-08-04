@@ -119,7 +119,7 @@ CREATE TABLE students (
   name                TEXT        NOT NULL,
   grade               INTEGER     NOT NULL CHECK (grade BETWEEN 7 AND 12),
   date_of_birth       DATE,
-  current_pathway     TEXT        CHECK (current_pathway IN ('STEM','Arts & Sports','Social Sciences')),
+  current_pathway     TEXT        CHECK (current_pathway IN ('STEM','Social Sciences','Arts & Sports Science')),
   level               TEXT        NOT NULL
                                   CHECK (level IN ('Junior School','Senior School')),
   term                INTEGER     CHECK (term BETWEEN 1 AND 3),

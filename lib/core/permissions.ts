@@ -38,6 +38,7 @@ import {
   MembershipRequiredError,
   PermissionDeniedError,
   ResourceOwnershipError,
+  isEduNexusError,
 } from '@/lib/core/errors'
 
 const SCHOOL_ADMIN_ROLES: readonly SchoolUserRole[] = ['school_admin', 'headteacher', 'deputy_headteacher']
@@ -144,8 +145,13 @@ export async function canManageAssessment(client: SupabaseClient, schoolId: stri
   try {
     await requireClassTeacher(client, classId)
     return true
-  } catch {
-    return false
+  } catch (err) {
+    // requireClassTeacher only ever throws UnauthorizedError/ResourceOwnershipError
+    // (both EduNexusError, both genuine denials) for its own business logic —
+    // any other error (DB outage, programming error) must propagate, not be
+    // read by a caller as an ordinary "you may not do this."
+    if (isEduNexusError(err)) return false
+    throw err
   }
 }
 

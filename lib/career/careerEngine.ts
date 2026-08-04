@@ -6,6 +6,7 @@ import { extractCapabilityProfile } from './capabilityExtractor'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { projectionToTimestampedScoreHistory, type TimestampedScoreSnapshot } from '@/lib/learnerIntelligence/projectionAdapters'
 import { STANDARD_DISCLAIMER } from './types'
+import { SENIOR_PATHWAYS } from '@/lib/curriculum/subjects'
 import type {
   Career,
   CareerCategory,
@@ -23,7 +24,7 @@ const VALID_CATEGORIES: CareerCategory[] = [
   'technology', 'health', 'agriculture', 'creative', 'business',
   'trades', 'education', 'environment', 'media', 'finance',
 ]
-const VALID_PATHWAYS: CareerPathway[] = ['STEM', 'Social Sciences', 'Arts & Sports Science']
+const VALID_PATHWAYS: CareerPathway[] = [...SENIOR_PATHWAYS]
 
 function slugify(name: string): string {
   return name

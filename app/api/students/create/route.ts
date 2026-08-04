@@ -5,13 +5,15 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
 import { requireAuthentication } from '@/lib/core/permissions'
 import { UnauthorizedError } from '@/lib/core/errors'
+import { logger } from '@/lib/observability/logger'
+import { SENIOR_PATHWAYS } from '@/lib/curriculum/subjects'
 
 const CreateStudentSchema = z.object({
   name:              z.string().trim().min(1),
   grade:             z.coerce.number().int().min(7).max(12),
   school:            z.string().trim().optional(),
   curriculum_type:   z.enum(['cbc', 'igcse', 'ib', 'other']).optional(),
-  current_pathway:   z.enum(['STEM', 'Social Sciences', 'Arts & Sports Science']).optional(),
+  current_pathway:   z.enum(SENIOR_PATHWAYS).optional(),
   selected_subjects: z.array(z.string()).optional(),
 })
 
@@ -66,7 +68,10 @@ export async function POST(request: Request) {
       .or(`user_id.eq.${userId},parent_user_id.eq.${userId}`)
       .neq('added_by', 'teacher')
 
-    if (countError) return apiError(countError.message)
+    if (countError) {
+      logger.error('Student count lookup failed', { operation: 'students.create.count', user_id: userId }, countError)
+      return apiError('Unable to create student. Please try again.')
+    }
 
     if ((count ?? 0) >= maxStudents) {
       return apiError(
@@ -75,12 +80,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const VALID_PATHWAYS = ['STEM', 'Social Sciences', 'Arts & Sports Science'] as const
-    type ValidPathway = typeof VALID_PATHWAYS[number]
-    const pathwayValue: ValidPathway | null =
-      current_pathway && VALID_PATHWAYS.includes(current_pathway as ValidPathway)
-        ? (current_pathway as ValidPathway)
-        : null
+    const pathwayValue = current_pathway ?? null
 
     // Create student
     const { data: student, error: insertError } = await service
@@ -99,7 +99,10 @@ export async function POST(request: Request) {
       .select()
       .single()
 
-    if (insertError) return apiError(insertError.message)
+    if (insertError) {
+      logger.error('Student insert failed', { operation: 'students.create.insert', user_id: userId }, insertError)
+      return apiError('Unable to create student. Please try again.')
+    }
 
     // Ensure token_balances row exists for user
     await service

@@ -29,9 +29,9 @@ interface Props {
 // single highest-priority item's own title, so it reads as a live status
 // ("Grade 8 Science needs attention") rather than a static greeting.
 export default function TodaysMission({ firstName, today, term, weekOfTerm, activeClasses }: Props) {
-  const { attentionItems } = useDashboardData()
+  const { attentionItems, attentionError } = useDashboardData()
   const noClasses = activeClasses === 0
-  const loading   = !noClasses && attentionItems === null
+  const loading   = !noClasses && attentionItems === null && !attentionError
 
   const priorities   = attentionItems ? topPriorityItems(attentionItems, PRIORITY_COUNT) : []
   const [topPriority, ...restPriorities] = priorities

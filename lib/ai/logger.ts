@@ -1,4 +1,5 @@
 import { repos } from '@/lib/repositories'
+import { logger } from '@/lib/observability/logger'
 
 export interface AICallLog {
   feature: string    // 'sow' | 'lesson-plan' | 'compass' | etc.
@@ -14,7 +15,7 @@ export interface AICallLog {
 
 export async function logAICall(log: AICallLog): Promise<void> {
   if (process.env.NODE_ENV === 'development') {
-    console.log('[AI_LOG]', {
+    logger.debug('[AI_LOG]', {
       feature: log.feature,
       model: log.model,
       success: log.success,
@@ -32,10 +33,6 @@ export async function logAICall(log: AICallLog): Promise<void> {
     // Logging must never crash the caller — but a failure here means an AI
     // call's cost/usage silently never reaches ai_call_logs, so at least
     // surface it server-side instead of dropping it entirely.
-    console.error('[ai/logger] insertAICallLog failed', {
-      feature: log.feature,
-      userId:  log.userId,
-      message: err instanceof Error ? err.message : String(err),
-    })
+    logger.error('insertAICallLog failed', { operation: 'ai.logger.logAICall', feature: log.feature, user_id: log.userId }, err)
   }
 }

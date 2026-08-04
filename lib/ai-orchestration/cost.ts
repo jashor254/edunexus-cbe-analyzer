@@ -2,6 +2,7 @@
 // Track AI token usage in usage_events for billing and cost monitoring.
 import { repos } from '@/lib/repositories'
 import type { ModelProvider } from './types'
+import { logger } from '@/lib/observability/logger'
 
 type TrackAICostParams = {
   organization_id: string
@@ -36,8 +37,11 @@ export async function trackAICost(params: TrackAICostParams): Promise<void> {
         completion_tokens: params.completion_tokens,
       },
     })
-  } catch {
-    // Never let cost tracking errors surface to callers
+  } catch (err) {
+    // Never let cost tracking errors surface to callers/learners — but a
+    // silent failure here means this call's cost never reaches usage_events,
+    // so at least make it diagnosable server-side.
+    logger.warn('AI cost tracking failed', { operation: 'aiOrchestration.trackAICost', organization_id: params.organization_id, feature: params.feature ?? params.model }, err)
   }
 }
 

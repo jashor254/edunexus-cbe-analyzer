@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound, apiBadRequest } from '@/lib/api/response'
 import { z } from 'zod'
+import { logger } from '@/lib/observability/logger'
 
 // ─── Shared auth helper ───────────────────────────────────────────────────────
 
@@ -20,8 +21,9 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let schemeId: string | undefined
   try {
-    const { id: schemeId } = await params
+    ;({ id: schemeId } = await params)
     const { teacher, db } = await resolveTeacher()
     if (!teacher || !db) return apiUnauthorized()
 
@@ -50,7 +52,8 @@ export async function GET(
 
     return apiSuccess({ scheme, lessons: lessons ?? [], breaks: ((scheme as unknown) as { breaks: unknown }).breaks ?? [] })
   } catch (err: unknown) {
-    return apiError(err instanceof Error ? err.message : 'Failed to fetch scheme')
+    logger.error('Scheme fetch failed', { operation: 'schemes.get', scheme_id: schemeId }, err)
+    return apiError('Failed to fetch scheme')
   }
 }
 
@@ -71,14 +74,17 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let schemeId: string | undefined
+  let lessonId: string | undefined
   try {
-    const { id: schemeId } = await params
+    ;({ id: schemeId } = await params)
     const { teacher, db } = await resolveTeacher()
     if (!teacher || !db) return apiUnauthorized()
 
     const parsed = PatchSchema.safeParse(await req.json())
     if (!parsed.success) return apiBadRequest('Invalid request body')
-    const { lessonId, field, value } = parsed.data
+    const { field, value } = parsed.data
+    lessonId = parsed.data.lessonId
 
     if (!PATCHABLE_FIELDS.has(field)) return apiBadRequest(`Field "${field}" is not editable`)
 
@@ -107,11 +113,15 @@ export async function PATCH(
       .update({ [field]: value, updated_at: new Date().toISOString() })
       .eq('id', lessonId)
 
-    if (error) return apiError('Save failed: ' + error.message)
+    if (error) {
+      logger.error('Scheme lesson save failed', { operation: 'schemes.patch', scheme_id: schemeId, lesson_id: lessonId }, error)
+      return apiError('Save failed. Please try again.')
+    }
 
     return apiSuccess({ lessonId, field, value })
   } catch (err: unknown) {
-    return apiError(err instanceof Error ? err.message : 'Save failed')
+    logger.error('Scheme lesson save failed', { operation: 'schemes.patch', scheme_id: schemeId, lesson_id: lessonId }, err)
+    return apiError('Save failed. Please try again.')
   }
 }
 
@@ -121,8 +131,9 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let schemeId: string | undefined
   try {
-    const { id: schemeId } = await params
+    ;({ id: schemeId } = await params)
     const { teacher, db } = await resolveTeacher()
     if (!teacher || !db) return apiUnauthorized()
 
@@ -141,11 +152,14 @@ export async function DELETE(
       .eq('id', schemeId)
       .eq('teacher_id', teacher.id)
 
-    if (error) return apiError('Could not delete scheme. Please try again.')
+    if (error) {
+      logger.error('Scheme delete failed', { operation: 'schemes.delete', scheme_id: schemeId }, error)
+      return apiError('Could not delete scheme. Please try again.')
+    }
 
     return apiSuccess({ deleted: schemeId })
   } catch (err: unknown) {
-    console.error('[schemes/delete]', err)
-    return apiError(err instanceof Error ? err.message : 'Delete failed')
+    logger.error('Scheme delete failed', { operation: 'schemes.delete', scheme_id: schemeId }, err)
+    return apiError('Delete failed. Please try again.')
   }
 }

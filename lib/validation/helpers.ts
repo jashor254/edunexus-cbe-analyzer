@@ -2,6 +2,8 @@
 // INPUT VALIDATION HELPERS
 // ===========================================
 
+import { SENIOR_PATHWAYS } from '@/lib/curriculum/subjects'
+
 export type ValidationError = {
   field: string
   message: string
@@ -127,11 +129,10 @@ export function validateStudent(data: {
 
   // Validate pathway (required for Grade 10-12)
   if (data.grade && data.grade >= 10) {
-    const validPathways = ['STEM', 'Arts & Sports', 'Social Sciences']
-    if (!data.current_pathway || !validPathways.includes(data.current_pathway)) {
-      errors.push({ 
-        field: 'current_pathway', 
-        message: 'Pathway is required for Grade 10-12 (STEM, Arts & Sports, or Social Sciences)' 
+    if (!data.current_pathway || !(SENIOR_PATHWAYS as readonly string[]).includes(data.current_pathway)) {
+      errors.push({
+        field: 'current_pathway',
+        message: `Pathway is required for Grade 10-12 (${SENIOR_PATHWAYS.join(', ')})`
       })
     }
   }

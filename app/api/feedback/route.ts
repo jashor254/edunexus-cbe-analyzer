@@ -5,6 +5,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { requireAuth } from '@/lib/api/middleware'
 import { ADMIN_CONFIG } from '@/lib/config/api'
 import { timingSafeEqualString } from '@/lib/api/secretCompare'
+import { logger } from '@/lib/observability/logger'
 
 const FeedbackSchema = z.object({
   trigger:        z.string().optional(),
@@ -40,8 +41,8 @@ export async function POST(request: NextRequest) {
     })
 
     if (insertError) {
-      // Log but don't break user experience
-      console.error('Feedback insert failed:', insertError)
+      logger.error('Feedback insert failed', { operation: 'feedback.create', user_id: auth.user.id }, insertError)
+      return NextResponse.json({ error: 'Failed to save feedback' }, { status: 500 })
     }
 
     // Promoter flag — only set when NPS is genuinely high; user owns their own profile record

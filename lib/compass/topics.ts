@@ -1,4 +1,5 @@
 import { repos } from '@/lib/repositories'
+import { logger } from '@/lib/observability/logger'
 
 // In-process cache — warm for same-process invocations.
 // Cold starts will miss but now cost 1 DB roundtrip (was 4).
@@ -21,7 +22,11 @@ export async function getGradeTopics(
     })
     topicsCache.set(cacheKey, results)
     return results
-  } catch {
+  } catch (err) {
+    // [] here is a deliberate resilient fallback (callers treat "no topics"
+    // as an unconstrained AI generation, not an error) — but a fetch failure
+    // is indistinguishable from a genuinely empty subject/grade without this log.
+    logger.warn('getGradeTopics failed, falling back to empty topic list', { operation: 'compass.getGradeTopics', grade, subject }, err)
     return []
   }
 }
