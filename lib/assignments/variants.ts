@@ -51,6 +51,8 @@ export type VariantRow = {
   archived_at: string | null
 }
 
+const VARIANT_COLUMNS = 'id, question_id, variant_type, question_text, choices, correct_index, cognitive_intent, difficulty_rationale, expected_misconceptions, teacher_explanation, learner_explanation, status, generated_by, sub_strand_id, learning_outcome, supersedes, superseded_by, created_at, updated_at, approved_at, archived_at' as const
+
 function toRow(v: VariantInput) {
   return {
     question_id: v.questionId,
@@ -76,7 +78,7 @@ export async function createDraftVariants(inputs: VariantInput[]): Promise<Varia
   const { data, error } = await db
     .from('assignment_question_variants')
     .insert(inputs.map(toRow))
-    .select('*')
+    .select(VARIANT_COLUMNS)
   if (error) throw new Error(`Failed to create draft variants: ${error.message}`)
   return (data ?? []) as VariantRow[]
 }
@@ -86,7 +88,7 @@ export async function findVariantsForQuestion(questionId: string): Promise<Varia
   const db = createServiceClient()
   const { data, error } = await db
     .from('assignment_question_variants')
-    .select('*')
+    .select(VARIANT_COLUMNS)
     .eq('question_id', questionId)
     .order('created_at', { ascending: true })
   if (error) throw new Error(`Failed to fetch variants: ${error.message}`)
@@ -106,7 +108,7 @@ export async function findVariantsForQuestionIds(questionIds: string[]): Promise
   const db = createServiceClient()
   const { data, error } = await db
     .from('assignment_question_variants')
-    .select('*')
+    .select(VARIANT_COLUMNS)
     .in('question_id', questionIds)
     .order('created_at', { ascending: true })
   if (error) throw new Error(`Failed to fetch variants: ${error.message}`)
@@ -118,7 +120,7 @@ export async function findApprovedVariant(questionId: string, variantType: Varia
   const db = createServiceClient()
   const { data, error } = await db
     .from('assignment_question_variants')
-    .select('*')
+    .select(VARIANT_COLUMNS)
     .eq('question_id', questionId)
     .eq('variant_type', variantType)
     .eq('status', 'approved')
@@ -132,7 +134,7 @@ export async function findVariantById(variantId: string): Promise<VariantRow | n
   const db = createServiceClient()
   const { data, error } = await db
     .from('assignment_question_variants')
-    .select('*')
+    .select(VARIANT_COLUMNS)
     .eq('id', variantId)
     .maybeSingle()
   if (error) throw new Error(`Failed to fetch variant: ${error.message}`)
@@ -166,7 +168,7 @@ export async function editVariant(variantId: string, patch: {
     .from('assignment_question_variants')
     .update(update)
     .eq('id', variantId)
-    .select('*')
+    .select(VARIANT_COLUMNS)
     .single()
   if (error) throw new Error(`Failed to edit variant: ${error.message}`)
   return data as VariantRow
@@ -178,7 +180,7 @@ export async function approveVariant(variantId: string): Promise<VariantRow> {
     .from('assignment_question_variants')
     .update({ status: 'approved', approved_at: new Date().toISOString() })
     .eq('id', variantId)
-    .select('*')
+    .select(VARIANT_COLUMNS)
     .single()
   if (error) throw new Error(`Failed to approve variant: ${error.message}`)
   return data as VariantRow
@@ -190,7 +192,7 @@ export async function rejectVariant(variantId: string): Promise<VariantRow> {
     .from('assignment_question_variants')
     .update({ status: 'rejected' })
     .eq('id', variantId)
-    .select('*')
+    .select(VARIANT_COLUMNS)
     .single()
   if (error) throw new Error(`Failed to reject variant: ${error.message}`)
   return data as VariantRow

@@ -274,6 +274,12 @@ export default function LessonAccordion({ lessons: initial, moduleColor, moduleI
                   </div>
                 )}
 
+                {/* lesson.content is academy_lessons.content — RLS on that table grants only
+                    an "authenticated read" SELECT policy (no INSERT/UPDATE policy exists at
+                    all), and no route or component in this codebase ever writes to it.
+                    Content is admin-seeded curriculum, never learner/teacher/AI input, so
+                    this is not a live XSS sink today. If a write path is ever added, sanitize
+                    with an allowlist-based sanitizer (e.g. DOMPurify) before this changes. */}
                 <div
                   className="prose prose-sm max-w-none text-gray-700 prose-headings:text-gray-900 prose-headings:font-black mb-5"
                   dangerouslySetInnerHTML={{ __html: lesson.content }}
