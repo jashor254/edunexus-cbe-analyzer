@@ -8,6 +8,7 @@ import { apiUnauthorized, apiForbidden, apiBadRequest, apiError } from '@/lib/ap
 import { generateBulkExportPDF } from '@/lib/documents/bulkExportPdf'
 import type { SchemeMeta, ExportScheme } from '@/lib/documents/bulkExportPdf'
 import type { LessonPlanRecord } from '@/lib/lessonPlan/types'
+import { getRecordOfWorkForScheme, syncRecordOfWorkForScheme } from '@/lib/row/recordOfWork'
 import { z } from 'zod'
 
 const BodySchema = z.object({
@@ -64,9 +65,21 @@ export async function POST(req: Request) {
           .order('week_number')
           .order('lesson_number')
 
+        // Phase 3 — the Record of Work section reads the canonical stored
+        // record, exactly as the single ROW download does, so the two exports
+        // cannot disagree about the same document (ADR-0032 §12).
+        // Materialised through the same idempotent canonical writer, and only
+        // when the caller actually asked for a Record of Work.
+        let recordOfWork = null
+        if (include.recordOfWork) {
+          await syncRecordOfWorkForScheme(sow.id)
+          recordOfWork = await getRecordOfWorkForScheme(sow.id, teacher.id)
+        }
+
         return {
           meta: sow,
           lessonPlans: (plans ?? []) as unknown as LessonPlanRecord[],
+          recordOfWork,
         }
       })
     )

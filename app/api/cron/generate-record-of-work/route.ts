@@ -1,29 +1,46 @@
 // Vercel Cron: Monday 06:00 EAT (03:00 UTC) — "0 3 * * 1"
-// Converts lesson plans from completed weeks into Record of Work entries.
-// A week is considered complete once a newer week's plans have been generated
-// (teachers often teach offline and never mark lessons as "taught").
+//
+// Keeps each scheme's Record of Work skeleton in step with its teaching
+// documents. This route is now a thin driver: all behaviour lives in
+// lib/row/recordOfWork.ts, the single canonical writer it shares with the
+// interactive route (ADR-0032 §7).
+//
+// ── What changed in Phase 1, and why ────────────────────────────────────────
+//
+// OWNERSHIP. This route used to write `lesson_plans.teacher_id` — an
+// auth.users id — into `records_of_work.teacher_id`, a column whose RLS and
+// every API filter resolve `teachers.id`. Every Record of Work it produced
+// was therefore invisible to the teacher who owned it. The owner is now
+// derived inside `syncRecordOfWorkForScheme` from `schemes_of_work.teacher_id`,
+// which is already canonical, so this route no longer handles an identity at
+// all. See ADR-0032 §2.
+//
+// TEACHER EVIDENCE. This route used to UPSERT a payload that rewrote every
+// entry column on each run. It now cannot touch `date_taught`, `reflection`
+// or `remarks` — those columns are absent from the writer's payload by
+// construction. See ADR-0032 §4 and the Test E regression guard.
+//
+// COVERAGE. This route used to skip each scheme's latest week, on the theory
+// that a week is "complete" only once a newer one exists — which meant the
+// final week of every scheme could never enter the Record of Work at all.
+// Because entries are now structural (`status: 'planned'`) rather than an
+// assertion that teaching happened, the whole scheme is seeded and the
+// teacher records what was actually taught. See ADR-0032 §8.
+//
+// PHASE 2 — EVIDENCE CONVERGENCE. This synchronisation now also carries
+// `lesson_plans.taught_date` and `lesson_plans.teacher_self_evaluation` into
+// the corresponding Record of Work entry, but only to *initialise* an empty
+// field. Once the Record of Work holds a teacher value it is authoritative
+// and no later run can change it. That merge lives entirely in
+// `convergeTeacherEvidence()`; there is no mapping logic in this route, and
+// `remarks` is never touched. See ADR-0032 §11.
 
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { timingSafeEqualString } from '@/lib/api/secretCompare'
+import { syncRecordOfWorkForScheme } from '@/lib/row/recordOfWork'
 
 export const maxDuration = 300
-
-interface LessonPlanCandidate {
-  id: string
-  sow_id: string
-  teacher_id: string
-  week_number: number
-  lesson_number: number
-  strand: string
-  sub_strand: string
-  learning_outcomes: string[]
-  key_inquiry_questions: string[]
-  learning_resources: string[]
-  step_1: string | null
-  step_2: string | null
-  step_3: string | null
-}
 
 export async function GET(request: Request) {
   if (!timingSafeEqualString(request.headers.get('authorization'), `Bearer ${process.env.CRON_SECRET}`)) {
@@ -33,145 +50,43 @@ export async function GET(request: Request) {
   try {
     const db = createServiceClient()
 
-    // Fetch all lesson plans regardless of taught status — teachers often teach offline
-    // and never mark lessons as taught, so we can't gate on that
+    // Trigger condition is unchanged: a scheme enters the Record of Work
+    // pipeline once it has lesson plans. Status is not gated on — teachers
+    // often teach offline and never mark a lesson taught.
     const { data: candidates, error } = await db
       .from('lesson_plans')
-      .select('id, sow_id, teacher_id, week_number, lesson_number, strand, sub_strand, learning_outcomes, key_inquiry_questions, learning_resources, step_1, step_2, step_3')
+      .select('sow_id')
       .in('status', ['generated', 'edited', 'taught'])
 
     if (error) {
+      console.error('[cron/generate-record-of-work] lesson_plans read failed:', error.message)
       return NextResponse.json({ error: 'Failed to fetch lesson plans' }, { status: 500 })
     }
 
-    if (!candidates?.length) {
+    const schemeIds = [...new Set((candidates ?? []).map(c => c.sow_id as string).filter(Boolean))]
+
+    if (schemeIds.length === 0) {
       return NextResponse.json({ processed: 0, message: 'No lesson plans to convert' })
     }
 
-    // Determine the max week_number per sow_id — the "current" week being generated
-    const maxWeekBySow: Record<string, number> = {}
-    for (const p of candidates) {
-      if ((maxWeekBySow[p.sow_id] ?? 0) < p.week_number) {
-        maxWeekBySow[p.sow_id] = p.week_number
+    const results: Array<{ sowId: string; source: string; entries: number; headerCreated: boolean }> = []
+    const errors:  Array<{ sowId: string; error: string }> = []
+
+    for (const schemeId of schemeIds) {
+      try {
+        const result = await syncRecordOfWorkForScheme(schemeId)
+        results.push({
+          sowId:         schemeId,
+          source:        result.source,
+          entries:       result.seeded,
+          headerCreated: result.created,
+        })
+      } catch (err: unknown) {
+        errors.push({ sowId: schemeId, error: err instanceof Error ? err.message : String(err) })
       }
     }
 
-    // Only process weeks that are strictly before the latest generated week
-    // (the latest week is still "current" — not yet finished)
-    const toProcess = (candidates as LessonPlanCandidate[]).filter(
-      p => p.week_number < maxWeekBySow[p.sow_id]
-    )
-
-    if (!toProcess.length) {
-      return NextResponse.json({ processed: 0, message: 'All generated plans are from the current week' })
-    }
-
-    // Group by sow_id
-    const bySow: Record<string, LessonPlanCandidate[]> = {}
-    for (const p of toProcess) {
-      if (!bySow[p.sow_id]) bySow[p.sow_id] = []
-      bySow[p.sow_id].push(p)
-    }
-
-    const results: Array<{ sowId: string; entriesCreated: number }> = []
-    const errors: Array<{ sowId: string; error: string }> = []
-
-    const sowIds     = Object.keys(bySow)
-    const teacherIds = [...new Set(Object.values(bySow).map(plans => plans[0].teacher_id))]
-
-    // ── Pre-fetch SOW + teacher metadata for all SOWs — 2 batched queries
-    // instead of 2 queries per SOW ────────────────────────────────────────────
-    const [{ data: sowRows }, { data: teacherRows }] = await Promise.all([
-      db.from('schemes_of_work')
-        .select('id, teacher_id, school, grade, learning_area, term, year, curriculum_mode')
-        .in('id', sowIds),
-      db.from('teachers').select('id, full_name').in('id', teacherIds),
-    ])
-
-    const sowById     = new Map((sowRows ?? []).map(s => [s.id, s]))
-    const teacherById = new Map((teacherRows ?? []).map(t => [t.id, t]))
-
-    // ── Upsert all ROW headers in one call, then map scheme_id -> row id ──────
-    const headerRows = sowIds
-      .map(sowId => {
-        const sow = sowById.get(sowId)
-        if (!sow) return null
-        return {
-          scheme_id: sowId,
-          teacher_id: bySow[sowId][0].teacher_id,
-          school: sow.school,
-          grade: sow.grade,
-          learning_area: sow.learning_area,
-          term: String(sow.term),
-          year: sow.year,
-          curriculum_mode: sow.curriculum_mode,
-          teacher_name: teacherById.get(sow.teacher_id)?.full_name ?? '',
-        }
-      })
-      .filter((r): r is NonNullable<typeof r> => r !== null)
-
-    const missingSowIds = sowIds.filter(id => !sowById.has(id))
-    for (const sowId of missingSowIds) errors.push({ sowId, error: 'SOW not found' })
-
-    let rowIdBySow = new Map<string, string>()
-    if (headerRows.length > 0) {
-      const { data: upsertedHeaders, error: headerErr } = await db
-        .from('records_of_work')
-        .upsert(headerRows, { onConflict: 'scheme_id' })
-        .select('id, scheme_id')
-
-      if (headerErr) {
-        for (const row of headerRows) errors.push({ sowId: row.scheme_id, error: headerErr.message })
-      } else {
-        rowIdBySow = new Map((upsertedHeaders ?? []).map(h => [h.scheme_id, h.id]))
-      }
-    }
-
-    // ── Build and upsert all per-lesson entries across every SOW in one call ──
-    const allEntries: Array<{
-      row_id: string; week: number; lesson: number; strand: string; substrand: string
-      learning_outcomes: string[]; key_inquiry_questions: string[]; learning_resources: string[]
-      activities_summary: string[]; status: string; remarks: string
-    }> = []
-
-    for (const sowId of sowIds) {
-      const rowId = rowIdBySow.get(sowId)
-      if (!rowId) continue
-
-      const plans = bySow[sowId]
-      const entries = plans.map(p => ({
-        row_id: rowId,
-        week: p.week_number,
-        lesson: p.lesson_number,
-        strand: p.strand,
-        substrand: p.sub_strand,
-        learning_outcomes: p.learning_outcomes ?? [],
-        key_inquiry_questions: p.key_inquiry_questions ?? [],
-        learning_resources: p.learning_resources ?? [],
-        activities_summary: [p.step_1, p.step_2, p.step_3].filter((s): s is string => !!s),
-        status: 'completed',
-        remarks: '',
-      }))
-      allEntries.push(...entries)
-      results.push({ sowId, entriesCreated: entries.length })
-    }
-
-    if (allEntries.length > 0) {
-      const { error: entriesErr } = await db
-        .from('row_entries')
-        .upsert(allEntries, { onConflict: 'row_id,week,lesson' })
-
-      if (entriesErr) {
-        for (const r of results) errors.push({ sowId: r.sowId, error: entriesErr.message })
-        results.length = 0
-      }
-    }
-
-    return NextResponse.json({
-      processed: Object.keys(bySow).length,
-      results,
-      errors,
-    })
+    return NextResponse.json({ processed: results.length, results, errors })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Cron job failed'
     console.error('[cron/generate-record-of-work]', message)

@@ -31,14 +31,20 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
     const db = createServiceClient()
 
+    // Phase 1 — these column names are the live, canonical ones. This
+    // previously selected `sow_id` and `subject`, neither of which exists on
+    // records_of_work (the columns are `scheme_id` and `learning_area`), so
+    // PostgREST errored and every detail request fell through to the 404
+    // below. See ADR-0032 §6.
     const { data: row, error } = await db
       .from('records_of_work')
-      .select('id, teacher_id, sow_id, school, grade, subject, term, year, created_at, updated_at')
+      .select('id, teacher_id, scheme_id, school, grade, learning_area, term, year, curriculum_mode, teacher_name, created_at, updated_at')
       .eq('id', id)
       .eq('teacher_id', teacher.id)
-      .single()
+      .maybeSingle()
 
-    if (error || !row) return apiError('Record not found', 404)
+    if (error) return apiError('Failed to load record')
+    if (!row) return apiError('Record not found', 404)
 
     const { data: entries } = await db
       .from('row_entries')
@@ -110,7 +116,28 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
 
     const db = createServiceClient()
 
-    await db.from('records_of_work').delete().eq('id', id).eq('teacher_id', teacher.id)
+    // Phase 1 — the delete itself was always correctly scoped by teacher_id,
+    // so a non-owner never removed anything; but the route reported
+    // `{ ok: true }` regardless, telling a caller a delete had succeeded when
+    // no row matched. Confirm ownership first and answer 404 (matching GET's
+    // convention — non-disclosure) when there is nothing this teacher owns.
+    const { data: owned } = await db
+      .from('records_of_work')
+      .select('id')
+      .eq('id', id)
+      .eq('teacher_id', teacher.id)
+      .maybeSingle()
+
+    if (!owned) return apiError('Record not found', 404)
+
+    const { error } = await db
+      .from('records_of_work')
+      .delete()
+      .eq('id', id)
+      .eq('teacher_id', teacher.id)
+
+    if (error) return apiError('Failed to delete record')
+
     return apiSuccess({ ok: true })
   } catch (e: unknown) {
     return apiError(e instanceof Error ? e.message : 'Internal error')

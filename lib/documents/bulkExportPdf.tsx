@@ -7,6 +7,7 @@ import {
   Document, Page, Text, View, StyleSheet,
 } from '@react-pdf/renderer'
 import type { LessonPlanRecord } from '@/lib/lessonPlan/types'
+import { workDoneFor, type StoredRecordOfWork } from '@/lib/row/recordOfWork'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,6 +29,14 @@ export interface SchemeMeta {
 export interface ExportScheme {
   meta: SchemeMeta
   lessonPlans: LessonPlanRecord[]
+  /**
+   * Phase 3 — the canonical stored Record of Work for this scheme, read via
+   * `getRecordOfWorkForScheme()`. The Record of Work page renders from this,
+   * never from `lessonPlans`, so a bulk export and a single ROW download are
+   * the same document (ADR-0032 §12). Null when the scheme has no Record of
+   * Work, in which case the page is skipped.
+   */
+  recordOfWork: StoredRecordOfWork | null
 }
 
 export interface BulkExportOptions {
@@ -319,8 +328,20 @@ function LPPages({ meta, plans }: { meta: SchemeMeta; plans: LessonPlanRecord[] 
   )
 }
 
-function ROWPage({ meta, plans }: { meta: SchemeMeta; plans: LessonPlanRecord[] }) {
-  if (!plans.length) return null
+function ROWPage({ meta, row }: { meta: SchemeMeta; row: StoredRecordOfWork | null }) {
+  if (!row || !row.entries.length) return null
+
+  // Phase 3 — every cell below reads the canonical stored Record of Work.
+  // Two columns changed, both deliberately:
+  //   * Reflection previously printed `lesson_plans.reflection`, which is the
+  //     AI-authored guiding-question template when a teacher has not
+  //     completed their evaluation. It now prints the teacher's stored
+  //     Record of Work reflection.
+  //   * "Status" previously derived Taught/Pending from the Lesson Plan.
+  //     `row_entries.status` is structural ('planned') and would print the
+  //     same word on every row, so the column is replaced by Date — which is
+  //     the actual evidence of teaching and gives this page parity with the
+  //     single ROW download.
   return (
     <Page size="A4" orientation="landscape" style={S.page}>
       <View style={[S.sectionHeader, { borderLeftColor: C.row, backgroundColor: C.rowBg }]}>
@@ -333,27 +354,25 @@ function ROWPage({ meta, plans }: { meta: SchemeMeta; plans: LessonPlanRecord[] 
         <View style={S.tableHeader}>
           <Text style={[S.th, S.colWk]}>Wk</Text>
           <Text style={[S.th, S.colLes]}>Les</Text>
+          <Text style={[S.th, { width: '10%' }]}>Date</Text>
           <Text style={[S.th, S.colStr]}>Strand</Text>
           <Text style={[S.th, S.colSub]}>Sub-strand</Text>
-          <Text style={[S.th, { width: '28%' }]}>Learning Outcomes</Text>
-          <Text style={[S.th, { width: '16%' }]}>Activities</Text>
-          <Text style={[S.th, { width: '10%' }]}>Status</Text>
-          <Text style={[S.th, { width: '10%' }]}>Reflection</Text>
+          <Text style={[S.th, { width: '24%' }]}>Learning Outcomes</Text>
+          <Text style={[S.th, { width: '16%' }]}>Work Done</Text>
+          <Text style={[S.th, { width: '14%' }]}>Reflection</Text>
         </View>
-        {plans.map((p, i) => (
-          <View key={p.id} style={i % 2 === 0 ? S.tableRow : S.tableRowAlt}>
-            <Text style={[S.td, S.colWk]}>{p.week_number}</Text>
-            <Text style={[S.td, S.colLes]}>{p.lesson_number}</Text>
-            <Text style={[S.td, S.colStr]}>{p.strand}</Text>
-            <Text style={[S.td, S.colSub]}>{p.sub_strand}</Text>
-            <Text style={[S.td, { width: '28%' }]}>{joinBullets(p.learning_outcomes)}</Text>
-            <Text style={[S.td, { width: '16%' }]}>
-              {[p.step_1, p.step_2, p.step_3].filter(Boolean).join(' / ').slice(0, 80) || '—'}
+        {row.entries.map((e, i) => (
+          <View key={`${e.week}:${e.lesson}`} style={i % 2 === 0 ? S.tableRow : S.tableRowAlt}>
+            <Text style={[S.td, S.colWk]}>{e.week}</Text>
+            <Text style={[S.td, S.colLes]}>{e.lesson}</Text>
+            <Text style={[S.td, { width: '10%', color: e.date_taught ? C.green : C.muted }]}>
+              {e.date_taught ?? '—'}
             </Text>
-            <Text style={[S.td, { width: '10%', color: p.status === 'taught' ? C.green : C.muted }]}>
-              {p.status === 'taught' ? 'Taught' : 'Pending'}
-            </Text>
-            <Text style={[S.td, { width: '10%' }]}>{p.reflection ?? ''}</Text>
+            <Text style={[S.td, S.colStr]}>{e.strand}</Text>
+            <Text style={[S.td, S.colSub]}>{e.substrand}</Text>
+            <Text style={[S.td, { width: '24%' }]}>{joinBullets(e.learning_outcomes)}</Text>
+            <Text style={[S.td, { width: '16%' }]}>{workDoneFor(e).slice(0, 80) || '—'}</Text>
+            <Text style={[S.td, { width: '14%' }]}>{e.reflection}</Text>
           </View>
         ))}
       </View>
@@ -376,12 +395,12 @@ function BulkExportDocument({
   return (
     <Document title="EduNexus Document Bundle" author="EduNexus">
       <CoverPage schemes={schemes} include={include} />
-      {schemes.map(({ meta, lessonPlans }) => (
+      {schemes.map(({ meta, lessonPlans, recordOfWork }) => (
         <React.Fragment key={meta.id}>
           <SchemeDivider meta={meta} />
           {include.sow ? <SOWPage meta={meta} /> : null}
           {include.lessonPlans ? <LPPages meta={meta} plans={lessonPlans} /> : null}
-          {include.recordOfWork ? <ROWPage meta={meta} plans={lessonPlans} /> : null}
+          {include.recordOfWork ? <ROWPage meta={meta} row={recordOfWork} /> : null}
         </React.Fragment>
       ))}
     </Document>

@@ -18,6 +18,11 @@ import type { SOWPreviewData, CurriculumMode } from '@/lib/sow/types'
 import type { LessonPlanRecord } from '@/lib/lessonPlan/types'
 import type { RecordOfWork, ROWEntry } from '@/lib/row/pdfRenderer'
 import { toTitleCase, firstSentence } from '@/lib/utils/formatters'
+import {
+  getRecordOfWorkForScheme,
+  syncRecordOfWorkForScheme,
+  workDoneFor,
+} from '@/lib/row/recordOfWork'
 import { z } from 'zod'
 
 const BodySchema = z.object({
@@ -149,51 +154,51 @@ export async function POST(req: Request) {
     // ── Record of Work ────────────────────────────────────────────────────────────
 
     if (type === 'row') {
-      let rowQuery = db
-        .from('lesson_plans')
-        .select(
-          'week_number, lesson_number, taught_date, strand, sub_strand, ' +
-          'learning_outcomes, key_inquiry_questions, learning_resources, ' +
-          'step_1, step_2, step_3, status'
-        )
-        .eq('sow_id', schemeId)
-        .order('week_number')
-        .order('lesson_number')
+      // Phase 3 — the Record of Work PDF now prints the canonical stored
+      // Record of Work, not an independent re-derivation from lesson_plans.
+      // Before this, a teacher who opened their Record of Work saw their own
+      // converged date and reflection, while the download of the same
+      // document showed the Lesson Plan's date and a hardcoded empty
+      // Reflection column. One professional record, one definition
+      // (ADR-0032 §12).
+      //
+      // Materialise first, through the canonical writer: `download` already
+      // writes (it upserts a document_downloads marker below), and this is
+      // the same idempotent path the Monday cron uses. It guarantees a
+      // scheme that was printable before this change is still printable now,
+      // including a scheme whose Record of Work has not been created yet.
+      await syncRecordOfWorkForScheme(schemeId)
 
-      if (fromWeek) rowQuery = rowQuery.gte('week_number', fromWeek) as typeof rowQuery
+      const stored = await getRecordOfWorkForScheme(schemeId, teacher.id)
+      if (!stored) return apiError('No record of work found for this scheme', 404)
 
-      const { data: plans } = await rowQuery
+      const visible = fromWeek ? stored.entries.filter(e => e.week >= fromWeek) : stored.entries
 
-      type ShortPlanRow = {
-        week_number: number; lesson_number: number; taught_date: string | null;
-        strand: string; sub_strand: string;
-        learning_outcomes: string[] | null; key_inquiry_questions: string[] | null;
-        learning_resources: string[] | null; step_1: string | null; step_2: string | null;
-        step_3: string | null; status: string;
-      }
-      const rows = (plans || []) as unknown as ShortPlanRow[]
-      lpCount = rows.length
-      if (rows.length) maxWeekDownloaded = Math.max(...rows.map(p => p.week_number))
+      lpCount = visible.length
+      if (visible.length) maxWeekDownloaded = Math.max(...visible.map(e => e.week))
 
-      const entries: ROWEntry[] = rows.map(p => ({
-        week_number:   p.week_number,
-        lesson_number: p.lesson_number,
-        date_taught:   p.taught_date,
-        strand:        p.strand,
-        sub_strand:    p.sub_strand,
-        work_done:     firstSentence(p.step_1) || p.sub_strand,
-        reflection:    '',
+      const entries: ROWEntry[] = visible.map(e => ({
+        week_number:   e.week,
+        lesson_number: e.lesson,
+        date_taught:   e.date_taught,
+        strand:        e.strand,
+        sub_strand:    e.substrand,
+        work_done:     workDoneFor(e),
+        reflection:    e.reflection,
       }))
 
       const rowData: RecordOfWork = {
-        teacher_name:   toTitleCase(s.teacher_name || ''),
-        school:         toTitleCase(s.school || ''),
-        grade:          s.grade,
-        learning_area:  s.learning_area,
-        term:           s.term,
-        year:           s.year,
+        // Header comes from the stored Record of Work, falling back to the
+        // scheme only where the stored header is blank (a manually created
+        // record may not carry every field).
+        teacher_name:   toTitleCase(stored.teacherName || s.teacher_name || ''),
+        school:         toTitleCase(stored.school || s.school || ''),
+        grade:          stored.grade        || s.grade,
+        learning_area:  stored.learningArea || s.learning_area,
+        term:           stored.term         || s.term,
+        year:           stored.year         || s.year,
         entries,
-        curriculumMode: s.curriculum_mode as CurriculumMode,
+        curriculumMode: (stored.curriculumMode ?? s.curriculum_mode) as CurriculumMode,
       }
 
       html = generateROWHTML(rowData)

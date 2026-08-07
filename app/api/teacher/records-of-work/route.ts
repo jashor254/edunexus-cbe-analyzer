@@ -5,6 +5,7 @@ import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } fr
 import { requireAuthentication } from '@/lib/core/permissions'
 import { resolveTeacher } from '@/lib/core/identity'
 import { UnauthorizedError } from '@/lib/core/errors'
+import { ensureRecordOfWork, seedRecordOfWorkEntries } from '@/lib/row/recordOfWork'
 
 const CreateRowSchema = z.object({
   schemeId:       z.string().uuid().optional(),
@@ -86,49 +87,49 @@ export async function POST(req: Request) {
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Missing required fields')
     const { schemeId, school, grade, learningArea, term, year, curriculumMode } = parsed.data
 
-    const { data: row, error: rowErr } = await db
-      .from('records_of_work')
-      .insert({
-        teacher_id:      teacher.id,
-        scheme_id:       schemeId || null,
-        school:          school || '',
-        grade,
-        learning_area:   learningArea,
-        term:            String(term),
-        year:            Number(year),
-        curriculum_mode: curriculumMode || null,
-        teacher_name:    teacher.fullName || '',
-      })
-      .select('id')
-      .single()
-
-    if (rowErr) return apiError('Failed to create record: ' + rowErr.message)
-
-    // Pre-fill entries from scheme_lessons if linked
+    // Phase 1 — creation and seeding both go through lib/row/recordOfWork.ts,
+    // the single canonical writer shared with the Monday cron (ADR-0032 §7).
+    // Two behaviours changed here, both deliberate:
+    //   * get-or-create replaces the plain INSERT, so a scheme whose Record
+    //     of Work the cron already created no longer surfaces a raw
+    //     duplicate-key error (records_of_work_scheme_id_key).
+    //   * seeding falls back across sources rather than reading
+    //     scheme_lessons alone, which produced an empty document for any
+    //     scheme whose scheme_lessons rows are missing.
+    // Ownership is unchanged: still teachers.id, still this teacher.
     if (schemeId) {
-      const { data: lessons } = await db
-        .from('scheme_lessons')
-        .select('week, lesson, strand, substrand')
-        .eq('scheme_id', schemeId)
-        .order('week').order('lesson')
+      const { data: owned } = await db
+        .from('schemes_of_work')
+        .select('id')
+        .eq('id', schemeId)
+        .eq('teacher_id', teacher.id)
+        .maybeSingle()
 
-      if (lessons && lessons.length > 0) {
-        const entries = lessons.map((l: { week: number; lesson: number; strand: string | null; substrand: string | null }) => ({
-          row_id:    row.id,
-          week:      l.week,
-          lesson:    l.lesson,
-          strand:    l.strand || '',
-          substrand: l.substrand || '',
-        }))
-
-        const BATCH = 200
-        for (let i = 0; i < entries.length; i += BATCH) {
-          await db.from('row_entries').insert(entries.slice(i, i + BATCH))
-        }
-      }
+      if (!owned) return apiForbidden()
     }
 
-    return apiSuccess({ rowId: row.id })
+    let rowId: string
+    try {
+      const header = await ensureRecordOfWork({
+        schemeId:       schemeId || null,
+        teacherId:      teacher.id,
+        school:         school || '',
+        grade:          String(grade),
+        learningArea:   learningArea,
+        term:           String(term),
+        year:           Number(year),
+        curriculumMode: curriculumMode || null,
+        teacherName:    teacher.fullName || '',
+      })
+      rowId = header.rowId
+
+      if (schemeId) await seedRecordOfWorkEntries(rowId, schemeId)
+    } catch (err) {
+      console.error('[teacher/records-of-work POST]', err instanceof Error ? err.message : String(err))
+      return apiError('Failed to create record')
+    }
+
+    return apiSuccess({ rowId })
   } catch (e: unknown) {
     return apiError(e instanceof Error ? e.message : 'Internal error')
   }

@@ -10,6 +10,7 @@ import {
   apiForbidden,
   apiBadRequest,
 } from '@/lib/api/response'
+import { syncRecordOfWorkInBackground } from '@/lib/row/recordOfWork'
 
 interface RouteContext {
   params: Promise<{ planId: string }>
@@ -45,6 +46,14 @@ export async function PATCH(req: Request, { params }: RouteContext) {
       .single()
 
     if (error || !plan) return apiForbidden()
+
+    // Phase 3 — the teaching evidence has just been persisted; converge it
+    // into an already-existing Record of Work now rather than leaving it
+    // stale until the Monday cron. Fire-and-forget by design: the mark itself
+    // has succeeded and must not be reported as failed if synchronisation
+    // trips (ADR-0032 §13). No convergence logic lives here — this calls the
+    // one canonical domain function.
+    if (plan.sow_id) syncRecordOfWorkInBackground(plan.sow_id as string, 'taught')
 
     return apiSuccess({ plan })
   } catch (err: unknown) {

@@ -13,6 +13,7 @@ import {
   apiBadRequest,
 } from '@/lib/api/response'
 import { submitEvaluation } from '@/lib/lessonPlan/evaluation'
+import { syncRecordOfWorkInBackground } from '@/lib/row/recordOfWork'
 
 interface RouteContext {
   params: Promise<{ planId: string }>
@@ -39,6 +40,17 @@ export async function PATCH(req: Request, { params }: RouteContext) {
 
     try {
       const plan = await submitEvaluation(planId, user.id, { evaluation, followUp, reflectionSource })
+
+      // Phase 3 — saving the evaluation is the moment the reflection becomes
+      // available, so converge it into an already-existing Record of Work
+      // now instead of waiting for the Monday cron. The reflection is NOT
+      // copied here: this hands off to the one canonical domain function,
+      // whose guarded fill-if-empty merge still means an existing Record of
+      // Work value wins (ADR-0032 §13). Fire-and-forget — the evaluation is
+      // already saved and must not report failure if synchronisation trips.
+      const sowId = (plan as { sow_id?: string | null }).sow_id
+      if (sowId) syncRecordOfWorkInBackground(sowId, 'evaluation')
+
       return apiSuccess({ plan })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Evaluation failed'
