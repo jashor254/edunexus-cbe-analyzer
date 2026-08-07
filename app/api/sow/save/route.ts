@@ -31,7 +31,13 @@ const SaveSOWSchema = z.object({
       teacherName:     z.string().optional(),
       tscNumber:       z.string().optional(),
     }),
-    lessons: z.array(z.record(z.string(), z.unknown())),
+    // R3 — `lessons` previously had no minimum, so a payload claiming
+    // `totalLessons: 9` with an empty `lessons` array was accepted and
+    // stored as an `active` scheme with no lesson structure at all. That is
+    // the live shape of one production scheme, and the Friday cron then read
+    // it as a break week every week. A Scheme of Work without lessons is not
+    // a Scheme of Work.
+    lessons: z.array(z.record(z.string(), z.unknown())).min(1, 'A scheme must contain at least one lesson'),
     breaks:  z.array(z.record(z.string(), z.unknown())),
   }),
 })
@@ -116,7 +122,21 @@ export async function POST(req: Request) {
     const schemeId = scheme.id
 
     // ── Insert lessons ────────────────────────────────────────────────────────
-    if (lessons.length > 0) {
+    //
+    // R3 — the normalized `scheme_lessons` rows are part of the save
+    // contract, not an optimisation. Lesson Plan generation reads the JSON
+    // copy, but Record of Work seeding falls back to `scheme_lessons`, and a
+    // scheme missing them is structurally incomplete. This block used to
+    // `console.error` and return success, so a Scheme could be reported
+    // saved while its lesson structure was silently absent.
+    //
+    // Compensating rollback is safe here specifically because this route is
+    // INSERT-only: it contains exactly two writes, both inserts, and no other
+    // module writes `schemes_of_work`. The scheme deleted below can only ever
+    // be the one this same request just created — never a teacher's
+    // pre-existing work. If this route ever gains an update path, this
+    // strategy must be revisited.
+    {
       const lessonRows = lessons.map(l => ({
         scheme_id: schemeId,
         week: l.week,
@@ -134,12 +154,31 @@ export async function POST(req: Request) {
         // pci_links and confidence are preserved in schemes_of_work.lessons JSONB
       }))
 
-      const { error: lessonsErr } = await db
+      const { data: insertedLessons, error: lessonsErr } = await db
         .from('scheme_lessons')
         .insert(lessonRows)
+        .select('id')
 
-      if (lessonsErr) {
-        console.error('[sow/save] scheme_lessons insert error:', lessonsErr.message)
+      // Structural consistency check — the insert's own response is the
+      // proof, so this costs no extra query.
+      const persisted = insertedLessons?.length ?? 0
+
+      if (lessonsErr || persisted !== lessonRows.length) {
+        console.error(
+          '[sow/save] scheme_lessons insert failed:',
+          lessonsErr?.message ?? `persisted ${persisted} of ${lessonRows.length}`,
+          { schemeId },
+        )
+
+        // Compensate: remove the header this request just created so no
+        // structurally incomplete scheme survives. scheme_lessons cascades on
+        // schemes_of_work deletion, so any partial rows go with it.
+        const { error: rollbackErr } = await db.from('schemes_of_work').delete().eq('id', schemeId)
+        if (rollbackErr) {
+          console.error('[sow/save] rollback failed, scheme may be incomplete:', rollbackErr.message, { schemeId })
+        }
+
+        return apiError('Could not save the scheme’s lessons. Nothing was saved — please try again.')
       }
     }
 

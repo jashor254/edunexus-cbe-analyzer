@@ -13,6 +13,7 @@ import { classifyRootCause } from '@/lib/teachingIntelligence/rootCauseClassifie
 import { runTIEForSOW } from '@/lib/teachingIntelligence/weeklyGenerator'
 import type { SubstrandHealthRow } from '@/lib/teachingIntelligence/types'
 import { timingSafeEqualString } from '@/lib/api/secretCompare'
+import { resolveAuthUserForTeacher } from '@/lib/core/identity'
 
 export const maxDuration = 300
 
@@ -72,6 +73,32 @@ export async function GET(req: Request) {
 
     const lpResults:  Array<{ sowId: string; result: Awaited<ReturnType<typeof generateWeeklyPlans>> }> = []
     const lpErrors:   Array<{ sowId: string; error: string }> = []
+    const lpSkipped:  Array<{ sowId: string; reason: string }> = []
+
+    // R2 — `schemes_of_work.teacher_id` is a `teachers.id`, but
+    // `lesson_plans.teacher_id` and `generation_jobs.teacher_id` are both
+    // foreign-keyed to `auth.users(id)`. This route used to pass the
+    // teachers.id straight through, so every write violated its FK — including
+    // the failure record the catch block writes, which is why the breakage
+    // left no trace anywhere. Resolve once per scheme, up front, and fail
+    // closed if the mapping is missing rather than guessing an identity.
+    // See ADR-0032 for the namespace map.
+    const authIdByTeacher = new Map<string, string | null>()
+    async function authUserFor(teacherId: string): Promise<string | null> {
+      if (!authIdByTeacher.has(teacherId)) {
+        authIdByTeacher.set(teacherId, await resolveAuthUserForTeacher(teacherId))
+      }
+      return authIdByTeacher.get(teacherId) ?? null
+    }
+
+    // generation_jobs writes are the route's only failure record. A silently
+    // rejected insert here is what made R2 invisible, so surface it.
+    async function recordJob(row: Record<string, unknown>): Promise<void> {
+      const { error: jobErr } = await db.from('generation_jobs').insert(row)
+      if (jobErr) {
+        console.error('[cron/friday-generation] generation_jobs insert failed:', jobErr.message, row)
+      }
+    }
     const tieResults: Array<{ sowId: string; result: Awaited<ReturnType<typeof runTIEForSOW>> }> = []
     const tieErrors:  Array<{ sowId: string; error: string }> = []
 
@@ -84,26 +111,38 @@ export async function GET(req: Request) {
       const latestWeek    = latestWeekBySow[sow.id] ?? 0
       const sowCurrentWeek = latestWeek > 0 ? latestWeek : 0
 
+      const authUserId = await authUserFor(sow.teacher_id)
+      if (!authUserId) {
+        // Fail closed. Without a resolvable owner there is no valid
+        // teacher_id for the generated plans, and substituting any other
+        // identity would attribute this teacher's work to someone else.
+        const message = `no auth user for teachers.id ${sow.teacher_id}`
+        lpSkipped.push({ sowId: sow.id, reason: 'unresolved_teacher_identity' })
+        console.error('[cron/friday-generation] skipped scheme', sow.id, message)
+        continue
+      }
+
       try {
-        const result = await generateWeeklyPlans(sow.id, sow.teacher_id, sowCurrentWeek)
+        const result = await generateWeeklyPlans(sow.id, authUserId, sowCurrentWeek)
         lpResults.push({ sowId: sow.id, result })
-        await db.from('generation_jobs').insert({
-          teacher_id: sow.teacher_id,
-          sow_id:     sow.id,
+        await recordJob({
+          teacher_id:  authUserId,
+          sow_id:      sow.id,
           week_number: sowCurrentWeek + 1,
-          job_type:   'weekly_lp',
-          status:     'done',
+          job_type:    'weekly_lp',
+          status:      'done',
+          error_message: result.generated === 0 ? `skipped: ${result.reason ?? 'unknown'}` : null,
           completed_at: new Date().toISOString(),
         })
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err)
         lpErrors.push({ sowId: sow.id, error: message })
-        await db.from('generation_jobs').insert({
-          teacher_id: sow.teacher_id,
-          sow_id:     sow.id,
+        await recordJob({
+          teacher_id:  authUserId,
+          sow_id:      sow.id,
           week_number: sowCurrentWeek + 1,
-          job_type:   'weekly_lp',
-          status:     'failed',
+          job_type:    'weekly_lp',
+          status:      'failed',
           error_message: message,
           completed_at: new Date().toISOString(),
         })
@@ -134,12 +173,12 @@ export async function GET(req: Request) {
         }
 
         if ((pendingRows ?? []).length > 0) {
-          await db.from('generation_jobs').insert({
-            teacher_id: sow.teacher_id,
-            sow_id:     sow.id,
+          await recordJob({
+            teacher_id:  authUserId,
+            sow_id:      sow.id,
             week_number: currentWeek,
-            job_type:   'gap_root_cause',
-            status:     'done',
+            job_type:    'gap_root_cause',
+            status:      'done',
             completed_at: new Date().toISOString(),
           })
         }
@@ -150,6 +189,12 @@ export async function GET(req: Request) {
 
       // ── 2b. Weekly intelligence + ROW population ────────────────────────
       try {
+        // NOTE: `sow.teacher_id` (teachers.id) is correct here and is
+        // deliberately NOT changed. runTIEForSOW writes
+        // weekly_intelligence.teacher_id, whose only reader
+        // (getTeacherAttentionTier) filters it alongside
+        // learner_marks.teacher_id — both in the teachers namespace, and the
+        // live rows match. Only the two auth-FK'd writers above were wrong.
         const tieResult = await runTIEForSOW(sow.id, sow.teacher_id, {
           grade: sow.grade,
           learningArea: sow.learning_area,
@@ -157,12 +202,12 @@ export async function GET(req: Request) {
         tieResults.push({ sowId: sow.id, result: tieResult })
 
         if (tieResult.processed) {
-          await db.from('generation_jobs').insert({
-            teacher_id: sow.teacher_id,
-            sow_id:     sow.id,
+          await recordJob({
+            teacher_id:  authUserId,
+            sow_id:      sow.id,
             week_number: tieResult.weekNumber,
-            job_type:   'weekly_intelligence',
-            status:     'done',
+            job_type:    'weekly_intelligence',
+            status:      'done',
             completed_at: new Date().toISOString(),
           })
         }
@@ -178,9 +223,10 @@ export async function GET(req: Request) {
       term: currentTerm,
       week: currentWeek,
       processed: (activeSows || []).length,
-      lp: { generated: lpResults.length, errors: lpErrors.length },
+      lp: { generated: lpResults.length, errors: lpErrors.length, skipped: lpSkipped.length },
       tie: { processed: tieResults.filter(r => r.result.processed).length, errors: tieErrors.length },
       details: lpResults.map(r => ({ sowId: r.sowId, ...r.result })),
+      skipped: lpSkipped,
     })
   } catch (err: unknown) {
     console.error('[cron/friday-generation]', err)

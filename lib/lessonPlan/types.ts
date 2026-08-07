@@ -75,6 +75,17 @@ export interface WeeklyGenerationResult {
   generated: number
   week?: number
   subject?: string
-  reason?: 'break_week'
+  /**
+   * Why zero plans were generated.
+   *   break_week               — a genuine school break; nothing to teach.
+   *   invalid_scheme_structure — the scheme has teaching slots in its
+   *                              timeline but no usable lesson data to
+   *                              generate from. Structural corruption, NOT a
+   *                              holiday (Teaching Workflow Reliability,
+   *                              Phase 0). Previously reported as
+   *                              `break_week`, which made a broken scheme
+   *                              indistinguishable from a legitimate one.
+   */
+  reason?: 'break_week' | 'invalid_scheme_structure'
   nextTeachingWeek?: number
 }

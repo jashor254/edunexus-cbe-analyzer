@@ -93,7 +93,12 @@ export async function generateWeeklyPlans(
   const sowLessons = matchSlotsToLessons(teachingSlots, sow.lessons || [])
 
   if (sowLessons.length === 0) {
-    return { generated: 0, reason: 'break_week', nextTeachingWeek: nextWeek + 1 }
+    // Teaching slots exist for this week but no lesson matched them. That is
+    // structural corruption, not a holiday — the two were previously
+    // reported identically, so a scheme saved without its lesson data looked
+    // to the Friday cron exactly like a school break and was skipped
+    // silently, every week, forever.
+    return { generated: 0, reason: 'invalid_scheme_structure', nextTeachingWeek: nextWeek + 1 }
   }
 
   const results = await Promise.all(
@@ -157,7 +162,10 @@ export async function generateSpecificWeekPlans(
   const sowLessons = matchSlotsToLessons(weekSlots, sow.lessons || [])
 
   if (sowLessons.length === 0) {
-    return { generated: 0, reason: 'break_week' }
+    // A requested week with no teaching slots at all is a break; a week with
+    // slots but no matching lesson data is corruption. See generateWeeklyPlans.
+    const isBreak = weekSlots.length === 0
+    return { generated: 0, reason: isBreak ? 'break_week' : 'invalid_scheme_structure' }
   }
 
   const results = await Promise.all(

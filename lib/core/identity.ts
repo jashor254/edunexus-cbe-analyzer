@@ -121,6 +121,36 @@ export async function resolveTeacher(userId: string, client?: SupabaseClient): P
   return { id: data.id, userId: data.user_id, fullName: data.full_name, legacyRole: data.role }
 }
 
+/**
+ * The reverse of {@link resolveTeacher}: given a `teachers.id`, returns the
+ * `auth.users.id` that owns it, or `null` when no such mapping exists.
+ *
+ * Added for the Friday Lesson Plan automation (R2). Every other identity
+ * helper in this module travels auth → domain, because that is the direction
+ * a request travels. Background jobs travel the other way: they start from a
+ * row (`schemes_of_work.teacher_id`, a `teachers.id`) and need the auth
+ * identity that `lesson_plans.teacher_id` and `generation_jobs.teacher_id`
+ * are foreign-keyed to. Before this, the Friday cron simply passed the
+ * `teachers.id` straight through, violating both foreign keys on every write.
+ *
+ * Returns `null` rather than throwing or substituting any other identity —
+ * callers must fail closed. A teacher whose auth user cannot be resolved has
+ * no valid owner for generated work, and guessing one would attribute a
+ * teacher's lesson plans to somebody else.
+ *
+ * See ADR-0032 for the canonical namespace map.
+ */
+export async function resolveAuthUserForTeacher(teacherId: string, client?: SupabaseClient): Promise<string | null> {
+  const db = client ?? createServiceClient()
+  const { data } = await db
+    .from('teachers')
+    .select('user_id')
+    .eq('id', teacherId)
+    .maybeSingle()
+
+  return (data?.user_id as string | null) ?? null
+}
+
 /** Resolves the `students` row this user *is* (self-service student portal), or `null`. Does not resolve parent/guardian links — see {@link resolveParent}. */
 export async function resolveStudent(userId: string, client?: SupabaseClient): Promise<ResolvedStudent | null> {
   const db = client ?? createServiceClient()
