@@ -36,6 +36,8 @@ const PUBLIC_PREFIXES = [
   '/shared',
   '/preview',
   '/school-concepts',
+  // Public reviewer presentation — static slides, no product data, no login.
+  '/demo',
   '/payment',
   '/_next',
   '/favicon',

@@ -56,6 +56,80 @@ body:has(main [data-school-concept-shell]) > div[data-global-whatsapp] {
   display: none;
 }
 
+/* /demo is a self-contained reviewer presentation (own shell, own controls,
+   own footer qualifier) rendered inside the root layout's <main>. Suppress
+   the site-wide fallback footer and the EduNexus WhatsApp widget there for
+   the same reason as the school-concept rule above: presentation chrome
+   would compete with the slide for a reviewer's attention. */
+body:has(main [data-demo-shell]) > footer[data-site-footer],
+body:has(main [data-demo-shell]) > div[data-global-whatsapp] {
+  display: none;
+}
+
+/* ── /demo presentation tokens ──────────────────────────────────────────────
+   Scoped to the demo shell so nothing here can affect the product or the
+   marketing site. Deep ink ground, restrained teal for meaning/progress,
+   warm gold used once per slide at most, off-white for type. */
+.demo-shell {
+  --demo-ink: #0b1220;
+  --demo-ink-soft: #131c2e;
+  --demo-paper: #f6f5f1;
+  --demo-muted: #a8b3c4;
+  --demo-muted-dim: #6f7d91;
+  --demo-teal: #00a896;
+  --demo-gold: #c8a45c;
+  --demo-line: rgba(255, 255, 255, 0.08);
+  --demo-line-strong: rgba(255, 255, 255, 0.16);
+
+  background: var(--demo-ink);
+  color: var(--demo-paper);
+}
+
+.demo-control {
+  border: 1px solid var(--demo-line-strong);
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--demo-paper);
+  background: transparent;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.demo-control:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--demo-teal);
+}
+.demo-control:focus-visible {
+  outline: 2px solid var(--demo-teal);
+  outline-offset: 2px;
+}
+.demo-control:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Slide entrance. A single short fade-and-lift on change of slide — motion
+   only where meaning changes, per the visual language standard. */
+@keyframes demo-slide-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.demo-slide-enter {
+  animation: demo-slide-enter 420ms ease-out both;
+}
+
+/* A viewer who has asked for reduced motion gets no transition at all. The
+   autoplay timer is separately disabled in the controller — this covers the
+   presentational half of the same preference. */
+@media (prefers-reduced-motion: reduce) {
+  .demo-slide-enter {
+    animation: none;
+  }
+  .demo-control {
+    transition: none;
+  }
+}
+
 /* /early-access and /pricing each ship their own self-contained nav (logo +
    Back/Dashboard link) predating their move into the marketing route
    group. Suppress the shared MarketingNav on those routes so they don't

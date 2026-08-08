@@ -8,6 +8,7 @@ export default function robots(): MetadataRoute.Robots {
       allow: '/',
       disallow: [
         '/dashboard/',     // Hizi hazitaonekana kwenye Google
+        '/demo',           // Reviewer presentation — noindex until approved
         '/api/',
         '/admin/',
         '/_next/',         // Next.js internal files
