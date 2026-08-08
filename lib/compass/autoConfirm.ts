@@ -49,15 +49,23 @@ export async function applyConservativeAutoConfirm(insertedRows: EvidenceRow[]):
     row.extraction_method === ENGAGEMENT_EXTRACTION_METHOD
   )
 
-  // Hard invariant, not just a filter condition: this function must never be
-  // the thing that confirms a mastery claim, under any circumstance.
   for (const row of eligible) {
-    if (row.extraction_method === MASTERY_EXTRACTION_METHOD) {
-      throw new Error('applyConservativeAutoConfirm: refusing to auto-confirm a mastery claim — this must never happen')
+    // Hard invariant, checked against the row actually about to be confirmed
+    // rather than against the filter above — a guard that only re-tests what
+    // the immediately preceding filter already guaranteed cannot fail, and so
+    // protects nothing if that filter is ever widened. This is the last line
+    // before the write: whatever selected this row, it must be engagement-
+    // shaped, and it must never be a mastery claim.
+    if (
+      row.extraction_method === MASTERY_EXTRACTION_METHOD ||
+      row.extraction_method !== ENGAGEMENT_EXTRACTION_METHOD
+    ) {
+      throw new Error(
+        `applyConservativeAutoConfirm: refusing to auto-confirm non-engagement evidence ${row.id} ` +
+        `(extraction_method=${row.extraction_method}) — this must never happen`
+      )
     }
-  }
 
-  for (const row of eligible) {
     try {
       await confirmReview(row.id, systemUserId, AUTO_CONFIRM_REASON)
     } catch (err) {

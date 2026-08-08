@@ -11,9 +11,8 @@ const SESSION_RESUME_COLS     = 'id, created_at' as const
 const SESSION_STALE_COLS      = 'id, created_at, updated_at' as const
 const SESSION_STATE_COLS      = 'session_state' as const
 const SESSION_EXCHANGE_COLS   = 'exchange_count' as const
-const CONTEXT_SUBJECT_COLS    = 'subject_tiers, compass_bridge, recommended_pathway, grade, session_goal' as const
+const CONTEXT_SUBJECT_COLS    = 'subject_tiers, compass_bridge, recommended_pathway, grade, session_goal, first_subject, subject_rest_until' as const
 const LAST_SESSION_COLS       = 'subject' as const
-const STUDENT_CONTEXT_COLS    = 'subject_rest_until' as const
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -50,6 +49,14 @@ export type StudentLearningContextRow = {
   recommended_pathway:  string | null
   grade:                number | null
   session_goal:         string | null
+  /**
+   * The subject `session_goal` was authored for. `session_goal` is a single
+   * per-student column but is always written alongside this one (see
+   * lib/academicClinic/assessmentPipeline.ts and lib/career/autoReportGenerator.ts),
+   * so it is only meaningful when paired with the subject it belongs to.
+   */
+  first_subject:        string | null
+  subject_rest_until:   string | null
 }
 
 export type GradeTopicRPCParams = {
@@ -247,13 +254,24 @@ export class CompassRepository extends BaseRepository {
 
   // ── Session — end ───────────────────────────────────────────────────────────
 
+  /**
+   * Transitions an `active` session to its terminal state.
+   *
+   * Returns `true` only when THIS call performed the transition. The
+   * `status = 'active'` predicate makes the update the atomic claim on
+   * ending a session: a concurrent or repeated call matches zero rows and
+   * gets `false`. Callers that award XP, bump counters, or emit Evidence
+   * must gate that work on this return value — ending a session is not a
+   * naturally idempotent operation and the client can legitimately fire it
+   * more than once (idle timer, countdown expiry, manual button).
+   */
   async endSession(
     sessionId:       string,
     learnerId:       string,
     status:          'completed' | 'abandoned',
     durationSeconds: number,
-  ): Promise<void> {
-    const { error } = await this.db
+  ): Promise<boolean> {
+    const { data, error } = await this.db
       .from('compass_sessions')
       .update({
         status,
@@ -263,8 +281,11 @@ export class CompassRepository extends BaseRepository {
       .eq('id', sessionId)
       .eq('learner_id', learnerId)
       .eq('status', 'active')
+      .select('id')
 
     if (error) throw new Error(`Failed to end session: ${error.message}`)
+
+    return (data ?? []).length > 0
   }
 
   // ── Student learning context ────────────────────────────────────────────────
@@ -287,6 +308,8 @@ export class CompassRepository extends BaseRepository {
       recommended_pathway: (data.recommended_pathway  as string | null) ?? null,
       grade:               (data.grade                as number | null)  ?? null,
       session_goal:        (data.session_goal          as string | null) ?? null,
+      first_subject:       (data.first_subject         as string | null) ?? null,
+      subject_rest_until:  (data.subject_rest_until    as string | null) ?? null,
     }
   }
 
@@ -321,17 +344,63 @@ export class CompassRepository extends BaseRepository {
     if (error) throw new Error(`mergeTeacherSuggestedTopic: ${error.message}`)
   }
 
-  async getSubjectRestUntil(studentId: string): Promise<string | null> {
-    const { data, error } = await this.db
-      .from('student_learning_context')
-      .select(STUDENT_CONTEXT_COLS)
-      .eq('student_id', studentId)
-      .maybeSingle()
+  // ── Study-group bonus (Compass session completion) ─────────────────────────
 
-    if (error) throw new Error(`Failed to get subject rest: ${error.message}`)
+  /**
+   * Completed sessions for this learner since `sinceIso`, excluding one
+   * session id. Used to cap the once-per-day study-group bonus: the bonus
+   * belongs to the first Compass session a learner completes each day, and
+   * `compass_sessions` is the record that says whether one already happened.
+   */
+  async countCompletedSessionsSince(
+    studentId:       string,
+    sinceIso:        string,
+    excludeSessionId: string,
+  ): Promise<number> {
+    const { count, error } = await this.db
+      .from('compass_sessions')
+      .select('id', { count: 'exact', head: true })
+      .eq('learner_id', studentId)
+      .eq('status', 'completed')
+      .gte('completed_at', sinceIso)
+      .neq('id', excludeSessionId)
 
-    return (data?.subject_rest_until as string | null) ?? null
+    if (error) throw new Error(`Failed to count completed sessions: ${error.message}`)
+
+    return count ?? 0
   }
+
+  async findStudyGroupMemberships(
+    studentId:     string,
+    subjectFilter: string,
+  ): Promise<Array<{ id: string; points: number; group_id: string }>> {
+    const { data, error } = await this.db
+      .from('study_group_members')
+      .select('id, points, group_id, study_groups!inner(subject)')
+      .eq('student_id', studentId)
+      .filter('study_groups.subject', 'ilike', subjectFilter)
+
+    if (error) throw new Error(`Failed to find study group memberships: ${error.message}`)
+
+    return (data ?? []).map(row => ({
+      id:       row.id       as string,
+      points:   (row.points  as number | null) ?? 0,
+      group_id: row.group_id as string,
+    }))
+  }
+
+  async addStudyGroupPoints(memberId: string, points: number): Promise<void> {
+    const { error } = await this.db
+      .from('study_group_members')
+      .update({ points, updated_at: new Date().toISOString() })
+      .eq('id', memberId)
+
+    if (error) throw new Error(`Failed to award study group points: ${error.message}`)
+  }
+
+  // `subject_rest_until` is now read as part of getStudentLearningContext (the
+  // single context read getNextSubject already makes) rather than through a
+  // second dedicated query.
 
   // ── Last active session for next-subject selection ─────────────────────────
 
@@ -341,6 +410,30 @@ export class CompassRepository extends BaseRepository {
       .select(LAST_SESSION_COLS)
       .eq('learner_id', studentId)
       .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) throw new Error(`Failed to get last session subject: ${error.message}`)
+
+    return (data?.subject as string | null) ?? null
+  }
+
+  /**
+   * The subject of this learner's most recent session in ANY state.
+   *
+   * Distinct from `getLastActiveSessionSubject`, which only sees sessions
+   * still open. "What did they just study" is answered by the most recent
+   * row regardless of status — a finished session is `completed`, so an
+   * active-only lookup returns null in the normal case and rotation never
+   * fires. Used by `getNextSubject()` to avoid recommending the same
+   * subject twice in a row.
+   */
+  async getLastSessionSubject(studentId: string): Promise<string | null> {
+    const { data, error } = await this.db
+      .from('compass_sessions')
+      .select(LAST_SESSION_COLS)
+      .eq('learner_id', studentId)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()

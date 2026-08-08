@@ -110,26 +110,15 @@ export async function getOrCreateSession(
   }
 }
 
-// ── 2. shouldRestSubject ───────────────────────────────────────────────────────
-// subject_rest_until is currently a single per-student field.
-// The subject parameter is accepted for forward-compatibility with
-// per-subject rest tracking once that column exists.
-
-export async function shouldRestSubject(
-  studentId: string,
-  _subject:  string
-): Promise<boolean> {
-  const restUntil = await repos.compass.getSubjectRestUntil(studentId)
-  if (!restUntil) return false
-  return new Date(restUntil) > new Date()
-}
-
-// ── 3. getNextSubject ──────────────────────────────────────────────────────────
+// ── 2. getNextSubject ──────────────────────────────────────────────────────────
 
 export async function getNextSubject(studentId: string): Promise<NextSubject> {
   const [ctx, lastSubject] = await Promise.all([
     repos.compass.getStudentLearningContext(studentId),
-    repos.compass.getLastActiveSessionSubject(studentId),
+    // Most recent session in ANY state — a just-finished session is
+    // 'completed', so an active-only lookup would see nothing and the
+    // "don't repeat the last subject" rule below would never fire.
+    repos.compass.getLastSessionSubject(studentId),
   ])
 
   const subjectTiers  = ctx?.subject_tiers  ?? {}
@@ -137,6 +126,13 @@ export async function getNextSubject(studentId: string): Promise<NextSubject> {
   const pathway       = ctx?.recommended_pathway ?? null
   const grade         = ctx?.grade ?? 7
   const isSenior      = grade >= 10
+
+  // A rest window set by the AI's end-of-session eval ('this learner needs a
+  // break from what they just did') applies to the subject they just did —
+  // subject_rest_until is a single per-student column, and the session that
+  // set it is the one `lastSubject` names.
+  const restUntil  = ctx?.subject_rest_until ?? null
+  const restActive = restUntil !== null && new Date(restUntil) > new Date()
 
   // a) Teacher recommendation — highest priority
   if (compassBridge.teacherSuggested && compassBridge.firstSubject) {
@@ -171,15 +167,31 @@ export async function getNextSubject(studentId: string): Promise<NextSubject> {
     .sort((a, b) => a.level - b.level)
 
   const eligible = ranked.filter(s => s.subject !== lastSubject)
-  const pick     = eligible[0] ?? ranked[0] // fallback if all filtered
+  // Normally the last subject is only de-prioritised, and falling back to it
+  // beats recommending nothing. While a rest window is active that fallback is
+  // exactly what rest forbids, so it is dropped rather than reused.
+  const pick     = eligible[0] ?? (restActive ? undefined : ranked[0])
 
   if (!pick) {
-    return { subject: 'mathematics', subtopic: null, reason: 'rotation' }
+    // Every candidate is rested-out (or there are none): 'mathematics' is the
+    // long-standing default, but never while it is the subject being rested.
+    const fallback = restActive && lastSubject === 'mathematics' ? 'english' : 'mathematics'
+    return { subject: fallback, subtopic: null, reason: 'rotation' }
   }
 
-  // Holiday plan: use session_goal as the subtopic hint when set
+  // Holiday plan: `session_goal` is a single per-student column authored for one
+  // specific subject (`first_subject` / `compass_bridge.firstSubject`, always
+  // written in the same operation). Attaching it to whatever subject rotation
+  // happened to pick would hand the learner a Maths goal for a Kiswahili
+  // session, so it only applies when the picked subject is the one it is for.
+  const goalSubject = (compassBridge.firstSubject as string | null) ?? ctx?.first_subject ?? null
   const sessionGoal = ctx?.session_goal ?? null
-  const reason: NextSubject['reason'] = sessionGoal
+  const goalApplies =
+    sessionGoal !== null &&
+    goalSubject !== null &&
+    goalSubject.toLowerCase() === pick.subject.toLowerCase()
+
+  const reason: NextSubject['reason'] = goalApplies
     ? 'holiday_plan'
     : pick.level <= 2
     ? 'weakest_gap'
@@ -187,12 +199,12 @@ export async function getNextSubject(studentId: string): Promise<NextSubject> {
 
   return {
     subject:  pick.subject,
-    subtopic: sessionGoal,
+    subtopic: goalApplies ? sessionGoal : null,
     reason,
   }
 }
 
-// ── 4. recordExchange ─────────────────────────────────────────────────────────
+// ── 3. recordExchange ─────────────────────────────────────────────────────────
 
 export async function recordExchange(sessionId: string): Promise<number> {
   const current = await repos.compass.getExchangeCount(sessionId)
@@ -201,17 +213,25 @@ export async function recordExchange(sessionId: string): Promise<number> {
   return next
 }
 
-// ── 5. endSession ──────────────────────────────────────────────────────────────
+// ── 4. endSession ──────────────────────────────────────────────────────────────
 
+/**
+ * Ends a session, returning `true` only if this call is the one that actually
+ * transitioned it out of `active`. A repeat call on an already-ended session
+ * returns `false` and does nothing — callers must gate XP, session counters,
+ * and Evidence emission on that, since none of those are idempotent.
+ */
 export async function endSession(
   sessionId:       string,
   learnerId:       string,
   status:          'completed' | 'abandoned',
   durationSeconds: number,
   subject?:        string,
-): Promise<void> {
+): Promise<boolean> {
   const exchangeCount = await repos.compass.getExchangeCount(sessionId)
-  await repos.compass.endSession(sessionId, learnerId, status, durationSeconds)
+  const transitioned  = await repos.compass.endSession(sessionId, learnerId, status, durationSeconds)
+
+  if (!transitioned) return false
 
   if (status === 'completed') {
     void publishEvent({
@@ -229,6 +249,8 @@ export async function endSession(
       idempotency_key: `student.session.completed:${sessionId}`,
     }).catch(err => console.error('[events] student.session.completed:', err instanceof Error ? err.message : String(err)))
   }
+
+  return true
 }
 
 // ── Legacy: used by app/api/learn/route.ts ────────────────────────────────────

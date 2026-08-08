@@ -217,6 +217,12 @@ function LearnContent() {
   // Session state
   const [activeSubject,        setActiveSubject]        = useState<SubjectCard | null>(null)
   const [sessionId,            setSessionId]            = useState<string | null>(null)
+  // Guards against ending the same session twice. Several paths can fire at
+  // once — the idle wrap, the countdown hitting zero, and the eval-summary
+  // handler's 1.5s delayed close all run while pageState is still
+  // 'active_session', as does the manual end button. A ref (not state) because
+  // the check has to see the update within the same tick.
+  const endedSessionRef = useRef<string | null>(null)
   const [messages,             setMessages]             = useState<Message[]>([])
   const [conversationHistory,  setConversationHistory]  = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
   const [input,           setInput]           = useState('')
@@ -400,6 +406,8 @@ function LearnContent() {
   // End session — calls API and surfaces XP/streak on the completion screen
   const endCompassSession = useCallback(async (status: 'completed' | 'abandoned') => {
     if (!sessionId || !student?.id) return
+    if (endedSessionRef.current === sessionId) return
+    endedSessionRef.current = sessionId
     clearIdleTimer()
     const durationSeconds = Math.min(SESSION_SECS, Math.floor((Date.now() - startedAt) / 1000))
     try {

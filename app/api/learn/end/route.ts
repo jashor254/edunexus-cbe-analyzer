@@ -6,6 +6,7 @@ import { type FeatureKey } from '@/lib/payments/config'
 import { endSession, tierToLevel } from '@/lib/compass/session'
 import { resolveCompassStudentAccess, resolveSessionOwnership } from '@/lib/compass/ownership'
 import { recordCompassSessionEvidence } from '@/lib/compass/evidence'
+import { awardCompassGroupBonus } from '@/lib/compass/groupBonus'
 import { updateFromCompass } from '@/lib/learnerModel/updater'
 import { getStudentBasicInfo } from '@/lib/learnerModel'
 import { apiSuccess, apiError, apiForbidden, getErrorMessage } from '@/lib/api/response'
@@ -127,8 +128,33 @@ export async function POST(req: Request): Promise<Response> {
 
     const levelGained = startingLevel !== null && endingLevel !== null && endingLevel > startingLevel
 
+    // Ending a session is the atomic claim on everything that follows. XP,
+    // session counters, the group bonus, the Learner Model write and Evidence
+    // emission are all non-idempotent, and the client legitimately fires this
+    // route more than once (idle wrap, countdown expiry, manual end button).
+    // Only the call that actually transitions the session out of 'active' may
+    // do that work; a repeat call reports the already-recorded outcome.
+    const transitioned = await endSession(sessionId, studentId, status, durationSeconds)
+
+    if (!transitioned) {
+      const { data: settled } = await db
+        .from('compass_sessions')
+        .select('xp_earned, ending_level')
+        .eq('id', sessionId)
+        .maybeSingle()
+
+      return apiSuccess<EndSessionResult>({
+        ended:            true,
+        xpEarned:         (settled?.xp_earned as number | null) ?? 0,
+        totalSessions:    prevTotal,
+        sessionsThisWeek: prevWeekly,
+        startingLevel,
+        endingLevel:      (settled?.ending_level as number | null) ?? endingLevel,
+        levelGained:      false,
+      })
+    }
+
     await Promise.all([
-      endSession(sessionId, studentId, status, durationSeconds),
       db.from('compass_sessions').update({ xp_earned: xpEarned, ending_level: endingLevel }).eq('id', sessionId),
       db.from('student_learning_context')
         .update({
@@ -141,37 +167,11 @@ export async function POST(req: Request): Promise<Response> {
 
     // Award group bonus points if student is in a group for this subject
     if (sessionRow?.subject && status === 'completed') {
-      const subjectFormatted = (sessionRow.subject as string)
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, (c: string) => c.toUpperCase())
-
-      const { data: memberships } = await db
-        .from('study_group_members')
-        .select('id, points, group_id, study_groups!inner(subject)')
-        .eq('student_id', studentId)
-        .filter('study_groups.subject', 'ilike', `%${subjectFormatted.split(' ')[0]}%`)
-
-      if (memberships && memberships.length > 0) {
-        const today = new Date().toISOString().slice(0, 10)
-        for (const m of memberships) {
-          // Check if already earned group bonus from Compass today (to prevent farming)
-          const { data: alreadyBonused } = await db
-            .from('study_group_answers')
-            .select('id')
-            .eq('group_id', m.group_id)
-            .eq('user_id', access.userId)
-            .gte('created_at', `${today}T00:00:00`)
-            .limit(1)
-            .maybeSingle()
-
-          if (!alreadyBonused) {
-            await db
-              .from('study_group_members')
-              .update({ points: ((m.points as number) ?? 0) + 5 })
-              .eq('id', m.id)
-          }
-        }
-      }
+      await awardCompassGroupBonus({
+        studentId,
+        sessionId,
+        subject: sessionRow.subject as string,
+      }).catch(err => console.error('[learn/end] awardCompassGroupBonus failed', err))
     }
 
     // Update Learner Model — fire and forget. Dual-write with Evidence emission

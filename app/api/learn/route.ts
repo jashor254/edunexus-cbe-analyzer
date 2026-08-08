@@ -2,7 +2,7 @@
 import { createServiceClient } from '@/utils/supabase/service'
 import { streamDeepSeek } from '@/lib/ai/deepseek'
 import { getOrCreateSession, readSession, writeSession, resolveSubject, recordExchange, tierToLevel } from '@/lib/compass/session'
-import { resolveCompassStudentAccess } from '@/lib/compass/ownership'
+import { resolveCompassStudentAccess, resolveSessionOwnership } from '@/lib/compass/ownership'
 import { buildCompassPrompt, type CompassPromptParams, type KnowledgeContextBlock } from '@/lib/compass/prompt'
 import type { RootCauseResult } from '@/lib/knowledgeGraph/types'
 import { getGradeTopics } from '@/lib/compass/topics'
@@ -13,6 +13,8 @@ import { apiError } from '@/lib/api/response'
 import { repos } from '@/lib/repositories'
 
 const FEATURE: FeatureKey = 'learning_compass'
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // Kenya CBC term calendar
 // Term 1: Jan 1 – Apr 11 | Term 2: Apr 29 – Aug 1 | Term 3: Sep 1 – Oct 31
@@ -172,6 +174,21 @@ export async function POST(req: Request) {
     if (!studentResult.data) return apiError('Student not found', 404)
     const ownership = await resolveCompassStudentAccess(access.userId, studentId)
     if (!ownership.allowed) return apiError('Access denied', 403)
+
+    // ── Ownership: verify the supplied session belongs to THIS student ────────
+    // `sessionId` is client-supplied and every write below is addressed by it
+    // through the service client, RLS bypassed — `readSession` is scoped to the
+    // learner but returns null silently, which is not a gate. Without this, a
+    // caller authorized for student A can write transcript, session state and
+    // exchange counts into student B's session by supplying B's session id.
+    // Same check app/api/learn/end/route.ts already makes.
+    if (sessionId) {
+      if (typeof sessionId !== 'string' || !UUID_RE.test(sessionId)) {
+        return apiError('Invalid sessionId', 400)
+      }
+      const sessionOwned = await resolveSessionOwnership(sessionId, studentId)
+      if (!sessionOwned) return apiError('Access denied', 403)
+    }
 
     // Session upsert — only runs once ownership is verified above, since this writes
     // to compass_sessions. Started immediately post-auth if subject is in the request.
@@ -392,6 +409,20 @@ export async function POST(req: Request) {
     let sseBuffer    = ''
     let firstToken   = false
 
+    // Token deduction is kicked off the moment the model produces its first
+    // token — that is the point the AI response has succeeded, and it is the
+    // last point we are guaranteed to reach. `flush` only runs when the stream
+    // is read to completion, so a client that starts reading and then aborts
+    // used to receive the answer for free.
+    let deduction: Promise<void> | null = null
+
+    const deductOnce = (): void => {
+      if (deduction !== null || !access.deductTokens) return
+      deduction = deductFeatureTokens(access.userId, FEATURE, access.cost)
+        .then(() => undefined)
+        .catch(err => { console.error('[learn] token deduction failed:', err) })
+    }
+
     const transformStream = new TransformStream<Uint8Array, Uint8Array>({
       transform(chunk, controller) {
         sseBuffer += new TextDecoder().decode(chunk)
@@ -406,7 +437,10 @@ export async function POST(req: Request) {
             const parsed = JSON.parse(data) as { choices: [{ delta: { content?: string } }] }
             const content = parsed.choices[0]?.delta?.content ?? ''
             if (content) {
-              if (!firstToken) firstToken = true
+              if (!firstToken) {
+                firstToken = true
+                deductOnce()
+              }
               accumulated += content
               controller.enqueue(encoder.encode(content))
             }
@@ -423,6 +457,10 @@ export async function POST(req: Request) {
               const parsed = JSON.parse(data) as { choices: [{ delta: { content?: string } }] }
               const content = parsed.choices[0]?.delta?.content ?? ''
               if (content) {
+                if (!firstToken) {
+                  firstToken = true
+                  deductOnce()
+                }
                 accumulated += content
                 controller.enqueue(encoder.encode(content))
               }
@@ -462,7 +500,18 @@ export async function POST(req: Request) {
 
         // Persist eval results
         if (parsedEval !== null) {
-          const currentSwi = (ctx?.sessions_without_improvement as number | null) ?? 0
+          // Re-read rather than reusing the value loaded at the top of the
+          // request: a full AI turn has streamed since then, and this counter
+          // is also written by concurrent turns and by the assessment
+          // pipeline. Reading here narrows the read-modify-write window from
+          // the whole request to this block.
+          const { data: freshCtx } = await db.from('student_learning_context')
+            .select('sessions_without_improvement')
+            .eq('student_id', studentId)
+            .maybeSingle()
+          const currentSwi = (freshCtx?.sessions_without_improvement as number | null)
+            ?? (ctx?.sessions_without_improvement as number | null)
+            ?? 0
           try {
             await db.from('compass_sessions')
               .update({ one_line_summary: parsedEval.one_line_summary })
@@ -522,10 +571,9 @@ export async function POST(req: Request) {
           },
         ])
 
-        // Deduct tokens
-        if (access.deductTokens) {
-          await deductFeatureTokens(access.userId, FEATURE, access.cost)
-        }
+        // Deduction was started at the first token (see deductOnce) — settle it
+        // here so it completes before the response closes on the happy path.
+        if (deduction !== null) await deduction
       },
     })
 
