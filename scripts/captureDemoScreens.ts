@@ -159,14 +159,21 @@ async function capture(page: Page, target: Target, outDir: string): Promise<'ok'
 
   await page.waitForTimeout(target.settleMs ?? 2_500)
 
-  // Dismiss the first-run tour. This is a real control a real user clicks —
-  // not retouching. Leaving it up would cover the screen the slide is about.
-  for (const label of ['Explore myself', 'Explore Myself']) {
-    const dismiss = page.getByRole('button', { name: label })
-    if (await dismiss.count() > 0) {
-      try { await dismiss.first().click({ timeout: 3_000 }); await page.waitForTimeout(600) } catch { /* already gone */ }
-      break
-    }
+  // Fallback for anything the seeded storage did not suppress: click the real
+  // dismiss control, then confirm it is actually gone before shooting. The
+  // previous single-shot attempt fired before the tour had mounted, which is
+  // how a tour prompt ended up baked into a shipped screenshot.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const dismiss = page.getByRole('button', { name: /explore myself/i })
+    if (await dismiss.count() === 0) break
+    try { await dismiss.first().click({ timeout: 3_000 }) } catch { /* gone mid-click */ }
+    await page.waitForTimeout(700)
+  }
+
+  const tourStillUp = await page.getByText(/Karibu, Mwalimu|Hey, Superstar/i).count()
+  if (tourStillUp > 0) {
+    console.warn(`  ! first-run tour still visible on ${target.url} — not shooting this one`)
+    return 'failed'
   }
 
   if (target.anchorText) {
@@ -222,6 +229,25 @@ async function main() {
     colorScheme: 'dark',
   })
   await context.addCookies(cookies)
+
+  // Mark the first-run tours as already seen, before any page script runs.
+  // The "Karibu, Mwalimu!" tutorial and the onboarding video modal both gate
+  // on localStorage, so this puts the capture browser in the state a real
+  // teacher's browser is in from their second visit onward. That is more
+  // honest than hiding the overlay with CSS — the product is not altered,
+  // and a screenshot of a first-run prompt is not what these slides are
+  // about. Keys are read from the components themselves:
+  // components/teacher/TeacherOnboardingTutorial.tsx and
+  // components/video-onboarding-modal.tsx.
+  await context.addInitScript(() => {
+    try {
+      localStorage.setItem('hasSeenTeacherTutorial', 'true')
+      for (const role of ['teacher', 'parent', 'student', 'admin']) {
+        localStorage.setItem(`edunexus_onboarding_v1_${role}`, 'true')
+      }
+    } catch { /* storage unavailable — the click fallback below still applies */ }
+  })
+
   const page = await context.newPage()
 
   // Find a learner whose Blueprint actually renders. The Coherence Engine

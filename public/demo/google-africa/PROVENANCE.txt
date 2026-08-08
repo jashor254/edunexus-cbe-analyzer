@@ -1,7 +1,7 @@
 Captured by scripts/captureDemoScreens.ts from the running application.
 School:  Mwatate Ridge Senior School (synthetic reference-school fixture)
 Teacher: Chepkorir Wanjiru (synthetic)
-Captured: 2026-08-08T13:50:38.463Z
+Captured: 2026-08-08T17:45:19.171Z
 
 No real learner, teacher, school or guardian appears in these images.
 Re-run the script to refresh them after a UI change.
