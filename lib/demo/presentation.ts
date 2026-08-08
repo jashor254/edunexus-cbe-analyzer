@@ -137,12 +137,32 @@ export const DEMO_SLIDES: readonly DemoSlide[] = [
     headline: 'Start with one school.',
     support: 'Learn from real evidence. Improve from there.',
     visual: { kind: 'closing' },
-    // null = the presentation holds here. It never loops back on its own.
-    durationMs: null,
+    // Held a beat longer than any other slide so the closing line lands before
+    // the presentation wraps. `null` here would mean "stop forever" — see
+    // DEMO_LOOPS below.
+    durationMs: 14_000,
   },
 ] as const
 
 export const DEMO_SLIDE_COUNT = DEMO_SLIDES.length
+
+/**
+ * Whether the presentation runs continuously.
+ *
+ * `true` — the deck wraps from the closing slide back to the first and keeps
+ * going, and navigation wraps in both directions, so it never reaches a dead
+ * end. This is what a reviewer who leaves the tab open, or a screen at a
+ * stand, actually wants.
+ *
+ * `false` — autoplay stops on the closing slide and only a deliberate Replay
+ * restarts it.
+ *
+ * A single switch, deliberately: which of the two a presentation should do is
+ * a judgement about the audience, not something to be inferred from scattered
+ * conditionals. Everything downstream — the reducer, the controls, and the
+ * offline build — reads this one value.
+ */
+export const DEMO_LOOPS = true
 
 /** Shown small and persistently, so no screen is ever mistaken for live school data. */
 export const DEMO_DATA_QUALIFIER = 'Product screens use reference-school / test data.'

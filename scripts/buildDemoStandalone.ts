@@ -22,6 +22,7 @@ import {
   DEMO_ASSETS,
   DEMO_ASSET_DIR,
   DEMO_DATA_QUALIFIER,
+  DEMO_LOOPS,
   type DemoSlide,
 } from '../lib/demo/presentation'
 
@@ -148,6 +149,7 @@ function renderSlide(slide: DemoSlide, index: number, assets: Record<string, str
 
 function renderHtml(assets: Record<string, string>): string {
   const durations = JSON.stringify(DEMO_SLIDES.map(s => s.durationMs))
+  const loops = DEMO_LOOPS ? 'true' : 'false'
   const attached = Object.keys(assets).length
 
   return `<!doctype html>
@@ -270,6 +272,7 @@ function renderHtml(assets: Record<string, string>): string {
   // loops; manual navigation never resumes a paused deck; reduced motion
   // disables autoplay entirely while leaving the buttons working.
   var DURATIONS = ${durations};
+  var LOOPS = ${loops};
   var COUNT = DURATIONS.length;
   var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
   var pips = Array.prototype.slice.call(document.querySelectorAll('#progress span'));
@@ -284,18 +287,23 @@ function renderHtml(assets: Record<string, string>): string {
   var timer = null;
 
   function isLast(i) { return i >= COUNT - 1; }
+  function resolve(i) {
+    // Looping wraps both ways so the deck never reaches a dead end.
+    if (!LOOPS) return Math.min(Math.max(i, 0), COUNT - 1);
+    return ((i % COUNT) + COUNT) % COUNT;
+  }
 
   function render() {
     slides.forEach(function (el, i) {
       if (i === index) { el.removeAttribute('hidden'); }
       else { el.setAttribute('hidden', ''); }
     });
-    pips.forEach(function (p, i) { p.className = i <= index ? 'on' : ''; });
+    pips.forEach(function (p, i) { p.className = (LOOPS ? i === index : i <= index) ? 'on' : ''; });
 
-    prevBtn.disabled = index === 0;
-    nextBtn.disabled = isLast(index);
+    prevBtn.disabled = !LOOPS && index === 0;
+    nextBtn.disabled = !LOOPS && isLast(index);
 
-    if (isLast(index)) {
+    if (!LOOPS && isLast(index)) {
       playBtn.textContent = 'Replay presentation';
       playBtn.setAttribute('aria-label', 'Replay presentation from the beginning');
       playBtn.removeAttribute('aria-pressed');
@@ -317,17 +325,17 @@ function renderHtml(assets: Record<string, string>): string {
   }
 
   function goTo(target) {
-    var next = Math.min(Math.max(target, 0), COUNT - 1);
+    var next = resolve(target);
     if (next === index) { schedule(); return; }
     index = next;
-    if (isLast(index)) playing = false;   // the deck holds at the end
+    if (!LOOPS && isLast(index)) playing = false;   // holds at the end
     render();
   }
 
   prevBtn.addEventListener('click', function () { goTo(index - 1); });
   nextBtn.addEventListener('click', function () { goTo(index + 1); });
   playBtn.addEventListener('click', function () {
-    if (isLast(index)) { index = 0; playing = !reduced; render(); return; }
+    if (!LOOPS && isLast(index)) { index = 0; playing = !reduced; render(); return; }
     if (reduced) return;
     playing = !playing;
     render();
@@ -347,7 +355,7 @@ function renderHtml(assets: Record<string, string>): string {
     else if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(index - 1); }
     else if (e.key === ' ' && !onControl) {
       e.preventDefault();
-      if (!isLast(index) && !reduced) { playing = !playing; render(); }
+      if ((LOOPS || !isLast(index)) && !reduced) { playing = !playing; render(); }
     }
   });
 

@@ -8,6 +8,8 @@
 // timer and the event listeners; every decision about what those events mean
 // is here.
 
+import { DEMO_LOOPS } from './presentation'
+
 export type PresentationState = {
   /** Current slide index. Always within [0, slideCount - 1]. */
   index: number
@@ -43,22 +45,37 @@ export function createInitialState(autoplayAllowed: boolean): PresentationState 
   return { index: 0, isPlaying: autoplayAllowed, autoplayAllowed }
 }
 
-function clamp(index: number, slideCount: number): number {
-  return Math.min(Math.max(index, 0), Math.max(slideCount - 1, 0))
+/**
+ * Resolves a target index.
+ *
+ * A looping deck wraps in both directions — past the end returns to the start,
+ * before the start returns to the end — so a continuously running presentation
+ * never reaches a dead end or a disabled control. A non-looping deck clamps.
+ */
+function resolveIndex(target: number, slideCount: number, loop: boolean): number {
+  if (slideCount <= 0) return 0
+  if (!loop) return Math.min(Math.max(target, 0), slideCount - 1)
+  return ((target % slideCount) + slideCount) % slideCount
 }
 
 /**
- * Moves to `target`, applying the one rule that governs the end of the
- * presentation: arriving at the final slide always stops autoplay. The
- * presentation holds there until the viewer chooses Replay — it never restarts
- * itself, however it got there.
+ * Moves to `target`.
+ *
+ * When the deck does not loop, arriving at the final slide always stops
+ * autoplay — it holds there until the viewer chooses Replay, however it got
+ * there. A looping deck never stops on arrival; that is the whole point.
  */
-function moveTo(state: PresentationState, target: number, slideCount: number): PresentationState {
-  const index = clamp(target, slideCount)
+function moveTo(
+  state: PresentationState,
+  target: number,
+  slideCount: number,
+  loop: boolean,
+): PresentationState {
+  const index = resolveIndex(target, slideCount, loop)
   return {
     ...state,
     index,
-    isPlaying: isLastSlide(index, slideCount) ? false : state.isPlaying,
+    isPlaying: !loop && isLastSlide(index, slideCount) ? false : state.isPlaying,
   }
 }
 
@@ -66,6 +83,7 @@ export function presentationReducer(
   state: PresentationState,
   action: PresentationAction,
   slideCount: number,
+  loop: boolean = DEMO_LOOPS,
 ): PresentationState {
   switch (action.type) {
     case 'advance':
@@ -73,22 +91,23 @@ export function presentationReducer(
       // that arrives while paused (or after reduced motion was turned on) is
       // ignored rather than silently moving the presentation on.
       if (!state.isPlaying || !state.autoplayAllowed) return state
-      return moveTo(state, state.index + 1, slideCount)
+      return moveTo(state, state.index + 1, slideCount, loop)
 
     case 'next':
       // Manual navigation works whether playing or paused, and does not
       // resume a paused presentation — the viewer stays in control.
-      return moveTo(state, state.index + 1, slideCount)
+      return moveTo(state, state.index + 1, slideCount, loop)
 
     case 'prev':
-      return moveTo(state, state.index - 1, slideCount)
+      return moveTo(state, state.index - 1, slideCount, loop)
 
     case 'togglePlay': {
       if (!state.autoplayAllowed) return state
-      // Nothing to play toward on the final slide; Replay is the affordance
-      // there, so this is a no-op rather than a button that appears to work
-      // and then immediately stops itself.
-      if (!state.isPlaying && isLastSlide(state.index, slideCount)) return state
+      // On a non-looping deck there is nothing to play toward from the final
+      // slide, so this is a no-op rather than a button that appears to work
+      // and then immediately stops itself. A looping deck always has a next
+      // slide, so play always means something.
+      if (!loop && !state.isPlaying && isLastSlide(state.index, slideCount)) return state
       return { ...state, isPlaying: !state.isPlaying }
     }
 

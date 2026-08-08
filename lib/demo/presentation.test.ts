@@ -4,10 +4,11 @@
 // boundary that keeps it a presentation.
 //
 // Autoplay is tested through the pure reducer rather than a rendered DOM —
-// the rules a reviewer actually experiences (it advances, it pauses, it stops
-// at the end and never loops) are decisions, and they live in one place. The
-// component's timer and listeners are deliberately not tested; per the brief,
-// animation internals are not the point.
+// the rules a reviewer actually experiences (it advances, it pauses, it runs
+// continuously) are decisions, and they live in one place. Both modes of the
+// DEMO_LOOPS switch are covered, so flipping it back stays a one-line change.
+// The component's timer and listeners are deliberately not tested; per the
+// brief, animation internals are not the point.
 //
 // Run: npx tsx --test lib/demo/presentation.test.ts
 
@@ -22,6 +23,7 @@ import {
   DEMO_SLIDE_COUNT,
   DEMO_ASSETS,
   DEMO_DATA_QUALIFIER,
+  DEMO_LOOPS,
 } from './presentation'
 import {
   createInitialState,
@@ -31,23 +33,14 @@ import {
 } from './presentationController'
 
 const COUNT = DEMO_SLIDE_COUNT
+/** The configured behaviour — what a viewer actually gets. */
 const reduce = (state: PresentationState, action: Parameters<typeof presentationReducer>[1]) =>
-  presentationReducer(state, action, COUNT)
+  presentationReducer(state, action, COUNT, DEMO_LOOPS)
+/** The non-looping behaviour, still supported behind the DEMO_LOOPS switch. */
+const reduceOnce = (state: PresentationState, action: Parameters<typeof presentationReducer>[1]) =>
+  presentationReducer(state, action, COUNT, false)
 
 const playing = (): PresentationState => createInitialState(true)
-
-/** Runs autoplay to a standstill, returning the final state and tick count. */
-function runAutoplay(from: PresentationState): { state: PresentationState; ticks: number } {
-  let state = from
-  let ticks = 0
-  for (let i = 0; i < COUNT * 3; i++) {
-    const next = reduce(state, { type: 'advance' })
-    if (next === state) break
-    state = next
-    ticks++
-  }
-  return { state, ticks }
-}
 
 // ── The story ────────────────────────────────────────────────────────────────
 
@@ -80,10 +73,14 @@ test('every slide has one headline and no paragraph-length copy', () => {
   }
 })
 
-test('only the final slide holds; every other slide has a dwell time', () => {
+test('every slide has a dwell time, with the closing beat held longest', () => {
   const durations = DEMO_SLIDES.map(s => s.durationMs)
   assert.deepEqual(durations.slice(0, -1), [8_000, 11_000, 12_000, 12_000, 12_000, 11_000, 11_000])
-  assert.equal(durations.at(-1), null, 'the closing slide must not schedule an advance')
+  assert.equal(durations.at(-1), 14_000, 'the closing line needs a beat before the deck wraps')
+  assert.ok(
+    durations.every(d => d !== null),
+    'a null duration would stop the deck dead; DEMO_LOOPS governs that instead',
+  )
 })
 
 test('every screenshot slide carries meaningful alt text, not a filename', () => {
@@ -114,18 +111,31 @@ test('autoplay starts on the first slide and advances', () => {
   assert.equal(after.isPlaying, true)
 })
 
-test('autoplay reaches the final slide and stops there', () => {
-  const { state, ticks } = runAutoplay(playing())
-  assert.equal(state.index, COUNT - 1, 'should end on the closing slide')
-  assert.equal(state.isPlaying, false, 'autoplay must stop, not hold a live timer')
-  assert.equal(ticks, COUNT - 1, 'one advance per slide transition, no extras')
+test('the deck runs continuously, wrapping from the closing slide to the first', () => {
+  let state = playing()
+  for (let i = 0; i < COUNT - 1; i++) state = reduce(state, { type: 'advance' })
+  assert.equal(state.index, COUNT - 1, 'reaches the closing slide')
+  assert.equal(state.isPlaying, true, 'and keeps running')
+
+  state = reduce(state, { type: 'advance' })
+  assert.equal(state.index, 0, 'wraps back to the opening slide')
+  assert.equal(state.isPlaying, true, 'without needing anyone to press anything')
 })
 
-test('the final slide never loops back to the start on its own', () => {
-  const { state } = runAutoplay(playing())
-  const later = reduce(state, { type: 'advance' })
-  assert.equal(later.index, COUNT - 1, 'it must stay on the closing slide')
-  assert.equal(later.isPlaying, false)
+test('it keeps cycling indefinitely, never settling', () => {
+  let state = playing()
+  for (let i = 0; i < COUNT * 3; i++) state = reduce(state, { type: 'advance' })
+  assert.equal(state.isPlaying, true, 'three full passes and still running')
+  assert.equal(state.index, (COUNT * 3) % COUNT)
+})
+
+test('non-looping mode still stops dead on the closing slide', () => {
+  // The behaviour DEMO_LOOPS switches away from, kept working and covered so
+  // flipping the constant back is a one-line change, not a rewrite.
+  let state = playing()
+  for (let i = 0; i < COUNT * 2; i++) state = reduceOnce(state, { type: 'advance' })
+  assert.equal(state.index, COUNT - 1)
+  assert.equal(state.isPlaying, false)
 })
 
 test('pause stops advancing, and play resumes from where it stopped', () => {
@@ -144,16 +154,24 @@ test('pause stops advancing, and play resumes from where it stopped', () => {
 
 // ── Manual navigation ────────────────────────────────────────────────────────
 
-test('next and previous move one slide and clamp at both ends', () => {
+test('next and previous wrap in both directions — no dead ends', () => {
   let state = playing()
-  assert.equal(reduce(state, { type: 'prev' }).index, 0, 'cannot go back past the first slide')
+  assert.equal(reduce(state, { type: 'prev' }).index, COUNT - 1,
+    'back from the first slide reaches the last')
 
   state = reduce(state, { type: 'next' })
   assert.equal(state.index, 1)
   assert.equal(reduce(state, { type: 'prev' }).index, 0)
 
-  for (let i = 0; i < COUNT * 2; i++) state = reduce(state, { type: 'next' })
-  assert.equal(state.index, COUNT - 1, 'cannot go forward past the closing slide')
+  for (let i = 0; i < COUNT - 1; i++) state = reduce(state, { type: 'next' })
+  assert.equal(state.index, 0, 'forward past the closing slide returns to the start')
+})
+
+test('non-looping mode clamps at both ends instead of wrapping', () => {
+  let state = playing()
+  assert.equal(reduceOnce(state, { type: 'prev' }).index, 0)
+  for (let i = 0; i < COUNT * 2; i++) state = reduceOnce(state, { type: 'next' })
+  assert.equal(state.index, COUNT - 1)
 })
 
 test('manual navigation does not resume a paused presentation', () => {
@@ -163,20 +181,31 @@ test('manual navigation does not resume a paused presentation', () => {
   assert.equal(state.isPlaying, false, 'the viewer chose to pause; Next must not undo that')
 })
 
-test('navigating manually to the final slide also stops autoplay', () => {
+test('reaching the closing slide manually does not stop a looping deck', () => {
   let state = playing()
   for (let i = 0; i < COUNT - 1; i++) state = reduce(state, { type: 'next' })
   assert.equal(state.index, COUNT - 1)
-  assert.equal(state.isPlaying, false, 'however the closing slide is reached, it holds')
+  assert.equal(state.isPlaying, true, 'it carries on round')
 })
 
-test('play is a no-op on the final slide — Replay is the affordance there', () => {
-  const { state } = runAutoplay(playing())
-  assert.equal(reduce(state, { type: 'togglePlay' }), state)
+test('non-looping mode stops however the closing slide is reached', () => {
+  let state = playing()
+  for (let i = 0; i < COUNT - 1; i++) state = reduceOnce(state, { type: 'next' })
+  assert.equal(state.isPlaying, false)
 })
 
-test('replay returns to the start and plays again, only when asked', () => {
-  const { state } = runAutoplay(playing())
+test('pause and play work on every slide, including the closing one', () => {
+  let state = playing()
+  for (let i = 0; i < COUNT - 1; i++) state = reduce(state, { type: 'next' })
+  state = reduce(state, { type: 'togglePlay' })
+  assert.equal(state.isPlaying, false, 'a viewer can hold the closing slide')
+  state = reduce(state, { type: 'togglePlay' })
+  assert.equal(state.isPlaying, true, 'and set it running again')
+})
+
+test('replay returns to the start and plays again', () => {
+  let state = playing()
+  for (let i = 0; i < COUNT - 1; i++) state = reduce(state, { type: 'next' })
   const replayed = reduce(state, { type: 'replay' })
   assert.equal(replayed.index, 0)
   assert.equal(replayed.isPlaying, true)
@@ -328,7 +357,10 @@ test('the standalone build carries the same story and timings as the route', () 
 
     const durations = JSON.stringify(DEMO_SLIDES.map(s => s.durationMs))
     assert.ok(html.includes(`var DURATIONS = ${durations}`), 'standalone timings drifted from the route')
-    assert.ok(html.includes('null]'), 'the closing slide must still hold in the standalone build')
+    assert.ok(
+      html.includes(`var LOOPS = ${DEMO_LOOPS ? 'true' : 'false'}`),
+      'the offline copy must run continuously exactly as the route does',
+    )
   } finally {
     rmSync(out, { force: true })
   }

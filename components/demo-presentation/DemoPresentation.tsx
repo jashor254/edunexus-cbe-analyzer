@@ -15,6 +15,7 @@ import {
   DEMO_SLIDES,
   DEMO_SLIDE_COUNT,
   DEMO_DATA_QUALIFIER,
+  DEMO_LOOPS,
 } from '@/lib/demo/presentation'
 import {
   createInitialState,
@@ -28,7 +29,7 @@ import { DemoSlideView } from './DemoSlide'
 const SWIPE_THRESHOLD_PX = 48
 
 function reducer(state: PresentationState, action: PresentationAction): PresentationState {
-  return presentationReducer(state, action, DEMO_SLIDE_COUNT)
+  return presentationReducer(state, action, DEMO_SLIDE_COUNT, DEMO_LOOPS)
 }
 
 export function DemoPresentation({ availableAssets }: { availableAssets: readonly string[] }) {
@@ -64,8 +65,9 @@ export function DemoPresentation({ availableAssets }: { availableAssets: readonl
 
   // ── The autoplay timer ────────────────────────────────────────────────────
   // Suspended — not reset — while the viewer is focused in or hovering the
-  // controls, or while the tab is hidden. A slide with a null duration (the
-  // closing beat) schedules nothing at all, so the presentation simply holds.
+  // controls, or while the tab is hidden. Every slide carries a dwell time, so
+  // the deck runs continuously; a null duration would mean "hold here forever"
+  // and is what DEMO_LOOPS = false expresses instead.
   const suspended = hovered || tabHidden
   const durationMs = slide.durationMs
 
@@ -134,7 +136,7 @@ export function DemoPresentation({ availableAssets }: { availableAssets: readonl
             <li key={s.id} className="h-0.5 flex-1 overflow-hidden rounded-full bg-white/10">
               <span
                 className={`block h-full rounded-full transition-colors duration-500 ${
-                  i <= index ? 'bg-(--demo-teal)' : 'bg-transparent'
+                  (DEMO_LOOPS ? i === index : i <= index) ? 'bg-(--demo-teal)' : 'bg-transparent'
                 }`}
               />
               <span className="sr-only">{s.label}</span>
@@ -170,14 +172,14 @@ export function DemoPresentation({ availableAssets }: { availableAssets: readonl
             <button
               type="button"
               onClick={() => dispatch({ type: 'prev' })}
-              disabled={index === 0}
+              disabled={!DEMO_LOOPS && index === 0}
               aria-label="Previous slide"
               className="demo-control"
             >
               Previous
             </button>
 
-            {onLastSlide ? (
+            {!DEMO_LOOPS && onLastSlide ? (
               <button
                 type="button"
                 onClick={() => dispatch({ type: 'replay' })}
@@ -202,7 +204,7 @@ export function DemoPresentation({ availableAssets }: { availableAssets: readonl
             <button
               type="button"
               onClick={() => dispatch({ type: 'next' })}
-              disabled={onLastSlide}
+              disabled={!DEMO_LOOPS && onLastSlide}
               aria-label="Next slide"
               className="demo-control"
             >
