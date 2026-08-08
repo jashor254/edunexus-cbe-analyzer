@@ -127,7 +127,7 @@ export function DemoPresentation({ availableAssets }: { availableAssets: readonl
       onTouchEnd={onTouchEnd}
     >
       {/* ── Progress ──────────────────────────────────────────────────────── */}
-      <div className="px-6 pt-6 md:px-10">
+      <div className="px-6 pt-4 md:px-10">
         <ol
           className="mx-auto flex max-w-6xl items-center gap-1.5"
           aria-label={`Presentation progress: slide ${index + 1} of ${DEMO_SLIDE_COUNT}`}
@@ -163,7 +163,7 @@ export function DemoPresentation({ availableAssets }: { availableAssets: readonl
 
       {/* ── Controls ──────────────────────────────────────────────────────── */}
       <footer
-        className="px-6 pb-7 md:px-10"
+        className="px-6 pb-4 md:px-10"
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >

@@ -13,7 +13,7 @@ function WorkflowSteps({ steps }: { steps: string[] }) {
     <ol className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
       {steps.map((step, i) => (
         <li key={step} className="flex items-center gap-3">
-          <span className="rounded-md border border-(--demo-line-strong) bg-(--demo-ink-soft) px-4 py-2 text-sm font-medium text-(--demo-paper) md:text-base">
+          <span className="rounded-md border border-(--demo-line-strong) bg-(--demo-ink-soft) px-3 py-1.5 text-sm font-medium text-(--demo-paper)">
             {step}
           </span>
           {i < steps.length - 1 && (
@@ -92,7 +92,7 @@ function SlideVisual({
   const steps = visual.kind === 'workflow' ? slide.points ?? [] : []
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-3">
       {steps.length > 0 && <WorkflowSteps steps={steps} />}
       {file && (
         <ScreenshotFrame
@@ -119,17 +119,38 @@ export function DemoSlideView({
   const isTitle = slide.visual.kind === 'wordmark' || slide.visual.kind === 'closing'
   const showPointsAsList = slide.points && slide.points.length > 0 && slide.visual.kind !== 'workflow'
 
+  // Slides 4-7 carry a product screenshot, and on a laptop the screenshot is
+  // the thing a reviewer is trying to read. They get a wider measure and a
+  // tighter vertical rhythm so the space goes to the image rather than to
+  // padding; the title and closing beats keep the roomier setting, which suits
+  // large type on a near-empty slide.
+  const isMedia = slide.visual.kind === 'screenshot' || slide.visual.kind === 'workflow'
+
+  // The screenshot is capped against the chrome that shares the fold with it
+  // (progress bar, headline, controls) rather than a fixed fraction of the
+  // viewport — so it fills whatever is genuinely left, at any window height,
+  // and can never push the controls below the fold. The workflow slide's step
+  // strip sits above its screenshot, so that slide reserves more.
+  const shotMax = slide.visual.kind === 'workflow'
+    ? 'calc(100svh - 15.5rem)'
+    : 'calc(100svh - 11.5rem)'
+
   return (
     <div
-      className={`mx-auto flex w-full max-w-6xl flex-col justify-center gap-8 px-6 py-10 md:gap-10 md:px-10 ${
-        isTitle ? 'items-center text-center' : ''
-      }`}
+      style={isMedia ? ({ '--demo-shot-max': shotMax } as React.CSSProperties) : undefined}
+      className={`mx-auto flex w-full flex-col justify-center px-6 ${
+        isMedia
+          ? 'max-w-[1400px] gap-3 py-2 md:gap-4 md:px-8'
+          : 'max-w-6xl gap-8 py-10 md:gap-10 md:px-10'
+      } ${isTitle ? 'items-center text-center' : ''}`}
     >
-      <header className={isTitle ? '' : 'max-w-3xl'}>
+      <header className={isTitle ? '' : isMedia ? 'max-w-4xl' : 'max-w-3xl'}>
         <h2
           className={`font-(--font-demo-heading) font-bold tracking-tight text-(--demo-paper) ${
             isTitle
               ? 'text-4xl sm:text-5xl md:text-6xl lg:text-7xl'
+              : isMedia
+              ? 'text-2xl sm:text-[1.75rem] md:text-3xl lg:text-[2rem]'
               : 'text-2xl sm:text-3xl md:text-4xl lg:text-[2.75rem]'
           }`}
         >
@@ -138,8 +159,12 @@ export function DemoSlideView({
 
         {slide.support && (
           <p
-            className={`mt-4 leading-relaxed text-(--demo-muted) ${
-              isTitle ? 'text-lg sm:text-xl md:text-2xl' : 'text-base md:text-lg lg:text-xl'
+            className={`leading-relaxed text-(--demo-muted) ${
+              isTitle
+                ? 'mt-4 text-lg sm:text-xl md:text-2xl'
+                : isMedia
+                ? 'mt-1.5 text-sm md:text-[0.95rem] lg:text-base'
+                : 'mt-4 text-base md:text-lg lg:text-xl'
             }`}
           >
             {slide.support}

@@ -47,15 +47,20 @@ export function ScreenshotFrame({
 
   return (
     <figure className="w-full">
-      <div className="overflow-hidden rounded-xl border border-(--demo-line-strong) bg-(--demo-ink-soft) shadow-[0_18px_50px_-24px_rgba(0,0,0,0.8)]">
+      {/* Sized by whichever runs out first: the available width, or the height
+          left over after the slide's own chrome (--demo-shot-max, set by the
+          slide). That way the screenshot fills the fold without ever pushing
+          the controls off it. `object-contain` against the intrinsic 2400x1500
+          keeps the aspect ratio exactly — nothing stretched, nothing cropped. */}
+      <div className="mx-auto w-fit max-w-full overflow-hidden rounded-xl border border-(--demo-line-strong) bg-(--demo-ink-soft) shadow-[0_18px_50px_-24px_rgba(0,0,0,0.8)]">
         <Image
           src={src}
           alt={alt}
           width={2400}
           height={1500}
           priority={priority}
-          sizes="(max-width: 768px) 100vw, (max-width: 1280px) 90vw, 1100px"
-          className="h-auto w-full"
+          sizes="(max-width: 768px) 100vw, (max-width: 1280px) 95vw, 1360px"
+          className="h-auto max-h-(--demo-shot-max) w-auto max-w-full object-contain"
         />
       </div>
     </figure>
