@@ -11,6 +11,7 @@ import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
 import { type FeatureKey } from '@/lib/payments/config'
 import { apiError } from '@/lib/api/response'
 import { repos } from '@/lib/repositories'
+import { logger } from '@/lib/observability/logger'
 
 const FEATURE: FeatureKey = 'learning_compass'
 
@@ -346,12 +347,28 @@ export async function POST(req: Request) {
       knowledgeContext = { ...knowledgeContext, graphOpener: true }
     }
 
-    // Record starting level on new sessions so completion screen can show level gained
-    if (session.isNew) {
-      void db.from('compass_sessions')
-        .update({ starting_level: level })
-        .eq('id', activeSessionId)
-    }
+    // Record starting level on new sessions so completion screen can show level gained.
+    //
+    // This was `void db.from(...).update(...)`. A PostgREST query builder is a
+    // lazy thenable — it issues no request until something calls `.then()`, and
+    // `void` never does. The update was therefore never sent: `starting_level`
+    // is null on every session row in the database, which makes `levelGained`
+    // permanently false in app/api/learn/end/route.ts and the completion
+    // screen's "level gained" unreachable. Calling `.then()` is what actually
+    // runs it; it is settled in `flush` so it stays off the time-to-first-token
+    // path without being dropped.
+    const startingLevelWrite = session.isNew
+      ? db.from('compass_sessions')
+          .update({ starting_level: level })
+          .eq('id', activeSessionId)
+          .then(({ error }) => {
+            if (error) logger.warn(
+              'Failed to record Compass starting level',
+              { operation: 'learn.recordStartingLevel', sessionId: activeSessionId },
+              error,
+            )
+          })
+      : null
 
     // Derived from level
     const languageMode: 'mixed' | 'english-only'                  = level <= 2 ? 'mixed'              : 'english-only'
@@ -389,10 +406,30 @@ export async function POST(req: Request) {
     // costContext resolved server-side (never trusted from the request);
     // a student/parent with no resolvable organization gets no costContext,
     // which is a no-op per lib/ai/deepseek.ts's contract.
-    const [compassOrg] = await repos.organizations.findUserOrganizations(access.userId)
-    const costContext = compassOrg
-      ? { organizationId: compassOrg.id, feature: FEATURE }
-      : undefined
+    //
+    // "No resolvable organization" has to include "the lookup itself failed".
+    // This is cost attribution for an internal dashboard — it is not part of
+    // answering the learner, and it must never be able to end their session.
+    // It could: `organization_members` is absent from this project's schema
+    // (defined in supabase/migrations/20260701_phase8_platform_foundation.sql,
+    // never applied; no entry in lib/database.types.ts), so the repository
+    // threw on every single turn and the route 500'd before DeepSeek was ever
+    // called. Degrading to "unattributed" is the correct failure mode, and it
+    // is logged rather than swallowed so the missing table stays visible.
+    let costContext: { organizationId: string; feature: FeatureKey } | undefined
+    try {
+      const [compassOrg] = await repos.organizations.findUserOrganizations(access.userId)
+      costContext = compassOrg
+        ? { organizationId: compassOrg.id, feature: FEATURE }
+        : undefined
+    } catch (err) {
+      logger.warn(
+        'Compass cost attribution unavailable — continuing without it',
+        { operation: 'learn.resolveCostContext', userId: access.userId },
+        err,
+      )
+      costContext = undefined
+    }
     const rawStream = await streamDeepSeek(systemPrompt, message as string, history, { temperature: 0.3, costContext })
 
     type CompassEval = {
@@ -572,7 +609,9 @@ export async function POST(req: Request) {
         ])
 
         // Deduction was started at the first token (see deductOnce) — settle it
-        // here so it completes before the response closes on the happy path.
+        // here so it completes before the response closes on the happy path,
+        // along with the starting-level write kicked off before streaming.
+        if (startingLevelWrite !== null) await startingLevelWrite
         if (deduction !== null) await deduction
       },
     })
