@@ -284,6 +284,41 @@ async function main() {
   const ok = Object.values(results).filter(r => r === 'ok').length
   console.log(`\n${ok} of ${targets.length} captured into public/${DEMO_ASSET_DIR}/`)
 
+  // Rewrite the manifest the /demo route reads. The route cannot look at the
+  // directory itself — Next forbids filesystem access during static rendering —
+  // so this is what keeps the page honest about which screens are attached.
+  const present = Object.values(DEMO_ASSETS)
+    .filter(file => existsSync(path.join(OUT_DIR, file)))
+    .sort()
+
+  await writeFile(
+    path.join(process.cwd(), 'lib', 'demo', 'availableAssets.ts'),
+    [
+      '// lib/demo/availableAssets.ts',
+      '//',
+      "// Which of the presentation's screenshots are actually present in",
+      '// public/demo/google-africa/.',
+      '//',
+      '// GENERATED — do not edit by hand. `scripts/captureDemoScreens.ts` rewrites',
+      '// this file after every capture run.',
+      '//',
+      '// Why a checked-in manifest rather than reading the directory: /demo is a',
+      '// statically rendered route, and Next does not permit dynamic filesystem',
+      '// access during static rendering. The set of attached screenshots is fixed at',
+      '// build time anyway — it changes only when someone commits new images — so a',
+      '// generated constant is both the honest representation and the one that',
+      '// builds. A file listed here that is missing from disk would 404 its image;',
+      '// a file omitted here renders the "Screen not attached" panel instead.',
+      '',
+      'export const DEMO_AVAILABLE_ASSETS: readonly string[] = [',
+      ...present.map(file => `  '${file}',`),
+      ']',
+      '',
+    ].join('\n'),
+    'utf8',
+  )
+  console.log(`manifest updated: lib/demo/availableAssets.ts (${present.length} attached)`)
+
   // A short provenance note beside the images, so it is always clear what the
   // deck is showing and that the qualifier on the slide is true.
   await writeFile(

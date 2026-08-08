@@ -374,7 +374,7 @@ test('the standalone build is genuinely self-contained', () => {
 
     // It must open by double-clicking, with no network. The only permitted
     // outbound reference is the closing slide's link to the public site.
-    const external = html.match(/(?:src|href)="(https?:\/\/[^"]+)"/g) ?? []
+    const external: string[] = html.match(/(?:src|href)="(https?:\/\/[^"]+)"/g) ?? []
     const unexpected = external.filter(ref => !ref.includes('edunexus.co.ke'))
     assert.deepEqual(unexpected, [], 'standalone build must not fetch anything at open time')
 
