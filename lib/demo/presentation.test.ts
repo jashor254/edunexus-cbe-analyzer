@@ -13,7 +13,10 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, rmSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import {
   DEMO_SLIDES,
   DEMO_SLIDE_COUNT,
@@ -302,6 +305,51 @@ test('no slide claims deployment, adoption, outcomes or accuracy', () => {
   const copy = DEMO_SLIDES.flatMap(s => [s.headline, s.support ?? '', ...(s.points ?? [])]).join(' ')
   for (const pattern of forbidden) {
     assert.ok(!pattern.test(copy), `presentation copy makes a claim it cannot support: ${pattern}`)
+  }
+})
+
+// ── Offline copy ─────────────────────────────────────────────────────────────
+
+test('the standalone build carries the same story and timings as the route', () => {
+  // scripts/buildDemoStandalone.ts exists so the file handed to someone on a
+  // laptop is generated from this module rather than copied by hand. These
+  // assertions are what make "it cannot drift" true rather than merely stated.
+  const out = path.join(tmpdir(), `edunexus-demo-${Date.now()}.html`)
+  try {
+    execFileSync('npx', ['tsx', 'scripts/buildDemoStandalone.ts', out], { stdio: 'pipe' })
+    const html = readFileSync(out, 'utf8')
+
+    for (const slide of DEMO_SLIDES) {
+      assert.ok(
+        html.includes(slide.headline.replace(/&/g, '&amp;')),
+        `standalone build is missing the "${slide.id}" beat`,
+      )
+    }
+
+    const durations = JSON.stringify(DEMO_SLIDES.map(s => s.durationMs))
+    assert.ok(html.includes(`var DURATIONS = ${durations}`), 'standalone timings drifted from the route')
+    assert.ok(html.includes('null]'), 'the closing slide must still hold in the standalone build')
+  } finally {
+    rmSync(out, { force: true })
+  }
+})
+
+test('the standalone build is genuinely self-contained', () => {
+  const out = path.join(tmpdir(), `edunexus-demo-${Date.now()}.html`)
+  try {
+    execFileSync('npx', ['tsx', 'scripts/buildDemoStandalone.ts', out], { stdio: 'pipe' })
+    const html = readFileSync(out, 'utf8')
+
+    // It must open by double-clicking, with no network. The only permitted
+    // outbound reference is the closing slide's link to the public site.
+    const external = html.match(/(?:src|href)="(https?:\/\/[^"]+)"/g) ?? []
+    const unexpected = external.filter(ref => !ref.includes('edunexus.co.ke'))
+    assert.deepEqual(unexpected, [], 'standalone build must not fetch anything at open time')
+
+    assert.ok(!/<script[^>]+src=/.test(html), 'no external script may be referenced')
+    assert.ok(!/<link[^>]+stylesheet/.test(html), 'no external stylesheet may be referenced')
+  } finally {
+    rmSync(out, { force: true })
   }
 })
 
