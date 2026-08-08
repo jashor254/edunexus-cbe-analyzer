@@ -270,17 +270,43 @@ export class AssessmentRepository extends BaseRepository {
       .eq('teacher_id', teacherId)
   }
 
-  async findStudentsByAdmissionNumbers(
-    admNos: string[],
-    teacherId: string,
-  ): Promise<Array<{ id: string; admission_number: string | null }>> {
-    if (admNos.length === 0) return []
-    const { data } = await this.db
+  /**
+   * The class roster, as the set of learners a mark saved against this class
+   * may be linked to.
+   *
+   * Replaces `findStudentsByAdmissionNumbers`, which filtered on
+   * `students.admission_number` — a column that does not exist — and dropped
+   * the resulting error on the floor, silently returning no matches for every
+   * caller. Scoped by class rather than by teacher: a mark belongs to an
+   * assessment, an assessment belongs to a class, and the roster is that
+   * class's definite membership.
+   */
+  async findClassRosterForMarkLinking(
+    classId: string,
+  ): Promise<Array<{ id: string; name: string; external_id: string | null; upi: string | null }>> {
+    const { data: enrolled, error: rosterError } = await this.db
+      .from('class_students')
+      .select('student_id')
+      .eq('class_id', classId)
+
+    if (rosterError) throw new Error(`Failed to fetch class roster: ${rosterError.message}`)
+
+    const studentIds = (enrolled ?? []).map(r => r.student_id as string)
+    if (studentIds.length === 0) return []
+
+    const { data, error } = await this.db
       .from('students')
-      .select('id, admission_number')
-      .in('admission_number', admNos)
-      .eq('teacher_id', teacherId)
-    return data ?? []
+      .select('id, name, external_id, upi')
+      .in('id', studentIds)
+
+    if (error) throw new Error(`Failed to fetch roster learners: ${error.message}`)
+
+    return (data ?? []).map(row => ({
+      id:          row.id          as string,
+      name:        (row.name        as string | null) ?? '',
+      external_id: (row.external_id as string | null) ?? null,
+      upi:         (row.upi         as string | null) ?? null,
+    }))
   }
 
   async insertMarks(
@@ -366,6 +392,7 @@ export class AssessmentRepository extends BaseRepository {
       total_marks: number
       mean_score: number
       mean_grade: string
+      student_id: string | null
       updated_at: string
     }>,
   ): Promise<void> {

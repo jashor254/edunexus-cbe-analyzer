@@ -4,6 +4,7 @@ import { updateFromAssessment } from '@/lib/learnerModel/updater'
 import { publishEvent } from '@/lib/events'
 import { getDefaultPurposeCode } from '@/lib/assessments/assessmentTypeCatalog'
 import { computeRankings } from '@/lib/ranking'
+import { buildMarkLinker } from './markLinking'
 import type { ClassAssessment, LearnerMark, MarkInput, CurriculumType } from './types'
 
 function sumScores(scores: Record<string, number>): number {
@@ -127,14 +128,10 @@ export async function bulkSaveMarks(
 
   if (marks.length === 0) return []
 
-  const admNos = marks.map(m => m.admNo).filter(Boolean) as string[]
-  const studentMap = new Map<string, string>()
-  if (admNos.length > 0) {
-    const students = await repos.assessments.findStudentsByAdmissionNumbers(admNos, teacherId)
-    students.forEach(s => {
-      if (s.admission_number) studentMap.set(s.admission_number, s.id)
-    })
-  }
+  // Link each mark to the learner it belongs to. `student_id` is what
+  // recordAssessmentEvidence attributes Evidence by — a null here means the
+  // mark reaches Projection, Blueprint and Career Intelligence for nobody.
+  const linkLearner = buildMarkLinker(await repos.assessments.findClassRosterForMarkLinking(classId))
 
   const rows = marks.map((m) => {
     const ms = calculateMeanScore(m.subjectScores)
@@ -148,7 +145,7 @@ export async function bulkSaveMarks(
       total_marks:      sumScores(m.subjectScores),
       mean_score:       ms,
       mean_grade:       calculateMeanGrade(ms, maxScore, curriculumType),
-      student_id:       m.admNo ? (studentMap.get(m.admNo) ?? null) : null,
+      student_id:       linkLearner(m),
     }
   })
 
@@ -187,9 +184,16 @@ export async function upsertMarksCSV(
   curriculumType: CurriculumType = 'cbc',
   maxScore: number = 100
 ): Promise<{ inserted: number; updated: number; marks: LearnerMark[] }> {
-  const existingNames = new Set(
-    (await repos.assessments.findExistingMarkNames(assessmentId, teacherId)).map(r => r.student_name)
-  )
+  const [existingMarkNames, roster] = await Promise.all([
+    repos.assessments.findExistingMarkNames(assessmentId, teacherId),
+    repos.assessments.findClassRosterForMarkLinking(classId),
+  ])
+  const existingNames = new Set(existingMarkNames.map(r => r.student_name))
+
+  // The CSV path previously set no `student_id` at all — same consequence as
+  // the manual path's broken lookup: uploaded marks belonged to no learner and
+  // produced no Evidence.
+  const linkLearner = buildMarkLinker(roster)
 
   const rows = marks.map((m) => {
     const ms = calculateMeanScore(m.subjectScores)
@@ -203,6 +207,7 @@ export async function upsertMarksCSV(
       total_marks:      sumScores(m.subjectScores),
       mean_score:       ms,
       mean_grade:       calculateMeanGrade(ms, maxScore, curriculumType),
+      student_id:       linkLearner(m),
       updated_at:       new Date().toISOString(),
     }
   })
