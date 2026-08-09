@@ -139,7 +139,7 @@ export default function LandingPage() {
       subtitle:      'EduNexus shortens the distance between when a learning problem begins and when someone notices — while there is still time to act on it.',
       ctaHref:       '/signup?role=school',
       ctaLabel:      'Create Your School Account',
-      trust:         '✓ CBC · Cambridge IGCSE · 8-4-4  ·  ✓ Grades 7–12  ·  ✓ 50+ pioneer teachers',
+      trust:         '✓ CBC · Cambridge IGCSE · 8-4-4  ·  ✓ Grades 7–12  ·  ✓ Works with your existing school system',
       secondary:     { label: 'Try a real sample report →', action: 'demo' },
       roleColor:     'trustblue',
     }
@@ -325,14 +325,21 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── TRUST BAR ─────────────────────────────────────────────────────────── */}
+      {/* ── CURRICULUM BAR ────────────────────────────────────────────────────
+          States what EduNexus covers, not who uses it. This slot previously
+          carried a trust claim, a pioneer-teacher headcount and a list of
+          cities — none of it supported: the headcount is unverified (the
+          allowlist in lib/config/features.ts is empty) and no evidence of
+          presence in any named city exists. Curriculum and grade coverage is
+          a fact about the product, and is what belongs here. Do not
+          reintroduce an adoption or geographic claim without evidence. */}
       <section className="py-10 md:py-12">
         <div className="max-w-275 mx-auto px-6">
           <p className="text-center text-sm font-semibold text-white/40 uppercase tracking-widest mb-1">
-            Trusted by CBC and 8-4-4 teachers across Kenya
+            Built for the Kenyan curriculum
           </p>
           <p className="text-center text-xs text-white/50">
-            50+ pioneer teachers &nbsp;·&nbsp; Nairobi, Kisumu, Nakuru &nbsp;·&nbsp; CBC · 8-4-4 · Cambridge IGCSE
+            CBC Junior (Grade 7–9) &nbsp;·&nbsp; CBC Senior (Grade 10–12) &nbsp;·&nbsp; 8-4-4 &nbsp;·&nbsp; Cambridge IGCSE
           </p>
         </div>
       </section>

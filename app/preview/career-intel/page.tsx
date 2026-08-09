@@ -198,7 +198,7 @@ const PRESENTATION_HTML = `
   <div class="scene" id="sc7">
     <p class="cta-pre anim anim-d1">✦ Take action today</p>
     <h2 class="cta-main anim anim-d2">Mtoto wako ana<br><span>future yake</span>.<br>Je, umeiona?</h2>
-    <p class="cta-sub anim anim-d3">Jiunge na wazazi 50+ wa pioneer<br>wanaotumia EduNexus Career Intelligence<br>kuandaa watoto wao kwa dunia ya kweli.</p>
+    <p class="cta-sub anim anim-d3">Anza na EduNexus Career Intelligence<br>uone njia halisi za mtoto wako<br>kwa dunia ya kweli.</p>
     <button class="cta-btn anim anim-d4">Jaribu Bure Leo →</button>
     <p class="cta-url anim anim-d5"><strong>edunexus.co.ke</strong></p>
     <div class="cta-logos anim anim-d6"><span>CBC · 8-4-4 · IGCSE</span></div>
