@@ -38,6 +38,11 @@ const PUBLIC_PREFIXES = [
   '/school-concepts',
   // Public reviewer presentation — static slides, no product data, no login.
   '/demo',
+  // The pitch deck, for the same reason: a static, self-contained document
+  // shared by link with people who have no EduNexus account and must not be
+  // asked for one. Noindex (app/pitch/layout.tsx and app/robots.ts) — public
+  // to anyone holding the link, never discoverable.
+  '/pitch',
   '/payment',
   '/_next',
   '/favicon',
