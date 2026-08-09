@@ -45,6 +45,14 @@ const PUBLIC_PREFIXES = [
   '/pitch',
   '/payment',
   '/_next',
+  // Vercel platform assets — `@vercel/analytics`'s <Analytics /> in
+  // app/layout.tsx loads /_vercel/insights/script.js on every page. Without
+  // this the middleware redirected that request to /login, the browser
+  // received HTML where it expected JavaScript, and every page in the site
+  // threw "Unexpected token '<'" while analytics silently never loaded.
+  // Found on /pitch and /demo during the ship pass; it was never specific to
+  // them. This path is platform-reserved and never serves user content.
+  '/_vercel',
   '/favicon',
   '/site.webmanifest',
   '/manifest.json',
