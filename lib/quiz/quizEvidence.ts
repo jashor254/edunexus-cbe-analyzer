@@ -30,6 +30,7 @@ import type { LearnerEvidence, AdaptiveDeliveryPayload } from '@/lib/intelligenc
 import { EVIDENCE_SOURCE_TRUST_TIER } from '@/lib/intelligence/evidence'
 import { computeConfidence, resolveReviewStatus } from '@/lib/intelligence/confidence'
 import { persistEvidenceBatch } from '@/lib/intelligence/evidenceLifecycle'
+import { quizAttemptKey } from '@/lib/intelligence/correctionKey'
 import { normaliseScore, marksToLevelForSchool } from '@/lib/assessments/gradeCalculator'
 import { resolveCurriculumContext } from '@/lib/curriculum/curriculumContext'
 
@@ -108,6 +109,10 @@ export async function recordQuizAutoGradeEvidence(input: QuizEvidenceInput): Pro
     strand: curriculumContext?.strandTitle ?? null,
     subStrand: curriculumContext?.subStrandTitle ?? input.topic,
     subStrandId: curriculumContext?.subStrandId ?? null,
+    // Phase E2 — a DIFFERENT namespace from assignment_mark even though both
+    // key on `assignments.id`. That separation is the whole point: today's
+    // `assignment:<id>` rawInputRef is identical across the two producers.
+    correctionKey: quizAttemptKey({ assignmentId: input.assignmentId, studentId: input.studentId, source: SOURCE }),
     // Stage 1 — instructional provenance. Context only: the score above is
     // still the whole educational claim of this row.
     payload: input.adaptiveDelivery ?? null,

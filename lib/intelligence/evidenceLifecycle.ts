@@ -11,6 +11,7 @@
 import { repos } from '@/lib/repositories'
 import type { LearnerEvidence } from './evidence'
 import type { EvidenceRow, NewEvidenceRow } from '@/lib/repositories/evidence.repository'
+import { correctionKeyNamespace } from './correctionKey'
 
 const PREFETCH_CONCURRENCY = 20
 
@@ -54,7 +55,47 @@ async function flagContradictionIfAny(priorRow: EvidenceRow, newRow: EvidenceRow
   ])
 }
 
-function claimKey(e: Pick<LearnerEvidence, 'learnerId' | 'subject' | 'assessmentType' | 'academicYear' | 'term' | 'evidenceSource'>): string | null {
+/**
+ * Phase E4 — THE AUTHORITATIVE AUTOMATIC CORRECTION RULE.
+ *
+ * Returns the identity of the ARTIFACT this evidence describes, or `null`
+ * when it describes no correctable artifact — in which case the evidence is
+ * an INDEPENDENT OBSERVATION and supersedes nothing, ever.
+ *
+ * There is exactly one such rule. `claimKey()` below no longer decides
+ * supersession; it survives for contradiction detection, where "same learner,
+ * subject, sub-strand and term" is genuinely the right question to ask.
+ *
+ * Deliberately NO legacy fallback: if this returns null, `persistEvidenceBatch`
+ * does not consult the six-field claim key. A fallback would keep the old
+ * defect alive for exactly the producers that have no artifact identity — the
+ * observation-only ones the defect hurt most.
+ */
+function correctionGroupKey(e: Pick<LearnerEvidence, 'learnerId' | 'evidenceSource' | 'correctionKey'>): string | null {
+  if (!e.learnerId) return null
+  if (!e.correctionKey) return null
+  // An unrecognised namespace is never trusted (E1 §13). Producer-side
+  // construction already refuses to mint one; this is the persistence-side
+  // backstop, and it fails CLOSED — to coexistence, never to the legacy rule.
+  if (!correctionKeyNamespace(e.correctionKey)) return null
+  return `${e.learnerId}:${e.evidenceSource}:${e.correctionKey}`
+}
+
+/**
+ * The legacy six-field claim identity.
+ *
+ * NO LONGER DECIDES SUPERSESSION (Phase E4). Retained because it answers a
+ * question that is still worth asking — "do these two rows describe the same
+ * learner, subject, sub-strand and term?" — which is precisely the input
+ * contradiction detection needs now that independent observations coexist and
+ * may legitimately disagree.
+ *
+ * Exported rather than deleted per E4 §10: it has no supersession caller any
+ * more, and the alternative to exporting it was removing it, which would
+ * throw away the only expression of "same curriculum claim" the domain has.
+ * Any future consumer must treat it as descriptive, never as authority.
+ */
+export function claimKey(e: Pick<LearnerEvidence, 'learnerId' | 'subject' | 'assessmentType' | 'academicYear' | 'term' | 'evidenceSource' | 'subStrandId'>): string | null {
   if (!e.learnerId) return null
   // Phase C (learner-record-layer-decisions.md Decision 1): teacher remarks
   // must never supersede each other — "quiet learner" in 2026 and
@@ -63,7 +104,81 @@ function claimKey(e: Pick<LearnerEvidence, 'learnerId' | 'subject' | 'assessment
   // already takes (persistEvidenceBatch skips supersession entirely for
   // null claim keys) — no new machinery, one narrow carve-out.
   if (e.evidenceSource === 'teacher_remark') return null
-  return `${e.learnerId}:${e.subject}:${e.assessmentType}:${e.academicYear}:${e.term ?? 'null'}`
+
+  // Phase 1.5 — Compass session evidence is EVENT evidence, not correction
+  // evidence, and is exempted for exactly the reason above.
+  //
+  // A Compass session produces two claims that are both true at once and
+  // neither of which corrects the other:
+  //   engagement — "this learner worked for 12 minutes across 8 exchanges"
+  //   mastery    — "this learner demonstrated progress on equivalent fractions"
+  // "The session happened" and "learning was demonstrated" are not two
+  // versions of one statement. Nor is a later session a correction of an
+  // earlier one: Tuesday's session and Thursday's session are both
+  // permanently true, exactly like two teacher remarks a year apart.
+  //
+  // Without this, all four of those relationships collapsed into one claim
+  // key (`learner:subject:assignment:year:term`), with three real
+  // consequences:
+  //
+  //  1. The mastery claim was inserted with `supersedes` pointing at the
+  //     engagement claim from its own session. Confirming mastery then
+  //     attempted `pending_review -> superseded` on the engagement row,
+  //     which the lifecycle trigger correctly rejected — so a teacher could
+  //     not confirm a Compass mastery claim at all unless the engagement
+  //     claim had already been confirmed first.
+  //  2. Each session's claims superseded the previous session's, so a
+  //     learner's Compass history collapsed to its most recent session and
+  //     the Behaviour Projector's observation count silently under-counted.
+  //  3. `assessment_type = 'assignment'` is shared by eight producers
+  //     (assignments, quizzes, formative signals, holiday return, parent
+  //     observations, intervention check-ins, topical assessments and
+  //     Compass), so a tier-1 AI-inferred Compass claim could take a
+  //     supersession pointer at a tier-3 teacher-graded assignment for the
+  //     same subject and term — and execute it on confirmation.
+  //
+  // Scoped to this one source deliberately: no other producer's claim-key
+  // behaviour changes, and supersession remains fully available to every
+  // source for which it is the right semantics (a re-graded exam, a
+  // corrected mark). See docs/architecture/learner-record-layer-decisions.md
+  // Decision 1 for the precedent this follows.
+  if (e.evidenceSource === 'compass_session') return null
+
+  // Phase 2 (GATE A) — curriculum grain is part of claim identity.
+  //
+  // "Mary is Level 1 in proportional reasoning" and "Mary is Level 3 in
+  // algebraic expressions" are two different claims about two different
+  // things. Without `subStrandId` in the key they were one claim
+  // (`learner:mathematics:assignment:2026:1`), so the second silently
+  // superseded the first and the learner's curriculum-level record
+  // collapsed to whichever sub-strand was assessed most recently. That was
+  // already live for the two producers that anchor evidence today
+  // (lib/assignments/evidence.ts, lib/quiz/quizEvidence.ts) and would get
+  // steadily worse as Phase 2 spreads anchoring.
+  //
+  // `null` is an identity value, not a wildcard: it means "this claim is
+  // about the subject as a whole, or its curriculum grain is unknown."
+  // Subject-level evidence therefore keys with `null` and continues to
+  // supersede other subject-level evidence exactly as before — no existing
+  // correction path is broken, and no historical row changes meaning.
+  // Anchored and unanchored claims simply stop being confused for each
+  // other, which is correct: a term exam over all of Mathematics is not a
+  // correction of a proportional-reasoning quiz.
+  //
+  // Re-grading still works: a corrected mark for the same assessment
+  // carries the same `subStrandId` (it comes from the same
+  // `assignments.substrand_id`), so it lands on the same key and supersedes
+  // as it always did.
+  //
+  // KNOWN, DELIBERATELY NOT FIXED HERE — see the Phase 2 report, GATE A:
+  // two *different* assignments on the same sub-strand in the same term
+  // still share a key and still supersede each other, even though they are
+  // two observations rather than a correction. Fixing that means moving
+  // correction identity onto per-artifact provenance (`rawInputRef`) for
+  // the whole assignment family, which changes behaviour for eight
+  // producers at once. That is a separate Evidence Domain decision, not a
+  // side effect of curriculum anchoring.
+  return `${e.learnerId}:${e.subject}:${e.subStrandId ?? 'null'}:${e.assessmentType}:${e.academicYear}:${e.term ?? 'null'}`
 }
 
 async function mapWithConcurrency<T, R>(items: T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -108,6 +223,8 @@ function toNewEvidenceRow(e: LearnerEvidence, runId: string, supersedes: string 
     school_id: e.schoolId ?? null,
     curriculum_version_id: e.curriculumVersionId ?? null,
     purpose_id: e.purposeId ?? null,
+    // Phase E4 — this is now the authoritative correction identity.
+    correction_key: e.correctionKey ?? null,
     payload: e.payload ?? null,
   }
 }
@@ -129,7 +246,7 @@ export async function persistEvidenceBatch(evidence: LearnerEvidence[], runId: s
   const groups = new Map<string, LearnerEvidence[]>()
   const unkeyed: LearnerEvidence[] = []
   for (const e of evidence) {
-    const key = claimKey(e)
+    const key = correctionGroupKey(e)
     if (key === null) { unkeyed.push(e); continue }
     const group = groups.get(key) ?? []
     group.push(e)
@@ -141,9 +258,12 @@ export async function persistEvidenceBatch(evidence: LearnerEvidence[], runId: s
   const priorByKey = new Map<string, EvidenceRow | null>()
   await mapWithConcurrency(keys, PREFETCH_CONCURRENCY, async key => {
     const first = groups.get(key)![0]
-    const prior = await repos.evidence.findCurrentEvidenceForClaim({
-      learnerId: first.learnerId!, subject: first.subject, assessmentType: first.assessmentType,
-      academicYear: first.academicYear, term: first.term,
+    // Phase E4 — mirrors correctionGroupKey() exactly: same learner, same
+    // producer, same artifact. Nothing about curriculum or time.
+    const prior = await repos.evidence.findCurrentEvidenceForCorrection({
+      learnerId: first.learnerId!,
+      evidenceSource: first.evidenceSource,
+      correctionKey: first.correctionKey!,
     })
     priorByKey.set(key, prior)
   })
@@ -204,8 +324,64 @@ export async function persistEvidenceBatch(evidence: LearnerEvidence[], runId: s
 
 // ── Review lifecycle ─────────────────────────────────────────────────────────
 
+/**
+ * Promotes evidence from `pending_review` to `reviewed_confirmed`.
+ *
+ * Phase 2 (GATE B) — re-confirming an already-confirmed row is an
+ * IDEMPOTENT, METADATA-PRESERVING NO-OP, recorded in the audit log.
+ *
+ * The lifecycle trigger permits same-state updates (its first branch exists
+ * so verification_state-only writes can pass), so a second confirmation
+ * previously succeeded at the database level and silently overwrote
+ * `reviewed_by`, `reviewed_at` and `review_reason` — replacing the record
+ * of who actually made the educational judgement with whoever clicked last.
+ * That is the real harm, and it is not what the trigger's same-state
+ * allowance was for.
+ *
+ * Rejected alternatives, and why:
+ *  - Hard error (the behaviour the existing test asserted): a double-click
+ *    or a retry after a network flake is a normal thing for a teacher's
+ *    client to do, and turning it into a failure surfaces alarm for a
+ *    harmless action. It also cannot be implemented in the database without
+ *    narrowing the same-state branch — a trigger migration whose blast
+ *    radius covers every evidence write.
+ *  - Full audited re-review (a second reviewer formally re-deciding): a
+ *    real workflow, but it needs product decisions this phase has no
+ *    mandate for — who may re-review, whether the first verdict is
+ *    displaced, what a learner's record shows. Deliberately not invented
+ *    here.
+ *
+ * What is implemented is the intersection: safe to retry, impossible to
+ * silently rewrite the original reviewer, and the repeat attempt is
+ * visible in `evidence_audit_log` for anyone auditing the decision. No
+ * migration; the guarantee lives in this function, which is already the
+ * only sanctioned path to `reviewed_confirmed`.
+ *
+ * Every genuinely illegal transition (`retracted -> reviewed_confirmed`,
+ * `reviewed_rejected -> reviewed_confirmed`, …) is still rejected by the
+ * trigger, untouched.
+ */
 export async function confirmReview(evidenceId: string, reviewerId: string, reason: string | null): Promise<EvidenceRow> {
   const before = await repos.evidence.findEvidenceById(evidenceId)
+
+  if (before?.lifecycle_state === 'reviewed_confirmed') {
+    await repos.evidence.insertAuditEvents([{
+      evidence_id: evidenceId,
+      event_type: 'reviewed_confirmed',
+      actor: reviewerId,
+      reason: reason,
+      previous_state: 'reviewed_confirmed',
+      new_state: 'reviewed_confirmed',
+      metadata: {
+        no_op: true,
+        repeat_confirmation: true,
+        original_reviewer: before.reviewed_by,
+        original_reviewed_at: before.reviewed_at,
+      },
+    }])
+    return before
+  }
+
   const updated = await repos.evidence.reviewConfirm(evidenceId, reviewerId, reason)
   await repos.evidence.insertAuditEvents([
     { evidence_id: evidenceId, event_type: 'reviewed_confirmed', actor: reviewerId, reason, previous_state: before?.lifecycle_state ?? null, new_state: 'reviewed_confirmed' },

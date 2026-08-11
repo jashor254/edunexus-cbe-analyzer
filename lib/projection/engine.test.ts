@@ -42,6 +42,7 @@ function evidence(overrides: Partial<EvidenceRow>): EvidenceRow {
     school_id: null, curriculum_version_id: null,
     erased_by: null, erased_at: null, erasure_reason: null,
     purpose_id: null,
+    correction_key: null,
     payload: null,
     ...overrides,
   }

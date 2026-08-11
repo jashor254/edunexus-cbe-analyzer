@@ -63,6 +63,18 @@ export type LearnerEvidence = {
   /** Populated only if a validation/mapping/identity issue kept this out of auto-confirmation. */
   issues: string[]
 
+  /**
+   * Phase E2 — immutable, producer-declared identity of the underlying
+   * correctable ARTIFACT (see lib/intelligence/correctionKey.ts). Built only
+   * through that module's constructors, never hand-rolled.
+   *
+   * Omit (or null) for an independent observation — that is the honest
+   * answer for every observation-only producer and the default for everyone
+   * else. NOT read for supersession decisions until Phase E4; `claimKey()`
+   * still drives every one of them today.
+   */
+  correctionKey?: string | null
+
   // ── Curriculum context (Projection V2.1, additive) ──────────────────────
   // Optional — most sources have no strand/substrand-level detail to offer.
   // Only set these when the producer genuinely knows them at creation time;
@@ -160,7 +172,6 @@ export type AdaptiveDeliveryPayload = {
   /** Set when the assignment was delivered from an approved Blueprint action, linking outcome back to intent. */
   blueprintActionItemId: string | null
 }
-
 
 /** LI-6: each source has a declared trust tier. Confidence scoring (confidence.ts) is capped by this. */
 export const EVIDENCE_SOURCE_TRUST_TIER: Record<EvidenceSource, 1 | 2 | 3> = {

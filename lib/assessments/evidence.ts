@@ -23,6 +23,7 @@ import type { LearnerEvidence } from '@/lib/intelligence/evidence'
 import { EVIDENCE_SOURCE_TRUST_TIER } from '@/lib/intelligence/evidence'
 import { computeConfidence, resolveReviewStatus } from '@/lib/intelligence/confidence'
 import { persistEvidenceBatch } from '@/lib/intelligence/evidenceLifecycle'
+import { classAssessmentResultKey } from '@/lib/intelligence/correctionKey'
 import { mapSubject } from '@/lib/intelligence/subjectMapping'
 import { marksToLevel } from '@/lib/assessments/gradeCalculator'
 import type { AssessmentType } from '@/lib/assessments/types'
@@ -126,6 +127,13 @@ export async function recordAssessmentEvidence(
         extractionMethod: EXTRACTION_METHOD,
         reviewStatus,
         rawInputRef: `class_assessments:${assessmentId}:${rawSubject}:${mark.student_id}`,
+        // Phase E2 — one correctable RESULT CELL, not the whole mark row: a
+        // single learner_marks row carries a subject_scores map, so
+        // correcting Maths must never touch English. Keyed on the canonical
+        // subject so a raw-name change cannot fork the identity.
+        correctionKey: classAssessmentResultKey({
+          assessmentId, studentId: mark.student_id, canonicalSubject, source: SOURCE,
+        }),
         importedAt,
         issues: [],
         purposeId,

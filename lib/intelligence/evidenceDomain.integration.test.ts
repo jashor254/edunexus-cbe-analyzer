@@ -166,22 +166,44 @@ test('an invalid lifecycle transition is rejected by the database', async () => 
 
 // ── Supersession / version chains ────────────────────────────────────────────
 
-test('re-imported corrected evidence supersedes the old record, which is preserved, not deleted', async () => {
-  const csv1 = ['name,external_id,geo', 'Test Learner Two,,60'].join('\n')
-  const first = await runCsvIngestion({
-    fileContents: csv1, teacherId, initiatedBy: authUserId, institution: SYNTHETIC_MARKER,
-    academicYear: 2026, term: 3, assessmentType: 'cat',
+test('a keyed correction supersedes its prior record, which is preserved, not deleted', async () => {
+  // Phase E4 rewrote this test's PREMISE, deliberately.
+  //
+  // It previously proved supersession by re-running a CSV import twice: two
+  // csv_export rows sharing learner/subject/type/year/term superseded each
+  // other under the legacy six-field claim key. After E4 that no longer
+  // happens, because supersession now follows producer-declared ARTIFACT
+  // identity and the dev-only `csv_export` path declares none (E3.5 §21 —
+  // it has no product caller, so nothing real regresses).
+  //
+  // So the supersession MACHINERY is now proven the way it is actually
+  // reached: through a correction key. The assertions about preservation,
+  // chain linkage and queryable history are unchanged.
+  const { persistEvidenceBatch } = await import('./evidenceLifecycle')
+  const { classAssessmentResultKey } = await import('./correctionKey')
+
+  const correctionKey = classAssessmentResultKey({
+    assessmentId: '9f9f9f9f-0000-4000-8000-00000000e4e4',
+    studentId: studentIds[1],
+    canonicalSubject: 'geography',
+    source: 'teacher_upload',
   })
-  assert.equal(first.confirmedCount, 1)
+
+  const base = {
+    learnerId: studentIds[1], extractedName: 'Test Learner Two', extractedExternalId: null,
+    subject: 'geography', rawSubject: 'geo', cbcLevel: 2 as const,
+    assessmentType: 'cat' as const, academicYear: 2026, term: 3,
+    evidenceSource: 'teacher_upload' as const, trustTier: 3 as const, evidenceConfidence: 100,
+    extractionMethod: 'e4_supersession_test', reviewStatus: 'auto_confirmed' as const,
+    importedAt: new Date().toISOString(), issues: [], subStrandId: null, correctionKey,
+  }
+
+  const run1 = await startIngestionRun({ source: 'teacher_upload', initiatedBy: authUserId, teacherId, institution: SYNTHETIC_MARKER })
+  const first = await persistEvidenceBatch([{ ...base, score: 60, rawInputRef: 'e4:original' }], run1.id)
   const originalId = first.inserted[0].id
 
-  // Same learner, same subject/term/year — a correction.
-  const csv2 = ['name,external_id,geo', 'Test Learner Two,,88'].join('\n')
-  const second = await runCsvIngestion({
-    fileContents: csv2, teacherId, initiatedBy: authUserId, institution: SYNTHETIC_MARKER,
-    academicYear: 2026, term: 3, assessmentType: 'cat',
-  })
-  assert.equal(second.confirmedCount, 1)
+  const run2 = await startIngestionRun({ source: 'teacher_upload', initiatedBy: authUserId, teacherId, institution: SYNTHETIC_MARKER })
+  const second = await persistEvidenceBatch([{ ...base, score: 88, rawInputRef: 'e4:corrected' }], run2.id)
   const correctedId = second.inserted[0].id
 
   const original = await repos.evidence.findEvidenceById(originalId)
@@ -193,9 +215,9 @@ test('re-imported corrected evidence supersedes the old record, which is preserv
   assert.equal(corrected?.supersedes, originalId)
   assert.equal(corrected?.score, 88)
 
-  // The current claim lookup must return the corrected record, not the superseded one.
-  const current = await repos.evidence.findCurrentEvidenceForClaim({
-    learnerId: studentIds[1], subject: 'geography', assessmentType: 'cat', academicYear: 2026, term: 3,
+  // The correction lookup must return the corrected record, not the superseded one.
+  const current = await repos.evidence.findCurrentEvidenceForCorrection({
+    learnerId: studentIds[1], evidenceSource: 'teacher_upload', correctionKey,
   })
   assert.equal(current?.id, correctedId)
 
@@ -203,6 +225,26 @@ test('re-imported corrected evidence supersedes the old record, which is preserv
   const history = await getEvidenceHistoryForLearner(studentIds[1])
   const historyIds = history.map(h => h.id)
   assert.ok(historyIds.includes(originalId) && historyIds.includes(correctedId))
+})
+
+test('E4: an UNKEYED producer re-import now coexists instead of superseding', async () => {
+  // The other half of the premise change above. Two csv_export imports of
+  // the same learner/subject/term used to supersede; they are now two
+  // independent observations, because csv_export declares no artifact.
+  const mk = (score: string) => runCsvIngestion({
+    fileContents: ['name,external_id,geo', `Coexist Learner,,${score}`].join('\n'),
+    teacherId, initiatedBy: authUserId, institution: SYNTHETIC_MARKER,
+    academicYear: 2026, term: 2, assessmentType: 'cat',
+  })
+
+  const first = await mk('55')
+  const second = await mk('70')
+  const a = await repos.evidence.findEvidenceById(first.inserted[0].id)
+  const b = await repos.evidence.findEvidenceById(second.inserted[0].id)
+
+  assert.equal(a?.correction_key, null, 'csv_export declares no correctable artifact')
+  assert.equal(b?.supersedes, null, 'so the second import corrects nothing')
+  assert.notEqual(a?.lifecycle_state, 'superseded', 'and the first observation survives')
 })
 
 // ── Audit metadata ───────────────────────────────────────────────────────────
@@ -420,7 +462,6 @@ test('erasing an already-erased row is rejected, and erasure cannot be used to c
   } finally {
     await db.auth.admin.deleteUser(actorBId)
   }
-
 
   // The immutability trigger's erasure exception is scoped to exactly
   // extracted_name/extracted_external_id/score — it must not become a

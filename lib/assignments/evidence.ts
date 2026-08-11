@@ -36,6 +36,7 @@ import type { LearnerEvidence, AdaptiveDeliveryPayload } from '@/lib/intelligenc
 import { EVIDENCE_SOURCE_TRUST_TIER } from '@/lib/intelligence/evidence'
 import { computeConfidence, resolveReviewStatus } from '@/lib/intelligence/confidence'
 import { persistEvidenceBatch } from '@/lib/intelligence/evidenceLifecycle'
+import { assignmentMarkKey } from '@/lib/intelligence/correctionKey'
 import { normaliseScore, marksToLevelForSchool } from '@/lib/assessments/gradeCalculator'
 import { resolveCurriculumContext } from '@/lib/curriculum/curriculumContext'
 
@@ -122,6 +123,10 @@ export async function recordAssignmentMarkEvidence(input: AssignmentMarkEvidence
     strand: curriculumContext?.strandTitle ?? null,
     subStrand: curriculumContext?.subStrandTitle ?? input.topic,
     subStrandId: curriculumContext?.subStrandId ?? null,
+    // Phase E2 — the correctable artifact: this learner's mark on this
+    // assignment. Stable across a regrade (which changes only the score),
+    // unlike `rawInputRef` above, which embeds the score itself.
+    correctionKey: assignmentMarkKey({ assignmentId: input.assignmentId, studentId: input.studentId, source: SOURCE }),
     // Stage 1 — instructional provenance. Context only: the score above is
     // still the whole educational claim of this row.
     payload: input.adaptiveDelivery ?? null,

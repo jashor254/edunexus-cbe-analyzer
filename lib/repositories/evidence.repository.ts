@@ -15,7 +15,7 @@ const EVIDENCE_COLS =
   'ingestion_run_id, trust_tier, evidence_confidence, confidence_formula_version, issues, lifecycle_state, ' +
   'reviewed_by, reviewed_at, review_reason, retracted_by, retracted_at, retraction_reason, supersedes, ' +
   'superseded_by, verification_state, updated_at, strand, sub_strand, sub_strand_id, knowledge_node_id, ' +
-  'school_id, curriculum_version_id, erased_by, erased_at, erasure_reason, purpose_id, payload'
+  'school_id, curriculum_version_id, erased_by, erased_at, erasure_reason, purpose_id, payload, correction_key'
 
 export type EvidenceRow = {
   id: string
@@ -64,6 +64,8 @@ export type EvidenceRow = {
   erasure_reason: string | null
   /** Phase G (learner-record-layer-decisions.md Decision 2) — educational meaning independent of the surface assessment-type label; null on any writer not yet updated to resolve it. */
   purpose_id: string | null
+  /** Phase E2 — immutable artifact identity; NULL = independent observation. Not yet read for supersession. */
+  correction_key: string | null
   /** Phase C (learner-record-layer-decisions.md Decision 1) — shape-specific content for narrative/non-scored evidence (e.g. a teacher remark's body), keyed by evidence_source. Null for measured (scored) evidence. */
   payload: Record<string, unknown> | null
 }
@@ -219,22 +221,45 @@ export class EvidenceRepository extends BaseRepository {
   }
 
   /** The current (non-superseded/retracted/rejected) record for a claim key, if one exists. */
-  async findCurrentEvidenceForClaim(claim: {
-    learnerId: string; subject: string; assessmentType: string; academicYear: number; term: number | null
+  /**
+   * The standing row a CORRECTION would replace — Phase E4's authoritative
+   * lookup.
+   *
+   * Scope is `(learner_id, evidence_source, correction_key)` and nothing
+   * else. Each part earns its place:
+   *   - learner: obvious.
+   *   - evidence_source: the trust boundary. A producer can never reach
+   *     another producer's artifact even if it somehow emitted that
+   *     artifact's key string, so a tier-1 parent observation cannot
+   *     supersede a tier-3 teacher mark.
+   *   - correction_key: the artifact itself.
+   *
+   * Subject, sub-strand, assessment type, year and term are deliberately
+   * ABSENT. Those describe the curriculum area, not the artifact, and
+   * matching on them was exactly the defect this replaces: of 55
+   * supersession chains in production, ~32 were independent observations
+   * that happened to share a curriculum area. A correction may also
+   * legitimately fix a mis-entered subject, which a subject match would
+   * block.
+   *
+   * A null/empty key never reaches here — `persistEvidenceBatch` treats
+   * unkeyed evidence as an independent observation and does not look for a
+   * prior at all.
+   */
+  async findCurrentEvidenceForCorrection(claim: {
+    learnerId: string; evidenceSource: string; correctionKey: string
   }): Promise<EvidenceRow | null> {
-    let query = this.db
+    const { data, error } = await this.db
       .from('learner_evidence')
       .select(EVIDENCE_COLS)
       .eq('learner_id', claim.learnerId)
-      .eq('subject', claim.subject)
-      .eq('assessment_type', claim.assessmentType)
-      .eq('academic_year', claim.academicYear)
+      .eq('evidence_source', claim.evidenceSource)
+      .eq('correction_key', claim.correctionKey)
       .in('lifecycle_state', ['auto_confirmed', 'pending_review', 'reviewed_confirmed'])
       .order('created_at', { ascending: false })
       .limit(1)
-    query = claim.term === null ? query.is('term', null) : query.eq('term', claim.term)
-    const { data, error } = await query.maybeSingle()
-    if (error) throw new Error(`findCurrentEvidenceForClaim: ${error.message}`)
+      .maybeSingle()
+    if (error) throw new Error(`findCurrentEvidenceForCorrection: ${error.message}`)
     return data as unknown as EvidenceRow | null
   }
 
