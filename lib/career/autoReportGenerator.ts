@@ -5,6 +5,87 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { callDeepSeek } from '@/lib/ai/deepseek'
 import { buildClinicReport } from './clinicReportBuilder'
 
+// ── compass_bridge ownership ─────────────────────────────────────────────────
+//
+// `student_learning_context.compass_bridge` is a single per-learner jsonb slot
+// with TWO writers, and they own different keys:
+//
+//   TEACHER / BLUEPRINT OWNED  teacherSuggested, teacherSuggestedAt,
+//                              subStrandId, deliveryId, strandName
+//     Written only by lib/compass/objective.ts::setTeacherSuggestedTopic
+//     (via the canonical merge). This is teacher intent and Blueprint
+//     delivery provenance.
+//
+//   CAREER REPORT OWNED        sessionGoal, startDifficulty,
+//                              subjectPriorities, weeklyMilestones,
+//                              parentWhatsAppMessage
+//     Written only here. Advisory context for a Compass session.
+//
+//   SHARED                     firstSubject, firstConcept
+//     Both writers set them — they name what the session should open on.
+//
+// This module previously wrote `compass_bridge: bridge` WHOLESALE, so
+// generating a class report erased every teacher/Blueprint-owned key. The
+// consequences were silent and severe: the intervention lost its top
+// priority in getNextSubject(), the session's mastery claim came back
+// unanchored (no subStrandId), and the blueprint_compass_deliveries row was
+// orphaned — deliveryBinding binds only to the delivery the bridge names, by
+// design, so it could never be completed.
+//
+// Report generation may still update everything it owns. It may not destroy
+// a teacher-approved intervention, and it may not grant itself teacher
+// authority.
+
+/** Keys owned by the teacher/Blueprint workflow. This path may never write or clear them. */
+const TEACHER_OWNED_BRIDGE_KEYS = [
+  'teacherSuggested', 'teacherSuggestedAt', 'subStrandId', 'deliveryId', 'strandName',
+] as const
+
+/** Shared keys that name the intervention's target — frozen only while one is live. */
+const INTERVENTION_TARGET_KEYS = ['firstSubject', 'firstConcept'] as const
+
+/**
+ * Merges freshly generated report context into an existing bridge without
+ * disturbing teacher intent.
+ *
+ * Three rules:
+ *   1. Report-owned keys update normally.
+ *   2. Teacher/Blueprint-owned keys always come from the CURRENT bridge —
+ *      restored if present, removed if absent. Written defensively rather
+ *      than relying on the generated object not containing them, so no
+ *      future change (or stray AI field) can escalate this path into
+ *      teacher authority. Report generation can never introduce
+ *      `teacherSuggested: true` that a teacher did not set.
+ *   3. When a live intervention exists (`teacherSuggested === true`), the
+ *      shared targeting keys are frozen too. Otherwise the report could
+ *      retarget the session to a different subject while keeping the
+ *      teacher's authority flag — which is the same defect wearing a
+ *      different hat, and would additionally strand the teacher's
+ *      subStrandId against an unrelated subject.
+ *
+ * With no teacher intervention present, this is exactly the previous
+ * behaviour: every generated field is written.
+ */
+export function mergeBridgePreservingTeacherIntent(
+  current: Record<string, unknown>,
+  generated: Record<string, unknown>,
+): Record<string, unknown> {
+  const merged: Record<string, unknown> = { ...current, ...generated }
+
+  for (const key of TEACHER_OWNED_BRIDGE_KEYS) {
+    if (key in current) merged[key] = current[key]
+    else delete merged[key]
+  }
+
+  if (current.teacherSuggested === true) {
+    for (const key of INTERVENTION_TARGET_KEYS) {
+      if (key in current) merged[key] = current[key]
+    }
+  }
+
+  return merged
+}
+
 // ── Compass Bridge type (matches what chat route consumes) ────────────────────
 
 export type CompassBridge = {
@@ -249,11 +330,30 @@ export async function generateClassReports(
       // 2. Generate specific compass_bridge via DeepSeek
       const bridge = await generateCompassBridge(studentId, db)
       if (bridge) {
+        // Never clobber a teacher-queued Blueprint intervention. This path
+        // used to write `compass_bridge: bridge` wholesale, which silently
+        // destroyed teacherSuggested / subStrandId / deliveryId — see
+        // mergeBridgePreservingTeacherIntent for the full reasoning.
+        const { data: contextRow } = await db
+          .from('student_learning_context')
+          .select('compass_bridge')
+          .eq('student_id', studentId)
+          .maybeSingle()
+
+        const mergedBridge = mergeBridgePreservingTeacherIntent(
+          (contextRow?.compass_bridge as Record<string, unknown> | null) ?? {},
+          bridge,
+        )
+
         await db
           .from('student_learning_context')
           .update({
-            compass_bridge: bridge,
-            first_subject: bridge.firstSubject,
+            compass_bridge: mergedBridge,
+            // Report-owned columns, unchanged. `first_subject` follows the
+            // MERGED bridge rather than the freshly generated one, so the
+            // column can never disagree with the subject Compass will
+            // actually steer to.
+            first_subject: mergedBridge.firstSubject ?? bridge.firstSubject,
             session_goal: bridge.sessionGoal,
             guided_topics: bridge.weeklyMilestones.map(m => m.checkConcept),
           })

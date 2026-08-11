@@ -35,6 +35,7 @@ import { getOrCreateSession, endSession } from './session'
 import { bindDeliveryToSession, completeDeliveryForSession } from './deliveryBinding'
 import { recordCompassSessionEvidence } from './evidence'
 import { MASTERY_EXTRACTION_METHOD } from './evidenceClaimTypes'
+import { mergeBridgePreservingTeacherIntent } from '@/lib/career/autoReportGenerator'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_P26_DELIVERY_BINDING_TEST'
 const db = createServiceClient()
@@ -167,6 +168,72 @@ test('1+2. an approved delivery starts as `available` and the bridge carries its
   assert.equal(b.deliveryId, deliveryAId, 'the durable reference is on the bridge')
   assert.equal(b.teacherSuggested, true)
   assert.equal(b.firstSubject, 'mathematics')
+})
+
+// ── CB. Legacy career-report generation must not destroy the intervention ──
+//
+// Deliberately placed HERE, in the at-risk window: the delivery is still
+// `available` and `teacherSuggested` is still true. Every test below this
+// point therefore runs against a bridge that a legacy class-report
+// generation has already written over — so binding, completion, provenance
+// and the review snapshot are all proven to survive it, not just the merge.
+//
+// Before the fix this single call orphaned the delivery permanently:
+// deliveryBinding binds only to the delivery the bridge names, by design,
+// so once `deliveryId` was erased nothing could ever claim or complete it.
+
+test('CB. a legacy career report written over the bridge does not destroy the queued intervention', async () => {
+  const before = await bridge()
+  assert.equal(before.deliveryId, deliveryAId, 'precondition: the intervention is queued')
+  assert.equal(before.teacherSuggested, true)
+
+  // The REAL production write path from lib/career/autoReportGenerator.ts —
+  // read current bridge, merge, single update — with the DeepSeek call
+  // replaced by a fixed generated object. Nothing else about it is simulated.
+  const generated = {
+    sessionGoal: 'Close the gap in essay structure — blocking the humanities pathway',
+    firstSubject: 'english',
+    firstConcept: 'essay_writing',
+    startDifficulty: 2,
+    subjectPriorities: [{ subject: 'english', gap: 2 }],
+    weeklyMilestones: [{ week: 1, goal: 'Draft one essay', subject: 'english', checkConcept: 'essay_writing' }],
+    parentWhatsAppMessage: 'Ask about essay practice this week.',
+  }
+
+  const { data: contextRow } = await db
+    .from('student_learning_context')
+    .select('compass_bridge')
+    .eq('student_id', legacyStudentId)
+    .maybeSingle()
+
+  const merged = mergeBridgePreservingTeacherIntent(
+    (contextRow?.compass_bridge as Record<string, unknown> | null) ?? {},
+    generated,
+  )
+
+  await db
+    .from('student_learning_context')
+    .update({
+      compass_bridge: merged,
+      first_subject: (merged.firstSubject as string | null) ?? generated.firstSubject,
+      session_goal: generated.sessionGoal,
+      guided_topics: generated.weeklyMilestones.map(m => m.checkConcept),
+    })
+    .eq('student_id', legacyStudentId)
+
+  const after = await bridge()
+  assert.equal(after.deliveryId, deliveryAId, 'the delivery reference survived — the row is not orphaned')
+  assert.equal(after.teacherSuggested, true, 'teacher authority survived')
+  assert.equal(after.subStrandId, before.subStrandId, 'the curriculum anchor survived')
+  assert.equal(after.firstSubject, 'mathematics', 'and the report did not retarget the intervention')
+
+  // Report-owned context did land.
+  assert.match(String(after.sessionGoal), /essay structure/)
+
+  // The delivery itself is untouched and still claimable.
+  const row = await deliveryRow(deliveryAId)
+  assert.equal(row.status, 'available')
+  assert.equal(row.compass_session_id, null)
 })
 
 // ── 19/22. Second active objective cannot silently overwrite the first ─────
