@@ -104,7 +104,8 @@ before(async () => {
     context: 'current_term', priority: 'medium', visibility: 'teacher_only',
     title: 'Page Test Action', rationale: 'r', intended_outcome: 'Reach the outcome.',
     learner_action: null, teacher_action: null, parent_support: null, school_support: null,
-    success_indicator: 'Success looks like this.', target_capability: null, review_date: null, teacher_notes: null,
+    success_indicator: 'Success looks like this.',
+    sub_strand_id: null, target_capability: null, review_date: null, teacher_notes: null,
     proposal_source: 'teacher', source_generator: null, evidence_basis: EVIDENCE_BASIS_EMPTY, proposed_by: null,
   }).then(row => repos.blueprintActionItems.recordDecision(row.id, {
     status: 'approved', reviewed_by: null, reviewed_at: new Date().toISOString(), decision_reason: null, review_date: null,

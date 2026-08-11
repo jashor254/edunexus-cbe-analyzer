@@ -31,6 +31,7 @@ function makeAction(overrides: Partial<BlueprintActionItemRow> = {}): BlueprintA
     school_support: null,
     success_indicator: 'Next confirmed assessment shows Level 3 or above.',
     target_capability: null,
+    sub_strand_id: null,
     review_date: '2026-08-15',
     teacher_notes: 'CONFIDENTIAL internal note.',
     proposal_source: 'teacher',

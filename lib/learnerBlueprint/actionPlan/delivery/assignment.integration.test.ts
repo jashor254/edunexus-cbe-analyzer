@@ -83,6 +83,7 @@ function baseActionFields(overrides: Partial<Parameters<typeof repos.blueprintAc
     school_support: null,
     success_indicator: 'Next confirmed assessment shows Level 3 or above.',
     target_capability: null,
+    sub_strand_id: null,
     review_date: '2026-08-15',
     teacher_notes: 'CONFIDENTIAL: this learner is also being monitored for attendance concerns.',
     proposal_source: 'teacher' as const,

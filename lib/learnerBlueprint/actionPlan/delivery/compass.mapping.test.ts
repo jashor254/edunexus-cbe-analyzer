@@ -32,6 +32,7 @@ function makeAction(overrides: Partial<BlueprintActionItemRow> = {}): BlueprintA
     school_support: null,
     success_indicator: 'Solves 4/5 fraction addition problems correctly in a Compass check.',
     target_capability: 'Grade 7 Mathematics — Fractions',
+    sub_strand_id: null,
     review_date: '2026-08-15',
     teacher_notes: 'CONFIDENTIAL internal note.',
     proposal_source: 'teacher',

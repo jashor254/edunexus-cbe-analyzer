@@ -107,6 +107,7 @@ function makeActionItem(over: Partial<BlueprintActionItem> = {}): BlueprintActio
     schoolSupport: null,
     successIndicator: 'The learner scores at least 70% on the next confirmed assessment in this subject.',
     targetCapability: null,
+    subStrandId: null,
     reviewDate: '2026-08-15',
     teacherNotes: null,
     proposalSource: 'teacher',
@@ -318,6 +319,7 @@ test('PASS: a fully coherent Blueprint with a well-formed action produces zero f
     title: 'Kiswahili practice',
     rationale: 'Kiswahili is approaching expectation and would benefit from continued practice.',
     targetCapability: 'kiswahili_lugha',
+    subStrandId: null,
     successIndicator: 'The learner\'s next confirmed Kiswahili evidence shows a full CBC level improvement.',
     reviewDate: '2026-08-15',
   })

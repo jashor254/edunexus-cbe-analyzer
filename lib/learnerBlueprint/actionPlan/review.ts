@@ -80,6 +80,30 @@ export type CompassReviewSnapshot =
       delivered: true
       deliveryId: string
       subject: string
+      /**
+       * Phase 2.6 / G-08 — the EXACT answer to "did they do the intervention
+       * I sent?".
+       *
+       * `deliveryStatus` is the intervention's own lifecycle
+       * (available -> started -> completed) and `boundSessionId` is the one
+       * Compass session that consumed it. Before these existed the closest
+       * available answer was the subject-wide session count below, which
+       * answers a different and much weaker question ("did they do any Maths
+       * Compass?").
+       *
+       * `completed` here means the learner finished that session. It does
+       * NOT mean the objective was mastered — the session's mastery claim is
+       * still `pending_review` until this teacher confirms it, which is
+       * exactly the judgement this review screen exists to support.
+       */
+      deliveryStatus: 'available' | 'started' | 'completed' | 'expired'
+      boundSessionId: string | null
+      /**
+       * Subject-wide session activity, retained deliberately: it is still
+       * useful context ("she has done four Maths sessions this term") and
+       * removing it would change what existing consumers render. It is no
+       * longer the only thing available, which was the actual problem.
+       */
       sessionCount: number
       activeCount: number
       completedCount: number
@@ -255,7 +279,14 @@ export async function getBlueprintActionReviewSnapshot(
     const sessionSummary = legacyStudentId
       ? await repos.compass.summarizeSessionsForSubject(legacyStudentId, compassDelivery.subject)
       : { sessionCount: 0, activeCount: 0, completedCount: 0, abandonedCount: 0, lastActivityAt: null }
-    compassSnapshot = { delivered: true, deliveryId: compassDelivery.id, subject: compassDelivery.subject, ...sessionSummary }
+    compassSnapshot = {
+      delivered: true,
+      deliveryId: compassDelivery.id,
+      subject: compassDelivery.subject,
+      deliveryStatus: compassDelivery.status,
+      boundSessionId: compassDelivery.compass_session_id,
+      ...sessionSummary,
+    }
   }
 
   const legacyStudentIdForEvidence = await resolveLegacyStudentId(action.learner_id)

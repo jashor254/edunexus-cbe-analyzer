@@ -86,6 +86,7 @@ function baseActionFields(overrides: Partial<Parameters<typeof repos.blueprintAc
     school_support: null,
     success_indicator: 'Next confirmed assessment shows improved reading accuracy.',
     target_capability: null,
+    sub_strand_id: null,
     review_date: '2026-08-15',
     teacher_notes: null,
     proposal_source: 'teacher' as const,

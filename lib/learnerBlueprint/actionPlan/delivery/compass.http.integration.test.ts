@@ -60,7 +60,8 @@ async function insertApprovedAction() {
     learner_action: 'Practice fraction addition with Compass for 15 minutes.',
     teacher_action: null, parent_support: null, school_support: null,
     success_indicator: 'Solves 4/5 fraction addition problems correctly.',
-    target_capability: null, review_date: '2026-08-15', teacher_notes: null,
+    target_capability: null,
+    sub_strand_id: null, review_date: '2026-08-15', teacher_notes: null,
     proposal_source: 'teacher', source_generator: null, evidence_basis: EVIDENCE_BASIS_EMPTY, proposed_by: null,
   })
   const approved = await repos.blueprintActionItems.recordDecision(row.id, {

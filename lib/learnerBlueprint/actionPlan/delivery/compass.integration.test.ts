@@ -83,6 +83,7 @@ function baseActionFields(overrides: Partial<Parameters<typeof repos.blueprintAc
     school_support: null,
     success_indicator: 'Solves 4/5 fraction addition problems correctly in a Compass check.',
     target_capability: 'Grade 7 Mathematics — Fractions',
+    sub_strand_id: null,
     review_date: '2026-08-15',
     teacher_notes: 'CONFIDENTIAL: flagged for additional monitoring this term.',
     proposal_source: 'teacher' as const,
@@ -375,7 +376,28 @@ test('an authorized teacher delivers an approved action to Compass as a queued o
   assert.equal(allForAction?.length, 1, 'exactly one delivery must exist for this action item after two delivery calls')
 })
 
+/**
+ * Marks any still-unconsumed delivery for the fixture learner as consumed.
+ *
+ * Phase 2.6 introduced a deliberate policy: a learner may have at most ONE
+ * unstarted teacher intervention waiting, because `compass_bridge` is a
+ * single per-learner slot and a second delivery would otherwise silently
+ * overwrite the first (REJECTED_SECOND_ACTIVE). Tests below that deliver an
+ * ADDITIONAL action for the same learner are not testing that policy — they
+ * are testing cross-learner isolation and same-action concurrency — so they
+ * clear the previous intervention first, exactly as a learner consuming it
+ * would. Without this they would trip the new rule and stop exercising what
+ * they were written for.
+ */
+async function consumePriorDeliveries(): Promise<void> {
+  await db.from('blueprint_compass_deliveries')
+    .update({ status: 'completed' })
+    .eq('learner_id', coreLearnerId)
+    .eq('status', 'available')
+}
+
 test('another learner cannot see or start a delivery meant for a different learner', async () => {
+  await consumePriorDeliveries()
   const action = await insertActionWithStatus('approved')
   createdDeliveryActionIds.push(action.id)
   const client = await signInAs(teacherEmail)
@@ -387,6 +409,7 @@ test('another learner cannot see or start a delivery meant for a different learn
 })
 
 test('concurrent delivery attempts for the same action create at most one active delivery', async () => {
+  await consumePriorDeliveries()
   const action = await insertActionWithStatus('approved')
   createdDeliveryActionIds.push(action.id)
   const client = await signInAs(teacherEmail)

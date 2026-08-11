@@ -46,6 +46,8 @@ export type BlueprintActionItem = {
   schoolSupport: string | null
   successIndicator: string
   targetCapability: string | null
+  /** Canonical curriculum anchor (`sow_substrands.id`), or null for a subject-level action. */
+  subStrandId: string | null
   reviewDate: string | null
   teacherNotes: string | null
   proposalSource: BlueprintActionProposalSource
@@ -80,6 +82,7 @@ export function toBlueprintActionItem(row: BlueprintActionItemRow): BlueprintAct
     schoolSupport: row.school_support,
     successIndicator: row.success_indicator,
     targetCapability: row.target_capability,
+    subStrandId: row.sub_strand_id,
     reviewDate: row.review_date,
     teacherNotes: row.teacher_notes,
     proposalSource: row.proposal_source,
@@ -109,6 +112,8 @@ export type ProposeBlueprintActionInput = {
   schoolSupport?: string | null
   successIndicator: string
   targetCapability?: string | null
+  /** Canonical curriculum anchor (`sow_substrands.id`). Never inferred from text. */
+  subStrandId?: string | null
   reviewDate?: string | null
   teacherNotes?: string | null
   proposalSource: BlueprintActionProposalSource

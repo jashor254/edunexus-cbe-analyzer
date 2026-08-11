@@ -147,6 +147,25 @@ export async function deliverBlueprintActionToCompass(
     throw new IdentityResolutionError('This learner has no Learning Compass identity yet — Compass is unavailable for this learner.')
   }
 
+  // Phase 2.6 §12 — NO SILENT OVERWRITE.
+  //
+  // `compass_bridge` is a single per-learner slot, so delivering a second
+  // objective while the first is still unconsumed would overwrite it and the
+  // learner would never see the first — with nothing recording that it had
+  // been replaced. Policy chosen: REJECTED_SECOND_ACTIVE. A queue is not
+  // built here (no infrastructure for one exists, and §12 warns against
+  // over-building), and silent replacement is not acceptable, so the second
+  // delivery is refused with an actionable error naming the intervention
+  // already waiting. A teacher who genuinely wants to replace it can act on
+  // the existing action item first.
+  const activeDelivery = await repos.blueprintCompassDeliveries.findActiveForLearner(action.learner_id)
+  if (activeDelivery && activeDelivery.blueprint_action_item_id !== action.id) {
+    throw new ConflictError(
+      `This learner already has a Compass intervention waiting ("${activeDelivery.objective}", ${activeDelivery.subject}) ` +
+      'that they have not started yet. Sending another now would replace it. Resolve the existing one first.'
+    )
+  }
+
   const draft = mapActionToCompassObjective(action)
   const objective = command.objective?.trim() || draft.objective
   const learnerInstructions = command.learnerInstructions?.trim() || draft.learnerInstructions
@@ -186,6 +205,13 @@ export async function deliverBlueprintActionToCompass(
     subject: command.subject,
     concept: objective,
     strandName: draft.curriculumReference,
+    // Phase 2 — the stable curriculum identity, alongside the free-text
+    // reference. `curriculumReference` is what a human reads;
+    // `sub_strand_id` is what the evidence comes back keyed on.
+    subStrandId: action.sub_strand_id,
+    // Phase 2.6 — the durable reference that lets the session that consumes
+    // this objective bind back to this exact delivery.
+    deliveryId: delivery.id,
   })
 
   await recordDeliveryHistory(action, delivery, actorId)

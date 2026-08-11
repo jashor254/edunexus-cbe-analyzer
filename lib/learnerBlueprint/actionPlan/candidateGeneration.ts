@@ -23,9 +23,31 @@ import { resolveLegacyStudentId } from '@/lib/core/identity'
 import { getLearner } from '@/lib/core/learners'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { buildAdaptiveTask, neutralGroupLabel } from '@/lib/adaptiveLearning/recommend'
+import { CurriculumService } from '@/lib/curriculum/service'
+import type { LearnerIntelligenceProjection } from '@/lib/projection/types'
 import type { BlueprintActionPriority, BlueprintActionEvidenceBasis } from './types'
 
 export const DETERMINISTIC_CANDIDATE_GENERATOR_ID = 'deterministic-adaptive-v1'
+
+/**
+ * The weakest sub-strand Projection has anchored evidence for in this
+ * subject, or null when it has none. Pure selection over data Projection
+ * already computed — no new scoring, no threshold, no inference. Ties break
+ * on the sub-strand id so the choice is deterministic across runs.
+ */
+export function selectWeakestSubStrandId(
+  projection: LearnerIntelligenceProjection,
+  subject: string,
+): string | null {
+  const bySubStrand = projection.academic?.value.bySubStrand ?? {}
+  const candidates = Object.values(bySubStrand).filter(s => s.subject === subject)
+  if (candidates.length === 0) return null
+
+  return candidates
+    .slice()
+    .sort((a, b) => a.latestLevel - b.latestLevel || a.subStrandId.localeCompare(b.subStrandId))[0]
+    .subStrandId
+}
 
 export type ActionCandidate = {
   context: 'current_term'
@@ -37,6 +59,8 @@ export type ActionCandidate = {
   teacherAction: string
   successIndicator: string
   targetCapability: string | null
+  /** Canonical curriculum anchor (`sow_substrands.id`) — the stable identity, never the free text above. Null for a subject-level candidate. */
+  subStrandId: string | null
   evidenceBasis: BlueprintActionEvidenceBasis
   priority: BlueprintActionPriority
 }
@@ -68,7 +92,27 @@ export async function generateActionCandidate(
   ])
   const learnerName = [learner.first_name, learner.middle_name, learner.last_name].filter(Boolean).join(' ')
 
-  const task = buildAdaptiveTask(legacyStudentId, learnerName, subject, projection)
+  // Phase 2 — curriculum grain. Projection already knows which sub-strands
+  // this learner has real, confirmed, anchored evidence for
+  // (`academic.bySubStrand`, keyed on `sow_substrands.id`). Pick the weakest
+  // one in this subject and resolve its real CurriculumContext, so
+  // `buildAdaptiveTask` classifies at sub-strand grain and the candidate
+  // carries a stable curriculum identity onward.
+  //
+  // Before this, `buildAdaptiveTask` was called with no curriculumContext at
+  // all, so `task.curriculum` was always null and `targetCapability`
+  // collapsed to the bare subject name — the curriculum identity was lost
+  // here, at candidate generation, before persistence ever came into it.
+  //
+  // Null is a normal outcome: a learner with only subject-level evidence has
+  // no anchored sub-strand to target, and the candidate stays subject-level
+  // exactly as it did before. Nothing is inferred from free text.
+  const weakestSubStrandId = selectWeakestSubStrandId(projection, subject)
+  const curriculumContext = weakestSubStrandId
+    ? await CurriculumService.resolveSubstrandContext(weakestSubStrandId).catch(() => null)
+    : null
+
+  const task = buildAdaptiveTask(legacyStudentId, learnerName, subject, projection, { curriculumContext })
   if (task.groupType === 'insufficient_data') return null // Never fabricate a candidate from no evidence.
 
   const academic = projection.academic
@@ -82,7 +126,9 @@ export async function generateActionCandidate(
     intendedOutcome: `Move ${learnerName} toward the next CBC level in ${subject}.`,
     teacherAction: task.action,
     successIndicator: `${learnerName}'s next confirmed ${subject} evidence shows improvement from the current level.`,
+    // Human/prompt-facing meaning. `subStrandId` below is the identity.
     targetCapability: task.curriculum ? `${task.curriculum.strandTitle} — ${task.curriculum.subStrandTitle}` : subject,
+    subStrandId: task.curriculum?.subStrandId ?? null,
     evidenceBasis: {
       projectorType: 'academic',
       supportingEvidenceIds: task.evidence,

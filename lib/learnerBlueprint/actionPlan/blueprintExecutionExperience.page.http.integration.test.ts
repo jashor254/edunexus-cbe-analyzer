@@ -93,7 +93,8 @@ before(async () => {
     context: 'current_term', priority: 'medium', visibility: 'teacher_only',
     title: 'Execution Experience Test Action', rationale: 'r', intended_outcome: 'Reach the outcome.',
     learner_action: 'Practice daily.', teacher_action: null, parent_support: null, school_support: null,
-    success_indicator: 'Success looks like this.', target_capability: null, review_date: null, teacher_notes: null,
+    success_indicator: 'Success looks like this.',
+    sub_strand_id: null, target_capability: null, review_date: null, teacher_notes: null,
     proposal_source: 'teacher', source_generator: null, evidence_basis: EVIDENCE_BASIS_EMPTY, proposed_by: null,
   })
   const approved = await repos.blueprintActionItems.recordDecision(row.id, {

@@ -52,7 +52,7 @@ test('CompassActivitySummary: no delivery renders correctly', () => {
 
 test('CompassActivitySummary: delivered with zero sessions shows "No learner activity recorded yet", not a failure', () => {
   const compass: CompassReviewSnapshot = {
-    delivered: true, deliveryId: 'd1', subject: 'english', sessionCount: 0, activeCount: 0, completedCount: 0, abandonedCount: 0, lastActivityAt: null,
+    delivered: true, deliveryId: 'd1', subject: 'english', deliveryStatus: 'available', boundSessionId: null, sessionCount: 0, activeCount: 0, completedCount: 0, abandonedCount: 0, lastActivityAt: null,
   }
   const html = renderToStaticMarkup(<CompassActivitySummary compass={compass} />)
   assert.match(html, /No learner activity recorded yet/)
@@ -60,7 +60,7 @@ test('CompassActivitySummary: delivered with zero sessions shows "No learner act
 
 test('CompassActivitySummary: never renders raw model/session content — only counts and dates are in its props at all', () => {
   const compass: CompassReviewSnapshot = {
-    delivered: true, deliveryId: 'd1', subject: 'english', sessionCount: 3, activeCount: 1, completedCount: 2, abandonedCount: 0, lastActivityAt: '2026-07-20T00:00:00Z',
+    delivered: true, deliveryId: 'd1', subject: 'english', deliveryStatus: 'completed', boundSessionId: 's1', sessionCount: 3, activeCount: 1, completedCount: 2, abandonedCount: 0, lastActivityAt: '2026-07-20T00:00:00Z',
   }
   const html = renderToStaticMarkup(<CompassActivitySummary compass={compass} />)
   assert.match(html, /3 sessions/)
@@ -140,7 +140,8 @@ function makeAction(overrides: Partial<BlueprintActionItemRow> = {}): BlueprintA
     learner_action: 'Read aloud for 10 minutes daily.',
     teacher_action: null, parent_support: 'CONFIDENTIAL parent-only guidance', school_support: null,
     success_indicator: 'Next confirmed assessment shows improved reading accuracy.',
-    target_capability: null, review_date: '2026-08-15',
+    target_capability: null,
+    sub_strand_id: null, review_date: '2026-08-15',
     teacher_notes: 'CONFIDENTIAL: internal note never shown to anyone but the authoring teacher.',
     proposal_source: 'teacher', source_generator: null,
     evidence_basis: { projectorType: null, supportingEvidenceIds: [], confidence: null, lastComputed: null, projectionVersion: null },

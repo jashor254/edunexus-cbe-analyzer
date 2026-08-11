@@ -20,6 +20,34 @@ function riskToSeverity(risk: RiskLevel): AttentionSeverity | null {
   return risk
 }
 
+/**
+ * Where a per-learner attention item sends the teacher.
+ *
+ * Every `student_id` reaching this module comes from the legacy space
+ * (`learner_profiles.student_id` / the Monday Panel, both keyed on
+ * `students.id`), which is exactly what
+ * `app/teacher/reports/blueprint/[studentId]` accepts: it resolves the
+ * bridged Core learner via `students.external_id` and redirects into the
+ * one canonical Blueprint route, which owns its own `requireLearnerAccess`
+ * gate and — for a teacher who may manage this learner — renders the
+ * candidate queue, the action plan, and both delivery panels. It is the
+ * same destination the legacy class roster already links to
+ * (`app/teacher/classes/[classId]/page.tsx`), so a teacher arriving from
+ * the feed and one arriving from the roster land in the same place.
+ *
+ * This replaces `/teacher/classes/{classId}/students/{studentId}`, which
+ * four call sites below pointed at and which has never existed — no such
+ * page, and no rewrite in `next.config.ts`. Every per-learner item in the
+ * feed 404'd. Defined once here rather than re-interpolated per call site
+ * precisely because it drifted unnoticed in four places.
+ *
+ * Deliberately NOT authorization: the destination gates itself. This
+ * function only decides where to point.
+ */
+function learnerActionLink(studentId: string): string {
+  return `/teacher/reports/blueprint/${studentId}`
+}
+
 // When 3+ students share the identical underlying reason, a teacher doesn't
 // want to read the same sentence repeated — collapse it into one class-level
 // line and only keep individual items for genuinely distinct cases.
@@ -69,7 +97,7 @@ export async function getEilsItems(teacherId: string, classIds: string[]): Promi
         title:           `${s.student_name} needs attention`,
         detail:          s.reason,
         suggestedAction: s.suggested_action,
-        actionLink:      `/teacher/classes/${panel.class_id}/students/${s.student_id}`,
+        actionLink:      learnerActionLink(s.student_id),
         generatedAt:     panel.generated_at,
         flagship:        false,
       })
@@ -198,7 +226,7 @@ export function mapMondayStudentRisk(rows: MondayPanelRow[]): AttentionItem[] {
         title:           `${s.student_name} needs attention`,
         detail:          s.reason,
         suggestedAction: s.action,
-        actionLink:      `/teacher/classes/${row.class_id}/students/${s.student_id}`,
+        actionLink:      learnerActionLink(s.student_id),
         generatedAt:     row.generated_at,
         flagship:        false,
       })
@@ -242,7 +270,7 @@ export function mapInterventionCheckins(rows: MondayPanelRow[]): AttentionItem[]
         title:           `Follow-up due: ${c.student_name}`,
         detail:          `${c.intervention_type} for ${c.substrand} — due ${c.due_date}`,
         suggestedAction: 'Check whether the intervention worked and log the outcome.',
-        actionLink:      `/teacher/classes/${row.class_id}/students/${c.student_id}`,
+        actionLink:      learnerActionLink(c.student_id),
         generatedAt:     row.generated_at,
         flagship:        false,
       })
@@ -267,7 +295,7 @@ export function mapCareerMoments(rows: MondayPanelRow[]): AttentionItem[] {
         title:           `Milestone: ${m.student_name}`,
         detail:          m.message,
         suggestedAction: null,
-        actionLink:      `/teacher/classes/${row.class_id}/students/${m.student_id}`,
+        actionLink:      learnerActionLink(m.student_id),
         generatedAt:     row.generated_at,
         flagship:        false,
       })

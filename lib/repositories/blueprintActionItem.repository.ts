@@ -50,6 +50,13 @@ export type BlueprintActionItemRow = {
   school_support: string | null
   success_indicator: string
   target_capability: string | null
+  /**
+   * Phase 2 — the canonical curriculum anchor (`sow_substrands.id`) this
+   * action targets, or null for a subject-level action. This, not the
+   * free-text `target_capability`, is the identity that must survive to
+   * delivery and back into evidence.
+   */
+  sub_strand_id: string | null
   review_date: string | null
   teacher_notes: string | null
   proposal_source: BlueprintActionProposalSource
@@ -81,6 +88,13 @@ export type InsertBlueprintActionItemInput = {
   school_support: string | null
   success_indicator: string
   target_capability: string | null
+  /**
+   * Phase 2 — the canonical curriculum anchor (`sow_substrands.id`) this
+   * action targets, or null for a subject-level action. This, not the
+   * free-text `target_capability`, is the identity that must survive to
+   * delivery and back into evidence.
+   */
+  sub_strand_id: string | null
   review_date: string | null
   teacher_notes: string | null
   proposal_source: BlueprintActionProposalSource
@@ -103,6 +117,10 @@ export type UpdateBlueprintActionItemContentInput = Partial<{
   school_support: string | null
   success_indicator: string
   target_capability: string | null
+  // NOTE: `sub_strand_id` is deliberately absent. It is curriculum IDENTITY,
+  // not editable content — a teacher may reword what an action says, but
+  // changing which sub-strand it targets is proposing a different action.
+  // Keeping it out of this type means it cannot be smuggled through an edit.
   review_date: string | null
   teacher_notes: string | null
   status: BlueprintActionStatus
@@ -117,7 +135,7 @@ export type DecisionInput = {
 }
 
 const ACTION_ITEM_COLS =
-  'id, learner_id, school_id, academic_year_id, term_id, blueprint_snapshot_id, context, priority, status, visibility, title, rationale, intended_outcome, learner_action, teacher_action, parent_support, school_support, success_indicator, target_capability, review_date, teacher_notes, proposal_source, source_generator, evidence_basis, proposed_by, reviewed_by, reviewed_at, decision_reason, created_at, updated_at'
+  'id, learner_id, school_id, academic_year_id, term_id, blueprint_snapshot_id, context, priority, status, visibility, title, rationale, intended_outcome, learner_action, teacher_action, parent_support, school_support, success_indicator, target_capability, sub_strand_id, review_date, teacher_notes, proposal_source, source_generator, evidence_basis, proposed_by, reviewed_by, reviewed_at, decision_reason, created_at, updated_at'
 
 export class BlueprintActionItemRepository extends BaseRepository {
   async insert(input: InsertBlueprintActionItemInput): Promise<BlueprintActionItemRow> {

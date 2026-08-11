@@ -151,13 +151,24 @@ export async function deliverBlueprintActionAsAssignment(
       title,
       subject: command.subject,
       topic: command.topic,
-      substrandId: null,
+      // Phase 2 — the action's canonical curriculum anchor becomes the
+      // assignment's. `assignments.substrand_id` already existed and
+      // `lib/assignments/evidence.ts` already resolves its CurriculumContext
+      // from it, so passing the id here is the whole of what was needed for
+      // the resulting evidence to come back curriculum-anchored. Previously
+      // hardcoded `null`, which is where the identity died on this path.
+      substrandId: action.sub_strand_id,
       instructions,
       dueDate,
       type: command.type,
       maxScore: command.maxScore,
       isQuiz: command.isQuiz,
-      isAdaptive: false,
+      // Adaptive only when the action genuinely came from adaptive
+      // intelligence AND targets a specific sub-strand. An action a teacher
+      // wrote by hand is not adaptive just because it was delivered through
+      // this adapter — mislabelling it would put ordinary teacher work into
+      // the adaptive variant pipeline.
+      isAdaptive: action.proposal_source === 'system' && action.sub_strand_id !== null,
       isCompassGuided: undefined,
       isHolidayAssignment: false,
       holidayPeriod: undefined,

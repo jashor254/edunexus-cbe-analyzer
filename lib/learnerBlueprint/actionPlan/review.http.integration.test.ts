@@ -60,7 +60,8 @@ async function insertApprovedAction() {
     learner_action: 'Read aloud for 10 minutes daily.',
     teacher_action: null, parent_support: null, school_support: null,
     success_indicator: 'Next confirmed assessment shows improved reading accuracy.',
-    target_capability: null, review_date: '2026-08-15', teacher_notes: null,
+    target_capability: null,
+    sub_strand_id: null, review_date: '2026-08-15', teacher_notes: null,
     proposal_source: 'teacher', source_generator: null, evidence_basis: EVIDENCE_BASIS_EMPTY, proposed_by: null,
   })
   const approved = await repos.blueprintActionItems.recordDecision(row.id, {

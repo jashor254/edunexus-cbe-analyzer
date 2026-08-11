@@ -35,6 +35,7 @@ function baseItem(overrides: Partial<BlueprintActionItem> = {}): BlueprintAction
     schoolSupport: null,
     successIndicator: 'Next confirmed assessment shows Level 3 or above.',
     targetCapability: 'Mathematics — Fractions',
+    subStrandId: null,
     reviewDate: '2026-08-15',
     teacherNotes: 'Hypothesis: struggles with mixed numbers specifically, not fractions generally — watch for this in the next assessment. Possible confusion with an earlier misconception from Term 1.',
     proposalSource: 'teacher',

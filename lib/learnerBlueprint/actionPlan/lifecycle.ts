@@ -107,6 +107,9 @@ export async function proposeBlueprintAction(
     school_support: input.schoolSupport ?? null,
     success_indicator: input.successIndicator,
     target_capability: input.targetCapability ?? null,
+    // Phase 2 — the canonical curriculum anchor travels with the action from
+    // the moment it is proposed. Never derived from `targetCapability` text.
+    sub_strand_id: input.subStrandId ?? null,
     review_date: input.reviewDate ?? null,
     teacher_notes: input.teacherNotes ?? null,
     proposal_source: input.proposalSource,

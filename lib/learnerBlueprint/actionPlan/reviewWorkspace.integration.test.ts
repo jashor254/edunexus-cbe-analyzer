@@ -78,6 +78,7 @@ function baseActionFields(learnerId: string, overrides: Partial<Parameters<typeo
     school_support: null,
     success_indicator: 'Next confirmed assessment shows improved reading accuracy.',
     target_capability: null,
+    sub_strand_id: null,
     review_date: null,
     teacher_notes: null,
     proposal_source: 'teacher' as const,

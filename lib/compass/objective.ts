@@ -24,6 +24,29 @@ export type SetTeacherSuggestedTopicInput = {
   subject: string
   concept: string
   strandName?: string | null
+  /**
+   * Phase 2 — the canonical curriculum anchor (`sow_substrands.id`) this
+   * objective targets, when the approved action had one.
+   *
+   * Carried in the existing `compass_bridge` jsonb rather than a new column:
+   * the bridge is already the channel teacher intent travels on, and adding
+   * a key to it needs no migration. Compass reads it back when the session's
+   * evidence is written, so a targeted session's mastery claim returns with
+   * the same identity the teacher aimed at. Never guessed — omitted entirely
+   * for a subject-level objective.
+   */
+  subStrandId?: string | null
+  /**
+   * Phase 2.6 — the `blueprint_compass_deliveries.id` this objective came
+   * from, when it came from a Blueprint delivery.
+   *
+   * A REFERENCE only: the bridge stays ephemeral handoff state and may be
+   * cleared once consumed, while the delivery row is the durable provenance
+   * ledger. Absent for the plain teacher topic-picker route, which creates
+   * no delivery row — such an objective is still honoured, it just has no
+   * delivery to bind.
+   */
+  deliveryId?: string | null
 }
 
 export async function setTeacherSuggestedTopic(input: SetTeacherSuggestedTopicInput): Promise<void> {
@@ -31,6 +54,8 @@ export async function setTeacherSuggestedTopic(input: SetTeacherSuggestedTopicIn
     firstSubject: input.subject,
     firstConcept: input.concept,
     strandName: input.strandName ?? null,
+    subStrandId: input.subStrandId ?? null,
+    deliveryId: input.deliveryId ?? null,
     teacherSuggested: true,
     teacherSuggestedAt: new Date().toISOString(),
   })
