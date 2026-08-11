@@ -1,7 +1,9 @@
 // app/api/learn/route.ts
 import { createServiceClient } from '@/utils/supabase/service'
 import { streamDeepSeek } from '@/lib/ai/deepseek'
-import { getOrCreateSession, readSession, writeSession, resolveSubject, recordExchange, tierToLevel } from '@/lib/compass/session'
+import { getOrCreateSession, readSession, writeSession, resolveSubject, recordExchange } from '@/lib/compass/session'
+import { resolveCompassAcademicLevelFor } from '@/lib/compass/learnerContext'
+import { bindDeliveryToSession } from '@/lib/compass/deliveryBinding'
 import { resolveCompassStudentAccess, resolveSessionOwnership } from '@/lib/compass/ownership'
 import { buildCompassPrompt, type CompassPromptParams, type KnowledgeContextBlock } from '@/lib/compass/prompt'
 import type { RootCauseResult } from '@/lib/knowledgeGraph/types'
@@ -238,18 +240,22 @@ export async function POST(req: Request) {
     const grade     = (student?.grade as number | null) ?? 7
     const isJunior  = grade <= 9
 
-    // Level priority: client-provided subjectLevel → per-subject tier → overall_level
+    // Level priority (Phase 1 / P0-A): canonical Projection → client hint →
+    // per-subject tier → overall_level → saved session → 2. The whole
+    // ordering, including the legacy tail this route used before, now lives
+    // in lib/compass/learnerContext.ts so that this route, the subject
+    // picker (/api/learn/student) and next-subject ranking
+    // (lib/compass/session.ts) cannot drift apart — a learner must not be
+    // shown "Level 2" on the picker and taught at Level 3 in the same
+    // session. `academicState.source` records which source actually won.
     const subjectTiers = (ctx?.subject_tiers ?? {}) as Record<string, string>
-    const tierKey      = Object.keys(subjectTiers).find(
-      k => k.toLowerCase() === subject.toLowerCase()
-    )
-    const tierLevel = tierKey
-      ? tierToLevel(subjectTiers[tierKey])
-      : ((ctx?.overall_level as number | null) ?? savedSession?.overallLevel ?? 2)
-    const clientLevel = typeof subjectLevel === 'number' && subjectLevel >= 1 && subjectLevel <= 4
-      ? subjectLevel as 1 | 2 | 3 | 4
-      : null
-    const level = clientLevel ?? (Math.max(1, Math.min(4, tierLevel)) as 1 | 2 | 3 | 4)
+    const academicState = await resolveCompassAcademicLevelFor(studentId, subject, {
+      subjectTiers,
+      overallLevel: (ctx?.overall_level as number | null) ?? null,
+      sessionLevel: savedSession?.overallLevel ?? null,
+      clientHint: typeof subjectLevel === 'number' ? subjectLevel : null,
+    })
+    const level = academicState.level
 
     // Pathway — only meaningful for senior students; prefer student record, fall back to context
     const pathway: ValidPathway | null = isJunior
@@ -341,6 +347,22 @@ export async function POST(req: Request) {
 
     const [gradeTopics, session] = await Promise.all([gradeTopicsPromise, sessionPromise])
     const activeSessionId = sessionId ?? session.sessionId
+
+    // ── Phase 2.6 / G-08 — claim the teacher intervention this session consumes ──
+    //
+    // Runs once a REAL session row exists and we know the session's ACTUAL
+    // subject, which is what makes wrong-subject protection possible. Safe to
+    // call on every turn: the claim is an atomic conditional update, so a
+    // repeated first message, a retry, two tabs or a resume all converge on
+    // one binding. A failed bind is the normal case for a learner-directed
+    // session and never blocks it — fire-and-forget so provenance can never
+    // break a learner's lesson.
+    void bindDeliveryToSession(studentId, activeSessionId, subject, compassBridge)
+      .catch(err => logger.warn(
+        'Compass delivery binding failed',
+        { operation: 'learn.bindDelivery', sessionId: activeSessionId },
+        err,
+      ))
 
     // Enable graph-driven opener only for brand-new sessions with root cause data
     if (knowledgeContext && session.isNew && knowledgeContext.rootCauseTopic && knowledgeContext.failingTopic) {

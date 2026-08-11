@@ -890,11 +890,17 @@ function LearnContent() {
           <AlertCircle className="w-8 h-8 text-white" />
         </div>
         <div className="space-y-2">
-          <h2 className="text-2xl font-bold text-white">Assessment Needed</h2>
+          <h2 className="text-2xl font-bold text-white">Nothing to work on yet</h2>
           <p className="text-white/50 max-w-xs">
+            {/* Phase 2.5 / G-05 — this state now means "we hold no marks,
+                no assessment and no classwork for this learner in any
+                subject", not "no Academic Clinic assessment exists". A
+                learner whose teacher has entered marks reaches Compass
+                without ever visiting the Clinic. Deliberately plain
+                educational language: no architecture terms. */}
             {hasTeacher
-              ? "This student hasn't completed their initial assessment yet. Ask their teacher to run the assessment first so the Compass can personalise their learning."
-              : "Let's get this student's first assessment done so the Compass can personalise their learning."}
+              ? "We don't have any subject results for this student yet, so the Compass can't tell what to work on. Once their teacher records some classwork or an assessment, this will open up."
+              : "We don't have any subject results for this student yet. Add their first assessment and the Compass can start personalising their learning."}
           </p>
         </div>
         {hasTeacher ? (

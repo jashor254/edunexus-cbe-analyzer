@@ -4,6 +4,7 @@
 
 import { repos } from '@/lib/repositories'
 import { publishEvent } from '@/lib/events'
+import { readCompassAcademicProjection, resolveCompassSubjectRanking } from './learnerContext'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -33,16 +34,14 @@ export interface NextSubject {
 
 // ── Internal helpers ───────────────────────────────────────────────────────────
 
-// Canonical tier→level mapping — imported by app/api/learn/route.ts and
-// app/api/learn/student/route.ts rather than redefined in each.
-// Current DB values: 'challenge' | 'standard' | 'reinforcement' | 'remedial'
-// Legacy fallback handles old 'approaching_expectations' style strings.
-export function tierToLevel(tier: string): 1 | 2 | 3 | 4 {
-  if (tier === 'challenge'     || tier.includes('exceeding'))   return 4
-  if (tier === 'standard'      || tier.includes('meeting'))     return 3
-  if (tier === 'reinforcement' || tier.includes('approaching')) return 2
-  return 1 // remedial or unknown
-}
+// Canonical tier→level mapping. Its implementation moved to
+// lib/compass/learnerContext.ts (Phase 1 / P0-A) so that this module can
+// import that adapter's ranking function without a circular import — the
+// function itself is unchanged. Re-exported here because
+// app/api/learn/route.ts and app/api/learn/student/route.ts have always
+// imported it from this module, and there is no reason to churn those
+// imports.
+export { tierToLevel } from './learnerContext'
 
 const PATHWAY_SUBJECTS: Record<string, string[]> = {
   'STEM':            ['mathematics', 'physics', 'chemistry', 'biology', 'geography'],
@@ -113,12 +112,19 @@ export async function getOrCreateSession(
 // ── 2. getNextSubject ──────────────────────────────────────────────────────────
 
 export async function getNextSubject(studentId: string): Promise<NextSubject> {
-  const [ctx, lastSubject] = await Promise.all([
+  const [ctx, lastSubject, projection] = await Promise.all([
     repos.compass.getStudentLearningContext(studentId),
     // Most recent session in ANY state — a just-finished session is
     // 'completed', so an active-only lookup would see nothing and the
     // "don't repeat the last subject" rule below would never fire.
     repos.compass.getLastSessionSubject(studentId),
+    // Phase 1 / P0-A — canonical, evidence-derived academic state. A pure
+    // read (see readCompassAcademicProjection); resolved in parallel with
+    // the two reads that were already here, so this adds no round-trip to
+    // the critical path. Returns an all-null result for a learner with no
+    // persisted projection, which the ranking below handles by falling
+    // back to `subject_tiers` exactly as it always did.
+    readCompassAcademicProjection(studentId),
   ])
 
   const subjectTiers  = ctx?.subject_tiers  ?? {}
@@ -143,8 +149,14 @@ export async function getNextSubject(studentId: string): Promise<NextSubject> {
     }
   }
 
-  // Build candidate list
-  let candidates = Object.keys(subjectTiers)
+  // Build candidate list — canonical level per subject where Projection has
+  // one, the legacy tier otherwise, already sorted weakest-first. Same
+  // "weakest subject next" rule as before; only the source of "weakest"
+  // changed. `sourceKey` (not the normalized key) is what flows onward, so
+  // downstream subject addressing — KICD topic lookup especially — is
+  // unchanged for every learner who already has a tier.
+  let candidates = resolveCompassSubjectRanking({ academic: projection.academic, subjectTiers })
+    .map(r => ({ subject: r.sourceKey, level: r.level }))
 
   // e) Senior: restrict to pathway subjects
   if (isSenior && pathway) {
@@ -155,16 +167,14 @@ export async function getNextSubject(studentId: string): Promise<NextSubject> {
     if (pathwayKey) {
       const allowed = PATHWAY_SUBJECTS[pathwayKey]
       const filtered = candidates.filter(s =>
-        allowed.some(a => s.toLowerCase().includes(a.toLowerCase()))
+        allowed.some(a => s.subject.toLowerCase().includes(a.toLowerCase()))
       )
       if (filtered.length > 0) candidates = filtered
     }
   }
 
-  // b+c+d) Sort weakest first; skip last-session subject to avoid repetition
+  // b+c+d) Already weakest-first; skip last-session subject to avoid repetition
   const ranked = candidates
-    .map(s => ({ subject: s, level: tierToLevel(subjectTiers[s] ?? '') }))
-    .sort((a, b) => a.level - b.level)
 
   const eligible = ranked.filter(s => s.subject !== lastSubject)
   // Normally the last subject is only de-prioritised, and falling back to it
