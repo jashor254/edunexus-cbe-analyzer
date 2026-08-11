@@ -364,11 +364,63 @@ test('erasing an already-erased row is rejected, and erasure cannot be used to c
   const { inserted } = await persistEvidenceBatch([evidence], run.id)
   const evidenceId = inserted[0].id
 
+  // ── First erasure: must work exactly as it always has ─────────────────
   await eraseEvidence(evidenceId, authUserId, 'First request')
-  await assert.rejects(
-    async () => { await eraseEvidence(evidenceId, authUserId, 'Second request') },
-    /already erased/i,
-  )
+
+  const { data: afterFirst } = await db.from('learner_evidence')
+    .select('lifecycle_state, extracted_name, extracted_external_id, score, erased_by, erased_at, erasure_reason')
+    .eq('id', evidenceId).single()
+
+  assert.equal(afterFirst!.lifecycle_state, 'erased')
+  assert.equal(afterFirst!.extracted_name, '[erased]', 'identifying fields are still purged')
+  assert.equal(afterFirst!.extracted_external_id, null)
+  assert.equal(afterFirst!.score, null)
+  assert.equal(afterFirst!.erased_by, authUserId)
+  assert.equal(afterFirst!.erasure_reason, 'First request')
+  assert.ok(afterFirst!.erased_at)
+
+  // ── Second erasure by a DIFFERENT actor ───────────────────────────────
+  //
+  // A different actor is essential. Re-erasing as the same user would leave
+  // `erased_by` coincidentally unchanged, so the assertion below would pass
+  // even against the broken function — the defect this test exists to catch
+  // would slip through. Actor B makes an overwrite unmistakable.
+  const { data: actorB, error: actorBErr } = await db.auth.admin.createUser({
+    email: `${SYNTHETIC_MARKER.toLowerCase()}-erasure-actor-b-${Date.now()}@example.com`,
+    password: `Test!${Math.random().toString(36).slice(2, 12)}`,
+    email_confirm: true,
+  })
+  if (actorBErr) throw actorBErr
+  const actorBId = actorB.user.id
+
+  try {
+    await assert.rejects(
+      async () => { await eraseEvidence(evidenceId, actorBId, 'Second request') },
+      /already erased/i,
+      'erasure is terminal — a second erase request must be rejected',
+    )
+
+    // THE ACTUAL INVARIANT. Rejection alone is not enough: a guard that
+    // raised only AFTER the attribution had been overwritten would satisfy
+    // the assertion above while still destroying the audit answer to
+    // "who erased this, when, and why".
+    const { data: afterSecond } = await db.from('learner_evidence')
+      .select('lifecycle_state, erased_by, erased_at, erasure_reason')
+      .eq('id', evidenceId).single()
+
+    assert.equal(afterSecond!.erased_by, afterFirst!.erased_by,
+      'erased_by must survive a second erase attempt unchanged')
+    assert.equal(afterSecond!.erased_at, afterFirst!.erased_at,
+      'erased_at must survive a second erase attempt unchanged')
+    assert.equal(afterSecond!.erasure_reason, afterFirst!.erasure_reason,
+      'erasure_reason must survive a second erase attempt unchanged')
+    assert.notEqual(afterSecond!.erased_by, actorBId,
+      'the second actor must not have taken credit for the first actor\'s erasure')
+    assert.equal(afterSecond!.lifecycle_state, 'erased')
+  } finally {
+    await db.auth.admin.deleteUser(actorBId)
+  }
+
 
   // The immutability trigger's erasure exception is scoped to exactly
   // extracted_name/extracted_external_id/score — it must not become a
@@ -378,6 +430,39 @@ test('erasing an already-erased row is rejected, and erasure cannot be used to c
     /immutable/i,
     'erasure must not widen the immutability exception to non-PII fact columns',
   )
+})
+
+test('an unrelated update to an already-erased row is NOT newly rejected', async () => {
+  // The attribution guard must be scoped to erasure attribution, not
+  // "any update of an erased row". This pins that scoping: without it, a
+  // future tightening of the guard would silently freeze erased rows
+  // against every other legitimate write, and nothing would catch it.
+  const run = await startIngestionRun({ source: 'csv_export', initiatedBy: authUserId, teacherId, institution: SYNTHETIC_MARKER })
+  const evidence: LearnerEvidence = {
+    learnerId: studentIds[0], extractedName: 'Erased Row Unrelated Update', extractedExternalId: null,
+    subject: 'social studies', rawSubject: 'Social Studies', score: 61, cbcLevel: 2,
+    assessmentType: 'cat', academicYear: 2026, term: 1, evidenceSource: 'csv_export',
+    trustTier: 2, evidenceConfidence: 90, extractionMethod: 'csv_parser_v1',
+    reviewStatus: 'auto_confirmed', rawInputRef: 'test:erased-unrelated-update', importedAt: new Date().toISOString(), issues: [],
+  }
+  const { inserted } = await persistEvidenceBatch([evidence], run.id)
+  const evidenceId = inserted[0].id
+
+  await eraseEvidence(evidenceId, authUserId, 'Erasure before unrelated update')
+
+  // verification_state is not a fact column and not erasure attribution —
+  // updating it on an erased row must behave exactly as it did before.
+  const { error } = await db.from('learner_evidence')
+    .update({ verification_state: 'contradicted' })
+    .eq('id', evidenceId)
+  assert.equal(error, null, 'a non-attribution update to an erased row must still be allowed')
+
+  const { data: row } = await db.from('learner_evidence')
+    .select('verification_state, erased_by, erasure_reason')
+    .eq('id', evidenceId).single()
+  assert.equal(row!.verification_state, 'contradicted')
+  assert.equal(row!.erased_by, authUserId, 'and it must not disturb the erasure attribution')
+  assert.equal(row!.erasure_reason, 'Erasure before unrelated update')
 })
 
 // ── Phase -1: school_id / curriculum_version_id (additive, optional) ────────
