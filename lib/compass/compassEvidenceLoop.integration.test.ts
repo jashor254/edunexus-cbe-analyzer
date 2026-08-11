@@ -78,6 +78,15 @@ before(async () => {
 after(async () => {
   await db.from('learner_projections').delete().eq('learner_id', studentId)
 
+  // Derive the runs from the learner's own evidence rather than trusting the
+  // module-level list: a test that failed early may never have populated it,
+  // and the previous teacher_id-based lookup never populated it at all — so
+  // synthetic ingestion_runs rows were being left behind on every run.
+  if (studentId) {
+    const derived = await ingestionRunIdsForLearner()
+    ingestionRunIds = [...new Set([...ingestionRunIds, ...derived])]
+  }
+
   if (ingestionRunIds.length > 0) {
     const { data: ev } = await db.from('learner_evidence').select('id').in('ingestion_run_id', ingestionRunIds)
     const evidenceIds = (ev ?? []).map(e => e.id)
@@ -87,13 +96,32 @@ after(async () => {
       await db.from('learner_evidence').update({ supersedes: null, superseded_by: null }).in('id', evidenceIds)
       await db.from('learner_evidence').delete().in('id', evidenceIds)
     }
-    await db.from('ingestion_runs').delete().in('id', ingestionRunIds)
+    if (ingestionRunIds.length) await db.from('ingestion_runs').delete().in('id', ingestionRunIds)
   }
   await db.from('students').delete().eq('id', studentId)
   await db.from('teachers').delete().eq('id', teacherId)
   await db.auth.admin.deleteUser(authUserId)
   console.log('[cleanup] synthetic compass-evidence-loop fixtures removed')
 })
+
+/**
+ * The ingestion runs this learner's Compass evidence actually belongs to.
+ *
+ * Previously looked up as `ingestion_runs WHERE teacher_id = <teacher>`,
+ * which never matched: `recordCompassSessionEvidence` creates its run with
+ * `teacherId: null` (a Compass session has no teacher), so the filter
+ * returned zero rows and every assertion below silently had nothing to
+ * assert against. A test-harness defect, not a product one — the
+ * assertions themselves are unchanged; only the query that finds the rows
+ * is corrected, deriving the runs from the learner's own evidence.
+ */
+async function ingestionRunIdsForLearner(): Promise<string[]> {
+  const { data } = await db
+    .from('learner_evidence')
+    .select('ingestion_run_id')
+    .eq('learner_id', studentId)
+  return [...new Set((data ?? []).map(r => r.ingestion_run_id as string).filter(Boolean))]
+}
 
 test('a completed Compass session emits two distinct claim shapes, both pending_review at creation', async () => {
   const sessionId = randomUUID()
@@ -106,8 +134,7 @@ test('a completed Compass session emits two distinct claim shapes, both pending_
     endingLevel: 3, academicYear: 2026, term: 1,
   })
 
-  const { data: runs } = await db.from('ingestion_runs').select('id').eq('teacher_id', teacherId)
-  ingestionRunIds = (runs ?? []).map(r => r.id)
+  ingestionRunIds = await ingestionRunIdsForLearner()
 
   const { data: rows } = await db
     .from('learner_evidence')
@@ -153,29 +180,78 @@ test('the mastery claim requires a real teacher review — confirming it activat
   assert.ok(projection.behaviour!.supportingEvidenceIds.includes(mastery!.id))
 })
 
-test('illegal transitions are rejected — an already-reviewed_confirmed row cannot be confirmed again', async () => {
+test('re-confirming an already-confirmed row is an idempotent, metadata-preserving no-op (Phase 2 GATE B)', async () => {
+  // This test previously asserted that a second confirmReview() must throw.
+  // Phase 2 GATE B settled that question the other way, deliberately:
+  //   - a double-click or a retry after a network flake is normal client
+  //     behaviour, and turning it into a failure surfaces alarm for a
+  //     harmless action;
+  //   - a hard error could not be implemented without narrowing the
+  //     lifecycle trigger's same-state branch, a migration whose blast
+  //     radius covers every evidence write;
+  //   - the REAL harm was never permissiveness, it was that a second
+  //     confirmation silently overwrote reviewed_by / reviewed_at /
+  //     review_reason — replacing the record of who made the educational
+  //     judgement with whoever clicked last.
+  // So the expectation is updated to the decided semantics. The Gate B
+  // implementation was not changed to satisfy the old assertion.
   const pending = await getPendingReview({ learnerId: studentId })
   const engagement = pending.find(r => r.extraction_method === ENGAGEMENT_EXTRACTION_METHOD)
 
-  if (!engagement) {
-    // Already auto-confirmed by Phase 11's policy in this environment —
-    // use that row instead; either way we need an already-non-pending row.
+  let targetId: string
+  if (engagement) {
+    const first = await confirmReview(engagement.id, authUserId, 'first, legal confirmation')
+    assert.equal(first.lifecycle_state, 'reviewed_confirmed')
+    targetId = engagement.id
+  } else {
+    // Already auto-confirmed by Phase 11's policy in this environment.
     const { data: rows } = await db
       .from('learner_evidence')
       .select('id')
       .in('ingestion_run_id', ingestionRunIds)
       .eq('extraction_method', ENGAGEMENT_EXTRACTION_METHOD)
-      .neq('lifecycle_state', 'pending_review')
+      .eq('lifecycle_state', 'reviewed_confirmed')
       .limit(1)
-    assert.ok(rows && rows.length > 0)
-    await assert.rejects(() => confirmReview(rows![0].id, authUserId, 'attempting an illegal transition'))
-    return
+    assert.ok(rows && rows.length > 0, 'expected an already-confirmed engagement row')
+    targetId = rows![0].id
   }
 
-  await confirmReview(engagement.id, authUserId, 'first, legal confirmation')
+  const { data: before } = await db.from('learner_evidence')
+    .select('reviewed_by, reviewed_at, review_reason').eq('id', targetId).single()
+
+  // Second attempt — succeeds, changes nothing.
+  const again = await confirmReview(targetId, authUserId, 'second attempt with a DIFFERENT reason')
+  assert.equal(again.lifecycle_state, 'reviewed_confirmed', 'idempotent: no error on retry')
+
+  const { data: after } = await db.from('learner_evidence')
+    .select('reviewed_by, reviewed_at, review_reason').eq('id', targetId).single()
+
+  assert.equal(after!.reviewed_by, before!.reviewed_by, 'the original reviewer is preserved')
+  assert.equal(after!.reviewed_at, before!.reviewed_at, 'and the original timestamp')
+  assert.equal(after!.review_reason, before!.review_reason, 'and the original reason — never silently rewritten')
+
+  // The repeat is visible rather than invisible.
+  const { data: events } = await db.from('evidence_audit_log')
+    .select('metadata').eq('evidence_id', targetId).eq('event_type', 'reviewed_confirmed')
+  assert.ok(
+    (events ?? []).some(e => (e.metadata as Record<string, unknown>)?.repeat_confirmation === true),
+    'the repeat confirmation is recorded in the audit log',
+  )
+})
+
+test('genuinely illegal lifecycle transitions are still rejected — the guard was not weakened', async () => {
+  const { data: rows } = await db
+    .from('learner_evidence')
+    .select('id')
+    .in('ingestion_run_id', ingestionRunIds)
+    .eq('lifecycle_state', 'reviewed_rejected')
+    .limit(1)
+
+  if (!rows || rows.length === 0) return // nothing rejected yet in this run
+
   await assert.rejects(
-    () => confirmReview(engagement.id, authUserId, 'second attempt — must fail'),
-    /Invalid evidence lifecycle transition|already/i,
+    () => confirmReview(rows[0].id, authUserId, 'rejected evidence must not be confirmable'),
+    /Invalid evidence lifecycle transition/,
   )
 })
 
@@ -189,8 +265,7 @@ test('rejected evidence is retained, not deleted, and never reaches Projection',
     endingLevel: null, academicYear: 2026, term: 1,
   })
 
-  const { data: runs } = await db.from('ingestion_runs').select('id').eq('teacher_id', teacherId)
-  ingestionRunIds = (runs ?? []).map(r => r.id)
+  ingestionRunIds = await ingestionRunIdsForLearner()
 
   const pending = await getPendingReview({ learnerId: studentId })
   const abandoned = pending.find(r => r.raw_input_ref.includes(sessionId))

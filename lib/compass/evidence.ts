@@ -36,6 +36,25 @@
 // - mastery: emitted only when the AI's own in-session eval reported genuine
 //   progress AND named at least one concept. This is the one claim shape
 //   Phase 11's auto-confirm policy must never promote automatically.
+//
+// CLAIM IDENTITY (Phase 1.5). These two claims are independent: both can be
+// true simultaneously ("she worked for 12 minutes" AND "she demonstrated
+// progress on fractions"), and either can be true without the other (a
+// session with no demonstrated learning emits engagement only). Neither
+// corrects the other, and a later session does not correct an earlier one —
+// Compass session evidence is EVENT evidence.
+//
+// `claimKey()` in lib/intelligence/evidenceLifecycle.ts therefore exempts
+// `compass_session` from claim-key supersession, the same narrow carve-out
+// `teacher_remark` already takes and for the same reason. Nothing in THIS
+// file had to change for that: the two claims were always distinguishable
+// by `extractionMethod`, and remain so. What changed is that the Evidence
+// Domain no longer treats them as two versions of one claim.
+//
+// Consequence worth knowing when reading the rows: Compass evidence never
+// carries a `supersedes` pointer and is never marked `superseded`. A
+// mistaken claim is corrected by rejection (rejectReview) or retraction
+// (retractEvidence), not by a newer session overwriting it.
 
 import { repos } from '@/lib/repositories'
 import type { LearnerEvidence } from '@/lib/intelligence/evidence'
@@ -60,6 +79,15 @@ export async function recordCompassSessionEvidence(input: {
   endingLevel: number | null
   academicYear: number
   term: number | null
+  /**
+   * Phase 2 — the canonical curriculum anchor (`sow_substrands.id`) this
+   * session was TARGETED at, from the teacher-approved action that queued
+   * it (`compass_bridge.subStrandId`). Null for an open, learner-directed
+   * session, which is the normal case and must never be filled in by
+   * guessing: Compass has no reliable way to infer which sub-strand a
+   * free-form conversation covered, and a wrong anchor is worse than none.
+   */
+  targetSubStrandId?: string | null
 }): Promise<void> {
   const startedAt = new Date()
 
@@ -100,6 +128,11 @@ export async function recordCompassSessionEvidence(input: {
     reviewStatus,
     rawInputRef: `compass_session:${input.sessionId}:engagement:${input.subject}:` +
       `${input.exchangeCount}x:${durationMinutes}min:${input.sessionAbandoned ? 'abandoned' : 'completed'}`,
+    // Engagement stays behavioural even for a targeted session: "she worked
+    // on this for 12 minutes" is not a curriculum claim, and anchoring it
+    // would let attendance masquerade as sub-strand mastery in
+    // academic.bySubStrand. Deliberately unanchored (Phase 2 §20).
+    subStrandId: null,
     importedAt: startedAt.toISOString(),
     issues: input.sessionAbandoned ? ['session_abandoned'] : [],
   }
@@ -131,6 +164,13 @@ export async function recordCompassSessionEvidence(input: {
       reviewStatus,
       rawInputRef: `compass_session:${input.sessionId}:mastery:${input.subject}:` +
         `concepts=${input.masteredConcepts.join('|')}`,
+      // Phase 2 — a TARGETED session's mastery claim returns with the same
+      // curriculum identity the teacher aimed it at, so "did the
+      // proportional-reasoning weakness change?" becomes answerable. An open
+      // session leaves this null and stays subject-level, which remains a
+      // perfectly valid claim. Still tier 1 and still pending_review: an
+      // anchor makes the claim SPECIFIC, never more TRUSTED.
+      subStrandId: input.targetSubStrandId ?? null,
       importedAt: startedAt.toISOString(),
       issues: [],
     })

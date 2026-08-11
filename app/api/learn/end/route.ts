@@ -3,9 +3,11 @@ import { z } from 'zod'
 import { createServiceClient } from '@/utils/supabase/service'
 import { checkFeatureAccess } from '@/lib/payments/access'
 import { type FeatureKey } from '@/lib/payments/config'
-import { endSession, tierToLevel } from '@/lib/compass/session'
+import { endSession } from '@/lib/compass/session'
+import { resolveCompassAcademicLevelFor } from '@/lib/compass/learnerContext'
 import { resolveCompassStudentAccess, resolveSessionOwnership } from '@/lib/compass/ownership'
 import { recordCompassSessionEvidence } from '@/lib/compass/evidence'
+import { completeDeliveryForSession } from '@/lib/compass/deliveryBinding'
 import { awardCompassGroupBonus } from '@/lib/compass/groupBonus'
 import { updateFromCompass } from '@/lib/learnerModel/updater'
 import { getStudentBasicInfo } from '@/lib/learnerModel'
@@ -89,7 +91,7 @@ export async function POST(req: Request): Promise<Response> {
         .eq('id', sessionId)
         .maybeSingle(),
       db.from('student_learning_context')
-        .select('overall_level, subject_tiers, total_sessions, sessions_this_week, week_start_date')
+        .select('overall_level, subject_tiers, total_sessions, sessions_this_week, week_start_date, compass_bridge')
         .eq('student_id', studentId)
         .maybeSingle(),
     ])
@@ -116,14 +118,32 @@ export async function POST(req: Request): Promise<Response> {
     const newWeekly      = isSameWeek ? prevWeekly + 1 : 1
     const newTotal       = prevTotal + 1
 
-    // Ending level — same tier→level lookup used at session start (app/api/learn/route.ts),
-    // read fresh here since it's what changed (if anything) during the session.
+    // Ending level — Adaptive Remediation Phase 1, Stage 5.
+    //
+    // This used to read `student_learning_context.subject_tiers` directly
+    // and convert it with `tierToLevel()`. That tier map is written only by
+    // the Academic Clinic pipeline and is never refreshed when evidence
+    // changes — the exact stale snapshot `lib/compass/learnerContext.ts`
+    // exists to bypass at session START. Reading it at session END meant the
+    // legacy value re-entered the canonical Evidence Domain as the
+    // `cbc_level` of this session's mastery claim, and made `levelGained`
+    // compare a Projection-derived `starting_level` against a tier-derived
+    // ending level — two different semantics.
+    //
+    // Both ends of a Compass session now speak the same language, via the
+    // same resolver `/api/learn` already calls at start. `sessionLevel` is
+    // seeded with this session's own `starting_level` so the resolver's
+    // legacy tail degrades to the session's own start rather than to the
+    // Clinic tier, and the tier map is still passed as the last-resort
+    // fallback exactly as the resolver's documented precedence expects.
     const subjectTiers = (ctx?.subject_tiers as Record<string, string> | null) ?? {}
-    const tierKey       = sessionRow?.subject
-      ? Object.keys(subjectTiers).find(k => k.toLowerCase() === (sessionRow.subject as string).toLowerCase())
-      : undefined
-    const endingLevel = tierKey
-      ? tierToLevel(subjectTiers[tierKey])
+    const endingLevel = sessionRow?.subject
+      ? (await resolveCompassAcademicLevelFor(studentId, sessionRow.subject as string, {
+          subjectTiers,
+          overallLevel: (ctx?.overall_level as number | null) ?? null,
+          sessionLevel: startingLevel,
+          clientHint:   null,
+        })).level
       : ((ctx?.overall_level as number | null) ?? null)
 
     const levelGained = startingLevel !== null && endingLevel !== null && endingLevel > startingLevel
@@ -188,6 +208,23 @@ export async function POST(req: Request): Promise<Response> {
         sessionAbandoned:  status === 'abandoned',
       }).catch(() => {})
 
+      // Phase 2.6 / G-08 — "the learner finished the session this
+      // intervention sent them to". Matched on the exact bound session id,
+      // never on learner + subject + recency. Says NOTHING about mastery:
+      // the session's mastery claim below is still tier-1 pending_review
+      // until a teacher confirms it, and whether the intervention worked is
+      // a separate Blueprint action review. Fire-and-forget.
+      void completeDeliveryForSession(sessionId)
+        .catch(err => console.error('[learn/end] completeDeliveryForSession failed', err))
+
+      const bridge = (ctx?.compass_bridge ?? {}) as Record<string, unknown>
+      const bridgeSubject = (bridge.firstSubject as string | null) ?? null
+      const targetSubStrandIdForSession =
+        bridgeSubject !== null &&
+        bridgeSubject.toLowerCase() === String(sessionRow.subject ?? '').toLowerCase()
+          ? ((bridge.subStrandId as string | null) ?? null)
+          : null
+
       getStudentBasicInfo(studentId)
         .then(student => recordCompassSessionEvidence({
           studentId,
@@ -202,6 +239,14 @@ export async function POST(req: Request): Promise<Response> {
           endingLevel,
           academicYear:     student?.year ?? new Date().getFullYear(),
           term:             student?.term ?? null,
+          // Phase 2 — a TARGETED session's mastery claim returns with the
+          // curriculum identity the teacher aimed it at. The anchor is only
+          // honoured when the queued objective was for THIS session's
+          // subject: `compass_bridge` is a single per-learner slot, so a
+          // Maths objective must never anchor a Kiswahili session's
+          // evidence. An open, learner-directed session yields null and
+          // stays subject-level, which is correct — nothing is inferred.
+          targetSubStrandId: targetSubStrandIdForSession,
         }))
         .catch(err => console.error('[learn/end] recordCompassSessionEvidence failed', err))
     }
