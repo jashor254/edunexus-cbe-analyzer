@@ -57,8 +57,29 @@ export async function POST(
 
     const questions = await findQuestionsForTeacher(assignmentId)
     const existingVariants = await findVariantsForQuestionIds(questions.map(q => q.id))
-    const questionsWithVariants = new Set(existingVariants.filter(v => v.status !== 'archived').map(v => v.question_id))
-    const targetQuestions = questions.filter(q => !questionsWithVariants.has(q.id))
+
+    // Adaptive Remediation Phase 1, Stage 7. This used to skip any question
+    // that already had a single non-archived variant, which meant a question
+    // holding (say) foundation + supported_practice could never acquire an
+    // extension variant later — so a learner who improved into `on_track`
+    // after the first generation was permanently served the canonical
+    // question. The skip is now "this question is missing nothing", not
+    // "this question has something".
+    //
+    // Which tiers are actually missing is decided per question inside
+    // generateAdaptiveVariants() (the one place that knows what the class
+    // roster currently needs). This route only avoids paying for a question
+    // that already has all three deliverable tiers — the only case where
+    // that call is guaranteed to be a no-op.
+    const liveTypesByQuestion = new Map<string, Set<string>>()
+    for (const v of existingVariants) {
+      if (v.status === 'archived' || v.status === 'rejected') continue
+      const set = liveTypesByQuestion.get(v.question_id) ?? new Set<string>()
+      set.add(v.variant_type)
+      liveTypesByQuestion.set(v.question_id, set)
+    }
+    const ALL_TIERS = 3
+    const targetQuestions = questions.filter(q => (liveTypesByQuestion.get(q.id)?.size ?? 0) < ALL_TIERS)
 
     // Token-tier users are billed per question actually generated, deducted
     // immediately after each successful call — never before, and never for
@@ -69,7 +90,11 @@ export async function POST(
       try {
         const result = await generateVariantsForAssignmentQuestion(assignmentId, question.id, ctx)
         perQuestion.push({ questionId: question.id, created: result.created.length, failed: result.failed.length })
-        if (access.deductTokens) {
+        // Charge only for questions that actually produced a variant. Stage
+        // 7 made generation additive, so a question whose needed tiers all
+        // already exist is now a legitimate no-op reached without an AI
+        // call — billing it would charge a teacher for nothing.
+        if (access.deductTokens && result.created.length > 0) {
           await deductFeatureTokens(access.userId, 'adaptive_variant_generate', access.cost)
         }
       } catch (e: unknown) {

@@ -32,7 +32,7 @@
 // verified by a dedicated test, not assumed.
 
 import { repos } from '@/lib/repositories'
-import type { LearnerEvidence } from '@/lib/intelligence/evidence'
+import type { LearnerEvidence, AdaptiveDeliveryPayload } from '@/lib/intelligence/evidence'
 import { EVIDENCE_SOURCE_TRUST_TIER } from '@/lib/intelligence/evidence'
 import { computeConfidence, resolveReviewStatus } from '@/lib/intelligence/confidence'
 import { persistEvidenceBatch } from '@/lib/intelligence/evidenceLifecycle'
@@ -59,6 +59,12 @@ export type AssignmentMarkEvidenceInput = {
   academicYear:  number
   term:          number | null
   markedAt:      string
+  /**
+   * Adaptive Remediation Phase 1, Stage 1 — instructional provenance.
+   * Optional and never guessed; see AdaptiveDeliveryPayload. Never affects
+   * `score`, `cbcLevel`, confidence, or review status.
+   */
+  adaptiveDelivery?: AdaptiveDeliveryPayload | null
 }
 
 export async function recordAssignmentMarkEvidence(input: AssignmentMarkEvidenceInput): Promise<void> {
@@ -116,6 +122,9 @@ export async function recordAssignmentMarkEvidence(input: AssignmentMarkEvidence
     strand: curriculumContext?.strandTitle ?? null,
     subStrand: curriculumContext?.subStrandTitle ?? input.topic,
     subStrandId: curriculumContext?.subStrandId ?? null,
+    // Stage 1 — instructional provenance. Context only: the score above is
+    // still the whole educational claim of this row.
+    payload: input.adaptiveDelivery ?? null,
   }
 
   const result = await persistEvidenceBatch([evidence], runId)

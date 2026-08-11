@@ -115,6 +115,31 @@ export async function findVariantsForQuestionIds(questionIds: string[]): Promise
   return (data ?? []) as VariantRow[]
 }
 
+/**
+ * The variant types that currently EXIST for a question in a state that can
+ * still reach a learner — Adaptive Remediation Phase 1, Stage 7.
+ *
+ * `draft` and `approved` count as present; `rejected` and `archived` do not.
+ * A rejected tier is genuinely absent from delivery, so a teacher clicking
+ * Generate again should be offered it; an archived one has already been
+ * replaced by `regenerateVariant()`'s fresh draft, which is itself counted.
+ *
+ * Counting drafts also protects the partial unique index on
+ * (question_id, variant_type) WHERE status = 'approved': without it, a
+ * second Generate could create a duplicate draft that fails only later, at
+ * the moment the teacher tries to approve it.
+ */
+export async function findLiveVariantTypesForQuestion(questionId: string): Promise<Set<VariantType>> {
+  const db = createServiceClient()
+  const { data, error } = await db
+    .from('assignment_question_variants')
+    .select('variant_type, status')
+    .eq('question_id', questionId)
+    .in('status', ['draft', 'approved'])
+  if (error) throw new Error(`Failed to fetch live variant types: ${error.message}`)
+  return new Set((data ?? []).map(r => r.variant_type as VariantType))
+}
+
 /** The one row a serving/grading path (Sprint 4C, not built in this slice) may ever select fresh — approved only. */
 export async function findApprovedVariant(questionId: string, variantType: VariantType): Promise<VariantRow | null> {
   const db = createServiceClient()

@@ -26,7 +26,7 @@ import { CurriculumService, type CurriculumContext } from '@/lib/curriculum/serv
 import { routedCompletion } from '@/lib/ai-orchestration/router'
 import type { AIRequest, AIResponse } from '@/lib/ai-orchestration/types'
 import { findQuestionById, type TeacherQuestionRow } from '@/lib/quiz/quiz'
-import { createDraftVariants, findVariantById, regenerateVariant, type VariantInput, type VariantRow, type VariantType } from './variants'
+import { createDraftVariants, findLiveVariantTypesForQuestion, findVariantById, regenerateVariant, type VariantInput, type VariantRow, type VariantType } from './variants'
 
 /**
  * The AI call surface this module depends on — real dependency injection,
@@ -253,7 +253,30 @@ export async function generateAdaptiveVariants(input: {
     input.subStrandId ? CurriculumService.resolveSubstrandContext(input.subStrandId) : Promise.resolve(null),
   ])
 
-  const tiersConsidered = [...tierTasks.keys()]
+  // Adaptive Remediation Phase 1, Stage 7 — generation is ADDITIVE.
+  //
+  // The set generated is (tiers a real learner in this class needs right
+  // now) MINUS (tiers this question already has in a deliverable state).
+  // Both halves matter:
+  //
+  //   - the first half is the frozen cost discipline, unchanged: never all
+  //     three unconditionally, only tiers a real learner is classified into.
+  //   - the second half is new, and closes the gap where a learner who
+  //     improved AFTER the first generation could be classified `on_track`
+  //     with no `extension` variant in existence, silently falling back to
+  //     the canonical question forever. A teacher clicking Generate again
+  //     now fills exactly the newly-needed tier and re-generates nothing
+  //     already in review.
+  //
+  // This deliberately does NOT auto-generate on the learner's behalf at
+  // delivery time: every variant still enters as a draft a teacher must
+  // approve. When a needed tier genuinely does not exist yet, the learner
+  // receives the canonical question and that fact is now recorded as real
+  // provenance on the resulting evidence (Stage 1), rather than being
+  // invisible.
+  const existingTypes = await findLiveVariantTypesForQuestion(input.questionId)
+  const neededTiers = [...tierTasks.keys()]
+  const tiersConsidered = neededTiers.filter(tier => !existingTypes.has(tier))
   const created: VariantRow[] = []
   const failed: GenerationFailure[] = []
 

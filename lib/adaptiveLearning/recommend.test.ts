@@ -5,10 +5,15 @@
 // Run with: npx tsx --env-file=.env.local --test lib/adaptiveLearning/recommend.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { classifyGroup, buildAdaptiveTask, buildClassRecommendations, neutralGroupLabel } from './recommend'
+import { classifyGroup, decideAdaptive, buildAdaptiveTask, buildClassRecommendations, neutralGroupLabel } from './recommend'
 import type { LearnerIntelligenceProjection, AcademicValue, RiskValue } from '@/lib/projection/types'
 
 const SUBJECT = 'mathematics'
+
+/** A chronological (oldest-first) level history, in the shape academicProjector produces. */
+function historyOf(levels: Array<1 | 2 | 3 | 4>) {
+  return levels.map((level, i) => ({ level, score: null, at: `2026-0${i + 1}-01T00:00:00.000Z`, evidenceId: `ev-h${i}` }))
+}
 
 function projection(overrides: {
   level?: 1 | 2 | 3 | 4 | null
@@ -16,6 +21,8 @@ function projection(overrides: {
   riskSeverity?: 'watch' | 'at_risk' | 'critical' | null
   confidence?: number
   evidenceIds?: string[]
+  /** Oldest-first level history for the subject. `level` above stays the latestLevel, exactly as Projection reports it. */
+  history?: Array<1 | 2 | 3 | 4>
 }): LearnerIntelligenceProjection {
   const level = overrides.level === undefined ? 3 : overrides.level
   const academic = level === null ? null : {
@@ -25,7 +32,7 @@ function projection(overrides: {
           subject: SUBJECT,
           latestLevel: level,
           trend: overrides.trend ?? 'stable',
-          history: [],
+          history: historyOf(overrides.history ?? []),
         },
       },
       bySubStrand: {},
@@ -276,4 +283,152 @@ test('buildClassRecommendations: is deterministic for identical input', () => {
   const first = buildClassRecommendations(learners, SUBJECT)
   const second = buildClassRecommendations(learners, SUBJECT)
   assert.deepEqual(first, second)
+})
+
+// ── Evidence-aware adaptation (Adaptive Remediation Phase 1, Stages 2-3) ─────
+//
+// The governing rule these tests exist to protect: evidence QUANTITY changes
+// how confidently the system adapts, never WHETHER it adapts. There is
+// exactly one path to `insufficient_data` — no academic signal at all.
+
+test('ONE valid assessment is enough to adapt — never insufficient_data', () => {
+  for (const level of [1, 2, 3, 4] as const) {
+    const p = projection({ level, history: [level] })
+    const decision = decideAdaptive(p, SUBJECT)
+    assert.notEqual(decision.groupType, 'insufficient_data',
+      `Level ${level} on a single observation must still produce a real adaptive band`)
+    assert.equal(decision.evidenceState, 'initial')
+    assert.equal(decision.observationCount, 1)
+  }
+})
+
+test('a single weak assessment adapts immediately — the learner gets support, not a refusal', () => {
+  const decision = decideAdaptive(projection({ level: 2, history: [2] }), SUBJECT)
+  assert.equal(decision.groupType, 'prerequisite_gap', 'support is offered on the first observation')
+  assert.equal(decision.provisional, true, 'but it is explicitly revisable, not asserted as a settled pattern')
+})
+
+test('insufficient_data means NO signal at all, never "only one assessment"', () => {
+  const decision = decideAdaptive(projection({ level: null }), SUBJECT)
+  assert.equal(decision.groupType, 'insufficient_data')
+  assert.equal(decision.evidenceState, 'no_evidence')
+  assert.equal(decision.observationCount, 0)
+
+  // And the one-observation case is emphatically NOT this case.
+  assert.notEqual(decideAdaptive(projection({ level: 1, history: [1] }), SUBJECT).evidenceState, 'no_evidence')
+})
+
+test('evidence state escalates with corroboration: initial -> developing -> established', () => {
+  assert.equal(decideAdaptive(projection({ level: 3, history: [3] }), SUBJECT).evidenceState, 'initial')
+  assert.equal(decideAdaptive(projection({ level: 3, history: [3, 3] }), SUBJECT).evidenceState, 'developing')
+  assert.equal(decideAdaptive(projection({ level: 3, history: [3, 3, 3] }), SUBJECT).evidenceState, 'established')
+})
+
+test('provisional clears once a second observation corroborates', () => {
+  assert.equal(decideAdaptive(projection({ level: 2, history: [2] }), SUBJECT).provisional, true)
+  assert.equal(decideAdaptive(projection({ level: 2, history: [2, 2] }), SUBJECT).provisional, false)
+})
+
+// ── Stage 3: one score must not overturn an established pattern ─────────────
+
+test('one weak score does NOT drop an established strong learner into foundation work', () => {
+  // 4, 4, then a single 2. Undamped this is prerequisite_gap -> foundation tier.
+  const decision = decideAdaptive(projection({ level: 2, history: [4, 4, 2] }), SUBJECT)
+  assert.equal(decision.groupType, 'concept_confusion',
+    'damped to supported practice — the learner still gets more support, just not foundation work')
+  assert.equal(decision.provisional, true)
+  assert.match(decision.rationale, /reverses an established pattern/)
+})
+
+test('a SECOND consecutive weak score confirms the change and the state moves fully', () => {
+  const decision = decideAdaptive(projection({ level: 2, history: [4, 4, 2, 2] }), SUBJECT)
+  assert.equal(decision.groupType, 'prerequisite_gap', 'corroborated — the adaptive state moves')
+  assert.equal(decision.provisional, false)
+})
+
+test('damping is symmetric — one strong score does not jump an established weak learner to enrichment', () => {
+  const decision = decideAdaptive(projection({ level: 4, history: [1, 1, 4] }), SUBJECT)
+  assert.equal(decision.groupType, 'concept_confusion',
+    'a single strong result must not withdraw support a learner may still need')
+  assert.equal(decision.provisional, true)
+})
+
+test('damping never fires on a wobble within the same instructional tier', () => {
+  // 1 and 2 both mean foundation work — a 1->2 move is not a reversal worth damping.
+  const decision = decideAdaptive(projection({ level: 1, history: [2, 2, 1] }), SUBJECT)
+  assert.equal(decision.groupType, 'prerequisite_gap')
+  assert.equal(decision.provisional, false)
+})
+
+test('a consistent established pattern is never damped', () => {
+  const decision = decideAdaptive(projection({ level: 1, history: [1, 1, 1] }), SUBJECT)
+  assert.equal(decision.groupType, 'prerequisite_gap')
+  assert.equal(decision.provisional, false)
+  assert.equal(decision.evidenceState, 'established')
+})
+
+test('damping cannot fire on two observations — there is no established pattern to protect', () => {
+  const decision = decideAdaptive(projection({ level: 1, history: [4, 1] }), SUBJECT)
+  assert.equal(decision.groupType, 'prerequisite_gap', 'developing evidence follows the latest observation')
+  assert.equal(decision.evidenceState, 'developing')
+})
+
+test('critical_gap still requires a critical risk flag, which itself requires corroboration', () => {
+  // Undamped path: level 1 + critical severity, on a consistent pattern.
+  const withFlag = decideAdaptive(projection({ level: 1, riskSeverity: 'critical', history: [2, 1, 1] }), SUBJECT)
+  assert.equal(withFlag.groupType, 'critical_gap')
+
+  // Same level, no critical flag -> never critical_gap.
+  const noFlag = decideAdaptive(projection({ level: 1, riskSeverity: null, history: [2, 1, 1] }), SUBJECT)
+  assert.equal(noFlag.groupType, 'prerequisite_gap')
+})
+
+test('classifyGroup and decideAdaptive can never disagree — one computation, two surfaces', () => {
+  const cases = [
+    projection({ level: 2, history: [4, 4, 2] }),
+    projection({ level: 1, riskSeverity: 'critical', history: [3, 1, 1] }),
+    projection({ level: 4, history: [4] }),
+    projection({ level: null }),
+  ]
+  for (const p of cases) {
+    assert.equal(classifyGroup(p, SUBJECT), decideAdaptive(p, SUBJECT).groupType)
+  }
+})
+
+test('a provisional decision says so in the observation a teacher actually reads', () => {
+  const task = buildAdaptiveTask('l1', 'Amina', SUBJECT, projection({ level: 2, history: [2] }))
+  assert.equal(task.decision.provisional, true)
+  assert.match(task.observation, /first confirmed observation/,
+    'the uncertainty is in the sentence, not hidden in an unrendered field')
+})
+
+test('a well-corroborated decision does not clutter the observation with caveats', () => {
+  const task = buildAdaptiveTask('l1', 'Amina', SUBJECT, projection({ level: 2, history: [2, 2, 2] }))
+  assert.equal(task.decision.provisional, false)
+  assert.doesNotMatch(task.observation, /first confirmed observation|reverses an established/)
+})
+
+test('every decision carries a non-empty rationale, including insufficient_data', () => {
+  for (const p of [projection({ level: 3, history: [3] }), projection({ level: null })]) {
+    assert.ok(decideAdaptive(p, SUBJECT).rationale.length > 0)
+  }
+})
+
+test('sub-strand decisions are corroborated by SUB-STRAND history, never by subject-wide history', () => {
+  const SUB = 'substrand-uuid-1'
+  const p = projection({ level: 4, history: [4, 4, 4] })
+  // A sub-strand with its own, single, weak observation inside a strong subject.
+  p.academic!.value.bySubStrand[SUB] = {
+    subStrandId: SUB, subStrandTitle: 'Proportional Reasoning', strandTitle: 'Numbers',
+    subject: SUBJECT, latestLevel: 2, trend: 'insufficient_data',
+    history: [{ level: 2, score: null, at: '2026-05-01T00:00:00.000Z', evidenceId: 'ev-s1' }],
+  }
+
+  const decision = decideAdaptive(p, SUBJECT, SUB)
+  assert.equal(decision.grain, 'subStrand')
+  assert.equal(decision.observationCount, 1, 'counts sub-strand observations only, not the subject\'s three')
+  assert.equal(decision.evidenceState, 'initial')
+  assert.equal(decision.groupType, 'prerequisite_gap',
+    'the sub-strand weakness is acted on despite a strong subject picture')
+  assert.equal(decision.provisional, true)
 })

@@ -26,7 +26,7 @@
 // distinguishable from teacher-verified evidence.
 
 import { repos } from '@/lib/repositories'
-import type { LearnerEvidence } from '@/lib/intelligence/evidence'
+import type { LearnerEvidence, AdaptiveDeliveryPayload } from '@/lib/intelligence/evidence'
 import { EVIDENCE_SOURCE_TRUST_TIER } from '@/lib/intelligence/evidence'
 import { computeConfidence, resolveReviewStatus } from '@/lib/intelligence/confidence'
 import { persistEvidenceBatch } from '@/lib/intelligence/evidenceLifecycle'
@@ -48,6 +48,14 @@ export type QuizEvidenceInput = {
   maxScore:      number
   academicYear:  number
   term:          number | null
+  /**
+   * Adaptive Remediation Phase 1, Stage 1 — instructional provenance, so
+   * this outcome can later be attributed to the support that produced it.
+   * Optional: a caller that cannot establish it must pass nothing rather
+   * than guess. Never affects `score`, `cbcLevel`, confidence, or review
+   * status — see AdaptiveDeliveryPayload's own doc comment.
+   */
+  adaptiveDelivery?: AdaptiveDeliveryPayload | null
 }
 
 export async function recordQuizAutoGradeEvidence(input: QuizEvidenceInput): Promise<void> {
@@ -100,6 +108,9 @@ export async function recordQuizAutoGradeEvidence(input: QuizEvidenceInput): Pro
     strand: curriculumContext?.strandTitle ?? null,
     subStrand: curriculumContext?.subStrandTitle ?? input.topic,
     subStrandId: curriculumContext?.subStrandId ?? null,
+    // Stage 1 — instructional provenance. Context only: the score above is
+    // still the whole educational claim of this row.
+    payload: input.adaptiveDelivery ?? null,
   }
 
   const result = await persistEvidenceBatch([evidence], runId)

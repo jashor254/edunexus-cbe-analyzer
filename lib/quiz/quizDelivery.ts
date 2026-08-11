@@ -17,7 +17,7 @@ import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { buildAdaptiveTask, type AdaptiveGroupType } from '@/lib/adaptiveLearning/recommend'
 import { CurriculumService } from '@/lib/curriculum/service'
 import { BAND_TO_TIER } from '@/lib/assignments/variantGeneration'
-import { findApprovedVariant, findVariantById } from '@/lib/assignments/variants'
+import { findApprovedVariant, findVariantById, type VariantType } from '@/lib/assignments/variants'
 import { findQuestionsForTeacher } from './quiz'
 
 export type ServedVariantMap = Record<string, string | null>
@@ -121,6 +121,61 @@ export async function findServedQuestionsForStudent(params: {
   }
 
   return results.sort((a, b) => a.order_index - b.order_index)
+}
+
+/**
+ * Adaptive Remediation Phase 1, Stage 1 — the instructional provenance of
+ * one (assignment, student) delivery, assembled entirely from facts already
+ * persisted at delivery time.
+ *
+ * Deliberately performs NO classification: it never calls
+ * `recomputeLearnerProjection`, `decideAdaptive`, or `buildAdaptiveTask`.
+ * Re-deriving the band here would report the learner's state after the
+ * outcome rather than the condition under which it was produced — the exact
+ * mistake this provenance exists to prevent. It reads `served_variant_map`
+ * (written once, immutably, at first open) and the variant rows it names.
+ *
+ * Returns null when the submission has no served map at all — an assignment
+ * delivered before Sprint 9 Slice 3, or a non-quiz path. Null is honest;
+ * a fabricated "canonical" answer would not be.
+ */
+export async function summariseServedAdaptation(params: {
+  assignmentId: string
+  studentId: string
+}): Promise<{
+  servedTier: VariantType | null
+  servedVariantIds: string[]
+  questionsServedVariant: number
+  questionsServedCanonical: number
+} | null> {
+  const db = createServiceClient()
+  const { data: submission } = await db
+    .from('assignment_submissions')
+    .select('served_variant_map')
+    .eq('assignment_id', params.assignmentId)
+    .eq('student_id', params.studentId)
+    .maybeSingle()
+
+  const servedMap = submission?.served_variant_map as ServedVariantMap | null
+  if (!servedMap) return null
+
+  const entries = Object.values(servedMap)
+  const variantIds = [...new Set(entries.filter((v): v is string => v !== null))]
+
+  // Tier comes from the bound variant rows themselves — the only place it
+  // is a recorded fact. All bound variants for one (assignment, student)
+  // share a tier by construction (resolveServedVariantsForStudent resolves
+  // the band exactly once), but this reads rather than assumes it, and
+  // reports null if that invariant ever failed rather than picking one.
+  const variants = await Promise.all(variantIds.map(id => findVariantById(id)))
+  const tiers = [...new Set(variants.filter(v => v !== null).map(v => v!.variant_type))]
+
+  return {
+    servedTier: tiers.length === 1 ? tiers[0] : null,
+    servedVariantIds: variantIds,
+    questionsServedVariant: entries.filter(v => v !== null).length,
+    questionsServedCanonical: entries.filter(v => v === null).length,
+  }
 }
 
 /**

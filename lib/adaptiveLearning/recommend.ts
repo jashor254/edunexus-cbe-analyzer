@@ -56,6 +56,15 @@ export type AdaptiveTask = Insight & {
    * actually resolved. `null` only for 'insufficient_data'.
    */
   academicGrain:     'subStrand' | 'subject' | null
+  /**
+   * How well-founded this task's band is — evidence state at the resolved
+   * grain, whether it is provisional, and the plain-language why. Always
+   * present, including for `insufficient_data`. `decision.groupType` is by
+   * construction the same value as `groupType` above (both come from the
+   * one `decideAdaptive()` call); it is repeated here rather than removed
+   * so the decision object stays independently meaningful when passed on.
+   */
+  decision:          AdaptiveDecision
 }
 
 export type LearnerContext = {
@@ -136,7 +145,112 @@ function buildGroundedAction(
   return { action: GROUP_ACTION_GROUNDED[groupType](outcome, curriculum), curriculumNotice: null }
 }
 
-type AcademicSignal = { level: 1 | 2 | 3 | 4; trend: Trend; grain: 'subStrand' | 'subject' }
+type AcademicSignal = {
+  level: 1 | 2 | 3 | 4
+  trend: Trend
+  grain: 'subStrand' | 'subject'
+  /**
+   * The chronological level history at the grain that actually won — the
+   * sub-strand's own history when `grain === 'subStrand'`, the subject's
+   * otherwise. Read at the resolved grain deliberately: a sub-strand
+   * decision must be corroborated by sub-strand observations, never by
+   * subject-wide ones that may be about an entirely different topic.
+   */
+  history: ReadonlyArray<{ level: 1 | 2 | 3 | 4 }>
+}
+
+/**
+ * How much observation this decision rests on, AT THE GRAIN THE DECISION
+ * WAS MADE. This is the sprint's central educational commitment made
+ * explicit: it changes how CONFIDENTLY the system adapts, never WHETHER it
+ * adapts. There is no state here that means "refuse to help" — the only
+ * non-adapting outcome remains `insufficient_data`, which means Projection
+ * resolved no academic signal at all for this subject/grain.
+ *
+ * - `initial`     one valid observation. Enough to begin. Marked provisional.
+ * - `developing`  two observations — the first real corroboration.
+ * - `established` three or more — a pattern that a single later observation
+ *                 must not be able to overturn on its own (see damping in
+ *                 `decideAdaptive`).
+ */
+export type AdaptiveEvidenceState = 'no_evidence' | 'initial' | 'developing' | 'established'
+
+/**
+ * Instructional severity rank of a CBC level, and the only place levels are
+ * collapsed for corroboration purposes. Deliberately mirrors the existing
+ * band→tier grouping (levels 1 and 2 both mean foundation work), so damping
+ * never fires on a change that would not have changed the delivered tier
+ * anyway — a 1→2 wobble is not a reversal worth damping.
+ */
+function severityRank(level: 1 | 2 | 3 | 4): 0 | 1 | 2 {
+  if (level <= 2) return 0
+  if (level === 3) return 1
+  return 2
+}
+
+function evidenceStateFor(observationCount: number): AdaptiveEvidenceState {
+  if (observationCount === 0) return 'initial'  // a resolved signal with no history rows still rests on one real observation
+  if (observationCount === 1) return 'initial'
+  if (observationCount === 2) return 'developing'
+  return 'established'
+}
+
+/**
+ * The full adaptive decision — band plus everything a caller needs to know
+ * about how well-founded it is. `classifyGroup` below is a thin wrapper that
+ * keeps its long-standing contract; both share this one computation, so a
+ * consumer reading `groupType` here and one calling `classifyGroup` can
+ * never disagree.
+ */
+export type AdaptiveDecision = {
+  groupType: AdaptiveGroupType | 'insufficient_data'
+  evidenceState: AdaptiveEvidenceState
+  /** Which grain of Projection evidence the decision rests on — null only for `insufficient_data`. */
+  grain: 'subStrand' | 'subject' | null
+  level: 1 | 2 | 3 | 4 | null
+  trend: Trend | null
+  /** Observations at the resolved grain — the corroboration count, not a learner-wide evidence total. */
+  observationCount: number
+  /**
+   * True when this decision should be treated as revisable on the next
+   * observation: either it rests on a single observation, or the latest
+   * observation reversed an established pattern and has not yet been
+   * corroborated. Never means "do not adapt" — it means "adapt, and expect
+   * to revise."
+   */
+  provisional: boolean
+  /** Plain-language why. Always populated — a decision that cannot explain itself must not be delivered. */
+  rationale: string
+}
+
+/**
+ * Applies the corroboration rule to an established pattern.
+ *
+ * A single observation must not be able to move a learner into foundation
+ * work (or out of the support they are currently getting and into
+ * enrichment) on its own. When a learner has an established pattern (three
+ * or more observations at this grain), the two most recent prior
+ * observations agreed with each other, and the newest one reverses them,
+ * the decision is damped one step toward the middle rather than following
+ * the newest observation all the way.
+ *
+ * Deliberately NOT a statistical model, a moving average, or a weighting
+ * scheme: it is a two-point corroboration rule over data Projection already
+ * computed. The very next observation in the same direction satisfies it
+ * and the adaptive state moves fully — so a real, sustained change is never
+ * blocked, only an isolated one is held for confirmation.
+ *
+ * Damping always lands on the MIDDLE rank (level 3 / `concept_confusion`),
+ * which is by construction never more extreme than the undamped result in
+ * either direction.
+ */
+function isUncorroboratedReversal(history: ReadonlyArray<{ level: 1 | 2 | 3 | 4 }>): boolean {
+  if (history.length < 3) return false
+  const latest = severityRank(history[history.length - 1].level)
+  const prior1 = severityRank(history[history.length - 2].level)
+  const prior2 = severityRank(history[history.length - 3].level)
+  return prior1 === prior2 && latest !== prior1
+}
 
 /**
  * The one place Recommendation reads a learner's academic level from
@@ -159,17 +273,97 @@ function resolveAcademicSignal(
   if (subStrandId) {
     const subStrand = academic.bySubStrand[subStrandId]
     if (subStrand && subStrand.subject === subject) {
-      return { level: subStrand.latestLevel, trend: subStrand.trend, grain: 'subStrand' }
+      return { level: subStrand.latestLevel, trend: subStrand.trend, grain: 'subStrand', history: subStrand.history }
     }
   }
 
   const bySubject = academic.bySubject[subject]
   if (!bySubject) return null
-  return { level: bySubject.latestLevel, trend: bySubject.trend, grain: 'subject' }
+  return { level: bySubject.latestLevel, trend: bySubject.trend, grain: 'subject', history: bySubject.history }
+}
+
+/** The undamped band for a level + this subject's own risk flag — the rule set as it has always been. */
+function rawBand(level: 1 | 2 | 3 | 4, subjectFlagSeverity: string | null): AdaptiveGroupType {
+  if (level === 1 && subjectFlagSeverity === 'critical') return 'critical_gap'
+  if (level <= 2) return 'prerequisite_gap'
+  if (level === 3) return 'concept_confusion'
+  return 'on_track'
 }
 
 /**
- * Classifies a learner's group for one subject, from Projection alone.
+ * The one place "what adaptive support does this learner need, and how
+ * sure are we" is answered. Everything below and every consumer of
+ * `classifyGroup` shares this computation.
+ *
+ * NON-NEGOTIABLE: evidence quantity changes CONFIDENCE and CAUTION, never
+ * permission. There is exactly one path to `insufficient_data` — Projection
+ * resolved no academic signal for this subject/grain at all. A learner with
+ * one trustworthy assessment gets a real, adaptive decision.
+ */
+export function decideAdaptive(
+  projection: LearnerIntelligenceProjection,
+  subject: string,
+  subStrandId?: string | null,
+): AdaptiveDecision {
+  const signal = resolveAcademicSignal(projection, subject, subStrandId)
+  if (!signal) {
+    return {
+      groupType: 'insufficient_data',
+      evidenceState: 'no_evidence',
+      grain: null, level: null, trend: null,
+      observationCount: 0,
+      provisional: false,
+      rationale: `No confirmed academic evidence has been resolved for ${subject} yet, at any grain.`,
+    }
+  }
+
+  const observationCount = signal.history.length
+  const evidenceState = evidenceStateFor(observationCount)
+  const subjectFlag = projection.risk?.value.flags.find(f => f.subject === subject) ?? null
+  const undamped = rawBand(signal.level, subjectFlag?.severity ?? null)
+
+  const grainLabel = signal.grain === 'subStrand' ? 'this sub-strand' : subject
+
+  // Established pattern + an isolated reversal → hold the more extreme
+  // move for confirmation, but keep adapting at the middle band.
+  if (evidenceState === 'established' && isUncorroboratedReversal(signal.history)) {
+    return {
+      groupType: 'concept_confusion',
+      evidenceState,
+      grain: signal.grain,
+      level: signal.level,
+      trend: signal.trend,
+      observationCount,
+      provisional: true,
+      rationale:
+        `The most recent observation (Level ${signal.level}) reverses an established pattern across ` +
+        `${observationCount} observations in ${grainLabel}. Support is adjusted, but a single observation ` +
+        `is not treated as a settled change — the next observation in the same direction will confirm it.`,
+    }
+  }
+
+  return {
+    groupType: undamped,
+    evidenceState,
+    grain: signal.grain,
+    level: signal.level,
+    trend: signal.trend,
+    observationCount,
+    provisional: evidenceState === 'initial',
+    rationale: evidenceState === 'initial'
+      ? `Based on the first confirmed observation in ${grainLabel} (Level ${signal.level}). ` +
+        `That is enough to begin adapting; it is not yet enough to call this a persistent pattern.`
+      : `Based on ${observationCount} confirmed observations in ${grainLabel} (currently Level ${signal.level}, ${signal.trend}).`,
+  }
+}
+
+/**
+ * Classifies a learner's group for one subject, from Projection alone —
+ * the long-standing contract, now a thin wrapper over `decideAdaptive()`
+ * so band selection is computed exactly once. Callers wanting to know how
+ * well-founded the band is (evidence state, provisional, rationale) should
+ * call `decideAdaptive()` directly rather than re-deriving anything.
+ *
  * Curriculum-aware (ADR-0024 Phase 3): when `subStrandId` resolves to real
  * evidence in `academic.bySubStrand`, the sub-strand-specific level drives
  * classification; otherwise the subject-level level does, exactly as before.
@@ -189,16 +383,7 @@ export function classifyGroup(
   subject: string,
   subStrandId?: string | null,
 ): AdaptiveGroupType | 'insufficient_data' {
-  const signal = resolveAcademicSignal(projection, subject, subStrandId)
-  if (!signal) return 'insufficient_data'
-  const level = signal.level
-
-  const subjectFlag = projection.risk?.value.flags.find(f => f.subject === subject) ?? null
-
-  if (level === 1 && subjectFlag?.severity === 'critical') return 'critical_gap'
-  if (level <= 2) return 'prerequisite_gap'
-  if (level === 3) return 'concept_confusion'
-  return 'on_track'
+  return decideAdaptive(projection, subject, subStrandId).groupType
 }
 
 /**
@@ -215,11 +400,12 @@ export function buildAdaptiveTask(
   context?:    { careerNote?: string | null; curriculumContext?: CurriculumContext | null },
 ): AdaptiveTask {
   const curriculum = context?.curriculumContext ?? null
-  const groupType = classifyGroup(projection, subject, curriculum?.subStrandId)
+  const decision = decideAdaptive(projection, subject, curriculum?.subStrandId)
+  const groupType = decision.groupType
 
   if (groupType === 'insufficient_data') {
     const base = insufficientEvidenceInsight(`${learnerName}'s ${subject} progress`)
-    return { ...base, learnerId, subject, groupType, level: null, taskStyle: 'reinforcement', curriculum: null, curriculumNotice: null, academicGrain: null }
+    return { ...base, learnerId, subject, groupType, level: null, taskStyle: 'reinforcement', curriculum: null, curriculumNotice: null, academicGrain: null, decision }
   }
 
   const signal = resolveAcademicSignal(projection, subject, curriculum?.subStrandId)!
@@ -229,11 +415,19 @@ export function buildAdaptiveTask(
   const { action: groundedAction, curriculumNotice } = buildGroundedAction(groupType, subject, curriculum)
   const action = context?.careerNote ? `${groundedAction} ${context.careerNote}` : groundedAction
 
-  const observation = curriculum
+  const baseObservation = curriculum
     ? (signal.grain === 'subStrand'
         ? `${learnerName} is currently at Level ${level} in ${curriculum.strandTitle} — ${curriculum.subStrandTitle} (${signal.trend}), based on evidence specific to this sub-strand.`
         : `${learnerName} is currently at Level ${level} in ${subject} (${signal.trend}), working within ${curriculum.strandTitle} — ${curriculum.subStrandTitle}.`)
     : `${learnerName} is currently at Level ${level} in ${subject} (${signal.trend}).`
+
+  // A provisional decision must SAY it is provisional. The mandate is that
+  // thin evidence changes how confidently we speak, not whether we help —
+  // so the support is still delivered, with the uncertainty stated in the
+  // same sentence a teacher reads, never buried in a field nobody renders.
+  const observation = decision.provisional
+    ? `${baseObservation} ${decision.rationale}`
+    : baseObservation
 
   return {
     observation,
@@ -248,6 +442,7 @@ export function buildAdaptiveTask(
     curriculum,
     curriculumNotice,
     academicGrain: signal.grain,
+    decision,
   }
 }
 

@@ -18,6 +18,9 @@ import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest, apiNotFound } from '@/lib/api/response'
 import { UnauthorizedError, ForbiddenError, NotFoundError, ConflictError } from '@/lib/core/errors'
 import { getBlueprintActionReviewSnapshot, reviewBlueprintAction } from '@/lib/learnerBlueprint/actionPlan/review'
+import { recordBlueprintActionReviewEvidence } from '@/lib/learnerBlueprint/actionPlan/reviewEvidence'
+import { requireAuthentication } from '@/lib/core/permissions'
+import { resolveTeacher } from '@/lib/core/identity'
 
 const ReviewDecisionSchema = z.object({
   decision: z.enum(['complete', 'needs_revision', 'reopen', 'defer', 'no_decision']),
@@ -48,6 +51,33 @@ export async function POST(req: Request, { params }: { params: Promise<{ actionI
       decision: parsed.data.decision,
       notes: parsed.data.notes,
     })
+
+    // Adaptive Remediation Phase 1, Stage 4 — the teacher's verdict becomes
+    // learner Evidence, emitted HERE rather than inside reviewBlueprintAction
+    // so that service's no-evidence-writes guardrail (ADR-0031, proven by a
+    // static scan) stays intact. Additive and fire-and-forget, exactly like
+    // every other orchestration-layer producer: the review itself is already
+    // committed and must never be lost to an Evidence failure.
+    //
+    // Only `complete` and `needs_revision` produce a row, and the row is
+    // non-scored — see lib/learnerBlueprint/actionPlan/reviewEvidence.ts for
+    // why "completed" is never allowed to become "mastered".
+    void (async () => {
+      const user = await requireAuthentication(supabase)
+      const teacher = await resolveTeacher(user.id)
+      await recordBlueprintActionReviewEvidence({
+        actionItemId,
+        coreLearnerId:    review.learner_id,
+        decision:         review.decision,
+        notes:            review.notes,
+        reviewId:         review.id,
+        reviewedByUserId: user.id,
+        teacherId:        teacher?.id ?? null,
+        academicYear:     new Date().getFullYear(),
+        term:             null,
+      })
+    })().catch(err =>
+      console.error('[blueprint/actions/review] evidence emission failed:', err instanceof Error ? err.message : String(err)))
 
     return apiSuccess({ review, snapshot }, 201)
   } catch (e: unknown) {

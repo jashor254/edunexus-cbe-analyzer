@@ -93,8 +93,12 @@ export type LearnerEvidence = {
   // ── Phase C (learner-record-layer-decisions.md Decision 1), additive ────
   // Shape-specific content for narrative/non-scored evidence, discriminated
   // by evidenceSource. One shared column (payload jsonb), not a new
-  // nullable scalar column per source — see EvidencePayload below. Null for
-  // measured (scored) evidence.
+  // nullable scalar column per source — see EvidencePayload below.
+  //
+  // Originally "null for measured (scored) evidence". Widened by Adaptive
+  // Remediation Phase 1 Stage 1 to also carry INSTRUCTIONAL PROVENANCE on
+  // scored rows — see the `adaptive_delivery` variant below for exactly why
+  // that is not a violation of the fact/claim separation.
   payload?: EvidencePayload | null
 }
 
@@ -108,6 +112,55 @@ export type LearnerEvidence = {
  */
 export type EvidencePayload =
   | { kind: 'remark'; payloadVersion: 1; body: string }
+  | AdaptiveDeliveryPayload
+
+/**
+ * Adaptive Remediation Phase 1, Stage 1 — the instructional condition under
+ * which a scored outcome was produced.
+ *
+ * WHAT THIS IS: context describing the task the learner was actually given.
+ * "Amina produced this result on a foundation-tier variant of question X."
+ *
+ * WHAT THIS IS NOT: an academic claim. The learner's RESULT (`score`,
+ * `cbc_level`) remains the entire educational evidence of this row; nothing
+ * here is read by any projector, contributes to any level, or asserts
+ * anything about what the learner knows. Removing this payload would change
+ * no learner's projection by a single point. It exists so the platform can
+ * later answer "what support produced this outcome?" — a question about the
+ * SYSTEM's behaviour, not the learner's.
+ *
+ * Every field is a fact already persisted elsewhere at the moment of
+ * delivery, gathered here rather than recomputed:
+ *   - `servedTier` / `servedVariantIds` derive from
+ *     `assignment_submissions.served_variant_map`, written when the learner
+ *     first opened the assignment.
+ *   - `isAdaptiveAssignment` / `blueprintActionItemId` come from the
+ *     `assignments` row itself.
+ *
+ * The adaptive BAND is deliberately absent. Bands are not persisted at
+ * delivery time, and recomputing one at grading time would report the
+ * learner's state AFTER this outcome — a different question wearing the
+ * right label. Only the served tier, which is a real persisted fact, is
+ * recorded. (`critical_gap` and `prerequisite_gap` both deliver
+ * `foundation`, so the tier does not let the band be inferred, and this
+ * payload never pretends otherwise.)
+ */
+export type AdaptiveDeliveryPayload = {
+  kind: 'adaptive_delivery'
+  payloadVersion: 1
+  /** The instructional tier actually served, or null when the learner received the canonical task. */
+  servedTier: 'foundation' | 'supported_practice' | 'extension' | null
+  /** Every distinct variant row this learner was bound to on this assignment. Empty when fully canonical. */
+  servedVariantIds: string[]
+  /** How many of the assignment's questions were served a variant vs. the teacher's canonical question. */
+  questionsServedVariant: number
+  questionsServedCanonical: number
+  /** `assignments.is_adaptive` — whether this was delivered as targeted adaptive work at all. */
+  isAdaptiveAssignment: boolean
+  /** Set when the assignment was delivered from an approved Blueprint action, linking outcome back to intent. */
+  blueprintActionItemId: string | null
+}
+
 
 /** LI-6: each source has a declared trust tier. Confidence scoring (confidence.ts) is capped by this. */
 export const EVIDENCE_SOURCE_TRUST_TIER: Record<EvidenceSource, 1 | 2 | 3> = {

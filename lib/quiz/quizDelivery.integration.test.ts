@@ -268,3 +268,79 @@ test('fallback path: a tier with no approved variant serves the canonical questi
   await db.from('learner_evidence').delete().eq('learner_id', student3!.id)
   await db.from('students').delete().eq('id', student3!.id)
 })
+
+// ── Adaptive Remediation Phase 1, Stage 6 ───────────────────────────────────
+//
+// The audit asked whether the sticky null is intentional product behaviour
+// or an accidental artifact of immutability. It is INTENTIONAL, and this
+// test exists so that stays a decision rather than a discovery.
+//
+// The scenario: a learner opens a quiz before the teacher has approved
+// variants, is honestly bound to the canonical question (a real null), and
+// the teacher approves the matching tier afterwards. The binding must not
+// move. Re-resolving would swap the question underneath a learner who may
+// be mid-attempt, and — because grading resolves the answer key from this
+// same map — would grade them against a key belonging to a question they
+// never saw.
+//
+// The residual cost (a learner in that window stays canonical for the whole
+// assignment) is now visible rather than silent: Stage 1's provenance
+// records `servedTier: null` with `questionsServedCanonical > 0` on the
+// resulting evidence. The real remedy is upstream — not letting learners
+// open a quiz whose variants are still unapproved — which is a publishing
+// gate, not a change to this binding.
+
+test('Stage 6: a null bound BEFORE approval stays null after the matching tier is approved', async () => {
+  const { data: student5 } = await db.from('students')
+    .insert({ user_id: null, name: `${SYNTHETIC_MARKER} PreApproval`, grade: 8, level: 'Junior School' })
+    .select('id').single()
+  await db.from('class_students').insert({ class_id: classId, student_id: student5!.id })
+  await db.from('assignment_submissions').insert({ assignment_id: assignmentId, student_id: student5!.id, class_id: classId, status: 'pending' })
+
+  // Level 4 -> on_track -> extension tier, which has no approved variant yet.
+  await recordQuizAutoGradeEvidence({
+    studentId: student5!.id, initiatedBy: authUserId, assignmentId: `${SYNTHETIC_MARKER}-preapproval-seed`,
+    subject: SUBJECT, topic: 'Fractions', substrandId: null, score: 95, maxScore: 100, academicYear: 2026, term: 1,
+  })
+
+  const before = await resolveServedVariantsForStudent({ assignmentId, studentId: student5!.id, learnerName: 'PreApproval' })
+  assert.equal(before[questionId], null, 'opened before approval — honestly bound to the canonical question')
+
+  // The teacher now approves exactly the tier this learner would have needed.
+  const [extensionDraft] = await createDraftVariants([{
+    questionId, variantType: 'extension',
+    questionText: 'Extension: 3/8 + 2/8, then justify your method', choices: ['5/8', '5/16', '1', '6/8'], correctIndex: 0,
+  }])
+  const approvedExtension = await approveVariant(extensionDraft.id)
+
+  const after = await resolveServedVariantsForStudent({ assignmentId, studentId: student5!.id, learnerName: 'PreApproval' })
+  assert.equal(after[questionId], null,
+    'the binding is immutable in BOTH directions — a later approval never rewrites what a learner was already served')
+
+  const questions = await findServedQuestionsForStudent({ assignmentId, studentId: student5!.id, learnerName: 'PreApproval' })
+  assert.equal(questions[0].question_text, 'Calculate: 3/8 + 2/8',
+    'and the learner keeps seeing the exact question they started with')
+
+  // A learner who had NOT yet opened is unaffected by the same approval —
+  // proof that this is stickiness of an existing binding, not a global
+  // refusal to ever serve the extension tier.
+  const { data: student6 } = await db.from('students')
+    .insert({ user_id: null, name: `${SYNTHETIC_MARKER} PostApproval`, grade: 8, level: 'Junior School' })
+    .select('id').single()
+  await db.from('class_students').insert({ class_id: classId, student_id: student6!.id })
+  await db.from('assignment_submissions').insert({ assignment_id: assignmentId, student_id: student6!.id, class_id: classId, status: 'pending' })
+  await recordQuizAutoGradeEvidence({
+    studentId: student6!.id, initiatedBy: authUserId, assignmentId: `${SYNTHETIC_MARKER}-postapproval-seed`,
+    subject: SUBJECT, topic: 'Fractions', substrandId: null, score: 95, maxScore: 100, academicYear: 2026, term: 1,
+  })
+
+  const fresh = await resolveServedVariantsForStudent({ assignmentId, studentId: student6!.id, learnerName: 'PostApproval' })
+  assert.equal(fresh[questionId], approvedExtension.id,
+    'a learner opening after approval gets the extension variant — the window is the only thing lost, not the tier')
+
+  await db.from('assignment_question_variants').delete().eq('id', approvedExtension.id)
+  for (const s of [student5!.id, student6!.id]) {
+    await db.from('learner_evidence').delete().eq('learner_id', s)
+    await db.from('students').delete().eq('id', s)
+  }
+})
