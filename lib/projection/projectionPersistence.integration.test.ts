@@ -247,3 +247,94 @@ test('whole-roster recomputation (recomputeForTeacher) covers every student on t
     assert.ok(persisted.length > 0, `expected learner ${id} to have at least one persisted projection after whole-roster recomputation`)
   }
 })
+
+// ── Deterministic ordering under identical created_at ───────────────────────
+//
+// `created_at` is not a unique sort key. Evidence rows carry no explicit
+// value for it — it defaults to now(), which in Postgres is the TRANSACTION
+// timestamp, so every row written by one persistEvidenceBatch call shares an
+// identical one. Postgres does not guarantee ordering among equal sort keys,
+// so two identical recomputations could return the same rows in a different
+// order and produce projections that differed in supportingEvidenceIds.
+//
+// Measured before the `id` tiebreaker: 1 in 25 paired recomputations
+// differed, and every differing path was a supportingEvidenceIds[n] entry.
+// That is what made this suite intermittently red.
+//
+// The tie is created EXPLICITLY below (one batch insert, one transaction),
+// never left to timing luck.
+
+test('evidence sharing an identical created_at yields a byte-identical projection every time', async () => {
+  const { data: tieStudent } = await db.from('students')
+    .insert({ name: `${SYNTHETIC_MARKER} Tie Group`, grade: 8, level: 'Junior School' })
+    .select('id').single()
+  const tieStudentId = tieStudent!.id
+
+  const run = await repos.evidence.createIngestionRun({
+    source: 'csv_export', initiatedBy: authUserId, teacherId, institution: SYNTHETIC_MARKER,
+  })
+
+  // Six rows in ONE batch -> one transaction -> one shared created_at.
+  // Deliberately spread across two subjects and differing levels so that any
+  // order instability would be visible in more than one projector.
+  const { persistEvidenceBatch } = await import('@/lib/intelligence/evidenceLifecycle')
+  await persistEvidenceBatch(
+    ([['mathematics', 2], ['mathematics', 3], ['mathematics', 4],
+      ['english', 1], ['english', 3], ['english', 4]] as Array<[string, 1 | 2 | 3 | 4]>)
+      .map(([subject, cbcLevel], i) => ({
+        learnerId: tieStudentId, extractedName: `Tie ${i}`, extractedExternalId: null,
+        subject, rawSubject: subject, score: 40 + i * 5, cbcLevel,
+        assessmentType: 'cat' as const, academicYear: 2026, term: 1,
+        evidenceSource: 'csv_export' as const, trustTier: 2 as const, evidenceConfidence: 90,
+        extractionMethod: 'tie_group_v1', reviewStatus: 'auto_confirmed' as const,
+        rawInputRef: `${SYNTHETIC_MARKER}:tie-${i}`, importedAt: new Date().toISOString(), issues: [],
+      })),
+    run.id,
+  )
+
+  try {
+    // The tie is real, not assumed.
+    const { data: stamps } = await db.from('learner_evidence')
+      .select('created_at').eq('learner_id', tieStudentId)
+    assert.equal(stamps!.length, 6)
+    assert.equal(new Set(stamps!.map(r => r.created_at)).size, 1,
+      'fixture precondition: all six rows must share one created_at')
+
+    const strip = (p: unknown) =>
+      JSON.parse(JSON.stringify(p, (key, value) => (key === 'lastComputed' ? undefined : value)))
+
+    const first = strip(await recomputeLearnerProjection(tieStudentId))
+
+    // Repeated, because the defect was intermittent: a single pair passed
+    // roughly 24 times in 25 even while broken.
+    for (let i = 2; i <= 12; i++) {
+      const next = strip(await recomputeLearnerProjection(tieStudentId))
+      assert.deepEqual(next, first,
+        `recomputation #${i} over unchanged evidence must be identical to the first`)
+    }
+
+    // And the specific thing that used to drift is explicitly pinned.
+    const again = await recomputeLearnerProjection(tieStudentId)
+    assert.deepEqual(
+      again.academic!.supportingEvidenceIds,
+      (first as { academic: { supportingEvidenceIds: string[] } }).academic.supportingEvidenceIds,
+      'supportingEvidenceIds order must be stable across recomputations',
+    )
+    // The tiebreaker is `id ASC` within the tied group — assert the actual
+    // contract, not merely that two runs agreed with each other.
+    const ids = again.academic!.supportingEvidenceIds
+    assert.deepEqual(ids, [...ids].sort(), 'within one created_at group, ids order ascending')
+  } finally {
+    const { data: ev } = await db.from('learner_evidence').select('id').eq('learner_id', tieStudentId)
+    const ids = (ev ?? []).map(e => e.id)
+    if (ids.length) {
+      await db.from('evidence_audit_log').delete().in('evidence_id', ids)
+      await db.from('evidence_projection_events').delete().in('evidence_id', ids)
+      await db.from('learner_evidence').update({ supersedes: null, superseded_by: null }).in('id', ids)
+      await db.from('learner_evidence').delete().in('id', ids)
+    }
+    await db.from('learner_projections').delete().eq('learner_id', tieStudentId)
+    await db.from('ingestion_runs').delete().eq('id', run.id)
+    await db.from('students').delete().eq('id', tieStudentId)
+  }
+})

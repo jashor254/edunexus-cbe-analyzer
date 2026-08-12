@@ -278,6 +278,29 @@ export class EvidenceRepository extends BaseRepository {
    * excludes pending_review, reviewed_rejected, superseded, and retracted.
    * This is "all confirmed educational evidence available today."
    */
+  /**
+   * The Projection Engine's one read of a learner's confirmed evidence.
+   *
+   * `created_at` alone is NOT a unique sort key. Evidence rows carry no
+   * explicit `created_at` — it defaults to `now()`, which in Postgres is the
+   * TRANSACTION timestamp, so every row written by one `persistEvidenceBatch`
+   * call shares an identical value. Ties are therefore structural, not
+   * incidental: production currently holds 447 confirmed rows across 52 tied
+   * groups.
+   *
+   * Postgres does not guarantee ordering among equal sort keys, so two
+   * identical recomputations could return the same rows in different orders.
+   * Measured before this tiebreaker: 1 in 25 paired recomputations differed,
+   * and every differing path was a `supportingEvidenceIds[n]` entry.
+   *
+   * `id` is the tiebreaker: the primary key, always present, and immutable
+   * (the fact-immutability trigger forbids changing it). It is deliberately
+   * only a TIEBREAKER — `created_at ASC` remains the primary sort, so real
+   * chronology can never be reordered. Because ids are random uuids, the
+   * winner within a tied group is arbitrary but now STABLE; there is no
+   * insertion-order column to recover a truer answer from, and the previous
+   * behaviour was equally arbitrary while also being unstable.
+   */
   async findConfirmedEvidenceForLearner(learnerId: string): Promise<EvidenceRow[]> {
     const { data, error } = await this.db
       .from('learner_evidence')
@@ -285,6 +308,7 @@ export class EvidenceRepository extends BaseRepository {
       .eq('learner_id', learnerId)
       .in('lifecycle_state', ['auto_confirmed', 'reviewed_confirmed'])
       .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
     if (error) throw new Error(`findConfirmedEvidenceForLearner: ${error.message}`)
     return data as unknown as EvidenceRow[]
   }
