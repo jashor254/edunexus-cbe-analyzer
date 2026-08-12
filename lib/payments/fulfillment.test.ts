@@ -116,6 +116,30 @@ test('a subscription product creates an active subscription with a 3-month expir
   assert.ok(monthsUntilExpiry > 2.5 && monthsUntilExpiry < 3.5, 'expiry should be roughly 3 months out')
 })
 
+test('a family-plan payment credits an active subscription with plan=family', async () => {
+  // Regression test for the subscriptions_plan_check drift: the live
+  // constraint only allowed ('term','premium','school') and rejected
+  // 'family', even though SUBSCRIPTION_PRODUCTS and SUBSCRIPTION_PLANS
+  // have treated 'family' as canonical since the term/family pricing model
+  // shipped. This proves the constraint fix actually unblocks fulfillment,
+  // not just that the migration ran without erroring.
+  const payment = await createPendingPayment('family', 4499)
+
+  const result = await fulfillPayment(db, { id: payment.id, user_id: userId, product_id: 'family' })
+  assert.equal(result, 'fulfilled')
+
+  const { data: sub } = await db
+    .from('subscriptions')
+    .select('status, plan, expires_at')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .eq('plan', 'family')
+    .single()
+
+  assert.equal(sub?.plan, 'family')
+  assert.equal(sub?.status, 'active')
+})
+
 test('renewing an existing subscription extends it instead of creating a duplicate row', async () => {
   const { data: existingSubs } = await db.from('subscriptions').select('id').eq('user_id', userId).eq('status', 'active')
   assert.equal(existingSubs?.length, 1, 'precondition: exactly one active subscription from the previous test')

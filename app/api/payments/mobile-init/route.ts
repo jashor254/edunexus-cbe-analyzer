@@ -36,6 +36,26 @@ export async function POST(req: NextRequest) {
       return apiError('Payment provider not configured')
     }
 
+    // 🆔 Unique reference — generated locally so the payments row can be
+    // persisted BEFORE Paystack is called. This guarantees a webhook/verify
+    // lookup by transaction_id can always find the row, even if Paystack's
+    // response never reaches the client (network drop, timeout, etc).
+    const reference = `EDU-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+
+    const db = createServiceClient()
+    const { error: insertError } = await db.from('payments').insert({
+      user_id:        auth.user.id,
+      transaction_id: reference,
+      amount:         product.price,
+      status:         'pending',
+      product_id:     productId,
+      metadata:       { phone, email: auth.user.email, purchase_type: product.type, product_label: product.label },
+    })
+
+    if (insertError) {
+      return apiError('Could not save transaction. Try again.')
+    }
+
     const response = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
@@ -46,6 +66,7 @@ export async function POST(req: NextRequest) {
         email:       auth.user.email,
         amount:      product.price * 100, // kobo
         currency:    'KES',
+        reference,
         channels:    ['mpesa', 'card', 'bank', 'ussd', 'qr'],
         metadata:    { productId, phone_number: phone, user_id: auth.user.id },
         callback_url: `${process.env.NEXT_PUBLIC_SITE_URL}/payment/success`,
@@ -55,19 +76,11 @@ export async function POST(req: NextRequest) {
     const data = await response.json() as { status: boolean; data: { authorization_url: string; reference: string }; message?: string }
 
     if (!response.ok || !data.status) {
+      // Paystack never accepted the transaction — mark the local row failed
+      // so it doesn't sit as an orphaned 'pending' payment forever.
+      await db.from('payments').update({ status: 'failed' }).eq('transaction_id', reference)
       return apiError(data.message ?? 'Paystack initialization failed')
     }
-
-    // Record pending payment
-    const db = createServiceClient()
-    await db.from('payments').insert({
-      user_id:        auth.user.id,
-      transaction_id: data.data.reference,
-      amount:         product.price,
-      status:         'pending',
-      product_id:     productId,
-      metadata:       { phone, email: auth.user.email, purchase_type: product.type, product_label: product.label },
-    })
 
     return apiSuccess({
       authorization_url: data.data.authorization_url,

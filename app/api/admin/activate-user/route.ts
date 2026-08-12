@@ -8,6 +8,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiForbidden, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
 import { ADMIN_CONFIG } from '@/lib/config/api'
 import { SUBSCRIPTION_PLANS, TOKEN_PACK } from '@/lib/payments/config'
+import { creditSubscription, creditTokens } from '@/lib/payments/fulfillment'
 
 type Plan = 'starter' | 'term' | 'family'
 
@@ -65,81 +66,73 @@ export async function POST(request: NextRequest) {
     const userId = target.id
     const now    = new Date()
 
-    // ── Plan-specific activation ──────────────────────────────────────────────
-    let expiresAt: Date | null = null
+    // ── Idempotency guard ────────────────────────────────────────────────────
+    // A common support flow is: customer says "I paid but nothing happened",
+    // admin activates manually, then the (just-delayed, not actually lost)
+    // Paystack webhook lands too. Both paths credit the same tables, so
+    // refuse to credit twice for the same user+plan within a short window
+    // rather than silently doubling tokens / clobbering subscription expiry.
+    const lookback = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
+    const { data: recentSuccess } = await service
+      .from('payments')
+      .select('id, created_at')
+      .eq('user_id', userId)
+      .eq('product_id', typedPlan)
+      .eq('status', 'success')
+      .gte('created_at', lookback)
+      .maybeSingle()
 
-    if (typedPlan === 'starter') {
-      // Add tokens only — no subscription
-      // Add 15 tokens (starter pack — token-based, no subscription)
-      const { data: existing } = await service
-        .from('token_balances')
-        .select('balance, total_ever')
-        .eq('user_id', userId)
-        .single()
-
-      const currentBalance = existing?.balance   ?? 0
-      const currentTotal   = existing?.total_ever ?? 0
-
-      await service.from('token_balances').upsert(
-        {
-          user_id:    userId,
-          balance:    currentBalance + PLAN_BONUS_TOKENS.starter,
-          total_ever: currentTotal   + PLAN_BONUS_TOKENS.starter,
-        },
-        { onConflict: 'user_id' }
-      )
-
-    } else {
-      // term / family → subscription (120 days) + bonus tokens
-      expiresAt = new Date(now)
-      expiresAt.setDate(expiresAt.getDate() + 120)
-
-      const { error: subError } = await service.from('subscriptions').upsert(
-        {
-          user_id:    userId,
-          plan:       typedPlan,
-          status:     'active',
-          started_at: now.toISOString(),
-          expires_at: expiresAt.toISOString(),
-        },
-        { onConflict: 'user_id' }
-      )
-
-      if (subError) {
-        console.error('Subscription upsert error:', subError)
-        return apiError('Failed to activate subscription', 500)
-      }
-
-      // Add bonus tokens
-      const { data: existing } = await service
-        .from('token_balances')
-        .select('balance, total_ever')
-        .eq('user_id', userId)
-        .single()
-
-      const bonus          = PLAN_BONUS_TOKENS[typedPlan]
-      const currentBalance = existing?.balance   ?? 0
-      const currentTotal   = existing?.total_ever ?? 0
-
-      await service.from('token_balances').upsert(
-        {
-          user_id:    userId,
-          balance:    currentBalance + bonus,
-          total_ever: currentTotal   + bonus,
-        },
-        { onConflict: 'user_id' }
-      )
+    if (recentSuccess) {
+      return apiSuccess({
+        message:   'Already activated — a successful payment for this plan already exists in the last 24h. No changes made.',
+        email,
+        plan:      typedPlan,
+        expiresAt: null,
+      })
     }
 
-    // ── Record payment ────────────────────────────────────────────────────────
-    await service.from('payments').insert({
-      user_id:        userId,
-      payment_method: 'mpesa_manual',
-      status:         'success',
-      amount:         PLAN_AMOUNTS[typedPlan],
-      reference:      `MANUAL-${Date.now()}`,
-      created_at:     now.toISOString(),
-    })
+    // ── Record payment first — gives creditSubscription() a payment_id to
+    //    link, and matches the real payments schema (transaction_id,
+    //    product_id, amount, status, metadata — no payment_method/reference
+    //    columns exist) ──────────────────────────────────────────────────────
+    const { data: paymentRow, error: paymentError } = await service
+      .from('payments')
+      .insert({
+        user_id:        userId,
+        transaction_id: `MANUAL-${now.getTime()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+        amount:         PLAN_AMOUNTS[typedPlan],
+        status:         'success',
+        product_id:     typedPlan,
+        metadata:       { source: 'admin_manual_activation', activated_by: user.email },
+      })
+      .select('id')
+      .single()
+
+    if (paymentError || !paymentRow) {
+      console.error('Payment record insert error:', paymentError)
+      return apiError('Failed to record payment', 500)
+    }
+
+    // ── Plan-specific activation — shares the exact same crediting logic
+    //    used by the Paystack webhook/verify paths (lib/payments/fulfillment.ts)
+    //    so there is exactly one way tokens/subscriptions are ever granted.
+    const bonus = PLAN_BONUS_TOKENS[typedPlan]
+
+    if (typedPlan !== 'starter') {
+      await creditSubscription(service, userId, typedPlan, paymentRow.id)
+    }
+    await creditTokens(service, userId, bonus)
+
+    let expiresAt: Date | null = null
+    if (typedPlan !== 'starter') {
+      const { data: sub } = await service
+        .from('subscriptions')
+        .select('expires_at')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .maybeSingle()
+      expiresAt = sub?.expires_at ? new Date(sub.expires_at) : null
+    }
 
     // ── Update lead status ────────────────────────────────────────────────────
     if (leadId) {

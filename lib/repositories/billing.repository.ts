@@ -125,13 +125,18 @@ export class BillingRepository extends BaseRepository {
     metadata: Record<string, unknown>
   ): Promise<void> {
     return timedQuery('token_balances', 'deductTokens', async () => {
-      const { error } = await this.db.rpc('deduct_tokens', {
+      const { data, error } = await this.db.rpc('deduct_tokens', {
         p_user_id:  userId,
         p_action:   action,
         p_tokens:   tokens,
         p_metadata: metadata,
       })
       if (error) throw new Error(`Token deduction failed: ${error.message}`)
+      // The RPC returns FALSE (not a SQL error) on insufficient balance — a
+      // real, not hypothetical, race when two requests both pass
+      // checkFeatureAccess() before either deducts. Without this check the
+      // caller sees no thrown error and treats the deduction as successful.
+      if (data !== true) throw new Error('Token deduction failed: insufficient balance')
     })
   }
 

@@ -55,15 +55,21 @@ export async function fulfillPayment(
   }
 
   if (SUBSCRIPTION_PRODUCTS.has(payment.product_id)) {
-    await fulfillSubscription(db, payment.user_id, payment.product_id, payment.id)
+    await creditSubscription(db, payment.user_id, payment.product_id, payment.id)
   } else {
-    await fulfillTokens(db, payment.user_id)
+    await creditTokens(db, payment.user_id, TOKEN_PACK.tokens)
   }
 
   return 'fulfilled'
 }
 
-async function fulfillSubscription(
+/**
+ * Grants/extends an active subscription for a user. Exported so every
+ * crediting path (webhook, client verify, and admin manual activation)
+ * shares one implementation — in particular, one that always extends from
+ * an existing active subscription's expiry rather than overwriting it.
+ */
+export async function creditSubscription(
   db: SupabaseClient,
   userId: string,
   productId: string,
@@ -106,9 +112,12 @@ async function fulfillSubscription(
   }
 }
 
-async function fulfillTokens(db: SupabaseClient, userId: string): Promise<void> {
-  const tokensToAdd = TOKEN_PACK.tokens
-
+/**
+ * Credits `tokensToAdd` tokens to a user's balance. Exported so every
+ * crediting path (webhook, client verify, and admin manual activation)
+ * shares one implementation.
+ */
+export async function creditTokens(db: SupabaseClient, userId: string, tokensToAdd: number): Promise<void> {
   const { data: existing } = await db
     .from('token_balances')
     .select('balance, total_ever')
