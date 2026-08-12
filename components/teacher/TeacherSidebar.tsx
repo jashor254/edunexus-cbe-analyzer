@@ -6,7 +6,14 @@ import { Settings, LogOut, ChevronRight, Sparkles } from 'lucide-react'
 import { RoleSwitcher } from '@/components/layout/RoleSwitcher'
 import { Logo } from '@/components/ui/Logo'
 import TeacherBottomNav from '@/components/teacher/TeacherBottomNav'
-import { TEACHER_WORKSPACE_NAV, SCHOOL_OFFICE_NAV_ITEM } from '@/lib/config/teacherWorkspaceNav'
+import {
+  SCHOOL_OFFICE_NAV_ITEM,
+  TEACHER_NAV_GROUPS,
+  TEACHER_NAV_GROUP_ORDER,
+  itemsInGroup,
+  ungroupedItems,
+  type TeacherNavItem,
+} from '@/lib/config/teacherWorkspaceNav'
 
 interface Props {
   teacherName: string
@@ -16,15 +23,47 @@ interface Props {
   isAdminTier?: boolean
 }
 
+function isActive(pathname: string, href: string) {
+  if (href === '/teacher/dashboard') return pathname === href
+  return pathname.startsWith(href)
+}
+
+/** One sidebar row. Hoisted out of TeacherSidebar so it is a stable component identity across renders. */
+function NavLink({ item, pathname }: { item: TeacherNavItem; pathname: string }) {
+  const active = isActive(pathname, item.href)
+  return (
+    <Link
+      href={item.href}
+      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all group relative ${
+        active
+          ? 'bg-teal-500/15 text-teal-300'
+          : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+      }`}
+      aria-current={active ? 'page' : undefined}
+    >
+      {active && (
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-teal-400 rounded-full" />
+      )}
+      <item.icon className={`w-4.5 h-4.5 shrink-0 transition-colors ${active ? 'text-teal-400' : 'text-slate-500 group-hover:text-slate-300'}`} />
+      <span className="flex-1 min-w-0">
+        <span className="block truncate">{item.label}</span>
+        {item.hint && <span className="block text-[10px] font-normal text-slate-500 truncate">{item.hint}</span>}
+      </span>
+      {active && <ChevronRight className="w-3 h-3 text-teal-400/60 shrink-0" />}
+    </Link>
+  )
+}
+
 export default function TeacherSidebar({ teacherName, school, subject, isAdminTier }: Props) {
   const pathname = usePathname()
   const initials = teacherName.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
-  const nav = isAdminTier ? [...TEACHER_WORKSPACE_NAV, SCHOOL_OFFICE_NAV_ITEM] : TEACHER_WORKSPACE_NAV
 
-  function isActive(href: string) {
-    if (href === '/teacher/dashboard') return pathname === href
-    return pathname.startsWith(href)
-  }
+  // Phase 1 — the sidebar renders section by section instead of as one flat
+  // list of nineteen peers. Grouping metadata lives entirely in
+  // lib/config/teacherWorkspaceNav.ts; this component only lays it out, so
+  // the sidebar and the bottom nav cannot drift apart again (the PRP-1
+  // finding this config was created to fix).
+  const [myDay, settings] = ungroupedItems()
 
   return (
     <>
@@ -61,32 +100,39 @@ export default function TeacherSidebar({ teacherName, school, subject, isAdminTi
           )}
         </Link>
 
-        {/* Navigation */}
-        <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
-          {nav.map(item => {
-            const active = isActive(item.href)
+        {/* Navigation — My Day, then the four sections, then Settings. */}
+        <nav className="flex-1 px-3 overflow-y-auto" aria-label="Teacher workspace">
+          <div className="space-y-0.5">
+            {myDay && <NavLink item={myDay} pathname={pathname} />}
+          </div>
+
+          {TEACHER_NAV_GROUP_ORDER.map(group => {
+            const items = itemsInGroup(group)
+            if (items.length === 0) return null
+
+            // School Office is appended to My School for admin-tier users
+            // only — the same gate as before Phase 1, unchanged.
+            const withOffice =
+              group === 'school' && isAdminTier ? [...items, SCHOOL_OFFICE_NAV_ITEM] : items
+
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all group relative ${
-                  active
-                    ? 'bg-teal-500/15 text-teal-300'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-                }`}
-              >
-                {active && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-teal-400 rounded-full" />
-                )}
-                <item.icon className={`w-4.5 h-4.5 shrink-0 transition-colors ${active ? 'text-teal-400' : 'text-slate-500 group-hover:text-slate-300'}`} />
-                <span className="flex-1 min-w-0">
-                  <span className="block truncate">{item.label}</span>
-                  {item.hint && <span className="block text-[10px] font-normal text-slate-500 truncate">{item.hint}</span>}
-                </span>
-                {active && <ChevronRight className="w-3 h-3 text-teal-400/60 shrink-0" />}
-              </Link>
+              <section key={group} className="mt-5" aria-labelledby={`nav-group-${group}`}>
+                <h2
+                  id={`nav-group-${group}`}
+                  className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-600"
+                >
+                  {TEACHER_NAV_GROUPS[group]}
+                </h2>
+                <div className="space-y-0.5">
+                  {withOffice.map(item => <NavLink key={item.href} item={item} pathname={pathname} />)}
+                </div>
+              </section>
             )
           })}
+
+          <div className="mt-5 space-y-0.5">
+            {settings && <NavLink item={settings} pathname={pathname} />}
+          </div>
         </nav>
 
         {/* Footer */}

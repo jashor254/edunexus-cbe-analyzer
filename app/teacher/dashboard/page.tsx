@@ -3,7 +3,10 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Scroll, NotebookPen, ClipboardList, Presentation, ArrowRight } from 'lucide-react'
+import {
+  Scroll, NotebookPen, ClipboardList, Presentation, ArrowRight,
+  BookOpen, UserCheck, CalendarCheck,
+} from 'lucide-react'
 import AttentionFeed from '@/components/teacher/AttentionFeed'
 import TodaysMission from '@/components/teacher/TodaysMission'
 import ContinueWorking from '@/components/teacher/ContinueWorking'
@@ -33,6 +36,14 @@ function getWeekOfTerm(termNumber: 1 | 2 | 3): number {
   return Math.max(1, Math.ceil(daysSince / 7))
 }
 
+// Phase 1 — school/class entry points, shown only when the teacher has
+// class context. Every href already existed in the sidebar; nothing new.
+const SCHOOL_ITEMS = [
+  { href: '/teacher/classes',    icon: BookOpen,      label: 'My Classes',            sub: 'Rosters & learners' },
+  { href: '/teacher/attendance', icon: UserCheck,     label: 'Attendance',            sub: 'Mark the register' },
+  { href: '/teacher/core-term',  icon: CalendarCheck, label: 'Official Report Cards', sub: 'Lock & publish' },
+]
+
 const WORKSPACE_ITEMS = [
   { href: '/teacher/scheme-of-work', icon: Scroll,        label: 'Scheme of Work', sub: 'Plan the term' },
   { href: '/teacher/lesson-plans',   icon: NotebookPen,   label: 'Lesson Plans',   sub: 'Prepare lessons' },
@@ -45,7 +56,7 @@ export default async function TeacherDashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { teacher, activeClasses } = await getTeacherDashboardProjection(user.id)
+  const { teacher, activeClasses, activeSchemes } = await getTeacherDashboardProjection(user.id)
 
   if (!teacher) redirect('/teacher/setup')
 
@@ -69,16 +80,21 @@ export default async function TeacherDashboardPage() {
             term={term}
             weekOfTerm={weekOfTerm}
             activeClasses={activeClasses}
+            activeSchemes={activeSchemes}
           />
 
-          {/* ── 2. Today at a Glance ─────────────────────────────────── */}
+          {/* ── 2. Continue Teaching ──────────────────────────────────────
+              Phase 1 — promoted above the attention blocks. This is the
+              teacher's actual work in progress (scheme -> lesson plans ->
+              record of work), and it renders for any teacher with schemes,
+              with or without a class. */}
+          <ContinueWorking />
+
+          {/* ── 3. Needs your attention ─────────────────────────────────── */}
           <TodayAtAGlance
             pendingAssessmentCount={pendingAssessments.length}
             pendingAssessments={pendingAssessments.map(a => ({ id: a.id, class_id: a.class_id, title: a.title, class_name: a.class_name }))}
           />
-
-          {/* ── 3. Continue Working ──────────────────────────────────── */}
-          <ContinueWorking />
 
           {/* ── 4. Teacher Intelligence ───────────────────────────────── */}
           {activeClasses > 0 && (
@@ -93,9 +109,9 @@ export default async function TeacherDashboardPage() {
 
         </DashboardDataProvider>
 
-        {/* ── 5. Teaching Workspace ────────────────────────────────────── */}
+        {/* ── 6. Quick actions ─────────────────────────────────────────── */}
         <div>
-          <h2 className="text-sm font-black text-slate-900 mb-3">Teaching Workspace</h2>
+          <h2 className="text-sm font-black text-slate-900 mb-3">Quick actions</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {WORKSPACE_ITEMS.map(({ href, icon: Icon, label, sub }) => (
               <Link
@@ -115,6 +131,44 @@ export default async function TeacherDashboardPage() {
             ))}
           </div>
         </div>
+
+        {/* ── 7. My School ──────────────────────────────────────────────────
+            Phase 1 — school and class administration becomes a named,
+            bounded section instead of the front door. Shown only when there
+            is real school/class context, so an independent teacher is not
+            offered institutional concepts they have no use for. My Classes
+            remains fully reachable from the sidebar's My School group either
+            way — this hides a dashboard shortcut, never a capability.
+
+            The condition is deliberately `activeClasses > 0` and nothing
+            more: Phase 0 established that EduNexus cannot yet answer "which
+            Core classes are assigned to this teacher" (no
+            listClassesForTeacher query exists), so this block makes no claim
+            about assignment — it only surfaces entry points the teacher
+            already had. */}
+        {activeClasses > 0 && (
+          <div>
+            <h2 className="text-sm font-black text-slate-900 mb-3">My School</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {SCHOOL_ITEMS.map(({ href, icon: Icon, label, sub }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="bg-white border border-slate-200 rounded-2xl p-3.5 flex flex-col items-start hover:-translate-y-0.5 hover:shadow-sm transition-all group"
+                >
+                  <div className="w-8 h-8 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center mb-2.5">
+                    <Icon className="w-4 h-4 text-slate-500" />
+                  </div>
+                  <div className="font-black text-slate-900 text-sm leading-tight">{label}</div>
+                  <div className="text-slate-400 text-xs mt-0.5 mb-3">{sub}</div>
+                  <span className="flex items-center gap-1 text-xs font-bold text-slate-600 group-hover:text-slate-800 transition-colors">
+                    Open <ArrowRight className="w-3 h-3" />
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

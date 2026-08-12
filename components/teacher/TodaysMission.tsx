@@ -21,6 +21,12 @@ interface Props {
   term:           string
   weekOfTerm:     number
   activeClasses:  number
+  /**
+   * Phase 1 — how many Schemes of Work this teacher has. This, not
+   * `activeClasses`, decides whether the teacher has begun their
+   * professional work (see dashboardProjection.ts for why).
+   */
+  activeSchemes:  number
 }
 
 // The teacher's daily entry point — reads /api/teacher/attention-feed via
@@ -28,15 +34,26 @@ interface Props {
 // load) instead of computing anything new. The headline itself is the
 // single highest-priority item's own title, so it reads as a live status
 // ("Grade 8 Science needs attention") rather than a static greeting.
-export default function TodaysMission({ firstName, today, term, weekOfTerm, activeClasses }: Props) {
+export default function TodaysMission({ firstName, today, term, weekOfTerm, activeClasses, activeSchemes }: Props) {
   const { attentionItems, attentionError } = useDashboardData()
+
+  // Phase 1 — two independent conditions, deliberately not one.
+  //
+  //   noSchemes  -> this teacher has not started their professional work.
+  //                 The primary call to action is their Scheme of Work, NOT
+  //                 "Set Up Your First Class". Phase 0 proved the teaching
+  //                 chain needs no class, and that the class CTA routed
+  //                 independent teachers into silent school auto-provisioning.
+  //   noClasses  -> only governs the class-derived attention feed, which
+  //                 genuinely has nothing to show without a class roster.
+  const noSchemes = activeSchemes === 0
   const noClasses = activeClasses === 0
   const loading   = !noClasses && attentionItems === null && !attentionError
 
   const priorities   = attentionItems ? topPriorityItems(attentionItems, PRIORITY_COUNT) : []
   const [topPriority, ...restPriorities] = priorities
 
-  const headline = noClasses
+  const headline = noSchemes
     ? `Welcome, ${firstName}`
     : loading
     ? `Hi ${firstName}`
@@ -53,7 +70,7 @@ export default function TodaysMission({ firstName, today, term, weekOfTerm, acti
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse shrink-0" />
           <span className="text-teal-400 text-sm font-semibold">{today}</span>
-          {!noClasses && (
+          {!noSchemes && (
             <>
               <span className="w-1 h-1 rounded-full bg-slate-600 hidden sm:block" />
               <span className="text-slate-400 text-sm">{term}, Week {weekOfTerm}</span>
@@ -62,9 +79,9 @@ export default function TodaysMission({ firstName, today, term, weekOfTerm, acti
         </div>
 
         <p className="text-slate-400 text-sm font-medium mb-1 tracking-wide uppercase">
-          {noClasses ? 'Welcome to EduNexus' : "Today's Mission"}
+          {noSchemes ? 'Welcome to EduNexus' : "Today's Mission"}
         </p>
-        {!noClasses && !loading && topPriority && (
+        {!noSchemes && !loading && topPriority && (
           <p className="text-slate-500 text-sm mb-1">Hi {firstName} —</p>
         )}
         {topPriority && !loading ? (
@@ -80,7 +97,7 @@ export default function TodaysMission({ firstName, today, term, weekOfTerm, acti
         )}
 
         {/* Remaining priorities */}
-        {!noClasses && (
+        {!noSchemes && (
           <div className="mt-6 space-y-2 max-w-lg">
             {loading ? (
               <div className="h-10 bg-white/5 rounded-xl animate-pulse" />
@@ -109,12 +126,18 @@ export default function TodaysMission({ firstName, today, term, weekOfTerm, acti
         )}
 
         {/* Primary CTA — exactly one */}
+        {noSchemes && (
+          <p className="text-slate-400 text-sm mt-4 max-w-md">
+            Plan the term once — your lesson plans and Record of Work follow from it.
+          </p>
+        )}
+
         <Link
-          href={noClasses ? '/teacher/classes' : '/teacher/scheme-of-work'}
+          href={noSchemes ? '/teacher/scheme-of-work/new' : '/teacher/scheme-of-work'}
           className="inline-flex items-center gap-2 mt-6 bg-gradient-to-r from-teal-500 to-cyan-500 text-white px-5 py-3 rounded-xl font-black text-sm shadow-lg shadow-teal-900/30 hover:scale-[1.02] transition-transform"
         >
-          {noClasses ? <PlusCircle className="w-4 h-4" /> : null}
-          {noClasses ? 'Set Up Your First Class' : 'Continue Teaching'}
+          {noSchemes ? <PlusCircle className="w-4 h-4" /> : null}
+          {noSchemes ? 'Create your first Scheme of Work' : 'Continue Teaching'}
           <ArrowRight className="w-4 h-4" />
         </Link>
       </div>

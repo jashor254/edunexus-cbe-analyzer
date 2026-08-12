@@ -63,6 +63,11 @@ export default function DashboardNavbar({ isStudent = false }: { isStudent?: boo
   // parent-facing career intelligence entry point (Sprint 19 — see
   // app/(parent)/career-intelligence for the consolidated parent flow).
   const careersHref = isStudent ? '/student/career' : '/career-intelligence'
+  // NOTE: these overrides can legitimately point two different nav items at
+  // the same href — for a student, both "Compass" and "Assignments" resolve
+  // to /learn. That is intentional (see the comment above), so `href` is not
+  // unique across navLinks/bottomNav and must never be used as a React key.
+  // Labels are unique in every combination, so they are the key.
   const applyOverrides = <T extends { label: string; href: string }>(link: T): T => {
     if (link.label === 'Assignments') return { ...link, href: assignmentsHref }
     if (link.label === 'Careers')     return { ...link, href: careersHref }
@@ -93,7 +98,7 @@ export default function DashboardNavbar({ isStudent = false }: { isStudent?: boo
             <div className="hidden md:flex items-center gap-4 lg:gap-6">
               {navLinks.map(({ href, label, color }) => (
                 <Link
-                  key={href}
+                  key={label}
                   href={href}
                   className={`text-sm font-bold text-slate-600 ${color} transition-colors`}
                 >
@@ -142,7 +147,7 @@ export default function DashboardNavbar({ isStudent = false }: { isStudent?: boo
             <div className="max-w-6xl mx-auto px-4 py-2 flex flex-col">
               {navLinks.map(({ href, label, color }) => (
                 <Link
-                  key={href}
+                  key={label}
                   href={href}
                   onClick={() => setMenuOpen(false)}
                   className={`py-3 px-2 text-sm font-bold text-slate-600 ${color} border-b border-slate-100 last:border-0 transition-colors`}
@@ -163,7 +168,7 @@ export default function DashboardNavbar({ isStudent = false }: { isStudent?: boo
         <div className="flex items-stretch h-16">
           {bottomNav.map(({ href, label, icon }) => (
             <Link
-              key={href}
+              key={label}
               href={href}
               className="flex-1 flex flex-col items-center justify-center gap-0.5 text-slate-500 hover:text-violet-600 transition-colors"
             >

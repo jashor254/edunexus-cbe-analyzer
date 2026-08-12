@@ -4,17 +4,26 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard, BookOpen, MoreHorizontal, X, PlusCircle,
+  LayoutDashboard, GraduationCap, MoreHorizontal, X, PlusCircle,
   AlertTriangle, LogOut,
 } from 'lucide-react'
 import { RoleSwitcher } from '@/components/layout/RoleSwitcher'
-import { createSheetItems, moreSheetItems } from '@/lib/config/teacherWorkspaceNav'
+import { createSheetItems, moreSheetItems, teachingSheetItems } from '@/lib/config/teacherWorkspaceNav'
 
-// PRP-2 — both sheets now pull from the same shared taxonomy the desktop
+// PRP-2 — every sheet pulls from the same shared taxonomy the desktop
 // sidebar renders (lib/config/teacherWorkspaceNav.ts), replacing what used
 // to be two independently-maintained item lists (PRP-1 audit finding: the
 // bottom nav's grouping had drifted from the sidebar's).
-const CREATE_NAV = createSheetItems()
+//
+// Phase 1 — tab 2 is now Teaching, not Classes. Phase 0 measured that the
+// Classes tab was permanently empty for an independent teacher and
+// second-class for everyone else, while all three stages of the actual
+// teaching workflow sat two taps deep inside the Create sheet. My Classes
+// keeps its route and its Create Class button; it moves into the More sheet
+// (asserted by teacherWorkspaceNav.test.ts G2, so demoting it can never
+// become hiding it).
+const CREATE_NAV   = createSheetItems()
+const TEACHING_NAV = teachingSheetItems()
 
 function isRouteMatch(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + '/')
@@ -30,6 +39,7 @@ export default function TeacherBottomNav({ isAdminTier }: Props = {}) {
   const moreNav = moreSheetItems(isAdminTier)
   const [moreOpen, setMoreOpen]         = useState(false)
   const [createOpen, setCreateOpen]     = useState(false)
+  const [teachingOpen, setTeachingOpen] = useState(false)
   const [pendingEvals, setPendingEvals] = useState(0)
 
   useEffect(() => {
@@ -48,14 +58,14 @@ export default function TeacherBottomNav({ isAdminTier }: Props = {}) {
   }, [])
 
   // Close sheets on navigation
-  useEffect(() => { setMoreOpen(false); setCreateOpen(false) }, [pathname])
+  useEffect(() => { setMoreOpen(false); setCreateOpen(false); setTeachingOpen(false) }, [pathname])
 
   const homeActive   = pathname === '/teacher/dashboard' || pathname === '/teacher'
-  const classesActive = isRouteMatch(pathname, '/teacher/classes')
-  const alertsActive  = isRouteMatch(pathname, '/teacher/alerts')
-  const createActive  = CREATE_NAV.some(item => isRouteMatch(pathname, item.href))
-  const moreActive    = moreNav.some(item => isRouteMatch(pathname, item.href))
-  const sheetOpen     = moreOpen || createOpen
+  const teachingActive = TEACHING_NAV.some(item => isRouteMatch(pathname, item.href))
+  const alertsActive   = isRouteMatch(pathname, '/teacher/alerts')
+  const createActive   = CREATE_NAV.some(item => isRouteMatch(pathname, item.href))
+  const moreActive     = moreNav.some(item => isRouteMatch(pathname, item.href))
+  const sheetOpen      = moreOpen || createOpen || teachingOpen
 
   return (
     <>
@@ -76,18 +86,20 @@ export default function TeacherBottomNav({ isAdminTier }: Props = {}) {
             </span>
           </Link>
 
-          <Link
-            href="/teacher/classes"
+          <button
+            onClick={() => setTeachingOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={teachingOpen}
             className="flex-1 flex flex-col items-center justify-center gap-1 relative transition-all"
           >
-            {classesActive && (
+            {(teachingActive && !teachingOpen) && (
               <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-teal-400 rounded-full" />
             )}
-            <BookOpen className={`w-5 h-5 transition-colors ${classesActive ? 'text-teal-400' : 'text-slate-500'}`} />
-            <span className={`text-[10px] font-bold transition-colors ${classesActive ? 'text-teal-400' : 'text-slate-500'}`}>
-              Classes
+            <GraduationCap className={`w-5 h-5 transition-colors ${teachingActive ? 'text-teal-400' : 'text-slate-500'}`} />
+            <span className={`text-[10px] font-bold transition-colors ${teachingActive ? 'text-teal-400' : 'text-slate-500'}`}>
+              Teaching
             </span>
-          </Link>
+          </button>
 
           {/* Create — the teacher's production workspace */}
           <button
@@ -142,8 +154,72 @@ export default function TeacherBottomNav({ isAdminTier }: Props = {}) {
         className={`lg:hidden fixed inset-0 z-30 bg-black/50 transition-opacity duration-300 ${
           sheetOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
-        onClick={() => { setMoreOpen(false); setCreateOpen(false) }}
+        onClick={() => { setMoreOpen(false); setCreateOpen(false); setTeachingOpen(false) }}
       />
+
+      {/* ── Teaching Sheet ─────────────────────────────────────────────── */}
+      {/* The professional workflow, one tap from the bottom bar. Same sheet
+          mechanics as Create below — this is a layout of the shared nav
+          taxonomy, not a second navigation system. */}
+      <div
+        role="dialog"
+        aria-label="My Teaching"
+        aria-hidden={!teachingOpen}
+        className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0c1929] rounded-t-3xl transition-transform duration-300 ease-out max-h-[85vh] overflow-y-auto ${
+          teachingOpen ? 'translate-y-0' : 'translate-y-full'
+        }`}
+      >
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 bg-white/20 rounded-full" />
+        </div>
+
+        <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
+          <div>
+            <span className="text-white font-black text-base">My Teaching</span>
+            <p className="text-slate-500 text-xs mt-0.5">Plan the term, prepare the week, record what you taught</p>
+          </div>
+          <button
+            onClick={() => setTeachingOpen(false)}
+            aria-label="Close My Teaching"
+            className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center active:scale-95 transition-transform"
+          >
+            <X className="w-4 h-4 text-white" />
+          </button>
+        </div>
+
+        <div className="px-4 py-4 space-y-2">
+          {TEACHING_NAV.map(item => {
+            const active = isRouteMatch(pathname, item.href)
+            const showBadge = item.href === '/teacher/lesson-plans' && pendingEvals > 0
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setTeachingOpen(false)}
+                aria-current={active ? 'page' : undefined}
+                className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all active:scale-[0.98] ${
+                  active ? 'bg-teal-500/15' : 'bg-white/5 active:bg-white/10'
+                }`}
+              >
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${active ? 'bg-teal-500/20' : 'bg-white/8'}`}>
+                  <item.icon className={`w-5 h-5 ${active ? 'text-teal-400' : 'text-slate-400'}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm font-bold ${active ? 'text-teal-300' : 'text-slate-200'}`}>
+                    {item.label}
+                  </div>
+                  {item.hint && <div className="text-xs text-slate-500 mt-0.5">{item.hint}</div>}
+                </div>
+                {showBadge && (
+                  <span className="shrink-0 text-[10px] font-black bg-amber-400 text-slate-900 px-1.5 py-0.5 rounded-full">
+                    {pendingEvals}
+                  </span>
+                )}
+              </Link>
+            )
+          })}
+        </div>
+      </div>
 
       {/* ── Create Sheet ───────────────────────────────────────────────── */}
       <div

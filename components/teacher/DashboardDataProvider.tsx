@@ -36,26 +36,40 @@ export function DashboardDataProvider({
   const retryAttentionFeed = useCallback(() => setRetryToken(t => t + 1), [])
 
   useEffect(() => {
-    if (activeClasses === 0) return
     let cancelled = false
 
-    fetch('/api/teacher/attention-feed')
-      .then(r => r.json())
-      .then(data => {
-        if (cancelled) return
-        if (data.success) {
-          setAttentionItems(data.data.items)
-          setAttentionError(null)
-        } else {
-          setAttentionError(data.error ?? 'Failed to load attention feed')
-        }
-      })
-      .catch(err => {
-        if (cancelled) return
-        logger.error('Attention feed fetch failed', { operation: 'dashboard.attentionFeed' }, err)
-        setAttentionError('Failed to load attention feed')
-      })
+    // Phase 1 — the attention feed is genuinely class-derived
+    // (lib/attentionFeed reads teacher_classes), so it stays gated. Nothing
+    // else does.
+    if (activeClasses > 0) {
+      fetch('/api/teacher/attention-feed')
+        .then(r => r.json())
+        .then(data => {
+          if (cancelled) return
+          if (data.success) {
+            setAttentionItems(data.data.items)
+            setAttentionError(null)
+          } else {
+            setAttentionError(data.error ?? 'Failed to load attention feed')
+          }
+        })
+        .catch(err => {
+          if (cancelled) return
+          logger.error('Attention feed fetch failed', { operation: 'dashboard.attentionFeed' }, err)
+          setAttentionError('Failed to load attention feed')
+        })
+    } else {
+      // Loaded, nothing there — distinct from `null` ("still loading"), which
+      // would otherwise leave class-derived panels spinning forever.
+      setAttentionItems([])
+    }
 
+    // Schemes are NEVER class-gated. Before Phase 1 the whole effect returned
+    // early when activeClasses === 0, so an independent teacher's schemes were
+    // never fetched at all: `schemes` stayed null forever and Continue Working
+    // and Weekly Teaching Progress rendered nothing, no matter how much
+    // teaching work they had done. That was the root cause of the first-run
+    // problem, not just the CTA wording.
     fetch('/api/sow/list', { cache: 'no-store' })
       .then(r => r.json())
       .then(d => { if (!cancelled && d.success) setSchemes(d.data.schemes ?? []) })
