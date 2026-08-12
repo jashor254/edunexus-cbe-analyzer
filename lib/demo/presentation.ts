@@ -47,6 +47,16 @@ export type DemoSlide = {
   support?: string
   /** Optional short lines rendered as a restrained list, not prose. */
   points?: string[]
+  /**
+   * Narration for the video build, in the House Voice (docs/brand/
+   * edunexus-house-voice-standard.md): calm and unhurried, 8-18 word
+   * sentences, statements that end like statements, no selling. Written to
+   * fill roughly 80% of the slide's dwell time at the standard's 140-155 wpm,
+   * so each beat opens and closes on a little silence rather than running to
+   * the edge. Lives here, beside the slide it speaks over, so the two cannot
+   * drift apart.
+   */
+  narration?: string
   visual: DemoVisual
   /** Autoplay dwell time. `null` means: hold here and stop autoplay. */
   durationMs: number | null
@@ -62,6 +72,8 @@ export const DEMO_SLIDES: readonly DemoSlide[] = [
     label: 'EduNexus',
     headline: 'EduNexus',
     support: 'See the learner earlier. Act before the problem grows.',
+    narration:
+      "This is EduNexus. See the learner earlier, and act before the problem grows.",
     visual: { kind: 'wordmark' },
     durationMs: 8_000,
   },
@@ -71,6 +83,8 @@ export const DEMO_SLIDES: readonly DemoSlide[] = [
     headline: 'The problem',
     support: 'Schools already have marks, attendance and reports.',
     points: ['The missing layer is accumulated learner understanding.'],
+    narration:
+      "Schools already collect a great deal. Marks. Attendance. Reports. What is missing is the understanding that should accumulate from all of it.",
     visual: { kind: 'problem' },
     durationMs: 11_000,
   },
@@ -79,6 +93,8 @@ export const DEMO_SLIDES: readonly DemoSlide[] = [
     label: 'The intelligence loop',
     headline: 'The intelligence loop',
     support: 'Each turn of the loop leaves more behind than it started with.',
+    narration:
+      "So the work is a loop. Evidence becomes understanding. Understanding becomes an action a teacher or a learner can take. That action leaves new evidence behind.",
     visual: { kind: 'loop' },
     durationMs: 12_000,
   },
@@ -87,6 +103,8 @@ export const DEMO_SLIDES: readonly DemoSlide[] = [
     label: 'Learner Blueprint',
     headline: 'Learner Blueprint',
     support: 'Where we stand today — assembled from evidence already collected.',
+    narration:
+      "The Learner Blueprint is where that lands. Not a prediction. A plain account of where one learner stands today, drawn from evidence already recorded.",
     visual: {
       kind: 'screenshot',
       asset: 'blueprintToday',
@@ -99,6 +117,8 @@ export const DEMO_SLIDES: readonly DemoSlide[] = [
     label: 'From insight to action',
     headline: 'From insight to action',
     support: 'How we help next — the same evidence, turned into a next step.',
+    narration:
+      "The same evidence then answers a harder question. What should happen next? One clear priority, with the reasoning behind it, in the teacher's hands.",
     visual: {
       kind: 'screenshot',
       asset: 'blueprintNext',
@@ -112,6 +132,8 @@ export const DEMO_SLIDES: readonly DemoSlide[] = [
     headline: 'Teacher workflow',
     support: 'The planning teachers already do, connected end to end.',
     points: ['Scheme of Work', 'Lesson Plans', 'Record of Work'],
+    narration:
+      "None of this asks a teacher to do more. Scheme of work, lesson plans, record of work. One connected flow.",
     visual: {
       kind: 'workflow',
       asset: 'teacherDocuments',
@@ -124,6 +146,8 @@ export const DEMO_SLIDES: readonly DemoSlide[] = [
     label: 'Beyond today’s marks',
     headline: 'Beyond today’s marks',
     support: 'Strengths, growth areas, and fields worth exploring.',
+    narration:
+      "Over time the same record shows more than marks. Strengths. Areas to grow. Fields worth exploring, held lightly, as early signals.",
     visual: {
       kind: 'screenshot',
       asset: 'careerIntelligence',
@@ -136,6 +160,8 @@ export const DEMO_SLIDES: readonly DemoSlide[] = [
     label: 'Closing',
     headline: 'Start with one school.',
     support: 'Learn from real evidence. Improve from there.',
+    narration:
+      "There is no claim of scale here. Start with one school. Learn from real evidence. Improve from there. EduNexus Kenya.",
     visual: { kind: 'closing' },
     // Held a beat longer than any other slide so the closing line lands before
     // the presentation wraps. `null` here would mean "stop forever" — see

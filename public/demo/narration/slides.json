@@ -1,0 +1,42 @@
+[
+  {
+    "id": "s1",
+    "slideId": "edunexus",
+    "slideMs": 8000
+  },
+  {
+    "id": "s2",
+    "slideId": "problem",
+    "slideMs": 11000
+  },
+  {
+    "id": "s3",
+    "slideId": "loop",
+    "slideMs": 12000
+  },
+  {
+    "id": "s4",
+    "slideId": "blueprint-today",
+    "slideMs": 12000
+  },
+  {
+    "id": "s5",
+    "slideId": "insight-to-action",
+    "slideMs": 12000
+  },
+  {
+    "id": "s6",
+    "slideId": "teacher-workflow",
+    "slideMs": 11000
+  },
+  {
+    "id": "s7",
+    "slideId": "beyond-marks",
+    "slideMs": 11000
+  },
+  {
+    "id": "s8",
+    "slideId": "closing",
+    "slideMs": 14000
+  }
+]
