@@ -273,62 +273,6 @@ function futureEvidenceItems(blueprint: LearnerBlueprint): ActionItem[] {
     }
   }
 
-  if (blueprint.projects.status === 'available' && blueprint.projects.data) {
-    const { projectCount, currentActiveProject, featuredProject } = blueprint.projects.data
-    if (projectCount > 0 || currentActiveProject || featuredProject) {
-      items.push({
-        title: 'Projects',
-        detail: currentActiveProject
-          ? `${currentActiveProject.title} is currently active.`
-          : featuredProject
-            ? `${featuredProject.title} stands out among the project work so far.`
-            : `${projectCount} project signal${projectCount === 1 ? '' : 's'} so far.`,
-      })
-    }
-  }
-
-  if (blueprint.competitions.status === 'available' && blueprint.competitions.data) {
-    const { verifiedCompetitions, currentParticipation, latestCompetition } = blueprint.competitions.data
-    if (verifiedCompetitions > 0 || currentParticipation || latestCompetition) {
-      items.push({
-        title: 'Competitions',
-        detail: currentParticipation
-          ? `${currentParticipation.name} — currently taking part.`
-          : latestCompetition
-            ? `${latestCompetition.name} is the latest competition signal so far.`
-            : `${verifiedCompetitions} verified competition record${verifiedCompetitions === 1 ? '' : 's'}.`,
-      })
-    }
-  }
-
-  if (blueprint.leadership.status === 'available' && blueprint.leadership.data) {
-    const { currentRole, completedRoleCount, latestCompletedRole } = blueprint.leadership.data
-    if (currentRole || completedRoleCount > 0 || latestCompletedRole) {
-      items.push({
-        title: 'Leadership',
-        detail: currentRole
-          ? `${currentRole.title} — current role.`
-          : latestCompletedRole
-            ? `${latestCompletedRole.title} is the latest leadership signal so far.`
-            : `${completedRoleCount} completed leadership role${completedRoleCount === 1 ? '' : 's'}.`,
-      })
-    }
-  }
-
-  if (blueprint.innovations.status === 'available' && blueprint.innovations.data) {
-    const { currentStage, iterationCount, latestMilestone } = blueprint.innovations.data
-    if (currentStage || iterationCount > 0 || latestMilestone) {
-      items.push({
-        title: 'Innovation',
-        detail: currentStage
-          ? `${currentStage.problemAddressed} — currently ${currentStage.status}.`
-          : latestMilestone
-            ? `${latestMilestone} — the latest milestone so far.`
-            : `${iterationCount} iteration${iterationCount === 1 ? '' : 's'} recorded.`,
-      })
-    }
-  }
-
   return items
 }
 
@@ -460,12 +404,20 @@ export default function BlueprintView({
               ? `As it stood on ${generatedAtLabel} — kept exactly as it was, never recalculated.`
               : `Prepared ${generatedAtLabel}`}
           </p>
+          {/* Structural validation failed — say so plainly and tell the reader
+              what to do. The individual errors are internal field/status
+              diagnostics ("identity is required and must be 'available', got
+              'unavailable'"); a parent or learner can act on none of them, and
+              BlueprintStateMessage's own copy already sets the house standard
+              of never exposing internals. The detail belongs in logs, not on
+              a parent's screen. */}
           {!validation.valid && (
-            <div role="alert" className="mt-3 rounded-2xl border border-red-100 bg-red-50 p-3">
-              <p className="text-xs font-bold text-red-600">This Blueprint failed validation:</p>
-              {validation.errors.map((error, index) => (
-                <p key={index} className="text-[11px] text-red-500">{error.field}: {error.message}</p>
-              ))}
+            <div role="alert" className="mt-3 rounded-2xl border border-amber-100 bg-amber-50 p-3">
+              <p className="text-xs font-bold text-amber-700">Some of this Blueprint could not be prepared</p>
+              <p className="mt-0.5 text-[11px] text-amber-600">
+                Parts of this report are incomplete. Everything shown below is accurate — nothing has been
+                estimated or filled in. Please ask the school to check this learner&apos;s record.
+              </p>
             </div>
           )}
           <nav aria-label="Blueprint history navigation" data-blueprint-nav="true" className="mt-3">

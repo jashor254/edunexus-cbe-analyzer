@@ -11,27 +11,24 @@
 // Portfolio is keyed on the Core learner directly (`learners.id`) — unlike
 // Career/Compass/Academic Record, it has no legacy `students.id` space to
 // resolve, so this composer needs no `resolveLegacyStudentId` call.
+//
+// The availability/failure wrapper lives in `summarySection.ts`, shared
+// with composeAchievement.ts — this file owns only Portfolio's field
+// mapping and its learner-facing copy.
 
 import { getPortfolioSummary } from '@/lib/learnerPortfolio/portfolio'
+import { composeSummarySection } from './summarySection'
 import type { BlueprintSection, PortfolioData } from './types'
 
 const OWNER = 'lib/learnerPortfolio/portfolio.getPortfolioSummary'
 
-export async function composePortfolio(coreLearnerId: string, schoolId: string): Promise<BlueprintSection<PortfolioData>> {
-  try {
-    const summary = await getPortfolioSummary(coreLearnerId, schoolId)
-
-    if (!summary.available) {
-      return {
-        status: 'unavailable',
-        owner: OWNER,
-        freshness: 'live',
-        data: null,
-        unavailableReason: 'This learner has no published Portfolio items yet.',
-      }
-    }
-
-    const data: PortfolioData = {
+export function composePortfolio(coreLearnerId: string, schoolId: string): Promise<BlueprintSection<PortfolioData>> {
+  return composeSummarySection({
+    owner: OWNER,
+    load: () => getPortfolioSummary(coreLearnerId, schoolId),
+    emptyReason: 'This learner has no published Portfolio items yet.',
+    failureReason: 'Portfolio composition failed',
+    map: summary => ({
       publishedCount: summary.publishedCount,
       latestItem: summary.latestItem,
       featuredItem: summary.featuredItem,
@@ -40,16 +37,6 @@ export async function composePortfolio(coreLearnerId: string, schoolId: string):
       // stays "compose, never own" all the way through), so Blueprint is
       // the one place that knows both the learner id and the real route.
       portfolioUrl: `/student/portfolio/${coreLearnerId}`,
-    }
-
-    return { status: 'available', owner: OWNER, freshness: 'live', data }
-  } catch (error) {
-    return {
-      status: 'unavailable',
-      owner: OWNER,
-      freshness: 'live',
-      data: null,
-      unavailableReason: error instanceof Error ? error.message : 'Portfolio composition failed',
-    }
-  }
+    }),
+  })
 }

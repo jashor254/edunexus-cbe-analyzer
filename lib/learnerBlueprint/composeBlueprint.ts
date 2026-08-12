@@ -11,6 +11,20 @@
 // section on its own failure rather than throwing, so this orchestrator
 // runs them concurrently and simply assembles whatever came back. No
 // fabricated values anywhere in the result.
+//
+// Section set (2026-08-12 over-engineering pass): Projects, Competitions,
+// Leadership and Innovations were composed here from Sprint 12 until this
+// date and rendered `unavailable` for every learner the whole time — none
+// of the four domains has, or has ever had, a single write path or page in
+// `app/`, and their tables' last row was written on the build sprint's own
+// day (2026-07-18) with nothing since. Educational Identity was a hardcoded
+// `not_implemented` return occupying a section slot. Composing five sections
+// that structurally cannot hold data cost four DB round trips on every
+// Blueprint render, so they are no longer composed. The owning domains
+// (`lib/learnerProjects/`, `learnerCompetitions/`, `learnerLeadership/`,
+// `learnerInnovation/`) are untouched and still fully tested — when one of
+// them grows a real write path, re-adding its composer here is a five-line
+// change.
 
 import { resolveLegacyStudentId } from '@/lib/core/identity'
 import { composeIdentity } from './composeIdentity'
@@ -20,13 +34,8 @@ import { composeLearningCompass } from './composeLearningCompass'
 import { composeCareer } from './composeCareer'
 import { composePortfolio } from './composePortfolio'
 import { composeAchievement } from './composeAchievement'
-import { composeProjects } from './composeProjects'
-import { composeCompetitions } from './composeCompetitions'
-import { composeLeadership } from './composeLeadership'
-import { composeInnovation } from './composeInnovation'
 import { composeTeacherReflection } from './composeTeacherReflection'
 import { composeParentSummary } from './composeParentSummary'
-import { composeEducationalIdentity } from './composeEducationalIdentity'
 import { composeGrowthTimeline } from './composeGrowthTimeline'
 import { composeRisk } from './composeRisk'
 import { composeLearningStory } from './composeLearningStory'
@@ -41,16 +50,27 @@ import type { BlueprintIdentifiers, LearnerBlueprint } from './types'
 export type ComposeBlueprintResult = {
   blueprint: LearnerBlueprint
   validation: BlueprintValidationResult
-  /**
-   * Phase 4A — the Blueprint Intelligence Coherence Engine's diagnosis:
-   * whether every educational claim/recommendation/action in this
-   * composition is internally consistent with the learner's own Evidence/
-   * Projection. Distinct from `validation` above, which only checks
-   * structural completeness (every section present, owner declared) — a
-   * Blueprint can be `validation.valid === true` and still
-   * `coherence.result === 'FAIL'`. Never mutates `blueprint` — diagnosis
-   * only, per this phase's own rule.
-   */
+}
+
+/**
+ * Phase 4A — the Blueprint Intelligence Coherence Engine's diagnosis:
+ * whether every educational claim/recommendation/action in this
+ * composition is internally consistent with the learner's own Evidence/
+ * Projection. Distinct from `validation`, which only checks structural
+ * completeness (every section present, owner declared) — a Blueprint can
+ * be `validation.valid === true` and still `coherence.result === 'FAIL'`.
+ * Never mutates `blueprint` — diagnosis only, per this phase's own rule.
+ *
+ * Deliberately NOT part of `composeBlueprint()`'s own result: the engine
+ * costs an extra `listApprovedForLearner` query plus seven rule passes,
+ * and only two callers in the platform actually read the report (the
+ * learner Blueprint page's publication gate and `approveBlueprintAction`'s
+ * enforcement boundary). Every other caller — both Parent pages, snapshot
+ * capture — used to pay that cost and discard the result. Callers that
+ * need the diagnosis ask for it explicitly via
+ * `composeBlueprintWithCoherence()`; nothing else pays.
+ */
+export type ComposeBlueprintWithCoherenceResult = ComposeBlueprintResult & {
   coherence: CoherenceReport
 }
 
@@ -62,17 +82,13 @@ export async function composeBlueprint(ids: BlueprintIdentifiers): Promise<Compo
   // exactly as before. No composer re-implements this lookup.
   const legacyStudentId = await resolveLegacyStudentId(ids.coreLearnerId)
 
-  const [identity, attendance, learningCompass, career, portfolio, achievement, projects, competitions, leadership, innovations, teacherReflection, projectionAccess] = await Promise.all([
+  const [identity, attendance, learningCompass, career, portfolio, achievement, teacherReflection, projectionAccess] = await Promise.all([
     composeIdentity(ids),
     composeAttendance(ids.actorUserId, ids.schoolId, ids.coreLearnerId),
     composeLearningCompass(legacyStudentId),
     composeCareer(legacyStudentId),
     composePortfolio(ids.coreLearnerId, ids.schoolId),
     composeAchievement(ids.coreLearnerId, ids.schoolId),
-    composeProjects(ids.coreLearnerId, ids.schoolId),
-    composeCompetitions(ids.coreLearnerId, ids.schoolId),
-    composeLeadership(ids.coreLearnerId, ids.schoolId),
-    composeInnovation(ids.coreLearnerId, ids.schoolId),
     composeTeacherReflection(ids.coreLearnerId, ids.schoolId),
     loadProjectionAccess(legacyStudentId),
   ])
@@ -84,7 +100,6 @@ export async function composeBlueprint(ids: BlueprintIdentifiers): Promise<Compo
   ])
 
   const parentSummary = composeParentSummary(identity.data?.learnerName ?? null, academicRecord, attendance)
-  const educationalIdentity = composeEducationalIdentity()
   const learningStory = composeLearningStory({
     identity,
     academicRecord,
@@ -119,13 +134,8 @@ export async function composeBlueprint(ids: BlueprintIdentifiers): Promise<Compo
     career,
     portfolio,
     achievement,
-    projects,
-    competitions,
-    leadership,
-    innovations,
     teacherReflection,
     parentSummary,
-    educationalIdentity,
     growthTimeline,
     risk,
     learningStory,
@@ -142,6 +152,19 @@ export async function composeBlueprint(ids: BlueprintIdentifiers): Promise<Compo
 
   const blueprint: LearnerBlueprint = { metadata, ...sections }
   const validation = validateBlueprint(blueprint)
+
+  return { blueprint, validation }
+}
+
+/**
+ * `composeBlueprint()` plus the Coherence Engine's diagnosis — the opt-in
+ * path for the two callers that actually enforce on the report. Never call
+ * this just to render a Blueprint.
+ */
+export async function composeBlueprintWithCoherence(
+  ids: BlueprintIdentifiers
+): Promise<ComposeBlueprintWithCoherenceResult> {
+  const { blueprint, validation } = await composeBlueprint(ids)
   const coherence = await composeBlueprintCoherence(ids.coreLearnerId, ids.schoolId, blueprint)
 
   return { blueprint, validation, coherence }

@@ -11,23 +11,16 @@ import assert from 'node:assert/strict'
 import { composeMetadata } from './composeMetadata'
 import { validateBlueprint } from './validation'
 import { composeParentSummary } from './composeParentSummary'
-import { composeEducationalIdentity } from './composeEducationalIdentity'
 import { composeGrowthTimeline } from './composeGrowthTimeline'
 import { composeAcademicRecord } from './composeAcademicRecord'
 import { composeLearningCompass } from './composeLearningCompass'
 import { composeCareer } from './composeCareer'
 import type { LearnerBlueprint, BlueprintSection, AcademicRecordData, AttendanceData } from './types'
 
-// ── Placeholders (Educational Identity / Growth Timeline) ──────────────────────
+// ── Placeholders (Growth Timeline) ────────────────────────────────────────────
 // Teacher Reflection moved to composeBlueprint.integration.test.ts (Sprint
 // 12O) — it now reads the real `teacher_reflections` table via
 // `lib/teacherReflection/reflection.ts`, no longer a pure static placeholder.
-
-test('composeEducationalIdentity always returns not_implemented, never a guessed label', () => {
-  const section = composeEducationalIdentity()
-  assert.equal(section.status, 'not_implemented')
-  assert.equal(section.data, null)
-})
 
 test('composeGrowthTimeline is unavailable when no legacy student is bridged (no DB call attempted)', async () => {
   const section = await composeGrowthTimeline(null)
@@ -166,13 +159,8 @@ function fixtureBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlu
     career: na('not_implemented'),
     portfolio: na('not_implemented'),
     achievement: na('not_implemented'),
-    projects: na('not_implemented'),
-    competitions: na('not_implemented'),
-    leadership: na('not_implemented'),
-    innovations: na('not_implemented'),
     teacherReflection: na('not_implemented'),
     parentSummary: na('not_implemented'),
-    educationalIdentity: na('not_implemented'),
     growthTimeline: na('not_implemented', []),
     risk: na('not_implemented'),
     learningStory: na('not_implemented'),

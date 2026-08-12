@@ -139,9 +139,6 @@ test('composeBlueprint produces a partial-but-valid Blueprint for a Core-only le
   assert.equal(blueprint.teacherReflection.status, 'unavailable')
   assert.ok(blueprint.teacherReflection.unavailableReason)
 
-  // Educational Identity remains a placeholder, per explicit mission instruction.
-  assert.equal(blueprint.educationalIdentity.status, 'not_implemented')
-
   // Growth Timeline and Risk Exposure both read the Projection Engine
   // directly, so with no legacy student bridge they degrade explicitly.
   assert.equal(blueprint.growthTimeline.status, 'unavailable')

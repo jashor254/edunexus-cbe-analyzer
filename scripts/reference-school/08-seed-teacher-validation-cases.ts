@@ -38,7 +38,7 @@ import { computeConfidence, resolveReviewStatus } from '@/lib/intelligence/confi
 import { persistEvidenceBatch } from '@/lib/intelligence/evidenceLifecycle'
 import { marksToLevel } from '@/lib/assessments/gradeCalculator'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
-import { composeBlueprint } from '@/lib/learnerBlueprint/composeBlueprint'
+import { composeBlueprintWithCoherence } from '@/lib/learnerBlueprint/composeBlueprint'
 
 const SOURCE = 'teacher_upload' as const
 const EXTRACTION_METHOD = 'reference_school_validation_seed_v1'
@@ -187,7 +187,7 @@ async function main() {
 
     await recomputeLearnerProjection(legacyStudentId)
 
-    const result = await composeBlueprint({ actorUserId: adminUser!.user_id, coreLearnerId: c.coreLearnerId, schoolId: school.id })
+    const result = await composeBlueprintWithCoherence({ actorUserId: adminUser!.user_id, coreLearnerId: c.coreLearnerId, schoolId: school.id })
     const subjects = result.blueprint.academicRecord.status === 'available' ? result.blueprint.academicRecord.data?.bySubject ?? [] : []
     console.log(`  coherence: ${result.coherence.result}`)
     console.log(`  subjects: ${subjects.map(s => `${s.subject}:L${s.latestLevel}:${s.trend}:n=${s.evidenceCount}`).join(', ')}`)

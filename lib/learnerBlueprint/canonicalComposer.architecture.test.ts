@@ -5,20 +5,21 @@
 // live routes) cannot silently reappear. Walks the real source tree (no
 // mocks, no DB) and asserts:
 //
-//   1. The legacy composer (lib/learnerIntelligence/blueprint.ts) is
-//      imported ONLY by its own module and the two named, offline,
-//      non-route diagnostic/demo scripts kept alive on purpose (see
-//      docs/architecture/sprint-12ab-blueprint-canonicalization.md).
-//   2. No app/**/page.tsx or app/api/**/route.ts file imports it — i.e.
-//      no live route can reach the legacy composer, directly or via a
-//      component.
+//   1. The legacy composer (lib/learnerIntelligence/blueprint.ts) and its
+//      PDF stack no longer exist at all. Sprint 12AB quarantined them
+//      behind a two-script whitelist; the 2026-08-12 over-engineering pass
+//      deleted both files and both scripts, so the invariant is now
+//      "absent," not "quarantined" — strictly stronger, and it needs no
+//      whitelist to maintain.
+//   2. Nothing anywhere imports them, and in particular no
+//      app/**/page.tsx or app/api/**/route.ts can reach them.
 //   3. composeBlueprint() itself is still defined exactly once.
 //
 // Run: npx tsx --test lib/learnerBlueprint/canonicalComposer.architecture.test.ts
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 
 const ROOT = path.resolve(__dirname, '../..')
@@ -40,22 +41,31 @@ function walk(dir: string, out: string[] = []): string[] {
 
 const ALL_SOURCE_FILES = walk(ROOT)
 
-// Files explicitly authorized to still call the legacy composer — offline
-// tooling with zero live route/component reachability, documented in the
-// Sprint 12AB migration decision table. Any new entry here must be a
-// deliberate, reviewed decision, not a silent accretion.
-const LEGACY_COMPOSER_WHITELIST = new Set([
-  path.join(ROOT, 'lib/learnerIntelligence/blueprint.ts'),
-  path.join(ROOT, 'scripts/generate-learner-blueprints.ts'),
-  path.join(ROOT, 'scripts/trace-consistency-audit.ts'),
-])
+// The legacy composer's own files, deleted 2026-08-12. Their continued
+// absence is the invariant — recreating either one recreates the "two
+// independently-computed Blueprints for the same learner" bug the Guardian
+// Audit rated Critical.
+const DELETED_LEGACY_FILES = [
+  'lib/learnerIntelligence/blueprint.ts',
+  'lib/learnerIntelligence/pdfGenerator.tsx',
+]
 
 const LEGACY_IMPORT_PATTERN = /from\s+['"](@\/lib\/learnerIntelligence\/blueprint|\.\.?\/.*learnerIntelligence\/blueprint)['"]|import\(['"](\.\.\/lib\/learnerIntelligence\/blueprint)['"]\)/
 
-test('legacy Blueprint composer has no importers outside the documented whitelist', () => {
+test('the legacy Blueprint composer and its PDF stack no longer exist', () => {
+  for (const rel of DELETED_LEGACY_FILES) {
+    assert.equal(
+      existsSync(path.join(ROOT, rel)),
+      false,
+      `${rel} was deleted — recreating it recreates the two-competing-Blueprints bug`,
+    )
+  }
+})
+
+test('legacy Blueprint composer has no importers anywhere', () => {
   const offenders: string[] = []
   for (const file of ALL_SOURCE_FILES) {
-    if (LEGACY_COMPOSER_WHITELIST.has(file)) continue
+    if (file === path.join(ROOT, 'lib/learnerBlueprint/canonicalComposer.architecture.test.ts')) continue
     const content = readFileSync(file, 'utf8')
     if (LEGACY_IMPORT_PATTERN.test(content)) offenders.push(path.relative(ROOT, file))
   }
@@ -138,7 +148,10 @@ test('BlueprintView is presentation-only — it never calls composeBlueprint its
   const viewContent = readFileSync(path.join(ROOT, 'components/blueprint/BlueprintView.tsx'), 'utf8')
   assert.doesNotMatch(viewContent, /composeBlueprint\(/, 'BlueprintView must receive an already-composed blueprint as a prop, never compose its own')
 
+  // The live page uses the opt-in coherence variant (it gates publication on
+  // a FAIL), so match either entry point — the invariant is "composes once",
+  // not "which of the two entry points."
   const pageContent = readFileSync(path.join(ROOT, 'app/student/blueprint/[learnerId]/page.tsx'), 'utf8')
-  const composeCalls = pageContent.match(/composeBlueprint\(\{/g) ?? []
-  assert.equal(composeCalls.length, 1, 'the live Blueprint page must call composeBlueprint() exactly once per render — no duplicate composition tree')
+  const composeCalls = pageContent.match(/composeBlueprint(WithCoherence)?\(\{/g) ?? []
+  assert.equal(composeCalls.length, 1, 'the live Blueprint page must compose exactly once per render — no duplicate composition tree')
 })

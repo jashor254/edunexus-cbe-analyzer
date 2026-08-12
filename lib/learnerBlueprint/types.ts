@@ -432,13 +432,8 @@ export type LearnerBlueprint = {
   career: BlueprintSection<CareerData>
   portfolio: BlueprintSection<PortfolioData>
   achievement: BlueprintSection<AchievementData>
-  projects: BlueprintSection<ProjectsData>
-  competitions: BlueprintSection<CompetitionsData>
-  leadership: BlueprintSection<LeadershipData>
-  innovations: BlueprintSection<InnovationsData>
   teacherReflection: BlueprintSection<TeacherReflectionData>
   parentSummary: BlueprintSection<ParentSummaryData>
-  educationalIdentity: BlueprintSection<EducationalIdentityData>
   growthTimeline: BlueprintSection<GrowthTimelineEntry[]>
   risk: BlueprintSection<RiskData>
   learningStory: BlueprintSection<LearningStoryData>

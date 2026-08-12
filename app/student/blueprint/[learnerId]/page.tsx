@@ -24,7 +24,7 @@ import { requireAuthentication, requireLearnerAccess } from '@/lib/core/permissi
 import { ResourceOwnershipError, UnauthorizedError } from '@/lib/core/errors'
 import { repos } from '@/lib/repositories'
 import { getUserRoles } from '@/lib/auth/getRole'
-import { composeBlueprint } from '@/lib/learnerBlueprint/composeBlueprint'
+import { composeBlueprintWithCoherence } from '@/lib/learnerBlueprint/composeBlueprint'
 import { BLUEPRINT_EXPORT_QUERY_KEY, isBlueprintPdfExportMode } from '@/lib/learnerBlueprint/pdfExport'
 import { listReviewableBlueprintActionsForLearner, type ReviewableActionListItem } from '@/lib/learnerBlueprint/actionPlan/reviewWorkspace'
 import BlueprintView from '@/components/blueprint/BlueprintView'
@@ -80,7 +80,7 @@ export default async function StudentBlueprintPage({
 
   let blueprint, validation, coherence
   try {
-    ;({ blueprint, validation, coherence } = await composeBlueprint({
+    ;({ blueprint, validation, coherence } = await composeBlueprintWithCoherence({
       actorUserId: userId,
       coreLearnerId: learnerId,
       schoolId,

@@ -29,7 +29,6 @@ import {
   discontinueInnovation, addIteration, listIterations, listForLearner, listImplemented,
   getInnovationsSummary, getVerificationHistory,
 } from './innovation'
-import { composeInnovation } from '@/lib/learnerBlueprint/composeInnovation'
 import { createAchievement, verifyAchievement, publishAchievement, getAchievementSummary } from '@/lib/learnerAchievement/achievement'
 import { addItem as addPortfolioItem, submitItem as submitPortfolioItem, verifyItem, publishItem, getPortfolioSummary } from '@/lib/learnerPortfolio/portfolio'
 import { createDraft as createProjectDraft, getProjectsSummary } from '@/lib/learnerProjects/project'
@@ -299,24 +298,23 @@ test('terminal branch: Revoked is reachable only from Implementation, and revoca
   assert.equal(summary.latestImplementationDate, null)
 })
 
-test('Blueprint composition: unavailable for zero innovations, available once implemented, currentStage surfaces only an in-flight entry with no internal detail', async () => {
+test('Canonical summary: unavailable for zero innovations, available once implemented, currentStage surfaces only an in-flight entry with no internal detail', async () => {
   const fx = await fixtureSchoolWithTeacher('blueprint')
   const client = await signInAs(fx.teacherEmail)
 
-  const empty = await composeInnovation(fx.learnerId, fx.schoolId)
-  assert.equal(empty.status, 'unavailable')
-  assert.equal(empty.data, null)
+  const empty = await getInnovationsSummary(fx.learnerId, fx.schoolId)
+  assert.equal(empty.available, false)
 
   // An in-flight (not yet implemented) innovation surfaces as currentStage only.
   const idea = await createIdea(client, fx.schoolId, fx.learnerId, fx.teacherUserId, FIELDS)
   await beginExploration(client, fx.schoolId, idea.id)
 
-  const midway = await composeInnovation(fx.learnerId, fx.schoolId)
-  assert.equal(midway.status, 'available')
-  assert.equal(midway.data!.currentStage!.status, 'exploration')
-  assert.equal(midway.data!.latestImplementationDate, null, 'never counts unimplemented work as a milestone date')
+  const midway = await getInnovationsSummary(fx.learnerId, fx.schoolId)
+  assert.equal(midway.available, true)
+  assert.equal(midway.currentStage!.status, 'exploration')
+  assert.equal(midway.latestImplementationDate, null, 'never counts unimplemented work as a milestone date')
   // currentStage never leaks internal lifecycle detail beyond problem/status.
-  assert.deepEqual(Object.keys(midway.data!.currentStage!).sort(), ['problemAddressed', 'status'])
+  assert.deepEqual(Object.keys(midway.currentStage!).sort(), ['problemAddressed', 'status'])
 })
 
 test('cross-school isolation: a teacher at School A cannot read or act on School B\'s innovations', async () => {
@@ -414,10 +412,10 @@ test('regression: Portfolio, Achievement, Projects, Competitions, and Leadership
   assert.equal(blueprint.achievement.data!.achievementCount, 1)
   assert.equal(blueprint.portfolio.status, 'available')
   assert.equal(blueprint.portfolio.data!.publishedCount, 1)
-  assert.equal(blueprint.competitions.status, 'available')
-  assert.equal(blueprint.competitions.data!.currentParticipation!.name, 'National Innovation Challenge')
-  assert.equal(blueprint.leadership.status, 'available')
-  assert.equal(blueprint.leadership.data!.currentRole!.title, 'Science Club President')
-  assert.equal(blueprint.innovations.status, 'available')
-  assert.equal(blueprint.innovations.data!.currentStage!.status, 'exploration')
+  // Competitions/Leadership/Innovation are no longer Blueprint sections (2026-08-12:
+  // no write path, no UI, permanently `unavailable`), so their half of the no-clobbering
+  // invariant is asserted against their own canonical summaries.
+  const innovationsSummary = await getInnovationsSummary(fx.learnerId, fx.schoolId)
+  assert.equal(innovationsSummary.available, true)
+  assert.equal(innovationsSummary.currentStage!.status, 'exploration')
 })

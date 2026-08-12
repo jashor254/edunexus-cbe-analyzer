@@ -29,7 +29,6 @@ import {
   revokeCompetition, moveToHistorical, addTeamMember, listForLearner, listPublished,
   getCompetitionsSummary, getVerificationHistory,
 } from './competition'
-import { composeCompetitions } from '@/lib/learnerBlueprint/composeCompetitions'
 import { createAchievement, verifyAchievement, publishAchievement, getAchievementSummary } from '@/lib/learnerAchievement/achievement'
 import { addItem as addPortfolioItem, submitItem as submitPortfolioItem, verifyItem, publishItem, getPortfolioSummary } from '@/lib/learnerPortfolio/portfolio'
 import { createDraft as createProjectDraft, getProjectsSummary } from '@/lib/learnerProjects/project'
@@ -290,24 +289,23 @@ test('canonical level/category enforcement: rejects non-canonical level/category
   )
 })
 
-test('Blueprint composition: unavailable for zero competitions, available with total/verified/latest once published, currentParticipation surfaces only an in-flight entry with no internal detail', async () => {
+test('Canonical summary: unavailable for zero competitions, available with total/verified/latest once published, currentParticipation surfaces only an in-flight entry with no internal detail', async () => {
   const fx = await fixtureSchoolWithTeacher('blueprint')
   const client = await signInAs(fx.teacherEmail)
 
-  const empty = await composeCompetitions(fx.learnerId, fx.schoolId)
-  assert.equal(empty.status, 'unavailable')
-  assert.equal(empty.data, null)
+  const empty = await getCompetitionsSummary(fx.learnerId, fx.schoolId)
+  assert.equal(empty.available, false)
 
   // An in-flight (not yet published) competition surfaces as currentParticipation only.
   const inFlight = await createOpportunity(client, fx.schoolId, fx.learnerId, fx.teacherUserId, { ...FIELDS, name: 'Regional Science Fair' })
   await registerCompetition(client, fx.schoolId, inFlight.id)
 
-  const midway = await composeCompetitions(fx.learnerId, fx.schoolId)
-  assert.equal(midway.status, 'available')
-  assert.equal(midway.data!.totalCompetitions, 0, 'never counts unpublished work as a total')
-  assert.equal(midway.data!.currentParticipation!.name, 'Regional Science Fair')
+  const midway = await getCompetitionsSummary(fx.learnerId, fx.schoolId)
+  assert.equal(midway.available, true)
+  assert.equal(midway.totalCompetitions, 0, 'never counts unpublished work as a total')
+  assert.equal(midway.currentParticipation!.name, 'Regional Science Fair')
   // currentParticipation never leaks internal lifecycle status, judging, or feedback.
-  assert.deepEqual(Object.keys(midway.data!.currentParticipation!).sort(), ['category', 'level', 'name'])
+  assert.deepEqual(Object.keys(midway.currentParticipation!).sort(), ['category', 'level', 'name'])
 
   // Now publish a second competition.
   const opp2 = await createOpportunity(client, fx.schoolId, fx.learnerId, fx.teacherUserId, { ...FIELDS, name: 'National Robotics Championship' })
@@ -318,13 +316,13 @@ test('Blueprint composition: unavailable for zero competitions, available with t
   await recordResults(client, fx.schoolId, opp2.id, 'won', 'First place overall.', 'External panel', 'Outstanding engineering.')
   await publishCompetition(client, fx.schoolId, opp2.id)
 
-  const available = await composeCompetitions(fx.learnerId, fx.schoolId)
-  assert.equal(available.status, 'available')
-  assert.equal(available.data!.totalCompetitions, 1)
-  assert.equal(available.data!.latestCompetition!.name, 'National Robotics Championship')
+  const available = await getCompetitionsSummary(fx.learnerId, fx.schoolId)
+  assert.equal(available.available, true)
+  assert.equal(available.totalCompetitions, 1)
+  assert.equal(available.latestCompetition!.name, 'National Robotics Championship')
   // Never exposes judging or raw feedback anywhere in the Blueprint section.
-  assert.equal(JSON.stringify(available.data).includes('External panel'), false)
-  assert.equal(JSON.stringify(available.data).includes('Outstanding engineering'), false)
+  assert.equal(JSON.stringify(available).includes('External panel'), false)
+  assert.equal(JSON.stringify(available).includes('Outstanding engineering'), false)
 })
 
 test('relationship invariant: a Competition Entry may reference a Project, one direction only — Projects itself is never read, written, or mutated', async () => {
@@ -436,6 +434,10 @@ test('regression: Portfolio, Achievement, and Projects are entirely unaffected b
   assert.equal(blueprint.achievement.data!.achievementCount, 1)
   assert.equal(blueprint.portfolio.status, 'available')
   assert.equal(blueprint.portfolio.data!.publishedCount, 1)
-  assert.equal(blueprint.competitions.status, 'available')
-  assert.equal(blueprint.competitions.data!.currentParticipation!.name, FIELDS.name)
+  // Competitions is no longer a Blueprint section (2026-08-12: no write path, no UI,
+  // permanently `unavailable`), so its half of the no-clobbering invariant is asserted
+  // against its own canonical summary — the function Blueprint would read if it did.
+  const competitionsSummary = await getCompetitionsSummary(fx.learnerId, fx.schoolId)
+  assert.equal(competitionsSummary.available, true)
+  assert.equal(competitionsSummary.currentParticipation!.name, FIELDS.name)
 })

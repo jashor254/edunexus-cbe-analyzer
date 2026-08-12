@@ -199,6 +199,14 @@ export async function editBlueprintAction(
  * itself and never mutates the pending action item — diagnosis stays in
  * one place (types.ts's `toCoherenceReport`), enforcement is just "read
  * that result and stop."
+ *
+ * Uses the plain `composeBlueprint()` (not `composeBlueprintWithCoherence`)
+ * deliberately: the report this boundary needs is for the WOULD-BE approved
+ * set (existing approved + this pending item), which the composer's own
+ * report — computed over the currently-approved set only — cannot answer.
+ * Before coherence became opt-in, calling the composer here ran the seven
+ * rules once internally, threw that report away, and then ran them again
+ * below on the augmented set. Now it runs exactly once.
  */
 async function requireCoherentApproval(actorUserId: string, pending: BlueprintActionItemRow): Promise<void> {
   const [blueprintResult, approvedRows] = await Promise.all([

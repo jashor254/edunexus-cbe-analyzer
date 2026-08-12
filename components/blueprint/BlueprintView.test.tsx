@@ -111,33 +111,6 @@ function createBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlue
       highestLevelAchievement: { title: 'Math Challenge Certificate', category: 'Award', achievementType: 'Certificate', publishedAt: '2026-05-02T10:00:00.000Z' },
       profileUrl: '/student/achievements/learner-1',
     }),
-    projects: section({
-      projectCount: 1,
-      latestPublishedProject: { title: 'Water Filter Model', category: 'Science', publishedAt: '2026-05-12T10:00:00.000Z' },
-      currentActiveProject: { title: 'Water Filter Model', category: 'Science' },
-      featuredProject: { title: 'Water Filter Model', category: 'Science', publishedAt: '2026-05-12T10:00:00.000Z' },
-      projectsUrl: '/student/projects/learner-1',
-    }),
-    competitions: section({
-      totalCompetitions: 1,
-      verifiedCompetitions: 1,
-      latestCompetition: { name: 'Junior Math Contest', level: 'School', category: 'Mathematics', publishedAt: '2026-06-12T10:00:00.000Z' },
-      currentParticipation: null,
-      competitionsUrl: '/student/competitions/learner-1',
-    }),
-    leadership: section({
-      currentRole: null,
-      completedRoleCount: 1,
-      latestCompletedRole: { title: 'Class Librarian', scope: 'Class', publishedAt: '2026-04-12T10:00:00.000Z' },
-      leadershipUrl: '/student/leadership/learner-1',
-    }),
-    innovations: section({
-      currentStage: null,
-      iterationCount: 1,
-      latestMilestone: 'Prototype completed',
-      latestImplementationDate: null,
-      innovationsUrl: '/student/innovations/learner-1',
-    }),
     teacherReflection: section({
       strengths: 'Brian stays with difficult work when he has enough structure.',
       growthArea: 'He still needs stronger consistency in Mathematics.',
@@ -154,7 +127,6 @@ function createBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlue
       detail: 'Attendance this term is at 95%.',
       action: 'Practice ratio and fraction fluency three times each week.',
     }),
-    educationalIdentity: unavailable('Educational identity is not yet available for this learner.'),
     recommendedNextSteps: section({
       actions: [
         {
@@ -254,10 +226,6 @@ function createKevinBlueprint(overrides: Partial<LearnerBlueprint> = {}): Learne
     }),
     portfolio: section({ publishedCount: 0, latestItem: null, featuredItem: null, portfolioUrl: null }),
     achievement: section({ achievementCount: 0, latestVerifiedAchievement: null, highestLevelAchievement: null, profileUrl: null }),
-    projects: section({ projectCount: 0, latestPublishedProject: null, currentActiveProject: null, featuredProject: null, projectsUrl: null }),
-    competitions: section({ totalCompetitions: 0, verifiedCompetitions: 0, latestCompetition: null, currentParticipation: null, competitionsUrl: null }),
-    leadership: section({ currentRole: null, completedRoleCount: 0, latestCompletedRole: null, leadershipUrl: null }),
-    innovations: section({ currentStage: null, iterationCount: 0, latestMilestone: null, latestImplementationDate: null, innovationsUrl: null }),
     teacherReflection: unavailable("This learner's teacher has not yet published a reflection."),
     parentSummary: section({ headline: 'Kevin Otieno is still building a fuller evidence picture this term.', detail: '6 subjects currently tracked.', action: null }),
     growthTimeline: unavailable('Growth direction remains provisional until at least two scored evidence points are available.'),
@@ -391,7 +359,15 @@ test('Kevin: Level 3 subjects are described as secure, never as a deficit relati
   const html = render(createKevinBlueprint())
   assert.doesNotMatch(html, /weak/i)
   assert.doesNotMatch(html, /deficien/i)
-  assert.match(html, /stay just as real and capable/)
+  // The lower-reading subjects are framed as where effort pays off, not as a
+  // shortfall. This used to assert the exact phrase "stay just as real and
+  // capable", which sat in the same sentence as "never a gap to worry about" —
+  // a reassurance the Blueprint cannot honestly give a Grade 9 facing a gated
+  // placement. Assert the intent (no deficit framing, effort framed positively)
+  // rather than one sentence's wording, so the copy can improve without the
+  // guarantee weakening.
+  assert.match(html, /where focused effort would show the clearest return/)
+  assert.doesNotMatch(html, /never a gap to worry about/)
 })
 
 test('Kevin: Page 2 never claims a stable trend or "developing unevenly" from one assessment', () => {

@@ -29,7 +29,6 @@ import {
   addTeamMember, addMentor, addProgressUpdate, addArtifactLink,
   listForLearner, listPublished, getProjectsSummary,
 } from './project'
-import { composeProjects } from '@/lib/learnerBlueprint/composeProjects'
 import { addItem, linkItemToProject } from '@/lib/learnerPortfolio/portfolio'
 import { resolveProjectReference } from '@/lib/learnerPortfolio/portfolioProjectLink'
 
@@ -246,22 +245,21 @@ test('canonical category enforcement rejects non-canonical values', async () => 
   )
 })
 
-test('Blueprint composition: unavailable when no published/active projects, available with count/latest/current-active/featured once one exists', async () => {
+test('Canonical summary: unavailable when no published/active projects, available with count/latest/current-active/featured once one exists', async () => {
   const fx = await fixtureSchoolWithTeacher('blueprint')
   const client = await signInAs(fx.teacherEmail)
 
-  const empty = await composeProjects(fx.learnerId, fx.schoolId)
-  assert.equal(empty.status, 'unavailable')
-  assert.equal(empty.data, null)
+  const empty = await getProjectsSummary(fx.learnerId, fx.schoolId)
+  assert.equal(empty.available, false)
 
   const active = await createDraft(client, fx.schoolId, fx.learnerId, fx.teacherUserId, { ...FIELDS, title: 'Active Research Project', category: 'research' })
   await moveToPlanning(client, fx.schoolId, active.id)
   await startInProgress(client, fx.schoolId, active.id)
 
-  const withActive = await composeProjects(fx.learnerId, fx.schoolId)
-  assert.equal(withActive.status, 'available')
-  assert.equal(withActive.data!.currentActiveProject!.title, 'Active Research Project')
-  assert.equal(withActive.data!.projectCount, 0, 'not yet published, so publishedCount stays 0')
+  const withActive = await getProjectsSummary(fx.learnerId, fx.schoolId)
+  assert.equal(withActive.available, true)
+  assert.equal(withActive.currentActiveProject!.title, 'Active Research Project')
+  assert.equal(withActive.projectCount, 0, 'not yet published, so publishedCount stays 0')
 
   const published = await createDraft(client, fx.schoolId, fx.learnerId, fx.teacherUserId, { ...FIELDS, title: 'Published CBC Project', category: 'cbc' })
   await moveToPlanning(client, fx.schoolId, published.id)
@@ -271,14 +269,14 @@ test('Blueprint composition: unavailable when no published/active projects, avai
   await verifyProject(client, fx.schoolId, published.id, 'teacher_verified', null)
   await publishProject(client, fx.schoolId, published.id)
 
-  const full = await composeProjects(fx.learnerId, fx.schoolId)
-  assert.equal(full.data!.projectCount, 1)
-  assert.equal(full.data!.latestPublishedProject!.title, 'Published CBC Project')
-  assert.equal(full.data!.featuredProject!.title, 'Published CBC Project')
+  const full = await getProjectsSummary(fx.learnerId, fx.schoolId)
+  assert.equal(full.projectCount, 1)
+  assert.equal(full.latestPublishedProject!.title, 'Published CBC Project')
+  assert.equal(full.featuredProject!.title, 'Published CBC Project')
   // Blueprint's field budget: never internal lifecycle state (status/verification/etc) leaked through.
   assert.deepEqual(
-    Object.keys(full.data!).sort(),
-    ['currentActiveProject', 'featuredProject', 'latestPublishedProject', 'projectCount', 'projectsUrl']
+    Object.keys(full).sort(),
+    ['available', 'currentActiveProject', 'featuredProject', 'latestPublishedProject', 'projectCount', 'projectsUrl']
   )
 })
 

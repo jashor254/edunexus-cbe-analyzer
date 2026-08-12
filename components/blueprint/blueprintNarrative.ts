@@ -118,17 +118,33 @@ export function evidenceMaturityTier(bySubject: SubjectRecord[]): EvidenceMaturi
   return 'long-term'
 }
 
-export function maturitySentence(tier: EvidenceMaturityTier, subjectCount: number): string {
+/**
+ * States how much evidence is behind the picture — always with the count
+ * itself, never a bare adjective.
+ *
+ * The previous wording called four assessments "a well-established learning
+ * record, built up over several rounds of evidence." In a Kenyan school year
+ * an opener CAT, a mid-term, an end-term CAT and an end-term exam is *one
+ * term*. Describing a single term as well-established overstates the evidence
+ * to exactly the reader — a parent, at parents' day — least able to check it,
+ * and it is the kind of claim that gets quoted back at a teacher a year later.
+ * Every tier now says the number out loud and lets the reader judge.
+ */
+export function maturitySentence(tier: EvidenceMaturityTier, subjectCount: number, assessmentCount?: number): string {
   const subjects = subjectCount === 1 ? 'one subject' : `${subjectCount} subjects`
+  const rounds = assessmentCount !== undefined
+    ? `${assessmentCount} ${assessmentCount === 1 ? 'assessment' : 'assessments'}`
+    : null
+
   switch (tier) {
     case 'first-snapshot':
       return `This is an early snapshot, based on one assessment across ${subjects}. Future assessments will show how this picture changes over time.`
     case 'growing':
       return `This picture is starting to take shape, built from two rounds of evidence across ${subjects} — enough to notice a direction forming, though not yet a settled pattern.`
     case 'well-supported':
-      return `This picture now rests on a broader, more consistent body of evidence across ${subjects}.`
+      return `This picture rests on ${rounds ?? 'three rounds'} of evidence across ${subjects} — enough to be taken seriously, and still growing.`
     case 'long-term':
-      return `This reflects a well-established learning record, built up over several rounds of evidence across ${subjects}.`
+      return `This is built from ${rounds ?? 'four or more rounds'} of evidence across ${subjects}. A fuller pattern will emerge as it spans more terms.`
   }
 }
 
@@ -158,7 +174,8 @@ export function describeAcademicPicture(name: string, data: AcademicRecordData):
     paragraphs.push(`${joinNatural(groups[1])} ${groups[1].length === 1 ? 'is' : 'are'} still building the basics expected at this stage — the right kind of focus, not a setback.`)
   }
 
-  paragraphs.push(maturitySentence(evidenceMaturityTier(data.bySubject), subjectCount))
+  const maxEvidence = data.bySubject.reduce((max, s) => Math.max(max, s.evidenceCount), 0)
+  paragraphs.push(maturitySentence(evidenceMaturityTier(data.bySubject), subjectCount, maxEvidence))
 
   return paragraphs
 }
@@ -182,8 +199,14 @@ export function describeVariation(name: string, data: AcademicRecordData): strin
 
   if (groups[4].length > 0 && (groups[3].length > 0 || groups[2].length > 0)) {
     const secondary = [...groups[3], ...groups[2]]
+    // Deliberately no longer ends "never a gap to worry about." That phrasing
+    // was written to be reassuring, but it is a claim about consequences the
+    // Blueprint is in no position to make: for a Grade 9 months away from a
+    // gated senior-school placement, a subject sitting at Approaching is
+    // precisely a gap to act on. Describe the evidence; leave the verdict to
+    // the teacher and the pathway section, which know the learner's grade.
     paragraphs.push(
-      `${joinNatural(secondary)} ${secondary.length === 1 ? 'reads' : 'read'} lower than ${joinNatural(groups[4])} in the current evidence, but ${secondary.length === 1 ? 'stays' : 'stay'} just as real and capable — this is an enrichment opportunity in the stronger subjects, or continued challenge in the others, never a gap to worry about.`,
+      `${joinNatural(secondary)} ${secondary.length === 1 ? 'reads' : 'read'} lower than ${joinNatural(groups[4])} in the current evidence. ${secondary.length === 1 ? 'It is' : 'They are'} where focused effort would show the clearest return, while the stronger subjects have room to be stretched further.`,
     )
   }
 

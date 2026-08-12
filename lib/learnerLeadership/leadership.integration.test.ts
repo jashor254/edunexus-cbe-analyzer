@@ -29,7 +29,6 @@ import {
   publishLeadership, rejectLeadership, revokeLeadership, moveLeadershipToHistorical, setReflection,
   listForLearner, listPublished, getLeadershipSummary, getVerificationHistory,
 } from './leadership'
-import { composeLeadership } from '@/lib/learnerBlueprint/composeLeadership'
 import { createAchievement, verifyAchievement, publishAchievement, getAchievementSummary } from '@/lib/learnerAchievement/achievement'
 import { addItem as addPortfolioItem, submitItem as submitPortfolioItem, verifyItem, publishItem, getPortfolioSummary } from '@/lib/learnerPortfolio/portfolio'
 import { createDraft as createProjectDraft, getProjectsSummary } from '@/lib/learnerProjects/project'
@@ -311,24 +310,23 @@ test('evidence references: reference-only, never fabricated, never a copy of Evi
   assert.deepEqual(noEvidence.supportingEvidenceIds, [], 'no evidence is a valid, honest empty state, never fabricated')
 })
 
-test('Blueprint composition: unavailable for zero entries, available with completedRoleCount/latest once published, currentRole surfaces only an in-progress entry with no internal detail', async () => {
+test('Canonical summary: unavailable for zero entries, available with completedRoleCount/latest once published, currentRole surfaces only an in-progress entry with no internal detail', async () => {
   const fx = await fixtureSchoolWithTeacher('blueprint')
   const client = await signInAs(fx.teacherEmail)
 
-  const empty = await composeLeadership(fx.learnerId, fx.schoolId)
-  assert.equal(empty.status, 'unavailable')
-  assert.equal(empty.data, null)
+  const empty = await getLeadershipSummary(fx.learnerId, fx.schoolId)
+  assert.equal(empty.available, false)
 
   // An in-progress (not yet published) role surfaces as currentRole only.
   const nom = await createNomination(client, fx.schoolId, fx.learnerId, fx.teacherUserId, { ...FIELDS, positionTitle: 'Sports Captain' })
   await selectForLeadership(client, fx.schoolId, nom.id)
 
-  const midway = await composeLeadership(fx.learnerId, fx.schoolId)
-  assert.equal(midway.status, 'available')
-  assert.equal(midway.data!.completedRoleCount, 0, 'never counts an in-progress role as completed')
-  assert.equal(midway.data!.currentRole!.title, 'Sports Captain')
+  const midway = await getLeadershipSummary(fx.learnerId, fx.schoolId)
+  assert.equal(midway.available, true)
+  assert.equal(midway.completedRoleCount, 0, 'never counts an in-progress role as completed')
+  assert.equal(midway.currentRole!.title, 'Sports Captain')
   // currentRole never leaks internal lifecycle status, review notes, or dates.
-  assert.deepEqual(Object.keys(midway.data!.currentRole!).sort(), ['scope', 'title'])
+  assert.deepEqual(Object.keys(midway.currentRole!).sort(), ['scope', 'title'])
 
   // Now publish a second role.
   const nom2 = await createNomination(client, fx.schoolId, fx.learnerId, fx.teacherUserId, { ...FIELDS, positionTitle: 'Head Prefect' })
@@ -339,12 +337,12 @@ test('Blueprint composition: unavailable for zero entries, available with comple
   await queueLeadershipForVerification(client, fx.schoolId, nom2.id)
   await publishLeadership(client, fx.schoolId, nom2.id)
 
-  const available = await composeLeadership(fx.learnerId, fx.schoolId)
-  assert.equal(available.status, 'available')
-  assert.equal(available.data!.completedRoleCount, 1)
-  assert.equal(available.data!.latestCompletedRole!.title, 'Head Prefect')
+  const available = await getLeadershipSummary(fx.learnerId, fx.schoolId)
+  assert.equal(available.available, true)
+  assert.equal(available.completedRoleCount, 1)
+  assert.equal(available.latestCompletedRole!.title, 'Head Prefect')
   // Never exposes review notes anywhere in the Blueprint section.
-  assert.equal(JSON.stringify(available.data).includes('Confidential staff notes'), false)
+  assert.equal(JSON.stringify(available).includes('Confidential staff notes'), false)
 })
 
 test('Leadership Reflection is scoped to this service only, never merged with the general Teacher Reflection domain', async () => {
@@ -443,8 +441,10 @@ test('regression: Portfolio, Achievement, Projects, and Competitions are entirel
   assert.equal(blueprint.achievement.data!.achievementCount, 1)
   assert.equal(blueprint.portfolio.status, 'available')
   assert.equal(blueprint.portfolio.data!.publishedCount, 1)
-  assert.equal(blueprint.competitions.status, 'available')
-  assert.equal(blueprint.competitions.data!.currentParticipation!.name, 'Regional Debate Championship')
-  assert.equal(blueprint.leadership.status, 'available')
-  assert.equal(blueprint.leadership.data!.currentRole!.title, FIELDS.positionTitle)
+  // Competitions/Leadership are no longer Blueprint sections (2026-08-12: no write path,
+  // no UI, permanently `unavailable`), so their half of the no-clobbering invariant is
+  // asserted against their own canonical summaries.
+  const leadershipSummary = await getLeadershipSummary(fx.learnerId, fx.schoolId)
+  assert.equal(leadershipSummary.available, true)
+  assert.equal(leadershipSummary.currentRole!.title, FIELDS.positionTitle)
 })
