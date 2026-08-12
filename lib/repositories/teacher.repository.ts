@@ -689,6 +689,22 @@ export class TeacherRepository extends BaseRepository {
   // every learner_marks.student_id in a class/term back to a real
   // learners.id before writing term_subject_summaries.learner_id (a real
   // FK to `learners`, never `students` — see Sprint 10A audit).
+  // Forward batch bridge — Core learners.id[] -> the legacy students.id that
+  // was bridged for each. The singular `findLegacyStudentByExternalId` above is
+  // fine for one learner (Blueprint composes one at a time), but a class view
+  // resolves a whole roster at once and must never call it in a loop.
+  // Returns only learners that actually have a bridge; an absent row means "no
+  // legacy identity yet", a normal state for a newly-enrolled learner.
+  async findLegacyStudentsByExternalIds(externalIds: string[]): Promise<Array<{ id: string; external_id: string | null }>> {
+    if (!externalIds.length) return []
+    const { data, error } = await this.db
+      .from('students')
+      .select('id, external_id')
+      .in('external_id', externalIds)
+    if (error) throw new Error(`findLegacyStudentsByExternalIds: ${error.message}`)
+    return (data ?? []) as Array<{ id: string; external_id: string | null }>
+  }
+
   async findExternalIdsByStudentIds(studentIds: string[]): Promise<Array<{ id: string; external_id: string | null }>> {
     if (!studentIds.length) return []
     const { data, error } = await this.db
