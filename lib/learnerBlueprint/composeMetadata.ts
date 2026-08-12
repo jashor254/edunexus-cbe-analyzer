@@ -7,6 +7,7 @@
 // partially-unavailable Blueprint for a fully live one.
 
 import type { BlueprintMetadata } from './types'
+import type { BlueprintGradeBand } from './gradeBand'
 
 export const BLUEPRINT_VERSION = '1.0.0-composition-engine'
 
@@ -14,6 +15,8 @@ export function composeMetadata(input: {
   sectionStatuses: Array<'available' | 'unavailable' | 'not_implemented'>
   ownerVersions: Record<string, string>
   evidenceWindowStart: string | null
+  /** Resolved once by the composer from Identity's class name — never re-derived per render. */
+  gradeBand: BlueprintGradeBand
 }): BlueprintMetadata {
   const anyUnavailableOrNotImplemented = input.sectionStatuses.some(s => s !== 'available')
 
@@ -27,5 +30,6 @@ export function composeMetadata(input: {
     freshness: anyUnavailableOrNotImplemented ? 'partial' : 'live',
     evidenceWindow: { start: input.evidenceWindowStart, end: new Date().toISOString() },
     ownerVersions: input.ownerVersions,
+    gradeBand: input.gradeBand,
   }
 }

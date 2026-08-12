@@ -24,6 +24,13 @@ import type { LearnerBlueprint, BlueprintSection, AttendanceData } from '@/lib/l
 import type { BlueprintValidationResult } from '@/lib/learnerBlueprint/validation'
 import HistoricalBanner, { type HistoricalMeta } from './HistoricalBanner'
 import {
+  resolveGradeBand,
+  isSeniorBand,
+  gradeBandFraming,
+  futurePageTitle,
+  futurePageQuestion,
+} from '@/lib/learnerBlueprint/gradeBand'
+import {
   firstName,
   toDisplayName,
   subjectLabel,
@@ -211,21 +218,6 @@ function normalizeText(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 }
 
-function extractGradeLevel(className: string | null): number | null {
-  if (!className) return null
-  const match = className.match(/(?:grade|form)\s*(\d{1,2})/i)
-  return match ? Number(match[1]) : null
-}
-
-function getGradeBand(className: string | null): 'grade_7_8' | 'grade_9' | 'grade_10_12' | 'unknown' {
-  const grade = extractGradeLevel(className)
-  if (grade === null) return 'unknown'
-  if (grade >= 7 && grade <= 8) return 'grade_7_8'
-  if (grade === 9) return 'grade_9'
-  if (grade >= 10 && grade <= 12) return 'grade_10_12'
-  return 'unknown'
-}
-
 function attendanceNeedsResponse(section: BlueprintSection<AttendanceData>): boolean {
   return section.status === 'available'
     && section.data?.attendancePercentage !== null
@@ -304,7 +296,12 @@ export default function BlueprintView({
   const reportId = buildReportId(learnerId, generatedAt)
   const learnerName = toDisplayName(blueprint.identity.data?.learnerName ?? null)
   const name = firstName(learnerName)
-  const gradeBand = getGradeBand(blueprint.identity.data?.currentClassName ?? null)
+  // The band the composer resolved, not one re-derived here — so this render,
+  // the parent's render and a stored snapshot can never disagree about what
+  // stage the learner is at. `resolveGradeBand` falls back to the recorded
+  // class name only for snapshots taken before the field existed.
+  const gradeBand = resolveGradeBand(blueprint.metadata.gradeBand, blueprint.identity.data?.currentClassName ?? null)
+  const seniorStage = isSeniorBand(gradeBand)
   const attendanceAsConcern = attendanceNeedsResponse(blueprint.attendance)
   const futureEvidence = futureEvidenceItems(blueprint)
 
@@ -360,14 +357,7 @@ export default function BlueprintView({
     ? blueprint.recommendedNextSteps.data.actions.find((a) => a.actionType === 'explore_career_journey')?.destination ?? null
     : null
 
-  const futureFraming =
-    gradeBand === 'grade_7_8'
-      ? 'It’s still early to narrow things down — the priority now is trying things out and noticing what stands out.'
-      : gradeBand === 'grade_9'
-        ? 'At this transition point, it’s worth testing readiness for different pathways and being honest about what still needs to grow.'
-        : gradeBand === 'grade_10_12'
-          ? 'At this senior stage, real evidence can start pointing toward further education, technical training, entrepreneurship, or work — when the record supports it.'
-          : 'It’s still early to draw firm conclusions about direction — that sharpens as more evidence builds up.'
+  const futureFraming = gradeBandFraming(gradeBand)
 
   const shellProps = {
     exportMode,
@@ -529,17 +519,20 @@ export default function BlueprintView({
         </EvidenceBox>
       </PageShell>
 
-      {/* PAGE 4 — What May Be Emerging */}
+      {/* PAGE 4 — forward-looking. Its whole framing inverts between stages:
+          for a junior learner the pathway is still open and the page is about
+          what may emerge; for a senior learner the pathway is already settled
+          and the page is about where the record now leads. */}
       <PageShell
         pageNumber={4}
-        title="What May Be Emerging"
-        question="An early look at where this could lead."
-        transition={describeClosing(name, futureEvidence.length > 0)}
+        title={futurePageTitle(gradeBand)}
+        question={futurePageQuestion(gradeBand)}
+        transition={describeClosing(name, futureEvidence.length > 0, gradeBand)}
         {...shellProps}
       >
-        <EvidenceBox title="An early direction" tone="navy">
+        <EvidenceBox title={seniorStage ? 'Where the record points' : 'An early direction'} tone="navy">
           <p>{futureFraming}</p>
-          <Prose paragraphs={describeCareerDirection(name, blueprint.career.status === 'available' ? blueprint.career.data : null)} />
+          <Prose paragraphs={describeCareerDirection(name, blueprint.career.status === 'available' ? blueprint.career.data : null, gradeBand)} />
         </EvidenceBox>
 
         {/* Tighter internal spacing than the page's default space-y-5 —
@@ -548,7 +541,7 @@ export default function BlueprintView({
         <div className="space-y-3">
           {blueprint.career.status === 'available' && blueprint.career.data?.doorsPreview && (
             <div>
-              <p className="mb-1.5 text-[11px] font-black uppercase tracking-wide text-slate-500">Four ways this direction could open</p>
+              <p className="mb-1.5 text-[11px] font-black uppercase tracking-wide text-slate-500">{seniorStage ? 'Four ways this could open after school' : 'Four ways this direction could open'}</p>
               <div className="grid gap-2 sm:grid-cols-2">
                 {blueprint.career.data.doorsPreview.map((door) => (
                   <EvidenceBox key={door.type} title={DOOR_LABEL[door.type]} dense>

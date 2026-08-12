@@ -21,6 +21,7 @@
 import type { ConfidenceLevel } from '@/lib/learnerIntelligence/insight'
 import type { ParentAction } from '@/lib/parentExperience/actions'
 import type { EvidenceCoverage, Trend, RiskValue as ProjectionRiskValue, CapabilityValue, CompletenessValue } from '@/lib/projection/types'
+import type { BlueprintGradeBand } from './gradeBand'
 
 export type BlueprintSectionStatus = 'available' | 'unavailable' | 'not_implemented'
 
@@ -409,6 +410,7 @@ export type RecommendedNextStepsData = {
 
 // ── Metadata (Blueprint lifecycle helper — no persistence) ───────────────────
 
+
 export type BlueprintMetadata = {
   blueprintVersion: string
   generatedAt: string
@@ -419,6 +421,15 @@ export type BlueprintMetadata = {
   evidenceWindow: { start: string | null; end: string }
   /** Per-section source-function identifiers, for traceability (ADR-0008 Part 9). */
   ownerVersions: Record<string, string>
+  /**
+   * Which stage of the CBE journey this learner was at when the Blueprint was
+   * composed. Resolved once here rather than re-derived per render, because it
+   * now decides section CONTENT (a junior learner's pathway is a forecast; a
+   * senior learner's is already settled) and two renders of the same learner
+   * must never disagree about it. Stamped onto snapshots too, so a historical
+   * Blueprint keeps being read at the stage it was actually taken.
+   */
+  gradeBand: BlueprintGradeBand
 }
 
 // ── The canonical Blueprint ───────────────────────────────────────────────────

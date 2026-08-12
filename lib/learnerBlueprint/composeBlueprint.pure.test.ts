@@ -57,6 +57,7 @@ test('composeMetadata reports freshness "live" only when every section is availa
     sectionStatuses: ['available', 'available', 'available'],
     ownerVersions: { a: 'x' },
     evidenceWindowStart: null,
+    gradeBand: 'grade_9',
   })
   assert.equal(m.freshness, 'live')
   assert.equal(m.snapshotState, 'current')
@@ -67,6 +68,7 @@ test('composeMetadata reports freshness "partial" when any section is unavailabl
     sectionStatuses: ['available', 'unavailable', 'not_implemented'],
     ownerVersions: {},
     evidenceWindowStart: null,
+    gradeBand: 'grade_9',
   })
   assert.equal(m.freshness, 'partial')
 })
@@ -151,7 +153,7 @@ function fixtureBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlu
     ({ status, owner: 'owner', freshness: 'live', data, ...(status !== 'available' ? { unavailableReason: 'n/a' } : {}) })
 
   return {
-    metadata: composeMetadata({ sectionStatuses: ['available'], ownerVersions: {}, evidenceWindowStart: null }),
+    metadata: composeMetadata({ sectionStatuses: ['available'], ownerVersions: {}, evidenceWindowStart: null, gradeBand: 'grade_9' }),
     identity: na('unavailable'),
     academicRecord: na('not_implemented'),
     attendance: na('not_implemented'),

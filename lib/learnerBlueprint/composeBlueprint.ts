@@ -42,6 +42,7 @@ import { composeLearningStory } from './composeLearningStory'
 import { composeRecommendedNextSteps } from './composeRecommendedNextSteps'
 import { composeMetadata } from './composeMetadata'
 import { loadProjectionAccess } from './projectionAccess'
+import { getGradeBand } from './gradeBand'
 import { validateBlueprint, type BlueprintValidationResult } from './validation'
 import { composeBlueprintCoherence } from './coherence'
 import type { CoherenceReport } from './coherence'
@@ -148,6 +149,10 @@ export async function composeBlueprint(ids: BlueprintIdentifiers): Promise<Compo
       Object.entries(sections).map(([key, section]) => [key, section.owner])
     ),
     evidenceWindowStart: null,
+    // Resolved here, once, from Identity's own class name. Every render and
+    // every stored snapshot then reads the same stage rather than each
+    // re-deriving it — see gradeBand.ts for why this is a domain decision.
+    gradeBand: getGradeBand(identity.data?.currentClassName ?? null),
   })
 
   const blueprint: LearnerBlueprint = { metadata, ...sections }

@@ -23,6 +23,7 @@ import type {
   SubjectRecord,
 } from '@/lib/learnerBlueprint/types'
 import type { ParentAction } from '@/lib/parentExperience/actions'
+import { isSeniorBand, type BlueprintGradeBand } from '@/lib/learnerBlueprint/gradeBand'
 
 export type EvidenceMaturityTier = 'first-snapshot' | 'growing' | 'well-supported' | 'long-term'
 
@@ -244,12 +245,25 @@ export function describeRiskForReader(risk: RiskData | null, tier: EvidenceMatur
  * page (the page's closing transition covers the forward-looking half of
  * that idea instead of restating it).
  */
-export function describeCareerDirection(name: string, career: CareerData | null): string[] {
+export function describeCareerDirection(name: string, career: CareerData | null, band: BlueprintGradeBand = 'unknown'): string[] {
+  const senior = isSeniorBand(band)
+
   if (!career || !career.careerCluster) {
-    return [`${name}'s interests and strengths are still coming into focus — there isn’t yet a clear early direction to name, and that’s completely normal this early.`]
+    return [
+      senior
+        ? `${name}'s record doesn’t yet point clearly in one direction. At this stage that usually means the evidence is still thin rather than that nothing is emerging — the subjects being taken now are what will sharpen it.`
+        : `${name}'s interests and strengths are still coming into focus — there isn’t yet a clear early direction to name, and that’s completely normal this early.`,
+    ]
   }
+
+  // A senior learner is already placed in a pathway; framing their direction as
+  // an "early signal" that might "change" is both untrue and unhelpful when the
+  // subjects are largely fixed. A junior learner's direction genuinely is still
+  // open, and saying so protects them from being narrowed too soon.
   return [
-    `${name}'s current record suggests ${career.careerCluster} as one direction worth exploring. It is an early signal that future assessments, projects and experiences may sharpen or change.`,
+    senior
+      ? `${name}'s record points toward ${career.careerCluster}. This is grounded in the subjects and evidence already on file, and it is a direction to test and build on rather than a decision that has been made for them.`
+      : `${name}'s current record suggests ${career.careerCluster} as one direction worth exploring. It is an early signal that future assessments, projects and experiences may sharpen or change.`,
   ]
 }
 
@@ -276,7 +290,12 @@ export function describeExplorationSuggestions(subjects: string[] | null): strin
  * strengths" clause would be redundant with what's already on the page, so
  * a shorter generic line is used instead.
  */
-export function describeClosing(name: string, hasFutureEvidence: boolean): string {
+export function describeClosing(name: string, hasFutureEvidence: boolean, band: BlueprintGradeBand = 'unknown'): string {
+  if (isSeniorBand(band)) {
+    return hasFutureEvidence
+      ? `The work ${name} does from here is what turns this direction into a real destination.`
+      : `As ${name} builds a record in the subjects being taken now, what comes after school will come into sharper focus.`
+  }
   return hasFutureEvidence
     ? 'This picture will keep growing — new evidence will sharpen and expand it over time.'
     : `As ${name} adds projects, interests and experiences, this direction — and the wider strengths behind it — will become clearer.`

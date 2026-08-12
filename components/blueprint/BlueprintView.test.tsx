@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { renderToStaticMarkup } from 'react-dom/server'
 import BlueprintView from './BlueprintView'
 import type { LearnerBlueprint } from '@/lib/learnerBlueprint/types'
+import { getGradeBand } from '@/lib/learnerBlueprint/gradeBand'
 
 function section<T>(data: T) {
   return { status: 'available' as const, owner: 'test', freshness: 'live' as const, data }
@@ -13,8 +14,14 @@ function unavailable<T>(reason: string) {
 }
 
 // Rich, multi-round fixture — the "well-supported" evidence case.
+//
+// `metadata.gradeBand` is derived from whichever identity ends up on the
+// fixture, exactly as composeBlueprint() derives it from Identity's own class
+// name. A test that overrides identity to change the learner's grade therefore
+// gets the matching band for free, and can never accidentally assert
+// senior-stage copy against a junior band.
 function createBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlueprint {
-  return {
+  const base: LearnerBlueprint = {
     metadata: {
       blueprintVersion: 'test',
       generatedAt: '2026-07-23T10:00:00.000Z',
@@ -22,6 +29,7 @@ function createBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlue
       freshness: 'partial',
       evidenceWindow: { start: null, end: '2026-07-23T10:00:00.000Z' },
       ownerVersions: {},
+      gradeBand: 'unknown',
     },
     identity: section({
       learnerName: 'Brian Matthias',
@@ -154,6 +162,11 @@ function createBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlue
       ],
     }),
     ...overrides,
+  }
+
+  return {
+    ...base,
+    metadata: { ...base.metadata, gradeBand: getGradeBand(base.identity.data?.currentClassName ?? null) },
   }
 }
 
@@ -385,10 +398,11 @@ test('Kevin: risk is framed as "no current concern pattern", never exposes confi
   assert.doesNotMatch(html, /coverage/i)
 })
 
-test('Kevin: career is framed as an early exploration signal, in one compact sentence, never a settled recommendation — "within reach" and "main gap" language is not repeated verbatim', () => {
+test('Kevin: as a placed senior learner, career is framed as a grounded direction in one compact sentence, never a settled recommendation — "within reach" and "main gap" language is not repeated verbatim', () => {
   const html = render(createKevinBlueprint())
-  assert.match(html, /current record suggests Finance as one direction worth exploring/)
-  assert.match(html, /early signal that future assessments, projects and experiences may sharpen or change/)
+  // Kevin is Grade 10 — already placed. Senior framing, not an "early signal".
+  assert.match(html, /record points toward Finance/)
+  assert.match(html, /grounded in the subjects and evidence already on file/)
   assert.doesNotMatch(html, /is within reach/)
   assert.doesNotMatch(html, /main gap/i)
 })
@@ -403,7 +417,7 @@ test('Kevin: no specific occupation title ever appears on Page 4, even though th
 
 test('Kevin: the four real doors render as one generic-activity sentence each, under their plain labels, never the door’s own job-title-flavored heading', () => {
   const html = render(createKevinBlueprint())
-  assert.match(html, /Four ways this direction could open/)
+  assert.match(html, /Four ways this could open after school/)
   assert.match(html, />Employment</)
   assert.match(html, />Self-employment</)
   assert.match(html, />Entrepreneurship</)
@@ -455,7 +469,7 @@ test('Junior/exploration-mode learner: doorsPreview is null by design — no fou
   }))
 
   assert.match(html, /current record suggests Engineering &amp; Technology as one direction worth exploring/)
-  assert.doesNotMatch(html, /Four ways this direction could open/)
+  assert.doesNotMatch(html, /Four ways this could open after school/)
   assert.doesNotMatch(html, /How this field is changing/)
   assert.doesNotMatch(html, /Worth exploring next/)
   assert.doesNotMatch(html, /Software Developer/) // the specific example titles inside futureDirection are never rendered on Page 4 either
@@ -466,8 +480,8 @@ test('No canonical career match at all: empty-state fallback sentence, never an 
     career: unavailable('More learning evidence is needed before Career Intelligence can provide reliable guidance.'),
   }))
 
-  assert.match(html, /interests and strengths are still coming into focus/)
-  assert.doesNotMatch(html, /Four ways this direction could open/)
+  assert.match(html, /doesn’t yet point clearly in one direction/)
+  assert.doesNotMatch(html, /Four ways this could open after school/)
 })
 
 test('A career with a low AI-impact level and doors that differ from Finance renders generically — nothing hardcoded to Finance leaks through', () => {
@@ -508,9 +522,12 @@ test('Kevin: the priority action is Mathematics learning support, not "Explore C
 
 test('Kevin: empty future-evidence categories (Portfolio/Achievement/Projects/Competitions/Leadership/Innovation) render no empty cards — the closing line covers it once, in the page transition, not as a third paragraph', () => {
   const html = render(createKevinBlueprint())
-  assert.match(html, /As Kevin adds projects, interests and experiences, this direction — and the wider strengths behind it — will become clearer\./)
+  assert.match(html, /As Kevin builds a record in the subjects being taken now, what comes after school will come into sharper focus\./)
   assert.doesNotMatch(html, /Portfolio<\/p>/)
-  assert.equal((html.match(/will become clearer/g) ?? []).length, 1, 'the "wider strengths" idea must appear exactly once, not duplicated')
+  // The closing idea belongs in the page transition and nowhere else. Kevin is
+  // senior, so the phrase to count is his stage's closing line, not the junior
+  // "will become clearer" wording.
+  assert.equal((html.match(/come into sharper focus/g) ?? []).length, 1, 'the closing idea must appear exactly once, not duplicated as a third paragraph')
 })
 
 test('BlueprintView (rich fixture): with real future evidence present, Page 4 closes with the generic growth line, not the redundant "wider strengths" line', () => {
@@ -578,7 +595,7 @@ test('BlueprintView changes future framing by grade band and stays honest when f
       currentClassName: 'Grade 9', academicYearLabel: '2026', termLabel: 'Term 2', guardians: [],
     }),
   }))
-  assert.match(grade9, /testing readiness for different pathways/)
+  assert.match(grade9, /the year the senior school decision is made/)
 
   const senior = render(createKevinBlueprint({
     identity: section({
@@ -586,7 +603,61 @@ test('BlueprintView changes future framing by grade band and stays honest when f
       currentClassName: 'Grade 11', academicYearLabel: '2026', termLabel: 'Term 2', guardians: [],
     }),
   }))
-  assert.match(senior, /further education, technical training, entrepreneurship, or work/)
+  assert.match(senior, /further education, technical training, entrepreneurship or work/)
+})
+
+test('a junior learner’s Page 4 is about what may emerge; a senior learner’s is about where the record leads', () => {
+  const junior = render(createBlueprint({
+    identity: section({
+      learnerName: 'Brian Matthias', admissionNumber: 'ADM-1', schoolName: 'Test School', schoolLogoUrl: null,
+      currentClassName: 'Grade 8', academicYearLabel: '2026', termLabel: 'Term 2', guardians: [],
+    }),
+  }))
+  assert.match(junior, /What May Be Emerging/)
+  assert.match(junior, /An early direction/)
+  assert.doesNotMatch(junior, /Where This Could Lead/)
+
+  const senior = render(createKevinBlueprint({
+    identity: section({
+      learnerName: 'Kevin Otieno', admissionNumber: 'ADM-2', schoolName: 'Mwatate Ridge Senior School', schoolLogoUrl: null,
+      currentClassName: 'Grade 11', academicYearLabel: '2026', termLabel: 'Term 2', guardians: [],
+    }),
+  }))
+  assert.match(senior, /Where This Could Lead/)
+  assert.match(senior, /Where the record points/)
+  assert.doesNotMatch(senior, /What May Be Emerging/)
+})
+
+test('a senior learner is never told their direction is an early signal that may change', () => {
+  // Their pathway is already settled by placement — "early signal" is both
+  // untrue and unactionable once the subjects are largely fixed.
+  const senior = render(createBlueprint({
+    identity: section({
+      learnerName: 'Kevin Otieno', admissionNumber: 'ADM-2', schoolName: 'Mwatate Ridge Senior School', schoolLogoUrl: null,
+      currentClassName: 'Grade 11', academicYearLabel: '2026', termLabel: 'Term 2', guardians: [],
+    }),
+  }))
+  assert.doesNotMatch(senior, /It is an early signal/)
+  assert.match(senior, /a direction to test and build on rather than a decision that has been made for them/)
+
+  // The junior learner keeps exactly that protection against being narrowed early.
+  const junior = render(createBlueprint())
+  assert.match(junior, /It is an early signal/)
+})
+
+test('an 8-4-4 Form 3 learner gets senior framing, not the neutral fallback', () => {
+  const form3 = render(createBlueprint({
+    identity: section({
+      learnerName: 'Kevin Otieno', admissionNumber: 'ADM-3', schoolName: 'Mwatate Ridge Senior School', schoolLogoUrl: null,
+      currentClassName: 'Form 3', academicYearLabel: '2026', termLabel: 'Term 2', guardians: [],
+    }),
+  }))
+  assert.match(form3, /Where This Could Lead/)
+})
+
+test('Grade 7-8 tells the family that work at this stage already counts toward placement', () => {
+  const grade7 = render(createBlueprint())
+  assert.match(grade7, /already counts/)
 })
 
 test('BlueprintView preserves honest, interpretive handling when core sections are unavailable — never fabricates, never crashes', () => {

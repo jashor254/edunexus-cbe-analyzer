@@ -19,7 +19,7 @@ function na<T>(data: T | null = null): BlueprintSection<T> {
 
 function fixtureBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlueprint {
   return {
-    metadata: composeMetadata({ sectionStatuses: ['available'], ownerVersions: {}, evidenceWindowStart: null }),
+    metadata: composeMetadata({ sectionStatuses: ['available'], ownerVersions: {}, evidenceWindowStart: null, gradeBand: 'grade_9' }),
     identity: na(),
     learningStory: na(),
     academicRecord: na(),

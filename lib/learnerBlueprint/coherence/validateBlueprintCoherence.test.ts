@@ -39,6 +39,7 @@ function baseBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBluepr
       freshness: 'live',
       evidenceWindow: { start: null, end: new Date().toISOString() },
       ownerVersions: {},
+    gradeBand: 'grade_9' as const,
     },
     identity: available({ learnerName: 'Test Learner', admissionNumber: 'T-1', schoolName: 'Test School', schoolLogoUrl: null, currentClassName: null, academicYearLabel: null, termLabel: null, guardians: [] }),
     academicRecord: unavailable<AcademicRecordData>(),
