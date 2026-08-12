@@ -7,6 +7,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
 import { runAssessmentPipeline } from '@/lib/academicClinic/assessmentPipeline'
+import { recordReportCardAssessmentEvidence } from '@/lib/assessments/reportCardEvidence'
 import { requireAuthentication, requireStudent, requireParent } from '@/lib/core/permissions'
 import { UnauthorizedError } from '@/lib/core/errors'
 
@@ -75,6 +76,26 @@ export async function POST(req: Request) {
     })
 
     if (result.status === 'error') return apiError(result.error ?? 'Failed to process assessment')
+
+    // Phase 1 / P0-B — the same canonical producer the teacher route already
+    // calls (app/api/teacher/assessments/process). Until now this route wrote
+    // an `assessments` row and a `student_learning_context` row and emitted
+    // no Evidence at all, so a parent-entered assessment shaped what Compass
+    // taught while staying invisible to the learner's canonical record.
+    //
+    // `teacherId` is null because this path genuinely has no teacher; the
+    // producer reads `assessments.source` to emit `parent_observation`
+    // (tier 1), which the existing confidence ceiling keeps at
+    // `pending_review` — a parent-reported score can only reach canonical
+    // state through a real teacher review.
+    //
+    // Fire-and-forget with the same failure isolation as the teacher route:
+    // the pipeline has already succeeded by this point, and an Evidence
+    // write failing must never fail the parent's request, their report, or
+    // their PDF.
+    recordReportCardAssessmentEvidence(assessment_id, student_id, null, userId).catch((e: unknown) =>
+      console.error('[parent/assessments/process] recordReportCardAssessmentEvidence failed:', e instanceof Error ? e.message : String(e))
+    )
 
     return apiSuccess({ result })
   } catch (e: unknown) {
