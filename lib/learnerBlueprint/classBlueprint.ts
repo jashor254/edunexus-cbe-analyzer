@@ -45,18 +45,24 @@ export async function getClassBlueprint(input: {
   termId: string
   schoolId: string
 }): Promise<ClassBlueprint> {
-  const [cls, roster] = await Promise.all([
-    getClass(input.classId, input.schoolId).catch(() => null),
-    getClassRoster(input.classId, input.termId),
-  ])
+  // The class is resolved FIRST, and a failure here is fatal rather than
+  // degraded. `getClassRoster()` filters only on class_id + term_id — it has no
+  // school scoping of its own — so running it alongside a tolerated
+  // `getClass(...).catch(() => null)` would have let a staff member at one
+  // school read another school's roster by supplying a foreign class id, with
+  // only the class NAME going missing to hint that anything was wrong.
+  // `findClassById` is school-scoped, so this call is the access-control
+  // boundary for everything below it and must never be made tolerant.
+  const cls = await getClass(input.classId, input.schoolId)
 
+  const roster = await getClassRoster(input.classId, input.termId)
   const learners = roster as unknown as RosterLearner[]
   const coreLearnerIds = learners.map(l => l.id)
 
   if (coreLearnerIds.length === 0) {
     return computeClassBlueprint({
       classId: input.classId,
-      className: cls?.name ?? null,
+      className: cls.display_name ?? cls.class_name,
       termId: input.termId,
       roster: [],
       projections: [],
@@ -110,7 +116,7 @@ export async function getClassBlueprint(input: {
 
   return computeClassBlueprint({
     classId: input.classId,
-    className: cls?.name ?? null,
+    className: cls.display_name ?? cls.class_name,
     termId: input.termId,
     roster: learners,
     projections: [...byCoreLearner.values()],
