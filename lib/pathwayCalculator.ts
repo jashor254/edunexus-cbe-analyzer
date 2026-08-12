@@ -1,5 +1,16 @@
 // lib/pathwayCalculator.ts
 
+import {
+  getActiveKjseaRuleSet,
+  cbcLevelToKjseaPointsFloor,
+  isKjseaPointsAmbiguousForLevel,
+  isKjseaRuleSetVerified,
+  kjseaPointsFromScore,
+  getPathwayMinimum,
+  type KjseaRuleSet,
+  type KjseaPathway,
+} from '@/lib/config/kjseaRules'
+
 export type SubjectScores = Record<string, number>
 
 // ─── Subject key normalisation ────────────────────────────────────────────────
@@ -42,49 +53,71 @@ export function normalizeSubjectScores(scores: SubjectScores): SubjectScores {
   return out
 }
 
-// ─── KJSEA 2025 Disclaimer ────────────────────────────────────────────────────
+// ─── Pathway disclaimer ───────────────────────────────────────────────────────
+//
+// Built from the active rule set rather than written out, for two reasons.
+// First, it previously quoted the gates as prose ("STEM requires 20+") in a
+// second place, so a cycle change would have silently left the disclaimer
+// contradicting the arithmetic. Second, it asserted these were "the official
+// KNEC ... criteria" when no primary KNEC document has been checked — the
+// wording now tracks the rule set's real verification status instead of
+// claiming an authority the platform hasn't earned.
 
-export const PATHWAY_DISCLAIMER = {
-  short:
-    'Based on KNEC KJSEA 2025 criteria. ' +
-    'Subject to change as CBC evolves.',
+export type PathwayDisclaimer = { short: string; full: string; source: string }
 
-  full:
-    'This pathway recommendation is based on ' +
-    'the official KNEC Kenya Junior Secondary ' +
-    'Education Assessment (KJSEA) 2025 placement ' +
-    'criteria released December 2025. ' +
-    'STEM requires a composite score of 20+ points; ' +
-    'Social Sciences and Arts & Sports Science ' +
-    'require 25+ points (out of 72 total). ' +
-    'As Kenya\'s CBC system continues to evolve, ' +
-    'these criteria may be updated. EduNexus will ' +
-    'reflect any official changes from KNEC. ' +
-    'This is a guide to support planning — final ' +
-    'pathway decisions should consider the ' +
-    'learner\'s own interests and teacher guidance.',
+export function buildPathwayDisclaimer(ruleSet: KjseaRuleSet = getActiveKjseaRuleSet()): PathwayDisclaimer {
+  const verified = isKjseaRuleSetVerified(ruleSet)
+  const gates = (['STEM', 'Social Sciences', 'Arts'] as const)
+    .map(p => {
+      const min = getPathwayMinimum(p, ruleSet)
+      return min === null ? null : `${p} ${min}+ points`
+    })
+    .filter((g): g is string => g !== null)
+    .join('; ')
 
-  source:
-    'Source: KNEC KJSEA 2025 Results & Placement ' +
-    'Criteria, December 2025.',
+  const basis = verified
+    ? `the official KNEC KJSEA ${ruleSet.cycle} placement criteria`
+    : `reported KNEC KJSEA ${ruleSet.cycle} placement criteria, not yet confirmed against an official KNEC publication`
+
+  return {
+    short: verified
+      ? `Based on KNEC KJSEA ${ruleSet.cycle} criteria. Subject to change between cycles.`
+      : `Based on reported KJSEA ${ruleSet.cycle} criteria — not yet officially confirmed. Subject to change between cycles.`,
+
+    full:
+      `This pathway guidance is based on ${basis}. ` +
+      (gates ? `Composite minimums: ${gates}. ` : '') +
+      'Placement rules change from one assessment cycle to the next, and EduNexus updates them as KNEC publishes changes. ' +
+      'Eligibility gates are not placement guarantees — actual placement also applies capacity formulas this guidance does not model. ' +
+      'This is a planning aid: final pathway decisions should rest with the learner, their family and their teachers.',
+
+    source: verified
+      ? `Source: KNEC KJSEA ${ruleSet.cycle} placement criteria.`
+      : `Source: secondary reporting on KJSEA ${ruleSet.cycle}; awaiting verification against a primary KNEC publication.`,
+  }
 }
+
+/** @deprecated Prefer `buildPathwayDisclaimer(ruleSet)` so the copy tracks the cycle actually in use. */
+export const PATHWAY_DISCLAIMER: PathwayDisclaimer = buildPathwayDisclaimer()
 
 // ─── Pathway Rules & Weights ──────────────────────────────────────────────────
 
+// Subject-level guidance thresholds only. The per-pathway KJSEA composite
+// minimums that used to live here were a second copy of the gates in
+// lib/config/kjseaRules.ts and have been removed — read them via
+// `getPathwayMinimum(pathway, ruleSet)` so there is exactly one source of truth
+// per cycle. These remaining values are EduNexus's own advisory thresholds, not
+// KNEC's, and are deliberately not presented as official anywhere.
 export const PATHWAY_RULES = {
   STEM: {
     mathematics:        3,   // Level 3+ preferred
     integrated_science: 3,   // Level 3+ preferred
-    language_avg:       2.5, // KJSEA 2025: inclusive threshold (59% qualified for STEM)
-    // KJSEA 2025: composite minimum
-    kjsea_composite_min: 20,
+    language_avg:       2.5, // inclusive threshold, tuned against reported 2025 STEM qualification rates
   },
   SOCIAL_SCIENCES: {
     minimum_avg: 2.0,
-    kjsea_composite_min: 25,
   },
   ARTS: {
-    kjsea_composite_min: 25,
     // fallback — no hard subject requirements
   },
 } as const
@@ -383,39 +416,90 @@ export type PathwayRecommendation = {
   kjsea_qualifies_social?:  boolean
 }
 
+// ─── KJSEA points and composites ──────────────────────────────────────────────
+//
+// Every number below now comes from a versioned rule set
+// (lib/config/kjseaRules.ts) rather than a literal in this file. KJSEA is a
+// new assessment whose bands, gates and weighting have already moved once and
+// will move again; a hardcoded "STEM needs 20" is a claim about one cycle that
+// quietly becomes wrong in the next. Callers that need a specific year pass
+// its rule set; callers that don't get the active one.
+//
+// Read the verification contract at the top of lib/config/kjseaRules.ts before
+// putting any of these figures in front of a parent or learner — the current
+// rule set is PROVISIONAL.
+
 /**
- * Convert CBC 1-4 scores to KJSEA-equivalent points
- * Official mapping from KNEC KJSEA 2025
- * EE = Exceeding Expectations, ME = Meeting, etc.
+ * Points for a CBC 1-4 level when no raw mark is available.
+ *
+ * Deliberately a lower bound, not a conversion — see
+ * `cbcLevelToKjseaPointsFloor`. Retained under its original name because
+ * several Academic Clinic callers depend on it; new code should prefer
+ * `kjseaPointsFromScore()` whenever a real percentage exists, because the
+ * level alone cannot distinguish EE1 from EE2 (8 points from 7).
  */
-export function cbcToKJSEAPoints(level: number): number {
-  switch (Math.round(level)) {
-    case 4: return 7  // EE  (Exceeding Expectations)
-    case 3: return 5  // ME2 (Meeting Expectations)
-    case 2: return 3  // AE  (Approaching Expectations)
-    case 1: return 1  // BE  (Below Expectations)
-    default: return 0
-  }
+export function cbcToKJSEAPoints(level: number, ruleSet: KjseaRuleSet = getActiveKjseaRuleSet()): number {
+  return cbcLevelToKjseaPointsFloor(level, ruleSet)
 }
 
+/**
+ * Composite across a learner's subjects.
+ *
+ * `scores` carries CBC 1-4 levels, and a level of 0 still means "no evidence
+ * for this subject" (unchanged). `percentages`, when supplied, carries the
+ * real marks behind those same subjects and is used in preference wherever a
+ * subject has one — that is the difference between scoring a 95% learner at 8
+ * points and floor-guessing them at 7. Subjects absent from `percentages`
+ * fall back to the conservative level-only estimate, so a partial set is fine.
+ */
 export function calculateKJSEAComposite(
-  scores: SubjectScores
+  scores: SubjectScores,
+  percentages?: SubjectScores,
+  ruleSet: KjseaRuleSet = getActiveKjseaRuleSet(),
 ): number {
-  scores = normalizeSubjectScores(scores)
-  return Object.values(scores)
-    .filter(v => v > 0)
-    .reduce((sum, level) => sum + cbcToKJSEAPoints(level), 0)
+  const levels = normalizeSubjectScores(scores)
+  const marks  = percentages ? normalizeSubjectScores(percentages) : null
+
+  return Object.entries(levels)
+    .filter(([, level]) => level > 0)
+    .reduce((sum, [subject, level]) => {
+      const mark = marks?.[subject]
+      const points = mark !== undefined && Number.isFinite(mark) && mark >= 0 && mark <= 100
+        ? kjseaPointsFromScore(mark, ruleSet)
+        : cbcToKJSEAPoints(level, ruleSet)
+      return sum + points
+    }, 0)
 }
 
+/**
+ * Whether a composite built from levels alone could understate this learner —
+ * true when any subject sits at a level spanning two point values. Lets a
+ * caller say "at least N points" instead of implying an exact figure.
+ */
+export function isCompositeUnderestimated(
+  scores: SubjectScores,
+  percentages?: SubjectScores,
+  ruleSet: KjseaRuleSet = getActiveKjseaRuleSet(),
+): boolean {
+  const levels = normalizeSubjectScores(scores)
+  const marks  = percentages ? normalizeSubjectScores(percentages) : null
+
+  return Object.entries(levels).some(([subject, level]) =>
+    level > 0 &&
+    marks?.[subject] === undefined &&
+    isKjseaPointsAmbiguousForLevel(level, ruleSet),
+  )
+}
+
+/**
+ * Composite minimum for a pathway. Returns null when the active cycle
+ * published no gate for it — never a guessed number.
+ */
 export function getPathwayCompositeMinimum(
-  pathway: 'STEM' | 'Social Sciences' | 'Arts'
-): number {
-  // Official KNEC KJSEA 2025 thresholds
-  switch (pathway) {
-    case 'STEM':            return 20
-    case 'Social Sciences': return 25
-    case 'Arts':            return 25
-  }
+  pathway: KjseaPathway,
+  ruleSet: KjseaRuleSet = getActiveKjseaRuleSet(),
+): number | null {
+  return getPathwayMinimum(pathway, ruleSet)
 }
 
 /**
@@ -441,9 +525,17 @@ export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRe
   const langAvg   = (engLevel + kisLevel) / 2
 
   // ── KJSEA composite score ─────────────────────────────────────────────────────
-  const kjseaComposite   = calculateKJSEAComposite(scores)
-  const stemCompositeOk  = kjseaComposite >= 20
-  const socialCompositeOk = kjseaComposite >= 25
+  // Gates come from the active rule set, never a literal — KJSEA's thresholds
+  // are per-cycle and have already changed once. A cycle that publishes no gate
+  // for a pathway yields `null`, and an absent gate is treated as "not
+  // demonstrable" rather than "passed": we never claim eligibility we cannot
+  // evidence.
+  const ruleSet          = getActiveKjseaRuleSet()
+  const kjseaComposite   = calculateKJSEAComposite(scores, undefined, ruleSet)
+  const stemMinimum      = getPathwayMinimum('STEM', ruleSet)
+  const socialMinimum    = getPathwayMinimum('Social Sciences', ruleSet)
+  const stemCompositeOk  = stemMinimum   !== null && kjseaComposite >= stemMinimum
+  const socialCompositeOk = socialMinimum !== null && kjseaComposite >= socialMinimum
 
   // ── Weighted readiness scores (0–100) ────────────────────────────────────────
   const stemWeighted   = calculateWeightedScore(scores, PATHWAY_WEIGHTS.STEM as unknown as Record<string, number>)
@@ -533,7 +625,7 @@ export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRe
       ],
       alternative_pathway:    'Social Sciences',
       kjsea_composite:        kjseaComposite,
-      kjsea_stem_threshold:   20,
+      kjsea_stem_threshold:   stemMinimum ?? undefined,
       kjsea_qualifies_stem:   stemCompositeOk,
       kjsea_qualifies_social: socialCompositeOk,
     }
@@ -582,7 +674,7 @@ export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRe
       ],
       alternative_pathway:    stemViableNotGated ? 'STEM' : 'Arts & Sports Science',
       kjsea_composite:        kjseaComposite,
-      kjsea_stem_threshold:   20,
+      kjsea_stem_threshold:   stemMinimum ?? undefined,
       kjsea_qualifies_stem:   stemCompositeOk,
       kjsea_qualifies_social: socialCompositeOk,
     }
@@ -616,7 +708,7 @@ export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRe
     ],
     alternative_pathway:    'Social Sciences',
     kjsea_composite:        kjseaComposite,
-    kjsea_stem_threshold:   20,
+    kjsea_stem_threshold:   stemMinimum ?? undefined,
     kjsea_qualifies_stem:   stemCompositeOk,
     kjsea_qualifies_social: socialCompositeOk,
   }
