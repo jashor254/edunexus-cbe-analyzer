@@ -187,7 +187,41 @@ export async function POST(req: Request) {
             })
           },
         )
-        await repos.jobs.markComplete(job.id, { total, completed: total, result })
+        // A returned result is not the same as a successful one. This used to
+        // call markComplete() on the strength of "the pipeline did not throw",
+        // so a run that generated nothing finished as `completed` wrapping an
+        // inner `status: 'failed'` — and the teacher UI, which advances on the
+        // outer status, showed an empty scheme of work as a success.
+        //
+        // The verdict is the pipeline's own `result.status`
+        // (lib/sow/lessonPipeline.ts) — not a second success rule invented
+        // here. 'partial' still counts as completed: some lessons were
+        // generated and are usable, and the failures travel inside `result`.
+        const generated = result.summary.generated
+
+        if (result.status === 'failed') {
+          await repos.jobs.updateProgress(job.id, {
+            status: 'failed',
+            result: {
+              total,
+              completed: generated,
+              failed:    result.summary.failed,
+              // User-safe by construction: counts and a plain sentence. The
+              // pipeline's per-lesson `failures[].error` strings can carry raw
+              // provider text, so they stay inside `result` and are never
+              // promoted into the message the teacher is shown.
+              errorMessage: total === 0
+                ? 'No lessons could be scheduled for this term. Check the term start and end weeks, then try again.'
+                : `No lessons could be generated (0 of ${total}). Please try again.`,
+              result,
+            },
+          })
+          return
+        }
+
+        // Counts come from the result, not from `total` — a partial run that
+        // generated 3 of 10 lessons must not record 10 completed.
+        await repos.jobs.markComplete(job.id, { total, completed: generated, failed: result.summary.failed, result })
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         await repos.jobs.updateProgress(job.id, { status: 'failed', result: { total, completed: 0, failed: total, errorMessage: message } })
