@@ -17,7 +17,7 @@ import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createServiceClient } from '@/utils/supabase/service'
 import { fulfillPayment } from './fulfillment'
-import { TOKEN_PACK } from './config'
+import { TOKEN_PACK, TEACHER_PLANNING_BUNDLE, TOKEN_COSTS } from './config'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_FULFILLMENT_TEST'
 const db = createServiceClient()
@@ -95,6 +95,80 @@ test('two concurrent fulfillPayment calls for the same payment (webhook + browse
 
   const { data: balanceAfter } = await db.from('token_balances').select('balance').eq('user_id', userId).single()
   assert.equal(balanceAfter?.balance, balanceBefore + TOKEN_PACK.tokens, 'a race between two callers must still only credit tokens once')
+})
+
+test('a planning bundle credits exactly one scheme of work, not a token pack', async () => {
+  // The non-subscription branch of fulfillPayment() used to credit
+  // TOKEN_PACK.tokens for every product, which was only ever correct while
+  // 'starter' was the sole non-subscription product. A KES 100 planning bundle
+  // would have credited a KES 500 pack's worth — five bundles for the price of
+  // one. This pins the grant to what the SOW chain actually consumes.
+  //
+  // The insert below is also the live proof that payments_product_id_check
+  // admits 'planning_bundle' (migration 20260812114441). If that constraint
+  // ever narrows again this test fails loudly rather than skipping.
+  const payment = await createPendingPayment(TEACHER_PLANNING_BUNDLE.id, TEACHER_PLANNING_BUNDLE.priceKes)
+
+  const { data: pending } = await db
+    .from('payments')
+    .select('product_id, amount, status')
+    .eq('id', payment.id)
+    .single()
+  assert.equal(pending?.product_id, TEACHER_PLANNING_BUNDLE.id, 'the row must retain its product_id')
+  assert.equal(pending?.amount, TEACHER_PLANNING_BUNDLE.priceKes, 'a planning bundle is KES 100')
+  assert.equal(pending?.status, 'pending')
+
+  const before  = await db.from('token_balances').select('balance').eq('user_id', userId).maybeSingle()
+  const balanceBefore = before.data?.balance ?? 0
+
+  const result = await fulfillPayment(db, {
+    id:         payment.id,
+    user_id:    userId,
+    product_id: TEACHER_PLANNING_BUNDLE.id,
+  })
+  assert.equal(result, 'fulfilled')
+
+  const { data: balanceAfter } = await db.from('token_balances').select('balance').eq('user_id', userId).single()
+  assert.equal(
+    balanceAfter?.balance,
+    balanceBefore + TOKEN_COSTS.sow_generate,
+    'a planning bundle must credit exactly what one Scheme of Work costs'
+  )
+  assert.notEqual(
+    balanceAfter?.balance,
+    balanceBefore + TOKEN_PACK.tokens,
+    'a KES 100 bundle must never credit a KES 500 pack'
+  )
+
+  // Idempotency holds for this product too, not just for 'starter'.
+  const second = await fulfillPayment(db, {
+    id:         payment.id,
+    user_id:    userId,
+    product_id: TEACHER_PLANNING_BUNDLE.id,
+  })
+  assert.equal(second, 'already_processed')
+
+  const { data: balanceFinal } = await db.from('token_balances').select('balance').eq('user_id', userId).single()
+  assert.equal(
+    balanceFinal?.balance,
+    balanceBefore + TOKEN_COSTS.sow_generate,
+    'a replayed bundle fulfilment must not credit a second time'
+  )
+})
+
+test('a historical starter payment still fulfils for a full token pack', async () => {
+  // 'starter' is no longer purchasable, but rows created while it was must
+  // still credit exactly what the customer paid for. Retiring a product from
+  // sale must never strand a payment.
+  const payment = await createPendingPayment(TOKEN_PACK.id, TOKEN_PACK.priceKes)
+  const before  = await db.from('token_balances').select('balance').eq('user_id', userId).maybeSingle()
+  const balanceBefore = before.data?.balance ?? 0
+
+  const result = await fulfillPayment(db, { id: payment.id, user_id: userId, product_id: TOKEN_PACK.id })
+  assert.equal(result, 'fulfilled')
+
+  const { data: balanceAfter } = await db.from('token_balances').select('balance').eq('user_id', userId).single()
+  assert.equal(balanceAfter?.balance, balanceBefore + TOKEN_PACK.tokens)
 })
 
 test('a subscription product creates an active subscription with a 3-month expiry', async () => {

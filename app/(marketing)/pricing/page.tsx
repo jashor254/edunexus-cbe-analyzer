@@ -20,6 +20,7 @@ import {
 import Link from 'next/link'
 import type { User } from '@supabase/supabase-js'
 import { FOCUS_RING, SCHOOL_DEMO_WA_LINK } from '../constants'
+import { SUBSCRIPTION_PLANS, TEACHER_PLANNING_BUNDLE } from '@/lib/payments/config'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -42,20 +43,23 @@ type FAQItem = { q: string; a: string }
 
 // ─── School plans ─────────────────────────────────────────────────────────────
 
+// Schools are not sold a shelf price. Every school is quoted after a
+// conversation about learner count, curriculum, current systems and reporting
+// needs — so these describe what a school receives at each size, and the CTA
+// starts that conversation. No school id here is ever passed to a payment
+// endpoint; they exist only as React keys.
 const SCHOOL_PLANS = [
   {
-    id:         'school_starter',
-    name:       'Starter',
-    learners:   'Up to 120 learners',
-    price:      25000,
-    perLearner: 208,
-    billing:    'per term',
-    tagline:    'The full EduNexus platform for a growing school.',
-    badge:      '',
-    highlight:  false,
+    id:        'school_starter',
+    name:      'Starter',
+    learners:  'Up to 120 learners',
+    billing:   'quoted per term',
+    tagline:   'The full EduNexus platform for a growing school.',
+    badge:     '',
+    highlight: false,
     includes: [
       'School Intelligence Dashboard',
-      'Teacher Pro for all teachers — automatic',
+      'Teacher tools for every teacher — automatic',
       'Learning Compass for every learner',
       'Learner Blueprint every term',
       'Career Intelligence built in',
@@ -64,18 +68,16 @@ const SCHOOL_PLANS = [
       'Guided onboarding included',
     ],
     cta:  'Book a Demo',
-    note: '≈ KES 208 per learner per term.',
+    note: 'Quoted on your learner count after a short consultation.',
   },
   {
-    id:         'school_growth',
-    name:       'Growth',
-    learners:   'Up to 350 learners',
-    price:      45000,
-    perLearner: 129,
-    billing:    'per term',
-    tagline:    'Learning intelligence across every classroom, every week.',
-    badge:      'Most popular',
-    highlight:  true,
+    id:        'school_growth',
+    name:      'Growth',
+    learners:  'Up to 350 learners',
+    billing:   'quoted per term',
+    tagline:   'Learning intelligence across every classroom, every week.',
+    badge:     'Most popular',
+    highlight: true,
     includes: [
       'Everything in Starter',
       'Priority onboarding & teacher training',
@@ -85,18 +87,16 @@ const SCHOOL_PLANS = [
       'Quarterly intelligence review',
     ],
     cta:  'Book a Demo',
-    note: '≈ KES 129 per learner per term.',
+    note: 'Quoted on your learner count after a short consultation.',
   },
   {
-    id:         'school_institution',
-    name:       'Institution',
-    learners:   '350+ learners',
-    price:      0,
-    perLearner: 0,
-    billing:    'custom pricing',
-    tagline:    'A tailored implementation for large schools and school groups.',
-    badge:      '',
-    highlight:  false,
+    id:        'school_institution',
+    name:      'Institution',
+    learners:  '350+ learners',
+    billing:   'quoted per term',
+    tagline:   'A tailored implementation for large schools and school groups.',
+    badge:     '',
+    highlight: false,
     includes: [
       'Everything in Growth',
       'School group / network pricing',
@@ -106,101 +106,42 @@ const SCHOOL_PLANS = [
       'Onsite teacher training sessions',
     ],
     cta:  'Contact Us',
-    note: 'Starting from KES 80,000/term. Priced on learner count.',
+    note: 'Scoped and quoted with you — school groups and networks included.',
   },
 ]
 
 // ─── Teacher products ─────────────────────────────────────────────────────────
 
-const TEACHER_WALLET_COSTS = [
-  {
-    action: 'Planning Bundle',
-    detail: 'SOW + Lesson Plans + Record of Work — one subject, full term',
-    kes:    100,
-    color:  'text-amber-400',
-  },
-  {
-    action: 'AI Slides',
-    detail: 'Full presentation deck for any lesson',
-    kes:    50,
-    color:  'text-violet-400',
-  },
-  {
-    action: 'Remedial Planner',
-    detail: 'Differentiated class intervention plan',
-    kes:    50,
-    color:  'text-teal-400',
-  },
-  {
-    action: 'Holiday Study Plan',
-    detail: 'Per-student holiday plan',
-    kes:    30,
-    color:  'text-green-400',
-  },
-]
-
-const TEACHER_WALLET_PRODUCT: PayProduct = {
-  id:        'wallet_topup',
-  name:      'Wallet Top-up',
-  price:     100,
-  billing:   'minimum · never expires',
-  tagline:   'Top up from KES 100.',
+// The single teacher product. Its price and id come from lib/payments/config.ts
+// so this card cannot drift from what the server will actually charge.
+const TEACHER_PLANNING_PRODUCT: PayProduct = {
+  id:        TEACHER_PLANNING_BUNDLE.id,
+  name:      TEACHER_PLANNING_BUNDLE.name,
+  price:     TEACHER_PLANNING_BUNDLE.priceKes,
+  billing:   'one subject · one term',
+  tagline:   'Everything you need to teach one subject for a whole term.',
   badge:     '',
-  highlight: false,
-  features:  [],
-  cta:       '',
-  note:      '',
+  highlight: true,
+  features: [
+    'Scheme of Work for the full term',
+    'Every lesson plan in that scheme\n(generated week by week, as you teach)',
+    'Record of Work — kept up to date for you',
+    'CBC-aligned, TSC inspection ready',
+    'PDF downloads for all three',
+  ],
+  cta:  `Get the Planning Bundle — KES ${TEACHER_PLANNING_BUNDLE.priceKes}`,
+  note: 'One subject, one term. Teaching three subjects? That is three bundles.',
 }
 
-const TEACHER_PAY_PLANS: PayProduct[] = [
-  {
-    id:        'term_pack',
-    name:      'Term Planning Pack',
-    price:     1499,
-    billing:   'per term · one-time',
-    tagline:   'Complete planning for the full term — all your subjects.',
-    badge:     '',
-    highlight: false,
-    features: [
-      'Planning Bundle for all your subjects\n(SOW + Lesson Plans + Record of Work)',
-      'CBC-aligned, TSC inspection ready',
-      'PDF downloads — all documents',
-      'No subscription required',
-    ],
-    cta:  'Get Term Pack — KES 1,499',
-    note: 'One payment covers the whole term across all subjects.',
-  },
-  {
-    id:        'teacher_pro',
-    name:      'Teacher Pro',
-    price:     2499,
-    billing:   'per term',
-    tagline:   'Unlimited planning, analytics, and teaching intelligence.',
-    badge:     'Best for active teachers',
-    highlight: true,
-    features: [
-      'Unlimited Planning Bundles — all subjects, all term',
-      'Monday Panel — weekly class readiness',
-      'Class Analytics & Cohort Insights',
-      'AI Slides — unlimited presentations',
-      'Remedial Planner — differentiated support',
-      'Holiday Plans for every student',
-      'Kiswahili Insha evaluation',
-      'Advanced student reporting',
-      'Priority support',
-    ],
-    cta:  'Start Teacher Pro — KES 2,499',
-    note: 'If your school is on EduNexus, Teacher Pro is included automatically.',
-  },
-]
+const TEACHER_PAY_PLANS: PayProduct[] = [TEACHER_PLANNING_PRODUCT]
 
 // ─── Family products ──────────────────────────────────────────────────────────
 
 const FAMILY_PAY_PLANS: PayProduct[] = [
   {
-    id:        'term',
-    name:      'Term Plan',
-    price:     2499,
+    id:        SUBSCRIPTION_PLANS.TERMLY_SINGLE.id,
+    name:      SUBSCRIPTION_PLANS.TERMLY_SINGLE.name,
+    price:     SUBSCRIPTION_PLANS.TERMLY_SINGLE.priceKes,
     billing:   'per term',
     tagline:   'Everything your child needs this term — unlimited.',
     badge:     'Most popular',
@@ -213,13 +154,13 @@ const FAMILY_PAY_PLANS: PayProduct[] = [
       'Teacher connection + instant alerts',
       'PDF report downloads',
     ],
-    cta:  'Start Term Plan — KES 2,499',
+    cta:  `Start Term Plan — KES ${SUBSCRIPTION_PLANS.TERMLY_SINGLE.priceKes.toLocaleString()}`,
     note: 'Start with a free report — upgrade when ready.',
   },
   {
-    id:        'family',
-    name:      'Family Plan',
-    price:     4499,
+    id:        SUBSCRIPTION_PLANS.TERMLY_FAMILY.id,
+    name:      SUBSCRIPTION_PLANS.TERMLY_FAMILY.name,
+    price:     SUBSCRIPTION_PLANS.TERMLY_FAMILY.priceKes,
     billing:   'per term',
     tagline:   'More than one child? This is the smarter plan.',
     badge:     'Best value',
@@ -230,49 +171,25 @@ const FAMILY_PAY_PLANS: PayProduct[] = [
       'Family performance overview dashboard',
       'Priority WhatsApp support',
     ],
-    cta:  'Start Family Plan — KES 4,499',
-    note: '3 × KES 2,499 = KES 7,497 separately. You save KES 2,998.',
+    cta:  `Start Family Plan — KES ${SUBSCRIPTION_PLANS.TERMLY_FAMILY.priceKes.toLocaleString()}`,
+    note: `3 × KES ${SUBSCRIPTION_PLANS.TERMLY_SINGLE.priceKes.toLocaleString()} = KES ${(SUBSCRIPTION_PLANS.TERMLY_SINGLE.priceKes * 3).toLocaleString()} separately. You save KES ${(SUBSCRIPTION_PLANS.TERMLY_SINGLE.priceKes * 3 - SUBSCRIPTION_PLANS.TERMLY_FAMILY.priceKes).toLocaleString()}.`,
   },
 ]
-
-// Token count and KES/token below must match lib/payments/config.ts's
-// TOKEN_PACK — that file is the canonical source (per CLAUDE.md), and the
-// API route that actually charges this purchase (app/api/payments/initialize)
-// reads TOKEN_PACK directly. This page previously said "5 tokens" while the
-// real purchase granted 10 — found and fixed 2026-08-01.
-const TOKEN_PRODUCT: PayProduct = {
-  id:        'starter',
-  name:      'Pay-As-You-Go',
-  price:     500,
-  billing:   'one-time · never expires',
-  tagline:   'Not ready to commit? Start with 10 tokens.',
-  badge:     '',
-  highlight: false,
-  features:  [],
-  cta:       'Buy 10 Tokens — KES 500',
-  note:      '',
-}
-
-const ALL_FAMILY_PRODUCTS = [TOKEN_PRODUCT, ...FAMILY_PAY_PLANS]
 
 // ─── FAQ ──────────────────────────────────────────────────────────────────────
 
 const FAQ_ITEMS: FAQItem[] = [
   {
-    q: 'What does a school subscription include for teachers?',
-    a: 'Every teacher at a school on EduNexus receives Teacher Pro automatically — unlimited planning bundles, analytics, AI slides, remedial planning, and everything else. Teachers never pay separately when their school is subscribed.',
+    q: 'What do teachers at an EduNexus school get?',
+    a: 'Every teacher at a school on EduNexus gets the full teacher workspace automatically — planning, analytics, slides, remedial planning, and the rest. Teachers never pay separately when their school is on EduNexus.',
   },
   {
-    q: 'What is the Planning Bundle exactly?',
-    a: 'One Planning Bundle = one Scheme of Work + all lesson plans for the full term + the Record of Work — for one subject. When you generate it, KES 100 is deducted from your wallet. A teacher with 3 subjects uses 3 bundles (KES 300). Teacher Pro gives unlimited bundles at no extra cost per bundle.',
+    q: 'What is the Term Planning Bundle exactly?',
+    a: 'One bundle covers one subject for one term: the Scheme of Work, every lesson plan in that scheme, and the Record of Work. You pay KES 100 once, at the start — the lesson plans and the Record of Work that follow cost nothing extra. A teacher who teaches three subjects buys three bundles.',
   },
   {
-    q: 'What is the first free SOW?',
-    a: 'Every teacher gets one Scheme of Work free on first use — no card, no wallet needed. This lets you see exactly what EduNexus produces before deciding to continue. After that, your wallet needs KES 100 to generate the next one.',
-  },
-  {
-    q: 'How does the teacher wallet work?',
-    a: 'Your wallet holds KES credit. When you generate a planning bundle, KES 100 is automatically deducted. If your wallet is empty, you\'re prompted to top up. You can add as little as KES 100 (just enough for one bundle) or top up more for convenience. Credit never expires.',
+    q: 'What is the first free Scheme of Work?',
+    a: 'Your genuinely first Scheme of Work is free — no card, no payment. It lets you see exactly what EduNexus produces before deciding to continue. After that, each subject you plan for the term is one KES 100 bundle.',
   },
   {
     q: 'Which curriculum does EduNexus support?',
@@ -345,8 +262,8 @@ function SchoolSection() {
           Learning intelligence<br />for your entire school.
         </h2>
         <p className="text-lg text-white/50 max-w-120 mx-auto leading-relaxed">
-          From KES 129 per learner per term — every teacher, every learner,
-          every classroom, one platform.
+          Every teacher, every learner, every classroom, one platform —
+          priced for your school after a short consultation.
         </p>
       </div>
 
@@ -382,22 +299,8 @@ function SchoolSection() {
               </div>
 
               <div className="mb-6">
-                {plan.price > 0 ? (
-                  <>
-                    <span className="text-4xl font-black text-white tracking-tight">
-                      KES {plan.price.toLocaleString()}
-                    </span>
-                    <p className="text-xs text-white/35 mt-0.5">{plan.billing}</p>
-                    <p className="text-[11px] text-blue-400/80 mt-1 font-semibold">
-                      ≈ KES {plan.perLearner}/learner/term
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-3xl font-black text-white">Custom pricing</span>
-                    <p className="text-xs text-white/35 mt-0.5">{plan.billing}</p>
-                  </>
-                )}
+                <span className="text-3xl font-black text-white">Quoted for your school</span>
+                <p className="text-xs text-white/35 mt-0.5">{plan.billing}</p>
               </div>
 
               <ul className="space-y-3 flex-1 mb-6">
@@ -448,8 +351,8 @@ function SchoolSection() {
               icon:  <Users className="w-5 h-5" />,
               color: 'text-amber-400',
               bg:    'bg-amber-500/10',
-              title: 'Teacher Pro — all teachers',
-              body:  'Every teacher gets unlimited planning, analytics, AI slides, and all tools. Automatically included.',
+              title: 'Full workspace — all teachers',
+              body:  'Every teacher gets planning, analytics, AI slides, and all tools. Automatically included.',
             },
             {
               icon:  <BookOpen className="w-5 h-5" />,
@@ -546,73 +449,32 @@ function TeacherSection({
         <p className="text-xs text-white/50 mt-3">After that, choose how you continue below.</p>
       </div>
 
-      {/* Wallet model */}
+      {/* How the bundle works */}
       <div className="max-w-3xl mx-auto mb-14">
-
-        {/* How the wallet works */}
-        <div className="bg-amber-500/6 border border-amber-500/20 rounded-2xl p-6 mb-6">
+        <div className="bg-amber-500/6 border border-amber-500/20 rounded-2xl p-6">
           <div className="flex flex-col sm:flex-row gap-6 items-start">
             <div className="flex-1">
               <p className="text-sm font-black text-amber-400 mb-1">How it works</p>
               <p className="text-sm text-white/60 leading-relaxed">
-                Every teacher has a wallet. When you generate a planning bundle, <strong className="text-white">KES 100 is deducted</strong> automatically.
-                If your wallet is at KES 0, you&apos;ll be prompted to top up — you can add exactly KES 100
-                for that one scheme, or keep more for convenience.
+                You buy one subject&apos;s planning for one term. The Scheme of Work comes first,
+                then its lesson plans week by week as you teach, and the Record of Work keeps
+                itself up to date behind you. <strong className="text-white">One payment, at the start —
+                nothing more for that subject, that term.</strong>
               </p>
             </div>
             <div className="shrink-0 text-center bg-white/5 border border-white/10 rounded-xl px-5 py-4">
-              <p className="text-3xl font-black text-amber-400 leading-none">KES 100</p>
-              <p className="text-xs text-white/40 mt-1.5 font-semibold">per planning bundle</p>
-              <p className="text-[10px] text-white/50 mt-0.5">SOW + Lesson Plans + ROW</p>
+              <p className="text-3xl font-black text-amber-400 leading-none">
+                KES {TEACHER_PLANNING_BUNDLE.priceKes}
+              </p>
+              <p className="text-xs text-white/40 mt-1.5 font-semibold">per subject, per term</p>
+              <p className="text-[10px] text-white/50 mt-0.5">Scheme + Lessons + Record</p>
             </div>
           </div>
         </div>
-
-        {/* What gets deducted */}
-        <h3 className="text-sm font-black text-white uppercase tracking-widest mb-4">Wallet deductions</h3>
-        <div className="bg-white/3 border border-white/8 rounded-2xl overflow-hidden mb-4">
-          <div className="grid grid-cols-3 px-5 py-3 border-b border-white/8 text-[10px] font-black uppercase tracking-widest text-white/50">
-            <span className="col-span-2">Action</span>
-            <span className="text-right">Deducted</span>
-          </div>
-          {TEACHER_WALLET_COSTS.map((row) => (
-            <div key={row.action} className="grid grid-cols-3 px-5 py-4 border-b border-white/5 last:border-0 items-start">
-              <div className="col-span-2">
-                <span className={`text-sm font-bold ${row.color}`}>{row.action}</span>
-                <p className="text-xs text-white/35 mt-0.5 leading-snug">{row.detail}</p>
-              </div>
-              <div className="text-right">
-                <span className="text-sm font-black text-white">KES {row.kes}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Top-up selector */}
-        <div className="grid grid-cols-3 gap-3 mb-3">
-          {[
-            { amount: 100,  label: '1 bundle',   sub: 'Just this scheme',      id: 'wallet_100'  },
-            { amount: 500,  label: '5 bundles',  sub: 'Full term, 5 subjects', id: 'wallet_500'  },
-            { amount: 1000, label: '10 bundles', sub: 'Comfortable balance',   id: 'wallet_1000' },
-          ].map((opt) => (
-            <button
-              key={opt.amount}
-              onClick={() => onSelect({ ...TEACHER_WALLET_PRODUCT, id: opt.id, price: opt.amount, billing: 'wallet top-up' })}
-              className={`bg-white/4 border rounded-xl p-4 text-center transition-all cursor-pointer hover:border-amber-500/40 ${FOCUS_RING} ${
-                selected.id === opt.id ? 'border-amber-500/60 bg-amber-500/8' : 'border-white/10'
-              }`}
-            >
-              <p className="text-xl font-black text-white leading-none">KES {opt.amount.toLocaleString()}</p>
-              <p className={`text-xs font-bold mt-1.5 ${selected.id === opt.id ? 'text-amber-400' : 'text-amber-400/60'}`}>{opt.label}</p>
-              <p className="text-[10px] text-white/50 mt-0.5 leading-tight">{opt.sub}</p>
-            </button>
-          ))}
-        </div>
-        <p className="text-xs text-white/50 text-center">Wallet credit never expires · Top up any time · Pay just what you need</p>
       </div>
 
-      {/* Plan cards */}
-      <div className="grid md:grid-cols-2 gap-5 max-w-3xl mx-auto mb-14">
+      {/* Plan card */}
+      <div className="max-w-md mx-auto mb-14">
         {TEACHER_PAY_PLANS.map((plan) => (
           <div
             key={plan.id}
@@ -686,7 +548,8 @@ function TeacherSection({
       <div className="max-w-2xl mx-auto bg-amber-500/5 border border-amber-500/15 rounded-2xl px-8 py-6 text-center">
         <p className="text-sm font-black text-amber-400 mb-1">Teaching at a school?</p>
         <p className="text-sm text-white/50 leading-relaxed">
-          When your school adopts EduNexus, Teacher Pro is unlocked automatically — at no cost to you.
+          When your school adopts EduNexus, your whole teacher workspace is unlocked automatically —
+          at no cost to you. No bundles to buy.
         </p>
         <a
           href={SCHOOL_DEMO_WA_LINK}
@@ -829,20 +692,6 @@ function FamilySection({
         ))}
       </div>
 
-      {/* Pay-per-use, demoted — most families now arrive through a school;
-          this is the residual path for a learner with no attached school
-          or parent, not the primary offer. */}
-      <p className="max-w-3xl mx-auto text-center text-xs text-white/40 mb-14">
-        Prefer to pay per report instead of a full term?{' '}
-        <button
-          onClick={() => onSelect(TOKEN_PRODUCT)}
-          className={`underline decoration-white/20 hover:text-white/70 hover:decoration-white/40 transition-colors rounded ${FOCUS_RING}`}
-        >
-          Start with 10 tokens for KES 500
-        </button>
-        {' '}(1 token = KES 50, never expires).
-      </p>
-
       {/* School nudge */}
       <div className="max-w-2xl mx-auto bg-white/3 border border-white/8 rounded-2xl px-8 py-5 text-center">
         <p className="text-sm text-white/50 leading-relaxed">
@@ -871,7 +720,7 @@ function PricingContent() {
 
   const [activeTab,     setActiveTab]     = useState<TabId>('school')
   const [familySel,     setFamilySel]     = useState<PayProduct>(FAMILY_PAY_PLANS[0])
-  const [teacherSel,    setTeacherSel]    = useState<PayProduct>(TEACHER_WALLET_PRODUCT)
+  const [teacherSel,    setTeacherSel]    = useState<PayProduct>(TEACHER_PLANNING_PRODUCT)
   const [phone,         setPhone]         = useState('')
   const [user,          setUser]          = useState<User | null>(null)
   const [dashboardHref, setDashboardHref] = useState('/')
@@ -901,7 +750,7 @@ function PricingContent() {
 
       if (productId) {
         const teacherProduct = TEACHER_PAY_PLANS.find(p => p.id === productId)
-        const familyProduct  = ALL_FAMILY_PRODUCTS.find(p => p.id === productId)
+        const familyProduct  = FAMILY_PAY_PLANS.find(p => p.id === productId)
 
         if (teacherProduct) {
           setActiveTab('teacher')
@@ -1071,7 +920,7 @@ function PricingContent() {
         {/* Trust footer */}
         <div className="text-center pb-8 space-y-1.5">
           <p className="text-white/20 text-xs">🔒 256-bit SSL · Paystack · M-PESA · Made in Kenya 🇰🇪</p>
-          <p className="text-white/15 text-xs">Tokens never expire · Full refund if not satisfied</p>
+          <p className="text-white/15 text-xs">Full refund if not satisfied</p>
         </div>
 
       </div>
@@ -1085,7 +934,7 @@ function PricingContent() {
             <div className="flex-1 text-center sm:text-left">
               <p className="text-[10px] font-black text-white/50 uppercase tracking-widest">School Edition</p>
               <p className="text-sm text-white/65">
-                From KES 129 per learner per term · Teacher Pro included for all teachers
+                Quoted for your school · Full teacher workspace included for every teacher
               </p>
             </div>
             <a
@@ -1107,10 +956,7 @@ function PricingContent() {
             <div className="flex flex-col sm:flex-row items-center gap-3">
               <div className="w-full sm:w-auto text-center sm:text-left sm:pr-4 sm:border-r sm:border-white/10 shrink-0">
                 <p className="text-[10px] font-black text-white/50 uppercase tracking-widest leading-none mb-1">
-                  {TEACHER_PAY_PLANS.some(p => p.id === teacherSel.id)
-                    ? teacherSel.name
-                    : 'Wallet top-up'
-                  }
+                  {teacherSel.name}
                 </p>
                 <p className="text-xl font-black text-white leading-none">
                   KES {teacherSel.price.toLocaleString()}

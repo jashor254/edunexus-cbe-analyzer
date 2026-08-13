@@ -73,16 +73,20 @@ export default function UsageQuota({ userId, tier }: Props) {
       name: 'Free Plan',
       color: 'bg-gray-100 text-gray-800'
     },
+    // Prices deliberately omitted: this badge is a status indicator, not a
+    // price list, and the three prices it used to hardcode had all drifted
+    // away from lib/payments/config.ts. 'starter' and 'premium' survive only
+    // to label pre-existing accounts on retired plans.
     starter: {
-      name: 'Starter — KES 500',
+      name: 'Starter',
       color: 'bg-blue-100 text-blue-800'
     },
     term: {
-      name: 'Term Plan — KES 3,200',
+      name: 'Term Plan',
       color: 'bg-violet-100 text-violet-800'
     },
     premium: {
-      name: 'Premium — KES 7,000',
+      name: 'Premium',
       color: 'bg-amber-100 text-amber-800'
     },
     admin: {

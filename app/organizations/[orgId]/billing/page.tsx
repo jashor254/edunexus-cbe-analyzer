@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import {
-  Receipt, TrendingUp, BarChart3, Zap, ArrowUp,
+  Receipt, TrendingUp, BarChart3, Zap, MessageCircle,
   Loader2, CheckCircle2, AlertCircle, Crown,
 } from 'lucide-react'
+import { SCHOOL_DEMO_WA_LINK } from '@/app/(marketing)/constants'
 
 type UsageData = {
   usage: {
@@ -58,8 +59,6 @@ export default function BillingPage() {
   const [data,      setData]      = useState<UsageData | null>(null)
   const [plans,     setPlans]     = useState<Plan[]>([])
   const [loading,   setLoading]   = useState(true)
-  const [upgrading, setUpgrading] = useState('')
-  const [upgraded,  setUpgraded]  = useState('')
   const [error,     setError]     = useState('')
 
   const load = useCallback(async () => {
@@ -81,26 +80,6 @@ export default function BillingPage() {
   }, [orgId])
 
   useEffect(() => { load() }, [load])
-
-  async function upgradePlan(planName: string) {
-    setUpgrading(planName)
-    setError('')
-    try {
-      const res = await fetch(`/api/organizations/${orgId}/billing/plans`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan_name: planName }),
-      })
-      const d = await res.json()
-      if (!res.ok) throw new Error(d.error)
-      setUpgraded(planName)
-      setTimeout(() => { setUpgraded(''); load() }, 2000)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upgrade failed')
-    } finally {
-      setUpgrading('')
-    }
-  }
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -243,19 +222,20 @@ export default function BillingPage() {
                 ))}
               </ul>
 
+              {/* Institution plans are agreed with us, never self-served: this
+                  button used to POST straight to the plan-upgrade endpoint and
+                  grant a paid plan without collecting a single shilling. The
+                  plan change now happens on our side, after a conversation. */}
               {isUpgrade && plan.name !== 'free' && (
-                <button
-                  onClick={() => upgradePlan(plan.name)}
-                  disabled={upgrading === plan.name}
-                  className="mt-4 w-full bg-teal-500 hover:bg-teal-400 disabled:opacity-40 text-white py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                <a
+                  href={SCHOOL_DEMO_WA_LINK}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 w-full bg-white/8 hover:bg-white/14 border border-white/10 text-white py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                 >
-                  {upgrading === plan.name
-                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    : upgraded === plan.name
-                    ? <CheckCircle2 className="w-3.5 h-3.5" />
-                    : <ArrowUp className="w-3.5 h-3.5" />}
-                  {upgraded === plan.name ? 'Upgraded!' : 'Upgrade'}
-                </button>
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  Talk to us
+                </a>
               )}
             </div>
           )

@@ -159,12 +159,12 @@ export default function SchoolsPage() {
       <section className="bg-white/3 py-16 md:py-20">
         <div className="max-w-140 mx-auto px-6 text-center">
           <h2 className="text-2xl md:text-3xl font-extrabold text-white leading-tight mb-5">
-            Per-learner pricing, three plans.
+            Quoted for your school, after we understand it.
           </h2>
           <p className="text-white/55 leading-relaxed mb-8">
             Starter, Growth, and Institution scale by learner count and by how much implementation
             support your school wants — not by how much Educational Intelligence any single learner
-            receives. Every learner at a subscribed school gets the full{' '}
+            receives. We quote after a short consultation. Every learner at a subscribed school gets the full{' '}
             <Link href="/learner-blueprint" className={`text-blue-400 hover:text-blue-300 font-semibold rounded ${FOCUS_RING}`}>Blueprint</Link>,{' '}
             <Link href="/compass" className={`text-blue-400 hover:text-blue-300 font-semibold rounded ${FOCUS_RING}`}>Compass</Link>, and{' '}
             <Link href="/career-pathways" className={`text-blue-400 hover:text-blue-300 font-semibold rounded ${FOCUS_RING}`}>Career Intelligence</Link> experience regardless of plan.

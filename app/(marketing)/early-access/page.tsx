@@ -8,7 +8,6 @@ import {
   MessageCircle,
   Zap,
   Crown,
-  Gift,
   Star,
   ArrowLeft,
   Users,
@@ -16,60 +15,37 @@ import {
   Shield,
 } from 'lucide-react'
 import { FOCUS_RING, WHATSAPP_NUMBER } from '../constants'
+import { SUBSCRIPTION_PLANS } from '@/lib/payments/config'
 
 // ─── WhatsApp messages per plan ───────────────────────────────────────────────
 
 const WA_MESSAGES = {
-  starter: `Habari EduNexus! 👋
-Nataka kujiunga Early Access.
-Plan: Starter — KES 500
-Jina: [jina lako]
-Namba: [namba yako]
-Grade ya mtoto: [grade]
-Niambie hatua za kulipa. Asante!`,
-
   term: `Habari EduNexus! 👋
 Nataka kujiunga Early Access.
-Plan: Term Plan — KES 2,499
+Plan: Term Plan — KES ${SUBSCRIPTION_PLANS.TERMLY_SINGLE.priceKes.toLocaleString()}
 Jina: [jina lako]
 Namba: [namba yako]
 Grade ya mtoto: [grade]
 Niambie hatua za kulipa. Asante!`,
 
-  premium: `Habari EduNexus! 👋
+  family: `Habari EduNexus! 👋
 Nataka kujiunga Early Access.
-Plan: Premium — KES 7,000
+Plan: Family Plan — KES ${SUBSCRIPTION_PLANS.TERMLY_FAMILY.priceKes.toLocaleString()}
 Jina: [jina lako]
 Namba: [namba yako]
 Watoto: [majina na grades]
 Niambie hatua za kulipa. Asante!`,
 }
 
-type PlanId = 'starter' | 'term' | 'premium'
+type PlanId = 'term' | 'family'
 
 // ─── Plans ────────────────────────────────────────────────────────────────────
 
 const PLANS = [
   {
-    id: 'starter' as PlanId,
-    name: 'Starter',
-    price: 500,
-    billing: 'one-time',
-    badge: null,
-    highlight: false,
-    color: 'from-blue-500 to-cyan-500',
-    icon: Gift,
-    features: [
-      '15 Learning Compass sessions',
-      'Academic Clinic report',
-      'Career guidance',
-      'Tokens never expire',
-    ],
-  },
-  {
     id: 'term' as PlanId,
-    name: 'Term Plan',
-    price: 2499,
+    name: SUBSCRIPTION_PLANS.TERMLY_SINGLE.name,
+    price: SUBSCRIPTION_PLANS.TERMLY_SINGLE.priceKes,
     billing: 'per term',
     badge: 'MOST POPULAR',
     highlight: true,
@@ -87,11 +63,9 @@ const PLANS = [
     ],
   },
   {
-    id: 'premium' as PlanId,
-    name: 'Premium',
-    price: 7000,
-    originalPrice: 9500,
-    savings: 2500,
+    id: 'family' as PlanId,
+    name: SUBSCRIPTION_PLANS.TERMLY_FAMILY.name,
+    price: SUBSCRIPTION_PLANS.TERMLY_FAMILY.priceKes,
     billing: 'per term',
     badge: 'BEST VALUE',
     highlight: false,
@@ -99,7 +73,7 @@ const PLANS = [
     icon: Crown,
     features: [
       'Everything in Term Plan',
-      'Track 3 students',
+      `Up to ${SUBSCRIPTION_PLANS.TERMLY_FAMILY.childLimit} children`,
       'Family dashboard',
       'Priority WhatsApp support',
     ],
@@ -238,26 +212,11 @@ export default function EarlyAccessPage() {
 
                   {/* Price */}
                   <div className="mb-5">
-                    {'originalPrice' in plan && plan.originalPrice && (
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm text-white/50 line-through">
-                          KES {plan.originalPrice.toLocaleString()}
-                        </span>
-                        <span className="text-xs bg-green-500/20 text-green-400 border border-green-500/20 px-2 py-0.5 rounded-full font-black">
-                          Save KES {plan.savings?.toLocaleString()}
-                        </span>
-                      </div>
-                    )}
                     <div className="flex items-baseline gap-1">
                       <span className="text-4xl font-black text-white">
                         KES {plan.price.toLocaleString()}
                       </span>
                     </div>
-                    {'savings' in plan && plan.savings && (
-                      <p className="text-xs text-green-400 font-bold mt-1">
-                        Save KES {plan.savings.toLocaleString()} as founding member
-                      </p>
-                    )}
                   </div>
 
                   {/* Features */}

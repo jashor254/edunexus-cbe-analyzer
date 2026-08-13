@@ -6,18 +6,12 @@ import { NextRequest } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiBadRequest } from '@/lib/api/response'
 import { requireAuth } from '@/lib/api/middleware'
-import { SUBSCRIPTION_PLANS, TOKEN_PACK } from '@/lib/payments/config'
+import { PURCHASABLE_PRODUCTS } from '@/lib/payments/config'
 
 const MobileInitSchema = z.object({
   phone:     z.string().min(1),
   productId: z.string().min(1),
 })
-
-const PRODUCTS: Record<string, { price: number; type: string; label: string; tokens?: number }> = {
-  starter: { price: TOKEN_PACK.priceKes,                        type: 'token',        label: 'Pay-As-You-Go', tokens: TOKEN_PACK.tokens },
-  term:    { price: SUBSCRIPTION_PLANS.TERMLY_SINGLE.priceKes, type: 'subscription', label: 'Term Plan'      },
-  family:  { price: SUBSCRIPTION_PLANS.TERMLY_FAMILY.priceKes, type: 'subscription', label: 'Family Plan'    },
-}
 
 export async function POST(req: NextRequest) {
   const auth = await requireAuth()
@@ -28,8 +22,10 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'phone and productId are required')
     const { phone, productId } = parsed.data
 
-    // 🔒 Server-side price lookup — client-supplied amount is never used
-    const product = PRODUCTS[productId]
+    // 🔒 Server-side price lookup — client-supplied amount is never used.
+    //    Same registry as app/api/payments/initialize, so the two entry points
+    //    accept exactly the same products at exactly the same prices.
+    const product = PURCHASABLE_PRODUCTS[productId]
     if (!product) return apiBadRequest('Invalid product selected')
 
     if (!process.env.PAYSTACK_SECRET_KEY) {

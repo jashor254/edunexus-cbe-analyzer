@@ -51,9 +51,8 @@ export default function PaymentCancelledPage() {
               💡 Pro Tip
             </p>
             <p className="text-sm text-white/60 leading-relaxed">
-              Wazazi wengi wanaanza na{' '}
-              <strong className="text-white/90">Try It (KES 500)</strong>{' '}
-              — ripoti moja kamili ya mtoto wako, bila commitment. Unaona thamani kwanza.
+              Unaweza kuanza na ripoti moja ya bure ya mtoto wako kabla ya kulipa{' '}
+              <strong className="text-white/90">Term Plan</strong>. Unaona thamani kwanza.
             </p>
           </div>
 

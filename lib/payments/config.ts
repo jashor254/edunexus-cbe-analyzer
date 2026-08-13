@@ -28,7 +28,11 @@ export const SUBSCRIPTION_PLANS = {
 } as const
 
 // ===== TOKEN PACK =====
-// Pay-as-you-go — higher per-unit cost than subscribing, maximum flexibility.
+// RETIRED FROM PUBLIC SALE. Kept because it is still the internal unit of
+// account: KES_PER_TOKEN is derived from it, and every historical payment row
+// with product_id 'starter' still resolves its token grant through it (see
+// TOKEN_GRANTS below). It is deliberately absent from PURCHASABLE_PRODUCTS,
+// so no new customer purchase can be initialized against it.
 export const TOKEN_PACK = {
   id:       'starter',
   priceKes: 500,
@@ -70,6 +74,71 @@ export const TOKEN_COSTS = {
 } as const
 
 export type TokenFeature = keyof typeof TOKEN_COSTS
+
+// ===== SOLO TEACHER PRODUCT =====
+// The one thing a teacher without a school actually buys: a term's planning
+// for one subject. It is deliberately priced at exactly what the SOW →
+// lesson plans → Record of Work chain consumes, because TOKEN_COSTS already
+// encodes that chain as a single charge (sow_generate: 2, lesson_plan_generate:
+// 0, row_generate: 0). Deriving `tokens` from TOKEN_COSTS.sow_generate rather
+// than restating "2" is what keeps the customer-facing bundle and the internal
+// entitlement from drifting apart.
+//
+// `tokens` is an internal accounting quantity — never render it to a customer.
+export const TEACHER_PLANNING_BUNDLE = {
+  id:       'planning_bundle',
+  name:     'Term Planning Bundle',
+  priceKes: 100,
+  tokens:   TOKEN_COSTS.sow_generate,
+} as const
+
+// ===== PURCHASABLE PRODUCTS =====
+// The complete set of products a NEW payment may be initialized against.
+// Both payment entry points (app/api/payments/initialize and
+// app/api/payments/mobile-init) read this one map, so they cannot drift and
+// the pricing page cannot emit an id the server does not honour.
+//
+// Note what is absent: TOKEN_PACK ('starter'). Public token sales are retired —
+// customers buy term access or a planning outcome, never a currency. Historical
+// 'starter' payments are unaffected; they fulfil through TOKEN_GRANTS.
+export type PurchaseType = 'token' | 'subscription'
+
+export type PurchasableProduct = {
+  price:  number
+  type:   PurchaseType
+  label:  string
+  tokens?: number
+}
+
+export const PURCHASABLE_PRODUCTS: Record<string, PurchasableProduct> = {
+  [TEACHER_PLANNING_BUNDLE.id]: {
+    price:  TEACHER_PLANNING_BUNDLE.priceKes,
+    type:   'token',
+    label:  TEACHER_PLANNING_BUNDLE.name,
+    tokens: TEACHER_PLANNING_BUNDLE.tokens,
+  },
+  [SUBSCRIPTION_PLANS.TERMLY_SINGLE.id]: {
+    price: SUBSCRIPTION_PLANS.TERMLY_SINGLE.priceKes,
+    type:  'subscription',
+    label: SUBSCRIPTION_PLANS.TERMLY_SINGLE.name,
+  },
+  [SUBSCRIPTION_PLANS.TERMLY_FAMILY.id]: {
+    price: SUBSCRIPTION_PLANS.TERMLY_FAMILY.priceKes,
+    type:  'subscription',
+    label: SUBSCRIPTION_PLANS.TERMLY_FAMILY.name,
+  },
+}
+
+// ===== TOKEN GRANTS PER PRODUCT =====
+// How many tokens a fulfilled non-subscription payment credits, keyed by the
+// product_id stored on the payment row. This is deliberately a SUPERSET of
+// PURCHASABLE_PRODUCTS: 'starter' can no longer be bought, but rows that were
+// legitimately created while it could must still fulfil for exactly what the
+// customer paid for. Retiring a product from sale must never strand a payment.
+export const TOKEN_GRANTS: Record<string, number> = {
+  [TOKEN_PACK.id]:              TOKEN_PACK.tokens,               // historical only
+  [TEACHER_PLANNING_BUNDLE.id]: TEACHER_PLANNING_BUNDLE.tokens,
+}
 
 // ===== FEATURE ACCESS MATRIX =====
 // 'free'  = no cost ever

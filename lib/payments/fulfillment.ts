@@ -11,7 +11,7 @@
 // the webhook and browser-redirect payment paths).
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { TOKEN_PACK } from '@/lib/payments/config'
+import { TOKEN_PACK, TOKEN_GRANTS } from '@/lib/payments/config'
 
 export type FulfillmentResult = 'fulfilled' | 'already_processed'
 
@@ -57,10 +57,36 @@ export async function fulfillPayment(
   if (SUBSCRIPTION_PRODUCTS.has(payment.product_id)) {
     await creditSubscription(db, payment.user_id, payment.product_id, payment.id)
   } else {
-    await creditTokens(db, payment.user_id, TOKEN_PACK.tokens)
+    await creditTokens(db, payment.user_id, resolveTokenGrant(payment.product_id))
   }
 
   return 'fulfilled'
+}
+
+/**
+ * How many tokens a non-subscription product credits.
+ *
+ * This used to be TOKEN_PACK.tokens for every product, which was correct only
+ * while 'starter' was the sole non-subscription product. The moment a second
+ * one exists it silently overpays: a KES 100 planning bundle would have
+ * credited a KES 500 pack's worth of tokens.
+ *
+ * Unrecognised product ids fall back to the historical constant rather than
+ * throwing, because a payment row that already exists must always fulfil —
+ * refusing to credit a customer who has actually paid is the worse failure.
+ * The error log is what surfaces a product added to sale but not to
+ * TOKEN_GRANTS.
+ */
+function resolveTokenGrant(productId: string): number {
+  const grant = TOKEN_GRANTS[productId]
+  if (grant === undefined) {
+    console.error(
+      `[fulfillment] no token grant configured for product_id '${productId}' — ` +
+      `falling back to TOKEN_PACK.tokens (${TOKEN_PACK.tokens}). Add it to TOKEN_GRANTS.`
+    )
+    return TOKEN_PACK.tokens
+  }
+  return grant
 }
 
 /**

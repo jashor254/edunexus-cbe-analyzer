@@ -163,21 +163,28 @@ export default async function StudentReportPage({
     seniorGuidance
   )
 
-  // Get token/subscription status
+  // Access status. Both reads here were querying columns that do not exist —
+  // `balance` on the legacy `user_tokens` table (its column is
+  // `tokens_remaining`) and `sub_status` on `subscriptions` (its column is
+  // `status`) — so both silently returned null and hasAccess was always false.
+  // Canonical balances live in `token_balances`, and an active subscription is
+  // status='active' AND not yet expired, matching
+  // repos.billing.findActiveSubscription(). The legacy table is left in place.
   const { data: tokens } = await supabase
-    .from('user_tokens')
+    .from('token_balances')
     .select('balance')
     .eq('user_id', user.id)
-    .single()
+    .maybeSingle()
 
   const { data: subscription } = await supabase
     .from('subscriptions')
-    .select('sub_status')
+    .select('status')
     .eq('user_id', user.id)
-    .eq('sub_status', 'active')
-    .single()
+    .eq('status', 'active')
+    .gt('expires_at', new Date().toISOString())
+    .maybeSingle()
 
-  const hasAccess = subscription || (tokens && tokens.balance > 0)
+  const hasAccess = Boolean(subscription) || (tokens?.balance ?? 0) > 0
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">

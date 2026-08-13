@@ -2,6 +2,7 @@
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { FOCUS_RING, FOCUS_RING_ON_LIGHT } from '../../constants'
+import { SUBSCRIPTION_PLANS, TEACHER_PLANNING_BUNDLE } from '@/lib/payments/config'
 
 export default function TermsPage() {
   return (
@@ -51,29 +52,27 @@ export default function TermsPage() {
             <li>No credit card required</li>
           </ul>
 
-          <h3>Pay-As-You-Go (Token Plan)</h3>
+          <h3>Family Term Plans</h3>
           <ul>
-            <li>KES 100 for 10 tokens</li>
-            <li>KES 300 for 35 tokens</li>
-            <li>KES 500 for 60 tokens</li>
-            <li>Tokens never expire</li>
-            <li>Non-refundable once purchased</li>
-          </ul>
-
-          <p><strong>Token Usage:</strong></p>
-          <ul>
-            <li>Guardian Tutor: 2 tokens per session</li>
-            <li>Career Recommendation: 2 tokens per search</li>
-          </ul>
-
-          <h3>Termly Unlimited Plan</h3>
-          <ul>
-            <li>KES 1,500 per term (3 months)</li>
+            <li>Term Plan: KES {SUBSCRIPTION_PLANS.TERMLY_SINGLE.priceKes.toLocaleString()} per term — 1 child</li>
+            <li>Family Plan: KES {SUBSCRIPTION_PLANS.TERMLY_FAMILY.priceKes.toLocaleString()} per term — up to 3 children</li>
             <li>Unlimited pathway analyses</li>
-            <li>Unlimited Guardian Tutor access</li>
+            <li>Unlimited Learning Compass access</li>
             <li>Unlimited career recommendations</li>
-            <li>Track up to 3 children</li>
-            <li>Auto-renews unless cancelled</li>
+          </ul>
+
+          <h3>Teacher Term Planning Bundle</h3>
+          <ul>
+            <li>KES {TEACHER_PLANNING_BUNDLE.priceKes} — one subject, one term</li>
+            <li>Covers the Scheme of Work, its lesson plans, and its Record of Work</li>
+            <li>A teacher&apos;s genuinely first Scheme of Work is free</li>
+            <li>Teachers at a school on EduNexus receive these tools through their school</li>
+          </ul>
+
+          <h3>Schools</h3>
+          <ul>
+            <li>Priced per school after a consultation, and invoiced directly</li>
+            <li>No self-service school checkout</li>
           </ul>
 
           <h2>Payment Terms</h2>
@@ -87,10 +86,10 @@ export default function TermsPage() {
 
           <h2>Refund Policy</h2>
 
-          <h3>Token Purchases</h3>
+          <h3>Teacher Planning Bundles</h3>
           <ul>
-            <li><strong>Non-refundable</strong> once purchased</li>
-            <li>Tokens remain valid indefinitely</li>
+            <li><strong>Non-refundable</strong> once the Scheme of Work has been generated</li>
+            <li>A purchased bundle remains valid for that subject and term</li>
           </ul>
 
           <h3>Termly Subscriptions</h3>

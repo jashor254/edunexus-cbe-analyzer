@@ -1,20 +1,13 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
-import { SUBSCRIPTION_PLANS, TOKEN_PACK } from '@/lib/payments/config'
+import { PURCHASABLE_PRODUCTS } from '@/lib/payments/config'
 import { z } from 'zod'
 
 const InitializeSchema = z.object({
   productId:   z.string().min(1),
   phoneNumber: z.string().min(1),
 })
-
-// Backend product map — prices pulled from config, never hardcoded here
-const PRODUCTS: Record<string, { price: number; type: string; label: string; tokens?: number }> = {
-  starter: { price: TOKEN_PACK.priceKes,                        type: 'token',        label: 'Pay-As-You-Go', tokens: TOKEN_PACK.tokens },
-  term:    { price: SUBSCRIPTION_PLANS.TERMLY_SINGLE.priceKes, type: 'subscription', label: 'Term Plan'      },
-  family:  { price: SUBSCRIPTION_PLANS.TERMLY_FAMILY.priceKes, type: 'subscription', label: 'Family Plan'    },
-}
 
 export async function POST(req: Request) {
   try {
@@ -33,8 +26,10 @@ export async function POST(req: Request) {
       return apiUnauthorized()
     }
 
-    // 🧠 2. Validate product
-    const product = PRODUCTS[productId]
+    // 🧠 2. Validate product — PURCHASABLE_PRODUCTS is the single registry of
+    //    what a NEW payment may be opened against. Retired products (notably
+    //    the 'starter' token pack) are absent and are rejected here.
+    const product = PURCHASABLE_PRODUCTS[productId]
     if (!product) {
       return apiBadRequest('Invalid product selected')
     }

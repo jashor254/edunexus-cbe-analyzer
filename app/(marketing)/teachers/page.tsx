@@ -140,10 +140,10 @@ export default function TeachersPage() {
             Your first Scheme of Work is on us.
           </h2>
           <p className="text-white/55 leading-relaxed mb-8">
-            Every teacher&apos;s genuinely first Scheme of Work is free — no card, no wallet needed.
-            After that, a Planning Bundle (one scheme, all its lesson plans, and its Record of Work)
-            is KES 100 per subject, or go unlimited with Teacher Pro at KES 2,499/term. If your
-            school is on EduNexus, Teacher Pro is included automatically, at no extra cost to you.
+            Every teacher&apos;s genuinely first Scheme of Work is free — no card, no payment.
+            After that, a Term Planning Bundle (one scheme, all its lesson plans, and its Record of
+            Work) is KES 100 per subject, per term. If your school is on EduNexus, your whole
+            teacher workspace is included automatically, at no cost to you.
           </p>
           <Link
             href="/pricing?tab=teacher"

@@ -32,7 +32,7 @@ export function DownloadReportButton({ studentId, studentName, assessments, prof
 
       if (!response.ok) {
         if (response.status === 403) {
-          setError('You need tokens or an active subscription to download reports. Go to Pricing to top up.')
+          setError('Your current plan does not cover report downloads. See Pricing to start a Term Plan.')
         } else if (response.status === 401) {
           setError('Please log in to download reports.')
         } else {
