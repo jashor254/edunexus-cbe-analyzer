@@ -18,6 +18,7 @@ import type {
   CapabilityDimension,
   CapabilityGrowthReport,
 } from '@/lib/career/types'
+import type { ProvisionalCareerPreview as ProvisionalPreview } from '@/lib/career/provisionalPreview'
 import type { CareerFamilyInsight } from '@/lib/learnerIntelligence/careerIntelligence'
 import { CAPABILITY_LABELS } from '@/lib/career/capabilityExtractor'
 import { alignmentToPercent, tierLabel, tierColor, demandLabel } from '@/lib/career/capabilityMatchEngine'
@@ -511,6 +512,10 @@ function GrowthBanner({ growth }: { growth: CapabilityGrowthReport }) {
 
 export default function CareerPage() {
   const [careers,         setCareers]         = useState<CareerSummary[]>([])
+  // A career we do not have a verified profile for. The API returns an outline
+  // with no salary figures, entry grades or course costs — see
+  // lib/career/provisionalPreview.ts for why it is that narrow.
+  const [provisional,     setProvisional]     = useState<ProvisionalPreview | null>(null)
   const [capabilityReport,setCapabilityReport] = useState<CareerMatchesResponse | null>(null)
   const [profile,         setProfile]         = useState<CapabilityProfile | null>(null)
   const [growth,          setGrowth]          = useState<CapabilityGrowthReport | null>(null)
@@ -634,6 +639,7 @@ export default function CareerPage() {
       const data = await res.json()
       const list: CareerSummary[] = data?.data?.careers ?? []
       setCareers(list)
+      setProvisional(data?.data?.provisional ? (data.data.preview as ProvisionalPreview) : null)
       setSeeded(list.length > 0)
     } catch {
       setError('Could not load careers. Please refresh.')
@@ -808,6 +814,23 @@ export default function CareerPage() {
                     <Zap className="w-4 h-4" /> Load Career Database
                   </button>
                 </>
+              ) : provisional ? (
+                <div className="text-left space-y-3">
+                  <div>
+                    <p className="text-white font-bold text-lg">{provisional.title}</p>
+                    <p className="text-white/40 text-xs uppercase tracking-wide">{provisional.pathway} pathway</p>
+                  </div>
+                  <p className="text-white/70 text-sm">{provisional.description}</p>
+                  {provisional.requiredSubjects.length > 0 && (
+                    <p className="text-white/60 text-sm">
+                      Subjects that matter most: {provisional.requiredSubjects.join(', ')}
+                    </p>
+                  )}
+                  <div className="flex items-start gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-amber-300 mt-0.5" />
+                    <p className="text-amber-100/90 text-xs leading-relaxed">{provisional.provisionalNotice}</p>
+                  </div>
+                </div>
               ) : (
                 <p className="text-white/50 text-sm">No careers match your search. Try different keywords.</p>
               )}

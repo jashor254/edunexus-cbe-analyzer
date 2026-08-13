@@ -21,6 +21,7 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 import type { ParentAction } from '@/lib/parentExperience/actions'
 import type { LearnerBlueprint, BlueprintSection, AttendanceData } from '@/lib/learnerBlueprint/types'
+import { readSection } from '@/lib/learnerBlueprint/readSection'
 import type { BlueprintValidationResult } from '@/lib/learnerBlueprint/validation'
 import HistoricalBanner, { type HistoricalMeta } from './HistoricalBanner'
 import {
@@ -301,6 +302,13 @@ export default function BlueprintView({
   // stage the learner is at. `resolveGradeBand` falls back to the recorded
   // class name only for snapshots taken before the field existed.
   const gradeBand = resolveGradeBand(blueprint.metadata.gradeBand, blueprint.identity.data?.currentClassName ?? null)
+
+  // Snapshots stored before this section existed have no `pathwayReadiness`
+  // key at all — the payload is JSON cast to the current type, so the property
+  // is `undefined` at runtime while the type insists it is there. Reading
+  // `.status` off it directly is a TypeError, and 117 stored snapshots predate
+  // this section. Same class of problem `resolveGradeBand` handles above.
+  const pathwayReadiness = readSection(blueprint.pathwayReadiness, 'pathway readiness')
   const seniorStage = isSeniorBand(gradeBand)
   const attendanceAsConcern = attendanceNeedsResponse(blueprint.attendance)
   const futureEvidence = futureEvidenceItems(blueprint)
@@ -564,49 +572,49 @@ export default function BlueprintView({
               it names one subject and one level rather than "work harder". The
               disclaimer is rendered unconditionally because the KJSEA rule set behind
               these thresholds is provisional — see lib/config/kjseaRules.ts. */}
-          {blueprint.pathwayReadiness.status === 'available' && blueprint.pathwayReadiness.data && (
+          {pathwayReadiness.status === 'available' && pathwayReadiness.data && (
             <EvidenceBox title="Senior school pathway" tone="navy" dense>
-              <p>{blueprint.pathwayReadiness.data.stageMessage}</p>
+              <p>{pathwayReadiness.data.stageMessage}</p>
 
-              {blueprint.pathwayReadiness.data.stage === 'decision_year' && (
+              {pathwayReadiness.data.stage === 'decision_year' && (
                 <>
                   <p className="mt-2">
                     Current composite:{' '}
                     <span className="font-bold">
-                      {blueprint.pathwayReadiness.data.isPartialComposite ? 'at least ' : ''}
-                      {blueprint.pathwayReadiness.data.compositeScore}
+                      {pathwayReadiness.data.isPartialComposite ? 'at least ' : ''}
+                      {pathwayReadiness.data.compositeScore}
                     </span>{' '}
-                    of {blueprint.pathwayReadiness.data.kjseaMaxScore}, from{' '}
-                    {blueprint.pathwayReadiness.data.subjectsEntered} of{' '}
-                    {blueprint.pathwayReadiness.data.subjectGroupsTotal} subject groups.
+                    of {pathwayReadiness.data.kjseaMaxScore}, from{' '}
+                    {pathwayReadiness.data.subjectsEntered} of{' '}
+                    {pathwayReadiness.data.subjectGroupsTotal} subject groups.
                   </p>
 
-                  {blueprint.pathwayReadiness.data.qualifiesFor.length > 0 && (
+                  {pathwayReadiness.data.qualifiesFor.length > 0 && (
                     <p className="mt-1">
                       On the record so far, this reaches the threshold for:{' '}
-                      <span className="font-bold">{blueprint.pathwayReadiness.data.qualifiesFor.join(', ')}</span>.
+                      <span className="font-bold">{pathwayReadiness.data.qualifiesFor.join(', ')}</span>.
                     </p>
                   )}
 
-                  {blueprint.pathwayReadiness.data.nextDoor && (
+                  {pathwayReadiness.data.nextDoor && (
                     <p className="mt-2">
-                      <span className="font-bold">The one thing that would open {blueprint.pathwayReadiness.data.nextDoor.pathway}:</span>{' '}
-                      moving {blueprint.pathwayReadiness.data.nextDoor.keyLever.subject} from level{' '}
-                      {blueprint.pathwayReadiness.data.nextDoor.keyLever.currentLevel} to level{' '}
-                      {blueprint.pathwayReadiness.data.nextDoor.keyLever.targetLevel}
-                      {blueprint.pathwayReadiness.data.nextDoor.keyLever.wouldUnlock
+                      <span className="font-bold">The one thing that would open {pathwayReadiness.data.nextDoor.pathway}:</span>{' '}
+                      moving {pathwayReadiness.data.nextDoor.keyLever.subject} from level{' '}
+                      {pathwayReadiness.data.nextDoor.keyLever.currentLevel} to level{' '}
+                      {pathwayReadiness.data.nextDoor.keyLever.targetLevel}
+                      {pathwayReadiness.data.nextDoor.keyLever.wouldUnlock
                         ? ' would be enough on its own.'
-                        : ` would close ${blueprint.pathwayReadiness.data.nextDoor.keyLever.pointsGained} of the ${blueprint.pathwayReadiness.data.nextDoor.pointsShort} points still needed.`}
+                        : ` would close ${pathwayReadiness.data.nextDoor.keyLever.pointsGained} of the ${pathwayReadiness.data.nextDoor.pointsShort} points still needed.`}
                     </p>
                   )}
                 </>
               )}
 
-              {blueprint.pathwayReadiness.data.notes.map((note, i) => (
+              {pathwayReadiness.data.notes.map((note, i) => (
                 <p key={i} className="mt-1 text-[11px] text-slate-500">{note}</p>
               ))}
 
-              <p className="mt-2 text-[11px] text-slate-500">{blueprint.pathwayReadiness.data.disclaimer}</p>
+              <p className="mt-2 text-[11px] text-slate-500">{pathwayReadiness.data.disclaimer}</p>
             </EvidenceBox>
           )}
 

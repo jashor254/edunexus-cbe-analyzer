@@ -36,6 +36,8 @@ import {
   ParentSummarySection,
   RecommendedNextStepsSection,
 } from '@/components/blueprint/sections'
+import { PathwayReadinessSection } from '@/components/blueprint/PathwayReadinessSection'
+import { readSection } from '@/lib/learnerBlueprint/readSection'
 
 export default function ParentBlueprintView({
   blueprint,
@@ -86,6 +88,14 @@ export default function ParentBlueprintView({
 
       <ParentSectionCard title="Career Exploration" section={blueprint.career}>
         {data => <CareerSection data={data} />}
+      </ParentSectionCard>
+
+      {/* Placed directly after Career Exploration: for a Grade 9 family this is
+          the most consequential thing in the whole document, and it answers the
+          question the career section deliberately does not ("which pathway?").
+          `readSection` guards snapshots stored before this section existed. */}
+      <ParentSectionCard title="Senior School Pathway" section={readSection(blueprint.pathwayReadiness, 'pathway readiness')}>
+        {data => <PathwayReadinessSection data={data} />}
       </ParentSectionCard>
 
       <ParentSectionCard title="Portfolio" section={blueprint.portfolio}>

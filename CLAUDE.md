@@ -109,6 +109,14 @@ utils/supabase/   → Supabase client factories (server, service, client)
 
 ---
 
+## Running Tests
+
+- Run tests with `npm test -- <path>`, never bare `npx tsx --test <path>`
+- The script carries `--experimental-test-module-mocks`, which `node:test`'s `mock.module` requires on Node 22+. Without it, every file using `mock.module` throws `mock.module is not a function` at import and reports as a failure while asserting nothing — seven files were silently contributing zero coverage this way
+- It also loads `.env.local`, which the integration tests need
+
+---
+
 ## Error Handling
 
 - `lib/` functions: `throw new Error('descriptive message')`

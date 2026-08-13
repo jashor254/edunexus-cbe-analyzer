@@ -2675,10 +2675,20 @@ export async function seedCareersCOS(): Promise<{ updated: number; errors: strin
 export async function seedCareers(): Promise<{ inserted: number; errors: string[] }> {
   const errors: string[] = []
   let inserted = 0
+  // Seeding IS a verification event: the facts in SEED_CAREERS were written and
+  // checked by a person, and running the seed asserts them as current. Without
+  // this, every seeded career lands with a null `knowledge_verified_at` and is
+  // classified `unknown` forever — which would have made the freshness work
+  // report "nobody has ever confirmed this" about the one corpus we hand-wrote.
+  const verifiedAt = new Date().toISOString()
 
   for (const career of SEED_CAREERS) {
     try {
-      await repos.careers.upsertCareer(career)
+      await repos.careers.upsertCareer({
+        ...career,
+        knowledge_verified_at: verifiedAt,
+        knowledge_source_note: 'Curated seed corpus (lib/career/seedCareers.ts)',
+      })
       inserted++
     } catch (err) {
       errors.push(`${career.slug}: ${err instanceof Error ? err.message : String(err)}`)

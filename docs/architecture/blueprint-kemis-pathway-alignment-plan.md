@@ -1,7 +1,18 @@
 # Learner Blueprint × KEMIS Career Pathway Alignment — Plan
 
 **Date:** 2026-08-13
-**Type:** Plan for approval. No code changed. Follows CLAUDE.md "Before Building Any New Feature" — approval gate per step.
+**Type:** Plan. Follows CLAUDE.md "Before Building Any New Feature" — approval gate per step.
+
+> **Status update, same day.** The founder directed a full career-pipeline fix
+> ("you are the driver here"), which superseded the step-gate in this document.
+> **Step 1 is built and shipped** — `lib/learnerBlueprint/composePathwayReadiness.ts`,
+> rendered on the teacher/learner Blueprint (Page 4) and in the parent portal.
+> Steps 2–5 (tracks, learner voice, aspiration capture, curriculum rule-set
+> extraction) remain unbuilt and still gated on the KEMIS source in Step 0.
+>
+> Work not in this plan also shipped alongside it — a career knowledge
+> lifecycle, a human review gate on AI-generated careers, and removal of a
+> fabricated market signal. See the commits from `34279cd` onward.
 **Question:** the Blueprint is evidence-honest and readable. Is it *decision-useful* against the actual national decision a Kenyan learner faces — the KEMIS/KNEC Senior School pathway, track, subject-combination and school selection?
 
 ---
