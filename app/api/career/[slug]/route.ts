@@ -14,7 +14,8 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized, apiNotFound } from '@/lib/api/response'
-import { getCareerBySlugWithCOS, searchOrGenerateCareer } from '@/lib/career/careerEngine'
+import { getCareerBySlugWithCOS } from '@/lib/career/careerEngine'
+import { requestCareerKnowledge } from '@/lib/career/knowledgeRequests'
 import { computeCapabilityMatches } from '@/lib/career/capabilityMatchEngine'
 import { resolveFreshCapabilityProfile, careerModeForGrade } from '@/lib/learnerIntelligence/careerIntelligence'
 import type { CapabilityCareerMatch } from '@/lib/career/types'
@@ -33,18 +34,31 @@ export async function GET(
     if (authError || !user) return apiUnauthorized()
 
     const { slug } = await params
-    let career = await getCareerBySlugWithCOS(slug)
+    const career = await getCareerBySlugWithCOS(slug)
 
-    // No exact slug match — generate on the fly so links never dead-end
+    // No exact slug match. This used to generate a career inline and persist it,
+    // then fall through and run `computeCapabilityMatches` against it — scoring
+    // a real learner's alignment to an AI-authored career whose capability
+    // minimums nobody had checked. It now returns the same provisional outline
+    // the search route does, and never reaches the match engine below.
     if (!career) {
       try {
-        career = await searchOrGenerateCareer(slug.replace(/-/g, ' '))
+        const result = await requestCareerKnowledge(slug.replace(/-/g, ' '), user.id)
+        if (result.status === 'provisional') {
+          return apiSuccess({
+            career: null,
+            provisional: true,
+            preview: result.preview,
+            capability_match: null,
+            readiness_report: null,
+          })
+        }
+        return apiSuccess({ career: result.career, provisional: false, capability_match: null, readiness_report: null })
       } catch (genErr) {
-        console.error('[career/slug] generation failed', genErr)
+        console.error('[career/slug] knowledge request failed', genErr)
+        return apiNotFound(`Career '${slug}' not found`)
       }
     }
-
-    if (!career) return apiNotFound(`Career '${slug}' not found`)
 
     const { searchParams } = new URL(req.url)
     const studentId = searchParams.get('studentId')

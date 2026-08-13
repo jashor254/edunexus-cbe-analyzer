@@ -326,6 +326,165 @@ export class CareerRepository extends BaseRepository {
     }
   }
 
+  // ── Career knowledge review queue ─────────────────────────────────────────────
+
+  /**
+   * Record that a career was asked for and is not in the corpus.
+   *
+   * One row per career: a repeat request increments the demand counter rather
+   * than stacking duplicates for a reviewer to wade through. The generated
+   * payload is only written on first sight — a later request must not silently
+   * overwrite a profile a reviewer is part-way through checking.
+   */
+  async enqueueCareerReview(row: {
+    slug:         string
+    career_name:  string
+    payload:      Record<string, unknown>
+    submitted_by: string | null
+    origin:       string
+  }): Promise<{ queued: boolean; requestCount: number }> {
+    const { data: existing } = await this.db
+      .from('career_review_queue')
+      .select('id, request_count, status')
+      .eq('slug', row.slug)
+      .maybeSingle()
+
+    if (existing) {
+      const requestCount = (existing.request_count as number) + 1
+      const { error } = await this.db
+        .from('career_review_queue')
+        .update({ request_count: requestCount, updated_at: new Date().toISOString() })
+        .eq('id', existing.id as string)
+      if (error) throw new Error(`Failed to record career demand for ${row.slug}: ${error.message}`)
+      return { queued: false, requestCount }
+    }
+
+    const { error } = await this.db
+      .from('career_review_queue')
+      .insert({
+        slug:          row.slug,
+        career_name:   row.career_name,
+        payload:       row.payload,
+        submitted_by:  row.submitted_by,
+        origin:        row.origin,
+        status:        'pending',
+        request_count: 1,
+      })
+    if (error) throw new Error(`Failed to queue career ${row.slug} for review: ${error.message}`)
+    return { queued: true, requestCount: 1 }
+  }
+
+  /** Pending careers awaiting human review, most-requested first. */
+  async listPendingCareerReviews(limit = 50): Promise<Array<{
+    id: string
+    slug: string | null
+    career_name: string
+    request_count: number
+    origin: string
+    created_at: string
+  }>> {
+    const { data, error } = await this.db
+      .from('career_review_queue')
+      .select('id, slug, career_name, request_count, origin, created_at')
+      .eq('status', 'pending')
+      .order('request_count', { ascending: false })
+      .order('created_at', { ascending: true })
+      .limit(limit)
+    if (error) throw new Error(`Failed to list pending career reviews: ${error.message}`)
+    return (data ?? []) as Array<{
+      id: string
+      slug: string | null
+      career_name: string
+      request_count: number
+      origin: string
+      created_at: string
+    }>
+  }
+
+  /** The full queued payload, for a reviewer about to publish or reject it. */
+  async findCareerReviewById(id: string): Promise<{
+    id: string
+    slug: string | null
+    career_name: string
+    status: string
+    payload: Record<string, unknown> | null
+  } | null> {
+    const { data } = await this.db
+      .from('career_review_queue')
+      .select('id, slug, career_name, status, payload')
+      .eq('id', id)
+      .maybeSingle()
+    if (!data) return null
+    return data as {
+      id: string
+      slug: string | null
+      career_name: string
+      status: string
+      payload: Record<string, unknown> | null
+    }
+  }
+
+  async markCareerReviewDecided(
+    id: string,
+    status: 'published' | 'rejected',
+    reviewedBy: string,
+    reviewerNotes: string | null,
+  ): Promise<void> {
+    const { error } = await this.db
+      .from('career_review_queue')
+      .update({
+        status,
+        reviewed_by:    reviewedBy,
+        reviewed_at:    new Date().toISOString(),
+        reviewer_notes: reviewerNotes,
+        updated_at:     new Date().toISOString(),
+      })
+      .eq('id', id)
+    if (error) throw new Error(`Failed to record career review decision: ${error.message}`)
+  }
+
+  // ── Career knowledge freshness ────────────────────────────────────────────────
+
+  /**
+   * Careers whose facts are due for re-confirmation, stalest first.
+   *
+   * Never-verified careers sort first because Postgres orders NULLs first on an
+   * ascending sort — which is exactly the priority we want, since an unverified
+   * career is the most overdue case, not the least.
+   */
+  async findCareersNeedingReverification(limit: number): Promise<Array<{
+    id: string
+    slug: string
+    title: string
+    knowledge_verified_at: string | null
+  }>> {
+    const { data, error } = await this.db
+      .from('careers')
+      .select('id, slug, title, knowledge_verified_at')
+      .order('knowledge_verified_at', { ascending: true, nullsFirst: true })
+      .limit(limit)
+    if (error) throw new Error(`Failed to list careers needing re-verification: ${error.message}`)
+    return (data ?? []) as Array<{
+      id: string
+      slug: string
+      title: string
+      knowledge_verified_at: string | null
+    }>
+  }
+
+  /** Stamp a career as confirmed. The only place `knowledge_verified_at` moves. */
+  async markCareerKnowledgeVerified(
+    slug: string,
+    verifiedAt: string,
+    sourceNote: string,
+  ): Promise<void> {
+    const { error } = await this.db
+      .from('careers')
+      .update({ knowledge_verified_at: verifiedAt, knowledge_source_note: sourceNote })
+      .eq('slug', slug)
+    if (error) throw new Error(`Failed to mark ${slug} verified: ${error.message}`)
+  }
+
   // ── Market cache ──────────────────────────────────────────────────────────────
   //
   // The four read/write helpers that lived here were removed with the

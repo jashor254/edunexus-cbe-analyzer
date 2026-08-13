@@ -26,7 +26,7 @@ const VALID_CATEGORIES: CareerCategory[] = [
 ]
 const VALID_PATHWAYS: CareerPathway[] = [...SENIOR_PATHWAYS]
 
-function slugify(name: string): string {
+export function slugify(name: string): string {
   return name
     .toLowerCase()
     .trim()
@@ -35,7 +35,7 @@ function slugify(name: string): string {
     .replace(/-+/g, '-')
 }
 
-async function generateCareerProfile(query: string): Promise<Omit<Career, 'id' | 'created_at' | 'updated_at'>> {
+export async function generateCareerProfile(query: string): Promise<Omit<Career, 'id' | 'created_at' | 'updated_at'>> {
   const systemPrompt = 'You are a Kenyan CBC career-guidance expert. Return ONLY valid JSON matching the exact schema requested — no markdown, no extra text.'
   const prompt = `Generate a complete career profile for: "${query}" — written for a Kenyan CBC (Competency-Based Curriculum) student and their parent.
 
@@ -175,20 +175,15 @@ export async function searchCareers(filters: CareerSearchFilters): Promise<Caree
   return repos.careers.searchCareers(filters)
 }
 
-export async function searchOrGenerateCareer(query: string): Promise<Career> {
-  const trimmed = query.trim()
-  if (!trimmed) throw new Error('Career search query cannot be empty')
-
-  const slug = slugify(trimmed)
-  const existing = await getCareerBySlug(slug)
-  if (existing) return existing
-
-  const titleMatch = await repos.careers.findCareerByTitleLike(trimmed)
-  if (titleMatch) return titleMatch
-
-  const generated = await generateCareerProfile(trimmed)
-  return repos.careers.upsertCareer(generated)
-}
+// `searchOrGenerateCareer()` was removed here. It generated a career profile
+// with DeepSeek and upserted it straight into `careers` — the table the match
+// engine reads and every learner-facing surface renders as canonical knowledge.
+// One learner's search could introduce AI-authored salary bands and KCSE
+// minimums into the corpus with no human ever seeing them.
+//
+// Use `requestCareerKnowledge()` from lib/career/knowledgeRequests.ts, which
+// routes generated profiles to `career_review_queue` and returns the asking
+// learner a provisional preview carrying no unreviewed figures.
 
 export async function getAllCareers(): Promise<CareerSummary[]> {
   return repos.careers.getAllCareers()

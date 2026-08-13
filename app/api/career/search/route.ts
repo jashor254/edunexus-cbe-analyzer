@@ -3,7 +3,8 @@ import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
-import { searchCareers, getAllCareers, searchOrGenerateCareer } from '@/lib/career/careerEngine'
+import { searchCareers, getAllCareers } from '@/lib/career/careerEngine'
+import { requestCareerKnowledge } from '@/lib/career/knowledgeRequests'
 import type { CareerSearchFilters } from '@/lib/career/types'
 
 export const dynamic = 'force-dynamic'
@@ -34,14 +35,24 @@ export async function GET(req: NextRequest) {
       ? await searchCareers(filters)
       : await getAllCareers()
 
-    // No career matched the learner's search — generate one on the fly so they
-    // never hit a dead end, and persist it so future learners get an instant hit.
+    // No career matched. The learner still gets an answer rather than a dead
+    // end, but an unreviewed one: an outline with no salary figures, entry
+    // grades or course costs, plus a queue entry so a person researches it.
+    // See lib/career/knowledgeRequests.ts for why the preview is this narrow.
     if (careers.length === 0 && filters.q) {
-      const generated = await searchOrGenerateCareer(filters.q)
-      return apiSuccess({ careers: [generated], generated: true })
+      const result = await requestCareerKnowledge(filters.q, user.id)
+      if (result.status === 'known') {
+        return apiSuccess({ careers: [result.career], provisional: false })
+      }
+      return apiSuccess({
+        careers: [],
+        provisional: true,
+        preview: result.preview,
+        requestCount: result.requestCount,
+      })
     }
 
-    return apiSuccess({ careers })
+    return apiSuccess({ careers, provisional: false })
   } catch (err) {
     console.error('[career/search]', err)
     return apiError('Failed to search careers')
