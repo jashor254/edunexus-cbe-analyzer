@@ -1,5 +1,4 @@
 import { notFound } from 'next/navigation'
-import { Source_Serif_4 } from 'next/font/google'
 import type { CSSProperties, ReactNode } from 'react'
 import type { Metadata } from 'next'
 import { getSchoolConcept } from '@/data/schoolConcepts'
@@ -19,14 +18,25 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
 
-// Institutional heading face, scoped to this route group only — self-hosted
-// at build time by next/font, not a runtime remote fetch. Used for headings
-// only (via --font-institutional); body copy stays on the existing sans
-// stack. This is the same next/font/google convention already used by
-// app/(marketing)/layout.tsx (Sora), applied here with a different,
-// deliberately more formal face to read as an institutional document
-// heading rather than a product heading.
-const institutionalSerif = Source_Serif_4({ subsets: ['latin'], weight: ['600', '700'], variable: '--font-institutional' })
+// Institutional heading face, scoped to this route group only. Used for
+// headings (via --font-institutional); body copy stays on the existing sans
+// stack.
+//
+// A system serif stack rather than next/font/google. This was
+// Source_Serif_4, and it broke `npm run build`: Google's CSS API returned
+// the @font-face rules, but the .woff2 binary Next requested 404'd at
+// fonts.gstatic.com, so Next emitted an unresolvable
+// `@vercel/turbopack-next/internal/font/google/font` reference and Turbopack
+// failed with 12 module-not-found errors. It was specific to this family —
+// Montserrat and Inter, used by the marketing/demo/pitch layouts, resolved
+// fine in the same build.
+//
+// A build that depends on a third party serving one exact binary URL is not
+// deterministic, and this is a concept site whose job is to read as a formal
+// institutional document. The stack below keeps that serif intent with no
+// network dependency and no font assets to ship. The --font-institutional
+// abstraction is unchanged, so all 21 consumers are untouched.
+const INSTITUTIONAL_SERIF_STACK = 'ui-serif, Georgia, "Times New Roman", serif'
 
 export default async function SchoolConceptLayout({
   children,
@@ -54,13 +64,17 @@ export default async function SchoolConceptLayout({
     '--concept-cream': config.theme.cream,
     '--concept-clay': config.theme.clay,
     '--concept-charcoal': config.theme.charcoal,
+    // Declared alongside the theme colours rather than through a font
+    // loader's generated className — same variable name, same scope, one
+    // fewer build-time dependency.
+    '--font-institutional': INSTITUTIONAL_SERIF_STACK,
   } as CSSProperties
 
   return (
     <div
       data-school-concept-shell="true"
       style={themeVars}
-      className={`${institutionalSerif.variable} flex min-h-screen flex-col bg-[var(--concept-cream)] font-sans text-[var(--concept-charcoal)]`}
+      className="flex min-h-screen flex-col bg-[var(--concept-cream)] font-sans text-[var(--concept-charcoal)]"
     >
       <SiteHeader config={config} portalCapabilities={portalCapabilities} />
       <div className="flex-1">{children}</div>
