@@ -142,9 +142,19 @@ export default function CoreAdmissionsPage() {
     <div className="max-w-2xl mx-auto p-6 space-y-6">
       <OperationalBreadcrumb current="Admit a Learner" />
 
-      <header>
-        <h1 className="text-xl font-black text-slate-900">Admit a Learner</h1>
-        <p className="text-sm text-slate-500">{membership ? membership.schoolName : 'Admission, guardian, and enrollment in one step'}</p>
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-black text-slate-900">Admit a Learner</h1>
+          <p className="text-sm text-slate-500">{membership ? membership.schoolName : 'Admission, guardian, and enrollment in one step'}</p>
+        </div>
+        {/* Bulk import supplements this form; it does not replace it. Adding one
+            learner mid-term stays a one-screen job. */}
+        <a
+          href="/teacher/core-admissions/import"
+          className="shrink-0 border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-medium px-3 py-2 rounded-lg transition-colors"
+        >
+          Import learners
+        </a>
       </header>
 
       {error && (

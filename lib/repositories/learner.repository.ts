@@ -215,6 +215,100 @@ export class LearnerRepository extends BaseRepository {
 
   // ── Enrollments ────────────────────────────────────────────────────────────
 
+  // Batched counterpart to insert(), for roster import.
+  //
+  // The column mapping below is a copy of insert()'s, deliberately — this is
+  // the SAME definition of a valid learner, written once per row instead of
+  // once per round trip. It is not a second interpretation: both take
+  // AdmitLearnerInput, both apply the same defaults, and roster validation
+  // runs before either. A 400-learner school would otherwise pay 400
+  // sequential network round trips.
+  //
+  // Chunked because PostgREST has a practical payload ceiling; 200 rows per
+  // request comfortably clears it at pilot scale.
+  async insertMany(schoolId: string, inputs: AdmitLearnerInput[]): Promise<Learner[]> {
+    const CHUNK = 200
+    const created: Learner[] = []
+
+    for (let i = 0; i < inputs.length; i += CHUNK) {
+      const chunk = inputs.slice(i, i + CHUNK).map(input => ({
+        school_id:        schoolId,
+        admission_number: input.admission_number,
+        first_name:       input.first_name,
+        middle_name:      input.middle_name ?? null,
+        last_name:        input.last_name,
+        date_of_birth:    input.date_of_birth ?? null,
+        gender:           input.gender ?? null,
+        upi:              input.upi ?? null,
+        county_of_origin: input.county_of_origin ?? null,
+        special_needs:    input.special_needs ?? [],
+        notes:            input.notes ?? null,
+      }))
+
+      const { data, error } = await this.db
+        .from('learners')
+        .insert(chunk)
+        .select(LEARNER_COLS)
+      if (error) throw new Error(`importLearners: ${error.message}`)
+      created.push(...(data ?? []))
+    }
+
+    return created
+  }
+
+  // Batched counterpart to upsertEnrollment(), same conflict target and the
+  // same "a learner who moved class this term updates rather than duplicates"
+  // behaviour the single-row version documents.
+  async upsertEnrollments(
+    rows: Array<EnrollLearnerInput & { school_id: string }>
+  ): Promise<number> {
+    if (rows.length === 0) return 0
+    const CHUNK = 200
+    const today = new Date().toISOString().split('T')[0]
+    let count = 0
+
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const chunk = rows.slice(i, i + CHUNK).map(input => ({
+        school_id:        input.school_id,
+        learner_id:       input.learner_id,
+        class_id:         input.class_id,
+        term_id:          input.term_id,
+        academic_year_id: input.academic_year_id,
+        enrollment_date:  today,
+        status:           'active',
+      }))
+
+      const { data, error } = await this.db
+        .from('learner_enrollments')
+        .upsert(chunk, { onConflict: 'learner_id,term_id' })
+        .select('id')
+      if (error) throw new Error(`importLearnerEnrollments: ${error.message}`)
+      count += data?.length ?? 0
+    }
+
+    return count
+  }
+
+  // Which of these admission numbers already exist at this school. One query,
+  // used by roster preview to tell NEW from ALREADY EXISTS before any write.
+  async findExistingAdmissionNumbers(schoolId: string, admissionNumbers: string[]): Promise<Set<string>> {
+    if (admissionNumbers.length === 0) return new Set()
+    const found = new Set<string>()
+    const CHUNK = 300
+
+    for (let i = 0; i < admissionNumbers.length; i += CHUNK) {
+      const { data, error } = await this.db
+        .from('learners')
+        .select('admission_number')
+        .eq('school_id', schoolId)
+        .in('admission_number', admissionNumbers.slice(i, i + CHUNK))
+      if (error) throw new Error(`findExistingAdmissionNumbers: ${error.message}`)
+      for (const row of data ?? []) found.add(row.admission_number)
+    }
+
+    return found
+  }
+
   async upsertEnrollment(
     input: EnrollLearnerInput & { school_id: string }
   ): Promise<LearnerEnrollment> {
