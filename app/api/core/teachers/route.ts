@@ -6,15 +6,37 @@
 // lives in lib/core/teacherOnboarding.ts.
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { inviteTeacher, acceptTeacherInvitation, getTeacherReadiness, listTeacherMemberships } from '@/lib/core/teacherOnboarding'
+import { inviteSchoolMember, acceptTeacherInvitation, getTeacherReadiness, listTeacherMemberships, INVITABLE_SCHOOL_ROLES } from '@/lib/core/teacherOnboarding'
 import { requireAuthentication, requireSchoolAdmin } from '@/lib/core/permissions'
+import { deactivateSchoolMembership } from '@/lib/core/school-users'
 import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
 import { z } from 'zod'
 
+// `role` is a strict server-side allowlist (INVITABLE_SCHOOL_ROLES), never a
+// free string from the browser — and it is only honoured after
+// requireSchoolAdmin(schoolId) proves the CALLER already holds admin authority
+// AT THAT SCHOOL. Both halves matter: an allowlist alone would still let a
+// teacher at School A make themselves an admin at School B.
+//
+// Omitting `role` keeps the pre-existing teacher-invite behaviour byte for
+// byte, so every existing caller is unaffected.
 const InviteSchema = z.object({
   action:   z.literal('invite'),
   schoolId: z.string().uuid(),
   email:    z.string().email(),
+  role:     z.enum(INVITABLE_SCHOOL_ROLES).optional(),
+})
+
+// Ending someone's employment at a school. `userId` here is the SUBJECT of the
+// action, not the caller — which is safe only because requireSchoolAdmin(schoolId)
+// proves the CALLER holds admin authority at that same school first, and the
+// service resolves the membership by (userId, schoolId) so an id from another
+// school matches nothing. A teacher cannot deactivate a colleague, and cannot
+// reactivate themselves, because neither can pass requireSchoolAdmin.
+const DeactivateSchema = z.object({
+  action:   z.literal('deactivate'),
+  schoolId: z.string().uuid(),
+  userId:   z.string().uuid(),
 })
 
 const AcceptSchema = z.object({
@@ -48,8 +70,38 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return errorResponse(err)
     }
 
-    const result = await inviteTeacher(parsed.data.schoolId, parsed.data.email, userId)
+    const result = await inviteSchoolMember(
+      parsed.data.schoolId,
+      parsed.data.email,
+      parsed.data.role ?? 'teacher',
+      userId
+    )
     return NextResponse.json({ data: result }, { status: result.status === 'invited' ? 201 : 200 })
+  }
+
+  if (body?.action === 'deactivate') {
+    const parsed = DeactivateSchema.safeParse(body)
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
+
+    let adminUserId: string
+    try {
+      adminUserId = (await requireSchoolAdmin(supabase, parsed.data.schoolId)).userId
+    } catch (err) {
+      return errorResponse(err)
+    }
+
+    // An admin removing themselves would leave a school with no administrator
+    // and no way back in without founder intervention. Refused here rather
+    // than at the UI, so the API is safe on its own.
+    if (adminUserId === parsed.data.userId) {
+      return NextResponse.json(
+        { error: 'You cannot remove your own school access. Ask another administrator at this school.' },
+        { status: 400 },
+      )
+    }
+
+    const removed = await deactivateSchoolMembership(parsed.data.userId, parsed.data.schoolId)
+    return NextResponse.json({ data: { removed } })
   }
 
   if (body?.action === 'accept') {

@@ -54,13 +54,32 @@ export async function updateClass(
 
 // ── Class → Subject → Teacher assignment ─────────────────────────────────────
 
+/**
+ * Assigns a teacher to a subject in a class, closing the outgoing teacher's
+ * tenure rather than overwriting it.
+ *
+ * `teacherId` is a `school_users.id` — the membership, not the person.
+ *
+ * Returns what actually happened so a caller can word its confirmation
+ * honestly ("replaced Peter" vs "assigned" vs "already assigned").
+ */
 export async function assignSubjectTeacher(
   schoolId: string,
   classId: string,
   subjectId: string,
   teacherId: string
-): Promise<void> {
-  return repos.teachers.upsertClassSubjectTeacher(schoolId, classId, subjectId, teacherId)
+): Promise<{ replaced: boolean; unchanged: boolean }> {
+  return repos.teachers.assignClassSubjectTeacher(schoolId, classId, subjectId, teacherId)
+}
+
+/** Every teacher who has held one class+subject post, newest first. Closed tenures included. */
+export async function getClassSubjectHistory(classId: string, subjectId: string): Promise<Array<{
+  id: string
+  teacherId: string
+  startedAt: string
+  endedAt: string | null
+}>> {
+  return repos.teachers.listClassSubjectHistory(classId, subjectId)
 }
 
 export async function listClassSubjects(classId: string): Promise<Array<{

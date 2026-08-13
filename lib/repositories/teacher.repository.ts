@@ -8,6 +8,7 @@ import type {
   SubjectCategory,
   SchoolUser,
   SchoolUserRole,
+  TeachingAssignment,
 } from '@/types/core'
 
 const CLASS_COLS = `
@@ -133,19 +134,239 @@ export class TeacherRepository extends BaseRepository {
 
   // ── Class Subjects ─────────────────────────────────────────────────────────
 
-  async upsertClassSubjectTeacher(
+  /**
+   * Assigns `teacherId` (a `school_users.id`) to teach `subjectId` in
+   * `classId`, closing whoever currently holds that post.
+   *
+   * This REPLACED an upsert on (class_id, subject_id). That upsert overwrote
+   * `teacher_id` in place, so a replacement erased the previous teacher's
+   * tenure — there was no row anywhere recording that they ever taught it.
+   * Now the outgoing assignment is closed (`ended_at` set) and the incoming
+   * one is a new row, so both tenures survive.
+   *
+   * Idempotent: re-assigning the teacher who already holds the post is a
+   * no-op. It deliberately does NOT close-and-reopen, which would reset
+   * `started_at` and manufacture a fake succession event out of a double
+   * click.
+   *
+   * ORDERING AND FAILURE (deliberate). The close must precede the insert:
+   * inserting first would momentarily place two current teachers on one
+   * class+subject, which `class_subjects_current_assignment_uniq` rejects
+   * outright. So a failure between the two statements leaves the post VACANT
+   * rather than double-staffed. That is the correct direction to fail — a
+   * vacancy is visibly wrong and an admin re-assigns; a silent second current
+   * teacher would corrupt every downstream read of "who teaches this."
+   *
+   * The critical invariant (never two current teachers) is enforced by the
+   * partial unique index, not by this ordering, so it holds even under
+   * concurrent callers. A SECURITY DEFINER RPC would additionally remove the
+   * transient-vacancy window, and was consciously not added: this codebase has
+   * already had one privilege-escalation incident from a SECURITY DEFINER
+   * function's default PUBLIC grant, and transient vacancy is a far smaller
+   * problem than new privileged surface.
+   */
+  async assignClassSubjectTeacher(
     schoolId: string,
     classId: string,
     subjectId: string,
-    teacherId: string
-  ): Promise<void> {
-    const { error } = await this.db
+    teacherId: string,
+    now: Date = new Date()
+  ): Promise<{ replaced: boolean; unchanged: boolean }> {
+    const { data: current, error: readErr } = await this.db
       .from('class_subjects')
-      .upsert(
-        { school_id: schoolId, class_id: classId, subject_id: subjectId, teacher_id: teacherId },
-        { onConflict: 'class_id,subject_id' }
-      )
-    if (error) throw new Error(`assignSubjectTeacher: ${error.message}`)
+      .select('id, teacher_id')
+      .eq('class_id', classId)
+      .eq('subject_id', subjectId)
+      .is('ended_at', null)
+      .maybeSingle()
+    if (readErr) throw new Error(`assignClassSubjectTeacher (read current): ${readErr.message}`)
+
+    if (current && current.teacher_id === teacherId) {
+      return { replaced: false, unchanged: true }
+    }
+
+    if (current) {
+      const { error: closeErr } = await this.db
+        .from('class_subjects')
+        .update({ ended_at: now.toISOString() })
+        .eq('id', current.id)
+        .is('ended_at', null) // never re-close an already-closed row
+      if (closeErr) throw new Error(`assignClassSubjectTeacher (close outgoing): ${closeErr.message}`)
+    }
+
+    const { error: insertErr } = await this.db
+      .from('class_subjects')
+      .insert({
+        school_id:  schoolId,
+        class_id:   classId,
+        subject_id: subjectId,
+        teacher_id: teacherId,
+        started_at: now.toISOString(),
+      })
+    if (insertErr) throw new Error(`assignClassSubjectTeacher (insert incoming): ${insertErr.message}`)
+
+    return { replaced: !!current, unchanged: false }
+  }
+
+  /**
+   * Closes every CURRENT assignment held by one membership — the assignment
+   * half of "this person no longer works here."
+   *
+   * Keyed on `school_users.id` rather than a user id because that is what an
+   * assignment actually belongs to: an employment relationship, not a person.
+   * The same human at another school keeps their assignments there untouched.
+   *
+   * Idempotent by construction: `.is('ended_at', null)` means a second call
+   * matches nothing and closes nothing, so a double-submitted "remove staff"
+   * action cannot rewrite the first closure's timestamp.
+   *
+   * Never deletes. A closed row is the record that this teacher taught this
+   * subject, and it outlives their employment.
+   */
+  async closeCurrentAssignmentsForMembership(
+    schoolUserId: string,
+    now: Date = new Date()
+  ): Promise<number> {
+    const { data, error } = await this.db
+      .from('class_subjects')
+      .update({ ended_at: now.toISOString() })
+      .eq('teacher_id', schoolUserId)
+      .is('ended_at', null)
+      .select('id')
+    if (error) throw new Error(`closeCurrentAssignmentsForMembership: ${error.message}`)
+    return (data ?? []).length
+  }
+
+  /**
+   * Full tenure history for one class+subject, newest first — who has taught
+   * it, and when. Exists so closed rows are reachable rather than orphaned
+   * data nothing can read (there is no history UI in this phase).
+   */
+  async listClassSubjectHistory(classId: string, subjectId: string): Promise<Array<{
+    id: string
+    teacherId: string
+    startedAt: string
+    endedAt: string | null
+  }>> {
+    const { data, error } = await this.db
+      .from('class_subjects')
+      .select('id, teacher_id, started_at, ended_at')
+      .eq('class_id', classId)
+      .eq('subject_id', subjectId)
+      .order('started_at', { ascending: false })
+    if (error) throw new Error(`listClassSubjectHistory: ${error.message}`)
+    return (data ?? []).map(r => ({
+      id:        r.id as string,
+      teacherId: r.teacher_id as string,
+      startedAt: r.started_at as string,
+      endedAt:   r.ended_at as string | null,
+    }))
+  }
+
+  /**
+   * The school ids where this user currently holds an ACTIVE teacher
+   * membership. Exists to answer "is this person a school teacher at all",
+   * separately from "what are they assigned to teach" — a teacher with a
+   * membership and no assignments must be distinguishable from a Solo
+   * Teacher, and `listTeachingAssignmentsByUser` collapses both to [].
+   */
+  async listActiveTeacherMembershipSchoolIds(userId: string): Promise<string[]> {
+    const { data, error } = await this.db
+      .from('school_users')
+      .select('school_id')
+      .eq('user_id', userId)
+      .eq('role', 'teacher')
+      .eq('is_active', true)
+    if (error) throw new Error(`listActiveTeacherMembershipSchoolIds: ${error.message}`)
+    return (data ?? []).map(r => r.school_id as string)
+  }
+
+  /**
+   * THE institutional read: every teaching assignment currently held by
+   * `userId`, resolved from their own active memberships outward.
+   *
+   * Two queries, deliberately, rather than one PostgREST embed:
+   * `class_subjects.teacher_id` FKs to `school_users.id`, so an embed would
+   * let PostgREST resolve the membership but gives no way to filter it by
+   * `user_id` AND `is_active` AND `role` in the same statement. Resolving
+   * memberships first also makes the security property inspectable — the
+   * `.in()` list is built ONLY from rows proven to belong to this user, so
+   * there is no id a caller could supply that widens the result.
+   *
+   * Returns [] (never throws) for a user with no active teacher membership:
+   * "not a school teacher" is an ordinary answer, not an error.
+   *
+   * `is_active = true` is required here, and so is `ended_at IS NULL` below.
+   * They are two independent guards on the same rule and both are needed: a
+   * membership can go inactive while its assignments are still open (a
+   * departure recorded in two steps), and an assignment can be closed while
+   * the membership stays active (an ordinary reassignment). Either alone
+   * would let a stale post surface as current work.
+   */
+  async listTeachingAssignmentsByUser(userId: string): Promise<TeachingAssignment[]> {
+    const { data: memberships, error: membershipError } = await this.db
+      .from('school_users')
+      .select('id, school_id')
+      .eq('user_id', userId)
+      .eq('role', 'teacher')
+      .eq('is_active', true)
+    if (membershipError) throw new Error(`listTeachingAssignmentsByUser (memberships): ${membershipError.message}`)
+    if (!memberships || memberships.length === 0) return []
+
+    const membershipIds = memberships.map(m => m.id as string)
+
+    const { data, error } = await this.db
+      .from('class_subjects')
+      .select(`
+        id, school_id, class_id, subject_id, teacher_id,
+        classes (id, class_name, display_name, academic_year_id, grades (name, code), streams (name)),
+        subjects (id, name, code),
+        schools (id, school_name)
+      `)
+      .in('teacher_id', membershipIds)
+      // CURRENT assignments only — My Teaching shows what this teacher teaches
+      // now, never a post they used to hold. A closed row is history, and
+      // history is not a timetable.
+      .is('ended_at', null)
+    if (error) throw new Error(`listTeachingAssignmentsByUser: ${error.message}`)
+
+    type Row = {
+      id: string
+      school_id: string
+      class_id: string
+      subject_id: string
+      teacher_id: string
+      classes: {
+        class_name: string | null
+        display_name: string | null
+        academic_year_id: string | null
+        grades: { name: string; code: string } | null
+        streams: { name: string } | null
+      } | null
+      subjects: { id: string; name: string; code: string } | null
+      schools: { id: string; school_name: string } | null
+    }
+
+    return ((data ?? []) as unknown as Row[])
+      // A class_subjects row whose class or subject no longer resolves is
+      // corrupt, not renderable — dropped rather than surfaced as a blank
+      // card the teacher cannot act on.
+      .filter(r => r.classes !== null && r.subjects !== null)
+      .map(r => ({
+        assignmentId:        r.id,
+        schoolId:            r.school_id,
+        schoolName:          r.schools?.school_name ?? '',
+        classId:             r.class_id,
+        className:           r.classes!.display_name ?? r.classes!.class_name ?? '',
+        gradeName:           r.classes!.grades?.name ?? null,
+        gradeCode:           r.classes!.grades?.code ?? null,
+        streamName:          r.classes!.streams?.name ?? null,
+        academicYearId:      r.classes!.academic_year_id,
+        subjectId:           r.subjects!.id,
+        subjectName:         r.subjects!.name,
+        subjectCode:         r.subjects!.code,
+        teacherMembershipId: r.teacher_id,
+      }))
   }
 
   async listClassSubjects(classId: string): Promise<Array<{
@@ -158,6 +379,10 @@ export class TeacherRepository extends BaseRepository {
       .from('class_subjects')
       .select('id, subject_id, teacher_id, subjects (id, name, code)')
       .eq('class_id', classId)
+      // CURRENT assignments only. Without this the admin structure page would
+      // list every teacher who has ever held each post, and a class with one
+      // replacement would appear to have two Mathematics teachers.
+      .is('ended_at', null)
     if (error) throw new Error(`listClassSubjects: ${error.message}`)
     return data as unknown as Array<{
       id: string
@@ -431,6 +656,28 @@ export class TeacherRepository extends BaseRepository {
       .eq('role', role)
       .maybeSingle()
     return data
+  }
+
+  // Every school_users row this user holds at this school, regardless of role
+  // OR status.
+  //
+  // findSchoolUserByUserIdAndRole answers "is this person a pending/active X
+  // here"; this answers the question an invitation actually needs to ask
+  // first: "does this person already hold ANY membership here, under any
+  // role." Without it, inviting an existing teacher as a school_admin would
+  // insert a SECOND active row (the unique key is school_id+user_id+role, so
+  // the database permits it) — and repos.schools.findSchoolUserByUserId()
+  // uses .maybeSingle(), so a second active row would make that lookup throw
+  // for every downstream caller. Membership changes role in place instead.
+  async listSchoolUserRowsForUser(schoolId: string, userId: string): Promise<SchoolUser[]> {
+    const { data, error } = await this.db
+      .from('school_users')
+      .select(SCHOOL_USER_COLS)
+      .eq('school_id', schoolId)
+      .eq('user_id', userId)
+      .order('created_at')
+    if (error) throw new Error(`listSchoolUserRowsForUser: ${error.message}`)
+    return data ?? []
   }
 
   // Creates a *pending* membership (is_active: false) — the "invited, not

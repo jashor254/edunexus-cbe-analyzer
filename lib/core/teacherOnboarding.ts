@@ -31,16 +31,43 @@
 // assigned/could own an assessment — it creates nothing.
 
 import { repos } from '@/lib/repositories'
-import { addSchoolUser, listSchoolUsers } from '@/lib/core/school-users'
+import { addSchoolUser, listSchoolUsers, updateSchoolUserRole } from '@/lib/core/school-users'
 import { resolveTeacher, resolveMembership } from '@/lib/core/identity'
 import type { SchoolUser } from '@/types/core'
 
 // ── Invite ───────────────────────────────────────────────────────────────────
 
+/**
+ * The roles a school admin may hand out from the Team screen.
+ *
+ * A strict server-side allowlist, never a role string from the browser. This
+ * is the exact vulnerability class closed by migration 20260812190000, where
+ * `teachers.role='admin'` — a value the user could write about themselves —
+ * was trusted as an authorization primitive. Here the role travels through a
+ * trusted invitation performed by someone who already holds admin authority
+ * AT THAT SCHOOL, and the invitee cannot alter it.
+ *
+ * 'headteacher' and 'deputy_headteacher' are equally canonical (both are in
+ * permissions.ts's SCHOOL_ADMIN_ROLES and carry identical authority), and are
+ * deliberately NOT offered yet — see this phase's report. Adding them later is
+ * a one-line change to this array.
+ *
+ * 'parent' is excluded: it is a real school_users role but not a staff
+ * appointment, and it grants nothing this screen is for.
+ */
+export const INVITABLE_SCHOOL_ROLES = ['teacher', 'school_admin'] as const
+export type InvitableSchoolRole = (typeof INVITABLE_SCHOOL_ROLES)[number]
+
+export function isInvitableSchoolRole(value: string): value is InvitableSchoolRole {
+  return (INVITABLE_SCHOOL_ROLES as readonly string[]).includes(value)
+}
+
 export type InviteTeacherResult =
   | { status: 'invited'; schoolUser: SchoolUser }
   | { status: 'already_pending'; schoolUser: SchoolUser }
   | { status: 'already_member'; schoolUser: SchoolUser }
+  /** An existing membership had its role changed in place (e.g. teacher → school_admin). */
+  | { status: 'role_changed'; schoolUser: SchoolUser; previousRole: SchoolUser['role'] }
   | { status: 'no_account'; email: string }
 
 /**
@@ -61,15 +88,58 @@ export async function inviteTeacher(
   email: string,
   invitedBy: string
 ): Promise<InviteTeacherResult> {
+  return inviteSchoolMember(schoolId, email, 'teacher', invitedBy)
+}
+
+/**
+ * Invites an existing platform user (by email) to join `schoolId` under one of
+ * the {@link INVITABLE_SCHOOL_ROLES}. This is how a school gets its own
+ * administrator: before it existed, `school_admin` was assigned in exactly one
+ * place in the codebase — `createSchool()`, to the creator — so a school the
+ * founder created could never be handed to its actual principal without SQL.
+ *
+ * Role changes happen IN PLACE rather than by adding a row. The `school_users`
+ * unique key is (school_id, user_id, role), so a second row is schema-legal —
+ * but `repos.schools.findSchoolUserByUserId()` resolves membership with
+ * .maybeSingle(), and a user holding two active rows at one school would make
+ * that throw for every downstream caller. One person, one membership per
+ * school; promotion edits the role they already hold.
+ *
+ * Idempotent in every direction: re-inviting at the same role is a no-op that
+ * reports current state, and promoting an already-promoted member reports
+ * `already_member`.
+ *
+ * Does not create an account for an email with none — returns
+ * `{status:'no_account'}`. No email or message is sent by this function; the
+ * invitee must already have signed up. That limitation is real and surfaced to
+ * the UI rather than papered over.
+ */
+export async function inviteSchoolMember(
+  schoolId: string,
+  email: string,
+  role: InvitableSchoolRole,
+  invitedBy: string
+): Promise<InviteTeacherResult> {
   const authUser = await repos.teachers.findAuthUserByEmail(email)
   if (!authUser) return { status: 'no_account', email }
 
-  const existing = await repos.teachers.findSchoolUserByUserIdAndRole(schoolId, authUser.id, 'teacher')
+  // Any membership at this school, under any role, in any state.
+  const rows = await repos.teachers.listSchoolUserRowsForUser(schoolId, authUser.id)
+
+  // Prefer an active row when (through legacy data) more than one exists, so a
+  // promotion edits the membership that is actually in force.
+  const existing = rows.find(r => r.is_active) ?? rows[0] ?? null
+
   if (existing) {
-    return { status: existing.is_active ? 'already_member' : 'already_pending', schoolUser: existing }
+    if (existing.role === role) {
+      return { status: existing.is_active ? 'already_member' : 'already_pending', schoolUser: existing }
+    }
+    const previousRole = existing.role
+    const schoolUser = await updateSchoolUserRole(existing.id, role)
+    return { status: 'role_changed', schoolUser, previousRole }
   }
 
-  const schoolUser = await repos.teachers.insertPendingSchoolUser(schoolId, authUser.id, 'teacher', invitedBy)
+  const schoolUser = await repos.teachers.insertPendingSchoolUser(schoolId, authUser.id, role, invitedBy)
   return { status: 'invited', schoolUser }
 }
 
@@ -83,9 +153,11 @@ export type AcceptTeacherInvitationResult = {
 }
 
 /**
- * Accepts a pending invitation (or, for a school_users row that's already
- * active through some other path — e.g. the legacy `ensureSchoolMembership`
- * bridge — self-heals it into the same canonical shape). Always ensures, on
+ * Accepts a pending invitation (or, for a school_users row that is already
+ * active through some other path — historically the `ensureSchoolMembership`
+ * name-matching bridge, removed in the self-join closeout, but still possible
+ * for rows it created before then — self-heals it into the same canonical
+ * shape). Always ensures, on
  * every call, that all three rows exist and are correctly linked:
  * `school_users` (active), `teachers`, `profiles`. Safe to call repeatedly
  * (Part 4/7: duplicate acceptance, partial onboarding) — every write is
@@ -100,16 +172,23 @@ export async function acceptTeacherInvitation(
   schoolId: string,
   profile: { full_name: string; subject?: string; grade_levels?: number[]; phone?: string }
 ): Promise<AcceptTeacherInvitationResult> {
-  const existingMembership = await repos.teachers.findSchoolUserByUserIdAndRole(schoolId, userId, 'teacher')
+  // The invitation's own role is authoritative — it is read from the row a
+  // trusted school admin created, never supplied by the accepting user. An
+  // invitee cannot upgrade themselves on the way in, and cannot accept a
+  // membership that was never extended to them (userId comes from
+  // auth.getUser() at the route, never from the request body).
+  const rows = await repos.teachers.listSchoolUserRowsForUser(schoolId, userId)
+  const existingMembership = rows.find(r => r.is_active) ?? rows[0] ?? null
   if (!existingMembership) {
     throw new Error(`acceptTeacherInvitation: no invitation found for this user at school ${schoolId} — invite them first.`)
   }
 
+  const invitedRole = existingMembership.role
   const wasAlreadyActive = existingMembership.is_active
   // addSchoolUser upserts on (school_id,user_id,role) and always sets
   // is_active:true — exactly "accept" for a pending row, and a safe no-op
   // re-affirmation for an already-active one (Part 4: repeated acceptance).
-  const schoolUser = await addSchoolUser(schoolId, userId, 'teacher', existingMembership.invited_by ?? userId)
+  const schoolUser = await addSchoolUser(schoolId, userId, invitedRole, existingMembership.invited_by ?? userId)
 
   const school = await repos.schools.findById(schoolId)
 
@@ -124,6 +203,14 @@ export async function acceptTeacherInvitation(
     })
   }
 
+  // profiles.role stays 'teacher' even for a school_admin membership, and that
+  // is deliberate rather than an oversight. `profiles.role` is the PLATFORM
+  // tier signal read by checkFeatureAccess() step 4/5: `isTeacherRole` is
+  // true only for 'teacher'. Writing 'school_admin' here would make a
+  // principal fail that check and lose school-covered teacher tools — they
+  // would be asked to pay for a SOW at the school that just paid for them.
+  // School authority lives in `school_users.role`, which is where every
+  // permission check actually reads it from.
   await repos.teachers.upsertProfile(userId, { role: 'teacher', full_name: profile.full_name })
 
   return { status: wasAlreadyActive ? 'already_member' : 'accepted', schoolUser, teacherId: teacher.id }
@@ -136,10 +223,16 @@ export type TeacherMembershipView = {
   userId: string
   fullName: string | null
   email: string | null
+  /** The school_users role this membership carries — the Team screen needs it to distinguish staff from administrators. */
+  role: SchoolUser['role']
   status: 'pending' | 'active'
   joinedAt: string | null
   invitedAt: string
 }
+
+/** Staff roles the Team screen lists. Excludes 'parent', which is not a staff appointment. */
+const TEAM_ROLES: ReadonlyArray<SchoolUser['role']> =
+  ['school_admin', 'headteacher', 'deputy_headteacher', 'teacher']
 
 /**
  * Read-only roster for a "Team" screen: every school_users row with
@@ -151,7 +244,11 @@ export type TeacherMembershipView = {
  * the identifying detail instead.
  */
 export async function listTeacherMemberships(schoolId: string): Promise<TeacherMembershipView[]> {
-  const memberships = await listSchoolUsers(schoolId, 'teacher')
+  // Now lists every staff role, not just 'teacher'. A Team screen that hid the
+  // school's own administrators could not show whether the school has one —
+  // which is precisely the question this phase exists to answer.
+  const all = await listSchoolUsers(schoolId)
+  const memberships = all.filter(m => TEAM_ROLES.includes(m.role))
   if (memberships.length === 0) return []
 
   const userIds = memberships.map(m => m.user_id)
@@ -165,6 +262,7 @@ export async function listTeacherMemberships(schoolId: string): Promise<TeacherM
     userId: m.user_id,
     fullName: profiles.get(m.user_id)?.full_name ?? null,
     email: emails.get(m.user_id) ?? null,
+    role: m.role,
     status: m.is_active ? 'active' : 'pending',
     joinedAt: m.joined_at,
     invitedAt: m.created_at,

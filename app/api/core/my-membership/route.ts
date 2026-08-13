@@ -44,6 +44,11 @@ export async function GET() {
     return apiSuccess({
       membership: {
         schoolId:   membership.school_id,
+        // The caller's own auth id. Already known to them (it is their
+        // session); returned so an admin screen can tell "this row is me"
+        // apart from a colleague without a second lookup — e.g. to hide a
+        // remove-access action that the API would refuse anyway.
+        userId:     membership.user_id,
         schoolName: school.school_name,
         role:       membership.role,
         currentTerm,
