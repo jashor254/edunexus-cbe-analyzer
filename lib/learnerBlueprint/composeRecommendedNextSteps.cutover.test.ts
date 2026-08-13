@@ -171,8 +171,13 @@ test('23c. an approved, teacher_only-visibility item does not trigger the cutove
     visibility: 'teacher_only',
     title: 'Teacher-only approved item',
     rationale: 'Internal only.',
-    intendedOutcome: 'n/a',
-    successIndicator: 'n/a',
+    // Real outcome and indicator, not 'n/a'. This test is about VISIBILITY, but
+    // it has to approve the item to get there, and `requireCoherentApproval`
+    // (added after this test was written) refuses to approve an action whose
+    // success indicator is too generic to check against evidence. The old 'n/a'
+    // made the test fail before it reached its own assertion.
+    intendedOutcome: 'Kiswahili comprehension improves from Level 2 to Level 3.',
+    successIndicator: 'Next Kiswahili assessment shows Level 3.',
     proposalSource: 'teacher',
   })
   await approveBlueprintAction(client, item.id)
