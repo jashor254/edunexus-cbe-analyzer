@@ -160,10 +160,17 @@ export async function analyseLearnerRoster(schoolId: string, csv: string): Promi
     listClasses(schoolId),
     getCurrentTerm(schoolId).catch(() => null),
   ])
+  // BOTH name columns are nullable, and a school activated through
+  // activateSchool() carries its label in display_name with class_name NULL —
+  // so indexing on class_name alone threw on the whole file before a single
+  // row was read. Every name a school might legitimately be using is indexed;
+  // a class with neither is simply unmatchable, which is not a crash.
   const classByName = new Map<string, string>()
   for (const c of classes) {
-    classByName.set(normaliseKey(c.class_name), c.id)
-    if (c.display_name) classByName.set(normaliseKey(c.display_name), c.id)
+    for (const name of [c.display_name, c.class_name]) {
+      const key = normalise(name)
+      if (key) classByName.set(normaliseKey(key), c.id)
+    }
   }
   const enrollmentAvailable = currentTerm !== null && classes.length > 0
 
@@ -199,10 +206,14 @@ export async function analyseLearnerRoster(schoolId: string, csv: string): Promi
     if (className) {
       resolvedClassId = classByName.get(normaliseKey(className)) ?? null
       if (!resolvedClassId) {
-        const available = classes.map(c => c.class_name).slice(0, 8).join(', ')
+        // Same precedence as the index above, and unnameable classes are left
+        // out entirely — a school activated with display_name only would
+        // otherwise be told "Existing classes: , , , ,".
+        const nameable = classes.map(c => normalise(c.display_name) || normalise(c.class_name)).filter(Boolean)
+        const available = nameable.slice(0, 8).join(', ')
         issues.push(
           `Class "${className}" does not exist at this school.` +
-          (available ? ` Existing classes: ${available}${classes.length > 8 ? '…' : ''}.` : ' This school has no classes yet.')
+          (available ? ` Existing classes: ${available}${nameable.length > 8 ? '…' : ''}.` : ' This school has no classes yet.')
         )
       } else if (!currentTerm) {
         issues.push('This school has no current term set, so learners cannot be placed in a class yet. Leave the class column blank to import them without a class.')

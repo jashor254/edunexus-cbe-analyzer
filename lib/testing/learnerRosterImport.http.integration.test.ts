@@ -340,6 +340,145 @@ test('21b. a matching class name places learners in that class for the current t
   assert.ok(enrollments!.every(e => e.class_id === klass!.id && e.term_id === term!.id && e.status === 'active'))
 })
 
+// ── Display-name-only classes ────────────────────────────────────────────────
+//
+// `classes.class_name` and `classes.display_name` are BOTH nullable, and a
+// school activated through activateSchool() gets its usable label in
+// display_name with class_name left NULL — the exact shape of all nine classes
+// at the Reference School, where this crashed the whole preview with
+// "Cannot read properties of null (reading 'trim')".
+//
+// The canonical precedence is `display_name ?? class_name`, already used by
+// academicBridge, termStatus and the TeachingAssignment contract.
+
+/** A school with one display-name-only class, plus a current year and term. */
+async function mkSchoolWithDisplayNameClass(label: string, displayName: string) {
+  const school = await mkSchool(label)
+  const admin = await mkUser(`${label}-admin`)
+  await db.from('school_users').insert({ school_id: school, user_id: admin.id, role: 'school_admin', is_active: true })
+
+  const { data: year } = await db.from('academic_years')
+    .insert({ school_id: school, name: '2026', start_date: '2026-01-01', end_date: '2026-11-30', is_current: true })
+    .select('id').single()
+  const { data: term } = await db.from('terms')
+    .insert({ school_id: school, academic_year_id: year!.id, term_number: 1, name: 'Term 1', start_date: '2026-01-05', end_date: '2026-04-10', is_current: true })
+    .select('id').single()
+
+  const { data: klass, error } = await db.from('classes')
+    .insert({ school_id: school, class_name: null, display_name: displayName, academic_year_id: year!.id })
+    .select('id, class_name, display_name').single()
+  if (error) throw new Error(`mkSchoolWithDisplayNameClass: ${error.message}`)
+  assert.equal(klass!.class_name, null, 'fixture must reproduce the NULL class_name shape')
+
+  return { school, admin, term: term!.id, classId: klass!.id }
+}
+
+test('23. a NULL class_name does not crash the roster preview', async () => {
+  const { school, admin } = await mkSchoolWithDisplayNameClass('displayname-crash', 'Grade 7 East')
+
+  // No class column at all — the crash was in building the class INDEX, so it
+  // fired before any row was even looked at.
+  const { status, raw } = await preview(admin.cookie, school, HEADER + 'ADM600,Null,Probe,,,\n')
+  assert.equal(status, 200, `preview 500'd on a display-name-only class: ${raw}`)
+  assert.ok(!/trim/.test(raw), `null.trim() reached the response: ${raw}`)
+})
+
+test('24. a learner naming a display-name-only class resolves to that class', async () => {
+  const { school, admin, term, classId } = await mkSchoolWithDisplayNameClass('displayname-resolve', 'Grade 7 East')
+
+  // Same casing/whitespace normalisation as class_name matching (test 21b).
+  const csv = HEADER +
+    'ADM610,Placed,One,,female,grade 7  east\n' +
+    'ADM611,Placed,Two,,male,Grade 7 East\n' +
+    'ADM612,Unplaced,Three,,male,\n'
+
+  const pre = await preview(admin.cookie, school, csv)
+  assert.equal(pre.status, 200, pre.raw)
+  assert.equal((pre.json.data as { summary: { willEnroll: number } }).summary.willEnroll, 2,
+    'a display-name-only class was not matched')
+  assert.equal(await learnerCount(school), 0, 'preview wrote to the database')
+
+  const res = await commit(admin.cookie, school, csv)
+  assert.equal(res.status, 200, res.raw)
+  const result = res.json.data as { created: number; enrolled: number }
+  assert.equal(result.created, 3)
+  assert.equal(result.enrolled, 2)
+
+  const { data: enrollments } = await db.from('learner_enrollments')
+    .select('class_id, term_id, status').eq('school_id', school)
+  assert.equal(enrollments?.length, 2)
+  assert.ok(enrollments!.every(e => e.class_id === classId && e.term_id === term && e.status === 'active'),
+    'learners were not enrolled into the display-name-only class')
+})
+
+test('25. an unnameable class does not take down the whole import', async () => {
+  const { school, admin, classId } = await mkSchoolWithDisplayNameClass('displayname-unnameable', 'Grade 8 West')
+
+  // A class with NEITHER usable name. Schema-legal (both columns are
+  // nullable), unmatchable by definition — and must not crash the run.
+  const { data: broken } = await db.from('classes')
+    .insert({ school_id: school, class_name: null, display_name: null })
+    .select('id').single()
+
+  const csv = HEADER +
+    'ADM620,Good,Row,,female,Grade 8 West\n' +
+    'ADM621,Other,Row,,male,\n'
+
+  const { status, json, raw } = await preview(admin.cookie, school, csv)
+  assert.equal(status, 200, `an unnameable class crashed the import: ${raw}`)
+  const data = json.data as { summary: { total: number; willEnroll: number } }
+  assert.equal(data.summary.total, 2)
+  assert.equal(data.summary.willEnroll, 1, 'the nameable class stopped resolving')
+
+  // The unnameable class is simply never matched — not invented, not renamed.
+  const res = await commit(admin.cookie, school, csv)
+  assert.equal(res.status, 200, res.raw)
+  const { data: enrollments } = await db.from('learner_enrollments')
+    .select('class_id').eq('school_id', school)
+  assert.equal(enrollments?.length, 1)
+  assert.equal(enrollments![0].class_id, classId)
+  assert.notEqual(enrollments![0].class_id, broken!.id)
+})
+
+test('26. class_name-only classes still match, and neighbours are unaffected', async () => {
+  // The pre-existing shape must keep working alongside the new one: one class
+  // named the old way, one the new way, in the same school.
+  const { school, admin } = await mkSchoolWithDisplayNameClass('displayname-mixed', 'Grade 9 North')
+  const { data: legacy } = await db.from('classes')
+    .insert({ school_id: school, class_name: 'Grade 9 South', display_name: null })
+    .select('id').single()
+
+  const csv = HEADER +
+    'ADM630,Legacy,Row,,female,Grade 9 South\n' +
+    'ADM631,Modern,Row,,male,Grade 9 North\n' +
+    'ADM632,Unknown,Row,,male,Grade 9 Nowhere\n'
+
+  const { status, json } = await preview(admin.cookie, school, csv)
+  assert.equal(status, 200)
+  const data = json.data as {
+    summary: { willEnroll: number; invalid: number }
+    rows: Array<{ resolvedClassId: string | null; issues: string[] }>
+  }
+  assert.equal(data.summary.willEnroll, 2, 'a mixed-shape school lost a class match')
+  assert.equal(data.rows[0].resolvedClassId, legacy!.id, 'class_name matching regressed')
+  assert.ok(data.rows[2].issues.some(i => /does not exist at this school/i.test(i)),
+    'an unknown class stopped being rejected')
+})
+
+test('27. the unknown-class message names classes the school can actually see', async () => {
+  // The same null assumption also reached the error text, which told a
+  // display-name-only school "Existing classes: , , , ,".
+  const { school, admin } = await mkSchoolWithDisplayNameClass('displayname-message', 'Grade 7 East')
+  await db.from('classes').insert({ school_id: school, class_name: null, display_name: null })
+
+  const { json } = await preview(admin.cookie, school, HEADER + 'ADM640,Bad,Class,,,Grade 99 Nowhere\n')
+  const issue = (json.data as { rows: Array<{ issues: string[] }> }).rows[0].issues
+    .find(i => /does not exist at this school/i.test(i))!
+
+  assert.ok(/Existing classes: Grade 7 East/.test(issue), `unhelpful message: ${issue}`)
+  assert.ok(!/: ,|, ,|, \./.test(issue), `empty class names leaked into the message: ${issue}`)
+})
+
 // ── Scale ────────────────────────────────────────────────────────────────────
 
 test('22. a realistic ~400-learner roster imports completely', async () => {

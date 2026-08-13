@@ -380,7 +380,14 @@ export type LearnerWithEnrollment = Learner & {
 export type ClassWithDetails = {
   id: string
   school_id: string
-  class_name: string
+  /**
+   * Nullable in the database, and genuinely NULL for schools activated through
+   * activateSchool(), which writes the label to `display_name` only. Read a
+   * human-readable name as `display_name ?? class_name` — the precedence
+   * academicBridge, termStatus and {@link TeachingAssignment} already use —
+   * and never assume either column alone is present.
+   */
+  class_name: string | null
   display_name: string | null
   grade_id: string | null
   stream_id: string | null
