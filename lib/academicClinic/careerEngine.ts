@@ -17,7 +17,6 @@
 // tracked as a deferred item rather than attempted in this pass.
 // ============================================================
 
-import { repos } from '@/lib/repositories'
 import { analyzePerformance } from '@/lib/adaptiveLearning'
 import { formatSubjectName } from '@/lib/pathwayCalculator'
 
@@ -87,12 +86,40 @@ export interface KenyaDisruptionAssessment {
   globalVsKenya: string
 }
 
+/**
+ * What we know about a career's live market conditions.
+ *
+ * `source: 'none'` is the only value this platform can currently produce
+ * honestly. The previous implementation called the DuckDuckGo Instant Answer
+ * API with "{career} jobs Kenya 2026 salary" and regex-matched the abstract for
+ * /increas|growing|rising/ to decide `salaryTrend`. That endpoint returns an
+ * empty abstract for essentially every query of that shape, so the result fell
+ * through to 'stable' regardless of the actual market — a fabricated trend
+ * presented as a live signal. It was removed rather than repaired: no consumer
+ * anywhere read this field, so it cost a network call and a cache write per
+ * career to produce a number nobody saw and nobody could trust.
+ *
+ * Wiring a real labour-market feed (job-board counts, KNBS wage data) means
+ * populating this from a sourced ingestion path and setting `source: 'live'`.
+ * Until such a feed exists, `salaryTrend` stays 'unknown' — the honest answer.
+ */
 export interface MarketSignal {
   jobPostingsCount: number | null
   salaryTrend: 'rising' | 'stable' | 'declining' | 'unknown'
   sectorNews: string | null
   lastChecked: string
-  source: 'live' | 'cached' | 'static'
+  source: 'live' | 'none'
+}
+
+/** The only market signal we can currently assert without inventing it. */
+function noMarketSignal(): MarketSignal {
+  return {
+    jobPostingsCount: null,
+    salaryTrend: 'unknown',
+    sectorNews: null,
+    lastChecked: new Date().toISOString(),
+    source: 'none',
+  }
 }
 
 export interface CareerMatch {
@@ -2614,17 +2641,16 @@ export class CareerEngine {
 
   // ── SECTION B: MARKET ENRICHMENT ────────────────────────────
 
+  // Kept async: several callers await it, and it becomes genuinely async again
+  // the moment a real market feed is wired in.
   async enrichWithMarket(
-    careers: CareerMatch[],
-    useCache = true
+    careers: CareerMatch[]
   ): Promise<EnrichedCareerMatch[]> {
-    return Promise.all(careers.map(async match => {
-      let marketSignal: MarketSignal
-      try {
-        marketSignal = await this.getMarketSignal(match.career.id, useCache)
-      } catch {
-        marketSignal = { jobPostingsCount: null, salaryTrend: 'unknown', sectorNews: null, lastChecked: new Date().toISOString(), source: 'static' }
-      }
+    return careers.map(match => {
+      // No live labour-market feed exists yet, so there is nothing to await and
+      // nothing to cache. This used to be a per-career network call inside a
+      // Promise.all — a query in a loop producing a value no consumer read.
+      const marketSignal = noMarketSignal()
       const disruption = this.assessKenyaAIDisruption(match.career)
       const urgency: EnrichedCareerMatch['urgency'] =
         match.career.kenyaShortageScore >= 70 && match.matchScore >= 60 ? 'start_now' :
@@ -2638,7 +2664,7 @@ export class CareerEngine {
         urgency,
         parentSummary,
       }
-    }))
+    })
   }
 
   // Qualitative wording, not the raw matchScore — a parent reading "35% match" reads as
@@ -2675,39 +2701,14 @@ export class CareerEngine {
     }
   }
 
-  private async getMarketSignal(careerId: string, useCache: boolean): Promise<MarketSignal> {
-    if (useCache) {
-      const cached = await repos.careers.findMarketCacheById(careerId)
-      const isStale = !cached || Date.now() - new Date(cached.cached_at).getTime() > 24 * 60 * 60 * 1000
-      if (!isStale && cached) return cached.data as unknown as MarketSignal
-    }
-
-    const fresh = await this.searchKenyaMarket(
-      CAREER_DATABASE.find(c => c.id === careerId)?.name ?? careerId
-    )
-    await repos.careers.upsertMarketCacheById(careerId, fresh as unknown as Record<string, unknown>, new Date().toISOString())
-    return fresh
-  }
-
-  private async searchKenyaMarket(careerName: string): Promise<MarketSignal> {
-    try {
-      const searchQuery = encodeURIComponent(`${careerName} jobs Kenya 2026 salary`)
-      const response = await fetch(
-        `https://api.duckduckgo.com/?q=${searchQuery}&format=json&no_html=1`,
-        { signal: AbortSignal.timeout(3000) }
-      )
-      if (!response.ok) throw new Error('Search failed')
-      const data = await response.json() as { Abstract?: string; RelatedTopics?: Array<{ Text?: string }> }
-      const abstract = data.Abstract ?? ''
-      const salaryTrend: MarketSignal['salaryTrend'] =
-        /increas|growing|rising/i.test(abstract) ? 'rising' :
-        /declin|shrink/i.test(abstract) ? 'declining' : 'stable'
-      const sectorNews = data.RelatedTopics?.[0]?.Text?.substring(0, 200) ?? null
-      return { jobPostingsCount: null, salaryTrend, sectorNews, lastChecked: new Date().toISOString(), source: 'live' }
-    } catch {
-      return { jobPostingsCount: null, salaryTrend: 'unknown', sectorNews: null, lastChecked: new Date().toISOString(), source: 'static' }
-    }
-  }
+  // `getMarketSignal` / `searchKenyaMarket` were removed here. They read a
+  // 24h-TTL cache and, on a miss, called the DuckDuckGo Instant Answer API and
+  // inferred a salary trend from a regex over the abstract. Because that
+  // endpoint returns nothing useful for "{career} jobs Kenya 2026 salary", the
+  // inference collapsed to 'stable' for every career — a fabricated market
+  // claim. `career_market_cache` still holds the 15 rows it wrote (newest
+  // 2026-06-20); nothing reads them, and they are left in place rather than
+  // dropped so the removal stays reversible.
 
   // ── SECTION C: HONEST AI DISRUPTION ─────────────────────────
 
@@ -2815,19 +2816,24 @@ export class CareerEngine {
     cbcScores: Record<string, number>
     curriculumType: 'cbc' | 'igcse'
     performanceTier: 'high' | 'mid' | 'low'
+    /**
+     * @deprecated No longer has any effect. It used to opt into the live
+     * DuckDuckGo market lookup, which was removed for fabricating trend data.
+     * Accepted so existing callers keep compiling; ignored.
+     */
     enrichWithRealTime?: boolean
     currentPathway?: string
   }): Promise<CareerAnalysisResult> {
-    const { studentName, grade, cbcScores, curriculumType, performanceTier, enrichWithRealTime = true, currentPathway } = params
+    const { studentName, grade, cbcScores, curriculumType, performanceTier, currentPathway } = params
 
     const allMatches = this.matchCareers(cbcScores, performanceTier, curriculumType, currentPathway)
     const top5 = allMatches.slice(0, 5)
-    const enriched = await this.enrichWithMarket(top5, enrichWithRealTime)
+    const enriched = await this.enrichWithMarket(top5)
 
     // Hidden gems: high shortage + viable but not in top 5
     const top5Ids = new Set(top5.map(m => m.career.id))
     const gemCandidates = allMatches.filter(m => !top5Ids.has(m.career.id) && m.career.kenyaShortageScore >= 70 && m.matchScore >= 35).slice(0, 3)
-    const hiddenGems = await this.enrichWithMarket(gemCandidates, enrichWithRealTime)
+    const hiddenGems = await this.enrichWithMarket(gemCandidates)
 
     const compassBridge = this.buildCompassBridge(enriched[0], cbcScores, studentName, grade)
 

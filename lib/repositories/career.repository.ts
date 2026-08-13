@@ -327,56 +327,13 @@ export class CareerRepository extends BaseRepository {
   }
 
   // ── Market cache ──────────────────────────────────────────────────────────────
-
-  async findMarketCache(
-    careerSlug: string,
-  ): Promise<{ data: Record<string, unknown>; cached_at: string } | null> {
-    const { data } = await this.db
-      .from('career_market_cache')
-      .select('data, cached_at')
-      .eq('career_slug', careerSlug)
-      .maybeSingle()
-    if (!data) return null
-    return {
-      data:      data.data as Record<string, unknown>,
-      cached_at: data.cached_at as string,
-    }
-  }
-
-  async upsertMarketCache(row: {
-    career_slug: string
-    data:        Record<string, unknown>
-    cached_at:   string
-  }): Promise<void> {
-    await this.db
-      .from('career_market_cache')
-      .upsert(row, { onConflict: 'career_slug' })
-  }
-
-  async findMarketCacheById(
-    careerId: string,
-  ): Promise<{ data: Record<string, unknown>; cached_at: string } | null> {
-    const { data } = await this.db
-      .from('career_market_cache')
-      .select('data, cached_at')
-      .eq('career_id', careerId)
-      .maybeSingle()
-    if (!data) return null
-    return {
-      data:      data.data as Record<string, unknown>,
-      cached_at: data.cached_at as string,
-    }
-  }
-
-  async upsertMarketCacheById(
-    careerId:  string,
-    marketData: Record<string, unknown>,
-    cachedAt:  string,
-  ): Promise<void> {
-    await this.db
-      .from('career_market_cache')
-      .upsert({ career_id: careerId, data: marketData, cached_at: cachedAt }, { onConflict: 'career_id' })
-  }
+  //
+  // The four read/write helpers that lived here were removed with the
+  // DuckDuckGo market lookup they existed to serve (see
+  // lib/academicClinic/careerEngine.ts). The `career_market_cache` table and its
+  // 15 rows are deliberately left in place so the removal stays reversible; when
+  // a real labour-market feed arrives it gets a purpose-built accessor rather
+  // than these.
 
   async updateCareerBySlug(
     slug: string,
