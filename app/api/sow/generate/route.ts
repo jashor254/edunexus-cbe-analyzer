@@ -18,11 +18,31 @@ import {
 const FEATURE: FeatureKey = 'sow_generate'
 export const SOW_GENERATE_JOB_TYPE = 'ai.sow.generate'
 
+// The context fields the PIPELINE actually dereferences, not the ones that
+// merely look like identifiers. The two were inverted: `learningArea` and
+// `grade` were validated and are never read by generation, while
+// `learningAreaName` and `gradeName` — which are read, unguarded — were not.
+//
+//   lib/sow/lessonPipeline.ts:25       detectSubjectType(context.learningAreaName) -> .toLowerCase()
+//   lib/sow/aiLessonGenerator.ts:159   grade (= context.gradeName)                 -> .replace(...)
+//
+// Omitting either returned 200 with a jobId and then died inside the
+// background job as a raw TypeError, which the caller never sees. Anything
+// generation cannot run without is validated here, before a job exists.
+//
+// `learningArea`/`grade` are kept required for compatibility: both production
+// callers send the full SOWContext, and this route is not the place to prune
+// fields. `.passthrough()` still carries the genuinely optional rest
+// (school, term, year, textbook, kicdContext).
 const GenerateSOWSchema = z.object({
   context: z.object({
-    learningArea:   z.string().min(1),
-    grade:          z.union([z.string(), z.number()]),
-    curriculumMode: z.string().min(1),
+    learningArea:     z.string().min(1),
+    grade:            z.union([z.string(), z.number()]),
+    curriculumMode:   z.string().min(1),
+    // Trimmed: a whitespace-only name passes .min(1) and then produces
+    // "Grade  Textbook" prompts and an empty subject-type match.
+    learningAreaName: z.string().trim().min(1, 'context.learningAreaName is required'),
+    gradeName:        z.string().trim().min(1, 'context.gradeName is required'),
   }).passthrough(),
   lessonStructure: z.object({
     lessonsPerWeek: z.number().int().min(1).optional(),
@@ -70,7 +90,17 @@ export async function POST(req: Request) {
 
     // ── Parse body ────────────────────────────────────────────────────────────
     const parsed = GenerateSOWSchema.safeParse(await req.json())
-    if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
+    if (!parsed.success) {
+      // Name the offending field. Zod's own message for an ABSENT key is
+      // "expected string, received undefined" — which does not say which key,
+      // so a caller that omitted context.gradeName learned no more from the
+      // 400 than they did from the background TypeError it replaced.
+      const issue = parsed.error.issues[0]
+      const path  = issue?.path.join('.')
+      return apiBadRequest(
+        issue ? `${path ? `${path}: ` : ''}${issue.message}` : 'Invalid input'
+      )
+    }
 
     const {
       context: parsedContext,
