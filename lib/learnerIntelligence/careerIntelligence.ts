@@ -11,6 +11,8 @@ import { extractCapabilityProfile } from '@/lib/career/capabilityExtractor'
 import { computeCapabilityMatches, alignmentToPercent } from '@/lib/career/capabilityMatchEngine'
 import { getAllCareersWithCOS, getCareerBySlugWithCOS } from '@/lib/career/careerEngine'
 import { COS_DISCLAIMER } from '@/lib/career/types'
+import { assessCareerKnowledge } from '@/lib/career/knowledgeLifecycle'
+import type { CareerKnowledgeState } from '@/lib/career/knowledgeLifecycle'
 import type { CapabilityCareerMatch, CareerCategory, CareerDoor, DoorType, CareerMatchWithDetail, CareerSummary } from '@/lib/career/types'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { projectionToScoreHistory } from './projectionAdapters'
@@ -287,6 +289,18 @@ export type CareerBlueprintSummary = {
   humanAdvantageSummary: string | null
   /** From `Career.required_subjects` — real, canonical, per-career field. Never derived from gap/weakness narrative text. Senior-only, same null rules. */
   explorationSuggestions: string[] | null
+  /**
+   * How current the underlying career knowledge is, from
+   * `assessCareerKnowledge()`. Senior-only, same null rules as the other
+   * per-career fields — Junior/exploration mode resolves to a cluster, not to a
+   * career row, so there is no single verification date to report.
+   *
+   * A renderer that shows anything sourced from that career must show this too.
+   * The corpus is hand-written and ages; presenting a salary band or a demand
+   * claim in the present tense without saying when it was confirmed is the
+   * defect this field exists to prevent.
+   */
+  knowledge: CareerKnowledgeState | null
 }
 
 const DOOR_ORDER: DoorType[] = ['employment', 'self_employment', 'entrepreneurship', 'ai_era']
@@ -355,11 +369,16 @@ export async function getCareerBlueprintSummary(studentId: string): Promise<Care
   // consolidated paragraph (see below). Field kept for type stability.
   const humanAdvantageSummary: string | null = null
   let explorationSuggestions: string[] | null = null
+  // How current the career row's facts are. Stays null unless a specific career
+  // was actually resolved, so a Junior cluster never carries a freshness claim
+  // about a career it did not resolve to.
+  let knowledge: CareerKnowledgeState | null = null
 
   if ('careerSlug' in top) {
     try {
       const career = await getCareerBySlugWithCOS(top.careerSlug)
       if (career) {
+        knowledge = assessCareerKnowledge(career.knowledge_verified_at)
         doorsPreview = buildDoorsPreview(career.doors ?? [])
         // One consolidated paragraph, built only from the structured
         // `replacing`/`human_advantage` arrays — deliberately never
@@ -401,6 +420,7 @@ export async function getCareerBlueprintSummary(studentId: string): Promise<Care
     aiChangeSummary,
     humanAdvantageSummary,
     explorationSuggestions,
+    knowledge,
   }
 }
 

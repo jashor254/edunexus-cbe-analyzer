@@ -201,6 +201,14 @@ export type Career = {
   disclaimer: string
   created_at: string
   updated_at: string
+  /**
+   * When this career's FACTS were last confirmed — distinct from `updated_at`,
+   * which any write moves. Null means never verified, which
+   * `assessCareerKnowledge()` treats as unknown freshness, never as fresh.
+   * Read it through lib/career/knowledgeLifecycle.ts, never bare.
+   */
+  knowledge_verified_at?: string | null
+  knowledge_source_note?: string | null
   // ── COS Phase 1: Capability Intelligence ──────────────────────────────────
   required_capabilities?:      CareerCapabilityRequirements
   capability_cluster?:         string[]

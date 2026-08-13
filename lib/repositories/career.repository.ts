@@ -20,12 +20,14 @@ const CAREER_FULL_COLS = [
   'required_subjects', 'skill_timeline', 'future_skills',
   'kenya_examples', 'pathway', 'disclaimer',
   'created_at', 'updated_at',
+  'knowledge_verified_at', 'knowledge_source_note',
 ].join(', ')
 
 const CAREER_SUMMARY_COLS = [
   'id', 'slug', 'title', 'category', 'description',
   'ai_impact', 'kenya_market_outlook',
   'salary_range_kes', 'required_subjects', 'pathway',
+  'knowledge_verified_at',
 ].join(', ')
 
 const CAREER_COS_COLS = [
@@ -36,6 +38,7 @@ const CAREER_COS_COLS = [
   'saturation_note', 'kcse_minimum', 'time_to_income_years', 'cost_to_qualify',
   'risk_level', 'prestige_level', 'social_reality',
   'alternative_career_slugs', 'complementary_career_slugs',
+  'knowledge_verified_at', 'knowledge_source_note',
 ].join(', ')
 
 const INTEREST_COLS =

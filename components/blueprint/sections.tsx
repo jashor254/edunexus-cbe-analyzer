@@ -137,6 +137,23 @@ export function CareerSection({ data }: { data: CareerData }) {
       {data.futureDirection && <p className="text-teal-700">{data.futureDirection}</p>}
       {data.aiOutlook && <p className="text-xs">AI Outlook: {data.aiOutlook}</p>}
       {data.confidence && <p className="text-xs">Confidence: {data.confidence}</p>}
+      {/*
+        When this career's figures were last confirmed. Rendered whenever a
+        verification state exists, not only when it is bad — a reader should be
+        able to see the date and judge for themselves, which is the whole point.
+        Stale knowledge gets visual weight so it cannot be skimmed past.
+      */}
+      {data.knowledge && (
+        <p
+          className={
+            data.knowledge.requiresHistoricalFraming
+              ? 'text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1'
+              : 'text-[11px] text-gray-400'
+          }
+        >
+          {data.knowledge.asOfLabel}
+        </p>
+      )}
       {data.notes.map((n, i) => (
         <p key={i} className="text-[11px] text-gray-400">{n}</p>
       ))}

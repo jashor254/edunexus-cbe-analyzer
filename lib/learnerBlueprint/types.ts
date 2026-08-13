@@ -22,6 +22,7 @@ import type { ConfidenceLevel } from '@/lib/learnerIntelligence/insight'
 import type { ParentAction } from '@/lib/parentExperience/actions'
 import type { EvidenceCoverage, Trend, RiskValue as ProjectionRiskValue, CapabilityValue, CompletenessValue } from '@/lib/projection/types'
 import type { BlueprintGradeBand } from './gradeBand'
+import type { CareerKnowledgeState } from '@/lib/career/knowledgeLifecycle'
 
 export type BlueprintSectionStatus = 'available' | 'unavailable' | 'not_implemented'
 
@@ -175,6 +176,17 @@ export type CareerData = {
   aiChangeSummary: string | null
   humanAdvantageSummary: string | null
   explorationSuggestions: string[] | null
+  /**
+   * How current the underlying career knowledge is. Null for Junior/exploration
+   * mode, which resolves to a cluster rather than to a career row, so there is
+   * no single verification date to report.
+   *
+   * Any renderer showing content sourced from that career must also render
+   * `knowledge.asOfLabel`. The career corpus is hand-written and ages; the
+   * defect this prevents is a family reading a salary band or demand claim in
+   * the present tense with no idea when it was last confirmed.
+   */
+  knowledge: CareerKnowledgeState | null
   notes: string[]
 }
 

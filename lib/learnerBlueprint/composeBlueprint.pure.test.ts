@@ -218,7 +218,7 @@ test('validateBlueprint passes for a "full blueprint" — every section availabl
     academicRecord: { status: 'available', owner: 'projection', freshness: 'live', data: { overallTrend: 'stable', bySubject: [], competencies: [], confidence: 70, lastComputed: '2026-07-17T00:00:00Z' } },
     attendance: { status: 'available', owner: 'attendance', freshness: 'snapshot', data: { presentCount: 10, absentCount: 0, lateCount: 0, excusedCount: 0, totalSessions: 10, attendancePercentage: 100, notes: [] } },
     learningCompass: { status: 'available', owner: 'compass', freshness: 'live', data: { currentLearningFocus: null, nextRecommendedAction: null, holidayProgrammeAvailable: false, learningReadiness: null, notes: [] } },
-    career: { status: 'available', owner: 'career', freshness: 'live', data: { careerCluster: null, strengthProfile: null, futureDirection: null, aiOutlook: null, confidence: null, doorsPreview: null, aiChangeSummary: null, humanAdvantageSummary: null, explorationSuggestions: null, notes: [] } },
+    career: { status: 'available', owner: 'career', freshness: 'live', data: { careerCluster: null, strengthProfile: null, futureDirection: null, aiOutlook: null, confidence: null, doorsPreview: null, aiChangeSummary: null, humanAdvantageSummary: null, explorationSuggestions: null, knowledge: null, notes: [] } },
     parentSummary: { status: 'available', owner: 'presentation', freshness: 'live', data: { headline: 'x', detail: 'x', action: null } },
   }))
   assert.equal(result.valid, true, JSON.stringify(result.errors))

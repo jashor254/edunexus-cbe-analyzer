@@ -61,7 +61,14 @@ export async function composeCareer(
       aiChangeSummary: summary.aiChangeSummary,
       humanAdvantageSummary: summary.humanAdvantageSummary,
       explorationSuggestions: summary.explorationSuggestions,
+      knowledge: summary.knowledge,
       notes: [
+        ...(summary.knowledge && summary.knowledge.freshness === 'stale'
+          ? ['The career knowledge behind this section is out of date and is shown with its confirmation date rather than as current.']
+          : []),
+        ...(summary.knowledge && summary.knowledge.freshness === 'unknown'
+          ? ['We have no record of when this career\'s figures were last confirmed.']
+          : []),
         ...(summary.aiOutlook === null ? ['AI Outlook has no canonical cluster-level source yet — left null, not guessed.'] : []),
         ...(summary.version === null ? ['No canonical algorithm-version export exists yet for Career Intelligence matching — left null, not invented.'] : []),
       ],

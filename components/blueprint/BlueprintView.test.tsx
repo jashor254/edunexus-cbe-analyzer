@@ -105,6 +105,7 @@ function createBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlue
       aiChangeSummary: 'Routine drafting and repetitive calculations are increasingly automated, but the bar for original design thinking has risen, not fallen.',
       humanAdvantageSummary: 'Judgement under real-world constraints, client trust and creative problem-solving remain valuable — the kind of judgment only a person can offer.',
       explorationSuggestions: ['Mathematics', 'Design And Technology'],
+      knowledge: null,
       notes: [],
     }),
     portfolio: section({
@@ -235,6 +236,7 @@ function createKevinBlueprint(overrides: Partial<LearnerBlueprint> = {}): Learne
       aiChangeSummary: 'AI and similar tools are automating manual ledger bookkeeping and bank reconciliation by hand. The field is not disappearing, but the bar is rising: complex tax planning requiring judgment, audit work requiring professional skepticism and forensic accounting investigations continue to depend heavily on human judgement.',
       humanAdvantageSummary: null,
       explorationSuggestions: ['Mathematics', 'English', 'Business Studies', 'Economics'],
+      knowledge: null,
       notes: [],
     }),
     portfolio: section({ publishedCount: 0, latestItem: null, featuredItem: null, portfolioUrl: null }),
@@ -464,6 +466,7 @@ test('Junior/exploration-mode learner: doorsPreview is null by design — no fou
       aiChangeSummary: null,
       humanAdvantageSummary: null,
       explorationSuggestions: null,
+      knowledge: null,
       notes: [],
     }),
   }))
@@ -498,6 +501,7 @@ test('A career with a low AI-impact level and doors that differ from Finance ren
       aiChangeSummary: 'AI tutoring tools are automating basic drill and practice, but mentorship, motivation, and classroom management remain deeply human.',
       humanAdvantageSummary: 'Building trust with learners, reading the room, and adapting to a real classroom remain valuable — the kind of judgment only a person can offer.',
       explorationSuggestions: ['English', 'Education'],
+      knowledge: null,
       notes: [],
     }),
   }))
