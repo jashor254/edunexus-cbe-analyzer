@@ -51,6 +51,7 @@ export default function PilotPage() {
   // Add student modal
   const [showAdd, setShowAdd] = useState(false)
   const [allStudents, setAllStudents] = useState<AllStudentOption[]>([])
+  const [allStudentsLoading, setAllStudentsLoading] = useState(false)
   const [addStudentId, setAddStudentId] = useState('')
   const [addParentName, setAddParentName] = useState('')
   const [addParentPhone, setAddParentPhone] = useState('')
@@ -93,19 +94,37 @@ export default function PilotPage() {
     })
   }, [router])
 
+  // Cross-tenant reads go through the server, never the browser's Supabase
+  // client. This used to be a direct `.from('students')` query that only
+  // worked because of an RLS policy trusting a self-writable admin flag
+  // (removed by migration 20260812190000). The endpoint below re-derives
+  // authorization server-side via requireGrowthUser().
   const fetchAllStudents = async () => {
-    const supabase = createClient()
-    const { data } = await supabase
-      .from('students')
-      .select('id, name, grade')
-      .order('name')
-    setAllStudents((data ?? []) as AllStudentOption[])
+    setAllStudentsLoading(true)
+    setAddError(null)
+    try {
+      const res = await fetch('/api/admin/pilot/available-students')
+      const json = await res.json()
+      if (json.success) {
+        setAllStudents(json.data.students as AllStudentOption[])
+      } else {
+        setAllStudents([])
+        setAddError(
+          res.status === 401 || res.status === 403
+            ? 'You are not authorised to load the student list.'
+            : 'Could not load students. Please try again.'
+        )
+      }
+    } catch {
+      setAllStudents([])
+      setAddError('Could not load students. Please try again.')
+    }
+    setAllStudentsLoading(false)
   }
 
   const handleOpenAdd = () => {
     setShowAdd(true)
     fetchAllStudents()
-    setAddError(null)
   }
 
   const handleAddStudent = async () => {
@@ -503,9 +522,16 @@ export default function PilotPage() {
                 <select
                   value={addStudentId}
                   onChange={(e) => setAddStudentId(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500"
+                  disabled={allStudentsLoading}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500 disabled:opacity-50"
                 >
-                  <option value="">Select a student…</option>
+                  <option value="">
+                    {allStudentsLoading
+                      ? 'Loading students…'
+                      : allStudents.length === 0
+                        ? 'No students available'
+                        : 'Select a student…'}
+                  </option>
                   {allStudents.map((st) => (
                     <option key={st.id} value={st.id}>
                       {st.name} (Grade {st.grade})
