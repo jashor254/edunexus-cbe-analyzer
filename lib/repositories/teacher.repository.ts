@@ -703,13 +703,42 @@ export class TeacherRepository extends BaseRepository {
   // already used in app/api/admin/activate-user/route.ts and siblings —
   // consolidated here rather than re-implemented inline a second time.
   async findAuthUserByEmail(email: string): Promise<{ id: string; email: string } | null> {
-    const { data, error } = await this.db.auth.admin.listUsers()
-    if (error) throw new Error(`findAuthUserByEmail: ${error.message}`)
     const normalized = email.toLowerCase().trim()
-    const match = (data.users as Array<{ id: string; email?: string | null }>).find(
-      u => u.email?.toLowerCase().trim() === normalized
-    )
-    return match ? { id: match.id, email: match.email! } : null
+    const match = await this.findAuthUser(u => u.email?.toLowerCase().trim() === normalized)
+    return match?.email ? { id: match.id, email: match.email } : null
+  }
+
+  /**
+   * Walks every page of auth.users, stopping early when `predicate` matches.
+   *
+   * `listUsers()` is PAGINATED and defaults to 50 users per page. Called
+   * bare, it silently searches only the newest 50 accounts on a platform with
+   * hundreds — so an existing user simply "did not exist", and a school
+   * handoff or teacher invite would tell the founder to ask a colleague to
+   * sign up for an account they already had. Absence must mean absence.
+   */
+  private async findAuthUser(
+    predicate: (u: { id: string; email?: string | null }) => boolean
+  ): Promise<{ id: string; email?: string | null } | null> {
+    for await (const page of this.eachAuthUserPage()) {
+      const match = page.find(predicate)
+      if (match) return match
+    }
+    return null
+  }
+
+  private async *eachAuthUserPage(): AsyncGenerator<Array<{ id: string; email?: string | null }>> {
+    const perPage = 1000
+    for (let page = 1; ; page++) {
+      const { data, error } = await this.db.auth.admin.listUsers({ page, perPage })
+      if (error) throw new Error(`listUsers(page ${page}): ${error.message}`)
+      const users = (data.users ?? []) as Array<{ id: string; email?: string | null }>
+      if (users.length === 0) return
+      yield users
+      // A short page is the last page. GoTrue may cap perPage below what was
+      // asked for, so the loop trusts the response size, not the request.
+      if (users.length < perPage) return
+    }
   }
 
   // Batched profile lookup for a teacher-membership list screen (Sprint
@@ -732,12 +761,16 @@ export class TeacherRepository extends BaseRepository {
   // invited-but-not-yet-accepted teacher in a list UI.
   async findAuthUsersByIds(userIds: string[]): Promise<Map<string, string>> {
     if (userIds.length === 0) return new Map()
-    const { data, error } = await this.db.auth.admin.listUsers()
-    if (error) throw new Error(`findAuthUsersByIds: ${error.message}`)
     const idSet = new Set(userIds)
     const result = new Map<string, string>()
-    for (const u of data.users as Array<{ id: string; email?: string | null }>) {
-      if (idSet.has(u.id) && u.email) result.set(u.id, u.email)
+    // Paginated for the same reason as findAuthUserByEmail: unpaginated, a
+    // 49-member school listed no emails at all, because none of its staff were
+    // among the newest 50 accounts on the platform.
+    for await (const page of this.eachAuthUserPage()) {
+      for (const u of page) {
+        if (idSet.has(u.id) && u.email) result.set(u.id, u.email)
+      }
+      if (result.size === idSet.size) break
     }
     return result
   }

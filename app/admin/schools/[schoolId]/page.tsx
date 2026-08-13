@@ -46,6 +46,26 @@ type SchoolSummary = {
   school_entitlement_expires_at: string | null
 }
 
+const HANDOFF_ROLES = [
+  { value: 'headteacher',        label: 'Headteacher / Principal' },
+  { value: 'deputy_headteacher', label: 'Deputy headteacher' },
+  { value: 'school_admin',       label: 'School administrator' },
+] as const
+
+type Administrator = {
+  userId: string
+  email: string | null
+  fullName: string | null
+  role: string
+}
+
+type HandoffState = {
+  administered: boolean
+  administrators: Administrator[]
+}
+
+const roleLabel = (v: string) => HANDOFF_ROLES.find(r => r.value === v)?.label ?? v
+
 type LoadResult =
   | { ok: true; school: SchoolSummary; payments: Payment[]; activeTeacherCount: number }
   | { ok: false; message: string }
@@ -75,6 +95,24 @@ export default function SchoolPaymentsPage() {
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+
+  // ── School handoff ──────────────────────────────────────────────────────
+  // Whether this school has an administrator of its own is a separate fact
+  // from whether it has paid, and is shown separately.
+  const [handoff, setHandoff] = useState<HandoffState | null>(null)
+  const [handoffEmail, setHandoffEmail] = useState('')
+  const [handoffRole, setHandoffRole] = useState<string>('headteacher')
+  const [handingOff, setHandingOff] = useState(false)
+  const [handoffError, setHandoffError] = useState<string | null>(null)
+  const [handoffSuccess, setHandoffSuccess] = useState<string | null>(null)
+
+  const loadHandoff = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/admin/schools/${schoolId}/bootstrap-admin`)
+      const json = await res.json()
+      if (json.success) setHandoff(json.data)
+    } catch { /* the card simply does not render; the page still works */ }
+  }, [schoolId])
 
   // Fetching and state application are separate on purpose. `fetchContext` is
   // pure — it returns data or an error string and touches no state — so the
@@ -115,6 +153,8 @@ export default function SchoolPaymentsPage() {
     setLoadError(null)
   }, [])
 
+  useEffect(() => { void loadHandoff() }, [loadHandoff])
+
   useEffect(() => {
     let cancelled = false
     fetchContext().then(result => { if (!cancelled) apply(result) })
@@ -122,6 +162,58 @@ export default function SchoolPaymentsPage() {
   }, [fetchContext, apply])
 
   const reload = useCallback(async () => { apply(await fetchContext()) }, [fetchContext, apply])
+
+  const handleHandoff = async () => {
+    setHandoffError(null)
+    setHandoffSuccess(null)
+
+    if (!handoffEmail.trim()) {
+      setHandoffError('Enter the email of the person who will administer this school.')
+      return
+    }
+
+    setHandingOff(true)
+    try {
+      const res = await fetch(`/api/admin/schools/${schoolId}/bootstrap-admin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: handoffEmail.trim(), role: handoffRole }),
+      })
+      const json = await res.json()
+
+      if (!json.success) {
+        setHandoffError(res.status === 401 || res.status === 403
+          ? 'You are not authorised to hand over a school.'
+          : 'Could not hand over this school. Please try again.')
+        return
+      }
+
+      const data = json.data as { status: string; administrators?: Administrator[] }
+      if (data.status === 'no_account') {
+        setHandoffError(
+          `${handoffEmail.trim()} has no EduNexus account yet. ` +
+          'Ask them to create their account, then retry the handoff.'
+        )
+        return
+      }
+      if (data.status === 'already_administered') {
+        setHandoffError('This school already has an active administrator. Use the school’s own staff management.')
+        await loadHandoff()
+        return
+      }
+
+      setHandoffSuccess(
+        `${handoffEmail.trim()} is now this school’s ${roleLabel(handoffRole).toLowerCase()}. ` +
+        'They can sign in and manage their own staff — you are not a member of this school.'
+      )
+      setHandoffEmail('')
+      await loadHandoff()
+    } catch {
+      setHandoffError('Could not hand over this school. Please try again.')
+    } finally {
+      setHandingOff(false)
+    }
+  }
 
   const handleSubmit = async () => {
     setFormError(null)
@@ -213,6 +305,68 @@ export default function SchoolPaymentsPage() {
           <div className="bg-red-950/40 border border-red-500/30 rounded-xl p-4">
             <p className="text-red-300 text-sm">{loadError}</p>
           </div>
+        )}
+
+        {!loadError && handoff && (
+          handoff.administered ? (
+            /* ADMINISTERED — the founder has nothing to do here. */
+            <div className="bg-white/5 border border-white/10 rounded-xl p-5">
+              <h2 className="text-lg font-bold">School administration already established</h2>
+              <p className="text-white/40 text-xs mt-1">
+                This school runs its own staff. Adding or removing members is done by its
+                administrators, not from here.
+              </p>
+              <ul className="mt-3 space-y-1.5">
+                {handoff.administrators.map(a => (
+                  <li key={a.userId} className="text-sm text-white/70 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
+                    <span className="text-white">{a.fullName ?? a.email ?? 'Unnamed member'}</span>
+                    <span className="text-white/40 text-xs">{roleLabel(a.role)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            /* UNADMINISTERED — the bootstrap exception applies. */
+            <div className="bg-amber-950/30 border border-amber-500/30 rounded-xl p-5 space-y-4">
+              <div>
+                <h2 className="text-lg font-bold text-amber-200">School handoff required</h2>
+                <p className="text-white/50 text-xs mt-1">
+                  This school has no administrator, so nobody there can add staff or manage learners.
+                  Hand it to its principal — they must already have an EduNexus account. You will not
+                  become a member of the school.
+                </p>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2">
+                  <label className={label}>Principal / admin email</label>
+                  <input
+                    type="email" value={handoffEmail} onChange={e => setHandoffEmail(e.target.value)}
+                    placeholder="principal@school.ac.ke" className={field}
+                  />
+                </div>
+                <div>
+                  <label className={label}>Role</label>
+                  <select value={handoffRole} onChange={e => setHandoffRole(e.target.value)} className={field}>
+                    {HANDOFF_ROLES.map(r => (
+                      <option key={r.value} value={r.value} className="bg-[#0a0a14]">{r.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {handoffError && <p className="text-red-300 text-sm">{handoffError}</p>}
+              {handoffSuccess && <p className="text-green-300 text-sm">{handoffSuccess}</p>}
+
+              <button
+                onClick={handleHandoff} disabled={handingOff}
+                className="bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-bold px-5 py-2.5 rounded-lg text-sm transition-colors"
+              >
+                {handingOff ? 'Handing over…' : 'Hand off school'}
+              </button>
+            </div>
+          )
         )}
 
         {!loadError && (

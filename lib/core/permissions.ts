@@ -41,7 +41,17 @@ import {
   isEduNexusError,
 } from '@/lib/core/errors'
 
-const SCHOOL_ADMIN_ROLES: readonly SchoolUserRole[] = ['school_admin', 'headteacher', 'deputy_headteacher']
+/**
+ * The roles that carry school-administrator authority. All three are equally
+ * canonical and equally authoritative — `requireSchoolAdmin` makes no
+ * distinction between them.
+ *
+ * Exported so that anything deciding "does this school have an administrator"
+ * asks the same question `requireSchoolAdmin` answers, rather than keeping its
+ * own list that could drift out of agreement with the gate it is meant to
+ * describe.
+ */
+export const SCHOOL_ADMIN_ROLES: readonly SchoolUserRole[] = ['school_admin', 'headteacher', 'deputy_headteacher']
 /** Admin-tier plus 'teacher' — i.e. every school role except 'parent'. Matches an existing role set used by learner-enrollment (`app/api/core/learners/[id]`), distinct from admin-only actions. */
 const SCHOOL_STAFF_ROLES: readonly SchoolUserRole[] = [...SCHOOL_ADMIN_ROLES, 'teacher']
 
