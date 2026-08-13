@@ -15,6 +15,7 @@ import TodayAtAGlance from '@/components/teacher/TodayAtAGlance'
 import { DashboardDataProvider } from '@/components/teacher/DashboardDataProvider'
 import { getPendingAssessments } from '@/lib/assessments/getters'
 import { getTeacherDashboardProjection } from '@/lib/teacherWorkspace/dashboardProjection'
+import MyTeaching from '@/components/teacher/MyTeaching'
 
 function getTermInfo() {
   const month = new Date().getMonth() + 1
@@ -56,7 +57,7 @@ export default async function TeacherDashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { teacher, activeClasses, activeSchemes } = await getTeacherDashboardProjection(user.id)
+  const { teacher, activeClasses, activeSchemes, teachingContext } = await getTeacherDashboardProjection(user.id)
 
   if (!teacher) redirect('/teacher/setup')
 
@@ -89,6 +90,14 @@ export default async function TeacherDashboardPage() {
               record of work), and it renders for any teacher with schemes,
               with or without a class. */}
           <ContinueWorking />
+
+          {/* ── 2b. My Teaching ──────────────────────────────────────────
+              The institutional assignments the school made, read from Core
+              `class_subjects`. Renders nothing for a Solo Teacher, and an
+              honest "nothing assigned yet" for a school teacher the admin
+              has not allocated — never a fallback to private
+              `teacher_classes` dressed up as school assignment. */}
+          <MyTeaching context={teachingContext} />
 
           {/* ── 3. Needs your attention ─────────────────────────────────── */}
           <TodayAtAGlance

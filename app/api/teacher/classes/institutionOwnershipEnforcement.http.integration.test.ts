@@ -1,11 +1,21 @@
 // app/api/teacher/classes/institutionOwnershipEnforcement.http.integration.test.ts
 //
-// Phase 0 — Institution Ownership Enforcement, route-level proof. Confirms
-// the two updated routes (POST /api/teacher/classes and POST
-// /api/teacher/classes/[classId]/students) always stamp a real school_id
-// going forward, that a second class reuses the same resolved school, that
-// adding a learner to a historical (school_id = NULL) class repairs it, and
-// that the untouched consumer/self-serve student route is unaffected.
+// Institution Ownership, route-level proof — REWRITTEN by the auto-provision
+// cleanup phase.
+//
+// This suite previously asserted that POST /api/teacher/classes "always
+// stamps a real school_id". That assertion encoded the anti-pattern as a
+// requirement: the only way to guarantee a non-null school_id for a teacher
+// with no membership was to MINT a school named "{teacher}'s School (pending
+// setup)" and make them its school_admin. Six such synthetic schools in the
+// live database were created by this very suite.
+//
+// The corrected contract, proven below:
+//   * a teacher WITH an active membership  -> class carries that school_id
+//   * a teacher WITHOUT one                -> class carries NULL, and NO
+//                                             school is created
+// Both `teacher_classes.school_id` and `students.school_id` are nullable
+// precisely because a private class need not belong to an institution.
 //
 // Requires a server already running at LMS_TEST_BASE_URL (default
 // http://localhost:3939).
@@ -63,10 +73,55 @@ after(async () => {
   for (const id of createdUserIds) await db.auth.admin.deleteUser(id)
 })
 
-test('POST /api/teacher/classes always returns a class with a non-null school_id', async () => {
+/** Gives a synthetic teacher a real school + active teacher membership. */
+async function attachToSchool(authId: string, label: string): Promise<string> {
+  const { data: school, error } = await db
+    .from('schools')
+    .insert({ school_name: `${SYNTHETIC_MARKER}_${label}_${Date.now()}` })
+    .select('id')
+    .single()
+  if (error || !school) throw new Error(`school insert failed: ${error?.message}`)
+  createdSchoolIds.push(school.id)
+  const { error: memberErr } = await db
+    .from('school_users')
+    .insert({ school_id: school.id, user_id: authId, role: 'teacher', is_active: true })
+  if (memberErr) throw new Error(`membership insert failed: ${memberErr.message}`)
+  return school.id
+}
+
+test('POST /api/teacher/classes creates NO school for a teacher with no membership', async () => {
   const teacher = await createSyntheticTeacher('class-create')
   createdUserIds.push(teacher.authId)
   createdTeacherIds.push(teacher.teacherId)
+
+  const { count: schoolsBefore } = await db.from('schools').select('id', { count: 'exact', head: true })
+
+  const res = await fetch(`${BASE_URL}/api/teacher/classes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: teacher.session.cookieHeader },
+    body: JSON.stringify({ name: SYNTHETIC_MARKER, grade: 8, subject: 'Mathematics', academic_year: '2026' }),
+  })
+  assert.equal(res.status, 201, 'a Solo Teacher can still create their private class')
+  const body = await res.json()
+  createdClassIds.push(body.data.class.id)
+
+  assert.equal(body.data.class.school_id, null, 'a private class with no institution behind it is school-less')
+
+  const { count: schoolsAfter } = await db.from('schools').select('id', { count: 'exact', head: true })
+  assert.equal(schoolsAfter, schoolsBefore, 'no school was manufactured')
+
+  // And no school_admin membership was conjured for them anywhere.
+  const { data: memberships } = await db.from('school_users').select('id').eq('user_id', teacher.authId)
+  assert.equal(memberships!.length, 0, 'no membership — least of all school_admin — was created')
+})
+
+test('POST /api/teacher/classes stamps the REAL school for a teacher who has one', async () => {
+  const teacher = await createSyntheticTeacher('class-create-member')
+  createdUserIds.push(teacher.authId)
+  createdTeacherIds.push(teacher.teacherId)
+  const schoolId = await attachToSchool(teacher.authId, 'member')
+
+  const { count: schoolsBefore } = await db.from('schools').select('id', { count: 'exact', head: true })
 
   const res = await fetch(`${BASE_URL}/api/teacher/classes`, {
     method: 'POST',
@@ -75,15 +130,19 @@ test('POST /api/teacher/classes always returns a class with a non-null school_id
   })
   assert.equal(res.status, 201)
   const body = await res.json()
-  assert.ok(body.data.class.school_id, 'newly-created class must have a non-null school_id')
   createdClassIds.push(body.data.class.id)
-  createdSchoolIds.push(body.data.class.school_id)
+
+  assert.equal(body.data.class.school_id, schoolId, 'the class adopts the school that actually employs them')
+
+  const { count: schoolsAfter } = await db.from('schools').select('id', { count: 'exact', head: true })
+  assert.equal(schoolsAfter, schoolsBefore, 'and still creates nothing new')
 })
 
 test('a second class from the same teacher reuses the same resolved school', async () => {
   const teacher = await createSyntheticTeacher('second-class')
   createdUserIds.push(teacher.authId)
   createdTeacherIds.push(teacher.teacherId)
+  const schoolId = await attachToSchool(teacher.authId, 'second')
 
   const create = () => fetch(`${BASE_URL}/api/teacher/classes`, {
     method: 'POST',
@@ -94,15 +153,16 @@ test('a second class from the same teacher reuses the same resolved school', asy
   const first = await (await create()).json()
   const second = await (await create()).json()
   createdClassIds.push(first.data.class.id, second.data.class.id)
-  createdSchoolIds.push(first.data.class.school_id)
 
-  assert.equal(second.data.class.school_id, first.data.class.school_id, 'second class must reuse the first resolved school, not provision a new one')
+  assert.equal(first.data.class.school_id, schoolId)
+  assert.equal(second.data.class.school_id, first.data.class.school_id, 'second class must reuse the same school, not provision a new one')
 })
 
 test('a teacher-enrolled learner receives the class school_id', async () => {
   const teacher = await createSyntheticTeacher('enroll-learner')
   createdUserIds.push(teacher.authId)
   createdTeacherIds.push(teacher.teacherId)
+  await attachToSchool(teacher.authId, 'enroll')
 
   const classRes = await fetch(`${BASE_URL}/api/teacher/classes`, {
     method: 'POST',
@@ -111,7 +171,7 @@ test('a teacher-enrolled learner receives the class school_id', async () => {
   })
   const cls = (await classRes.json()).data.class
   createdClassIds.push(cls.id)
-  createdSchoolIds.push(cls.school_id)
+  assert.ok(cls.school_id, 'fixture: this teacher genuinely has a school')
 
   const studentRes = await fetch(`${BASE_URL}/api/teacher/classes/${cls.id}/students`, {
     method: 'POST',
@@ -132,6 +192,7 @@ test('adding a learner to an historical school-less class repairs the class and 
   const teacher = await createSyntheticTeacher('historical-repair')
   createdUserIds.push(teacher.authId)
   createdTeacherIds.push(teacher.teacherId)
+  const schoolId = await attachToSchool(teacher.authId, 'historical')
 
   // Simulate a class created before Phase 0 shipped — school_id explicitly NULL.
   const { data: historicalClass } = await db
@@ -151,14 +212,48 @@ test('adding a learner to an historical school-less class repairs the class and 
   createdStudentIds.push(studentId)
 
   const { data: repairedClass } = await db.from('teacher_classes').select('school_id').eq('id', historicalClass!.id).single()
-  assert.ok(repairedClass?.school_id, 'the historical class must be repaired with a real school_id')
-  createdSchoolIds.push(repairedClass!.school_id)
+  assert.equal(repairedClass?.school_id, schoolId, 'the historical class is repaired with the teacher\'s REAL school')
 
   const { data: studentRow } = await db.from('students').select('school_id').eq('id', studentId).single()
   assert.equal(studentRow?.school_id, repairedClass?.school_id, 'the learner must match the repaired class exactly')
 
   const { count } = await db.from('schools').select('id', { count: 'exact', head: true }).eq('created_by', teacher.authId)
-  assert.equal(count, 1, 'repairing a historical class must not create more than one school for this teacher')
+  assert.equal(count, 0, 'the repair adopts an existing school — it never creates one')
+})
+
+test('adding a learner to an historical class leaves it school-less when the teacher has no school', async () => {
+  // The corrected boundary. Previously this path invented a school so the
+  // column could be filled; now an honest NULL survives, because a Solo
+  // Teacher's private roster has no institution behind it.
+  const teacher = await createSyntheticTeacher('historical-no-school')
+  createdUserIds.push(teacher.authId)
+  createdTeacherIds.push(teacher.teacherId)
+
+  const { data: historicalClass } = await db
+    .from('teacher_classes')
+    .insert({ teacher_id: teacher.teacherId, name: SYNTHETIC_MARKER, grade: 8, subject: 'Kiswahili', class_code: `SYNTH-HIST2-${Date.now()}`, school_id: null })
+    .select('id')
+    .single()
+  createdClassIds.push(historicalClass!.id)
+
+  const { count: schoolsBefore } = await db.from('schools').select('id', { count: 'exact', head: true })
+
+  const studentRes = await fetch(`${BASE_URL}/api/teacher/classes/${historicalClass!.id}/students`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: teacher.session.cookieHeader },
+    body: JSON.stringify({ students: [{ name: `${SYNTHETIC_MARKER} Solo Learner`, grade: 8 }] }),
+  })
+  assert.equal(studentRes.status, 201, 'the operation still succeeds — it is not blocked, just not inflated')
+  const studentId = (await studentRes.json()).data.results[0].studentId
+  createdStudentIds.push(studentId)
+
+  const { count: schoolsAfter } = await db.from('schools').select('id', { count: 'exact', head: true })
+  assert.equal(schoolsAfter, schoolsBefore, 'no school was manufactured to fill the column')
+
+  const { data: cls } = await db.from('teacher_classes').select('school_id').eq('id', historicalClass!.id).single()
+  assert.equal(cls?.school_id, null)
+  const { data: studentRow } = await db.from('students').select('school_id').eq('id', studentId).single()
+  assert.equal(studentRow?.school_id, null, 'learner and class agree: both school-less')
 })
 
 test('consumer/self-serve student creation (app/api/students/create) remains unchanged and school-less', async () => {

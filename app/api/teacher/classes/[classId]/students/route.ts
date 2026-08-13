@@ -11,7 +11,7 @@ import {
 import { sendWelcomeMessage } from '@/lib/whatsapp/sender'
 import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissions'
 import { resolveTeacher } from '@/lib/core/identity'
-import { resolveOwningSchool } from '@/lib/core/institutionOwnership'
+import { resolveExistingOwningSchool } from '@/lib/core/institutionOwnership'
 import { UnauthorizedError } from '@/lib/core/errors'
 import { SENIOR_PATHWAYS } from '@/lib/curriculum/subjects'
 
@@ -77,13 +77,25 @@ export async function POST(
 
     let classSchoolId = classRow?.school_id ?? null
     if (!classSchoolId) {
-      const { schoolId } = await resolveOwningSchool(userId, `${teacher.full_name}'s School (pending setup)`)
+      // Case B repair, without invention. If the teacher has a real active
+      // membership, adopt that school and heal the historical class row in
+      // the same request. If they do NOT, the class stays school-less —
+      // which is the truth for a Solo Teacher's private roster — rather than
+      // provisioning a fictional school to fill the column.
+      //
+      // The previous resolveOwningSchool() call made adding a learner enough
+      // to found an institution and become its school_admin. `students.school_id`
+      // and `teacher_classes.school_id` are both nullable, so nothing here
+      // requires a school to exist; the repair is best-effort by design.
+      const { schoolId } = await resolveExistingOwningSchool(userId)
       classSchoolId = schoolId
-      await db
-        .from('teacher_classes')
-        .update({ school_id: classSchoolId })
-        .eq('id', classId)
-        .is('school_id', null) // defense-in-depth: never clobber a value another concurrent repair already set
+      if (classSchoolId) {
+        await db
+          .from('teacher_classes')
+          .update({ school_id: classSchoolId })
+          .eq('id', classId)
+          .is('school_id', null) // defense-in-depth: never clobber a value another concurrent repair already set
+      }
     }
 
     const parsed = BodySchema.safeParse(await req.json())

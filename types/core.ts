@@ -455,3 +455,41 @@ export type TransferLearnerInput = {
   reason?: string
   document_urls?: string[]
 }
+
+// ── Institutional teaching assignment ────────────────────────────────────────
+
+/**
+ * One row of "what this teacher has been assigned to teach, by their school."
+ *
+ * The projection of the canonical assignment chain:
+ *
+ *     auth user
+ *       → school_users (role='teacher', is_active=true)
+ *       → class_subjects.teacher_id = school_users.id
+ *       → classes + subjects + schools
+ *
+ * `teacherMembershipId` is a `school_users.id`, NOT a `teachers.id` and NOT an
+ * `auth.users.id`. Those are three different id spaces in this codebase and
+ * `class_subjects` deliberately keys on the membership: an assignment belongs
+ * to an employment relationship, not to a person, so it ends when the
+ * employment does. Never pass a `teachers.id` here.
+ */
+export type TeachingAssignment = {
+  /** `class_subjects.id` — the assignment row itself. */
+  assignmentId: string
+  schoolId: string
+  schoolName: string
+  classId: string
+  /** `classes.display_name` when set, else `class_name` — what the school calls this class. */
+  className: string
+  /** Null for a school that models no streams; a single-stream school is a valid shape, not a degraded one. */
+  gradeName: string | null
+  gradeCode: string | null
+  streamName: string | null
+  academicYearId: string | null
+  subjectId: string
+  subjectName: string
+  subjectCode: string
+  /** `school_users.id` of the membership this assignment was made to. */
+  teacherMembershipId: string
+}

@@ -3,7 +3,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
 import { requireAuthentication } from '@/lib/core/permissions'
 import { resolveTeacher } from '@/lib/core/identity'
-import { resolveOwningSchool } from '@/lib/core/institutionOwnership'
+import { resolveExistingOwningSchool } from '@/lib/core/institutionOwnership'
 import { UnauthorizedError } from '@/lib/core/errors'
 import { getTeacherClassListProjection } from '@/lib/teacherWorkspace/classListProjection'
 
@@ -53,11 +53,24 @@ export async function POST(req: Request) {
     const teacher = await resolveTeacher(userId)
     if (!teacher) return apiForbidden()
 
-    // Institution Ownership Enforcement (Phase 0) — every new class must
-    // resolve to a real school before it's created. Never derived from
-    // free-text school-name matching here; see resolveOwningSchool's own
-    // doc comment for why.
-    const { schoolId } = await resolveOwningSchool(userId, `${teacher.fullName}'s School (pending setup)`)
+    // Institution Ownership: attach this class to the teacher's school when
+    // they genuinely have one, and to NOTHING when they don't.
+    //
+    // This route creates a LEGACY, teacher-owned private class
+    // (`teacher_classes`), not an institutional one. Institutional classes
+    // belong to the school and are created by an administrator through
+    // POST /api/core/classes; a school teacher's institutional classes reach
+    // them via `class_subjects` and are shown under My Teaching.
+    //
+    // It previously called resolveOwningSchool(), which minted a school named
+    // "{teacher}'s School (pending setup)" and made the teacher its
+    // `school_admin` whenever they had no membership. A Solo Teacher creating
+    // a private planning class is not founding an institution, and creating
+    // one for them manufactured a fictional tenant plus an unearned admin
+    // role. `teacher_classes.school_id` is nullable exactly because a private
+    // class legitimately has no institutional owner, so NULL is the honest
+    // value — not a gap to be filled by invention.
+    const { schoolId } = await resolveExistingOwningSchool(userId)
 
     const db = createServiceClient()
 

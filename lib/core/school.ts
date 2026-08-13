@@ -47,43 +47,62 @@ export async function getReferenceSchool(): Promise<School> {
   return school
 }
 
-// Links a teacher to a real `schools`/`school_users` row from the free-text
-// school name captured at signup (app/teacher/setup). Idempotent — a teacher
-// who already has an active school_users row is left untouched. Matches
-// case/whitespace-insensitively so "Nairobi Academy" and "nairobi academy "
-// resolve to the same school. When no match is found, this deliberately does
-// NOT create a new `schools` row — Core has no onboarding UI today (no page
-// calls any app/api/core/* route), so a silently-created school can never be
-// viewed, corrected, or managed by anyone. Returns `schoolId: null` in that
-// case; the caller (app/api/teacher/profile) already discards this return
-// value, so no caller-side change is needed.
-export async function ensureSchoolMembership(
+/**
+ * Records, for reconciliation only, the free-text school name a teacher typed
+ * into their own profile. **Writes nothing.**
+ *
+ * WHAT THIS REPLACED, AND WHY
+ * This was `ensureSchoolMembership()`, and it did exactly what its name said:
+ * it matched the typed name case-insensitively against `schools` and, on a
+ * hit, inserted a `school_users` row —
+ *
+ *     repos.schools.addSchoolUser(existingSchool.id, userId, 'teacher')
+ *
+ * — with `is_active` defaulting to TRUE, `invited_by` NULL, and no acceptance
+ * step. No administrator was consulted at any point. Because
+ * `lib/core/schoolEntitlement.ts` grants coverage on any active role='teacher'
+ * membership at an entitled school, typing a school's name was sufficient to
+ * inherit that institution's paid entitlement. Proven live against a synthetic
+ * entitled school before removal: `resolveSchoolCoverage()` returned
+ * `'covered'` (`lib/testing/teacherSelfJoin.http.integration.test.ts`).
+ *
+ * Institutional membership is school-owned data. It is created by an
+ * administrator through `inviteSchoolMember()` (requireSchoolAdmin-gated) and
+ * claimed by the teacher through `acceptTeacherInvitation()`, which reads the
+ * role from the row the admin wrote and never from the invitee. The school
+ * adds the teacher; the teacher does not add the school.
+ *
+ * The profile's `school` field survives as descriptive employment text on the
+ * `teachers` row — useful on documents and in support conversations, and
+ * carrying no authority whatsoever.
+ *
+ * The logging is kept deliberately: an unmatched (or matched-but-unlinked)
+ * name is the only signal of who believes they work somewhere EduNexus has
+ * not yet connected them to, and it is the reconciliation backlog a founder
+ * works through when onboarding that school.
+ */
+export async function recordSchoolNameForReconciliation(
   userId: string,
   schoolName: string
-): Promise<{ schoolId: string | null; role: SchoolUser['role'] | null; created: boolean }> {
+): Promise<void> {
   const existingMembership = await repos.schools.findSchoolUserByUserId(userId)
-  if (existingMembership) {
-    return { schoolId: existingMembership.school_id, role: existingMembership.role, created: false }
-  }
+  if (existingMembership) return // already institutionally linked — nothing to reconcile
 
+  // Matching is still performed, but only to make the log actionable: it tells
+  // a founder whether this teacher named a school EduNexus already knows about
+  // (so an admin can be asked to add them) or one it has never heard of.
   const existingSchool = await repos.schools.findByNameCaseInsensitive(schoolName)
 
-  if (existingSchool) {
-    const schoolUser = await repos.schools.addSchoolUser(existingSchool.id, userId, 'teacher')
-    return { schoolId: existingSchool.id, role: schoolUser.role, created: false }
-  }
-
-  // No match, and no school is minted (see comment above). Log the
-  // unmatched name so there's a reconciliation backlog once a school-
-  // management UI exists — without this there's no record of who fell
-  // through or what they typed.
-  logger.info('ensureSchoolMembership: no school match, no Core row created', {
-    service:  'core-school',
-    user_id:  userId,
+  logger.info('teacher profile school name recorded; no membership created', {
+    service:               'core-school',
+    user_id:               userId,
     attempted_school_name: schoolName,
+    matched_school_id:     existingSchool?.id ?? null,
+    // true = a real school of that name exists and this teacher is NOT linked
+    // to it. That is an onboarding action for its administrator, never a
+    // self-service join.
+    awaiting_admin_link:   !!existingSchool,
   })
-
-  return { schoolId: null, role: null, created: false }
 }
 
 export async function updateSchool(

@@ -28,8 +28,17 @@ interface TeacherClass {
   avg_level: number | null
 }
 
+/**
+ * Which workspace this teacher is in, from the canonical institutional read
+ * (`GET /api/teacher/teaching-assignments`). Only the discriminant is needed
+ * here — this screen lists LEGACY `teacher_classes`, and the context decides
+ * how honestly to frame them, not what to list.
+ */
+type ContextKind = 'school' | 'school_unassigned' | 'solo' | null
+
 export default function TeacherClassesPage() {
   const [classes, setClasses] = useState<TeacherClass[]>([])
+  const [contextKind, setContextKind] = useState<ContextKind>(null)
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -41,11 +50,39 @@ export default function TeacherClassesPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    fetch('/api/teacher/classes')
-      .then(r => r.json())
-      .then(d => { if (d.success) setClasses(d.data.classes) })
-      .finally(() => setLoading(false))
+    // Two independent reads, deliberately not merged: this page lists the
+    // teacher's own legacy `teacher_classes`, while the context comes from
+    // Core `class_subjects`. Merging them would let a private class stand in
+    // for an institutional assignment, which is precisely what this
+    // convergence exists to stop. The context only reframes the page.
+    Promise.all([
+      fetch('/api/teacher/classes')
+        .then(r => r.json())
+        .then(d => { if (d.success) setClasses(d.data.classes) })
+        .catch(() => {}),
+      fetch('/api/teacher/teaching-assignments')
+        .then(r => r.json())
+        .then(d => { if (d.data?.kind) setContextKind(d.data.kind) })
+        // A failed context read must not decide the teacher is a Solo
+        // Teacher — it leaves `contextKind` null, which shows the neutral
+        // legacy framing rather than asserting something unproven.
+        .catch(() => {}),
+    ]).finally(() => setLoading(false))
   }, [])
+
+  // A school teacher's institutional classes are assigned by their
+  // administrator and shown on the dashboard's My Teaching panel. Creating a
+  // class here would make a private one the school does not know about, so
+  // the create action stays available to Solo Teachers — whose private
+  // planning workspace this genuinely is — and is withdrawn from school
+  // teachers.
+  //
+  // This is presentation-level clarity, not the safety boundary. The route
+  // itself no longer provisions a school for anyone
+  // (resolveExistingOwningSchool), so a private class created by a teacher
+  // with no membership is simply school-less rather than the seed of a
+  // fictional institution.
+  const isSchoolTeacher = contextKind === 'school' || contextKind === 'school_unassigned'
 
   async function createClass(e: React.FormEvent) {
     e.preventDefault()
@@ -80,15 +117,23 @@ export default function TeacherClassesPage() {
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6 sm:mb-8">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-gray-900">My Classes</h1>
-          <p className="text-gray-500 mt-1">Manage your classes and share codes with parents</p>
+          <h1 className="text-2xl sm:text-3xl font-black text-gray-900">
+            {isSchoolTeacher ? 'My Own Classes' : 'My Classes'}
+          </h1>
+          <p className="text-gray-500 mt-1">
+            {isSchoolTeacher
+              ? 'Private classes you created. Classes assigned to you by your school appear under My Teaching.'
+              : 'Manage your classes and share codes with parents'}
+          </p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center justify-center gap-2 bg-teal-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-teal-700 transition shadow-sm sm:self-auto self-start"
-        >
-          <PlusCircle className="w-4 h-4" /> Create Class
-        </button>
+        {!isSchoolTeacher && (
+          <button
+            onClick={() => setShowModal(true)}
+            className="flex items-center justify-center gap-2 bg-teal-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-teal-700 transition shadow-sm sm:self-auto self-start"
+          >
+            <PlusCircle className="w-4 h-4" /> Create Class
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -98,14 +143,30 @@ export default function TeacherClassesPage() {
       ) : classes.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-2xl border-2 border-dashed border-gray-200">
           <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-black text-gray-600 mb-2">No classes yet</h3>
-          <p className="text-gray-400 mb-6">Create your first class and share the code with parents</p>
-          <button
-            onClick={() => setShowModal(true)}
-            className="inline-flex items-center gap-2 bg-teal-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-teal-700 transition"
-          >
-            <PlusCircle className="w-4 h-4" /> Create First Class
-          </button>
+          {isSchoolTeacher ? (
+            // Phase 19 — a school teacher is never told to "create your first
+            // class." Building the school's teaching structure is the
+            // administrator's responsibility, not theirs.
+            <>
+              <h3 className="text-xl font-black text-gray-600 mb-2">No private classes</h3>
+              <p className="text-gray-400 max-w-md mx-auto">
+                The classes and subjects your school has assigned to you appear under
+                My Teaching on your dashboard. If nothing is listed there yet, contact
+                your school administrator.
+              </p>
+            </>
+          ) : (
+            <>
+              <h3 className="text-xl font-black text-gray-600 mb-2">No classes yet</h3>
+              <p className="text-gray-400 mb-6">Create your first class and share the code with parents</p>
+              <button
+                onClick={() => setShowModal(true)}
+                className="inline-flex items-center gap-2 bg-teal-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-teal-700 transition"
+              >
+                <PlusCircle className="w-4 h-4" /> Create First Class
+              </button>
+            </>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">

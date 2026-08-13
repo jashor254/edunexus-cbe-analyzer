@@ -26,15 +26,15 @@
  *     invitation already surfaces as an active `school_users` row and is
  *     covered by step 1. See this module's implementation report,
  *     "Contradictions found," for why no separate step exists here.
- *  3. Deliberately does NOT call `lib/core/school.ts::ensureSchoolMembership`
- *     (fuzzy, case/whitespace-insensitive school-*name* matching against
- *     the free-text name a teacher typed at signup). That mechanism
- *     auto-attaches by name similarity, which this resolver's contract
- *     explicitly forbids (never infer institution ownership from fuzzy
- *     text matching). If `ensureSchoolMembership` already ran elsewhere
- *     (`app/api/teacher/profile`) and found a real match, its result is
- *     already a real `school_users` row and step 1 picks it up for free —
- *     no duplication, no reliance on fuzzy matching inside this resolver.
+ *  3. Never infers institution ownership from fuzzy school-*name* matching.
+ *     `app/api/teacher/profile` once did exactly that, via
+ *     `ensureSchoolMembership()`: it matched the free-text name a teacher
+ *     typed and created an active `school_users` row from it. That path was
+ *     removed (it is now `recordSchoolNameForReconciliation()`, which writes
+ *     nothing) because a teacher must not be able to type themselves into an
+ *     institution — and, through it, into that institution's entitlement.
+ *     Membership now originates only from an admin-provisioned invitation,
+ *     which step 1 picks up as a real `school_users` row.
  *  4. No safe deterministic relationship found — atomically provision one
  *     new school via the `provision_teacher_school` Postgres function
  *     (transaction-scoped advisory lock keyed on the user id; see that
@@ -62,6 +62,57 @@ export type OwningSchoolResolution = {
 }
 
 /**
+ * Resolves the school that owns this user's institutional writes, or `null`
+ * when there is no honest answer — WITHOUT ever creating one.
+ *
+ * This is the resolver every teacher-facing route uses. It is step 1 of
+ * {@link resolveOwningSchool} with the provisioning fallback deliberately
+ * absent, and it exists because that fallback was an institutional
+ * anti-pattern: a teacher performing ordinary teacher work (creating a class,
+ * adding a learner) would silently mint a school named "{their name}'s School
+ * (pending setup)" and be made its `school_admin`. School structure is
+ * provisioned by school administrators; teachers do not manufacture
+ * institutions, and school-admin authority is never a side effect of a
+ * teacher-side write.
+ *
+ * `null` is a correct, expected answer, not a failure:
+ *   - a genuine Solo Teacher has no institution, and their private class
+ *     genuinely has no `school_id`. Both `teacher_classes.school_id` and
+ *     `students.school_id` are nullable precisely because of this;
+ *   - a departed teacher's membership is inactive, so they resolve to `null`
+ *     rather than inheriting their former school (or being handed a new one).
+ *
+ * Callers must treat `null` as "no institutional owner" and proceed with a
+ * NULL `school_id` — never as a reason to provision, and never as a 500.
+ */
+export async function resolveExistingOwningSchool(
+  userId: string
+): Promise<{ schoolId: string | null }> {
+  // Same lookup resolveOwningSchool has always used for step 1 — active
+  // memberships only (`findSchoolUserByUserId` filters `is_active = true`),
+  // so an inactive/historical membership never resolves.
+  const existing = await repos.schools.findSchoolUserByUserId(userId)
+  return { schoolId: existing?.school_id ?? null }
+}
+
+/**
+ * @deprecated DORMANT — no production caller remains. Use
+ * {@link resolveExistingOwningSchool} instead.
+ *
+ * Retained, not deleted, because: the `provision_teacher_school` RPC it calls
+ * is still referenced by two migrations and by the security tests that prove
+ * the RPC is locked to `service_role`
+ * (`lib/core/securitySprintRlsHardening.integration.test.ts`), and this
+ * function is the only exercised path to it. Deleting the symbol would delete
+ * that coverage along with it.
+ *
+ * DO NOT wire this into any teacher-facing route. Its provisioning branch
+ * creates a school AND grants the caller `school_admin` over it — the exact
+ * institutional anti-pattern the auto-provision cleanup closed. If a future
+ * flow genuinely needs to create a school, it should call the school-creation
+ * service behind an administrative gate, not inherit admin authority as a
+ * side effect of a teacher's first write.
+ *
  * Resolves (or, on a teacher's genuine first institutional write,
  * atomically provisions) the school that owns this user's new
  * institutional writes. Never returns a null/undefined `schoolId`.

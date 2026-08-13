@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
-import { ensureSchoolMembership } from '@/lib/core/school'
+import { recordSchoolNameForReconciliation } from '@/lib/core/school'
 import { requireAuthentication } from '@/lib/core/permissions'
 import { UnauthorizedError } from '@/lib/core/errors'
 
@@ -115,13 +115,22 @@ export async function POST(req: Request) {
       teacher = data
     }
 
-    // Best-effort: link this teacher to a real schools/school_users row from
-    // the free-text school name. Never blocks profile save — a school-linking
-    // failure shouldn't stop a teacher from completing setup.
+    // Observation only — this NEVER creates a school membership.
+    //
+    // It used to: the free-text school name was matched against `schools` and
+    // a matching teacher got an active `school_users` row on the spot, which
+    // (via lib/core/schoolEntitlement.ts) handed them that school's paid
+    // entitlement. Institutional membership is provisioned by a school
+    // administrator through POST /api/core/teachers and claimed by the
+    // teacher; it is not something a teacher can type themselves into.
+    //
+    // Still best-effort and still never blocks the profile save — the call
+    // only writes a log line now, but a logging failure must not cost a
+    // teacher their setup.
     try {
-      await ensureSchoolMembership(userId, school)
+      await recordSchoolNameForReconciliation(userId, school)
     } catch (linkErr) {
-      console.error('[teacher/profile POST] school membership link failed', linkErr)
+      console.error('[teacher/profile POST] school name reconciliation log failed', linkErr)
     }
 
     // Pioneer counter needs service role to touch beta_stats
