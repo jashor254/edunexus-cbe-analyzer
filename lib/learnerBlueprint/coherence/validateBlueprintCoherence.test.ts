@@ -46,6 +46,7 @@ function baseBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBluepr
     attendance: unavailable(),
     learningCompass: unavailable(),
     career: unavailable<CareerData>(),
+    pathwayReadiness: { status: 'unavailable', owner: 'lib/pathwayCalculator.calculatePathwayGapAnalysis', freshness: 'live', data: null, unavailableReason: 'test fixture' } as never,
     portfolio: unavailable(),
     achievement: unavailable(),
     teacherReflection: unavailable(),
@@ -179,6 +180,7 @@ test('flags two approved actions with identical rationale text (duplicated recom
 test('flags a low-confidence career narrative with no hedging language', () => {
   const bp = baseBlueprint({
     career: available<CareerData>({ careerCluster: 'Agriculture', strengthProfile: 'You are a strong match for this career.', futureDirection: 'Pursue this path directly.', aiOutlook: null, confidence: 'Low', doorsPreview: null, aiChangeSummary: null, humanAdvantageSummary: null, explorationSuggestions: null, knowledge: null, notes: [] }),
+    pathwayReadiness: { status: 'unavailable', owner: 'lib/pathwayCalculator.calculatePathwayGapAnalysis', freshness: 'live', data: null, unavailableReason: 'test fixture' } as never,
   })
   const report = validateBlueprintCoherence(bp, [])
   assert.ok(report.findings.some(f => f.rule === 'career_alignment' && f.severity === 'warning'))
@@ -208,6 +210,7 @@ test('flags an unsupported teacherAction, learnerAction, and parentSupport indep
 test('flags a career claim with no confidence label at all (confidence mismatch)', () => {
   const bp = baseBlueprint({
     career: available<CareerData>({ careerCluster: 'Agriculture', strengthProfile: 'A strong fit.', futureDirection: null, aiOutlook: null, confidence: null, doorsPreview: null, aiChangeSummary: null, humanAdvantageSummary: null, explorationSuggestions: null, knowledge: null, notes: [] }),
+    pathwayReadiness: { status: 'unavailable', owner: 'lib/pathwayCalculator.calculatePathwayGapAnalysis', freshness: 'live', data: null, unavailableReason: 'test fixture' } as never,
   })
   const report = validateBlueprintCoherence(bp, [])
   assert.ok(report.findings.some(f => f.rule === 'career_alignment' && f.explanation.includes('no confidence label')))

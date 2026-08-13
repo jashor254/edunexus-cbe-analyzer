@@ -26,6 +26,7 @@ function fixtureBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlu
     attendance: na(),
     learningCompass: na(),
     career: na(),
+    pathwayReadiness: { status: 'unavailable', owner: 'lib/pathwayCalculator.calculatePathwayGapAnalysis', freshness: 'live', data: null, unavailableReason: 'test fixture' } as never,
     portfolio: na(),
     achievement: na(),
     teacherReflection: na(),

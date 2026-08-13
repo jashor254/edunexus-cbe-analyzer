@@ -108,6 +108,7 @@ function createBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlue
       knowledge: null,
       notes: [],
     }),
+    pathwayReadiness: { status: 'unavailable', owner: 'lib/pathwayCalculator.calculatePathwayGapAnalysis', freshness: 'live', data: null, unavailableReason: 'test fixture' } as never,
     portfolio: section({
       publishedCount: 1,
       latestItem: { title: 'Fractions Poster', category: 'Creative Work', publishedAt: '2026-06-02T10:00:00.000Z' },
@@ -239,6 +240,7 @@ function createKevinBlueprint(overrides: Partial<LearnerBlueprint> = {}): Learne
       knowledge: null,
       notes: [],
     }),
+    pathwayReadiness: { status: 'unavailable', owner: 'lib/pathwayCalculator.calculatePathwayGapAnalysis', freshness: 'live', data: null, unavailableReason: 'test fixture' } as never,
     portfolio: section({ publishedCount: 0, latestItem: null, featuredItem: null, portfolioUrl: null }),
     achievement: section({ achievementCount: 0, latestVerifiedAchievement: null, highestLevelAchievement: null, profileUrl: null }),
     teacherReflection: unavailable("This learner's teacher has not yet published a reflection."),

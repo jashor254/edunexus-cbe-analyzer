@@ -32,6 +32,7 @@ import { composeAcademicRecord } from './composeAcademicRecord'
 import { composeAttendance } from './composeAttendance'
 import { composeLearningCompass } from './composeLearningCompass'
 import { composeCareer } from './composeCareer'
+import { composePathwayReadiness } from './composePathwayReadiness'
 import { composePortfolio } from './composePortfolio'
 import { composeAchievement } from './composeAchievement'
 import { composeTeacherReflection } from './composeTeacherReflection'
@@ -100,6 +101,15 @@ export async function composeBlueprint(ids: BlueprintIdentifiers): Promise<Compo
     composeRisk(legacyStudentId, projectionAccess),
   ])
 
+  // Pure — no I/O of its own. Runs after academicRecord because the pathway
+  // composite is computed from the same Projection-sourced subject levels the
+  // Academic Record already resolved, never from a second read.
+  const gradeBand = getGradeBand(identity.data?.currentClassName ?? null)
+  const pathwayReadiness = composePathwayReadiness(
+    gradeBand,
+    academicRecord.data?.bySubject ?? [],
+  )
+
   const parentSummary = composeParentSummary(identity.data?.learnerName ?? null, academicRecord, attendance)
   const learningStory = composeLearningStory({
     identity,
@@ -133,6 +143,7 @@ export async function composeBlueprint(ids: BlueprintIdentifiers): Promise<Compo
     attendance,
     learningCompass,
     career,
+    pathwayReadiness,
     portfolio,
     achievement,
     teacherReflection,
@@ -152,7 +163,7 @@ export async function composeBlueprint(ids: BlueprintIdentifiers): Promise<Compo
     // Resolved here, once, from Identity's own class name. Every render and
     // every stored snapshot then reads the same stage rather than each
     // re-deriving it — see gradeBand.ts for why this is a domain decision.
-    gradeBand: getGradeBand(identity.data?.currentClassName ?? null),
+    gradeBand,
   })
 
   const blueprint: LearnerBlueprint = { metadata, ...sections }

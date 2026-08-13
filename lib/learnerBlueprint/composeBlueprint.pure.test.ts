@@ -159,6 +159,7 @@ function fixtureBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlu
     attendance: na('not_implemented'),
     learningCompass: na('not_implemented'),
     career: na('not_implemented'),
+    pathwayReadiness: { status: 'unavailable', owner: 'lib/pathwayCalculator.calculatePathwayGapAnalysis', freshness: 'live', data: null, unavailableReason: 'test fixture' } as never,
     portfolio: na('not_implemented'),
     achievement: na('not_implemented'),
     teacherReflection: na('not_implemented'),
@@ -219,6 +220,7 @@ test('validateBlueprint passes for a "full blueprint" — every section availabl
     attendance: { status: 'available', owner: 'attendance', freshness: 'snapshot', data: { presentCount: 10, absentCount: 0, lateCount: 0, excusedCount: 0, totalSessions: 10, attendancePercentage: 100, notes: [] } },
     learningCompass: { status: 'available', owner: 'compass', freshness: 'live', data: { currentLearningFocus: null, nextRecommendedAction: null, holidayProgrammeAvailable: false, learningReadiness: null, notes: [] } },
     career: { status: 'available', owner: 'career', freshness: 'live', data: { careerCluster: null, strengthProfile: null, futureDirection: null, aiOutlook: null, confidence: null, doorsPreview: null, aiChangeSummary: null, humanAdvantageSummary: null, explorationSuggestions: null, knowledge: null, notes: [] } },
+    pathwayReadiness: { status: 'unavailable', owner: 'lib/pathwayCalculator.calculatePathwayGapAnalysis', freshness: 'live', data: null, unavailableReason: 'test fixture' } as never,
     parentSummary: { status: 'available', owner: 'presentation', freshness: 'live', data: { headline: 'x', detail: 'x', action: null } },
   }))
   assert.equal(result.valid, true, JSON.stringify(result.errors))

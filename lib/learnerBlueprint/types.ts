@@ -190,6 +190,68 @@ export type CareerData = {
   notes: string[]
 }
 
+// ── Pathway Readiness (lib/pathwayCalculator.ts) ─────────────────────────────
+
+/**
+ * The single subject improvement that would open the next pathway — the most
+ * actionable thing on the whole Blueprint for a Grade 9 learner, because it
+ * names one subject and one level rather than "work harder".
+ */
+export type PathwayKeyLeverData = {
+  subject: string
+  currentLevel: number
+  targetLevel: number
+  pointsGained: number
+  /** True when this one improvement alone satisfies every gate for the next pathway. */
+  wouldUnlock: boolean
+}
+
+export type PathwayNextDoorData = {
+  pathway: string
+  pointsShort: number
+  unlockMessage: string
+  keyLever: PathwayKeyLeverData
+}
+
+/**
+ * Where a junior learner stands against the senior-school pathway decision.
+ *
+ * Every consumer of this section MUST render `disclaimer` and must not present
+ * `recommendedPathway` or `qualifiesFor` as a placement result. When
+ * `ruleSetVerified` is false the thresholds behind these figures come from
+ * secondary reporting rather than a primary KNEC publication — see the
+ * verification contract in lib/config/kjseaRules.ts.
+ */
+export type PathwayReadinessData = {
+  gradeBand: BlueprintGradeBand
+  /**
+   * `accumulating` (Grade 7-8) carries no forecast by design — evidence is
+   * being banked but a projection off it would be a guess. `decision_year`
+   * (Grade 9) carries the full forecast.
+   */
+  stage: 'accumulating' | 'decision_year'
+  compositeScore: number
+  kjseaMaxScore: number
+  subjectsEntered: number
+  subjectGroupsTotal: number
+  /** Fewer than all 9 subject groups have evidence — the composite is a floor, not a score. */
+  isPartialComposite: boolean
+  /** Levels alone cannot separate the top of a band from the bottom; the true composite may be higher. */
+  compositeUnderstated: boolean
+  /** Null in `accumulating` stage — deliberately withheld, never guessed. */
+  recommendedPathway: string | null
+  qualifiesFor: string[]
+  nextDoor: PathwayNextDoorData | null
+  ruleSetCycle: string
+  /** False when the thresholds are unconfirmed reporting. Renderers must show this. */
+  ruleSetVerified: boolean
+  disclaimer: string
+  disclaimerFull: string
+  source: string
+  stageMessage: string
+  notes: string[]
+}
+
 // ── Teacher Reflection ────────────────────────────────────────────────────────
 
 /**
@@ -453,6 +515,7 @@ export type LearnerBlueprint = {
   attendance: BlueprintSection<AttendanceData>
   learningCompass: BlueprintSection<LearningCompassData>
   career: BlueprintSection<CareerData>
+  pathwayReadiness: BlueprintSection<PathwayReadinessData>
   portfolio: BlueprintSection<PortfolioData>
   achievement: BlueprintSection<AchievementData>
   teacherReflection: BlueprintSection<TeacherReflectionData>

@@ -558,6 +558,58 @@ export default function BlueprintView({
             </EvidenceBox>
           )}
 
+          {/* Pathway readiness — junior only, by construction (composePathwayReadiness
+              returns unavailable for senior bands, where the decision is already made).
+              This is the most decision-useful block on the page for a Grade 9 family:
+              it names one subject and one level rather than "work harder". The
+              disclaimer is rendered unconditionally because the KJSEA rule set behind
+              these thresholds is provisional — see lib/config/kjseaRules.ts. */}
+          {blueprint.pathwayReadiness.status === 'available' && blueprint.pathwayReadiness.data && (
+            <EvidenceBox title="Senior school pathway" tone="navy" dense>
+              <p>{blueprint.pathwayReadiness.data.stageMessage}</p>
+
+              {blueprint.pathwayReadiness.data.stage === 'decision_year' && (
+                <>
+                  <p className="mt-2">
+                    Current composite:{' '}
+                    <span className="font-bold">
+                      {blueprint.pathwayReadiness.data.isPartialComposite ? 'at least ' : ''}
+                      {blueprint.pathwayReadiness.data.compositeScore}
+                    </span>{' '}
+                    of {blueprint.pathwayReadiness.data.kjseaMaxScore}, from{' '}
+                    {blueprint.pathwayReadiness.data.subjectsEntered} of{' '}
+                    {blueprint.pathwayReadiness.data.subjectGroupsTotal} subject groups.
+                  </p>
+
+                  {blueprint.pathwayReadiness.data.qualifiesFor.length > 0 && (
+                    <p className="mt-1">
+                      On the record so far, this reaches the threshold for:{' '}
+                      <span className="font-bold">{blueprint.pathwayReadiness.data.qualifiesFor.join(', ')}</span>.
+                    </p>
+                  )}
+
+                  {blueprint.pathwayReadiness.data.nextDoor && (
+                    <p className="mt-2">
+                      <span className="font-bold">The one thing that would open {blueprint.pathwayReadiness.data.nextDoor.pathway}:</span>{' '}
+                      moving {blueprint.pathwayReadiness.data.nextDoor.keyLever.subject} from level{' '}
+                      {blueprint.pathwayReadiness.data.nextDoor.keyLever.currentLevel} to level{' '}
+                      {blueprint.pathwayReadiness.data.nextDoor.keyLever.targetLevel}
+                      {blueprint.pathwayReadiness.data.nextDoor.keyLever.wouldUnlock
+                        ? ' would be enough on its own.'
+                        : ` would close ${blueprint.pathwayReadiness.data.nextDoor.keyLever.pointsGained} of the ${blueprint.pathwayReadiness.data.nextDoor.pointsShort} points still needed.`}
+                    </p>
+                  )}
+                </>
+              )}
+
+              {blueprint.pathwayReadiness.data.notes.map((note, i) => (
+                <p key={i} className="mt-1 text-[11px] text-slate-500">{note}</p>
+              ))}
+
+              <p className="mt-2 text-[11px] text-slate-500">{blueprint.pathwayReadiness.data.disclaimer}</p>
+            </EvidenceBox>
+          )}
+
           {blueprint.career.status === 'available' && describeExplorationSuggestions(blueprint.career.data?.explorationSuggestions ?? null) && (
             <p className="text-sm text-slate-600">{describeExplorationSuggestions(blueprint.career.data?.explorationSuggestions ?? null)}</p>
           )}
