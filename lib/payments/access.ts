@@ -7,6 +7,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { repos } from '@/lib/repositories'
+import { resolveSchoolCoverage } from '@/lib/core/schoolEntitlement'
 import {
   TOKEN_COSTS,
   FEATURE_ACCESS,
@@ -19,6 +20,23 @@ export type AccessResult =
   | { allowed: true;  tier: 'token'; deductTokens: true; cost: number; userId: string }
   | { allowed: false; reason: 'unauthenticated' | 'insufficient_tokens' | 'no_access' }
 
+// In-process, per-server-instance, keyed on user+feature.
+//
+// MAXIMUM STALE-ACCESS WINDOW: 60 seconds. This is the documented bound on
+// every entitlement change:
+//   * School activated      → covered teachers may see the old denial for ≤60s.
+//   * School suspended      → teachers may retain coverage for ≤60s.
+//   * Membership deactivated (teacher leaves/transfers/retires)
+//                           → the departed teacher may retain school-covered
+//                             access for ≤60s, then resolves as uncovered.
+//   * Replacement teacher added → covered within ≤60s of their first call.
+//
+// Not invalidated explicitly, and deliberately so: the map is per-instance and
+// non-shared, so a correct invalidation would need a distributed channel this
+// codebase has no infrastructure for today. A ≤60s window on a term-length
+// institutional entitlement is not a security-relevant exposure — a departing
+// teacher generating one more scheme of work a minute after their membership is
+// deactivated is not the risk this phase exists to close.
 const accessCache = new Map<string, { result: AccessResult; expiresAt: number }>()
 const CACHE_TTL_MS = 60_000
 
@@ -74,20 +92,36 @@ export async function checkFeatureAccess(
   const isTeacherRole = primaryRole === 'teacher' || secondaryRole === 'teacher'
 
   // 5. Teacher tier — free for teacher-designated features, but ONLY when
-  //    that teacher's school has an active EduNexus subscription. Role
-  //    alone ('teacher' in profiles) is not sufficient — a self-teacher
-  //    with no attached school pays per service like any token user, same
-  //    as everyone else. This is checked here, not inferred from role,
-  //    because role is set at signup and never re-verified against
-  //    whether a real, paying organization stands behind it.
+  //    that teacher's school holds an active EduNexus institutional
+  //    entitlement. Role alone ('teacher' in profiles) is not sufficient —
+  //    a Solo Teacher with no entitled school pays per service like any
+  //    token user, same as everyone else. This is checked here, not
+  //    inferred from role, because role is set at signup and never
+  //    re-verified against whether a real, paying school stands behind it.
+  //
+  //    Coverage belongs to the SCHOOL and is inherited through an active
+  //    school_users membership — see lib/core/schoolEntitlement.ts for the
+  //    full chain. A departed teacher's membership goes inactive and
+  //    coverage stops; their replacement inherits the same school
+  //    entitlement through their own membership, with no repurchase.
+  //
+  //    This previously called repos.organizations.findUserOrganizations(),
+  //    which queried `organization_members` — absent from production, so it
+  //    threw PGRST205 and every non-admin teacher got a 500 (including on
+  //    their free first SOW, since step 6b sits below this throw). The
+  //    resolver now returns lookup failure as a value instead of throwing,
+  //    and anything short of positive proof falls through to the personal
+  //    teacher paths below rather than failing the request.
   if (isTeacherRole) {
     const teacherAccess = FEATURE_ACCESS[feature].teacher
     if (teacherAccess === 'free') {
-      const organizations = await repos.organizations.findUserOrganizations(user.id)
-      if (organizations.length > 0) {
+      const coverage = await resolveSchoolCoverage(user.id)
+      if (coverage.outcome === 'covered') {
         return cacheAndReturn({ allowed: true, tier: 'teacher', deductTokens: false, userId: user.id })
       }
-      // Teacher role, no school affiliation → falls through to token pricing below.
+      // Not covered, or the institutional lookup was unavailable → falls
+      // through to first-SOW-free / subscription / token pricing below.
+      // Never the reverse: absence of proof is never treated as coverage.
     }
     // Teacher accessing a parent-tier feature (clinic, compass, career) → falls through
   }

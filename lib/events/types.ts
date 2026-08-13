@@ -56,6 +56,11 @@ export type WellKnownEventType =
   | 'organization.member.role_changed'
   | 'organization.subscription.upgraded'
   | 'organization.subscription.canceled'
+  // School institutional entitlement (lib/core/schoolEntitlement.ts) — granted
+  // by the EduNexus platform-admin path after payment is confirmed OUT OF BAND,
+  // never by the school itself and never by a payment provider callback.
+  | 'school.entitlement.activated'
+  | 'school.entitlement.suspended'
   // API events
   | 'api.key.created'
   | 'api.key.revoked'

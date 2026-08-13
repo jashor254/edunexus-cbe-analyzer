@@ -425,33 +425,19 @@ export async function POST(req: Request) {
       : []
 
     // ── Stream from DeepSeek ──────────────────────────────────────────────────
-    // costContext resolved server-side (never trusted from the request);
-    // a student/parent with no resolvable organization gets no costContext,
-    // which is a no-op per lib/ai/deepseek.ts's contract.
+    // Cost attribution is intentionally unset.
     //
-    // "No resolvable organization" has to include "the lookup itself failed".
-    // This is cost attribution for an internal dashboard — it is not part of
-    // answering the learner, and it must never be able to end their session.
-    // It could: `organization_members` is absent from this project's schema
-    // (defined in supabase/migrations/20260701_phase8_platform_foundation.sql,
-    // never applied; no entry in lib/database.types.ts), so the repository
-    // threw on every single turn and the route 500'd before DeepSeek was ever
-    // called. Degrading to "unattributed" is the correct failure mode, and it
-    // is logged rather than swallowed so the missing table stays visible.
-    let costContext: { organizationId: string; feature: FeatureKey } | undefined
-    try {
-      const [compassOrg] = await repos.organizations.findUserOrganizations(access.userId)
-      costContext = compassOrg
-        ? { organizationId: compassOrg.id, feature: FEATURE }
-        : undefined
-    } catch (err) {
-      logger.warn(
-        'Compass cost attribution unavailable — continuing without it',
-        { operation: 'learn.resolveCostContext', userId: access.userId },
-        err,
-      )
-      costContext = undefined
-    }
+    // This used to resolve an organization for per-org AI cost recording,
+    // wrapped in a try/catch so a failed lookup could not end a learner's
+    // session. The catch was load-bearing: `organization_members` is absent
+    // from this project's schema (defined in supabase/migrations/
+    // 20260701_phase8_platform_foundation.sql, never applied; no entry in
+    // lib/database.types.ts), so the repository threw on every single turn.
+    // The lookup could only ever fail, so both it and its catch are gone —
+    // omitting costContext produces exactly the outcome the catch produced,
+    // and is a documented no-op per lib/ai/deepseek.ts's contract. Per-school
+    // cost attribution, if ever wanted, belongs on the live school domain.
+    const costContext: { organizationId: string; feature: FeatureKey } | undefined = undefined
     const rawStream = await streamDeepSeek(systemPrompt, message as string, history, { temperature: 0.3, costContext })
 
     type CompassEval = {

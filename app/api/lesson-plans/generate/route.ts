@@ -96,11 +96,11 @@ export async function POST(req: Request) {
       })
     }
 
-    const [organization] = await repos.organizations.findUserOrganizations(access.userId)
-    const costContext = organization
-      ? { organizationId: organization.id, feature: 'lesson_plan_generate' }
-      : undefined
-    const result = await generateSpecificWeekPlans(sowId, access.userId, weekNumber, costContext)
+    // Cost attribution intentionally unset — see app/api/sow/generate/route.ts
+    // for the full reasoning. `organization_members` does not exist in
+    // production; this lookup threw PGRST205 and 500'd the route after the
+    // access check had passed. Omitting it is a documented no-op.
+    const result = await generateSpecificWeekPlans(sowId, access.userId, weekNumber, undefined)
 
     const { data: plans } = await db
       .from('lesson_plans')

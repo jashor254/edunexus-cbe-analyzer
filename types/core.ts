@@ -32,6 +32,57 @@ export type SchoolUserRole =
   | 'teacher'
   | 'parent'
 
+// Institutional entitlement held by the SCHOOL, never by an individual teacher.
+// Distinct from a teacher's personal Solo Teacher purchases and from a parent's
+// Family subscription — see lib/core/schoolEntitlement.ts.
+export type SchoolEntitlementStatus =
+  | 'none'
+  | 'active'
+  | 'suspended'
+  | 'expired'
+
+// How a school actually sent the money. Institutional payments arrive outside
+// EduNexus — there is no in-product collection — so this records the channel a
+// human verified, not a provider integration.
+export type SchoolPaymentMethod =
+  | 'mpesa'
+  | 'bank_transfer'
+  | 'cheque'
+  | 'cash'
+  | 'other'
+
+// Two statuses, both earned. There is no 'pending': a payment is recorded only
+// after the founder has confirmed the money arrived, so it is never pending
+// inside EduNexus.
+export type SchoolPaymentStatus =
+  | 'confirmed'
+  | 'reversed'
+
+/**
+ * One institutional payment received from a school, confirmed by a platform
+ * admin. Explains WHY a school holds entitlement — never consulted to decide
+ * whether access is allowed now (that is `schools.school_entitlement_status`).
+ */
+export type SchoolPayment = {
+  id: string
+  school_id: string
+  /** Whole Kenyan shillings. */
+  amount: number
+  payment_method: SchoolPaymentMethod
+  /** M-PESA code, bank reference, or a deliberate one the founder assigned. */
+  payment_reference: string
+  /** The day the money moved — not the day it was recorded. */
+  payment_date: string
+  coverage_start: string | null
+  coverage_end: string
+  /** The `growth_users` id of the admin who verified the payment. */
+  confirmed_by: string
+  status: SchoolPaymentStatus
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type LearnerStatus =
   | 'active'
   | 'transferred'
@@ -83,6 +134,10 @@ export type School = {
   motto: string | null
   subscription_tier: SubscriptionTier
   is_active: boolean
+  /** Institutional EduNexus entitlement. Active teachers inherit school-covered access through `school_users` while this is 'active' and unexpired. Mutable only through the platform-admin service path (DB trigger `trg_guard_school_entitlement`), never by the school itself. */
+  school_entitlement_status: SchoolEntitlementStatus
+  /** When institutional coverage lapses. Null means open-ended. */
+  school_entitlement_expires_at: string | null
   created_by: string | null
   /** Provenance tag for how this school came to exist — e.g. 'teacher_first_write_auto_provision' (lib/core/institutionOwnership.ts). Null for every normally-created school. */
   provisioning_source: string | null

@@ -556,6 +556,7 @@ export default function GrowthDashboardPage() {
               <h3 className="mb-2 text-xs font-medium text-neutral-400">Quick Actions</h3>
               <div className="space-y-1.5 rounded-md border border-neutral-200 bg-white p-3">
                 <Link href="/admin/pilot" className="block rounded-md px-3 py-1.5 text-sm text-violet-700 hover:bg-violet-50">Pilot Students →</Link>
+                <Link href="/admin/schools" className="block rounded-md px-3 py-1.5 text-sm text-violet-700 hover:bg-violet-50">Live Schools &amp; Payments →</Link>
                 <Link href="/admin/core-schools/new" className="block rounded-md px-3 py-1.5 text-sm text-violet-700 hover:bg-violet-50">Onboard Core School →</Link>
                 <button onClick={handleExportCSV} className="block w-full rounded-md px-3 py-1.5 text-left text-sm text-neutral-700 hover:bg-neutral-50">Export Users CSV ↓</button>
               </div>

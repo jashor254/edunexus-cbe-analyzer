@@ -86,14 +86,15 @@ export async function POST(req: Request) {
       timeline?: TimelineSlot[]
     }
 
-    // costContext is resolved server-side, never trusted from the request —
-    // teachers with no organization (individual, not school-affiliated) get
-    // no costContext, which is a no-op per lib/ai/deepseek.ts's contract.
-    const [organization] = await repos.organizations.findUserOrganizations(access.userId)
-    const context: SOWContext = {
-      ...parsedContext,
-      costContext: organization ? { organizationId: organization.id, feature: 'sow_generate' } : undefined,
-    }
+    // Cost attribution is intentionally unset. This used to resolve an
+    // organization for per-org AI cost recording, but `organization_members`
+    // has never existed in production — the lookup threw PGRST205 and 500'd
+    // this route AFTER the access check had already passed, so fixing
+    // checkFeatureAccess alone would have moved the same crash a few lines
+    // down. Omitting costContext is a documented no-op per lib/ai/deepseek.ts's
+    // contract ("optional and additive"). Per-school cost attribution, if it is
+    // ever wanted, belongs on the live school domain, not the absent one.
+    const context: SOWContext = { ...parsedContext }
 
     // ── Build or use pre-built timeline ───────────────────────────────────────
     let timeline: TimelineSlot[]

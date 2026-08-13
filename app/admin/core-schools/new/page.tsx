@@ -54,6 +54,7 @@ export default function NewCoreSchoolPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [activation, setActivation] = useState<ActivationResult | null>(null)
+  const [createdSchoolId, setCreatedSchoolId] = useState<string | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -86,6 +87,7 @@ export default function NewCoreSchoolPage() {
       })
       const body = await res.json()
       if (!res.ok) throw new Error(body.error?.formErrors?.[0] ?? body.error ?? 'Failed to create school')
+      setCreatedSchoolId(body.data.school?.id ?? null)
       setActivation(body.data.activation as ActivationResult)
       setLoading(false)
     } catch (err) {
@@ -131,11 +133,19 @@ export default function NewCoreSchoolPage() {
             )}
           </div>
 
+          {/* Straight into the school just created — the founder should never
+              need to copy a UUID to reach its payment/entitlement page. */}
           <button
-            onClick={() => router.push('/admin')}
+            onClick={() => router.push(createdSchoolId ? `/admin/schools/${createdSchoolId}` : '/admin/schools')}
             className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 text-white py-3 rounded-xl font-medium transition-colors"
           >
-            Continue to Admin <ArrowRight className="w-4 h-4" />
+            Open school <ArrowRight className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => router.push('/admin/schools')}
+            className="w-full text-center text-sm text-white/40 hover:text-white/70 transition-colors"
+          >
+            Back to all schools
           </button>
         </div>
       </div>

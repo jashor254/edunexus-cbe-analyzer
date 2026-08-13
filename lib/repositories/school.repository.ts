@@ -1,5 +1,5 @@
 import { BaseRepository } from './base'
-import type { School, SchoolUser, SchoolUserRole, SchoolSettings, AcademicYear, Term, SchoolReportCard, ReportCardWithSubjects, CbcLevel } from '@/types/core'
+import type { School, SchoolUser, SchoolUserRole, SchoolSettings, AcademicYear, Term, SchoolReportCard, ReportCardWithSubjects, CbcLevel, SchoolEntitlementStatus, SchoolPayment, SchoolPaymentMethod } from '@/types/core'
 import type {
   SchoolIntelligenceSummary,
   StrandHealthRecord,
@@ -9,7 +9,7 @@ import type {
 } from '@/lib/school/types'
 
 const SCHOOL_COLS =
-  'id, school_name, nemis_code, school_type, county, sub_county, ward, address, contact_phone, contact_email, logo_url, motto, subscription_tier, is_active, created_by, provisioning_source, created_at, updated_at'
+  'id, school_name, nemis_code, school_type, county, sub_county, ward, address, contact_phone, contact_email, logo_url, motto, subscription_tier, is_active, school_entitlement_status, school_entitlement_expires_at, created_by, provisioning_source, created_at, updated_at'
 
 const SCHOOL_USER_COLS =
   'id, school_id, user_id, role, is_active, invited_by, joined_at, created_at, updated_at'
@@ -23,8 +23,18 @@ const ACADEMIC_YEAR_COLS =
 const TERM_COLS =
   'id, school_id, academic_year_id, term_number, name, start_date, end_date, is_current, created_at, updated_at'
 
+const SCHOOL_PAYMENT_COLS =
+  'id, school_id, amount, payment_method, payment_reference, payment_date, coverage_start, coverage_end, confirmed_by, status, notes, created_at, updated_at'
+
 const REPORT_COLS =
   'id, school_id, learner_id, term_id, class_id, overall_score, overall_cbc_level, position_in_class, total_learners, days_present, days_absent, class_teacher_comment, headteacher_comment, pdf_url, is_published, published_at, generated_at, created_at, updated_at'
+
+/** One active teacher membership, with the entitlement state of the school it points at. */
+export type SchoolEntitlementMembership = {
+  schoolId:  string
+  status:    SchoolEntitlementStatus
+  expiresAt: string | null
+}
 
 export class SchoolRepository extends BaseRepository {
   // ── Schools ────────────────────────────────────────────────────────────────
@@ -89,6 +99,144 @@ export class SchoolRepository extends BaseRepository {
       .single()
     if (error) throw new Error(`createSchool: ${error.message}`)
     return data
+  }
+
+  // ── Institutional entitlement ──────────────────────────────────────────────
+
+  // The one query behind school-covered teacher access: every active teacher
+  // membership this user holds, with its school's entitlement state attached.
+  //
+  // Returns an ARRAY, and deliberately does not use .maybeSingle() the way
+  // findSchoolUserByUserId does. The `school_users` unique key is
+  // (school_id, user_id, role), so a second active teacher membership is
+  // schema-legal even though all 581 live memberships are currently 1-per-user
+  // — and .maybeSingle() would turn that data shape into a thrown error, i.e.
+  // an HTTP 500 on a gated teacher route. Resolution picks the entitled school
+  // (lib/core/schoolEntitlement.ts); it never fails merely because a teacher
+  // has two rows.
+  //
+  // Only role='teacher' memberships confer teacher-tool coverage. A 'parent'
+  // membership at an entitled school does not make that person a covered
+  // teacher.
+  async findActiveTeacherMembershipsWithEntitlement(
+    userId: string
+  ): Promise<SchoolEntitlementMembership[]> {
+    const { data, error } = await this.db
+      .from('school_users')
+      .select('school_id, role, is_active, schools!inner (id, school_entitlement_status, school_entitlement_expires_at)')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .eq('role', 'teacher')
+    if (error) throw new Error(`findActiveTeacherMembershipsWithEntitlement: ${error.message}`)
+
+    return (data ?? []).map((row) => {
+      const school = row.schools as unknown as {
+        id: string
+        school_entitlement_status: SchoolEntitlementStatus
+        school_entitlement_expires_at: string | null
+      }
+      return {
+        schoolId:  school.id,
+        status:    school.school_entitlement_status,
+        expiresAt: school.school_entitlement_expires_at,
+      }
+    })
+  }
+
+  // Sets institutional entitlement. Callable only from the platform-admin
+  // service path — the DB trigger trg_guard_school_entitlement rejects this
+  // write for the `authenticated` and `anon` roles regardless of what any
+  // caller intends, so this method is safe to expose but useless to abuse.
+  async setEntitlement(
+    schoolId: string,
+    status: SchoolEntitlementStatus,
+    expiresAt: string | null
+  ): Promise<School> {
+    const { data, error } = await this.db
+      .from('schools')
+      .update({
+        school_entitlement_status:     status,
+        school_entitlement_expires_at: expiresAt,
+      })
+      .eq('id', schoolId)
+      .select(SCHOOL_COLS)
+      .single()
+    if (error) throw new Error(`setSchoolEntitlement: ${error.message}`)
+    return data
+  }
+
+  // ── School payments ────────────────────────────────────────────────────────
+
+  // Records one confirmed institutional payment.
+  //
+  // Returns null (rather than throwing) when the unique identity
+  // (school_id, payment_method, lower(trim(payment_reference))) already exists,
+  // so the caller can distinguish a replay of the same payment from a genuine
+  // failure. That distinction is the whole idempotency story — see
+  // lib/core/schoolPayments.ts.
+  async insertPayment(input: {
+    school_id: string
+    amount: number
+    payment_method: SchoolPaymentMethod
+    payment_reference: string
+    payment_date: string
+    coverage_start: string | null
+    coverage_end: string
+    confirmed_by: string
+    notes: string | null
+  }): Promise<SchoolPayment | null> {
+    const { data, error } = await this.db
+      .from('school_payments')
+      .insert(input)
+      .select(SCHOOL_PAYMENT_COLS)
+      .single()
+
+    // 23505 = unique_violation — this exact payment is already on record.
+    if (error?.code === '23505') return null
+    if (error) throw new Error(`insertSchoolPayment: ${error.message}`)
+    return data
+  }
+
+  async findPaymentByIdentity(
+    schoolId: string,
+    paymentMethod: SchoolPaymentMethod,
+    paymentReference: string
+  ): Promise<SchoolPayment | null> {
+    const { data, error } = await this.db
+      .from('school_payments')
+      .select(SCHOOL_PAYMENT_COLS)
+      .eq('school_id', schoolId)
+      .eq('payment_method', paymentMethod)
+      // The unique index normalises with lower(btrim(...)); ilike with no
+      // wildcards is the case-insensitive equality that matches it.
+      .ilike('payment_reference', paymentReference.trim())
+      .maybeSingle()
+    if (error) throw new Error(`findSchoolPaymentByIdentity: ${error.message}`)
+    return data
+  }
+
+  // How many people actually inherit coverage when this school is entitled.
+  // Counts the same rows lib/core/schoolEntitlement.ts resolves against, so the
+  // number the founder is shown is the number that is really covered.
+  async countActiveTeachers(schoolId: string): Promise<number> {
+    const { count, error } = await this.db
+      .from('school_users')
+      .select('id', { count: 'exact', head: true })
+      .eq('school_id', schoolId)
+      .eq('role', 'teacher')
+      .eq('is_active', true)
+    if (error) throw new Error(`countActiveTeachers: ${error.message}`)
+    return count ?? 0
+  }
+
+  async listPaymentsBySchool(schoolId: string): Promise<SchoolPayment[]> {
+    const { data, error } = await this.db
+      .from('school_payments')
+      .select(SCHOOL_PAYMENT_COLS)
+      .eq('school_id', schoolId)
+      .order('created_at', { ascending: false })
+    if (error) throw new Error(`listSchoolPaymentsBySchool: ${error.message}`)
+    return data ?? []
   }
 
   // ── School Users ───────────────────────────────────────────────────────────

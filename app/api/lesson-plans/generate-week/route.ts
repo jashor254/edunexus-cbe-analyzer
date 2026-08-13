@@ -64,11 +64,11 @@ export async function POST(req: Request) {
 
     let result
     try {
-      const [organization] = await repos.organizations.findUserOrganizations(access.userId)
-      const costContext = organization
-        ? { organizationId: organization.id, feature: 'lesson_plan_generate' }
-        : undefined
-      result = await generateSpecificWeekPlans(sowId, access.userId, weekNumber, costContext)
+      // Cost attribution intentionally unset — see app/api/sow/generate/route.ts.
+      // `organization_members` does not exist in production; this lookup threw
+      // PGRST205, which the surrounding catch turned into a silently failed
+      // generation job rather than a visible error.
+      result = await generateSpecificWeekPlans(sowId, access.userId, weekNumber, undefined)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Generation failed'
       console.error('[lesson-plans/generate-week]', message)
