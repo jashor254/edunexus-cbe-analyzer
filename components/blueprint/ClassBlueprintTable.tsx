@@ -102,7 +102,7 @@ export default function ClassBlueprintTable({ data }: { data: ClassBlueprint }) 
     <div className="space-y-4">
       <header className="space-y-1">
         <h1 className="text-lg font-black text-[#0b1530]">
-          {data.className ?? 'Class'} — Blueprint overview
+          {data.className ?? 'Class'} — progress overview
         </h1>
         <p className="text-xs text-slate-500">
           {rows.length} learner{rows.length === 1 ? '' : 's'}, ordered by who needs attention first.

@@ -315,7 +315,7 @@ test('BlueprintView renders exactly four report pages, in order', () => {
     cursor = index
   }
 
-  assert.match(html, /Learner Blueprint/)
+  assert.match(html, /Learner Progress Report/)
 })
 
 test('Kevin (one assessment, trend insufficient_data): never says no data / insufficient data / unavailable / high-confidence, anywhere in the document', () => {
@@ -693,4 +693,43 @@ test('BlueprintView PDF export mode keeps all four pages, the branded report hea
   assert.doesNotMatch(html, /data-blueprint-nav="true"/)
   assert.doesNotMatch(html, /View History →/)
   assert.doesNotMatch(html, /data-blueprint-hide-in-pdf="true"/)
+})
+
+// ── Honest Kenyan situation (2026-08-14) ─────────────────────────────────────
+
+// The 2026-08-03 Kenyan evolution audit called this the single highest-leverage
+// change it found: "Blueprint" is engineering vocabulary, not a document a
+// Kenyan school has a mental slot for. The internal domain name is unchanged —
+// this asserts only what a reader sees.
+test('the document calls itself a Progress Report to the reader, never a Blueprint', () => {
+  const html = render(createKevinBlueprint())
+  assert.match(html, /Learner Progress Report/)
+
+  // Assert on VISIBLE TEXT only. `data-blueprint-*` attributes are internal
+  // markup hooks the PDF pipeline selects on — a reader never sees them, and
+  // renaming them would break pdfExport.ts for no reader-facing gain.
+  const visibleText = html.replace(/<[^>]*>/g, ' ')
+  assert.doesNotMatch(visibleText, /Blueprint/i)
+})
+
+// A Kenyan secondary school in 2026 holds Form 3/4 under 8-4-4 and Grade 10
+// under CBE on the same roll. The document must speak each learner's own
+// school vocabulary — CBC's rubric words are wrong for a Form 3 learner.
+test('an 8-4-4 learner is described in their own school vocabulary, never CBC rubric words', () => {
+  const html = render(createKevinBlueprint({
+    identity: section({
+      learnerName: 'Wanjiru Kamau', admissionNumber: 'F3-014', schoolName: 'Test School', schoolLogoUrl: null,
+      currentClassName: 'Form 3', academicYearLabel: '2026', termLabel: 'Term 2', guardians: [],
+    }),
+  }))
+  assert.doesNotMatch(html, /Meeting Expectations/)
+  assert.doesNotMatch(html, /Exceeding Expectations/)
+  assert.doesNotMatch(html, /Approaching Expectations/)
+  assert.match(html, /not a KCSE grade/i)
+})
+
+test('a CBE learner still sees KICD rubric wording — the strongest familiarity choice in the document', () => {
+  const html = render(createKevinBlueprint())
+  assert.match(html, /Expectations/)
+  assert.doesNotMatch(html, /not a KCSE grade/i)
 })

@@ -31,6 +31,7 @@ import {
   futurePageTitle,
   futurePageQuestion,
 } from '@/lib/learnerBlueprint/gradeBand'
+import { resolveCurriculumVoice, transitionNote } from '@/lib/learnerBlueprint/curriculumVoice'
 import {
   firstName,
   toDisplayName,
@@ -51,17 +52,22 @@ import {
 const TOTAL_PAGES = 4
 const ATTENDANCE_RESPONSE_THRESHOLD_PERCENT = 90
 
+/**
+ * What this document calls itself to a reader.
+ *
+ * "Blueprint" is the internal domain name and stays that way throughout the
+ * code. It is not a name a Kenyan school has a mental slot for — a school has
+ * report forms, progress reports and records — and the 2026-08-03 Kenyan
+ * evolution audit named this the single highest-leverage change it found,
+ * because it shapes the reader's impression before they have read one fact.
+ */
+const DOCUMENT_NAME = 'Learner Progress Report'
+
 type ActionItem = { title: string; detail: string }
 
-// CBC's own 1-4 rubric — a display-label lookup for an already-real level,
-// not a new calculation or a second scale.
-const CBC_LEVEL_LABEL: Record<1 | 2 | 3 | 4, string> = {
-  4: 'Exceeding Expectations',
-  3: 'Meeting Expectations',
-  2: 'Approaching Expectations',
-  1: 'Below Expectations',
-}
-
+// Level accent colours are shared across curricula — only the WORDS differ,
+// and those come from `resolveCurriculumVoice()` so an 8-4-4 learner is never
+// described in CBC rubric language their school does not use.
 const CBC_LEVEL_ACCENT: Record<1 | 2 | 3 | 4, string> = {
   4: 'bg-emerald-600 text-white',
   3: 'bg-sky-700 text-white',
@@ -94,9 +100,9 @@ function ReportHeader({
         )}
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.28em] text-amber-400">
-            {schoolName ? `${schoolName} · Learner Blueprint` : 'Learner Blueprint'}
+            {schoolName ? `${schoolName} · ${DOCUMENT_NAME}` : DOCUMENT_NAME}
           </p>
-          <p className="mt-0.5 text-xs font-semibold text-white/70">{learnerName ?? 'Learner Blueprint'}</p>
+          <p className="mt-0.5 text-xs font-semibold text-white/70">{learnerName ?? DOCUMENT_NAME}</p>
         </div>
       </div>
       <p className="text-xs font-bold text-white/60">Page {pageNumber} of {TOTAL_PAGES}</p>
@@ -107,7 +113,7 @@ function ReportHeader({
 function ReportFooter({ reportId, generatedAtLabel }: { reportId: string; generatedAtLabel: string }) {
   return (
     <div className="flex items-center justify-between border-t border-slate-200 px-6 py-2 text-[10px] text-slate-400 print:px-8">
-      <p>Learner Blueprint · Prepared {generatedAtLabel}</p>
+      <p>{DOCUMENT_NAME} · Prepared {generatedAtLabel}</p>
       <p>{reportId} · CONFIDENTIAL</p>
     </div>
   )
@@ -309,6 +315,13 @@ export default function BlueprintView({
   // `.status` off it directly is a TypeError, and 117 stored snapshots predate
   // this section. Same class of problem `resolveGradeBand` handles above.
   const pathwayReadiness = readSection(blueprint.pathwayReadiness, 'pathway readiness')
+
+  // Which vocabulary this learner's school actually uses. A Kenyan secondary
+  // school in 2026 holds Form 3/4 under 8-4-4 and Grade 10 under CBE on the
+  // same roll, so this is a per-learner fact read from the class name, never a
+  // school-wide setting.
+  const curriculumVoice = resolveCurriculumVoice(blueprint.identity.data?.currentClassName ?? null)
+  const transitionLine = transitionNote(curriculumVoice)
   const seniorStage = isSeniorBand(gradeBand)
   const attendanceAsConcern = attendanceNeedsResponse(blueprint.attendance)
   const futureEvidence = futureEvidenceItems(blueprint)
@@ -389,10 +402,10 @@ export default function BlueprintView({
         <div className="mb-2 rounded-3xl border border-gray-100 bg-white p-5 sm:p-6" data-blueprint-hide-in-pdf="true">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-black text-gray-900">
-              {historicalMeta ? 'Learner Blueprint — Historical Record' : 'Learner Blueprint'}
+              {historicalMeta ? `${DOCUMENT_NAME} — Historical Record` : DOCUMENT_NAME}
             </h1>
             {!historicalMeta && (
-              <span aria-label="This is the Current, live Blueprint" className="rounded border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
+              <span aria-label="This is the current, live report" className="rounded border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
                 Current
               </span>
             )}
@@ -411,7 +424,7 @@ export default function BlueprintView({
               a parent's screen. */}
           {!validation.valid && (
             <div role="alert" className="mt-3 rounded-2xl border border-amber-100 bg-amber-50 p-3">
-              <p className="text-xs font-bold text-amber-700">Some of this Blueprint could not be prepared</p>
+              <p className="text-xs font-bold text-amber-700">Some of this report could not be prepared</p>
               <p className="mt-0.5 text-[11px] text-amber-600">
                 Parts of this report are incomplete. Everything shown below is accurate — nothing has been
                 estimated or filled in. Please ask the school to check this learner&apos;s record.
@@ -449,11 +462,21 @@ export default function BlueprintView({
                 <div key={subject.subject} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
                   <p className="text-xs font-bold text-slate-900">{subjectLabel(subject.subject)}</p>
                   <span className={`mt-1 inline-block rounded px-2 py-0.5 text-[10px] font-black ${CBC_LEVEL_ACCENT[subject.latestLevel]}`}>
-                    {CBC_LEVEL_LABEL[subject.latestLevel]}
+                    {curriculumVoice.levelLabel[subject.latestLevel]}
                   </span>
                 </div>
               ))}
             </div>
+
+            {/* An 8-4-4 learner is told what these bands are and what they are
+                not. A CBE learner sees nothing extra — the KICD rubric words
+                are already the vocabulary of their classroom. */}
+            {curriculumVoice.scaleNote && (
+              <p className="text-[11px] text-slate-500">{curriculumVoice.scaleNote}</p>
+            )}
+            {transitionLine && (
+              <p className="text-[11px] text-slate-500">{transitionLine}</p>
+            )}
           </>
         ) : hasNoLegacyBridge(blueprint.academicRecord.unavailableReason) ? (
           <p className="text-sm text-slate-500">{`We don’t yet have enough set up to build ${name}'s academic picture.`}</p>
