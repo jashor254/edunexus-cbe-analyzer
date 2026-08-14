@@ -19,6 +19,7 @@
 
 import { getCareerBlueprintSummary } from '@/lib/learnerIntelligence/careerIntelligence'
 import type { BlueprintSection, CareerData } from './types'
+import type { StudentId } from '@/lib/core/identityTypes'
 
 const OWNER = 'lib/learnerIntelligence/careerIntelligence.getCareerBlueprintSummary'
 
@@ -26,7 +27,7 @@ const INSUFFICIENT_EVIDENCE_REASON =
   'More learning evidence is needed before Career Intelligence can provide reliable guidance.'
 
 export async function composeCareer(
-  legacyStudentId: string | null
+  legacyStudentId: StudentId | null
 ): Promise<BlueprintSection<CareerData>> {
   if (!legacyStudentId) {
     return {

@@ -29,6 +29,7 @@ import { repos } from '@/lib/repositories'
 import type { BlueprintActionItemRow } from '@/lib/repositories/blueprintActionItem.repository'
 import type { AssignmentRow } from '@/lib/repositories/assignment.repository'
 import { createAssignment } from '@/lib/assignments/create'
+import type { LearnerId } from '@/lib/core/identityTypes'
 
 export type DeliverBlueprintActionAsAssignmentCommand = {
   classId: string

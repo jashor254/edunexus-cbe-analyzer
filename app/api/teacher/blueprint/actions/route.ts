@@ -20,6 +20,7 @@ import { UnauthorizedError, ForbiddenError, NotFoundError } from '@/lib/core/err
 import { listBlueprintActionsForLearner, proposeBlueprintAction } from '@/lib/learnerBlueprint/actionPlan/lifecycle'
 import { generateActionCandidate } from '@/lib/learnerBlueprint/actionPlan/candidateGeneration'
 import { getLearner } from '@/lib/core/learners'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const PENDING_STATUSES = ['proposed', 'edited', 'deferred'] as const
 
@@ -44,7 +45,7 @@ export async function GET(req: Request) {
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
 
     const supabase = await createClient()
-    const actions = await listBlueprintActionsForLearner(supabase, parsed.data.learnerId, parsed.data.status ? { status: parsed.data.status } : undefined)
+    const actions = await listBlueprintActionsForLearner(supabase, asLearnerId(parsed.data.learnerId), parsed.data.status ? { status: parsed.data.status } : undefined)
 
     // Default view (no explicit status filter) is "what needs a decision" —
     // the whole point of this endpoint existing — not the full history.
@@ -67,15 +68,15 @@ export async function POST(req: Request) {
     // Confirms the learner is real and in this school before spending a
     // Projection recompute on a candidate — getLearner throws NotFoundError
     // for a bad/cross-school id, caught below.
-    await getLearner(learnerId, schoolId)
+    await getLearner(asLearnerId(learnerId), schoolId)
 
-    const candidate = await generateActionCandidate(learnerId, schoolId, subject)
+    const candidate = await generateActionCandidate(asLearnerId(learnerId), schoolId, subject)
     if (!candidate) {
       return apiBadRequest('Not enough evidence yet to responsibly suggest an action for this learner in this subject.')
     }
 
     const supabase = await createClient()
-    const action = await proposeBlueprintAction(supabase, { coreLearnerId: learnerId, ...candidate })
+    const action = await proposeBlueprintAction(supabase, { coreLearnerId: asLearnerId(learnerId), ...candidate })
 
     return apiSuccess({ action }, 201)
   } catch (e: unknown) {

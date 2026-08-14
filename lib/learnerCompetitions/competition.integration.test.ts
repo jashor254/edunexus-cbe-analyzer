@@ -33,6 +33,7 @@ import { createAchievement, verifyAchievement, publishAchievement, getAchievemen
 import { addItem as addPortfolioItem, submitItem as submitPortfolioItem, verifyItem, publishItem, getPortfolioSummary } from '@/lib/learnerPortfolio/portfolio'
 import { createDraft as createProjectDraft, getProjectsSummary } from '@/lib/learnerProjects/project'
 import { composeBlueprint } from '@/lib/learnerBlueprint/composeBlueprint'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_13B_COMPETITION_TEST'
 const db = createServiceClient()
@@ -429,7 +430,7 @@ test('regression: Portfolio, Achievement, and Projects are entirely unaffected b
   await registerCompetition(client, fx.schoolId, competition.id)
 
   // Blueprint composes every section together — Achievement/Portfolio/Competitions all present, none clobbered by another.
-  const { blueprint } = await composeBlueprint({ actorUserId: fx.teacherUserId, coreLearnerId: fx.learnerId, schoolId: fx.schoolId })
+  const { blueprint } = await composeBlueprint({ actorUserId: fx.teacherUserId, coreLearnerId: asLearnerId(fx.learnerId), schoolId: fx.schoolId })
   assert.equal(blueprint.achievement.status, 'available')
   assert.equal(blueprint.achievement.data!.achievementCount, 1)
   assert.equal(blueprint.portfolio.status, 'available')

@@ -5,6 +5,7 @@ import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } fr
 import { sendWelcomeMessage } from '@/lib/whatsapp/sender'
 import { requireAuthentication, requireStudent, requireParent } from '@/lib/core/permissions'
 import { UnauthorizedError } from '@/lib/core/errors'
+import { asStudentId } from '@/lib/core/identityTypes'
 
 /**
  * Preserves the exact original `.or(user_id.eq,parent_user_id.eq)` check
@@ -19,7 +20,7 @@ async function isSelfOrParentOf(client: Awaited<ReturnType<typeof createClient>>
     // fall through to the parent check
   }
   try {
-    await requireParent(client, studentId)
+    await requireParent(client, asStudentId(studentId))  // trust origin: students
     return true
   } catch {
     return false

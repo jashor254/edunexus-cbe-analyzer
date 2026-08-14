@@ -9,11 +9,12 @@
 import type { BlueprintSection, AcademicRecordData, SubjectRecord, CompetencyRecord } from './types'
 import type { ProjectionAccessResult } from './projectionAccess'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
+import type { StudentId } from '@/lib/core/identityTypes'
 
 const OWNER = 'lib/projection/recompute.recomputeLearnerProjection'
 
 export async function composeAcademicRecord(
-  legacyStudentId: string | null,
+  legacyStudentId: StudentId | null,
   projectionAccess?: ProjectionAccessResult
 ): Promise<BlueprintSection<AcademicRecordData>> {
   if (!legacyStudentId) {

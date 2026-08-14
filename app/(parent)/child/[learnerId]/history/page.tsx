@@ -18,6 +18,7 @@ import { listBlueprintSnapshots } from '@/lib/learnerBlueprint/snapshot'
 import type { BlueprintSnapshotType } from '@/lib/repositories/blueprintSnapshot.repository'
 import { compareSnapshots } from '@/lib/parentExperience/growthTimeline'
 import { PARENT_STATUS_LABEL } from '@/lib/parentExperience/terminology'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const SNAPSHOT_TYPE_LABEL: Record<BlueprintSnapshotType, string> = {
   report_card_publication: 'Report Card Time',
@@ -30,7 +31,10 @@ export default async function ParentGrowthTimelinePage({
 }: {
   params: Promise<{ learnerId: string }>
 }) {
-  const { learnerId } = await params
+  // Route-boundary trust origin: this segment is a Core `learners.id` — proven
+  // by the Core-learner queries below, not by the URL wording.
+  const { learnerId: rawLearnerId } = await params
+  const learnerId = asLearnerId(rawLearnerId)
   const supabase = await createClient()
 
   try {

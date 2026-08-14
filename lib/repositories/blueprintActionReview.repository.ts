@@ -11,12 +11,13 @@
 // the service layer — there is no `update`/`delete` method here on purpose.
 
 import { BaseRepository } from './base'
+import type { LearnerId } from '@/lib/core/identityTypes'
 
 export type BlueprintActionReviewDecision = 'complete' | 'needs_revision' | 'reopen' | 'defer' | 'no_decision'
 
 export type BlueprintActionReviewRow = {
   id: string
-  learner_id: string
+  learner_id: LearnerId
   school_id: string
   blueprint_action_item_id: string
   decision: BlueprintActionReviewDecision
@@ -31,7 +32,7 @@ export type BlueprintActionReviewRow = {
 }
 
 export type InsertBlueprintActionReviewInput = {
-  learner_id: string
+  learner_id: LearnerId
   school_id: string
   blueprint_action_item_id: string
   decision: BlueprintActionReviewDecision

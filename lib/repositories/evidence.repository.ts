@@ -1,4 +1,5 @@
 import { BaseRepository } from './base'
+import type { StudentId } from '@/lib/core/identityTypes'
 
 // Data access for the Evidence Domain (docs/architecture/evidence-domain-model.md).
 // This repository exposes domain-shaped operations over 4 tables
@@ -20,7 +21,15 @@ const EVIDENCE_COLS =
 export type EvidenceRow = {
   id: string
   created_at: string
-  learner_id: string | null
+  /**
+   * IDENTITY-1: the COLUMN is named `learner_id`, but its foreign key is
+   * `REFERENCES students(id)` — the migration says so explicitly
+   * (20260707_evidence_domain.sql:70). Its value is a legacy `StudentId`, and
+   * the RLS over this table resolves it through `students` accordingly.
+   * The column name is deliberately NOT being changed; this type states what
+   * it actually holds so the compiler refuses a Core `LearnerId` here.
+   */
+  learner_id: StudentId | null
   extracted_name: string
   extracted_external_id: string | null
   subject: string

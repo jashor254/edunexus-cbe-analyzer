@@ -1,6 +1,7 @@
 import { before, mock, test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { LearnerIntelligenceProjection } from '@/lib/projection/types'
+import { asLearnerId, asStudentId, type LearnerId, type StudentId } from '@/lib/core/identityTypes'
 
 let projectionBehavior: 'none' | 'insufficient' | 'rich' = 'none'
 
@@ -107,21 +108,21 @@ test('composeGrowthTimeline is unavailable when no legacy bridge exists', async 
 
 test('composeGrowthTimeline is unavailable when projection has no growth evidence', async () => {
   projectionBehavior = 'none'
-  const section = await composeGrowthTimeline('legacy-1')
+  const section = await composeGrowthTimeline(asStudentId('legacy-1'))
   assert.equal(section.status, 'unavailable')
   assert.match(section.unavailableReason ?? '', /scored evidence/i)
 })
 
 test('composeGrowthTimeline is unavailable when growth remains insufficient', async () => {
   projectionBehavior = 'insufficient'
-  const section = await composeGrowthTimeline('legacy-1')
+  const section = await composeGrowthTimeline(asStudentId('legacy-1'))
   assert.equal(section.status, 'unavailable')
   assert.match(section.unavailableReason ?? '', /at least two scored evidence points/i)
 })
 
 test('composeGrowthTimeline preserves trajectory, confidence, and coverage from projection growth', async () => {
   projectionBehavior = 'rich'
-  const section = await composeGrowthTimeline('legacy-1')
+  const section = await composeGrowthTimeline(asStudentId('legacy-1'))
   assert.equal(section.status, 'available')
   assert.equal(section.data?.length, 1)
   assert.equal(section.data?.[0].direction, 'improving')

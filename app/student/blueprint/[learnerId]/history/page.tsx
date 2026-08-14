@@ -14,6 +14,7 @@ import { repos } from '@/lib/repositories'
 import { listBlueprintSnapshots } from '@/lib/learnerBlueprint/snapshot'
 import type { BlueprintSnapshotType } from '@/lib/repositories/blueprintSnapshot.repository'
 import BlueprintStateMessage from '@/components/blueprint/BlueprintStateMessage'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const SNAPSHOT_TYPE_LABEL: Record<BlueprintSnapshotType, string> = {
   report_card_publication: 'Report Card Publication',
@@ -26,7 +27,10 @@ export default async function BlueprintHistoryPage({
 }: {
   params: Promise<{ learnerId: string }>
 }) {
-  const { learnerId } = await params
+  // Route-boundary trust origin: a Core `learners.id` — established by the
+  // Core-learner queries this page performs, not by the URL wording.
+  const { learnerId: rawLearnerId } = await params
+  const learnerId = asLearnerId(rawLearnerId)
   const supabase = await createClient()
 
   try {

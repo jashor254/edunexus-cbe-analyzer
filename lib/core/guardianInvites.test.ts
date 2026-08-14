@@ -19,6 +19,7 @@ import { onboardLearner } from '@/lib/core/learnerOnboarding'
 import { createGuardianInvite, claimGuardianInvite } from '@/lib/core/guardianInvites'
 import { requireParent } from '@/lib/core/permissions'
 import { ResourceOwnershipError } from '@/lib/core/errors'
+import { asStudentId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_S12_GUARDIAN_INVITE_TEST'
 const db = createServiceClient()
@@ -120,14 +121,14 @@ test('claimGuardianInvite: happy path — a real parent account claims the invit
   }
 
   const client = await signInAs(parent.email)
-  const user = await requireParent(client, learnerId)
+  const user = await requireParent(client, asStudentId(learnerId))
   assert.equal(user.id, parent.id)
 })
 
 test('claimGuardianInvite: an UNRELATED parent (different learner) still fails requireParent for this learner (cross-family isolation, not weakened by this fix)', async () => {
   const otherParent = await mkAuthUser('other-parent')
   const client = await signInAs(otherParent.email)
-  await assert.rejects(() => requireParent(client, learnerId), ResourceOwnershipError)
+  await assert.rejects(() => requireParent(client, asStudentId(learnerId)), ResourceOwnershipError)
 })
 
 test('claimGuardianInvite: re-claiming with the SAME user is an idempotent no-op, not an error', async () => {

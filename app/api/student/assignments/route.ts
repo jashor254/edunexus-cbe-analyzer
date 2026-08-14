@@ -3,6 +3,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
 import { requireAuthentication, requireStudent, requireParent } from '@/lib/core/permissions'
 import { UnauthorizedError } from '@/lib/core/errors'
+import { asStudentId } from '@/lib/core/identityTypes'
 
 /**
  * Preserves the exact original union check
@@ -12,7 +13,8 @@ import { UnauthorizedError } from '@/lib/core/errors'
  */
 async function isSelfOrParentOf(client: Awaited<ReturnType<typeof createClient>>, studentId: string): Promise<boolean> {
   try { await requireStudent(client, studentId); return true } catch { /* fall through */ }
-  try { await requireParent(client, studentId); return true } catch { return false }
+  // Trust origin: this id is used against `students` / `class_students` below.
+  try { await requireParent(client, asStudentId(studentId)); return true } catch { return false }
 }
 
 export async function GET(req: Request) {

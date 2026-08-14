@@ -54,6 +54,7 @@ import type { BlueprintActionReviewDecision, BlueprintActionReviewRow } from '@/
 import { getLearnerTimeline } from '@/lib/learnerRecord/timeline'
 import { getPersistedProjections } from '@/lib/projection/recompute'
 import type { ProjectionRow } from '@/lib/repositories/projection.repository'
+import type { LearnerId } from '@/lib/core/identityTypes'
 
 export type ReviewBlueprintActionCommand = {
   decision: BlueprintActionReviewDecision
@@ -154,7 +155,7 @@ const DECISION_TO_EVENT_TYPE: Record<BlueprintActionReviewDecision, BlueprintAct
   no_decision: 'review_no_decision',
 }
 
-async function requireManageAccess(client: SupabaseClient, schoolId: string, learnerId: string): Promise<void> {
+async function requireManageAccess(client: SupabaseClient, schoolId: string, learnerId: LearnerId): Promise<void> {
   const canManage = await canManageLearnerRecordCore(client, schoolId, learnerId)
   if (!canManage) throw new ResourceOwnershipError('You do not have permission to review this learner\'s Blueprint action plan.')
 }

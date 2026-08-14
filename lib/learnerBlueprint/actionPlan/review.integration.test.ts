@@ -31,6 +31,7 @@ import { persistEvidenceBatch } from '@/lib/intelligence/evidenceLifecycle'
 import type { LearnerEvidence, CBCLevel } from '@/lib/intelligence/evidence'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import type { BlueprintActionItemRow } from '@/lib/repositories/blueprintActionItem.repository'
+import { asLearnerId, asStudentId, type LearnerId, type StudentId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_BLUEPRINT_REVIEW_PHASE2D_TEST'
 const db = createServiceClient()
@@ -55,7 +56,7 @@ async function signInAs(email: string): Promise<SupabaseClient> {
 }
 
 let schoolId: string
-let coreLearnerId: string, legacyStudentId: string
+let coreLearnerId: LearnerId, legacyStudentId: string
 let classId: string
 let teacherUserId: string, teacherEmail: string, teacherId: string
 let unrelatedTeacherUserId: string, unrelatedTeacherEmail: string
@@ -69,7 +70,7 @@ let assignmentId: string
 
 function baseActionFields(overrides: Partial<Parameters<typeof repos.blueprintActionItems.insert>[0]> = {}) {
   return {
-    learner_id: coreLearnerId,
+    learner_id: asLearnerId(coreLearnerId),
     school_id: schoolId,
     academic_year_id: null,
     term_id: null,
@@ -246,7 +247,7 @@ test('assignment completion alone does not complete the action', async () => {
 
 test('Compass completion alone does not complete the action', async () => {
   await db.from('compass_sessions').insert({
-    learner_id: legacyStudentId, subject: 'english', mode: 'school', status: 'completed',
+    learner_id: asLearnerId(legacyStudentId), subject: 'english', mode: 'school', status: 'completed',
     session_state: {}, exchange_count: 4,
   })
 

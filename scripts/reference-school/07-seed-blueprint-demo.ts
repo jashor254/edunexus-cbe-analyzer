@@ -62,6 +62,7 @@ import { proposeBlueprintAction, approveBlueprintAction, listBlueprintActionsFor
 import { deliverBlueprintActionAsAssignment } from '@/lib/learnerBlueprint/actionPlan/delivery/assignment'
 import { deliverBlueprintActionToCompass } from '@/lib/learnerBlueprint/actionPlan/delivery/compass'
 import { reviewBlueprintAction, getBlueprintActionReviewSnapshot } from '@/lib/learnerBlueprint/actionPlan/review'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 export const DEMO_ACTION_TITLE = 'Strengthen Kiswahili comprehension through weekly guided practice'
 const DEMO_SUBJECT_LABEL = 'Kiswahili'
@@ -144,7 +145,7 @@ async function pickDemoLearner() {
   if (learnerErr) throw learnerErr
   if (!learner) throw new Error(`[blueprint-demo] could not resolve a demo learner in class ${cls.display_name}`)
 
-  return { schoolId, coreClassId: cls.id as string, className: cls.display_name as string, coreLearnerId: learner.id as string, learnerName: `${learner.first_name} ${learner.last_name}` }
+  return { schoolId, coreClassId: cls.id as string, className: cls.display_name as string, coreLearnerId: asLearnerId(learner.id as string), learnerName: `${learner.first_name} ${learner.last_name}` }
 }
 
 async function resolveTeacherAndLegacyClass(coreClassId: string, coreLearnerId: string) {

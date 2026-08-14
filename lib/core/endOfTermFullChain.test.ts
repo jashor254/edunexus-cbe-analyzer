@@ -26,6 +26,7 @@ import { publishAssessment, listAssessments } from '@/lib/core/assessments'
 import { getReportCard } from '@/lib/core/report-cards'
 import { runEndOfTerm } from '@/lib/core/endOfTerm'
 import { getCurrentTerm } from '@/lib/core/school'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_10A_EOT_CHAIN_TEST'
 const db = createServiceClient()
@@ -145,8 +146,8 @@ test('Final Validation: the complete End-of-Term journey — assessment through 
 
   // ── Evidence + Projection (recordBridgedMarks calls both, unmodified) ────
   await recordBridgedMarks(school.id, assessmentId, bridgedClass, teacher.id, [
-    { coreLearnerId: highLearnerId, admission_number: 'eot-high', student_name: 'High Scorer', subject_scores: { 'SS-MATH': 90 }, total_marks: 90, mean_score: 90 },
-    { coreLearnerId: lowLearnerId, admission_number: 'eot-low', student_name: 'Low Scorer', subject_scores: { 'SS-MATH': 60 }, total_marks: 60, mean_score: 60 },
+    { coreLearnerId: asLearnerId(highLearnerId), admission_number: 'eot-high', student_name: 'High Scorer', subject_scores: { 'SS-MATH': 90 }, total_marks: 90, mean_score: 90 },
+    { coreLearnerId: asLearnerId(lowLearnerId), admission_number: 'eot-low', student_name: 'Low Scorer', subject_scores: { 'SS-MATH': 60 }, total_marks: 60, mean_score: 60 },
   ])
   await publishAssessment(assessmentId)
 

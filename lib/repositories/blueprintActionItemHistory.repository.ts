@@ -9,6 +9,7 @@
 
 import { BaseRepository } from './base'
 import type { BlueprintActionItemRow } from './blueprintActionItem.repository'
+import type { LearnerId } from '@/lib/core/identityTypes'
 
 export type BlueprintActionHistoryEventType =
   | 'proposed' | 'edited' | 'approved' | 'rejected' | 'deferred'

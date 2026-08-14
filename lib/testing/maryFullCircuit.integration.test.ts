@@ -66,6 +66,7 @@ import { resolveCompassAcademicLevelFor } from '@/lib/compass/learnerContext'
 import { buildCompassPrompt } from '@/lib/compass/prompt'
 import { recordCompassSessionEvidence } from '@/lib/compass/evidence'
 import { MASTERY_EXTRACTION_METHOD, ENGAGEMENT_EXTRACTION_METHOD } from '@/lib/compass/evidenceClaimTypes'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_MARY_FULL_CIRCUIT_TEST'
 const db = createServiceClient()
@@ -374,7 +375,7 @@ test('3. the attention item links to a destination that resolves to Mary\'s cano
 // ── 4-5. Teacher generates and approves an evidence-backed action ───────────
 
 test('4. the teacher generates an evidence-backed action candidate for Mathematics', async () => {
-  const candidate = await generateActionCandidate(coreLearnerId, schoolId, 'mathematics')
+  const candidate = await generateActionCandidate(asLearnerId(coreLearnerId), schoolId, 'mathematics')
 
   assert.ok(candidate, 'a candidate must be generated from real projection data')
   assert.equal(candidate!.priority, 'high', 'a critical gap is high priority')
@@ -392,10 +393,10 @@ test('4. the teacher generates an evidence-backed action candidate for Mathemati
 })
 
 test('5. the teacher proposes and approves the action', async () => {
-  const candidate = (await generateActionCandidate(coreLearnerId, schoolId, 'mathematics'))!
+  const candidate = (await generateActionCandidate(asLearnerId(coreLearnerId), schoolId, 'mathematics'))!
 
   const proposed = await proposeBlueprintAction(teacherClient, {
-    coreLearnerId,
+    coreLearnerId: asLearnerId(coreLearnerId),
     context: 'current_term',
     title: candidate.title,
     rationale: candidate.rationale,
@@ -595,7 +596,7 @@ test('11. Compass now teaches to the improved canonical level', async () => {
 
 test('12. Mary\'s canonical Blueprint reflects the changed Mathematics state', async () => {
   const { blueprint } = await composeBlueprint({
-    actorUserId: teacherUserId, coreLearnerId, schoolId,
+    actorUserId: teacherUserId, coreLearnerId: asLearnerId(coreLearnerId), schoolId,
   })
 
   const academic = blueprint.academicRecord
@@ -646,7 +647,7 @@ test('P2-1 (was TRIPWIRE 1). curriculum identity survives the whole circuit, and
 })
 
 test('P2-2 (was TRIPWIRE 2). the action candidate carries stable curriculum identity, not just text', async () => {
-  const candidate = (await generateActionCandidate(coreLearnerId, schoolId, 'mathematics'))!
+  const candidate = (await generateActionCandidate(asLearnerId(coreLearnerId), schoolId, 'mathematics'))!
 
   assert.equal(candidate.subStrandId, targetSubStrandId, 'a real sow_substrands.id')
   assert.notEqual(candidate.targetCapability, 'mathematics')
@@ -670,7 +671,7 @@ test('P2-3 (was TRIPWIRE 3). Blueprint can now answer "did THIS weakness change?
     'the question "was the proportional-reasoning weakness resolved?" is now answerable from evidence')
 
   // Blueprint still composes, and still reflects the subject-level picture.
-  const { blueprint } = await composeBlueprint({ actorUserId: teacherUserId, coreLearnerId, schoolId })
+  const { blueprint } = await composeBlueprint({ actorUserId: teacherUserId, coreLearnerId: asLearnerId(coreLearnerId), schoolId })
   assert.equal(blueprint.academicRecord.status, 'available')
 })
 
@@ -694,11 +695,11 @@ test('P2-4. Career Intelligence still composes over the anchored record (no regr
 // ════════════════════════════════════════════════════════════════════════════
 
 test('AA1. a second approved action for the same need is delivered as a targeted, adaptive assignment', async () => {
-  const candidate = (await generateActionCandidate(coreLearnerId, schoolId, 'mathematics'))!
+  const candidate = (await generateActionCandidate(asLearnerId(coreLearnerId), schoolId, 'mathematics'))!
   assert.equal(candidate.subStrandId, targetSubStrandId)
 
   const proposed = await proposeBlueprintAction(teacherClient, {
-    coreLearnerId,
+    coreLearnerId: asLearnerId(coreLearnerId),
     context: 'current_term',
     title: 'Mathematics: reinforcement work',
     rationale: candidate.rationale,
@@ -737,7 +738,7 @@ test('AA1. a second approved action for the same need is delivered as a targeted
 
 test('AA2. a teacher-authored, subject-level action is NOT labelled adaptive', async () => {
   const proposed = await proposeBlueprintAction(teacherClient, {
-    coreLearnerId,
+    coreLearnerId: asLearnerId(coreLearnerId),
     context: 'current_term',
     title: 'General Mathematics revision',
     rationale: 'Teacher judgement after a parents evening.',
@@ -976,7 +977,7 @@ test('AR4. DECISION B — projection moved, and the adaptive decision moved with
   assert.equal(decision.provisional, false)
 
   // Point 16 — Blueprint consumes the same updated projection.
-  const { blueprint } = await composeBlueprint({ actorUserId: teacherUserId, coreLearnerId, schoolId })
+  const { blueprint } = await composeBlueprint({ actorUserId: teacherUserId, coreLearnerId: asLearnerId(coreLearnerId), schoolId })
   assert.equal(blueprint.academicRecord.status, 'available')
   const maths = blueprint.academicRecord.data?.bySubject?.find(s => /math/i.test(s.subject))
   assert.equal(maths!.latestLevel, 1, 'Blueprint shows the post-outcome level')
@@ -1153,7 +1154,7 @@ test('TR4. a targeted assignment uses the sub-strand picture, and does not distu
   // the evidence does not support — it still reports at subject grain, and
   // says so, rather than silently presenting a sub-strand level as global.
   const { blueprint } = await composeBlueprint({
-    actorUserId: teacherUserId, coreLearnerId: kofiCoreLearnerId, schoolId,
+    actorUserId: teacherUserId, coreLearnerId: asLearnerId(kofiCoreLearnerId), schoolId,
   })
   assert.equal(blueprint.academicRecord.status, 'available')
   const maths = blueprint.academicRecord.data?.bySubject?.find(s => /math/i.test(s.subject))
@@ -1189,7 +1190,7 @@ test('TV1. workflow-only decisions never become educational evidence', async () 
 
     const wrote = await recordBlueprintActionReviewEvidence({
       actionItemId:     assignmentActionItemId,
-      coreLearnerId,
+      coreLearnerId: asLearnerId(coreLearnerId),
       decision,
       notes:            'test',
       reviewId:         '00000000-0000-0000-0000-000000000000',
@@ -1221,7 +1222,7 @@ test('TV2. a real verdict on a delivered intervention becomes Evidence — throu
   // ...then the orchestration-layer producer the route calls after it.
   const wrote = await recordBlueprintActionReviewEvidence({
     actionItemId:     assignmentActionItemId,
-    coreLearnerId,
+    coreLearnerId: asLearnerId(coreLearnerId),
     decision:         review.decision,
     notes:            review.notes,
     reviewId:         review.id,
@@ -1256,7 +1257,7 @@ test('TV2. a real verdict on a delivered intervention becomes Evidence — throu
 test('TV3. a NEGATIVE verdict is recorded just as faithfully as a positive one', async () => {
   const wrote = await recordBlueprintActionReviewEvidence({
     actionItemId:     assignmentActionItemId,
-    coreLearnerId,
+    coreLearnerId: asLearnerId(coreLearnerId),
     decision:         'needs_revision',
     notes:            `${SYNTHETIC_MARKER}: the approach did not work, we need a different one.`,
     reviewId:         '11111111-1111-1111-1111-111111111111',
@@ -1279,7 +1280,7 @@ test('TV4. an action that never reached the learner produces no verdict evidence
   // the cleanest such case — it has, by definition, never reached the
   // learner, and so has no delivery to source a real subject from.
   const proposed = await proposeBlueprintAction(teacherClient, {
-    coreLearnerId,
+    coreLearnerId: asLearnerId(coreLearnerId),
     context: 'current_term',
     title: 'Never delivered',
     rationale: 'Teacher judgement after a corridor conversation.',
@@ -1290,7 +1291,7 @@ test('TV4. an action that never reached the learner produces no verdict evidence
 
   const wrote = await recordBlueprintActionReviewEvidence({
     actionItemId:     proposed.id,
-    coreLearnerId,
+    coreLearnerId: asLearnerId(coreLearnerId),
     decision:         'complete',
     notes:            null,
     reviewId:         '22222222-2222-2222-2222-222222222222',

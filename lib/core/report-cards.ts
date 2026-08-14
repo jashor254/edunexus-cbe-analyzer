@@ -6,6 +6,7 @@ import type { GradeScale } from '@/lib/grading'
 import type { SchoolReportCard, ReportCardWithSubjects, CbcLevel } from '@/types/core'
 import { getAttendanceStatusCountsForClass } from '@/lib/core/attendance'
 import { createBlueprintSnapshot } from '@/lib/learnerBlueprint/snapshot'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 // Sprint 12B (ADR-0004 — Attendance -> Report Card Integration): Report
 // Cards is the consumer here, Attendance the owner. `days_present`/
@@ -211,7 +212,7 @@ export async function publishReportCards(
   // itself.
   for (const card of result.publishedCards) {
     await createBlueprintSnapshot({
-      coreLearnerId: card.learner_id,
+      coreLearnerId: asLearnerId(card.learner_id),
       schoolId,
       academicYearId: null,
       termId,

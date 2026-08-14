@@ -6,6 +6,7 @@ import { requireAuthentication, requireSchoolMembership, canManageAssessment } f
 import { UnauthorizedError, PermissionDeniedError, isEduNexusError } from '@/lib/core/errors'
 import { ensureBridgedClass, createBridgedAssessment, recordBridgedMarks } from '@/lib/core/academicBridge'
 import { z } from 'zod'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const CreateSchema = z.object({
   schoolId: z.string().uuid(),
@@ -122,7 +123,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       const bridged = await ensureBridgedClass(parsed.data.schoolId, parsed.data.classId, userId)
       legacyClassId = bridged.legacyClassId
       await requireCanManageAssessment(supabase, parsed.data.schoolId, legacyClassId)
-      await recordBridgedMarks(parsed.data.schoolId, parsed.data.assessmentId, bridged, userId, parsed.data.scores)
+      await recordBridgedMarks(parsed.data.schoolId, parsed.data.assessmentId, bridged, userId, parsed.data.scores.map(sc => ({ ...sc, coreLearnerId: asLearnerId(sc.coreLearnerId) })))
     } catch (err) {
       return errorResponse(err)
     }

@@ -18,6 +18,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { repos } from '@/lib/repositories'
 import { signInForHttpTest, type SyntheticSession } from '@/lib/testing/httpAuthTestHelper'
 import { EVIDENCE_BASIS_EMPTY } from '../types'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const BASE_URL = process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3939'
 const SYNTHETIC_MARKER = 'SYNTHETIC_BLUEPRINT_DELIVERY_HTTP_TEST'
@@ -58,7 +59,7 @@ async function createSyntheticUser(label: string) {
 
 async function insertApprovedAction() {
   const row = await repos.blueprintActionItems.insert({
-    learner_id: coreLearnerId, school_id: schoolId, academic_year_id: null, term_id: null, blueprint_snapshot_id: null,
+    learner_id: asLearnerId(coreLearnerId), school_id: schoolId, academic_year_id: null, term_id: null, blueprint_snapshot_id: null,
     context: 'current_term', priority: 'medium', visibility: 'teacher_only',
     title: 'Strengthen fractions', rationale: 'Recent evidence shows steady development.',
     intended_outcome: 'Move to Level 3 in fractions by end of term.',

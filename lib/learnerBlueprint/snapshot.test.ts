@@ -21,6 +21,7 @@ import { publishReportCards, getReportCard } from '@/lib/core/report-cards'
 import { runAnnualPromotion } from '@/lib/core/promotions'
 import { getSchoolUser } from '@/lib/core/school-users'
 import { createBlueprintSnapshot, getBlueprintSnapshot, listBlueprintSnapshots, getLatestBlueprintSnapshot } from './snapshot'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_12K_BLUEPRINT_SNAPSHOT_TEST'
 const db = createServiceClient()
@@ -79,7 +80,7 @@ test('createBlueprintSnapshot stores the real composed payload, retrievable by g
   const learnerId = enroll.learnerId!
 
   const row = await createBlueprintSnapshot({
-    coreLearnerId: learnerId,
+    coreLearnerId: asLearnerId(learnerId),
     schoolId: fx.schoolId,
     academicYearId: fx.academicYearId,
     termId: fx.termId,
@@ -100,7 +101,7 @@ test('createBlueprintSnapshot stores the real composed payload, retrievable by g
   assert.ok(fetched)
   assert.equal(fetched!.id, row.id)
 
-  const listed = await listBlueprintSnapshots(learnerId, fx.schoolId)
+  const listed = await listBlueprintSnapshots(asLearnerId(learnerId), fx.schoolId)
   assert.equal(listed.length, 1)
   assert.equal(listed[0].id, row.id)
 })
@@ -116,21 +117,21 @@ test('getLatestBlueprintSnapshot returns the most recently created snapshot, and
   if (enroll.status !== 'complete') throw new Error('enroll failed')
   const learnerId = enroll.learnerId!
 
-  assert.equal(await getLatestBlueprintSnapshot(learnerId, fx.schoolId), null, 'no snapshots yet')
+  assert.equal(await getLatestBlueprintSnapshot(asLearnerId(learnerId), fx.schoolId), null, 'no snapshots yet')
 
   const first = await createBlueprintSnapshot({
-    coreLearnerId: learnerId, schoolId: fx.schoolId,
+    coreLearnerId: asLearnerId(learnerId), schoolId: fx.schoolId,
     academicYearId: fx.academicYearId, termId: fx.termId,
     snapshotType: 'end_of_term', sourceRecordId: null, actorUserId: fx.adminId,
   })
   await new Promise(resolve => setTimeout(resolve, 10))
   const second = await createBlueprintSnapshot({
-    coreLearnerId: learnerId, schoolId: fx.schoolId,
+    coreLearnerId: asLearnerId(learnerId), schoolId: fx.schoolId,
     academicYearId: fx.academicYearId, termId: fx.termId,
     snapshotType: 'graduation', sourceRecordId: null, actorUserId: fx.adminId,
   })
 
-  const latest = await getLatestBlueprintSnapshot(learnerId, fx.schoolId)
+  const latest = await getLatestBlueprintSnapshot(asLearnerId(learnerId), fx.schoolId)
   assert.ok(latest)
   assert.equal(latest!.id, second.id, 'the more recently created row wins, not just insertion order')
   assert.notEqual(latest!.id, first.id)
@@ -148,7 +149,7 @@ test('blueprint_snapshots rows are immutable — UPDATE and DELETE are both reje
   const learnerId = enroll.learnerId!
 
   const row = await createBlueprintSnapshot({
-    coreLearnerId: learnerId,
+    coreLearnerId: asLearnerId(learnerId),
     schoolId: fx.schoolId,
     academicYearId: fx.academicYearId,
     termId: fx.termId,
@@ -192,7 +193,7 @@ test('publishReportCards creates a report_card_publication snapshot for each pub
   const card = await getReportCard(learnerId, fx.termId, fx.schoolId)
   assert.ok(card?.is_published)
 
-  const snapshots = await listBlueprintSnapshots(learnerId, fx.schoolId)
+  const snapshots = await listBlueprintSnapshots(asLearnerId(learnerId), fx.schoolId)
   assert.equal(snapshots.length, 1)
   assert.equal(snapshots[0].snapshot_type, 'report_card_publication')
   assert.equal(snapshots[0].provenance.sourceRecordId, card!.id)
@@ -220,7 +221,7 @@ test('runAnnualPromotion creates a graduation snapshot when a learner graduates 
   assert.deepEqual(errors, [])
   assert.equal(processed, 1)
 
-  const snapshots = await listBlueprintSnapshots(learnerId, fx.schoolId)
+  const snapshots = await listBlueprintSnapshots(asLearnerId(learnerId), fx.schoolId)
   assert.equal(snapshots.length, 1)
   assert.equal(snapshots[0].snapshot_type, 'graduation')
 })

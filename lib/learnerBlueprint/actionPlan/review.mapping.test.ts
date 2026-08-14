@@ -13,6 +13,7 @@ import { summarizeAssignment, summarizeLatestEvidence, deriveProjectionTrend } f
 import type { TimelineEntry } from '@/lib/learnerRecord/timeline'
 import type { ProjectionRow } from '@/lib/repositories/projection.repository'
 import type { BlueprintActionReviewRow } from '@/lib/repositories/blueprintActionReview.repository'
+import { asLearnerId, asStudentId } from '@/lib/core/identityTypes'
 
 // ── summarizeAssignment ─────────────────────────────────────────────────────
 
@@ -87,7 +88,7 @@ test('summarizeLatestEvidence: ignores promotion entries when counting/summarizi
 
 function projectionRow(overrides: Partial<ProjectionRow> = {}): ProjectionRow {
   return {
-    id: 'p1', learner_id: 'l1', projector_type: 'capability', projection_version: '1',
+    id: 'p1', learner_id: asStudentId('l1'), projector_type: 'capability', projection_version: '1',
     value: {}, supporting_evidence_ids: [], confidence: 50, evidence_count: 3, evidence_diversity: 1,
     latest_evidence_at: null, oldest_evidence_at: null, coverage: null, freshness_days: 2, last_computed: '2026-07-20T00:00:00Z',
     ...overrides,
@@ -96,7 +97,7 @@ function projectionRow(overrides: Partial<ProjectionRow> = {}): ProjectionRow {
 
 function reviewRow(overrides: Partial<BlueprintActionReviewRow> = {}): BlueprintActionReviewRow {
   return {
-    id: 'r1', learner_id: 'l1', school_id: 's1', blueprint_action_item_id: 'a1',
+    id: 'r1', learner_id: asLearnerId('l1'), school_id: 's1', blueprint_action_item_id: 'a1',
     decision: 'no_decision', notes: null,
     assignment_snapshot: null, compass_snapshot: null, evidence_snapshot: null, projection_snapshot: null,
     reviewed_by: null, created_at: '2026-07-20T00:00:00Z', updated_at: '2026-07-20T00:00:00Z',

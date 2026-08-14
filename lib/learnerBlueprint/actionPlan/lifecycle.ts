@@ -27,6 +27,7 @@ import { validateProposeInput, validateEditFields, requireNonEmptyReason } from 
 import { toBlueprintActionItem, EVIDENCE_BASIS_EMPTY, type BlueprintActionItem, type ProposeBlueprintActionInput, type EditableBlueprintActionFields } from './types'
 import { composeBlueprint } from '@/lib/learnerBlueprint/composeBlueprint'
 import { validateBlueprintCoherence } from '@/lib/learnerBlueprint/coherence'
+import type { LearnerId } from '@/lib/core/identityTypes'
 
 // Statuses from which a decision (approve/reject/defer) may be recorded —
 // a fresh proposal, an edited-but-undecided proposal, or a previously
@@ -37,7 +38,7 @@ import { validateBlueprintCoherence } from '@/lib/learnerBlueprint/coherence'
 const DECIDABLE_STATUSES = ['proposed', 'edited', 'deferred'] as const
 const EDITABLE_STATUSES = ['proposed', 'edited'] as const
 
-async function requireManageAccess(client: SupabaseClient, schoolId: string, learnerId: string): Promise<void> {
+async function requireManageAccess(client: SupabaseClient, schoolId: string, learnerId: LearnerId): Promise<void> {
   const canManage = await canManageLearnerRecordCore(client, schoolId, learnerId)
   if (!canManage) throw new ResourceOwnershipError('You do not have permission to manage this learner\'s Blueprint action plan.')
 }
@@ -300,7 +301,7 @@ export async function getBlueprintAction(client: SupabaseClient, actionItemId: s
 /** The current canonical action items for a learner, newest first, optionally filtered by context/status. */
 export async function listBlueprintActionsForLearner(
   client: SupabaseClient,
-  coreLearnerId: string,
+  coreLearnerId: LearnerId,
   filters?: { context?: BlueprintActionItem['context']; status?: BlueprintActionItem['status'] }
 ): Promise<BlueprintActionItem[]> {
   const schoolId = await repos.learners.findSchoolId(coreLearnerId)

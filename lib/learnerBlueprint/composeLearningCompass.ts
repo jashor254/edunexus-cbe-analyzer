@@ -20,11 +20,12 @@
 
 import { getLearningCompassSummary } from '@/lib/compass/summary'
 import type { BlueprintSection, LearningCompassData } from './types'
+import type { StudentId } from '@/lib/core/identityTypes'
 
 const OWNER = 'lib/compass/summary.getLearningCompassSummary'
 
 export async function composeLearningCompass(
-  legacyStudentId: string | null
+  legacyStudentId: StudentId | null
 ): Promise<BlueprintSection<LearningCompassData>> {
   if (!legacyStudentId) {
     return {

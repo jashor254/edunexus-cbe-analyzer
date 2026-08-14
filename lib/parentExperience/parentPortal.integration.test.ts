@@ -21,6 +21,7 @@ import { requireParent } from '@/lib/core/permissions'
 import { ResourceOwnershipError } from '@/lib/core/errors'
 import { composeBlueprint } from '@/lib/learnerBlueprint/composeBlueprint'
 import { listBlueprintSnapshots, getLatestBlueprintSnapshot } from '@/lib/learnerBlueprint/snapshot'
+import { asLearnerId, asStudentId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_12Q_PARENT_PORTAL_TEST'
 const db = createServiceClient()
@@ -86,21 +87,21 @@ test('a real linked guardian passes requireParent and can compose the exact same
 
   const client = await signInAs(parentUser.email)
 
-  const user = await requireParent(client, fx.learnerId)
+  const user = await requireParent(client, asStudentId(fx.learnerId))
   assert.equal(user.id, parentUser.id)
 
   const { blueprint, validation } = await composeBlueprint({
     actorUserId: parentUser.id,
-    coreLearnerId: fx.learnerId,
+    coreLearnerId: asLearnerId(fx.learnerId),
     schoolId: fx.schoolId,
   })
   assert.equal(blueprint.identity.status, 'available')
   assert.equal(validation.valid, true, JSON.stringify(validation.errors))
 
   // The other two functions every Parent Portal history route calls.
-  const history = await listBlueprintSnapshots(fx.learnerId, fx.schoolId)
+  const history = await listBlueprintSnapshots(asLearnerId(fx.learnerId), fx.schoolId)
   assert.deepEqual(history, [], 'no snapshot has been taken for this fresh learner yet — an empty array, not an error')
-  const latest = await getLatestBlueprintSnapshot(fx.learnerId, fx.schoolId)
+  const latest = await getLatestBlueprintSnapshot(asLearnerId(fx.learnerId), fx.schoolId)
   assert.equal(latest, null)
 })
 
@@ -109,7 +110,7 @@ test('an unlinked user is rejected by requireParent — the same gate every Pare
   const stranger = await mkAuthUser('stranger')
   const client = await signInAs(stranger.email)
 
-  await assert.rejects(() => requireParent(client, fx.learnerId), ResourceOwnershipError)
+  await assert.rejects(() => requireParent(client, asStudentId(fx.learnerId)), ResourceOwnershipError)
 })
 
 test('a guardian of one learner cannot access a different, unrelated learner\'s Blueprint data', async () => {
@@ -122,6 +123,6 @@ test('a guardian of one learner cannot access a different, unrelated learner\'s 
 
   const client = await signInAs(parentA.email)
 
-  await requireParent(client, fxA.learnerId) // sanity: still works for their own child
-  await assert.rejects(() => requireParent(client, fxB.learnerId), ResourceOwnershipError)
+  await requireParent(client, asStudentId(fxA.learnerId)) // sanity: still works for their own child
+  await assert.rejects(() => requireParent(client, asStudentId(fxB.learnerId)), ResourceOwnershipError)
 })

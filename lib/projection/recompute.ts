@@ -13,6 +13,7 @@ import { repos } from '@/lib/repositories'
 import { computeLearnerProjection } from './engine'
 import type { LearnerIntelligenceProjection, Projection, ProjectorType } from './types'
 import type { UpsertProjectionInput } from '@/lib/repositories/projection.repository'
+import { asStudentId } from '@/lib/core/identityTypes'
 
 const PERSISTED_PROJECTOR_TYPES: ProjectorType[] = [
   'academic', 'capability', 'knowledge', 'behaviour', 'growth', 'risk', 'completeness',
@@ -25,9 +26,14 @@ const PERSISTED_PROJECTOR_TYPES: ProjectorType[] = [
 // these to PERSISTED_PROJECTOR_TYPES (and migrate the CHECK constraint)
 // once a real V2 consumer exists.
 
+// IDENTITY-1 write boundary. `learner_projections.learner_id` is FK'd to
+// `students(id)`, so this is the point where a plain string becomes a
+// StudentId. The public `recomputeLearnerProjection` still takes `string`
+// deliberately — branding it would cascade to 81 call sites for no extra
+// protection, since every write funnels through here.
 function toUpsertInput(learnerId: string, type: ProjectorType, p: Projection<unknown>): UpsertProjectionInput {
   return {
-    learner_id: learnerId,
+    learner_id: asStudentId(learnerId),
     projector_type: type,
     projection_version: p.projectionVersion,
     value: p.value,

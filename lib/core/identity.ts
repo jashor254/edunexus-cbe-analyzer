@@ -32,6 +32,14 @@ import { getUserRoles, type UserRole } from '@/lib/auth/getRole'
 import { getSchoolUser } from '@/lib/core/school-users'
 import type { SchoolUserRole } from '@/types/core'
 import { UnauthorizedError, IdentityResolutionError } from '@/lib/core/errors'
+import {
+  asLearnerId,
+  asStudentId,
+  asLearnerIdOrNull,
+  asStudentIdOrNull,
+  type LearnerId,
+  type StudentId,
+} from '@/lib/core/identityTypes'
 
 export type CurrentUser = {
   id: string
@@ -53,7 +61,8 @@ export type ResolvedTeacher = {
 }
 
 export type ResolvedStudent = {
-  id: string
+  /** A `students.id` — this resolver reads the legacy `students` table. */
+  id: StudentId
   userId: string | null
   parentUserId: string | null
   teacherId: string | null
@@ -62,9 +71,9 @@ export type ResolvedStudent = {
 
 export type ResolvedParent = {
   /** Every `students.id` this user is linked to, across the legacy `parent_user_id` link and Core's `learner_guardians`, deduplicated. */
-  studentIds: string[]
+  studentIds: StudentId[]
   /** Core `learners.id` values this user is a registered guardian for, per `learner_guardians` — kept separate since Learner/students are not yet unified (Stage 0.5). */
-  coreLearnerIds: string[]
+  coreLearnerIds: LearnerId[]
 }
 
 export type ResolvedMembership = {
@@ -160,7 +169,8 @@ export async function resolveStudent(userId: string, client?: SupabaseClient): P
     .eq('user_id', userId)
     .maybeSingle()
   if (!data) return null
-  return { id: data.id, userId: data.user_id, parentUserId: data.parent_user_id, teacherId: data.teacher_id, name: data.name }
+  // Trust origin: `students.id`, selected directly from `students` above.
+  return { id: asStudentId(data.id), userId: data.user_id, parentUserId: data.parent_user_id, teacherId: data.teacher_id, name: data.name }
 }
 
 /**
@@ -181,8 +191,12 @@ export async function resolveParent(userId: string, client?: SupabaseClient): Pr
   ])
 
   return {
-    studentIds: (legacyStudents ?? []).map(s => s.id),
-    coreLearnerIds,
+    // Trust origins are distinct and must stay distinct: `studentIds` comes
+    // from `students.id`, `coreLearnerIds` from `learner_guardians.learner_id`
+    // (a real FK to `learners`). This function is the single place both spaces
+    // are produced side by side, which is exactly why they are branded here.
+    studentIds: (legacyStudents ?? []).map(s => asStudentId(s.id)),
+    coreLearnerIds: coreLearnerIds.map(asLearnerId),
   }
 }
 
@@ -239,9 +253,11 @@ export async function resolveCurrentContext(client: SupabaseClient): Promise<Ide
 // read-only consumers (Blueprint, future read-side domains) must never
 // create a legacy shadow row as a side effect of composing a report — see
 // this function's callers for the enforced distinction.
-export async function resolveLegacyStudentId(coreLearnerId: string): Promise<string | null> {
+export async function resolveLegacyStudentId(coreLearnerId: LearnerId): Promise<StudentId | null> {
   const existing = await repos.teachers.findLegacyStudentByExternalId(coreLearnerId)
-  return existing?.id ?? null
+  // Trust origin: `students.id`, returned by a lookup keyed on
+  // `students.external_id` — the bridge column that holds a `learners.id`.
+  return asStudentIdOrNull(existing?.id ?? null)
 }
 
 /**
@@ -254,10 +270,13 @@ export async function resolveLegacyStudentId(coreLearnerId: string): Promise<str
  * alike — the caller decides how to explain either case, this function
  * only answers "is there exactly one, and what is it."
  */
-export async function resolveOwnCoreLearnerId(userId: string): Promise<string | null> {
+export async function resolveOwnCoreLearnerId(userId: string): Promise<LearnerId | null> {
   const owned = await repos.compass.findOwnedStudents(userId)
   if (!owned || owned.length === 0 || owned.length >= 2) return null
 
   const [row] = await repos.teachers.findExternalIdsByStudentIds([owned[0].id])
-  return row?.external_id ?? null
+  // Trust origin: `students.external_id`, which holds a `learners.id`. This is
+  // the reverse of `resolveLegacyStudentId` — StudentId -> LearnerId — and the
+  // one place in the codebase where that direction is resolved.
+  return asLearnerIdOrNull(row?.external_id ?? null)
 }

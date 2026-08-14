@@ -14,6 +14,7 @@ import {
   resolveSchool,
 } from '@/lib/core/identity'
 import { IdentityResolutionError } from '@/lib/core/errors'
+import { asStudentId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_IDENTITY_TEST'
 const db = createServiceClient()
@@ -104,7 +105,7 @@ test('resolveStudent returns null for a user with no student row', async () => {
 
 test('resolveParent finds the legacy students.parent_user_id link', async () => {
   const parent = await resolveParent(parentUserId)
-  assert.ok(parent.studentIds.includes(studentId))
+  assert.ok(parent.studentIds.includes(asStudentId(studentId)))
 })
 
 test('resolveParent returns empty arrays for a user who is not a parent of anyone', async () => {

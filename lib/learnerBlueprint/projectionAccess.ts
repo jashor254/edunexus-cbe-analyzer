@@ -1,5 +1,6 @@
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import type { LearnerIntelligenceProjection } from '@/lib/projection/types'
+import type { StudentId } from '@/lib/core/identityTypes'
 
 export type ProjectionAccessResult = {
   projection: LearnerIntelligenceProjection | null
@@ -7,7 +8,7 @@ export type ProjectionAccessResult = {
 }
 
 export async function loadProjectionAccess(
-  legacyStudentId: string | null
+  legacyStudentId: StudentId | null
 ): Promise<ProjectionAccessResult> {
   if (!legacyStudentId) return { projection: null, error: null }
 

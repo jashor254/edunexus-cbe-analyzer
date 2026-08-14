@@ -23,6 +23,7 @@ import { getLearnerReadiness } from '@/lib/core/learnerOnboarding'
 import { ensureBridgedClass, ensureBridgedLearner, createBridgedAssessment, recordBridgedMarks } from '@/lib/core/academicBridge'
 import { resolveCompassStudentAccess } from '@/lib/compass/ownership'
 import { MembershipRequiredError, PermissionDeniedError } from '@/lib/core/errors'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_9F_BRIDGE_TEST'
 const db = createServiceClient()
@@ -156,7 +157,7 @@ test('end-to-end: Create School -> Activate -> Invite/Accept Teacher -> Admit ->
   assert.equal(bridgedClass.legacyClassId, legacyClassId) // reused, not re-created
 
   const { legacyStudentIds } = await recordBridgedMarks(fixture.schoolId, assessmentId, bridgedClass, fixture.teacherUserId, [
-    { coreLearnerId: learnerId, admission_number: 'E2E', student_name: 'Bridge Test', subject_scores: { mathematics: 78 }, total_marks: 78, mean_score: 78 },
+    { coreLearnerId: asLearnerId(learnerId), admission_number: 'E2E', student_name: 'Bridge Test', subject_scores: { mathematics: 78 }, total_marks: 78, mean_score: 78 },
   ])
   const legacyStudentId = legacyStudentIds[0]
 
@@ -195,8 +196,8 @@ test('ensureBridgedLearner: idempotent — repeated calls reuse the same legacy 
   const learnerId = await admitAndEnroll(fixture, `IDEM-${Date.now()}`)
   const bridgedClass = await ensureBridgedClass(fixture.schoolId, fixture.classId, fixture.teacherUserId)
 
-  const first = await ensureBridgedLearner(fixture.schoolId, learnerId, bridgedClass)
-  const second = await ensureBridgedLearner(fixture.schoolId, learnerId, bridgedClass)
+  const first = await ensureBridgedLearner(fixture.schoolId, asLearnerId(learnerId), bridgedClass)
+  const second = await ensureBridgedLearner(fixture.schoolId, asLearnerId(learnerId), bridgedClass)
 
   assert.equal(first.legacyStudentId, second.legacyStudentId)
   const { data: rows } = await db.from('students').select('id').eq('external_id', learnerId)
@@ -289,8 +290,8 @@ test('ranking and grading are computed by the existing, unmodified engines for b
     { legacyClassId, legacyTeacherId, coreClassId: fixture.classId, gradeNumber: 10 },
     fixture.teacherUserId,
     [
-      { coreLearnerId: learnerA, admission_number: 'RANK-A', student_name: 'Learner A', subject_scores: { english: 90 }, total_marks: 90, mean_score: 90 },
-      { coreLearnerId: learnerB, admission_number: 'RANK-B', student_name: 'Learner B', subject_scores: { english: 60 }, total_marks: 60, mean_score: 60 },
+      { coreLearnerId: asLearnerId(learnerA), admission_number: 'RANK-A', student_name: 'Learner A', subject_scores: { english: 90 }, total_marks: 90, mean_score: 90 },
+      { coreLearnerId: asLearnerId(learnerB), admission_number: 'RANK-B', student_name: 'Learner B', subject_scores: { english: 60 }, total_marks: 60, mean_score: 60 },
     ]
   )
 
@@ -318,7 +319,7 @@ test('recordBridgedMarks: repeated calls with the same scores upsert, not duplic
   })
   const legacyTeacherId = (await repos.teachers.findTeacherByUserId(fixture.teacherUserId))!.id
   const bridgedClass = { legacyClassId, legacyTeacherId, coreClassId: fixture.classId, gradeNumber: 10 }
-  const scores = [{ coreLearnerId: learnerId, admission_number: 'RETRY', student_name: 'Retry Test', subject_scores: { science: 40 }, total_marks: 40, mean_score: 40 }]
+  const scores = [{ coreLearnerId: asLearnerId(learnerId), admission_number: 'RETRY', student_name: 'Retry Test', subject_scores: { science: 40 }, total_marks: 40, mean_score: 40 }]
 
   const first = await recordBridgedMarks(fixture.schoolId, assessmentId, bridgedClass, fixture.teacherUserId, scores)
   const second = await recordBridgedMarks(fixture.schoolId, assessmentId, bridgedClass, fixture.teacherUserId, scores)

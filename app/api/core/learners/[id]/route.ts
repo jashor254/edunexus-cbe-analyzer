@@ -6,6 +6,7 @@ import { getBridgedLearnerTimeline, getBridgedCareerIntelligence } from '@/lib/c
 import { requireSchoolMembership, requireSchoolAdmin, requireSchoolStaff } from '@/lib/core/permissions'
 import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
 import { z } from 'zod'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const UpdateSchema = z.object({
   schoolId: z.string().uuid(),
@@ -69,12 +70,12 @@ export async function GET(req: NextRequest, { params }: Params): Promise<NextRes
   // completely unmodified. null (not 404) when this learner has no
   // assessment history yet — a real, common, non-error state.
   if (view === 'timeline') {
-    const data = await getBridgedLearnerTimeline(id)
+    const data = await getBridgedLearnerTimeline(asLearnerId(id))
     return NextResponse.json({ data })
   }
 
   if (view === 'career-intelligence') {
-    const data = await getBridgedCareerIntelligence(id)
+    const data = await getBridgedCareerIntelligence(asLearnerId(id))
     return NextResponse.json({ data })
   }
 

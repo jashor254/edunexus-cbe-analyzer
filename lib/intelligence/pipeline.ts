@@ -68,7 +68,7 @@ export function buildEvidenceForRow(
       score = numericScore
     }
 
-    if (identity.learnerId === null) {
+    if (identity.studentId === null) {
       issues.push(`Could not confidently resolve learner identity for "${row.name}"`)
     }
 
@@ -80,7 +80,7 @@ export function buildEvidenceForRow(
     })
 
     results.push({
-      learnerId: identity.learnerId,
+      learnerId: identity.studentId,
       extractedName: row.name,
       extractedExternalId: row.externalId,
       subject: canonicalSubject,

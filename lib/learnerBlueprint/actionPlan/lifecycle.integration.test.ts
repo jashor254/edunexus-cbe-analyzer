@@ -26,6 +26,7 @@ import {
 } from './lifecycle'
 import { generateActionCandidate } from './candidateGeneration'
 import type { ProposeBlueprintActionInput } from './types'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_ACTIONPLAN_PHASE1_TEST'
 const db = createServiceClient()
@@ -88,7 +89,7 @@ const teacherRowIds: string[] = []
 
 function basePropose(overrides: Partial<ProposeBlueprintActionInput> = {}): ProposeBlueprintActionInput {
   return {
-    coreLearnerId,
+    coreLearnerId: asLearnerId(coreLearnerId),
     context: 'current_term',
     title: 'Strengthen fractions',
     rationale: 'Recent evidence shows steady development in Mathematics.',
@@ -455,7 +456,7 @@ test('20. candidate generation and the full propose/edit/approve/reject/defer li
   // Candidate generation itself (read-only) — this learner has zero
   // evidence, so Projection reports insufficient_data and this correctly
   // returns null rather than fabricating anything.
-  const candidate = await generateActionCandidate(coreLearnerId, schoolId, 'Mathematics')
+  const candidate = await generateActionCandidate(asLearnerId(coreLearnerId), schoolId, 'Mathematics')
   assert.equal(candidate, null)
 
   const client = await signInAs(teacherEmail)
@@ -503,7 +504,7 @@ test('24. multiple contexts can coexist for one learner', async () => {
   await proposeBlueprintAction(client, basePropose({ title: 'Holiday item', context: 'holiday' }))
   await proposeBlueprintAction(client, basePropose({ title: 'Intervention item', context: 'intervention' }))
 
-  const all = await listBlueprintActionsForLearner(client, coreLearnerId)
+  const all = await listBlueprintActionsForLearner(client, asLearnerId(coreLearnerId))
   const contexts = new Set(all.map(a => a.context))
   assert.ok(contexts.has('current_term'))
   assert.ok(contexts.has('holiday'))

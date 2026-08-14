@@ -34,6 +34,7 @@ import { addItem as addPortfolioItem, submitItem as submitPortfolioItem, verifyI
 import { createDraft as createProjectDraft, getProjectsSummary } from '@/lib/learnerProjects/project'
 import { createOpportunity as createCompetitionOpportunity, registerCompetition, getCompetitionsSummary } from '@/lib/learnerCompetitions/competition'
 import { composeBlueprint } from '@/lib/learnerBlueprint/composeBlueprint'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_13D_LEADERSHIP_TEST'
 const db = createServiceClient()
@@ -436,7 +437,7 @@ test('regression: Portfolio, Achievement, Projects, and Competitions are entirel
   await selectForLeadership(client, fx.schoolId, nom.id)
 
   // Blueprint composes every section together — Achievement/Portfolio/Competitions/Leadership all present, none clobbered by another.
-  const { blueprint } = await composeBlueprint({ actorUserId: fx.teacherUserId, coreLearnerId: fx.learnerId, schoolId: fx.schoolId })
+  const { blueprint } = await composeBlueprint({ actorUserId: fx.teacherUserId, coreLearnerId: asLearnerId(fx.learnerId), schoolId: fx.schoolId })
   assert.equal(blueprint.achievement.status, 'available')
   assert.equal(blueprint.achievement.data!.achievementCount, 1)
   assert.equal(blueprint.portfolio.status, 'available')

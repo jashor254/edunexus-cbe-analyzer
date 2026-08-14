@@ -2,6 +2,7 @@ import { repos } from '@/lib/repositories'
 import type { LearnerPromotion, RunPromotionInput } from '@/types/core'
 import { createBlueprintSnapshot } from '@/lib/learnerBlueprint/snapshot'
 import { enrollLearner } from '@/lib/core/learners'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 export async function getLearnerPromotionHistory(
   learnerId: string,
@@ -108,7 +109,7 @@ export async function runAnnualPromotion(
         // failure must never block or roll back a real graduation
         // decision, which has already been recorded above.
         await createBlueprintSnapshot({
-          coreLearnerId: decision.learner_id,
+          coreLearnerId: asLearnerId(decision.learner_id),
           schoolId,
           academicYearId: input.academic_year_id,
           termId: null,

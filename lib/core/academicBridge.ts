@@ -56,6 +56,7 @@
 
 import { repos } from '@/lib/repositories'
 import { resolveTeacher, resolveMembership, resolveLegacyStudentId } from '@/lib/core/identity'
+import { asStudentId, type LearnerId, type StudentId } from '@/lib/core/identityTypes'
 import { isSchoolAdmin, getSchoolUser } from '@/lib/core/school-users'
 import { getClass } from '@/lib/core/classes'
 import { getLearner } from '@/lib/core/learners'
@@ -188,9 +189,9 @@ const GRADE_LEVEL_LABEL = (grade: number): string =>
  */
 export async function ensureBridgedLearner(
   schoolId: string,
-  coreLearnerId: string,
+  coreLearnerId: LearnerId,
   bridgedClass: BridgedClass
-): Promise<{ legacyStudentId: string }> {
+): Promise<{ legacyStudentId: StudentId }> {
   const learner = await getLearner(coreLearnerId, schoolId) // throws if not found / wrong school
 
   const existing = await repos.teachers.findLegacyStudentByExternalId(coreLearnerId)
@@ -198,7 +199,8 @@ export async function ensureBridgedLearner(
     // Roster link ensured every call, not just on first creation — idempotent
     // upsert, closes the gap even for a student bridged before Sprint 9G.
     await repos.teachers.upsertLegacyClassRoster(bridgedClass.legacyClassId, existing.id)
-    return { legacyStudentId: existing.id }
+    // Trust origin: `students.id`, from a lookup on `students.external_id`.
+    return { legacyStudentId: asStudentId(existing.id) }
   }
 
   const created = await repos.teachers.insertLegacyStudent({
@@ -217,7 +219,8 @@ export async function ensureBridgedLearner(
   // safe from the static migration file alone.
   await repos.teachers.upsertLegacyClassRoster(bridgedClass.legacyClassId, created.id)
 
-  return { legacyStudentId: created.id }
+  // Trust origin: `students.id`, returned by the insert that just created it.
+  return { legacyStudentId: asStudentId(created.id) }
 }
 
 // ── High-level orchestration: Assessment → Evidence → Projection ────────────
@@ -252,7 +255,7 @@ export async function createBridgedAssessment(
 }
 
 export type BridgedScoreInput = {
-  coreLearnerId: string
+  coreLearnerId: LearnerId
   admission_number: string
   student_name: string
   subject_scores: Record<string, number>
@@ -279,9 +282,9 @@ export async function recordBridgedMarks(
   bridgedClass: BridgedClass,
   actingUserId: string,
   scores: BridgedScoreInput[]
-): Promise<{ legacyStudentIds: string[] }> {
+): Promise<{ legacyStudentIds: StudentId[] }> {
   const legacyScores = []
-  const legacyStudentIds: string[] = []
+  const legacyStudentIds: StudentId[] = []
   for (const score of scores) {
     const { legacyStudentId } = await ensureBridgedLearner(schoolId, score.coreLearnerId, bridgedClass)
     legacyStudentIds.push(legacyStudentId)
@@ -341,21 +344,21 @@ export { resolveLegacyStudentId } from '@/lib/core/identity'
  * the identity the bridge produces. No change to that function; this is
  * the resolve-then-call wrapper making it reachable from a Core learner id.
  */
-export async function getBridgedLearnerTimeline(coreLearnerId: string): Promise<TimelineEntry[] | null> {
+export async function getBridgedLearnerTimeline(coreLearnerId: LearnerId): Promise<TimelineEntry[] | null> {
   const legacyStudentId = await resolveLegacyStudentId(coreLearnerId)
   if (!legacyStudentId) return null
   return getLearnerTimeline(legacyStudentId)
 }
 
 /** Career Intelligence (Step 9) — `buildCareerIntelligence()` is unmodified; already Projection-sourced per docs/architecture/migration-ledger.md, already keyed to the same legacy studentId the bridge resolves. */
-export async function getBridgedCareerIntelligence(coreLearnerId: string): Promise<CareerIntelligence | null> {
+export async function getBridgedCareerIntelligence(coreLearnerId: LearnerId): Promise<CareerIntelligence | null> {
   const legacyStudentId = await resolveLegacyStudentId(coreLearnerId)
   if (!legacyStudentId) return null
   return buildCareerIntelligence(legacyStudentId)
 }
 
 /** Compass access (Step 10) — `resolveCompassStudentAccess()` is unmodified; grants via the same `students.teacher_id` link `ensureBridgedLearner` already sets. */
-export async function getBridgedCompassAccess(coreLearnerId: string, actingUserId: string): Promise<{ legacyStudentId: string; access: OwnershipResult } | null> {
+export async function getBridgedCompassAccess(coreLearnerId: LearnerId, actingUserId: string): Promise<{ legacyStudentId: StudentId; access: OwnershipResult } | null> {
   const legacyStudentId = await resolveLegacyStudentId(coreLearnerId)
   if (!legacyStudentId) return null
   const access = await resolveCompassStudentAccess(actingUserId, legacyStudentId)

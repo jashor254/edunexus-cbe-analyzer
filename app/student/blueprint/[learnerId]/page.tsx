@@ -33,6 +33,7 @@ import BlueprintActionPlanSection from '@/components/blueprint/actionPlan/Bluepr
 import BlueprintCandidateQueue from '@/components/blueprint/actionPlan/BlueprintCandidateQueue'
 import JourneyLinks from '@/components/student/JourneyLinks'
 import Link from 'next/link'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 export default async function StudentBlueprintPage({
   params,
@@ -41,7 +42,10 @@ export default async function StudentBlueprintPage({
   params: Promise<{ learnerId: string }>
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
-  const { learnerId } = await params
+  // Route-boundary trust origin: a Core `learners.id` — established by the
+  // Core-learner queries this page performs, not by the URL wording.
+  const { learnerId: rawLearnerId } = await params
+  const learnerId = asLearnerId(rawLearnerId)
   const supabase = await createClient()
   const query = await searchParams
   const exportMode = isBlueprintPdfExportMode(query[BLUEPRINT_EXPORT_QUERY_KEY]) ? 'pdf' : 'screen'

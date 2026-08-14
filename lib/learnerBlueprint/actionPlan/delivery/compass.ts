@@ -31,6 +31,7 @@ import { repos } from '@/lib/repositories'
 import type { BlueprintActionItemRow } from '@/lib/repositories/blueprintActionItem.repository'
 import type { BlueprintCompassDeliveryRow } from '@/lib/repositories/blueprintCompassDelivery.repository'
 import { setTeacherSuggestedTopic } from '@/lib/compass/objective'
+import type { LearnerId } from '@/lib/core/identityTypes'
 
 export type DeliverBlueprintActionToCompassCommand = {
   /** Must be literally `true`. Anything else (including omission) is a validation failure — delivery never happens implicitly. */

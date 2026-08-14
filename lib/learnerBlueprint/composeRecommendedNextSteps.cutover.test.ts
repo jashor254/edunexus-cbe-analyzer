@@ -15,6 +15,7 @@ import { repos } from '@/lib/repositories'
 import { composeRecommendedNextSteps } from './composeRecommendedNextSteps'
 import { proposeBlueprintAction, approveBlueprintAction } from './actionPlan/lifecycle'
 import type { BlueprintSection, LearningCompassData, TeacherReflectionData, AttendanceData, CareerData } from './types'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_CUTOVER_TEST'
 const db = createServiceClient()
@@ -135,7 +136,7 @@ after(async () => {
 
 test('23a. with zero canonical action items, composeRecommendedNextSteps falls back to the legacy selector (no_action_needed, since no other signal is present)', async () => {
   const section = await composeRecommendedNextSteps(
-    coreLearnerId, schoolId,
+    asLearnerId(coreLearnerId), schoolId,
     unavailable<LearningCompassData>(), unavailable<TeacherReflectionData>(), unavailable<AttendanceData>(), unavailable<CareerData>()
   )
   assert.equal(section.status, 'available')
@@ -146,7 +147,7 @@ test('23a. with zero canonical action items, composeRecommendedNextSteps falls b
 test('23b. a proposed-but-not-yet-approved canonical item does not trigger the cutover — legacy fallback still runs', async () => {
   const client = await signInAs(teacherEmail)
   await proposeBlueprintAction(client, {
-    coreLearnerId,
+    coreLearnerId: asLearnerId(coreLearnerId),
     context: 'current_term',
     visibility: 'parent_visible',
     title: 'Not yet approved',
@@ -157,7 +158,7 @@ test('23b. a proposed-but-not-yet-approved canonical item does not trigger the c
   })
 
   const section = await composeRecommendedNextSteps(
-    coreLearnerId, schoolId,
+    asLearnerId(coreLearnerId), schoolId,
     unavailable<LearningCompassData>(), unavailable<TeacherReflectionData>(), unavailable<AttendanceData>(), unavailable<CareerData>()
   )
   assert.equal(section.data?.actions[0].actionType, 'no_action_needed', 'a draft item must not trigger the canonical cutover')
@@ -166,7 +167,7 @@ test('23b. a proposed-but-not-yet-approved canonical item does not trigger the c
 test('23c. an approved, teacher_only-visibility item does not trigger the cutover either (not stakeholder-visible)', async () => {
   const client = await signInAs(teacherEmail)
   const item = await proposeBlueprintAction(client, {
-    coreLearnerId,
+    coreLearnerId: asLearnerId(coreLearnerId),
     context: 'current_term',
     visibility: 'teacher_only',
     title: 'Teacher-only approved item',
@@ -183,7 +184,7 @@ test('23c. an approved, teacher_only-visibility item does not trigger the cutove
   await approveBlueprintAction(client, item.id)
 
   const section = await composeRecommendedNextSteps(
-    coreLearnerId, schoolId,
+    asLearnerId(coreLearnerId), schoolId,
     unavailable<LearningCompassData>(), unavailable<TeacherReflectionData>(), unavailable<AttendanceData>(), unavailable<CareerData>()
   )
   assert.equal(section.data?.actions[0].actionType, 'no_action_needed', 'a teacher_only item must never surface via the parent cutover')
@@ -192,7 +193,7 @@ test('23c. an approved, teacher_only-visibility item does not trigger the cutove
 test('23d. an approved, parent-visible canonical item switches composeRecommendedNextSteps to the canonical-only path — never merged with the legacy selector', async () => {
   const client = await signInAs(teacherEmail)
   const item = await proposeBlueprintAction(client, {
-    coreLearnerId,
+    coreLearnerId: asLearnerId(coreLearnerId),
     context: 'current_term',
     visibility: 'parent_visible',
     title: 'Practice fractions at home',
@@ -205,7 +206,7 @@ test('23d. an approved, parent-visible canonical item switches composeRecommende
   await approveBlueprintAction(client, item.id)
 
   const section = await composeRecommendedNextSteps(
-    coreLearnerId, schoolId,
+    asLearnerId(coreLearnerId), schoolId,
     unavailable<LearningCompassData>(), unavailable<TeacherReflectionData>(), unavailable<AttendanceData>(), unavailable<CareerData>()
   )
   assert.equal(section.status, 'available')

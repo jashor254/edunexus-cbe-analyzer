@@ -28,6 +28,7 @@ import { resolveLegacyStudentId } from '@/lib/core/identity'
 import { loadProjectionAccess } from './projectionAccess'
 import { composeLearningCompass } from './composeLearningCompass'
 import { compareProjections, diffsOf } from '@/lib/projection/equivalenceHarness'
+import { asLearnerId, asStudentId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_BLUEPRINT_EQUIVALENCE_TEST'
 const db = createServiceClient()
@@ -113,9 +114,9 @@ test('loadProjectionAccess: Core-resolved and legacy-direct calls produce equiva
   createdStudentIds.push(studentId)
   await seedEvidence(studentId, [makeEvidence(studentId)])
 
-  const legacyResult = await loadProjectionAccess(studentId)
+  const legacyResult = await loadProjectionAccess(asStudentId(studentId))
 
-  const resolvedId = await resolveLegacyStudentId(coreLearnerId)
+  const resolvedId = await resolveLegacyStudentId(asLearnerId(coreLearnerId))
   assert.equal(resolvedId, studentId, 'must prove real resolution, not assume it')
   const coreResult = await loadProjectionAccess(resolvedId)
 
@@ -140,8 +141,8 @@ test('composeLearningCompass: Core-resolved and legacy-direct calls produce an i
   const { studentId, coreLearnerId } = await makeSyntheticStudent('learning-compass')
   createdStudentIds.push(studentId)
 
-  const legacySection = await composeLearningCompass(studentId)
-  const resolvedId = await resolveLegacyStudentId(coreLearnerId)
+  const legacySection = await composeLearningCompass(asStudentId(studentId))
+  const resolvedId = await resolveLegacyStudentId(asLearnerId(coreLearnerId))
   assert.equal(resolvedId, studentId)
   const coreSection = await composeLearningCompass(resolvedId)
 
@@ -171,8 +172,8 @@ test('drift detection: a deliberately different legacy id produces a non-equival
   })
   if (error) throw new Error(`holiday_plans seed failed: ${error.message}`)
 
-  const sectionA = await composeLearningCompass(a.studentId)
-  const sectionB = await composeLearningCompass(b.studentId)
+  const sectionA = await composeLearningCompass(asStudentId(a.studentId))
+  const sectionB = await composeLearningCompass(asStudentId(b.studentId))
 
   assert.notDeepEqual(sectionA, sectionB, 'the comparator must be able to detect a real divergence, not pass by construction')
   assert.equal(sectionA.data?.holidayProgrammeAvailable, true)

@@ -6,6 +6,7 @@
 // from the raw DB row types in lib/repositories/blueprintActionItem
 // .repository.ts, which this module maps to/from internally.
 
+import type { LearnerId } from '@/lib/core/identityTypes'
 import type {
   BlueprintActionContext,
   BlueprintActionPriority,
@@ -99,7 +100,7 @@ export function toBlueprintActionItem(row: BlueprintActionItemRow): BlueprintAct
 
 /** Input for `proposeBlueprintAction` — every field a fresh proposal needs. `proposedBy`/`schoolId`/`status`/timestamps are never caller-supplied (derived internally from the authenticated session and the learner's real school). */
 export type ProposeBlueprintActionInput = {
-  coreLearnerId: string
+  coreLearnerId: LearnerId
   context: BlueprintActionContext
   priority?: BlueprintActionPriority
   visibility?: BlueprintActionVisibility

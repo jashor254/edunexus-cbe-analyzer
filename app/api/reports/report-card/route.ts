@@ -18,6 +18,7 @@ import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } fr
 import { getReportCard } from '@/lib/core/report-cards'
 import { requireParent } from '@/lib/core/permissions'
 import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const QuerySchema = z.object({
   learnerId: z.string().uuid(),
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
     const { learnerId, termId } = parsed.data
 
     try {
-      await requireParent(supabase, learnerId)
+      await requireParent(supabase, asLearnerId(learnerId))
     } catch (err) {
       if (err instanceof UnauthorizedError) return apiUnauthorized()
       if (isEduNexusError(err)) return apiForbidden()

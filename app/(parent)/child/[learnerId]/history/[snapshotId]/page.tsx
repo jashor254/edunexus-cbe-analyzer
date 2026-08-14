@@ -14,13 +14,16 @@ import { repos } from '@/lib/repositories'
 import { getBlueprintSnapshot } from '@/lib/learnerBlueprint/snapshot'
 import { listAcademicYears, listTerms } from '@/lib/core/school'
 import ParentBlueprintView from '@/components/parent/ParentBlueprintView'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 export default async function ParentHistoricalSnapshotPage({
   params,
 }: {
   params: Promise<{ learnerId: string; snapshotId: string }>
 }) {
-  const { learnerId, snapshotId } = await params
+  // Route-boundary trust origin: Core `learners.id` (repos.learners.findSchoolId below).
+  const { learnerId: rawLearnerId, snapshotId } = await params
+  const learnerId = asLearnerId(rawLearnerId)
   const supabase = await createClient()
 
   try {

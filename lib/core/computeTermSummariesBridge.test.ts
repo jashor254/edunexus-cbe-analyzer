@@ -21,6 +21,7 @@ import { inviteTeacher, acceptTeacherInvitation } from '@/lib/core/teacherOnboar
 import { onboardLearner } from '@/lib/core/learnerOnboarding'
 import { createBridgedAssessment, recordBridgedMarks, ensureBridgedClass } from '@/lib/core/academicBridge'
 import { publishAssessment, computeTermSummaries } from '@/lib/core/assessments'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_10A_TERMSUMMARY_TEST'
 const db = createServiceClient()
@@ -120,7 +121,7 @@ async function fullyOnboardedLearner(labelPrefix: string) {
   })
   const bridgedClass = await ensureBridgedClass(school.id, classId, teacher.id)
   const { legacyStudentIds } = await recordBridgedMarks(school.id, assessmentId, bridgedClass, teacher.id, [
-    { coreLearnerId, admission_number: 'TS', student_name: 'Term Summary', subject_scores: { 'SS-MATH': 82 }, total_marks: 82, mean_score: 82 },
+    { coreLearnerId: asLearnerId(coreLearnerId), admission_number: 'TS', student_name: 'Term Summary', subject_scores: { 'SS-MATH': 82 }, total_marks: 82, mean_score: 82 },
   ])
   await publishAssessment(assessmentId)
 

@@ -31,6 +31,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { canViewLearnerRecord, requireLearnerAccess } from '@/lib/core/permissions'
 import { ResourceOwnershipError } from '@/lib/core/errors'
 import { signInForHttpTest, type SyntheticSession } from './httpAuthTestHelper'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const BASE_URL = process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3939'
 const SYNTHETIC_MARKER = 'SYNTHETIC_SPRINT6_BLUEPRINT_SELF_ACCESS_TEST'
@@ -132,19 +133,19 @@ function cookie(session: SyntheticSession) {
 
 test('canViewLearnerRecord(coreLearnerId): the learner\'s own account is allowed', async () => {
   const client = await signInClient(studentEmail)
-  const allowed = await canViewLearnerRecord(client, schoolIds[0], coreLearnerId)
+  const allowed = await canViewLearnerRecord(client, schoolIds[0], asLearnerId(coreLearnerId))
   assert.equal(allowed, true)
 })
 
 test('requireLearnerAccess(coreLearnerId): the learner\'s own account does not throw', async () => {
   const client = await signInClient(studentEmail)
-  const user = await requireLearnerAccess(client, schoolIds[0], coreLearnerId)
+  const user = await requireLearnerAccess(client, schoolIds[0], asLearnerId(coreLearnerId))
   assert.ok(user.id)
 })
 
 test('requireLearnerAccess(coreLearnerId): an unrelated student account is denied', async () => {
   const client = await signInClient(otherStudentEmail)
-  await assert.rejects(() => requireLearnerAccess(client, schoolIds[0], coreLearnerId), ResourceOwnershipError)
+  await assert.rejects(() => requireLearnerAccess(client, schoolIds[0], asLearnerId(coreLearnerId)), ResourceOwnershipError)
 })
 
 // ── The actual page, over real HTTP ──────────────────────────────────────────

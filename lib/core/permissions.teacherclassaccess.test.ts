@@ -23,6 +23,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { createServiceClient } from '@/utils/supabase/service'
 import { repos } from '@/lib/repositories'
 import { canViewLearner } from '@/lib/core/permissions'
+import { asStudentId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_TEACHER_CLASS_ACCESS_TEST'
 const db = createServiceClient()
@@ -158,50 +159,50 @@ after(async () => {
 
 test('canViewLearner: a teacher linked through class_students can view the learner', async () => {
   const client = await signInAs(classTeacherEmail)
-  assert.equal(await canViewLearner(client, schoolId, classStudentId), true)
+  assert.equal(await canViewLearner(client, schoolId, asStudentId(classStudentId)), true)
 })
 
 test('canViewLearner: a teacher not linked to any of the learner\'s classes cannot view them (fails closed)', async () => {
   const client = await signInAs(unrelatedTeacherEmail)
-  assert.equal(await canViewLearner(client, schoolId, classStudentId), false)
+  assert.equal(await canViewLearner(client, schoolId, asStudentId(classStudentId)), false)
 })
 
 test('canViewLearner: a teacher who is legitimately staff at a DIFFERENT school cannot view the learner (cross-school isolation)', async () => {
   const client = await signInAs(otherSchoolTeacherEmail)
-  assert.equal(await canViewLearner(client, schoolId, classStudentId), false)
+  assert.equal(await canViewLearner(client, schoolId, asStudentId(classStudentId)), false)
 })
 
 test('canViewLearner: legacy teacher_id-of-record compatibility path still grants access (documented Phase 0 decision — retained because RLS still honors it)', async () => {
   const client = await signInAs(legacyTeacherEmail)
-  assert.equal(await canViewLearner(client, schoolId, legacyOnlyStudentId), true)
+  assert.equal(await canViewLearner(client, schoolId, asStudentId(legacyOnlyStudentId)), true)
 })
 
 test('canViewLearner: the class-linked teacher has no access to the legacy-only student (the two paths are isolated, not a blanket grant)', async () => {
   const client = await signInAs(classTeacherEmail)
-  assert.equal(await canViewLearner(client, schoolId, legacyOnlyStudentId), false)
+  assert.equal(await canViewLearner(client, schoolId, asStudentId(legacyOnlyStudentId)), false)
 })
 
 test('canViewLearner: the legacy-of-record teacher has no access to the class-only student (isolated the other direction too)', async () => {
   const client = await signInAs(legacyTeacherEmail)
-  assert.equal(await canViewLearner(client, schoolId, classStudentId), false)
+  assert.equal(await canViewLearner(client, schoolId, asStudentId(classStudentId)), false)
 })
 
 test('canViewLearner: parent access is unchanged', async () => {
   const client = await signInAs(parentEmail)
-  assert.equal(await canViewLearner(client, schoolId, classStudentId), true)
+  assert.equal(await canViewLearner(client, schoolId, asStudentId(classStudentId)), true)
 })
 
 test('canViewLearner: learner self-access is unchanged', async () => {
   const client = await signInAs(selfStudentEmail)
-  assert.equal(await canViewLearner(client, schoolId, selfStudentId), true)
+  assert.equal(await canViewLearner(client, schoolId, asStudentId(selfStudentId)), true)
 })
 
 test('canViewLearner: school-admin access is unchanged', async () => {
   const client = await signInAs(adminEmail)
-  assert.equal(await canViewLearner(client, schoolId, classStudentId), true)
+  assert.equal(await canViewLearner(client, schoolId, asStudentId(classStudentId)), true)
 })
 
 test('canViewLearner: a fully unrelated account (no role at all) is denied — fails closed', async () => {
   const client = await signInAs(outsiderEmail)
-  assert.equal(await canViewLearner(client, schoolId, classStudentId), false)
+  assert.equal(await canViewLearner(client, schoolId, asStudentId(classStudentId)), false)
 })

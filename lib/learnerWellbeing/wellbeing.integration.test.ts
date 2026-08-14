@@ -30,6 +30,7 @@ import {
   findCaseById, listUpdates,
 } from './wellbeing'
 import { composeBlueprint } from '@/lib/learnerBlueprint/composeBlueprint'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_13G_WELLBEING_TEST'
 const db = createServiceClient()
@@ -335,11 +336,11 @@ test('regression: Blueprint composition is completely unaffected by a learner ha
   const fx = await fixtureSchoolWithTwoTeachers('blueprint-regression')
   const client = await signInAs(fx.teacherAEmail)
 
-  const { blueprint: before } = await composeBlueprint({ actorUserId: fx.teacherAUserId, coreLearnerId: fx.learnerId, schoolId: fx.schoolId })
+  const { blueprint: before } = await composeBlueprint({ actorUserId: fx.teacherAUserId, coreLearnerId: asLearnerId(fx.learnerId), schoolId: fx.schoolId })
 
   await raiseConcern(client, fx.schoolId, fx.learnerId, fx.teacherAUserId, FIELDS)
 
-  const { blueprint: after } = await composeBlueprint({ actorUserId: fx.teacherAUserId, coreLearnerId: fx.learnerId, schoolId: fx.schoolId })
+  const { blueprint: after } = await composeBlueprint({ actorUserId: fx.teacherAUserId, coreLearnerId: asLearnerId(fx.learnerId), schoolId: fx.schoolId })
 
   // Every section's status/shape is identical before and after a Wellbeing case exists for this learner.
   assert.deepEqual(Object.keys(before).sort(), Object.keys(after).sort())

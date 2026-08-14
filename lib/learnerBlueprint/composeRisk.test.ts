@@ -1,6 +1,7 @@
 import { before, mock, test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { LearnerIntelligenceProjection } from '@/lib/projection/types'
+import { asLearnerId, asStudentId, type LearnerId, type StudentId } from '@/lib/core/identityTypes'
 
 let projectionBehavior: 'none' | 'normal' | 'flagged' = 'none'
 
@@ -95,14 +96,14 @@ test('composeRisk is unavailable when no legacy bridge exists', async () => {
 
 test('composeRisk is unavailable when projection has no risk evidence', async () => {
   projectionBehavior = 'none'
-  const section = await composeRisk('legacy-1')
+  const section = await composeRisk(asStudentId('legacy-1'))
   assert.equal(section.status, 'unavailable')
   assert.match(section.unavailableReason ?? '', /risk exposure/i)
 })
 
 test('composeRisk returns an available normal state when evidence supports no active flags', async () => {
   projectionBehavior = 'normal'
-  const section = await composeRisk('legacy-1')
+  const section = await composeRisk(asStudentId('legacy-1'))
   assert.equal(section.status, 'available')
   assert.equal(section.data?.overallRiskLevel, 'normal')
   assert.deepEqual(section.data?.flags, [])
@@ -111,7 +112,7 @@ test('composeRisk returns an available normal state when evidence supports no ac
 
 test('composeRisk preserves level, flags, evidence references, confidence, coverage, and freshness metadata', async () => {
   projectionBehavior = 'flagged'
-  const section = await composeRisk('legacy-1')
+  const section = await composeRisk(asStudentId('legacy-1'))
   assert.equal(section.status, 'available')
   assert.equal(section.data?.overallRiskLevel, 'critical')
   assert.equal(section.data?.flags[0].reason, 'Below Expectation in Mathematics and declining from prior evidence')

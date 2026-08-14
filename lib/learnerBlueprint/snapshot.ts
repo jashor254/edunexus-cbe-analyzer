@@ -20,9 +20,10 @@ import type {
   BlueprintSnapshotRow,
   BlueprintSnapshotType,
 } from '@/lib/repositories/blueprintSnapshot.repository'
+import type { LearnerId } from '@/lib/core/identityTypes'
 
 export type CreateBlueprintSnapshotInput = {
-  coreLearnerId: string
+  coreLearnerId: LearnerId
   schoolId: string
   academicYearId: string | null
   termId: string | null
@@ -84,7 +85,7 @@ export async function getBlueprintSnapshot(
 }
 
 export async function listBlueprintSnapshots(
-  coreLearnerId: string,
+  coreLearnerId: LearnerId,
   schoolId: string
 ): Promise<BlueprintSnapshotRow[]> {
   return repos.blueprintSnapshots.listForLearner(coreLearnerId, schoolId)
@@ -92,7 +93,7 @@ export async function listBlueprintSnapshots(
 
 /** Pure read — same ordering `listBlueprintSnapshots` already uses, no new query shape, no recomputation. */
 export async function getLatestBlueprintSnapshot(
-  coreLearnerId: string,
+  coreLearnerId: LearnerId,
   schoolId: string
 ): Promise<BlueprintSnapshotRow | null> {
   return repos.blueprintSnapshots.getLatestForLearner(coreLearnerId, schoolId)

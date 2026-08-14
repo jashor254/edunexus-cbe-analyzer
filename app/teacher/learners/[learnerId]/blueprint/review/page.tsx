@@ -20,6 +20,7 @@ import { listReviewableBlueprintActionsForLearner, type ReviewableActionListItem
 import BlueprintStateMessage from '@/components/blueprint/BlueprintStateMessage'
 import BlueprintReviewWorkspace from '@/components/blueprint/review/BlueprintReviewWorkspace'
 import Link from 'next/link'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 function learnerDisplayName(learner: { first_name: string; middle_name: string | null; last_name: string }): string {
   return [learner.first_name, learner.middle_name, learner.last_name].filter(Boolean).join(' ')
@@ -41,7 +42,10 @@ export default async function BlueprintReviewWorkspacePage({
   params: Promise<{ learnerId: string }>
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
-  const { learnerId } = await params
+  // Route-boundary trust origin: a Core `learners.id` — established by the
+  // Core-learner queries this page performs, not by the URL wording.
+  const { learnerId: rawLearnerId } = await params
+  const learnerId = asLearnerId(rawLearnerId)
   const query = await searchParams
   // Optional deep-link (Phase 3A) — the Blueprint Action Plan's "Review
   // progress" link passes ?action=<id> so the teacher lands directly on

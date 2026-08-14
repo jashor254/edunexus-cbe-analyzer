@@ -7,6 +7,7 @@ import assert from 'node:assert/strict'
 import { projectAcademic } from './academicProjector'
 import { projectKnowledge } from './knowledgeProjector'
 import type { EvidenceRow } from '@/lib/repositories/evidence.repository'
+import { asStudentId } from '@/lib/core/identityTypes'
 
 const LEARNER_ID = 'learner-1'
 const SUBSTRAND_A = 'substrand-fractions'
@@ -16,7 +17,7 @@ function evidence(overrides: Partial<EvidenceRow>): EvidenceRow {
   return {
     id: overrides.id ?? `ev-${Math.random().toString(36).slice(2, 8)}`,
     created_at: overrides.created_at ?? new Date().toISOString(),
-    learner_id: LEARNER_ID,
+    learner_id: asStudentId(LEARNER_ID),
     extracted_name: 'Test Learner',
     extracted_external_id: null,
     subject: 'mathematics',

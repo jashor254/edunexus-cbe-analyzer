@@ -8,6 +8,7 @@
 
 import { BaseRepository } from './base'
 import type { LearnerBlueprint } from '@/lib/learnerBlueprint/types'
+import type { LearnerId } from '@/lib/core/identityTypes'
 
 export type BlueprintSnapshotType = 'report_card_publication' | 'end_of_term' | 'graduation'
 
@@ -19,7 +20,7 @@ export type BlueprintSnapshotProvenance = {
 
 export type BlueprintSnapshotRow = {
   id: string
-  learner_id: string
+  learner_id: LearnerId
   school_id: string
   academic_year_id: string | null
   term_id: string | null
@@ -32,7 +33,7 @@ export type BlueprintSnapshotRow = {
 }
 
 export type InsertBlueprintSnapshotInput = {
-  learner_id: string
+  learner_id: LearnerId
   school_id: string
   academic_year_id: string | null
   term_id: string | null

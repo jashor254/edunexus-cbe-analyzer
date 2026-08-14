@@ -10,11 +10,12 @@ import assert from 'node:assert/strict'
 import { mapActionToCompassObjective } from './compass'
 import { EVIDENCE_BASIS_EMPTY } from '../types'
 import type { BlueprintActionItemRow } from '@/lib/repositories/blueprintActionItem.repository'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 function makeAction(overrides: Partial<BlueprintActionItemRow> = {}): BlueprintActionItemRow {
   return {
     id: 'action-1',
-    learner_id: 'learner-1',
+    learner_id: asLearnerId('learner-1'),
     school_id: 'school-1',
     academic_year_id: null,
     term_id: null,

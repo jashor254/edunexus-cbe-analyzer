@@ -14,6 +14,7 @@ import { type FeatureKey } from '@/lib/payments/config'
 import { apiError } from '@/lib/api/response'
 import { repos } from '@/lib/repositories'
 import { logger } from '@/lib/observability/logger'
+import { asStudentId } from '@/lib/core/identityTypes'
 
 const FEATURE: FeatureKey = 'learning_compass'
 
@@ -357,7 +358,7 @@ export async function POST(req: Request) {
     // one binding. A failed bind is the normal case for a learner-directed
     // session and never blocks it — fire-and-forget so provenance can never
     // break a learner's lesson.
-    void bindDeliveryToSession(studentId, activeSessionId, subject, compassBridge)
+    void bindDeliveryToSession(asStudentId(studentId), activeSessionId, subject, compassBridge)
       .catch(err => logger.warn(
         'Compass delivery binding failed',
         { operation: 'learn.bindDelivery', sessionId: activeSessionId },

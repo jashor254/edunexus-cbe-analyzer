@@ -13,6 +13,7 @@ import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } fr
 import { requireAuthentication, requireParent } from '@/lib/core/permissions'
 import { UnauthorizedError, ResourceOwnershipError } from '@/lib/core/errors'
 import { buildGradebook, type GradebookColumn, type GradebookRow } from '@/lib/gradebook/gradebook'
+import { asStudentId } from '@/lib/core/identityTypes'
 
 export type ParentGradebookClass = {
   classId: string
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
     const supabase = await createClient()
     try {
       await requireAuthentication(supabase)
-      await requireParent(supabase, studentId)
+      await requireParent(supabase, asStudentId(studentId))  // trust origin: class_students.student_id → students
     } catch (err) {
       if (err instanceof UnauthorizedError) return apiUnauthorized()
       if (err instanceof ResourceOwnershipError) return apiForbidden()

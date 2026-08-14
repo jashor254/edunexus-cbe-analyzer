@@ -33,6 +33,7 @@ import { repos } from '@/lib/repositories'
 import { resolveLegacyStudentId } from '@/lib/core/identity'
 import { normalizeSubjectKey } from '@/lib/pathwayCalculator'
 import type { BlueprintCompassDeliveryRow } from '@/lib/repositories/blueprintCompassDelivery.repository'
+import type { StudentId } from '@/lib/core/identityTypes'
 
 /** Why a session did or did not claim a delivery — returned for tests and debugging, never surfaced to a learner. */
 export type DeliveryBindOutcome =
@@ -64,7 +65,7 @@ export type DeliveryBindOutcome =
  * @param subject    the subject the session is ACTUALLY about
  */
 export async function bindDeliveryToSession(
-  learnerId: string,
+  learnerId: StudentId,
   sessionId: string,
   subject: string,
   bridge: Record<string, unknown>,

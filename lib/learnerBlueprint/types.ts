@@ -23,6 +23,7 @@ import type { ParentAction } from '@/lib/parentExperience/actions'
 import type { EvidenceCoverage, Trend, RiskValue as ProjectionRiskValue, CapabilityValue, CompletenessValue } from '@/lib/projection/types'
 import type { BlueprintGradeBand } from './gradeBand'
 import type { CareerKnowledgeState } from '@/lib/career/knowledgeLifecycle'
+import type { LearnerId } from '@/lib/core/identityTypes'
 
 export type BlueprintSectionStatus = 'available' | 'unavailable' | 'not_implemented'
 
@@ -56,7 +57,13 @@ export type BlueprintSection<T> = {
 
 export type BlueprintIdentifiers = {
   actorUserId: string
-  coreLearnerId: string
+  /**
+   * A Core `learners.id`. Blueprint is addressed institutionally and resolves
+   * its own legacy `students.id` internally via `resolveLegacyStudentId()` —
+   * the two live in the same scope inside `composeBlueprint()`, which is
+   * precisely why they are now different types.
+   */
+  coreLearnerId: LearnerId
   schoolId: string
 }
 

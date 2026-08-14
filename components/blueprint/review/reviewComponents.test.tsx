@@ -23,6 +23,7 @@ import type { AssignmentReviewSnapshot, CompassReviewSnapshot, EvidenceReviewSna
 import type { BlueprintActionItemRow } from '@/lib/repositories/blueprintActionItem.repository'
 import type { BlueprintActionReviewRow } from '@/lib/repositories/blueprintActionReview.repository'
 import type { ReviewableActionListItem } from '@/lib/learnerBlueprint/actionPlan/reviewWorkspace'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 // ── AssignmentActivitySummary ───────────────────────────────────────────────
 
@@ -106,7 +107,7 @@ test('ProjectionSummary: shows a confidence CATEGORY, not a bare invented percen
 
 function makeReview(overrides: Partial<BlueprintActionReviewRow> = {}): BlueprintActionReviewRow {
   return {
-    id: 'r1', learner_id: 'l1', school_id: 's1', blueprint_action_item_id: 'a1',
+    id: 'r1', learner_id: asLearnerId('l1'), school_id: 's1', blueprint_action_item_id: 'a1',
     decision: 'no_decision', notes: null,
     assignment_snapshot: null, compass_snapshot: null, evidence_snapshot: null, projection_snapshot: null,
     reviewed_by: null, created_at: '2026-07-01T00:00:00Z', updated_at: '2026-07-01T00:00:00Z',
@@ -133,7 +134,7 @@ test('ReviewHistory: renders reviews chronologically (oldest first) even though 
 
 function makeAction(overrides: Partial<BlueprintActionItemRow> = {}): BlueprintActionItemRow {
   return {
-    id: 'a1', learner_id: 'l1', school_id: 's1', academic_year_id: null, term_id: null, blueprint_snapshot_id: null,
+    id: 'a1', learner_id: asLearnerId('l1'), school_id: 's1', academic_year_id: null, term_id: null, blueprint_snapshot_id: null,
     context: 'current_term', priority: 'medium', status: 'approved', visibility: 'teacher_only',
     title: 'Reading Fluency', rationale: 'Recent evidence shows steady development.',
     intended_outcome: 'Reach fluent oral reading by end of term.',

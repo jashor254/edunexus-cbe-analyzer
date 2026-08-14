@@ -20,6 +20,7 @@ import { startIngestionRun } from '@/lib/intelligence/ingestionRun'
 import { persistEvidenceBatch, retractEvidence } from '@/lib/intelligence/evidenceLifecycle'
 import type { LearnerEvidence } from '@/lib/intelligence/evidence'
 import { resolveLegacyStudentId } from '@/lib/core/identity'
+import { asLearnerId } from '@/lib/core/identityTypes'
 import {
   classifyBridge,
   runLegacyProjectionPath,
@@ -125,7 +126,7 @@ test('Cohort A (rich evidence): Core-resolved and legacy-direct projections are 
   ])
 
   const legacy = await runLegacyProjectionPath(studentId, NOW)
-  const coreResult = await runCoreResolvedProjectionPath(coreLearnerId, NOW)
+  const coreResult = await runCoreResolvedProjectionPath(asLearnerId(coreLearnerId), NOW)
 
   assert.equal(coreResult.status, 'RESOLVED')
   if (coreResult.status !== 'RESOLVED') return
@@ -156,7 +157,7 @@ test('Cohort B (retracted evidence): supersession/retraction is honored identica
   await retractEvidence(secondBatchIds[0], initiatedByUserId, 'test: verifying retraction is honored identically')
 
   const legacy = await runLegacyProjectionPath(studentId, NOW)
-  const coreResult = await runCoreResolvedProjectionPath(coreLearnerId, NOW)
+  const coreResult = await runCoreResolvedProjectionPath(asLearnerId(coreLearnerId), NOW)
 
   assert.equal(coreResult.status, 'RESOLVED')
   if (coreResult.status !== 'RESOLVED') return
@@ -177,7 +178,7 @@ test('Cohort C (sparse evidence): provisional/unavailable projections are equal 
   ])
 
   const legacy = await runLegacyProjectionPath(studentId, NOW)
-  const coreResult = await runCoreResolvedProjectionPath(coreLearnerId, NOW)
+  const coreResult = await runCoreResolvedProjectionPath(asLearnerId(coreLearnerId), NOW)
 
   assert.equal(coreResult.status, 'RESOLVED')
   if (coreResult.status !== 'RESOLVED') return
@@ -194,10 +195,10 @@ test('Cohort D (valid bridge): a Core learner id resolves through external_id to
   const { studentId, coreLearnerId } = await makeSyntheticStudent('cohort-d')
   createdStudentIds.push(studentId)
 
-  const classification = await classifyBridge(coreLearnerId)
+  const classification = await classifyBridge(asLearnerId(coreLearnerId))
   assert.deepEqual(classification, { status: 'ELIGIBLE', legacyStudentId: studentId })
 
-  const resolved = await resolveLegacyStudentId(coreLearnerId)
+  const resolved = await resolveLegacyStudentId(asLearnerId(coreLearnerId))
   assert.equal(resolved, studentId, 'the real production resolveLegacyStudentId must agree with the harness classification')
 })
 
@@ -206,14 +207,14 @@ test('Cohort D (valid bridge): a Core learner id resolves through external_id to
 test('Cohort E (no bridge): a never-bridged Core learner id is reported as absence, not an equivalence failure', async () => {
   const neverBridgedCoreLearnerId = crypto.randomUUID()
 
-  const classification = await classifyBridge(neverBridgedCoreLearnerId)
+  const classification = await classifyBridge(asLearnerId(neverBridgedCoreLearnerId))
   assert.deepEqual(classification, { status: 'NO_BRIDGE' })
 
-  const coreResult = await runCoreResolvedProjectionPath(neverBridgedCoreLearnerId, NOW)
+  const coreResult = await runCoreResolvedProjectionPath(asLearnerId(neverBridgedCoreLearnerId), NOW)
   assert.deepEqual(coreResult, { status: 'NO_BRIDGE' }, 'must be reported as NO_BRIDGE, never as an equivalence failure — there is nothing to compare')
 
   // The real production function must independently agree there's no legacy id here.
-  const resolved = await resolveLegacyStudentId(neverBridgedCoreLearnerId)
+  const resolved = await resolveLegacyStudentId(asLearnerId(neverBridgedCoreLearnerId))
   assert.equal(resolved, null)
 })
 
@@ -229,11 +230,11 @@ test('Cohort F (ambiguous bridge): two legacy students sharing one external_id a
   const { error } = await db.from('students').update({ external_id: sharedCoreLearnerId }).in('id', [a.studentId, b.studentId])
   if (error) throw new Error(`Cohort F setup failed: ${error.message}`)
 
-  const classification = await classifyBridge(sharedCoreLearnerId)
+  const classification = await classifyBridge(asLearnerId(sharedCoreLearnerId))
   assert.equal(classification.status, 'AMBIGUOUS_BRIDGE')
   assert.equal((classification as { count: number }).count, 2)
 
-  const coreResult = await runCoreResolvedProjectionPath(sharedCoreLearnerId, NOW)
+  const coreResult = await runCoreResolvedProjectionPath(asLearnerId(sharedCoreLearnerId), NOW)
   assert.deepEqual(coreResult, { status: 'AMBIGUOUS_BRIDGE' }, 'the harness must refuse to compare, never picking one of the two arbitrarily')
 
   // Document the real production function's current (known, separately
@@ -242,7 +243,7 @@ test('Cohort F (ambiguous bridge): two legacy students sharing one external_id a
   // imprecisely. This assertion exists so a future fix to
   // resolveLegacyStudentId's classification is a visible, intentional
   // change to this test, not a silent behavior change.
-  const resolved = await resolveLegacyStudentId(sharedCoreLearnerId)
+  const resolved = await resolveLegacyStudentId(asLearnerId(sharedCoreLearnerId))
   assert.equal(resolved, null, 'known limitation: resolveLegacyStudentId returns null (not an arbitrary pick) for an ambiguous bridge — see the Identity Resolution Failure Audit')
 })
 

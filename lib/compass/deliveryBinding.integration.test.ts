@@ -36,12 +36,13 @@ import { bindDeliveryToSession, completeDeliveryForSession } from './deliveryBin
 import { recordCompassSessionEvidence } from './evidence'
 import { MASTERY_EXTRACTION_METHOD } from './evidenceClaimTypes'
 import { mergeBridgePreservingTeacherIntent } from '@/lib/career/autoReportGenerator'
+import { asLearnerId, asStudentId, type LearnerId, type StudentId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_P26_DELIVERY_BINDING_TEST'
 const db = createServiceClient()
 const PASSWORD = `Test!${Math.random().toString(36).slice(2, 12)}`
 
-let schoolId: string, coreLearnerId: string, legacyStudentId: string, classId: string
+let schoolId: string, coreLearnerId: LearnerId, legacyStudentId: string, classId: string
 let teacherRowId: string, teacherUserId: string, teacherEmail: string
 let teacherClient: SupabaseClient
 let actionAId: string, actionBId: string
@@ -79,7 +80,7 @@ const deliveryRow = async (id: string) => (await repos.blueprintCompassDeliverie
 
 async function makeApprovedAction(title: string, subject = 'mathematics') {
   const proposed = await proposeBlueprintAction(teacherClient, {
-    coreLearnerId, context: 'current_term', title,
+    coreLearnerId: asLearnerId(coreLearnerId), context: 'current_term', title,
     rationale: 'Evidence-backed need.', intendedOutcome: 'Improve.',
     successIndicator: 'Next confirmed evidence improves.',
     learnerAction: `Work on ${title}`, proposalSource: 'teacher',
@@ -259,7 +260,7 @@ test('19. a SECOND active teacher objective is REJECTED, never silently overwrit
 
 test('6. a wrong-subject session cannot claim the delivery', async () => {
   const kiswahili = await getOrCreateSession(legacyStudentId, 'kiswahili', 'school')
-  const outcome = await bindDeliveryToSession(legacyStudentId, kiswahili.sessionId, 'kiswahili', await bridge())
+  const outcome = await bindDeliveryToSession(asStudentId(legacyStudentId), kiswahili.sessionId, 'kiswahili', await bridge())
 
   assert.equal(outcome.bound, false)
   assert.equal(outcome.bound === false && outcome.reason, 'subject_mismatch')
@@ -270,14 +271,14 @@ test('6. a wrong-subject session cannot claim the delivery', async () => {
 
 test('7. an open, learner-directed session cannot claim the delivery — no heuristic binding', async () => {
   // Same subject as the delivery, but NO teacher direction in play.
-  const outcome = await bindDeliveryToSession(legacyStudentId, 'ignored', 'mathematics', { teacherSuggested: false })
+  const outcome = await bindDeliveryToSession(asStudentId(legacyStudentId), 'ignored', 'mathematics', { teacherSuggested: false })
   assert.equal(outcome.bound, false)
   assert.equal(outcome.bound === false && outcome.reason, 'no_teacher_direction')
   assert.equal((await deliveryRow(deliveryAId)).status, 'available')
 })
 
 test('7b. a session whose bridge names no delivery cannot claim one by proximity', async () => {
-  const outcome = await bindDeliveryToSession(legacyStudentId, 'ignored', 'mathematics', { teacherSuggested: true, firstSubject: 'mathematics' })
+  const outcome = await bindDeliveryToSession(asStudentId(legacyStudentId), 'ignored', 'mathematics', { teacherSuggested: true, firstSubject: 'mathematics' })
   assert.equal(outcome.bound === false && outcome.reason, 'no_delivery_id',
     'the newest available delivery must not be adopted by a session that was never sent to it')
 })
@@ -287,7 +288,7 @@ test('8. a different learner cannot claim this learner\'s delivery', async () =>
   // point under test is the LEARNER check, so the id must be valid enough to
   // reach it.
   const outcome = await bindDeliveryToSession(
-    '00000000-0000-0000-0000-000000000000',
+    asStudentId('00000000-0000-0000-0000-000000000000'),
     '11111111-1111-1111-1111-111111111111',
     'mathematics',
     await bridge(),
@@ -302,7 +303,7 @@ test('3+4+5. the matching targeted session claims the delivery and is permanentl
   const session = await getOrCreateSession(legacyStudentId, 'mathematics', 'school')
   boundSessionId = session.sessionId
 
-  const outcome = await bindDeliveryToSession(legacyStudentId, boundSessionId, 'mathematics', await bridge())
+  const outcome = await bindDeliveryToSession(asStudentId(legacyStudentId), boundSessionId, 'mathematics', await bridge())
   assert.equal(outcome.bound, true)
 
   const row = await deliveryRow(deliveryAId)
@@ -314,7 +315,7 @@ test('3+4+5. the matching targeted session claims the delivery and is permanentl
 
 test('9+10. repeated first-message and resume converge on one binding, never re-binding', async () => {
   for (let i = 0; i < 3; i++) {
-    const again = await bindDeliveryToSession(legacyStudentId, boundSessionId, 'mathematics', await bridge())
+    const again = await bindDeliveryToSession(asStudentId(legacyStudentId), boundSessionId, 'mathematics', await bridge())
     assert.equal(again.bound, true, 'repeat calls stay bound rather than erroring')
   }
 
@@ -336,12 +337,12 @@ test('10b. a genuinely different session cannot steal a delivery that is already
   // covers. A distinct row is created directly so this exercises the
   // "already claimed" branch rather than the resume branch.
   const other = await repos.compass.createSession({
-    learner_id: legacyStudentId, subject: 'mathematics', mode: 'holiday',
+    learner_id: asLearnerId(legacyStudentId), subject: 'mathematics', mode: 'holiday',
     status: 'active', exchange_count: 0, session_state: {},
   })
   assert.notEqual(other.id, boundSessionId, 'this really is a second, distinct session')
 
-  const outcome = await bindDeliveryToSession(legacyStudentId, other.id, 'mathematics', await bridge())
+  const outcome = await bindDeliveryToSession(asStudentId(legacyStudentId), other.id, 'mathematics', await bridge())
   assert.equal(outcome.bound === false && outcome.reason, 'not_available')
   assert.equal((await deliveryRow(deliveryAId)).compass_session_id, boundSessionId, 'the original binding stands')
 

@@ -11,11 +11,12 @@
 import type { BlueprintSection, GrowthTimelineEntry } from './types'
 import type { ProjectionAccessResult } from './projectionAccess'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
+import type { StudentId } from '@/lib/core/identityTypes'
 
 const OWNER = 'lib/projection/recompute.recomputeLearnerProjection'
 
 export async function composeGrowthTimeline(
-  legacyStudentId: string | null,
+  legacyStudentId: StudentId | null,
   projectionAccess?: ProjectionAccessResult
 ): Promise<BlueprintSection<GrowthTimelineEntry[]>> {
   if (!legacyStudentId) {

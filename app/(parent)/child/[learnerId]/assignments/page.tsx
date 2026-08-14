@@ -13,13 +13,17 @@ import { requireAuthentication, requireParent } from '@/lib/core/permissions'
 import { UnauthorizedError, ResourceOwnershipError } from '@/lib/core/errors'
 import { repos } from '@/lib/repositories'
 import ParentAssignmentsClient from './ParentAssignmentsClient'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 export default async function ParentAssignmentsPage({
   params,
 }: {
   params: Promise<{ learnerId: string }>
 }) {
-  const { learnerId } = await params
+  // Route-boundary trust origin: this segment is a Core `learners.id` — proven
+  // by the Core-learner queries below, not by the URL wording.
+  const { learnerId: rawLearnerId } = await params
+  const learnerId = asLearnerId(rawLearnerId)
   const supabase = await createClient()
 
   try {

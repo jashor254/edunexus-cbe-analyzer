@@ -19,6 +19,7 @@ import { reviewBlueprintAction } from './review'
 import { listReviewableBlueprintActionsForLearner } from './reviewWorkspace'
 import { EVIDENCE_BASIS_EMPTY } from './types'
 import type { BlueprintActionItemRow } from '@/lib/repositories/blueprintActionItem.repository'
+import { asLearnerId, asStudentId, type LearnerId, type StudentId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_BLUEPRINT_REVIEW_WORKSPACE_PHASE2E_TEST'
 const db = createServiceClient()
@@ -43,7 +44,7 @@ async function signInAs(email: string): Promise<SupabaseClient> {
 }
 
 let schoolId: string, otherSchoolId: string
-let coreLearnerId: string, legacyStudentId: string
+let coreLearnerId: LearnerId, legacyStudentId: string
 let otherLearnerId: string
 let classId: string
 let teacherUserId: string, teacherEmail: string, teacherId: string
@@ -61,7 +62,7 @@ let otherLearnerActionId: string
 
 function baseActionFields(learnerId: string, overrides: Partial<Parameters<typeof repos.blueprintActionItems.insert>[0]> = {}) {
   return {
-    learner_id: learnerId,
+    learner_id: asLearnerId(learnerId),
     school_id: schoolId,
     academic_year_id: null,
     term_id: null,
@@ -160,7 +161,7 @@ before(async () => {
   await db.from('class_students').insert({ class_id: classId, student_id: legacyStudentId })
 
   await db.from('learner_guardians')
-    .insert({ school_id: schoolId, learner_id: coreLearnerId, user_id: parentUserId, relationship: 'mother', full_name: SYNTHETIC_MARKER, phone: '0700000000' })
+    .insert({ school_id: schoolId, learner_id: asLearnerId(coreLearnerId), user_id: parentUserId, relationship: 'mother', full_name: SYNTHETIC_MARKER, phone: '0700000000' })
 
   teacherClient = await signInAs(teacherEmail)
 
@@ -201,33 +202,33 @@ after(async () => {
 
 test('unauthenticated caller is denied', async () => {
   const anon = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
-  await assert.rejects(() => listReviewableBlueprintActionsForLearner(anon, coreLearnerId), UnauthorizedError)
+  await assert.rejects(() => listReviewableBlueprintActionsForLearner(anon, asLearnerId(coreLearnerId)), UnauthorizedError)
 })
 
 test('an unrelated same-school teacher is denied', async () => {
   const client = await signInAs(unrelatedTeacherEmail)
-  await assert.rejects(() => listReviewableBlueprintActionsForLearner(client, coreLearnerId), ResourceOwnershipError)
+  await assert.rejects(() => listReviewableBlueprintActionsForLearner(client, asLearnerId(coreLearnerId)), ResourceOwnershipError)
 })
 
 test('a cross-school teacher is denied', async () => {
   const client = await signInAs(otherSchoolTeacherEmail)
-  await assert.rejects(() => listReviewableBlueprintActionsForLearner(client, coreLearnerId), ResourceOwnershipError)
+  await assert.rejects(() => listReviewableBlueprintActionsForLearner(client, asLearnerId(coreLearnerId)), ResourceOwnershipError)
 })
 
 test('a parent is denied', async () => {
   const client = await signInAs(parentEmail)
-  await assert.rejects(() => listReviewableBlueprintActionsForLearner(client, coreLearnerId), ResourceOwnershipError)
+  await assert.rejects(() => listReviewableBlueprintActionsForLearner(client, asLearnerId(coreLearnerId)), ResourceOwnershipError)
 })
 
 test('the learner themself is denied — this is a teacher workspace, not a learner view', async () => {
   const client = await signInAs(learnerSelfEmail)
-  await assert.rejects(() => listReviewableBlueprintActionsForLearner(client, coreLearnerId), ResourceOwnershipError)
+  await assert.rejects(() => listReviewableBlueprintActionsForLearner(client, asLearnerId(coreLearnerId)), ResourceOwnershipError)
 })
 
 // ── Scoping and undelivered-state correctness ───────────────────────────────
 
 test('the authorized teacher sees exactly this learner\'s actions — another learner\'s action never appears', async () => {
-  const items = await listReviewableBlueprintActionsForLearner(teacherClient, coreLearnerId)
+  const items = await listReviewableBlueprintActionsForLearner(teacherClient, asLearnerId(coreLearnerId))
   const ids = items.map(i => i.actionId)
   assert.ok(ids.includes(deliveredActionId))
   assert.ok(ids.includes(undeliveredActionId))
@@ -235,7 +236,7 @@ test('the authorized teacher sees exactly this learner\'s actions — another le
 })
 
 test('an approved-but-undelivered action does not throw and reports both channels as not delivered', async () => {
-  const items = await listReviewableBlueprintActionsForLearner(teacherClient, coreLearnerId)
+  const items = await listReviewableBlueprintActionsForLearner(teacherClient, asLearnerId(coreLearnerId))
   const item = items.find(i => i.actionId === undeliveredActionId)!
   assert.equal(item.assignmentDelivered, false)
   assert.equal(item.compassDelivered, false)
@@ -245,7 +246,7 @@ test('an approved-but-undelivered action does not throw and reports both channel
 })
 
 test('a delivered action reports assignmentDelivered: true and is awaiting review before any review exists', async () => {
-  const items = await listReviewableBlueprintActionsForLearner(teacherClient, coreLearnerId)
+  const items = await listReviewableBlueprintActionsForLearner(teacherClient, asLearnerId(coreLearnerId))
   const item = items.find(i => i.actionId === deliveredActionId)!
   assert.equal(item.assignmentDelivered, true)
   assert.equal(item.compassDelivered, false)
@@ -254,7 +255,7 @@ test('a delivered action reports assignmentDelivered: true and is awaiting revie
 
 test('after a review is recorded, the list reflects the latest decision and is no longer awaiting review (absent new activity)', async () => {
   await reviewBlueprintAction(teacherClient, deliveredActionId, { decision: 'complete', notes: 'Looks solid.' })
-  const items = await listReviewableBlueprintActionsForLearner(teacherClient, coreLearnerId)
+  const items = await listReviewableBlueprintActionsForLearner(teacherClient, asLearnerId(coreLearnerId))
   const item = items.find(i => i.actionId === deliveredActionId)!
   assert.equal(item.latestDecision, 'complete')
   assert.equal(item.reviewCount, 1)
@@ -263,7 +264,7 @@ test('after a review is recorded, the list reflects the latest decision and is n
 
 test('new assignment activity after the latest review flips the action back to awaiting review', async () => {
   await db.from('assignment_submissions').update({ status: 'marked', score: 88, marked_at: new Date().toISOString() }).eq('assignment_id', createdAssignmentIds[0])
-  const items = await listReviewableBlueprintActionsForLearner(teacherClient, coreLearnerId)
+  const items = await listReviewableBlueprintActionsForLearner(teacherClient, asLearnerId(coreLearnerId))
   const item = items.find(i => i.actionId === deliveredActionId)!
   assert.equal(item.awaitingReview, true, 'new submission activity after the last review should re-surface the action')
   assert.equal(item.latestDecision, 'complete', 'the prior review decision is still the latest recorded decision — awaiting-review is a presentation flag, not a status reset')

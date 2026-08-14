@@ -20,6 +20,7 @@ import { deliverBlueprintActionToCompass, type DeliverBlueprintActionToCompassCo
 import { getNextSubject } from '@/lib/compass/session'
 import { EVIDENCE_BASIS_EMPTY } from '../types'
 import type { BlueprintActionItemRow } from '@/lib/repositories/blueprintActionItem.repository'
+import { asLearnerId, asStudentId, type LearnerId, type StudentId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_BLUEPRINT_COMPASS_PHASE2C_TEST'
 const db = createServiceClient()
@@ -48,7 +49,7 @@ function anonClient(): SupabaseClient {
 }
 
 let schoolId: string, otherSchoolId: string
-let coreLearnerId: string, legacyStudentId: string
+let coreLearnerId: LearnerId, legacyStudentId: string
 let unbridgedLearnerId: string // Core learner with no legacy students bridge
 let classId: string
 
@@ -66,7 +67,7 @@ const createdDeliveryActionIds: string[] = []
 
 function baseActionFields(overrides: Partial<Parameters<typeof repos.blueprintActionItems.insert>[0]> = {}) {
   return {
-    learner_id: coreLearnerId,
+    learner_id: asLearnerId(coreLearnerId),
     school_id: schoolId,
     academic_year_id: null,
     term_id: null,
@@ -300,7 +301,7 @@ test('validation: a missing subject is rejected', async () => {
 })
 
 test('precondition: a learner with no legacy Compass identity bridge is IdentityResolutionError ("Compass unavailable")', async () => {
-  const action = await insertActionWithStatus('approved', { learner_id: unbridgedLearnerId })
+  const action = await insertActionWithStatus('approved', { learner_id: asLearnerId(unbridgedLearnerId) })
   const client = await signInAs(adminEmail) // admin-tier passes canManageLearnerRecordCore's fallback branch even with no bridge
   await assert.rejects(() => deliverBlueprintActionToCompass(client, action.id, validCommand()), IdentityResolutionError)
 })

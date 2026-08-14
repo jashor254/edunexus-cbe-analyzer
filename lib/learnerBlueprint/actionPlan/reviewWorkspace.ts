@@ -31,6 +31,7 @@ import { repos } from '@/lib/repositories'
 import { getLearnerTimeline } from '@/lib/learnerRecord/timeline'
 import { getPersistedProjections } from '@/lib/projection/recompute'
 import type { BlueprintActionReviewDecision } from '@/lib/repositories/blueprintActionReview.repository'
+import type { LearnerId } from '@/lib/core/identityTypes'
 
 export type ReviewableActionListItem = {
   actionId: string
@@ -65,7 +66,7 @@ export type ReviewableActionListItem = {
   awaitingReview: boolean
 }
 
-async function requireManageAccess(client: SupabaseClient, schoolId: string, learnerId: string): Promise<void> {
+async function requireManageAccess(client: SupabaseClient, schoolId: string, learnerId: LearnerId): Promise<void> {
   const canManage = await canManageLearnerRecordCore(client, schoolId, learnerId)
   if (!canManage) throw new ResourceOwnershipError('You do not have permission to review this learner\'s Blueprint action plan.')
 }
@@ -131,7 +132,7 @@ function latestOf(...timestamps: Array<string | null>): string | null {
  */
 export async function listReviewableBlueprintActionsForLearner(
   client: SupabaseClient,
-  learnerId: string,
+  learnerId: LearnerId,
 ): Promise<ReviewableActionListItem[]> {
   const schoolId = await repos.learners.findSchoolId(learnerId)
   await requireManageAccess(client, schoolId, learnerId)

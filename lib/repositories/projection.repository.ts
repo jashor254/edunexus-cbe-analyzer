@@ -1,5 +1,6 @@
 import { BaseRepository } from './base'
 import type { ProjectorType } from '@/lib/projection/types'
+import type { StudentId } from '@/lib/core/identityTypes'
 
 const PROJECTION_COLS =
   'id, learner_id, projector_type, projection_version, value, supporting_evidence_ids, confidence, ' +
@@ -7,7 +8,8 @@ const PROJECTION_COLS =
 
 export type ProjectionRow = {
   id: string
-  learner_id: string
+  /** IDENTITY-1: FK is `REFERENCES students(id)` despite the column name — a legacy `StudentId`. See EvidenceRow.learner_id. */
+  learner_id: StudentId
   projector_type: ProjectorType
   projection_version: string
   value: unknown

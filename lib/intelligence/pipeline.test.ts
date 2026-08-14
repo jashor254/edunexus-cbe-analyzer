@@ -60,14 +60,14 @@ const roster: StudentIdentityCandidate[] = [
 
 test('resolveAgainstRoster matches on external_id with full confidence, ignoring name', () => {
   const result = resolveAgainstRoster({ name: 'Wrong Name Entirely', externalId: 'EXT001' }, roster)
-  assert.equal(result.learnerId, 'stu-1')
+  assert.equal(result.studentId, 'stu-1')
   assert.equal(result.confidence, 100)
   assert.equal(result.matchType, 'external_id')
 })
 
 test('resolveAgainstRoster matches on exact name + grade when unambiguous', () => {
   const result = resolveAgainstRoster({ name: 'Faith Wanjiru', grade: 7 }, roster)
-  assert.equal(result.learnerId, 'stu-2')
+  assert.equal(result.studentId, 'stu-2')
   assert.equal(result.matchType, 'exact_name_grade')
 })
 
@@ -78,7 +78,7 @@ test('resolveAgainstRoster refuses to guess when a name+grade match is ambiguous
     { id: 'b', name: 'John Kamau', grade: 9, external_id: null },
   ]
   const result = resolveAgainstRoster({ name: 'John Kamau', grade: 9 }, ambiguousRoster)
-  assert.equal(result.learnerId, null)
+  assert.equal(result.studentId, null)
   assert.equal(result.matchType, 'none')
 })
 
@@ -89,7 +89,7 @@ test('resolveAgainstRoster returns a capped, non-auto-confirmable confidence for
 
 test('resolveAgainstRoster finds no match for a genuinely unrecognized name', () => {
   const result = resolveAgainstRoster({ name: 'Zzyzx Nonexistent', grade: 8 }, roster)
-  assert.equal(result.learnerId, null)
+  assert.equal(result.studentId, null)
   assert.equal(result.matchType, 'none')
 })
 

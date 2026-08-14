@@ -14,6 +14,7 @@ import { sendWhatsApp } from '@/lib/whatsapp/sender'
 import { timingSafeEqualString } from '@/lib/api/secretCompare'
 import { publishEvent } from '@/lib/events'
 import { repos } from '@/lib/repositories'
+import { asStudentId } from '@/lib/core/identityTypes'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -243,7 +244,7 @@ export async function GET(req: Request): Promise<Response> {
 
       const students: StudentBrief[] = allSids.map(sid => {
         const t          = tally.get(sid)
-        const riskLevel  = fullRiskMap.get(sid) ?? 'normal'
+        const riskLevel  = fullRiskMap.get(asStudentId(sid)) ?? 'normal'
         const completed  = t?.completed ?? 0
         const abandoned  = t?.abandoned ?? 0
         const engaged    = completed >= 1

@@ -12,6 +12,7 @@ import { repos } from '@/lib/repositories'
 import type { LearnerEvidence } from './evidence'
 import type { EvidenceRow, NewEvidenceRow } from '@/lib/repositories/evidence.repository'
 import { correctionKeyNamespace } from './correctionKey'
+import { asStudentId } from '@/lib/core/identityTypes'
 
 const PREFETCH_CONCURRENCY = 20
 
@@ -194,9 +195,13 @@ async function mapWithConcurrency<T, R>(items: T[], concurrency: number, fn: (it
   return results
 }
 
+// IDENTITY-1 write boundary. `learner_evidence.learner_id` is FK'd to
+// `students(id)` (20260707_evidence_domain.sql:70) — every Evidence write in
+// the platform funnels through this builder, so this is the one place the
+// domain has to be asserted.
 function toNewEvidenceRow(e: LearnerEvidence, runId: string, supersedes: string | null): NewEvidenceRow {
   return {
-    learner_id: e.learnerId,
+    learner_id: e.learnerId === null ? null : asStudentId(e.learnerId),
     extracted_name: e.extractedName,
     extracted_external_id: e.extractedExternalId,
     subject: e.subject,

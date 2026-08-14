@@ -14,6 +14,7 @@ import assert from 'node:assert/strict'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { createServiceClient } from '@/utils/supabase/service'
 import { requireStudent, requireParent } from '@/lib/core/permissions'
+import { asStudentId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_SELF_OR_PARENT_TEST'
 const db = createServiceClient()
@@ -29,7 +30,7 @@ async function signInAs(email: string): Promise<SupabaseClient> {
 // Mirrors the exact composition used in the two migrated routes.
 async function isSelfOrParentOf(client: SupabaseClient, studentId: string): Promise<boolean> {
   try { await requireStudent(client, studentId); return true } catch { /* fall through */ }
-  try { await requireParent(client, studentId); return true } catch { return false }
+  try { await requireParent(client, asStudentId(studentId)); return true } catch { return false }
 }
 
 let studentUserId: string, studentEmail: string, studentId: string

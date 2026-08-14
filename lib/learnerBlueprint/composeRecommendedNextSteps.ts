@@ -32,11 +32,12 @@ import type {
   CareerData,
 } from './types'
 import type { ParentAction } from '@/lib/parentExperience/actions'
+import { type LearnerId } from '@/lib/core/identityTypes'
 
 const OWNER = 'lib/learnerBlueprint/actionPlan (canonical, when approved items exist) | lib/parentExperience/actions.composeParentActions (compatibility fallback)'
 
 export async function composeRecommendedNextSteps(
-  coreLearnerId: string,
+  coreLearnerId: LearnerId,
   schoolId: string,
   learningCompass: BlueprintSection<LearningCompassData>,
   teacherReflection: BlueprintSection<TeacherReflectionData>,

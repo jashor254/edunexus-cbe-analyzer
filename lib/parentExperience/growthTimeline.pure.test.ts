@@ -12,6 +12,7 @@ import { compareSnapshots, buildMilestones } from './growthTimeline'
 import type { BlueprintSnapshotRow } from '@/lib/repositories/blueprintSnapshot.repository'
 import type { LearnerBlueprint, BlueprintSection } from '@/lib/learnerBlueprint/types'
 import { composeMetadata } from '@/lib/learnerBlueprint/composeMetadata'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 function na<T>(data: T | null = null): BlueprintSection<T> {
   return { status: 'unavailable', owner: 'owner', freshness: 'live', data, unavailableReason: 'n/a' }
@@ -41,7 +42,7 @@ function fixtureBlueprint(overrides: Partial<LearnerBlueprint> = {}): LearnerBlu
 function fixtureSnapshot(overrides: Partial<BlueprintSnapshotRow> & { blueprint_payload: LearnerBlueprint }): BlueprintSnapshotRow {
   return {
     id: 'snap-1',
-    learner_id: 'learner-1',
+    learner_id: asLearnerId('learner-1'),
     school_id: 'school-1',
     academic_year_id: null,
     term_id: null,

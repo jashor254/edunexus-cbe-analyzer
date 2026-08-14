@@ -26,6 +26,7 @@ import { buildAdaptiveTask, neutralGroupLabel } from '@/lib/adaptiveLearning/rec
 import { CurriculumService } from '@/lib/curriculum/service'
 import type { LearnerIntelligenceProjection } from '@/lib/projection/types'
 import type { BlueprintActionPriority, BlueprintActionEvidenceBasis } from './types'
+import type { LearnerId } from '@/lib/core/identityTypes'
 
 export const DETERMINISTIC_CANDIDATE_GENERATOR_ID = 'deterministic-adaptive-v1'
 
@@ -79,7 +80,7 @@ const PRIORITY_BY_GROUP: Record<string, BlueprintActionPriority> = {
  * 'insufficient_data') — never fabricates a candidate from nothing.
  */
 export async function generateActionCandidate(
-  coreLearnerId: string,
+  coreLearnerId: LearnerId,
   schoolId: string,
   subject: string
 ): Promise<ActionCandidate | null> {

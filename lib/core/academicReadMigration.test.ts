@@ -25,6 +25,7 @@ import { activateSchool } from '@/lib/core/schoolActivation'
 import { inviteTeacher, acceptTeacherInvitation } from '@/lib/core/teacherOnboarding'
 import { onboardLearner } from '@/lib/core/learnerOnboarding'
 import { createBridgedAssessment, recordBridgedMarks, ensureBridgedClass, resolveLegacyStudentId, getBridgedLearnerTimeline, getBridgedCareerIntelligence, getBridgedCompassAccess } from '@/lib/core/academicBridge'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_9G_READ_TEST'
 const db = createServiceClient()
@@ -123,7 +124,7 @@ async function fullyOnboardedLearner(labelPrefix: string) {
   })
   const bridgedClass = await ensureBridgedClass(school.id, classId, teacher.id)
   const { legacyStudentIds } = await recordBridgedMarks(school.id, assessmentId, bridgedClass, teacher.id, [
-    { coreLearnerId, admission_number: 'RM', student_name: 'Read Migration', subject_scores: { mathematics: 82 }, total_marks: 82, mean_score: 82 },
+    { coreLearnerId: asLearnerId(coreLearnerId), admission_number: 'RM', student_name: 'Read Migration', subject_scores: { mathematics: 82 }, total_marks: 82, mean_score: 82 },
   ])
 
   return { schoolId: school.id, adminUserId: admin.id, teacherUserId: teacher.id, classId, termId, coreLearnerId, legacyClassId, legacyStudentId: legacyStudentIds[0], assessmentId }
@@ -163,7 +164,7 @@ test('class-detail roster view: a bridged learner appears via class_students, ex
 test('Learner Timeline: canonical end-to-end via the bridge, showing the recorded evidence', async () => {
   const fixture = await fullyOnboardedLearner('timeline')
 
-  const timeline = await getBridgedLearnerTimeline(fixture.coreLearnerId)
+  const timeline = await getBridgedLearnerTimeline(asLearnerId(fixture.coreLearnerId))
   assert.ok(timeline)
   assert.ok(timeline!.length > 0)
   assert.ok(timeline!.some(e => e.kind === 'evidence'))
@@ -181,7 +182,7 @@ test('Learner Timeline: returns null (not an error) for a learner with no bridge
   })
   assert.equal(second.status, 'complete')
 
-  const timeline = await getBridgedLearnerTimeline(second.learnerId!)
+  const timeline = await getBridgedLearnerTimeline(asLearnerId(second.learnerId!))
   assert.equal(timeline, null)
 })
 
@@ -189,7 +190,7 @@ test('Learner Timeline: returns null (not an error) for a learner with no bridge
 
 test('Career Intelligence: resolvable through the canonical bridge, unmodified buildCareerIntelligence', async () => {
   const fixture = await fullyOnboardedLearner('career')
-  const result = await getBridgedCareerIntelligence(fixture.coreLearnerId)
+  const result = await getBridgedCareerIntelligence(asLearnerId(fixture.coreLearnerId))
   // A single CAT is unlikely to produce a confident career match, but the
   // call must succeed and return the real, unmodified shape (studentId
   // resolved to the bridged legacy id, mode set from grade) — not throw,
@@ -203,7 +204,7 @@ test('Career Intelligence: resolvable through the canonical bridge, unmodified b
 
 test('Compass: the bridged teacher is granted direct access to the bridged learner, unmodified resolveCompassStudentAccess', async () => {
   const fixture = await fullyOnboardedLearner('compass')
-  const result = await getBridgedCompassAccess(fixture.coreLearnerId, fixture.teacherUserId)
+  const result = await getBridgedCompassAccess(asLearnerId(fixture.coreLearnerId), fixture.teacherUserId)
   assert.ok(result)
   assert.equal(result!.legacyStudentId, fixture.legacyStudentId)
   assert.equal(result!.access.allowed, true)
@@ -218,7 +219,7 @@ test('Compass: an unrelated teacher is denied access to the bridged learner (no 
   await repos.schools.addSchoolUser(outsiderSchool.id, outsiderTeacher.id, 'school_admin')
   await db.from('teachers').insert({ user_id: outsiderTeacher.id, full_name: 'Outsider', school: 'Outsider School' })
 
-  const result = await getBridgedCompassAccess(fixture.coreLearnerId, outsiderTeacher.id)
+  const result = await getBridgedCompassAccess(asLearnerId(fixture.coreLearnerId), outsiderTeacher.id)
   assert.ok(result)
   assert.equal(result!.access.allowed, false)
 })
@@ -229,7 +230,7 @@ test('cross-school isolation: a learner bridged in School A is invisible to a Sc
   const fixtureA = await fullyOnboardedLearner('isolation-a')
   const fixtureB = await fullyOnboardedLearner('isolation-b')
 
-  const timelineViaB = await getBridgedCompassAccess(fixtureA.coreLearnerId, fixtureB.teacherUserId)
+  const timelineViaB = await getBridgedCompassAccess(asLearnerId(fixtureA.coreLearnerId), fixtureB.teacherUserId)
   assert.equal(timelineViaB!.access.allowed, false)
 
   // School B's teacher_classes count is unaffected by School A's bridge.
@@ -243,8 +244,8 @@ test('cross-school isolation: a learner bridged in School A is invisible to a Sc
 test('duplicate prevention: resolving reads for the same learner twice never creates a second bridge or roster row', async () => {
   const fixture = await fullyOnboardedLearner('dup')
 
-  const first = await resolveLegacyStudentId(fixture.coreLearnerId)
-  const second = await resolveLegacyStudentId(fixture.coreLearnerId)
+  const first = await resolveLegacyStudentId(asLearnerId(fixture.coreLearnerId))
+  const second = await resolveLegacyStudentId(asLearnerId(fixture.coreLearnerId))
   assert.equal(first, second)
 
   const { data: studentRows } = await db.from('students').select('id').eq('external_id', fixture.coreLearnerId)
@@ -262,6 +263,6 @@ test('canonical identity resolution: teacher identity is the same ADR-0002 teach
   const { data: bridgedClassRow } = await db.from('teacher_classes').select('teacher_id').eq('external_id', fixture.classId).single()
   assert.equal(bridgedClassRow?.teacher_id, legacyTeacherId)
 
-  const compassResult = await getBridgedCompassAccess(fixture.coreLearnerId, fixture.teacherUserId)
+  const compassResult = await getBridgedCompassAccess(asLearnerId(fixture.coreLearnerId), fixture.teacherUserId)
   assert.equal(compassResult!.access.allowed, true) // resolved via the same teachers.id, no second identity
 })

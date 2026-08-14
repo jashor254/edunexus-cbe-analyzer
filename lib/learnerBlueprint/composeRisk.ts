@@ -1,11 +1,12 @@
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import type { BlueprintSection, RiskData } from './types'
 import type { ProjectionAccessResult } from './projectionAccess'
+import type { StudentId } from '@/lib/core/identityTypes'
 
 const OWNER = 'lib/projection/recompute.recomputeLearnerProjection'
 
 export async function composeRisk(
-  legacyStudentId: string | null,
+  legacyStudentId: StudentId | null,
   projectionAccess?: ProjectionAccessResult
 ): Promise<BlueprintSection<RiskData>> {
   if (!legacyStudentId) {

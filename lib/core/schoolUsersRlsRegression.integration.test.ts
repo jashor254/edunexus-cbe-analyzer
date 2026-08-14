@@ -25,6 +25,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { createServiceClient } from '@/utils/supabase/service'
 import { repos } from '@/lib/repositories'
 import { canManageLearnerRecordCore, canViewLearnerRecord } from '@/lib/core/permissions'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_SCHOOLUSERS_RLS_REGRESSION'
 const db = createServiceClient()
@@ -238,15 +239,15 @@ test('C9. School A admin cannot read or write School B rows in a school_users-de
 
 test('C10/C11. app-layer teacher access still matches the Phase 0 rule after the school_users fix', async () => {
   const client = await signInAs(teacherAEmail)
-  assert.equal(await canManageLearnerRecordCore(client, schoolA, coreLearnerA), true, 'teacherA teaches this learner via class_students')
+  assert.equal(await canManageLearnerRecordCore(client, schoolA, asLearnerId(coreLearnerA)), true, 'teacherA teaches this learner via class_students')
 
   const unrelated = await signInAs(teacherBEmail)
-  assert.equal(await canManageLearnerRecordCore(unrelated, schoolA, coreLearnerA), false, 'teacherB has no relationship to this learner')
+  assert.equal(await canManageLearnerRecordCore(unrelated, schoolA, asLearnerId(coreLearnerA)), false, 'teacherB has no relationship to this learner')
 })
 
 test('C12/C13. parent/self-access via canViewLearnerRecord is unaffected by the school_users fix', async () => {
   const stranger = await signInAs(noMembershipEmail)
-  assert.equal(await canViewLearnerRecord(stranger, schoolA, coreLearnerA), false)
+  assert.equal(await canViewLearnerRecord(stranger, schoolA, asLearnerId(coreLearnerA)), false)
 })
 
 test('C14. an inactive (deactivated) teacher does not retain manage authorization', async () => {
@@ -254,7 +255,7 @@ test('C14. an inactive (deactivated) teacher does not retain manage authorizatio
   // Not linked to this learner's class at all, AND inactive — either
   // reason alone should deny; this proves inactivity doesn't grant a
   // free pass through some other branch.
-  assert.equal(await canManageLearnerRecordCore(client, schoolA, coreLearnerA), false)
+  assert.equal(await canManageLearnerRecordCore(client, schoolA, asLearnerId(coreLearnerA)), false)
 
   // Direct RLS check: the deactivated teacher's OWN row remains visible to
   // them (their own historical record — see the audit doc for why this is

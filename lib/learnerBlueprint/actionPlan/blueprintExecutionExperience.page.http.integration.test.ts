@@ -18,6 +18,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { repos } from '@/lib/repositories'
 import { signInForHttpTest, type SyntheticSession } from '@/lib/testing/httpAuthTestHelper'
 import { EVIDENCE_BASIS_EMPTY } from './types'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const BASE_URL = process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3939'
 const SYNTHETIC_MARKER = 'SYNTHETIC_BLUEPRINT_EXECUTION_EXPERIENCE_PHASE3A_TEST'
@@ -89,7 +90,7 @@ before(async () => {
     .insert({ school_id: schoolId, learner_id: coreLearnerId, user_id: parentAuthId, relationship: 'mother', full_name: SYNTHETIC_MARKER, phone: '0700000000' })
 
   const row = await repos.blueprintActionItems.insert({
-    learner_id: coreLearnerId, school_id: schoolId, academic_year_id: null, term_id: null, blueprint_snapshot_id: null,
+    learner_id: asLearnerId(coreLearnerId), school_id: schoolId, academic_year_id: null, term_id: null, blueprint_snapshot_id: null,
     context: 'current_term', priority: 'medium', visibility: 'teacher_only',
     title: 'Execution Experience Test Action', rationale: 'r', intended_outcome: 'Reach the outcome.',
     learner_action: 'Practice daily.', teacher_action: null, parent_support: null, school_support: null,

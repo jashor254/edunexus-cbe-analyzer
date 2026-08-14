@@ -67,6 +67,7 @@ import { computeConfidence, resolveReviewStatus } from '@/lib/intelligence/confi
 import { persistEvidenceBatch } from '@/lib/intelligence/evidenceLifecycle'
 import { resolveLegacyStudentId } from '@/lib/core/identity'
 import type { BlueprintActionReviewDecision } from '@/lib/repositories/blueprintActionReview.repository'
+import type { LearnerId } from '@/lib/core/identityTypes'
 
 const SOURCE = 'classroom_observation' as const
 export const REVIEW_EXTRACTION_METHOD = 'blueprint_action_review_v1' as const
@@ -81,7 +82,7 @@ export function isInstructionalJudgement(decision: BlueprintActionReviewDecision
 export type BlueprintActionReviewEvidenceInput = {
   actionItemId: string
   /** Core learner id, as held on the action item — resolved to the legacy id Evidence keys on. */
-  coreLearnerId: string
+  coreLearnerId: LearnerId
   decision: BlueprintActionReviewDecision
   notes: string | null
   /** The review row's own id — the artifact this observation describes. */

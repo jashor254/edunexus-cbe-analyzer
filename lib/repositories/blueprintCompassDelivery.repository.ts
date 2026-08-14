@@ -9,12 +9,14 @@
 
 import { ConflictError } from '@/lib/core/errors'
 import { BaseRepository } from './base'
+import type { LearnerId } from '@/lib/core/identityTypes'
 
 export type BlueprintCompassDeliveryStatus = 'available' | 'started' | 'completed' | 'expired'
 
 export type BlueprintCompassDeliveryRow = {
   id: string
-  learner_id: string
+  /** FK to `learners(id)` — a Core LearnerId. */
+  learner_id: LearnerId
   school_id: string
   blueprint_action_item_id: string
   status: BlueprintCompassDeliveryStatus
@@ -31,7 +33,8 @@ export type BlueprintCompassDeliveryRow = {
 }
 
 export type InsertBlueprintCompassDeliveryInput = {
-  learner_id: string
+  /** FK to `learners(id)` — a Core LearnerId. */
+  learner_id: LearnerId
   school_id: string
   blueprint_action_item_id: string
   subject: string

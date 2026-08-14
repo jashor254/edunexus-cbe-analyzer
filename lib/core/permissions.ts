@@ -33,6 +33,7 @@ import {
   type CurrentUser,
   type ResolvedMembership,
 } from '@/lib/core/identity'
+import { identityIsIn, type LearnerId, type StudentId, type AnyLearnerIdentity } from '@/lib/core/identityTypes'
 import {
   UnauthorizedError,
   MembershipRequiredError,
@@ -123,10 +124,12 @@ export async function requireClassTeacher(client: SupabaseClient, classId: strin
 }
 
 /** Throws {@link ResourceOwnershipError} unless the authenticated user is a parent/guardian of `studentId` (legacy `students.parent_user_id` or Core `learner_guardians`, per {@link resolveParent}). */
-export async function requireParent(client: SupabaseClient, studentId: string): Promise<CurrentUser> {
+export async function requireParent(client: SupabaseClient, studentId: AnyLearnerIdentity): Promise<CurrentUser> {
   const user = await requireAuthentication(client)
   const parent = await resolveParent(user.id)
-  const isLinked = parent.studentIds.includes(studentId) || parent.coreLearnerIds.includes(studentId)
+  // Deliberately checks BOTH spaces: this is called with a LearnerId from the
+  // Core guardian-invite flow and with a StudentId from the legacy parent flow.
+  const isLinked = identityIsIn(parent.studentIds, studentId) || identityIsIn(parent.coreLearnerIds, studentId)
   if (!isLinked) throw new ResourceOwnershipError('You are not a registered guardian of this learner.')
   return user
 }
@@ -259,7 +262,7 @@ async function isCurrentTeacherOfStudent(teacherId: string, studentId: string): 
  * satisfied by a teacher at a different school. Isolation for the Core-space
  * branches above (self/admin/parent) is unaffected by this change.
  */
-export async function canViewLearner(client: SupabaseClient, schoolId: string, studentId: string): Promise<boolean> {
+export async function canViewLearner(client: SupabaseClient, schoolId: string, studentId: StudentId): Promise<boolean> {
   const user = await requireAuthentication(client)
 
   const student = await resolveStudent(user.id)
@@ -269,7 +272,7 @@ export async function canViewLearner(client: SupabaseClient, schoolId: string, s
   if (membership && SCHOOL_ADMIN_ROLES.includes(membership.role)) return true // admin-tier
 
   const parent = await resolveParent(user.id)
-  if (parent.studentIds.includes(studentId) || parent.coreLearnerIds.includes(studentId)) return true // guardian
+  if (identityIsIn(parent.studentIds, studentId) || identityIsIn(parent.coreLearnerIds, studentId)) return true // guardian
 
   const teacher = await resolveTeacher(user.id)
   if (teacher && await isCurrentTeacherOfStudent(teacher.id, studentId)) return true
@@ -293,7 +296,7 @@ export async function canViewLearner(client: SupabaseClient, schoolId: string, s
  * this is proper factoring of a shared capability, not a second,
  * independently-derived authorization query.
  */
-export async function canManageLearnerRecord(client: SupabaseClient, schoolId: string, studentId: string): Promise<boolean> {
+export async function canManageLearnerRecord(client: SupabaseClient, schoolId: string, studentId: StudentId): Promise<boolean> {
   const user = await requireAuthentication(client)
 
   const membership = await resolveMembership(user.id, schoolId)
@@ -316,7 +319,7 @@ export async function canManageLearnerRecord(client: SupabaseClient, schoolId: s
  * yet, so a teacher who would otherwise qualify simply cannot be verified
  * against anything and is denied until a bridge exists.
  */
-export async function canManageLearnerRecordCore(client: SupabaseClient, schoolId: string, coreLearnerId: string): Promise<boolean> {
+export async function canManageLearnerRecordCore(client: SupabaseClient, schoolId: string, coreLearnerId: LearnerId): Promise<boolean> {
   const legacyStudentId = await resolveLegacyStudentId(coreLearnerId)
   if (legacyStudentId && await canManageLearnerRecord(client, schoolId, legacyStudentId)) return true
 
@@ -337,7 +340,7 @@ export async function canManageLearnerRecordCore(client: SupabaseClient, schoolI
  * (Core-side parent links and school admin membership don't depend on the
  * legacy bridge at all).
  */
-export async function canViewLearnerRecord(client: SupabaseClient, schoolId: string, coreLearnerId: string): Promise<boolean> {
+export async function canViewLearnerRecord(client: SupabaseClient, schoolId: string, coreLearnerId: LearnerId): Promise<boolean> {
   const legacyStudentId = await resolveLegacyStudentId(coreLearnerId)
   if (legacyStudentId && await canViewLearner(client, schoolId, legacyStudentId)) return true
 
@@ -350,7 +353,7 @@ export async function canViewLearnerRecord(client: SupabaseClient, schoolId: str
 }
 
 /** Throws {@link ResourceOwnershipError} unless {@link canViewLearnerRecord} is true — the throwing counterpart for pages that need a hard gate, not a boolean. */
-export async function requireLearnerAccess(client: SupabaseClient, schoolId: string, coreLearnerId: string): Promise<CurrentUser> {
+export async function requireLearnerAccess(client: SupabaseClient, schoolId: string, coreLearnerId: LearnerId): Promise<CurrentUser> {
   const user = await requireAuthentication(client)
   if (!(await canViewLearnerRecord(client, schoolId, coreLearnerId))) {
     throw new ResourceOwnershipError('You do not have access to this learner\'s record.')

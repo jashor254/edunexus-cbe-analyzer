@@ -23,6 +23,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { requireParent } from '@/lib/core/permissions'
 import { ResourceOwnershipError } from '@/lib/core/errors'
 import { signInForHttpTest, type SyntheticSession } from './httpAuthTestHelper'
+import { asStudentId } from '@/lib/core/identityTypes'
 
 const BASE_URL = process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3939'
 const SYNTHETIC_MARKER = 'SYNTHETIC_SPRINT5_PARENT_CONVERGENCE_TEST'
@@ -193,18 +194,18 @@ for (const page of CHILD_PAGES) {
 
 test('requireParent(coreLearnerId): the linked parent is authorized', async () => {
   const client = await signInClient(parentEmail)
-  const user = await requireParent(client, coreLearnerId)
+  const user = await requireParent(client, asStudentId(coreLearnerId))
   assert.ok(user.id)
 })
 
 test('requireParent(coreLearnerId): an unrelated parent (no linked learner) is denied', async () => {
   const client = await signInClient(otherParentEmail)
-  await assert.rejects(() => requireParent(client, coreLearnerId), ResourceOwnershipError)
+  await assert.rejects(() => requireParent(client, asStudentId(coreLearnerId)), ResourceOwnershipError)
 })
 
 test('requireParent(coreLearnerId): a teacher (no parent linkage) is denied', async () => {
   const client = await signInClient(teacherEmail)
-  await assert.rejects(() => requireParent(client, coreLearnerId), ResourceOwnershipError)
+  await assert.rejects(() => requireParent(client, asStudentId(coreLearnerId)), ResourceOwnershipError)
 })
 
 // ── New parent gradebook API: authorization + correct scoping ───────────────

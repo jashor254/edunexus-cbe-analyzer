@@ -21,6 +21,7 @@ import { UnauthorizedError, ResourceOwnershipError, NotFoundError, ValidationErr
 import { deliverBlueprintActionAsAssignment, type DeliverBlueprintActionAsAssignmentCommand } from './assignment'
 import { EVIDENCE_BASIS_EMPTY } from '../types'
 import type { BlueprintActionItemRow } from '@/lib/repositories/blueprintActionItem.repository'
+import { asLearnerId, asStudentId, type LearnerId, type StudentId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_BLUEPRINT_DELIVERY_PHASE2B_TEST'
 const db = createServiceClient()
@@ -49,7 +50,7 @@ function anonClient(): SupabaseClient {
 }
 
 let schoolId: string, otherSchoolId: string
-let coreLearnerId: string, legacyStudentId: string
+let coreLearnerId: LearnerId, legacyStudentId: string
 let classId: string       // owned by `teacherEmail`, teaches the learner
 let classId2: string      // owned by `classOnlyTeacherEmail`, no learner relationship
 
@@ -66,7 +67,7 @@ const createdAssignmentIds: string[] = []
 
 function baseActionFields(overrides: Partial<Parameters<typeof repos.blueprintActionItems.insert>[0]> = {}) {
   return {
-    learner_id: coreLearnerId,
+    learner_id: asLearnerId(coreLearnerId),
     school_id: schoolId,
     academic_year_id: null,
     term_id: null,
@@ -203,7 +204,7 @@ before(async () => {
   await db.from('class_students').insert({ class_id: classId, student_id: legacyStudentId })
 
   await db.from('learner_guardians')
-    .insert({ school_id: schoolId, learner_id: coreLearnerId, user_id: parentUserId, relationship: 'mother', full_name: SYNTHETIC_MARKER, phone: '0700000000' })
+    .insert({ school_id: schoolId, learner_id: asLearnerId(coreLearnerId), user_id: parentUserId, relationship: 'mother', full_name: SYNTHETIC_MARKER, phone: '0700000000' })
 })
 
 after(async () => {

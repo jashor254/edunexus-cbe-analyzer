@@ -25,6 +25,7 @@ import { resolveLegacyStudentId } from '@/lib/core/identity'
 import { repos } from '@/lib/repositories'
 import { computeLearnerProjection } from './engine'
 import type { LearnerIntelligenceProjection, Projection, ProjectorType } from './types'
+import { type LearnerId } from '@/lib/core/identityTypes'
 
 const PROJECTOR_KEYS: ProjectorType[] = [
   'academic', 'capability', 'knowledge', 'behaviour', 'growth', 'risk', 'completeness',
@@ -46,7 +47,7 @@ export type BridgeClassification =
  * failure modes into one). This function exists specifically so the
  * harness can tell those two apart, which production code today cannot.
  */
-export async function classifyBridge(coreLearnerId: string): Promise<BridgeClassification> {
+export async function classifyBridge(coreLearnerId: LearnerId): Promise<BridgeClassification> {
   const db = createServiceClient()
   const { data, error } = await db.from('students').select('id').eq('external_id', coreLearnerId)
   if (error) throw new Error(`classifyBridge: ${error.message}`)
@@ -78,7 +79,7 @@ export type CoreProjectionResult =
  * is asserted to agree with the classification for the ELIGIBLE case, so
  * this proves resolution, it does not bypass it.
  */
-export async function runCoreResolvedProjectionPath(coreLearnerId: string, now?: Date): Promise<CoreProjectionResult> {
+export async function runCoreResolvedProjectionPath(coreLearnerId: LearnerId, now?: Date): Promise<CoreProjectionResult> {
   const classification = await classifyBridge(coreLearnerId)
   if (classification.status === 'NO_BRIDGE') return { status: 'NO_BRIDGE' }
   if (classification.status === 'AMBIGUOUS_BRIDGE') return { status: 'AMBIGUOUS_BRIDGE' }

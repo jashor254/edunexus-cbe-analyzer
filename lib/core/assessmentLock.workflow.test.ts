@@ -20,6 +20,7 @@ import { inviteTeacher, acceptTeacherInvitation } from '@/lib/core/teacherOnboar
 import { ensureBridgedClass, ensureBridgedLearner, createBridgedAssessment } from '@/lib/core/academicBridge'
 import { saveScores } from '@/lib/core/assessments'
 import { recordAssessmentEvidence } from '@/lib/assessments/evidence'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_S12_LOCK_TEST'
 const db = createServiceClient()
@@ -88,7 +89,7 @@ test('saveScores: succeeds on an unpublished assessment (happy path, unaffected 
     title: `${SYNTHETIC_MARKER} Unlocked`, assessment_type: 'formative', term: '1',
     year: new Date().getFullYear(), max_score: 100, subjects: ['Mathematics'], curriculum_type: 'cbc',
   })
-  const { legacyStudentId } = await ensureBridgedLearner(schoolId, coreLearnerId, bridgedClass)
+  const { legacyStudentId } = await ensureBridgedLearner(schoolId, asLearnerId(coreLearnerId), bridgedClass)
   await assert.doesNotReject(() => saveScores(assessmentId, bridgedClass.legacyClassId, bridgedClass.legacyTeacherId, [{
     learner_id: legacyStudentId, admission_number: `${SYNTHETIC_MARKER}-1`, student_name: 'Lock Learner',
     subject_scores: { Mathematics: 70 }, total_marks: 70, mean_score: 70,
@@ -102,7 +103,7 @@ test('saveScores: refuses to write once the assessment is published (High 2 fix)
     year: new Date().getFullYear(), max_score: 100, subjects: ['English'], curriculum_type: 'cbc',
   })
   await db.from('class_assessments').update({ is_published: true }).eq('id', assessmentId)
-  const { legacyStudentId } = await ensureBridgedLearner(schoolId, coreLearnerId, bridgedClass)
+  const { legacyStudentId } = await ensureBridgedLearner(schoolId, asLearnerId(coreLearnerId), bridgedClass)
 
   await assert.rejects(
     () => saveScores(assessmentId, bridgedClass.legacyClassId, bridgedClass.legacyTeacherId, [{
@@ -127,7 +128,7 @@ test('recordAssessmentEvidence: silently no-ops for a published (locked) assessm
   // lock, then attempt evidence recording directly — simulating a caller
   // that reaches this function after the assessment was locked in the
   // meantime (the defense-in-depth scenario, not the normal flow).
-  const { legacyStudentId } = await ensureBridgedLearner(schoolId, coreLearnerId, bridgedClass)
+  const { legacyStudentId } = await ensureBridgedLearner(schoolId, asLearnerId(coreLearnerId), bridgedClass)
   await saveScores(assessmentId, bridgedClass.legacyClassId, bridgedClass.legacyTeacherId, [{
     learner_id: legacyStudentId, admission_number: `${SYNTHETIC_MARKER}-1`, student_name: 'Lock Learner',
     subject_scores: { Science: 85 }, total_marks: 85, mean_score: 85,

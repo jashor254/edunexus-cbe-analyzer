@@ -22,6 +22,7 @@ import { getUserRoles } from '@/lib/auth/getRole'
 import { getLearnerTimeline } from '@/lib/learnerRecord/timeline'
 import Link from 'next/link'
 import JourneyLinks from '@/components/student/JourneyLinks'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const EVIDENCE_SOURCE_LABEL: Record<string, string> = {
   teacher_remark: 'Teacher note',
@@ -32,7 +33,10 @@ export default async function StudentTimelinePage({
 }: {
   params: Promise<{ learnerId: string }>
 }) {
-  const { learnerId } = await params
+  // Route-boundary trust origin: a Core `learners.id` — established by the
+  // Core-learner queries this page performs, not by the URL wording.
+  const { learnerId: rawLearnerId } = await params
+  const learnerId = asLearnerId(rawLearnerId)
   const supabase = await createClient()
 
   let userId: string

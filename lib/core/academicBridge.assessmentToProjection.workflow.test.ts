@@ -22,6 +22,7 @@ import { activateSchool } from '@/lib/core/schoolActivation'
 import { onboardLearner } from '@/lib/core/learnerOnboarding'
 import { inviteTeacher, acceptTeacherInvitation } from '@/lib/core/teacherOnboarding'
 import { ensureBridgedClass, createBridgedAssessment, recordBridgedMarks } from '@/lib/core/academicBridge'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_S11_BRIDGE_TEST'
 const db = createServiceClient()
@@ -104,7 +105,7 @@ test('recordBridgedMarks: a Core-side mark entry produces a real, confirmed lear
   })
 
   const { legacyStudentIds } = await recordBridgedMarks(schoolId, assessmentId, bridgedClass, teacherUserId, [{
-    coreLearnerId,
+    coreLearnerId: asLearnerId(coreLearnerId),
     admission_number: `${SYNTHETIC_MARKER}-1`,
     student_name: 'Bridge Learner',
     subject_scores: { Mathematics: 78 },
@@ -131,7 +132,7 @@ test('recordBridgedMarks: the same mark entry produces a real Projection (Bluepr
   })
 
   const { legacyStudentIds } = await recordBridgedMarks(schoolId, assessmentId, bridgedClass, teacherUserId, [{
-    coreLearnerId,
+    coreLearnerId: asLearnerId(coreLearnerId),
     admission_number: `${SYNTHETIC_MARKER}-1`,
     student_name: 'Bridge Learner',
     subject_scores: { English: 65 },

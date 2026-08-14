@@ -11,6 +11,7 @@
 // future bug in the service layer tried to call `update` on one.
 
 import { BaseRepository } from './base'
+import type { LearnerId } from '@/lib/core/identityTypes'
 
 export type BlueprintActionContext = 'current_term' | 'intervention' | 'extension' | 'end_of_term' | 'holiday'
 export type BlueprintActionPriority = 'low' | 'medium' | 'high'
@@ -32,7 +33,7 @@ export type BlueprintActionEvidenceBasis = {
 
 export type BlueprintActionItemRow = {
   id: string
-  learner_id: string
+  learner_id: LearnerId
   school_id: string
   academic_year_id: string | null
   term_id: string | null
@@ -71,7 +72,7 @@ export type BlueprintActionItemRow = {
 }
 
 export type InsertBlueprintActionItemInput = {
-  learner_id: string
+  learner_id: LearnerId
   school_id: string
   academic_year_id: string | null
   term_id: string | null

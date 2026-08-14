@@ -31,6 +31,7 @@ import { resolveLegacyStudentId } from '@/lib/core/identity'
 import { createClient as createAnonClient, type SupabaseClient } from '@supabase/supabase-js'
 import { createDraft as createReflectionDraft, publish as publishReflection } from '@/lib/teacherReflection/reflection'
 import { composeBlueprint } from './composeBlueprint'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_12G_BLUEPRINT_COMPOSITION_TEST'
 const db = createServiceClient()
@@ -111,7 +112,7 @@ test('composeBlueprint produces a partial-but-valid Blueprint for a Core-only le
 
   const { blueprint, validation } = await composeBlueprint({
     actorUserId: admin.id,
-    coreLearnerId: learnerId,
+    coreLearnerId: asLearnerId(learnerId),
     schoolId: school.id,
   })
 
@@ -170,7 +171,7 @@ test('composeBlueprint never throws for a nonexistent learner — Identity becom
 
   const { blueprint, validation } = await composeBlueprint({
     actorUserId: admin.id,
-    coreLearnerId: '00000000-0000-0000-0000-000000000000',
+    coreLearnerId: asLearnerId('00000000-0000-0000-0000-000000000000'),
     schoolId: school.id,
   })
 
@@ -219,17 +220,17 @@ test('composeBlueprint resolves a real bridged legacy identity via the canonical
   bridgedClassExternalIds.push(classId)
   bridgedLearnerExternalIds.push(learnerId)
   const bridgedClass = await ensureBridgedClass(school.id, classId, teacherUser.id)
-  const { legacyStudentId } = await ensureBridgedLearner(school.id, learnerId, bridgedClass)
+  const { legacyStudentId } = await ensureBridgedLearner(school.id, asLearnerId(learnerId), bridgedClass)
   assert.ok(legacyStudentId)
 
   // Prove the canonical resolver itself now finds it (this is what
   // composeBlueprint calls internally — asserted directly first so a
   // failure here is attributed to the resolver, not the composer).
-  assert.equal(await resolveLegacyStudentId(learnerId), legacyStudentId)
+  assert.equal(await resolveLegacyStudentId(asLearnerId(learnerId)), legacyStudentId)
 
   const { blueprint, validation } = await composeBlueprint({
     actorUserId: admin.id,
-    coreLearnerId: learnerId,
+    coreLearnerId: asLearnerId(learnerId),
     schoolId: school.id,
   })
 
@@ -313,12 +314,12 @@ test('composeBlueprint surfaces Career Intelligence as available, cluster-level 
   })
   const bridgedClass = await ensureBridgedClass(created.id, classId, teacher.id)
   await recordBridgedMarks(created.id, assessmentId, bridgedClass, teacher.id, [
-    { coreLearnerId: learnerId, admission_number: 'CAREER-12N', student_name: 'Career Learner', subject_scores: { mathematics: 85 }, total_marks: 85, mean_score: 85 },
+    { coreLearnerId: asLearnerId(learnerId), admission_number: 'CAREER-12N', student_name: 'Career Learner', subject_scores: { mathematics: 85 }, total_marks: 85, mean_score: 85 },
   ])
 
   const { blueprint, validation } = await composeBlueprint({
     actorUserId: admin.id,
-    coreLearnerId: learnerId,
+    coreLearnerId: asLearnerId(learnerId),
     schoolId: created.id,
   })
 
@@ -387,7 +388,7 @@ test('composeBlueprint surfaces a published Teacher Reflection, and only once it
 
   // Before any reflection exists, Blueprint must show an explicit
   // Unavailable state — never a blank/fabricated Teacher Reflection.
-  const before = await composeBlueprint({ actorUserId: admin.id, coreLearnerId: learnerId, schoolId: school.id })
+  const before = await composeBlueprint({ actorUserId: admin.id, coreLearnerId: asLearnerId(learnerId), schoolId: school.id })
   assert.equal(before.blueprint.teacherReflection.status, 'unavailable')
   assert.ok(before.blueprint.teacherReflection.unavailableReason)
 
@@ -401,12 +402,12 @@ test('composeBlueprint surfaces a published Teacher Reflection, and only once it
   })
 
   // A draft in progress must never leak into Blueprint.
-  const duringDraft = await composeBlueprint({ actorUserId: admin.id, coreLearnerId: learnerId, schoolId: school.id })
+  const duringDraft = await composeBlueprint({ actorUserId: admin.id, coreLearnerId: asLearnerId(learnerId), schoolId: school.id })
   assert.equal(duringDraft.blueprint.teacherReflection.status, 'unavailable')
 
   await publishReflection(client, school.id, draft.id, teacher.id)
 
-  const after = await composeBlueprint({ actorUserId: admin.id, coreLearnerId: learnerId, schoolId: school.id })
+  const after = await composeBlueprint({ actorUserId: admin.id, coreLearnerId: asLearnerId(learnerId), schoolId: school.id })
   assert.equal(after.blueprint.teacherReflection.status, 'available')
   const reflectionData = after.blueprint.teacherReflection.data!
   assert.equal(reflectionData.strengths, 'Asks thoughtful questions and helps peers during science experiments.')

@@ -12,6 +12,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { createServiceClient } from '@/utils/supabase/service'
 import { requireStudent, requireParent } from '@/lib/core/permissions'
 import { UnauthorizedError, ResourceOwnershipError } from '@/lib/core/errors'
+import { asStudentId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_STUDENT_PARENT_PERM_TEST'
 const db = createServiceClient()
@@ -83,22 +84,22 @@ test('requireStudent throws UnauthorizedError for no session', async () => {
 
 test('requireParent resolves for the registered guardian', async () => {
   const client = await signInAs(parentAEmail)
-  const user = await requireParent(client, studentAId)
+  const user = await requireParent(client, asStudentId(studentAId))
   assert.equal(user.id, parentAUserId)
 })
 
 test('requireParent throws ResourceOwnershipError for cross-parent access (parent B cannot view student A)', async () => {
   const client = await signInAs(parentBEmail)
-  await assert.rejects(() => requireParent(client, studentAId), ResourceOwnershipError)
+  await assert.rejects(() => requireParent(client, asStudentId(studentAId)), ResourceOwnershipError)
 })
 
 test('requireParent throws ResourceOwnershipError for a user linked to no learner at all', async () => {
   const client = await signInAs(outsiderEmail)
-  await assert.rejects(() => requireParent(client, studentAId), ResourceOwnershipError)
+  await assert.rejects(() => requireParent(client, asStudentId(studentAId)), ResourceOwnershipError)
 })
 
 test('parent B CAN access their own child (sanity check the isolation test isn\'t just "always false")', async () => {
   const client = await signInAs(parentBEmail)
-  const user = await requireParent(client, studentBId)
+  const user = await requireParent(client, asStudentId(studentBId))
   assert.equal(user.id, parentBUserId)
 })

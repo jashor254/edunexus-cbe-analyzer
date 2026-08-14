@@ -36,6 +36,7 @@ import { repos } from '@/lib/repositories'
 import { canViewLearnerRecord, requireLearnerAccess, canManageLearnerRecordCore } from '@/lib/core/permissions'
 import { ResourceOwnershipError } from '@/lib/core/errors'
 import { listReviewableBlueprintActionsForLearner } from '@/lib/learnerBlueprint/actionPlan/reviewWorkspace'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_P0C_ATTENTION_DESTINATION_TEST'
 const db = createServiceClient()
@@ -184,8 +185,8 @@ test('2. the destination resolves the legacy students.id the feed carries to a C
 
 test('5. the teacher of record can view this learner\'s record at the destination', async () => {
   const client = await signInAs(teacherEmail)
-  assert.equal(await canViewLearnerRecord(client, schoolId, coreLearnerId), true)
-  const user = await requireLearnerAccess(client, schoolId, coreLearnerId)
+  assert.equal(await canViewLearnerRecord(client, schoolId, asLearnerId(coreLearnerId)), true)
+  const user = await requireLearnerAccess(client, schoolId, asLearnerId(coreLearnerId))
   assert.ok(user.id, 'requireLearnerAccess returns the authenticated user for an authorized teacher')
 })
 
@@ -193,38 +194,38 @@ test('5. the teacher of record can view this learner\'s record at the destinatio
 
 test('3. a teacher who does not teach this learner is refused at the destination', async () => {
   const client = await signInAs(unrelatedTeacherEmail)
-  assert.equal(await canViewLearnerRecord(client, schoolId, coreLearnerId), false)
-  await assert.rejects(() => requireLearnerAccess(client, schoolId, coreLearnerId), ResourceOwnershipError)
+  assert.equal(await canViewLearnerRecord(client, schoolId, asLearnerId(coreLearnerId)), false)
+  await assert.rejects(() => requireLearnerAccess(client, schoolId, asLearnerId(coreLearnerId)), ResourceOwnershipError)
 })
 
 // ── 4. Cross-school access fails ────────────────────────────────────────────
 
 test('4. a teacher at a different school is refused (cross-school isolation)', async () => {
   const client = await signInAs(otherSchoolTeacherEmail)
-  assert.equal(await canViewLearnerRecord(client, schoolId, coreLearnerId), false)
-  await assert.rejects(() => requireLearnerAccess(client, schoolId, coreLearnerId), ResourceOwnershipError)
+  assert.equal(await canViewLearnerRecord(client, schoolId, asLearnerId(coreLearnerId)), false)
+  await assert.rejects(() => requireLearnerAccess(client, schoolId, asLearnerId(coreLearnerId)), ResourceOwnershipError)
 })
 
 // ── 6. Teacher action sections are available when permitted ─────────────────
 
 test('6. the teacher of record reaches the action-plan capability at the destination', async () => {
   const client = await signInAs(teacherEmail)
-  assert.equal(await canManageLearnerRecordCore(client, schoolId, coreLearnerId), true)
+  assert.equal(await canManageLearnerRecordCore(client, schoolId, asLearnerId(coreLearnerId)), true)
 
   // The exact call app/student/blueprint/[learnerId]/page.tsx makes to
   // decide whether to render the candidate queue + action plan + delivery
   // panels. An empty list is the correct result for a learner with no
   // approved actions yet — what matters is that it does not throw
   // ResourceOwnershipError for this teacher.
-  const items = await listReviewableBlueprintActionsForLearner(client, coreLearnerId)
+  const items = await listReviewableBlueprintActionsForLearner(client, asLearnerId(coreLearnerId))
   assert.ok(Array.isArray(items), 'an authorized teacher gets the action list, not a permission error')
 })
 
 test('6b. an unrelated teacher does NOT reach the action-plan capability', async () => {
   const client = await signInAs(unrelatedTeacherEmail)
-  assert.equal(await canManageLearnerRecordCore(client, schoolId, coreLearnerId), false)
+  assert.equal(await canManageLearnerRecordCore(client, schoolId, asLearnerId(coreLearnerId)), false)
   await assert.rejects(
-    () => listReviewableBlueprintActionsForLearner(client, coreLearnerId),
+    () => listReviewableBlueprintActionsForLearner(client, asLearnerId(coreLearnerId)),
     ResourceOwnershipError,
   )
 })

@@ -19,6 +19,7 @@ import { onboardLearner } from '@/lib/core/learnerOnboarding'
 import { createBridgedAssessment, recordBridgedMarks, ensureBridgedClass } from '@/lib/core/academicBridge'
 import { publishAssessment, computeTermSummaries, listAssessments, getClassPerformanceSummary } from '@/lib/core/assessments'
 import { generateReportCards, publishReportCards, listClassReportCards } from '@/lib/core/report-cards'
+import { asLearnerId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_10A_GRANULAR_TEST'
 const db = createServiceClient()
@@ -103,7 +104,7 @@ test('granular teacher journey: lock -> compute -> generate -> publish, each a s
   })
   const bridgedClass = await ensureBridgedClass(school.id, classId, teacher.id)
   await recordBridgedMarks(school.id, assessmentId, bridgedClass, teacher.id, [
-    { coreLearnerId, admission_number: 'gran', student_name: 'Granular Learner', subject_scores: { 'SS-MATH': 60 }, total_marks: 60, mean_score: 60 },
+    { coreLearnerId: asLearnerId(coreLearnerId), admission_number: 'gran', student_name: 'Granular Learner', subject_scores: { 'SS-MATH': 60 }, total_marks: 60, mean_score: 60 },
   ])
 
   // Before lock: exactly the "Assessments Locked = false" state the UI reads.

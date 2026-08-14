@@ -13,11 +13,20 @@
 
 import { repos } from '@/lib/repositories'
 import type { StudentIdentityCandidate } from '@/lib/repositories/intelligence.repository'
+import { asStudentId, type StudentId } from '@/lib/core/identityTypes'
 
 export type IdentityMatchType = 'external_id' | 'exact_name_grade' | 'fuzzy_name' | 'none'
 
 export type IdentityResolution = {
-  learnerId:  string | null
+  /**
+   * IDENTITY-1 (2026-08-14): this field was named `learnerId` while every
+   * value it has ever carried came from a `students` query (see
+   * `intelligence.repository.findStudentsBy*`, which selects `.from('students')`).
+   * A reader reasonably assumed a Core `learners.id`. Renamed to match the
+   * domain it actually resolves against; the roster this matches on IS the
+   * legacy student roster.
+   */
+  studentId:  StudentId | null
   confidence: number   // 0-100
   matchType:  IdentityMatchType
 }
@@ -68,7 +77,7 @@ export function resolveAgainstRoster(
   // 1. External ID — exact, unambiguous, highest confidence.
   if (candidate.externalId) {
     const match = roster.find(s => s.external_id === candidate.externalId)
-    if (match) return { learnerId: match.id, confidence: 100, matchType: 'external_id' }
+    if (match) return { studentId: asStudentId(match.id), confidence: 100, matchType: 'external_id' }
   }
 
   // 2. Exact name (case/whitespace-insensitive) + grade match.
@@ -77,11 +86,11 @@ export function resolveAgainstRoster(
     (candidate.grade == null || s.grade === candidate.grade),
   )
   if (exactMatches.length === 1) {
-    return { learnerId: exactMatches[0].id, confidence: 90, matchType: 'exact_name_grade' }
+    return { studentId: asStudentId(exactMatches[0].id), confidence: 90, matchType: 'exact_name_grade' }
   }
   if (exactMatches.length > 1) {
     // Ambiguous — same name, same grade, multiple students. Never guess.
-    return { learnerId: null, confidence: 0, matchType: 'none' }
+    return { studentId: null, confidence: 0, matchType: 'none' }
   }
 
   // 3. Fuzzy name match — flagged for review, never auto-confirmed.
@@ -93,13 +102,13 @@ export function resolveAgainstRoster(
   const best = scored[0]
   if (best && best.similarity >= 0.75) {
     return {
-      learnerId:  best.student.id,
+      studentId:  asStudentId(best.student.id),
       confidence: Math.round(best.similarity * 60), // capped well below auto-confirm threshold — see confidence.ts
       matchType:  'fuzzy_name',
     }
   }
 
-  return { learnerId: null, confidence: 0, matchType: 'none' }
+  return { studentId: null, confidence: 0, matchType: 'none' }
 }
 
 export async function fetchRosterForTeacher(teacherId: string): Promise<StudentIdentityCandidate[]> {
