@@ -269,6 +269,15 @@ export async function resolveLegacyStudentId(coreLearnerId: LearnerId): Promise<
  * `null` for "no owned record" and "ambiguous, more than one owned record"
  * alike — the caller decides how to explain either case, this function
  * only answers "is there exactly one, and what is it."
+ *
+ * IDENTITY-1 Phase 2 correction: this is **`AuthUserId → LearnerId`**, not
+ * `StudentId → LearnerId` — the parameter is `auth.users.id`, matched against
+ * `students.user_id` / `students.parent_user_id` internally
+ * (`findOwnedStudents`). It resolves a `StudentId` along the way but never
+ * exposes it; the caller only ever sees the two ends, auth identity in and
+ * Core learner identity out. No function in this module accepts a bare
+ * `StudentId` and returns a `LearnerId` — {@link resolveLegacyStudentId} is
+ * the only cross-space resolver, and it runs the other direction.
  */
 export async function resolveOwnCoreLearnerId(userId: string): Promise<LearnerId | null> {
   const owned = await repos.compass.findOwnedStudents(userId)
