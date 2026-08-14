@@ -18,6 +18,7 @@ import { persistEvidenceBatch, confirmReview, rejectReview, retractEvidence, era
 import { startIngestionRun, getIngestionRun, getIngestionRunLiveStats } from './ingestionRun'
 import { repos } from '@/lib/repositories'
 import type { LearnerEvidence } from './evidence'
+import { asStudentId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_EVIDENCE_DOMAIN_TEST'
 const db = createServiceClient()
@@ -380,7 +381,7 @@ test('erasure purges identifying fields, preserves the row, and is reachable fro
 
   // Erased evidence must fall out of what Projection would read as confirmed,
   // and must emit a projection event so any existing computed state gets recomputed.
-  const confirmed = await repos.evidence.findConfirmedEvidenceForLearner(studentIds[0])
+  const confirmed = await repos.evidence.findConfirmedEvidenceForLearner(asStudentId(studentIds[0]))
   assert.ok(!confirmed.some(r => r.id === evidenceId), 'erased evidence must not count as confirmed')
   const { data: events, error } = await db
     .from('evidence_projection_events')

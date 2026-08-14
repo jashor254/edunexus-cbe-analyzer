@@ -32,6 +32,7 @@ import { EVIDENCE_SOURCE_TRUST_TIER, type LearnerEvidence } from '@/lib/intellig
 import { computeConfidence, resolveReviewStatus, AUTO_CONFIRM_THRESHOLD } from '@/lib/intelligence/confidence'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { recordReportCardAssessmentEvidence } from './reportCardEvidence'
+import { asStudentId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_P0B_REPORTCARD_EVIDENCE_TEST'
 const db = createServiceClient()
@@ -216,7 +217,7 @@ test('GATE. a parent tier-1 pending claim must not degrade a teacher tier-3 conf
   assert.equal(projectionAfterParent.academic?.value.bySubject.mathematics?.latestLevel, 4,
     'STOP P0-B: an unreviewed parent claim changed canonical academic state.')
 
-  const confirmed = await repos.evidence.findConfirmedEvidenceForLearner(collisionStudentId)
+  const confirmed = await repos.evidence.findConfirmedEvidenceForLearner(asStudentId(collisionStudentId))
   assert.ok(!confirmed.some(r => r.evidence_source === 'parent_observation'),
     'no parent_observation row may reach the confirmed set without a review')
 })

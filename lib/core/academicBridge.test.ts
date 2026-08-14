@@ -204,6 +204,35 @@ test('ensureBridgedLearner: idempotent — repeated calls reuse the same legacy 
   assert.equal(rows?.length, 1)
 })
 
+// IDENTITY-1 Phase 3 — the concurrency case `ensureBridgedLearner`'s
+// find-then-insert cannot rule out on its own: two callers racing the SAME
+// Core learner, both passing the lookup, one losing the insert to Phase 2's
+// `uq_students_external_id_bridge` partial unique index. Proves the loser
+// recovers the winner's row via `BridgeAlreadyClaimedError` instead of the
+// request failing — and that only one `students` row ever exists.
+test('ensureBridgedLearner: concurrent race for the same Core learner converges on one legacy row, never two', async () => {
+  const fixture = await fullySetUpSchool('race-learner')
+  const learnerId = await admitAndEnroll(fixture, `RACE-${Date.now()}`)
+  const bridgedClass = await ensureBridgedClass(fixture.schoolId, fixture.classId, fixture.teacherUserId)
+
+  const [a, b] = await Promise.all([
+    ensureBridgedLearner(fixture.schoolId, asLearnerId(learnerId), bridgedClass),
+    ensureBridgedLearner(fixture.schoolId, asLearnerId(learnerId), bridgedClass),
+  ])
+
+  // Both requests succeed — neither surfaces the race to its caller — and
+  // agree on exactly the same legacy identity.
+  assert.equal(a.legacyStudentId, b.legacyStudentId)
+
+  const { data: rows } = await db.from('students').select('id').eq('external_id', learnerId)
+  assert.equal(rows?.length, 1, 'a race must never leave two students rows bridged to one learner')
+
+  // The roster link is still established for whichever request actually won —
+  // upsertLegacyClassRoster runs on both the create path and the recovery path.
+  const { data: roster } = await db.from('class_students').select('student_id').eq('class_id', bridgedClass.legacyClassId)
+  assert.deepEqual(roster?.map(r => r.student_id), [a.legacyStudentId])
+})
+
 test('no duplicate teacher identity: the bridge reuses the existing canonical teachers row from Sprint 9C onboarding, creates no second one', async () => {
   const fixture = await fullySetUpSchool('no-dup-teacher')
   const beforeCount = (await db.from('teachers').select('id', { count: 'exact', head: true }).eq('user_id', fixture.teacherUserId)).count

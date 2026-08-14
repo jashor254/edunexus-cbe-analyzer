@@ -25,7 +25,7 @@ import { resolveLegacyStudentId } from '@/lib/core/identity'
 import { repos } from '@/lib/repositories'
 import { computeLearnerProjection } from './engine'
 import type { LearnerIntelligenceProjection, Projection, ProjectorType } from './types'
-import { type LearnerId } from '@/lib/core/identityTypes'
+import { asStudentId, type LearnerId } from '@/lib/core/identityTypes'
 
 const PROJECTOR_KEYS: ProjectorType[] = [
   'academic', 'capability', 'knowledge', 'behaviour', 'growth', 'risk', 'completeness',
@@ -60,7 +60,7 @@ export async function classifyBridge(coreLearnerId: LearnerId): Promise<BridgeCl
 
 /** The legacy-direct path: real evidence read + the real, pure, unmodified projection engine. No shortcuts. */
 export async function runLegacyProjectionPath(legacyStudentId: string, now?: Date): Promise<LearnerIntelligenceProjection> {
-  const evidence = await repos.evidence.findConfirmedEvidenceForLearner(legacyStudentId)
+  const evidence = await repos.evidence.findConfirmedEvidenceForLearner(asStudentId(legacyStudentId))
   return computeLearnerProjection(legacyStudentId, evidence, now)
 }
 

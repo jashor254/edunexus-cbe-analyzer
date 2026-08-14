@@ -57,7 +57,7 @@ function toUpsertInput(learnerId: string, type: ProjectorType, p: Projection<unk
  * reproducible value).
  */
 export async function recomputeLearnerProjection(learnerId: string): Promise<LearnerIntelligenceProjection> {
-  const evidence = await repos.evidence.findConfirmedEvidenceForLearner(learnerId)
+  const evidence = await repos.evidence.findConfirmedEvidenceForLearner(asStudentId(learnerId))
   const projection = computeLearnerProjection(learnerId, evidence)
 
   await Promise.all(PERSISTED_PROJECTOR_TYPES.map(async type => {

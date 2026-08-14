@@ -1,4 +1,5 @@
 import { BaseRepository } from './base'
+import { BridgeAlreadyClaimedError } from '@/lib/core/errors'
 import type {
   ClassWithDetails,
   Stream,
@@ -995,6 +996,15 @@ export class TeacherRepository extends BaseRepository {
     return (data ?? []) as Array<{ id: string; external_id: string | null }>
   }
 
+  /**
+   * Throws {@link BridgeAlreadyClaimedError} — never a bare `Error` — when the
+   * insert loses a race against a concurrent request bridging the same Core
+   * learner. IDENTITY-1 Phase 2's `uq_students_external_id_bridge` partial
+   * unique index makes that race a real Postgres `23505`, not a possibility;
+   * this method names it precisely (constraint name, not just the error code)
+   * so `ensureBridgedLearner` can recover from exactly this violation and
+   * nothing else. See lib/core/academicBridge.ts (IDENTITY-1 Phase 3).
+   */
   async insertLegacyStudent(input: {
     name: string
     grade: number
@@ -1017,7 +1027,12 @@ export class TeacherRepository extends BaseRepository {
       })
       .select('id')
       .single()
-    if (error) throw new Error(`insertLegacyStudent: ${error.message}`)
+    if (error) {
+      if (error.code === '23505' && error.message.includes('uq_students_external_id_bridge')) {
+        throw new BridgeAlreadyClaimedError(input.externalId)
+      }
+      throw new Error(`insertLegacyStudent: ${error.message}`)
+    }
     return data
   }
 

@@ -218,33 +218,42 @@ test('Cohort E (no bridge): a never-bridged Core learner id is reported as absen
   assert.equal(resolved, null)
 })
 
-// ── Cohort F — ambiguous/duplicate bridge (synthetic only, per instructions) ─
-
-test('Cohort F (ambiguous bridge): two legacy students sharing one external_id are reported as AMBIGUOUS, never resolved arbitrarily', async () => {
+// ── Cohort F — ambiguous/duplicate bridge ────────────────────────────────────
+//
+// IDENTITY-1 Phase 2 (2026-08-14) added `uq_students_external_id_bridge`, a
+// partial unique index on `students.external_id` scoped to the Core-bridge
+// case (`WHERE integration_connection_id IS NULL`). This cohort's original
+// setup — forcing two legacy `students` rows to share one `external_id` —
+// is exactly the state that index exists to make impossible, and it now is:
+// the UPDATE below fails with a real Postgres `23505`, not a hypothetical
+// one. The test is inverted rather than deleted, because it still proves a
+// real invariant: the state `classifyBridge`'s AMBIGUOUS_BRIDGE branch was
+// written to detect can no longer be CREATED going forward. That defensive
+// code is not deleted here — it stays correct for any row written before
+// this migration (Phase 2's own audit found none live), and removing it
+// would be a schema-adjacent behavior change this test file has no business
+// making.
+test('Cohort F (ambiguous bridge): the database now refuses to create the state this cohort used to force', async () => {
   const sharedCoreLearnerId = crypto.randomUUID()
   const a = await makeSyntheticStudent('cohort-f-a')
   const b = await makeSyntheticStudent('cohort-f-b')
   createdStudentIds.push(a.studentId, b.studentId)
-  // Force both legacy rows to share one external_id — synthetic-only,
-  // read-only afterwards, exactly as the ADR requires for this cohort.
-  const { error } = await db.from('students').update({ external_id: sharedCoreLearnerId }).in('id', [a.studentId, b.studentId])
-  if (error) throw new Error(`Cohort F setup failed: ${error.message}`)
 
-  const classification = await classifyBridge(asLearnerId(sharedCoreLearnerId))
-  assert.equal(classification.status, 'AMBIGUOUS_BRIDGE')
-  assert.equal((classification as { count: number }).count, 2)
+  // First write succeeds — one row may legitimately claim this Core learner.
+  const first = await db.from('students').update({ external_id: sharedCoreLearnerId }).eq('id', a.studentId)
+  assert.equal(first.error, null, 'the first row claiming a fresh Core learner id must succeed')
 
-  const coreResult = await runCoreResolvedProjectionPath(asLearnerId(sharedCoreLearnerId), NOW)
-  assert.deepEqual(coreResult, { status: 'AMBIGUOUS_BRIDGE' }, 'the harness must refuse to compare, never picking one of the two arbitrarily')
+  // The second, previously the whole point of this cohort's setup, must now
+  // be rejected by uq_students_external_id_bridge.
+  const second = await db.from('students').update({ external_id: sharedCoreLearnerId }).eq('id', b.studentId)
+  assert.ok(second.error, 'a second legacy student claiming an already-bridged Core learner must be rejected')
+  assert.equal(second.error?.code, '23505')
+  assert.match(second.error?.message ?? '', /uq_students_external_id_bridge/)
 
-  // Document the real production function's current (known, separately
-  // audited) limitation: it cannot distinguish this from NO_BRIDGE and
-  // returns null — safely (never arbitrarily resolves one of the two), but
-  // imprecisely. This assertion exists so a future fix to
-  // resolveLegacyStudentId's classification is a visible, intentional
-  // change to this test, not a silent behavior change.
+  // The single successful bridge still resolves normally — not ambiguous,
+  // not absent — proving the constraint didn't degrade the ordinary case.
   const resolved = await resolveLegacyStudentId(asLearnerId(sharedCoreLearnerId))
-  assert.equal(resolved, null, 'known limitation: resolveLegacyStudentId returns null (not an arbitrary pick) for an ambiguous bridge — see the Identity Resolution Failure Audit')
+  assert.equal(resolved, a.studentId)
 })
 
 // ── Drift detection — proves the comparator can actually fail ───────────────

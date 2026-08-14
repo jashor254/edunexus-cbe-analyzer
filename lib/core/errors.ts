@@ -151,6 +151,21 @@ export class ConflictError extends EduNexusError {
   }
 }
 
+/**
+ * A concurrent request already bridged this Core learner to a legacy
+ * `students` row (IDENTITY-1 Phase 2's `uq_students_external_id_bridge`
+ * partial unique index made this a real, reachable `23505`, not a
+ * theoretical one). Distinct from `ConflictError` so `ensureBridgedLearner`
+ * can catch exactly this violation and recover by re-reading the winner's
+ * bridge — never a generic 409 the caller has no useful way to act on, and
+ * never silently swallowing an unrelated unique violation.
+ */
+export class BridgeAlreadyClaimedError extends ConflictError {
+  constructor(readonly coreLearnerId: string) {
+    super(`Core learner ${coreLearnerId} was already bridged by a concurrent request.`)
+  }
+}
+
 /** True for any error this module defines — useful for a single catch-and-map in a route. */
 export function isEduNexusError(err: unknown): err is EduNexusError {
   return err instanceof EduNexusError

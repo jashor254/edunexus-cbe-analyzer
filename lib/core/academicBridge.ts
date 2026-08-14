@@ -57,6 +57,7 @@
 import { repos } from '@/lib/repositories'
 import { resolveTeacher, resolveMembership, resolveLegacyStudentId } from '@/lib/core/identity'
 import { asStudentId, type LearnerId, type StudentId } from '@/lib/core/identityTypes'
+import { BridgeAlreadyClaimedError } from '@/lib/core/errors'
 import { isSchoolAdmin, getSchoolUser } from '@/lib/core/school-users'
 import { getClass } from '@/lib/core/classes'
 import { getLearner } from '@/lib/core/learners'
@@ -203,14 +204,39 @@ export async function ensureBridgedLearner(
     return { legacyStudentId: asStudentId(existing.id) }
   }
 
-  const created = await repos.teachers.insertLegacyStudent({
-    name:       `${learner.first_name} ${learner.last_name}`,
-    grade:      bridgedClass.gradeNumber,
-    level:      GRADE_LEVEL_LABEL(bridgedClass.gradeNumber),
-    teacherId:  bridgedClass.legacyTeacherId,
-    externalId: coreLearnerId,
-    upi:        learner.upi,
-  })
+  // IDENTITY-1 Phase 3: the lookup above and this insert are not atomic — a
+  // concurrent request bridging the SAME Core learner (a network retry or a
+  // double-submitted assessment; the only caller, recordBridgedMarks, has no
+  // idempotency key) can insert between them. Phase 2's
+  // `uq_students_external_id_bridge` partial unique index makes that a real,
+  // reachable Postgres 23505, surfaced here as `BridgeAlreadyClaimedError`
+  // (never a generic 500). The loser recovers by re-reading the bridge the
+  // winner just created — this is idempotency recovery, not a retry of
+  // arbitrary failures, and it catches exactly this one named constraint.
+  let created: { id: string }
+  try {
+    created = await repos.teachers.insertLegacyStudent({
+      name:       `${learner.first_name} ${learner.last_name}`,
+      grade:      bridgedClass.gradeNumber,
+      level:      GRADE_LEVEL_LABEL(bridgedClass.gradeNumber),
+      teacherId:  bridgedClass.legacyTeacherId,
+      externalId: coreLearnerId,
+      upi:        learner.upi,
+    })
+  } catch (err) {
+    if (!(err instanceof BridgeAlreadyClaimedError)) throw err
+
+    const winner = await repos.teachers.findLegacyStudentByExternalId(coreLearnerId)
+    if (!winner) {
+      // The constraint fired, so a row exists — this would mean it was
+      // deleted between the failed insert and this re-read. Genuinely
+      // exceptional; surface it rather than silently returning nothing.
+      throw new Error(`ensureBridgedLearner: bridge claimed concurrently for ${coreLearnerId} but no row found on re-read`)
+    }
+    await repos.teachers.upsertLegacyClassRoster(bridgedClass.legacyClassId, winner.id)
+    // Trust origin: `students.id`, from the re-read that recovered the race.
+    return { legacyStudentId: asStudentId(winner.id) }
+  }
 
   // Sprint 9G: makes the bridged learner visible to the roster-based class
   // view (app/api/teacher/classes/[classId]/route.ts reads class_students,

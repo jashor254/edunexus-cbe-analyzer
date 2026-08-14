@@ -310,7 +310,20 @@ export class EvidenceRepository extends BaseRepository {
    * insertion-order column to recover a truer answer from, and the previous
    * behaviour was equally arbitrary while also being unstable.
    */
-  async findConfirmedEvidenceForLearner(learnerId: string): Promise<EvidenceRow[]> {
+  /**
+   * IDENTITY-1 Phase 3: `learnerId` is a `StudentId` — `learner_evidence.learner_id`
+   * is FK'd to `students(id)`, matching `EvidenceRow.learner_id`'s existing
+   * brand (Phase 1). Branding the read side mirrors `toUpsertInput`'s existing
+   * treatment of the write side, so a wrong-domain id can no longer be typo'd
+   * in here silently — a mismatch here would previously return `[]`, not
+   * throw, and `recomputeLearnerProjection` would then delete a real
+   * learner's persisted projection out from under them without ever reading
+   * their actual evidence. Phase 3's full caller audit found zero live
+   * defects of that shape (all 81 recomputeLearnerProjection callers already
+   * supply a StudentId-domain value) — this closes the class of mistake
+   * without touching any of them.
+   */
+  async findConfirmedEvidenceForLearner(learnerId: StudentId): Promise<EvidenceRow[]> {
     const { data, error } = await this.db
       .from('learner_evidence')
       .select(EVIDENCE_COLS)

@@ -18,6 +18,7 @@ import { recomputeLearnerProjection, recomputeLearnerProjections, getPersistedPr
 import { recomputeForTeacher } from './batch'
 import { processProjectionEvents } from './eventConsumer'
 import { repos } from '@/lib/repositories'
+import { asStudentId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_PROJECTION_ENGINE_TEST'
 const db = createServiceClient()
@@ -196,7 +197,7 @@ test('review-confirmed evidence (not just auto-confirmed) is included in project
 })
 
 test('repository correctness: findConfirmedEvidenceForLearner excludes pending, rejected, superseded, and retracted evidence', async () => {
-  const evidence = await repos.evidence.findConfirmedEvidenceForLearner(studentId)
+  const evidence = await repos.evidence.findConfirmedEvidenceForLearner(asStudentId(studentId))
   for (const e of evidence) {
     assert.ok(['auto_confirmed', 'reviewed_confirmed'].includes(e.lifecycle_state))
   }
@@ -205,7 +206,7 @@ test('repository correctness: findConfirmedEvidenceForLearner excludes pending, 
 // ── Reproducibility from Evidence alone, against real persisted evidence ────
 
 test('recomputing the same learner twice from persisted Evidence produces an identical projection (excluding lastComputed)', async () => {
-  const evidence = await repos.evidence.findConfirmedEvidenceForLearner(studentId)
+  const evidence = await repos.evidence.findConfirmedEvidenceForLearner(asStudentId(studentId))
   assert.ok(evidence.length > 0, 'expected confirmed evidence to exist from prior tests in this suite')
 
   const first = await recomputeLearnerProjection(studentId)

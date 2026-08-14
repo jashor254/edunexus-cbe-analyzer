@@ -83,3 +83,10 @@ test('the intelligence resolver reports the space it actually matched against', 
   expectType<Equals<HasOldField, false>>(true)
   assert.ok(true)
 })
+
+// IDENTITY-1 Phase 3 — the read-side gate added this phase.
+test('the Evidence read boundary now rejects a LearnerId the same way the write boundary already did', () => {
+  type FindConfirmed = typeof import('@/lib/repositories/evidence.repository').EvidenceRepository.prototype.findConfirmedEvidenceForLearner
+  expectType<Equals<Parameters<FindConfirmed>[0], StudentId>>(true)
+  assert.ok(true)
+})

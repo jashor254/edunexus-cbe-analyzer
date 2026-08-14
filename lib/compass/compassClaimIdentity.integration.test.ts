@@ -35,6 +35,7 @@ import { EVIDENCE_SOURCE_TRUST_TIER, type LearnerEvidence } from '@/lib/intellig
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { recordCompassSessionEvidence } from './evidence'
 import { ENGAGEMENT_EXTRACTION_METHOD, MASTERY_EXTRACTION_METHOD } from './evidenceClaimTypes'
+import { asStudentId } from '@/lib/core/identityTypes'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_P15_CLAIM_IDENTITY_TEST'
 const db = createServiceClient()
@@ -394,7 +395,7 @@ test('12. two Compass sessions do not collapse into one claim', async () => {
 test('12b. the Behaviour Projector counts every session, not just the newest', async () => {
   // Under the old behaviour each session superseded the last, so the
   // observation count silently collapsed toward one.
-  const confirmed = await repos.evidence.findConfirmedEvidenceForLearner(studentId)
+  const confirmed = await repos.evidence.findConfirmedEvidenceForLearner(asStudentId(studentId))
   const confirmedCompass = confirmed.filter(r => r.evidence_source === 'compass_session')
 
   const projection = await recomputeLearnerProjection(studentId)
