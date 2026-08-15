@@ -106,9 +106,28 @@ test('inviteTeacher: repeated invitation is idempotent — returns already_pendi
   assert.equal(rows?.length, 1)
 })
 
-test('inviteTeacher: an email with no platform account returns no_account rather than throwing', async () => {
-  const result = await inviteTeacher(schoolId, `nobody-${Date.now()}@example.com`, adminUserId)
-  assert.equal(result.status, 'no_account')
+// Phase 2 (admin-provisioned teacher activation) — was "returns no_account
+// rather than throwing." An email with no account no longer dead-ends:
+// inviteSchoolMember now creates the auth.users account itself via
+// Supabase's own invite-link primitive (lib/repositories/teacher.repository.ts
+// createInvitedAuthAccount), so a school admin can provision a teacher who
+// has genuinely never used EduNexus. `no_account` is now reserved for the
+// (untested-here) case where account creation itself fails. See
+// lib/core/teacherActivation.integration.test.ts for the full new-teacher
+// lifecycle proof.
+test('inviteTeacher: an email with no platform account now gets one created, rather than dead-ending at no_account', async () => {
+  const email = `nobody-${Date.now()}@example.com`
+  const result = await inviteTeacher(schoolId, email, adminUserId)
+  assert.equal(result.status, 'invited')
+  if (result.status !== 'invited') throw new Error('unreachable')
+  assert.equal(result.schoolUser.is_active, false)
+
+  const created = await repos.teachers.findAuthUserByEmail(email)
+  assert.ok(created, 'an auth.users account must now exist')
+
+  // Cleanup — this account isn't tracked by the fixture's own createdAuthUserIds.
+  await db.from('school_users').delete().eq('id', result.schoolUser.id)
+  await db.auth.admin.deleteUser(created!.id)
 })
 
 // ── Accept ───────────────────────────────────────────────────────────────────
@@ -242,7 +261,14 @@ test('onboarding works identically for a partially configured school (no activat
 
 // ── Failure + retry (Part 7) ─────────────────────────────────────────────────
 
-test('failure + retry: inviting an unregistered email, then retrying after they sign up, succeeds', async () => {
+// Phase 2 rewrite — was "inviting an unregistered email, then retrying
+// after they sign up, succeeds," which tested the pre-Phase-2 no_account
+// dead end. inviteTeacher no longer has a no_account state to retry past
+// (it creates the account itself on the first call); what's still worth
+// proving is the adjacent idempotency question: a SECOND invite call for
+// that same, now-existing (auto-created) account must not create a
+// duplicate account or a duplicate school_users row.
+test('failure + retry: inviting the same unregistered email twice creates exactly one account and one pending membership', async () => {
   const admin4 = await mkAuthUser('admin4')
   const school4 = await repos.schools.create({ school_name: `${SYNTHETIC_MARKER}_retry_${Date.now()}` }, admin4.id)
   createdSchoolIds.push(school4.id)
@@ -250,21 +276,22 @@ test('failure + retry: inviting an unregistered email, then retrying after they 
 
   const notYetRegisteredEmail = `not-yet-registered-${Date.now()}@example.com`
   const firstAttempt = await inviteTeacher(school4.id, notYetRegisteredEmail, admin4.id)
-  assert.equal(firstAttempt.status, 'no_account')
+  assert.equal(firstAttempt.status, 'invited')
+  if (firstAttempt.status !== 'invited') throw new Error('unreachable')
 
-  // The person signs up, using the exact email the admin tried to invite.
-  const { data: newAuth, error } = await db.auth.admin.createUser({
-    email: notYetRegisteredEmail,
-    password: `Test!${Math.random().toString(36).slice(2, 10)}`,
-    email_confirm: true,
-  })
-  if (error) throw error
-  createdAuthUserIds.push(newAuth.user.id)
+  const created = await repos.teachers.findAuthUserByEmail(notYetRegisteredEmail)
+  assert.ok(created)
+  createdAuthUserIds.push(created!.id)
 
-  const retry = await inviteTeacher(school4.id, notYetRegisteredEmail, admin4.id)
-  assert.equal(retry.status, 'invited')
+  const secondAttempt = await inviteTeacher(school4.id, notYetRegisteredEmail, admin4.id)
+  assert.equal(secondAttempt.status, 'already_pending')
+  if (secondAttempt.status !== 'already_pending') throw new Error('unreachable')
+  assert.equal(secondAttempt.schoolUser.id, firstAttempt.schoolUser.id, 'must be the SAME pending row, not a duplicate')
 
-  const accept = await acceptTeacherInvitation(newAuth.user.id, school4.id, { full_name: 'Retried Teacher' })
+  const { data: schoolUserRows } = await db.from('school_users').select('id').eq('school_id', school4.id).eq('user_id', created!.id)
+  assert.equal(schoolUserRows?.length, 1, 'must not duplicate the school_users row')
+
+  const accept = await acceptTeacherInvitation(created!.id, school4.id, { full_name: 'Retried Teacher' })
   assert.equal(accept.status, 'accepted')
 })
 

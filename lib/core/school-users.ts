@@ -1,5 +1,6 @@
 import { repos } from '@/lib/repositories'
 import { publishEvent } from '@/lib/events'
+import { SchoolMismatchError, ValidationError } from '@/lib/core/errors'
 import type { SchoolUser, SchoolUserRole } from '@/types/core'
 
 export async function getSchoolUser(
@@ -127,6 +128,56 @@ export async function deactivateSchoolUser(schoolUserId: string): Promise<void> 
     payload:         { school_user_id: schoolUserId },
     idempotency_key: `organization.member.removed:${schoolUserId}`,
   }).catch(err => console.error('[events] organization.member.removed:', err instanceof Error ? err.message : String(err)))
+}
+
+// Phase 9 — the canonical school-admin "welcome them back" operation. There
+// was previously no way back to active for a departed membership except the
+// invitee accepting a resent invite themselves (self-service, not an admin
+// action) — this is the missing admin-triggered counterpart.
+//
+// Reuses the SAME school_users row: no new membership, no new teacher/
+// profile identity. Deliberately does NOT touch class_subjects — a
+// reinstated teacher starts with zero current teaching load, exactly like a
+// freshly-accepted one; their July `ended_at` tenure on 7A/7B stays
+// historical. An admin assigns new work separately (Phase 8's Teaching
+// Coverage panel), the same way they would for any teacher who has none yet.
+//
+// A membership that was never accepted (joined_at IS NULL — still a pending
+// invite) is rejected rather than silently "reinstated": pending is not
+// departed, and the correct path for it is the existing invite/accept flow,
+// not this one.
+export async function reinstateSchoolMembership(
+  schoolId: string,
+  schoolUserId: string
+): Promise<{ reinstated: boolean }> {
+  const membership = await repos.schools.findSchoolUserById(schoolUserId)
+  if (!membership || membership.school_id !== schoolId) {
+    throw new SchoolMismatchError('This membership does not belong to your school.')
+  }
+
+  if (membership.is_active) {
+    // Idempotent: nothing to do if already current staff.
+    return { reinstated: false }
+  }
+
+  if (!membership.joined_at) {
+    throw new ValidationError('This person has not activated their invitation yet — there is nothing to reinstate. Resend the invitation instead.')
+  }
+
+  await reactivateSchoolUser(schoolUserId)
+  return { reinstated: true }
+}
+
+export async function reactivateSchoolUser(schoolUserId: string): Promise<void> {
+  await repos.teachers.reactivateSchoolUser(schoolUserId)
+
+  void publishEvent({
+    event_type:      'organization.member.reinstated',
+    resource_type:   'school_user',
+    resource_id:     schoolUserId,
+    payload:         { school_user_id: schoolUserId },
+    idempotency_key: `organization.member.reinstated:${schoolUserId}`,
+  }).catch(err => console.error('[events] organization.member.reinstated:', err instanceof Error ? err.message : String(err)))
 }
 
 export async function isSchoolAdmin(userId: string, schoolId: string): Promise<boolean> {

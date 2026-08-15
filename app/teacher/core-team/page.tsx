@@ -16,7 +16,7 @@
 // around.
 
 import { useState, useEffect, useCallback } from 'react'
-import { Loader2, AlertCircle, UserPlus, Clock, CheckCircle2 } from 'lucide-react'
+import { Loader2, AlertCircle, UserPlus, Clock, CheckCircle2, UserX } from 'lucide-react'
 import type { Term } from '@/types/core'
 import { ADMIN_TIER_ROLES } from '@/lib/core/adminTierRoles'
 import { OperationalBreadcrumb } from '@/components/core/OperationalBreadcrumb'
@@ -35,7 +35,7 @@ type TeacherMembership = {
   fullName: string | null
   email: string | null
   role: string
-  status: 'pending' | 'active'
+  status: 'pending' | 'active' | 'departed'
   joinedAt: string | null
   invitedAt: string
 }
@@ -88,6 +88,8 @@ export default function CoreTeamPage() {
   const [inviteRole, setInviteRole] = useState<(typeof INVITE_ROLES)[number]['value']>('teacher')
   const [confirmRemove, setConfirmRemove] = useState<TeacherMembership | null>(null)
   const [removing, setRemoving] = useState(false)
+  const [reinstatingId, setReinstatingId] = useState<string | null>(null)
+  const [reinstateError, setReinstateError] = useState('')
 
   useEffect(() => {
     fetchJson<{ membership: Membership | null }>('/api/core/my-membership')
@@ -152,6 +154,24 @@ export default function CoreTeamPage() {
     }
   }
 
+  async function reinstate(t: TeacherMembership) {
+    if (!membership) return
+    setReinstatingId(t.schoolUserId)
+    setReinstateError('')
+    try {
+      await fetchJson('/api/core/teachers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reinstate', schoolId: membership.schoolId, schoolUserId: t.schoolUserId }),
+      })
+      loadTeachers(membership.schoolId)
+    } catch (e) {
+      setReinstateError(e instanceof Error ? e.message : 'Failed to reinstate')
+    } finally {
+      setReinstatingId(null)
+    }
+  }
+
   if (membership === undefined) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -162,6 +182,7 @@ export default function CoreTeamPage() {
 
   const pending = teachers?.filter(t => t.status === 'pending') ?? []
   const active = teachers?.filter(t => t.status === 'active') ?? []
+  const departed = teachers?.filter(t => t.status === 'departed') ?? []
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">
@@ -230,12 +251,15 @@ export default function CoreTeamPage() {
             <div className="space-y-4">
               {pending.length > 0 && (
                 <div>
-                  <h2 className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">Pending ({pending.length})</h2>
+                  <h2 className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">Pending activation ({pending.length})</h2>
                   <div className="space-y-1.5">
                     {pending.map(t => (
                       <div key={t.schoolUserId} className="flex items-center gap-3 border border-slate-200 rounded-xl px-4 py-3 bg-white">
                         <Clock className="w-4 h-4 text-amber-500 shrink-0" />
-                        <span className="text-sm text-slate-700 truncate">{t.email ?? t.fullName ?? t.userId}</span>
+                        <div className="min-w-0">
+                          <p className="text-sm text-slate-700 truncate">{t.email ?? t.fullName ?? t.userId}</p>
+                          <p className="text-xs text-slate-400">Invited — hasn&apos;t activated EduNexus yet</p>
+                        </div>
                         <span className="ml-auto shrink-0 text-xs text-slate-400">{ROLE_LABEL[t.role] ?? t.role}</span>
                       </div>
                     ))}
@@ -272,6 +296,34 @@ export default function CoreTeamPage() {
                   ))}
                 </div>
               </div>
+
+              {departed.length > 0 && (
+                <div>
+                  <h2 className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">Former / inactive ({departed.length})</h2>
+                  {reinstateError && (
+                    <p className="text-xs text-red-600 mb-2">{reinstateError}</p>
+                  )}
+                  <div className="space-y-1.5">
+                    {departed.map(t => (
+                      <div key={t.schoolUserId} className="flex items-center gap-3 border border-slate-200 rounded-xl px-4 py-3 bg-slate-50">
+                        <UserX className="w-4 h-4 text-slate-400 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm text-slate-600 truncate">{t.fullName ?? t.email ?? t.userId}</p>
+                          <p className="text-xs text-slate-400">Left school — {ROLE_LABEL[t.role] ?? t.role}</p>
+                        </div>
+                        <button
+                          onClick={() => reinstate(t)}
+                          disabled={reinstatingId !== null}
+                          className="ml-auto shrink-0 flex items-center gap-1.5 text-xs font-bold text-teal-700 hover:text-teal-900 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {reinstatingId === t.schoolUserId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                          Reinstate
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </>
@@ -297,7 +349,7 @@ export default function CoreTeamPage() {
                 they are — including the record that they taught those classes.
               </p>
               <p className="text-slate-500">
-                If they come back, an administrator can invite them again.
+                If they come back, an administrator can reinstate them from the Former / inactive list — no new invitation needed.
               </p>
             </div>
             <div className="flex gap-2 justify-end">

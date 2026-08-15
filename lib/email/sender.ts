@@ -7,6 +7,7 @@ import { repos } from '@/lib/repositories'
 import {
   assignmentMarkedEmail,
   alertCreatedEmail,
+  teacherInviteEmail,
   type AlertType,
 } from './templates'
 
@@ -195,6 +196,70 @@ export async function sendAlertCreatedEmail(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// sendTeacherInviteEmail — Phase 2, admin-provisioned teacher activation
+// ---------------------------------------------------------------------------
+
+export type TeacherInviteEmailInput = {
+  schoolUserId: string
+  toEmail: string
+  schoolName: string
+  invitedByName: string
+  actionUrl: string
+  isNewAccount: boolean
+  userId?: string | null
+}
+
+// Deliberately NOT deduplicated via notification_log's isDuplicate — unlike
+// a per-event parent notification, re-sending a teacher invite is a
+// legitimate admin action (the "invite" button in /teacher/core-team is
+// also the "resend invite" button; there's no separate control), so every
+// call really does send. Still logged for the same observability the other
+// senders in this file get.
+export async function sendTeacherInviteEmail(input: TeacherInviteEmailInput): Promise<SendResult> {
+  try {
+    const { subject, html } = teacherInviteEmail({
+      schoolName:    input.schoolName,
+      invitedByName: input.invitedByName,
+      actionUrl:     input.actionUrl,
+      isNewAccount:  input.isNewAccount,
+    })
+
+    const { error } = await resend.emails.send({
+      from: getEmailFrom(),
+      to:   input.toEmail,
+      subject,
+      html,
+    })
+
+    if (error) {
+      await logAttempt({
+        userId:       input.userId ?? null,
+        type:         'teacher_invite',
+        referenceId:  input.schoolUserId,
+        emailAddress: input.toEmail,
+        success:      false,
+        errorMessage: error.message,
+      })
+      return { success: false, error: error.message }
+    }
+
+    await logAttempt({
+      userId:       input.userId ?? null,
+      type:         'teacher_invite',
+      referenceId:  input.schoolUserId,
+      emailAddress: input.toEmail,
+      success:      true,
+    })
+
+    return { success: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[sendTeacherInviteEmail]', message)
+    return { success: false, error: message }
+  }
+}
 
 function deriveCbcLevel(score: number, maxScore: number): 1 | 2 | 3 | 4 {
   if (maxScore === 0) return 1

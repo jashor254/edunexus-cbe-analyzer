@@ -537,6 +537,18 @@ export class TeacherRepository extends BaseRepository {
     if (error) throw new Error(`deactivateSchoolUser: ${error.message}`)
   }
 
+  // Phase 9 — the reinstatement counterpart to deactivateSchoolUser. Flips
+  // is_active back to true only; joined_at is left untouched (it already
+  // holds this membership's original acceptance date from the first time
+  // they activated, and reinstatement is not a second acceptance).
+  async reactivateSchoolUser(schoolUserId: string): Promise<void> {
+    const { error } = await this.db
+      .from('school_users')
+      .update({ is_active: true })
+      .eq('id', schoolUserId)
+    if (error) throw new Error(`reactivateSchoolUser: ${error.message}`)
+  }
+
   async isSchoolAdmin(userId: string, schoolId: string): Promise<boolean> {
     const { data } = await this.db
       .from('school_users')
@@ -681,6 +693,28 @@ export class TeacherRepository extends BaseRepository {
     return data ?? []
   }
 
+  // Phase 2 — the activation page's own read: "what invitations, at any
+  // school, is the CURRENTLY AUTHENTICATED user waiting to accept." Unlike
+  // listSchoolUserRowsForUser (school-scoped, needs a schoolId the
+  // invitee doesn't have yet), this is deliberately global and self-scoped
+  // by userId only — same safety shape as GET /api/core/my-membership
+  // (findSchoolUserByUserId): the caller can only ever see their OWN
+  // pending rows, never anyone else's, because userId always comes from
+  // auth.getUser() at the route, never from a query param.
+  async listPendingInvitationsForUser(userId: string): Promise<Array<SchoolUser & { school_name: string }>> {
+    const { data, error } = await this.db
+      .from('school_users')
+      .select(`${SCHOOL_USER_COLS}, schools!inner (school_name)`)
+      .eq('user_id', userId)
+      .eq('is_active', false)
+      .order('created_at', { ascending: false })
+    if (error) throw new Error(`listPendingInvitationsForUser: ${error.message}`)
+    return (data ?? []).map((row) => {
+      const { schools, ...rest } = row as unknown as SchoolUser & { schools: { school_name: string } }
+      return { ...rest, school_name: schools.school_name }
+    })
+  }
+
   // Creates a *pending* membership (is_active: false) — the "invited, not
   // yet accepted" state. Deliberately a plain insert, not an upsert: an
   // upsert here would risk silently flipping an already-active member back
@@ -707,6 +741,33 @@ export class TeacherRepository extends BaseRepository {
     const normalized = email.toLowerCase().trim()
     const match = await this.findAuthUser(u => u.email?.toLowerCase().trim() === normalized)
     return match?.email ? { id: match.id, email: match.email } : null
+  }
+
+  // Phase 2 (admin-provisioned teacher activation) — creates the
+  // auth.users account for someone who has never used EduNexus, so a
+  // school admin can invite a genuinely new teacher rather than dead-
+  // ending at {status:'no_account'}. Uses Supabase's own invite-link
+  // machinery (the same primitive scripts/captureDemoScreens.ts already
+  // uses for magiclinks) rather than a custom token: Supabase owns the
+  // token's entropy, expiry and single-use semantics end to end, so this
+  // adds no new security surface and no new schema. `action_link` is the
+  // full, ready-to-email URL; opening it authenticates the browser and
+  // redirects to `redirectTo` carrying a `code` for the existing
+  // /auth/callback exchange — no new verification code needed either.
+  // Returns null on failure (e.g. a race where the email was registered
+  // between the caller's own findAuthUserByEmail check and this call) so
+  // the caller can degrade rather than silently proceed with no account.
+  async createInvitedAuthAccount(email: string, redirectTo: string): Promise<{ userId: string; actionLink: string } | null> {
+    const { data, error } = await this.db.auth.admin.generateLink({
+      type: 'invite',
+      email,
+      options: { redirectTo },
+    })
+    if (error || !data?.user?.id || !data.properties?.action_link) {
+      console.error('[teacher.repository] createInvitedAuthAccount failed', { email, error: error?.message })
+      return null
+    }
+    return { userId: data.user.id, actionLink: data.properties.action_link }
   }
 
   /**
@@ -1054,5 +1115,35 @@ export class TeacherRepository extends BaseRepository {
         { onConflict: 'class_id,student_id' }
       )
     if (error) throw new Error(`upsertLegacyClassRoster: ${error.message}`)
+  }
+
+  // Phase 5 (legacy roster convergence on learner move) — the first
+  // production DELETE against class_students. Proven safe before writing
+  // this: no table anywhere in the schema has a foreign key referencing
+  // class_students.id (checked live via pg_constraint/information_schema);
+  // every historical academic table (learner_marks, learner_evidence,
+  // learner_projections, assessments, assignment_submissions, ...)
+  // references students.id directly, never class_students.id. Deleting a
+  // class_students row therefore removes only "this student currently
+  // appears on this legacy class's roster" — nothing historical.
+  //
+  // Scoped to an explicit, caller-resolved set of legacyClassIds (never a
+  // bare student_id match) — the caller (removeStaleLegacyRosterMembership,
+  // lib/core/academicBridge.ts) resolves that set from
+  // findLegacyClassIdsByExternalId(vacatedCoreClassId), so this can only
+  // ever remove rows tied to the EXACT vacated Core class, never a
+  // same-student row on an unrelated class. Returns the count removed
+  // (0 is a normal, safe outcome — not an error — for a never-bridged
+  // learner/class or an already-clean retry).
+  async removeLegacyClassRosterMembership(legacyClassIds: string[], legacyStudentId: string): Promise<number> {
+    if (legacyClassIds.length === 0) return 0
+    const { data, error } = await this.db
+      .from('class_students')
+      .delete()
+      .in('class_id', legacyClassIds)
+      .eq('student_id', legacyStudentId)
+      .select('id')
+    if (error) throw new Error(`removeLegacyClassRosterMembership: ${error.message}`)
+    return data?.length ?? 0
   }
 }

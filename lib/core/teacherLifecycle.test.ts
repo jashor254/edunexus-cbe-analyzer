@@ -20,7 +20,8 @@ import { activateSchool } from '@/lib/core/schoolActivation'
 import { inviteTeacher, acceptTeacherInvitation } from '@/lib/core/teacherOnboarding'
 import { createClass, assignSubjectTeacher, listClassSubjects, getClassSubjectHistory } from '@/lib/core/classes'
 import { listSubjects } from '@/lib/core/subjects'
-import { deactivateSchoolMembership } from '@/lib/core/school-users'
+import { deactivateSchoolMembership, reinstateSchoolMembership } from '@/lib/core/school-users'
+import { listTeacherMemberships } from '@/lib/core/teacherOnboarding'
 import { resolveSchoolCoverage } from '@/lib/core/schoolEntitlement'
 import { listTeachingAssignmentsForUser, resolveTeachingContext } from '@/lib/core/teachingAssignments'
 
@@ -270,7 +271,7 @@ test('14. exactly one CURRENT teacher exists for that class+subject', async () =
   assert.equal(current![0].teacher_id, maryMembershipId)
 
   // And the full tenure record reads as a succession.
-  const history = await getClassSubjectHistory(sevenEastId, mathsId)
+  const history = await getClassSubjectHistory(schoolAId, sevenEastId, mathsId)
   assert.equal(history.length, 2, 'two tenures: Peter then Mary')
   assert.equal(history[0].teacherId, maryMembershipId, 'newest first')
   assert.equal(history[0].endedAt, null, 'Mary is current')
@@ -330,7 +331,7 @@ test('23. the database itself refuses two current assignments for one class+subj
 test('23b. a historical row can never be mistaken for a current one', async () => {
   const current = await listClassSubjects(sevenEastId)
   assert.ok(!current.some(cs => cs.teacher_id === peterMembershipId), 'Peter absent from current listing')
-  const history = await getClassSubjectHistory(sevenEastId, mathsId)
+  const history = await getClassSubjectHistory(schoolAId, sevenEastId, mathsId)
   assert.ok(history.some(h => h.teacherId === peterMembershipId), 'but present in history')
 })
 
@@ -447,6 +448,96 @@ test('20b. Peter\'s scheme of work and record of work survive his departure inta
 
   await db.from('records_of_work').delete().eq('id', row!.id)
   await db.from('schemes_of_work').delete().eq('id', sow!.id)
+})
+
+// ── Reinstatement (Phase 9 — the gap this phase closes) ─────────────────────
+//
+// Peter was deactivated at School A earlier in this suite (tests 3+4, 15).
+// These tests pick up from that state: he is currently a departed
+// (is_active=false, joined_at NOT null) membership at School A.
+
+test('25. reinstating a pending (never-accepted) invite is rejected, not treated as a departure', async () => {
+  const pendingUser = await mkUser('pending-not-departed')
+  const { inviteTeacher } = await import('@/lib/core/teacherOnboarding')
+  const invited = await inviteTeacher(schoolAId, pendingUser.email, schoolAAdminId)
+  assert.equal(invited.status, 'invited')
+  await assert.rejects(
+    () => reinstateSchoolMembership(schoolAId, invited.schoolUser.id),
+    /activated|pending/i,
+  )
+})
+
+test('26. reinstating Peter restores the SAME membership row, no duplicate', async () => {
+  const before = await db.from('school_users').select('id, user_id, school_id, is_active').eq('id', peterMembershipId).single()
+  assert.equal(before.data!.is_active, false, 'fixture: Peter is departed going into this test')
+
+  const result = await reinstateSchoolMembership(schoolAId, peterMembershipId)
+  assert.equal(result.reinstated, true)
+
+  const after = await db.from('school_users').select('id, user_id, school_id, is_active').eq('id', peterMembershipId).single()
+  assert.equal(after.data!.id, before.data!.id, 'same school_users row, not a new one')
+  assert.equal(after.data!.user_id, before.data!.user_id, 'same person identity')
+  assert.equal(after.data!.is_active, true, 'membership active again')
+
+  const { count } = await db.from('school_users').select('id', { count: 'exact', head: true })
+    .eq('school_id', schoolAId).eq('user_id', peterUserId)
+  assert.equal(count, 1, 'still exactly one school_users row for Peter at School A')
+})
+
+test('27. reinstatement does not resurrect Peter\'s old Mathematics tenure', async () => {
+  const { data: current } = await db
+    .from('class_subjects').select('teacher_id')
+    .eq('class_id', sevenEastId).eq('subject_id', mathsId).is('ended_at', null)
+  assert.equal(current!.length, 1, 'still exactly one current teacher for 7A Mathematics')
+  assert.equal(current![0].teacher_id, maryMembershipId, 'Mary — not resurrected back to Peter')
+
+  // Scoped to School A: Peter also legitimately holds an active, assigned
+  // membership at School B from the earlier transfer test in this suite —
+  // multi-school membership is independent per school (§21-22), not a leak.
+  const assignments = await listTeachingAssignmentsForUser(peterUserId)
+  const atSchoolA = assignments.filter(a => a.schoolId === schoolAId)
+  assert.equal(atSchoolA.length, 0, 'reinstated Peter has zero current School A teaching load until assigned')
+})
+
+test('28. reinstated Peter appears as active, not pending or departed, on the Team roster', async () => {
+  const roster = await listTeacherMemberships(schoolAId)
+  const peterRow = roster.find(r => r.schoolUserId === peterMembershipId)
+  assert.ok(peterRow)
+  assert.equal(peterRow!.status, 'active')
+})
+
+test('29. admin can assign Peter new current teaching load after reinstatement, independent of his old history', async () => {
+  const { data: classes } = await db
+    .from('classes').select('grade_id, academic_year_id').eq('id', sevenEastId).single()
+  const eightEast = await createClass(schoolAId, {
+    grade_id: classes!.grade_id, academic_year_id: classes!.academic_year_id,
+    display_name: `${SYNTHETIC_MARKER} Grade 8 East (post-reinstatement)`,
+  })
+
+  await assignSubjectTeacher(schoolAId, eightEast.id, mathsId, peterMembershipId)
+
+  const assignments = await listTeachingAssignmentsForUser(peterUserId)
+  const atSchoolA = assignments.filter(a => a.schoolId === schoolAId)
+  assert.equal(atSchoolA.length, 1, 'exactly one current School A assignment (School B\'s is separate)')
+  assert.equal(atSchoolA[0].classId, eightEast.id, 'new current tenure, a different class from his old one')
+
+  // Old 7A/7B history is completely unchanged by this new assignment.
+  const { data: oldHistory } = await db
+    .from('class_subjects').select('id, ended_at').eq('teacher_id', peterMembershipId).eq('class_id', sevenEastId)
+  assert.equal(oldHistory!.length, 1)
+  assert.ok(oldHistory![0].ended_at, 'the old 7A Mathematics tenure is still closed/historical')
+})
+
+test('30. reinstating an already-active membership is a safe idempotent no-op', async () => {
+  const result = await reinstateSchoolMembership(schoolAId, peterMembershipId)
+  assert.equal(result.reinstated, false, 'already active — nothing to do')
+})
+
+test('31. School B admin cannot reinstate a School A membership', async () => {
+  await assert.rejects(
+    () => reinstateSchoolMembership(schoolBId, peterMembershipId),
+    /school|belong/i,
+  )
 })
 
 // ── 24. The 144 live rows ───────────────────────────────────────────────────

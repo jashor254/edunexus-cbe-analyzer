@@ -53,6 +53,7 @@ export type WellKnownEventType =
   | 'organization.member.invited'
   | 'organization.member.joined'
   | 'organization.member.removed'
+  | 'organization.member.reinstated'
   | 'organization.member.role_changed'
   | 'organization.subscription.upgraded'
   | 'organization.subscription.canceled'

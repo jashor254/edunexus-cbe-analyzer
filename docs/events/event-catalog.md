@@ -40,6 +40,7 @@ All events use `event_version: '1.0'` unless noted.
 | `organization.member.invited` | `school_user` | After `addSchoolUser()` succeeds | Teacher or parent added to a school |
 | `organization.member.joined` | `school_user` | After invite is accepted | Member accepted their invitation |
 | `organization.member.removed` | `school_user` | After `deactivateSchoolUser()` succeeds | Member deactivated from school |
+| `organization.member.reinstated` | `school_user` | After `reactivateSchoolUser()` succeeds | Previously-departed member restored to active by an admin |
 | `organization.subscription.upgraded` | `subscription` | After plan upgrade | Subscription tier increased |
 | `organization.subscription.canceled` | `subscription` | After cancellation | Subscription canceled |
 

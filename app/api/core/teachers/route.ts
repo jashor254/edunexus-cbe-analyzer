@@ -6,9 +6,9 @@
 // lives in lib/core/teacherOnboarding.ts.
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { inviteSchoolMember, acceptTeacherInvitation, getTeacherReadiness, listTeacherMemberships, INVITABLE_SCHOOL_ROLES } from '@/lib/core/teacherOnboarding'
+import { inviteSchoolMember, acceptTeacherInvitation, getTeacherReadiness, listTeacherMemberships, listMyPendingInvitations, INVITABLE_SCHOOL_ROLES } from '@/lib/core/teacherOnboarding'
 import { requireAuthentication, requireSchoolAdmin } from '@/lib/core/permissions'
-import { deactivateSchoolMembership } from '@/lib/core/school-users'
+import { deactivateSchoolMembership, reinstateSchoolMembership } from '@/lib/core/school-users'
 import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
 import { z } from 'zod'
 
@@ -37,6 +37,16 @@ const DeactivateSchema = z.object({
   action:   z.literal('deactivate'),
   schoolId: z.string().uuid(),
   userId:   z.string().uuid(),
+})
+
+// Phase 9 — the admin-triggered counterpart to deactivate. `schoolUserId`
+// (not `userId`) because the Team screen already has the membership row in
+// hand from listTeacherMemberships, and it is what reinstateSchoolMembership
+// scopes/validates against — same shape as assignSubjectTeacher's teacherId.
+const ReinstateSchema = z.object({
+  action:       z.literal('reinstate'),
+  schoolId:     z.string().uuid(),
+  schoolUserId: z.string().uuid(),
 })
 
 const AcceptSchema = z.object({
@@ -104,6 +114,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ data: { removed } })
   }
 
+  if (body?.action === 'reinstate') {
+    const parsed = ReinstateSchema.safeParse(body)
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
+
+    try {
+      // A departed membership cannot pass this check itself — only an
+      // admin whose OWN membership at this school is currently active can
+      // reach here, which is why no separate teacher-self-reinstate guard
+      // is needed the way deactivate needs a self-removal guard.
+      await requireSchoolAdmin(supabase, parsed.data.schoolId)
+      const result = await reinstateSchoolMembership(parsed.data.schoolId, parsed.data.schoolUserId)
+      return NextResponse.json({ data: result })
+    } catch (err) {
+      return errorResponse(err)
+    }
+  }
+
   if (body?.action === 'accept') {
     const parsed = AcceptSchema.safeParse(body)
     if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
@@ -135,6 +162,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const supabase = await createClient()
+
+  // Phase 2 — the activation page's own read, deliberately schoolId-less:
+  // "what invitations is the CURRENTLY AUTHENTICATED user waiting to
+  // accept, at any school." Self-scoped by userId from auth.getUser(),
+  // same safety shape as GET /api/core/my-membership — never takes a
+  // userId from the request, so it cannot be used to read anyone else's
+  // invitations.
+  if (req.nextUrl.searchParams.get('mine') === 'true') {
+    let userId: string
+    try {
+      userId = (await requireAuthentication(supabase)).id
+    } catch (err) {
+      return errorResponse(err)
+    }
+    const invitations = await listMyPendingInvitations(userId)
+    return NextResponse.json({ data: invitations })
+  }
 
   const schoolId = req.nextUrl.searchParams.get('schoolId')
   if (!schoolId) return NextResponse.json({ error: 'schoolId required' }, { status: 400 })

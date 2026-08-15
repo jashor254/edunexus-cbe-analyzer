@@ -187,6 +187,13 @@ type OrganizationMemberInvitedPayload = {
 }
 ```
 
+### `organization.member.reinstated`
+```typescript
+{
+  school_user_id: string
+}
+```
+
 ---
 
 ## System Payloads

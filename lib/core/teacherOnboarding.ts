@@ -33,7 +33,14 @@
 import { repos } from '@/lib/repositories'
 import { addSchoolUser, listSchoolUsers, updateSchoolUserRole } from '@/lib/core/school-users'
 import { resolveTeacher, resolveMembership } from '@/lib/core/identity'
+import { sendTeacherInviteEmail } from '@/lib/email/sender'
 import type { SchoolUser } from '@/types/core'
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://edunexus.co.ke'
+// /teacher/activate is open to any authenticated user regardless of role
+// (proxy.ts, same carve-out shape as the pre-existing /teacher/setup) — it
+// reads the caller's OWN pending invitations and lets them accept one.
+const ACTIVATION_PATH = '/teacher/activate'
 
 // ── Invite ───────────────────────────────────────────────────────────────────
 
@@ -106,13 +113,20 @@ export async function inviteTeacher(
  * school; promotion edits the role they already hold.
  *
  * Idempotent in every direction: re-inviting at the same role is a no-op that
- * reports current state, and promoting an already-promoted member reports
- * `already_member`.
+ * reports current state (though a resend, re-inviting a still-pending row,
+ * DOES re-send the activation email — that's the only "resend invite"
+ * control this screen has), and promoting an already-promoted member
+ * reports `already_member`.
  *
- * Does not create an account for an email with none — returns
- * `{status:'no_account'}`. No email or message is sent by this function; the
- * invitee must already have signed up. That limitation is real and surfaced to
- * the UI rather than papered over.
+ * Phase 2 — an email with no existing account no longer dead-ends at
+ * `{status:'no_account'}`. `repos.teachers.createInvitedAuthAccount()`
+ * creates the auth.users row via Supabase's own invite-link primitive (no
+ * custom token, no schema change — see that method's doc comment), and the
+ * teacher receives the same activation email either way. `no_account` is
+ * now returned only if that account creation itself fails (e.g. a race
+ * where the email became registered between this function's own
+ * findAuthUserByEmail check and the create call) — a real, surfaced
+ * failure, not silently swallowed.
  */
 export async function inviteSchoolMember(
   schoolId: string,
@@ -120,8 +134,29 @@ export async function inviteSchoolMember(
   role: InvitableSchoolRole,
   invitedBy: string
 ): Promise<InviteTeacherResult> {
-  const authUser = await repos.teachers.findAuthUserByEmail(email)
-  if (!authUser) return { status: 'no_account', email }
+  const [school, inviterProfile] = await Promise.all([
+    repos.schools.findById(schoolId),
+    repos.teachers.findProfilesByUserIds([invitedBy]),
+  ])
+  const invitedByName = inviterProfile.get(invitedBy)?.full_name ?? 'Your school administrator'
+
+  let authUser = await repos.teachers.findAuthUserByEmail(email)
+  let isNewAccount = false
+
+  if (!authUser) {
+    const created = await repos.teachers.createInvitedAuthAccount(email, `${APP_URL}/auth/callback?returnTo=${encodeURIComponent(ACTIVATION_PATH)}`)
+    if (!created) return { status: 'no_account', email }
+    authUser = { id: created.userId, email }
+    isNewAccount = true
+
+    const rows = await repos.teachers.listSchoolUserRowsForUser(schoolId, authUser.id)
+    const schoolUser = rows[0] ?? await repos.teachers.insertPendingSchoolUser(schoolId, authUser.id, role, invitedBy)
+    await sendTeacherInviteEmail({
+      schoolUserId: schoolUser.id, toEmail: email, schoolName: school.school_name,
+      invitedByName, actionUrl: created.actionLink, isNewAccount: true, userId: invitedBy,
+    })
+    return { status: 'invited', schoolUser }
+  }
 
   // Any membership at this school, under any role, in any state.
   const rows = await repos.teachers.listSchoolUserRowsForUser(schoolId, authUser.id)
@@ -132,6 +167,14 @@ export async function inviteSchoolMember(
 
   if (existing) {
     if (existing.role === role) {
+      if (!existing.is_active) {
+        // Resend: still pending, admin clicked invite again.
+        await sendTeacherInviteEmail({
+          schoolUserId: existing.id, toEmail: email, schoolName: school.school_name,
+          invitedByName, actionUrl: `${APP_URL}/login?returnTo=${encodeURIComponent(ACTIVATION_PATH)}`,
+          isNewAccount: false, userId: invitedBy,
+        })
+      }
       return { status: existing.is_active ? 'already_member' : 'already_pending', schoolUser: existing }
     }
     const previousRole = existing.role
@@ -140,6 +183,11 @@ export async function inviteSchoolMember(
   }
 
   const schoolUser = await repos.teachers.insertPendingSchoolUser(schoolId, authUser.id, role, invitedBy)
+  await sendTeacherInviteEmail({
+    schoolUserId: schoolUser.id, toEmail: email, schoolName: school.school_name,
+    invitedByName, actionUrl: `${APP_URL}/login?returnTo=${encodeURIComponent(ACTIVATION_PATH)}`,
+    isNewAccount: false, userId: invitedBy,
+  })
   return { status: 'invited', schoolUser }
 }
 
@@ -216,6 +264,26 @@ export async function acceptTeacherInvitation(
   return { status: wasAlreadyActive ? 'already_member' : 'accepted', schoolUser, teacherId: teacher.id }
 }
 
+// ── My pending invitations (Phase 2 — the activation page's own read) ──────
+
+export type PendingInvitationView = {
+  schoolId: string
+  schoolName: string
+  role: SchoolUser['role']
+  invitedAt: string
+}
+
+/** Every school where the authenticated userId has a pending (not yet accepted) invitation. */
+export async function listMyPendingInvitations(userId: string): Promise<PendingInvitationView[]> {
+  const rows = await repos.teachers.listPendingInvitationsForUser(userId)
+  return rows.map(r => ({
+    schoolId: r.school_id,
+    schoolName: r.school_name,
+    role: r.role,
+    invitedAt: r.created_at,
+  }))
+}
+
 // ── Membership list (Sprint 10E — Phase 2: surface the existing invite/accept workflow) ──
 
 export type TeacherMembershipView = {
@@ -225,7 +293,18 @@ export type TeacherMembershipView = {
   email: string | null
   /** The school_users role this membership carries — the Team screen needs it to distinguish staff from administrators. */
   role: SchoolUser['role']
-  status: 'pending' | 'active'
+  /**
+   * Phase 9 — was a binary is_active-only derivation, which meant a
+   * never-accepted invite and a departed (accepted, then deactivated)
+   * teacher rendered identically as 'pending'. `joined_at` is only ever
+   * stamped on acceptance and never cleared afterward (verified against
+   * every writer of is_active/joined_at — see docs/architecture Phase 9
+   * audit), so it reliably tells the two apart:
+   *   pending:   is_active=false, joined_at=null      (never accepted)
+   *   active:    is_active=true                        (current staff)
+   *   departed:  is_active=false, joined_at NOT null   (accepted, then left)
+   */
+  status: 'pending' | 'active' | 'departed'
   joinedAt: string | null
   invitedAt: string
 }
@@ -263,7 +342,7 @@ export async function listTeacherMemberships(schoolId: string): Promise<TeacherM
     fullName: profiles.get(m.user_id)?.full_name ?? null,
     email: emails.get(m.user_id) ?? null,
     role: m.role,
-    status: m.is_active ? 'active' : 'pending',
+    status: m.is_active ? 'active' : (m.joined_at ? 'departed' : 'pending'),
     joinedAt: m.joined_at,
     invitedAt: m.created_at,
   }))

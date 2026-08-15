@@ -293,3 +293,40 @@ export function alertCreatedEmail(p: AlertCreatedParams): { subject: string; htm
 
   return { subject, html: shell(content) }
 }
+
+// ---------------------------------------------------------------------------
+// teacherInviteEmail — Phase 2, admin-provisioned teacher activation
+// ---------------------------------------------------------------------------
+
+export type TeacherInviteEmailParams = {
+  schoolName: string
+  invitedByName: string
+  actionUrl: string
+  /** Whether `actionUrl` is a Supabase invite link that authenticates on click (new account) vs. a plain link to the login/activation page (existing account). Changes only the copy, not the mechanics. */
+  isNewAccount: boolean
+}
+
+export function teacherInviteEmail(p: TeacherInviteEmailParams): { subject: string; html: string } {
+  const subject = `You've been added as a teacher at ${p.schoolName}`
+
+  const body = p.isNewAccount
+    ? `<strong style="color:#374151;">${p.invitedByName}</strong> has added you as a teacher at <strong style="color:#374151;">${p.schoolName}</strong> on EduNexus. Click below to set up your account and see the classes and subjects already assigned to you.`
+    : `<strong style="color:#374151;">${p.invitedByName}</strong> has added you as a teacher at <strong style="color:#374151;">${p.schoolName}</strong> on EduNexus. Sign in and accept the invitation to see the classes and subjects already assigned to you.`
+
+  const content = `
+  <div style="display:inline-block;background:#e6fbf6;color:#0f766e;font-size:12px;font-weight:700;padding:5px 14px;border-radius:20px;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:16px;">
+    🏫 Teacher Invitation
+  </div>
+
+  <h1 style="font-size:20px;font-weight:900;color:#1a2744;margin:0 0 6px;">Welcome to ${p.schoolName}</h1>
+  <p style="font-size:14px;color:#64748b;line-height:1.7;margin:0 0 24px;">${body}</p>
+
+  ${ctaButton(p.isNewAccount ? 'Set up your account' : 'Sign in and accept', p.actionUrl)}
+
+  ${divider()}
+  <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0;">
+    You are receiving this because a school administrator added your email address to their EduNexus school.
+  </p>`
+
+  return { subject, html: shell(content) }
+}
