@@ -2,7 +2,23 @@ import { repos } from '@/lib/repositories'
 import type { LearnerPromotion, RunPromotionInput } from '@/types/core'
 import { createBlueprintSnapshot } from '@/lib/learnerBlueprint/snapshot'
 import { enrollLearner } from '@/lib/core/learners'
+import { removeStaleLegacyRosterMembership } from '@/lib/core/academicBridge'
 import { asLearnerId } from '@/lib/core/identityTypes'
+import { SchoolMismatchError } from '@/lib/core/errors'
+
+// Phase 6 (academic year progression) — the actual final grade is Grade 12
+// (level_order 14, grades table), not Grade 9. previewPromotion's own
+// terminal-grade detection only special-cased level_order 11 (Grade 9,
+// junior_secondary's own stage-exit) — a Grade 12 learner fell through to
+// the generic "promote" default with no Grade 13 to promote into. There is
+// no invalid grade actually created (destination classes are always real,
+// admin-picked, existing rows — the grades catalog itself has no level
+// beyond 14), but the SUGGESTED action was wrong. Both real stage-exit
+// points are named explicitly here rather than inferred from "is this the
+// max grade in the school", which would silently misclassify a Junior-only
+// school's Grade 9 as if it were the school's own final grade in a
+// different way than intended.
+const TERMINAL_GRADE_LEVEL_ORDERS = new Set([11, 14]) // Grade 9, Grade 12
 
 export async function getLearnerPromotionHistory(
   learnerId: string,
@@ -49,8 +65,29 @@ export async function runAnnualPromotion(
     .then(su => su?.user_id ?? processedBy)
     .catch(() => processedBy)
 
+  // Phase 6 (Task 28) — explicit, once-per-batch scoping proof for the
+  // "FROM" year. findActiveEnrollmentClass below has no schoolId parameter
+  // at all, so without this a learner_id from another school with (by
+  // sheer non-overlap of foreign keys) no row at this academic_year_id
+  // would already fail safely — but that safety was incidental, not
+  // verified. Explicit here, matching moveLearnerToClass/enrollLearner's
+  // own established pattern rather than relying on FK non-collision.
+  const schoolAcademicYears = await repos.schools.listAcademicYears(schoolId)
+  if (!schoolAcademicYears.some(y => y.id === input.academic_year_id)) {
+    throw new SchoolMismatchError('This academic year does not belong to your school.')
+  }
+
   for (const decision of input.decisions) {
     try {
+      // Source learner must belong to this school — same explicit shape
+      // Task 28 asks for on the destination side below.
+      try {
+        await repos.learners.findById(decision.learner_id, schoolId)
+      } catch {
+        errors.push(`Learner ${decision.learner_id}: does not belong to your school.`)
+        continue
+      }
+
       // Duplicate-promotion guard (Security Review finding, investigation
       // doc §Critical 2): learner_promotions has no unique constraint, so a
       // double-submitted batch would otherwise insert a second log row and
@@ -79,6 +116,43 @@ export async function runAnnualPromotion(
         continue
       }
 
+      // Destination year must belong to this school too (Task 28) —
+      // checked before any write, using the same batch-level list already
+      // loaded above rather than a second query per decision.
+      if (!isTerminal && !schoolAcademicYears.some(y => y.id === decision.to_academic_year_id)) {
+        errors.push(`Learner ${decision.learner_id}: destination academic year does not belong to your school.`)
+        continue
+      }
+
+      // Phase 11 — every remaining precondition for a NON-TERMINAL decision
+      // is now resolved and validated HERE, before any write. Before this
+      // fix, `decision.to_class_id`'s school-scoping and the destination
+      // term's existence were both only discovered inside enrollLearner /
+      // the enroll branch below, AFTER insertPromotion and
+      // withdrawActiveEnrollments had already run — so either failure left
+      // a learner withdrawn, promotion-logged, and enrolled nowhere,
+      // permanently (the duplicate-promotion guard above then refused every
+      // retry, since a promotion row for this academic_year_id already
+      // existed). This is the exact defect the Phase 10 rehearsal found
+      // (9 stranded synthetic learners). `destinationTerm` resolved here is
+      // reused below — the enroll branch no longer re-resolves it.
+      let destinationTerm: { id: string } | undefined
+      if (!isTerminal) {
+        try {
+          await repos.teachers.findClassById(decision.to_class_id!, schoolId)
+        } catch {
+          errors.push(`Learner ${decision.learner_id}: destination class does not belong to your school.`)
+          continue
+        }
+
+        const destinationTerms = await repos.schools.listTerms(schoolId, decision.to_academic_year_id!)
+        destinationTerm = destinationTerms[0]
+        if (!destinationTerm) {
+          errors.push(`Learner ${decision.learner_id}: destination academic year has no terms yet — set up a term for it before promoting into it. Nothing was changed for this learner.`)
+          continue
+        }
+      }
+
       await repos.learners.insertPromotion({
         school_id: schoolId,
         learner_id: decision.learner_id,
@@ -97,6 +171,23 @@ export async function runAnnualPromotion(
       // distinct from transferLearner's 'transferred' (a different real-
       // world reason for the same mechanical withdrawal).
       await repos.learners.withdrawActiveEnrollments(decision.learner_id, 'withdrawn')
+
+      // Phase 5 convergence, extended to year progression (Task F): a
+      // learner already bridged into the legacy gradebook for their old
+      // class must not keep appearing on that class's legacy roster once
+      // they've progressed/repeated/graduated out of it — same reasoning
+      // as moveLearnerToClass's own wiring. Best-effort: an expected no-op
+      // (never bridged) is silent; an actual failure is logged, never
+      // rolled back or surfaced as if the promotion itself failed — the
+      // canonical promotion above has already been recorded.
+      try {
+        await removeStaleLegacyRosterMembership(asLearnerId(decision.learner_id), fromClassId)
+      } catch (err) {
+        console.error('[promotions] legacy roster convergence failed (promotion already recorded)', {
+          learnerId: decision.learner_id, fromClassId,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
 
       if (isTerminal) {
         await repos.learners.updateStatusById(decision.learner_id, {
@@ -119,22 +210,18 @@ export async function runAnnualPromotion(
         }).catch(err => console.error('[blueprint-snapshot] graduation:', err instanceof Error ? err.message : String(err)))
       } else {
         // 'promoted' or 'repeated' — create the real new enrollment.
-        // RunPromotionInput's decision has no term_id field at all; resolve
-        // one from the destination academic year's own term 1, mirroring
-        // schoolActivation.ts's own term-creation convention (a promotion
-        // always lands a learner at the start of the destination year).
-        const destinationTerms = await repos.schools.listTerms(schoolId, decision.to_academic_year_id)
-        const destinationTerm = destinationTerms[0]
-        if (!destinationTerm) {
-          errors.push(`Learner ${decision.learner_id}: destination academic year ${decision.to_academic_year_id} has no terms — enrollment could not be created (old enrollment was already withdrawn; re-run once the destination year has a term).`)
-          continue
-        }
-
+        // RunPromotionInput's decision has no term_id field at all; term 1
+        // of the destination academic year, mirroring schoolActivation.ts's
+        // own term-creation convention (a promotion always lands a learner
+        // at the start of the destination year). Already resolved and
+        // validated above, before insertPromotion/withdrawActiveEnrollments
+        // ran — this can no longer be the write that discovers a missing
+        // term.
         await enrollLearner({
           school_id: schoolId,
           learner_id: decision.learner_id,
           class_id: decision.to_class_id!,
-          term_id: destinationTerm.id,
+          term_id: destinationTerm!.id,
           academic_year_id: decision.to_academic_year_id!,
         })
       }
@@ -185,14 +272,14 @@ export async function previewPromotion(
   return data.map((r) => {
     const learner = r.learners as unknown as { first_name: string; middle_name: string | null; last_name: string; admission_number: string }
     const cls = r.classes as unknown as { display_name: string; grades: { name: string; level_order: number } }
-    const isGrade9 = cls?.grades?.level_order === 11
+    const isTerminalGrade = TERMINAL_GRADE_LEVEL_ORDERS.has(cls?.grades?.level_order)
     return {
       learner_id: r.learner_id,
       full_name: [learner?.first_name, learner?.middle_name, learner?.last_name].filter(Boolean).join(' '),
       admission_number: learner?.admission_number ?? '',
       current_class: cls?.display_name ?? '',
       grade_name: cls?.grades?.name ?? '',
-      suggested_action: isGrade9 ? 'graduate' : 'promote',
+      suggested_action: isTerminalGrade ? 'graduate' : 'promote',
       hasReportCard: reportCardsByClass.get(r.class_id)?.has(r.learner_id) ?? false,
     }
   })

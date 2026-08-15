@@ -403,6 +403,39 @@ export default function AcademicOfficePage() {
                   <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
+
+              {/* Phase 12 (DR-03/DR-05) — the actual school-wide "turn the
+                  term" action. Deliberately separate from the per-class
+                  report-card workflow above: this is the one operation that
+                  advances every class and the school's own current term
+                  together, once every class above is ready. */}
+              <Link href="/teacher/core-office/academic/term-close" className="block border border-slate-200 rounded-2xl p-4 bg-white hover:border-teal-400 transition-colors">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <CalendarClock className="w-4.5 h-4.5 text-slate-400" />
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">Close Term</p>
+                      <p className="text-xs text-slate-500">
+                        {currentTermRow ? `Advance the whole school from ${currentTermRow.name}` : 'Set a current term first'}
+                      </p>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-slate-300" />
+                </div>
+              </Link>
+
+              <Link href="/teacher/core-office/academic/next-year" className="block border border-slate-200 rounded-2xl p-4 bg-white hover:border-teal-400 transition-colors">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <CalendarRange className="w-4.5 h-4.5 text-slate-400" />
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">Prepare Next Academic Year</p>
+                      <p className="text-xs text-slate-500">Create the next year, its terms, and destination classes</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-slate-300" />
+                </div>
+              </Link>
             </div>
           </div>
 

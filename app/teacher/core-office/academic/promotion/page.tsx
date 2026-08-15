@@ -30,11 +30,16 @@
 // matching Transfer's and Report Publish's pattern for an equally
 // irreversible action (the Sprint 11 UX-consistency finding).
 
-import { useState, useEffect, useCallback } from 'react'
-import { Loader2, AlertCircle, AlertTriangle, CheckCircle2, XCircle, TrendingUp, GraduationCap } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import Link from 'next/link'
+import { Loader2, AlertCircle, AlertTriangle, CheckCircle2, XCircle, TrendingUp, GraduationCap, ChevronDown, ChevronRight, Layers, ArrowRight } from 'lucide-react'
 import type { AcademicYear, ClassWithDetails, Term } from '@/types/core'
 import { ADMIN_TIER_ROLES } from '@/lib/core/adminTierRoles'
 import { OperationalBreadcrumb } from '@/components/core/OperationalBreadcrumb'
+import {
+  groupByCurrentClass, applyCohortDecision, summarizeDecisions, decisionNeedsDestination,
+  type PromotionDecision,
+} from '@/lib/core/client/promotionBulk'
 
 type Membership = {
   schoolId: string
@@ -52,8 +57,6 @@ type PreviewRow = {
   suggested_action: 'promote' | 'graduate'
   hasReportCard: boolean
 }
-
-type PromotionDecision = 'promote' | 'graduate' | 'repeat' | 'skip'
 
 type RunResult = { processed: number; errors: string[] }
 
@@ -74,6 +77,17 @@ export default function PromotionPage() {
   const [preview, setPreview] = useState<PreviewRow[] | null>(null)
   const [decisions, setDecisions] = useState<Record<string, PromotionDecision>>({})
   const [destinationClassByLearner, setDestinationClassByLearner] = useState<Record<string, string>>({})
+  // Phase 7 (Task D/9) — which learners have been individually edited since
+  // the last preview load. A bulk "Apply to cohort" action only ever
+  // touches learners NOT in this set (§9's "apply to unmodified learners
+  // only" rule) — an exception, once made, survives every later bulk apply.
+  const [overridden, setOverridden] = useState<Record<string, boolean>>({})
+  // Per-cohort bulk form input (the decision/destination the admin is about
+  // to apply) — ephemeral UI state, never itself part of the submit
+  // payload; only what it WRITES into decisions/destinationClassByLearner
+  // above ever reaches the request.
+  const [cohortBulkForm, setCohortBulkForm] = useState<Record<string, { decision: PromotionDecision; destinationClassId: string }>>({})
+  const [collapsedCohorts, setCollapsedCohorts] = useState<Record<string, boolean>>({})
   const [loadingPreview, setLoadingPreview] = useState(false)
   const [running, setRunning] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -119,6 +133,9 @@ export default function PromotionPage() {
       rows.forEach(r => { initial[r.learner_id] = r.suggested_action === 'graduate' ? 'graduate' : 'promote' })
       setDecisions(initial)
       setDestinationClassByLearner({})
+      setOverridden({})
+      setCohortBulkForm({})
+      setCollapsedCohorts({})
       setConfirming(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load promotion preview')
@@ -129,9 +146,42 @@ export default function PromotionPage() {
 
   const toSubmit = preview ? preview.filter(r => decisions[r.learner_id] !== 'skip') : []
   const toSubmitCount = toSubmit.length
-  // A promote/repeat decision needs a destination class; graduate does not.
-  const missingDestination = toSubmit.some(r => decisions[r.learner_id] !== 'graduate' && !destinationClassByLearner[r.learner_id])
+  const missingDestination = toSubmit.some(r => decisionNeedsDestination(decisions[r.learner_id] ?? 'promote') && !destinationClassByLearner[r.learner_id])
   const canRun = toSubmitCount > 0 && !!destinationYearId && !missingDestination
+
+  // Phase 7 (Task A/E/F) — cohorts grouped from the SAME preview data
+  // already loaded; no new API call. classNameById lets the summary show
+  // "Grade 8A" instead of a raw class id.
+  const cohorts = useMemo(() => (preview ? groupByCurrentClass(preview) : []), [preview])
+  const classNameById = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const c of destinationClasses ?? []) map[c.id] = c.display_name ?? c.class_name
+    return map
+  }, [destinationClasses])
+  const schoolWideSummary = useMemo(
+    () => preview ? summarizeDecisions(preview.map(r => r.learner_id), decisions, destinationClassByLearner, overridden, classNameById) : null,
+    [preview, decisions, destinationClassByLearner, overridden, classNameById]
+  )
+
+  function markOverridden(learnerId: string) {
+    setOverridden(o => ({ ...o, [learnerId]: true }))
+  }
+
+  function applyCohortBulk(cohortClassName: string, cohortLearnerIds: string[]) {
+    const form = cohortBulkForm[cohortClassName]
+    if (!form) return
+    if (decisionNeedsDestination(form.decision) && !form.destinationClassId) return
+    const result = applyCohortDecision({
+      learnerIds: cohortLearnerIds,
+      decision: form.decision,
+      destinationClassId: decisionNeedsDestination(form.decision) ? form.destinationClassId : null,
+      currentDecisions: decisions,
+      currentDestinations: destinationClassByLearner,
+      overridden,
+    })
+    setDecisions(result.decisions)
+    setDestinationClassByLearner(result.destinations)
+  }
 
   async function runPromotion() {
     if (!membership || !preview || !yearId || !canRun) return
@@ -159,7 +209,10 @@ export default function PromotionPage() {
         }),
       })
       setResult(data)
-      if (data.errors.length === 0) { setPreview(null); setDecisions({}); setDestinationClassByLearner({}) }
+      if (data.errors.length === 0) {
+        setPreview(null); setDecisions({}); setDestinationClassByLearner({})
+        setOverridden({}); setCohortBulkForm({}); setCollapsedCohorts({})
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to run promotion')
     } finally {
@@ -217,8 +270,24 @@ export default function PromotionPage() {
                 </select>
               </div>
             </div>
+            {/* Phase 12 (§22) — Phase 10 found this dropdown simply empty
+                with no way out when no next year exists yet. A real link
+                to the actual place that creates one, not a dead end. */}
+            {academicYears !== null && academicYears.filter(y => y.id !== yearId).length === 0 && (
+              <div className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <p className="text-xs text-amber-700">No next academic year has been prepared yet.</p>
+                <Link href="/teacher/core-office/academic/next-year" className="flex items-center gap-1 text-xs font-bold text-teal-700 hover:text-teal-900 shrink-0">
+                  Prepare next academic year <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            )}
             {destinationYearId && destinationClasses !== null && destinationClasses.length === 0 && (
-              <p className="text-xs text-amber-600">The destination year has no classes yet — create them in Academic Structure first.</p>
+              <div className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <p className="text-xs text-amber-700">The destination year has no classes yet.</p>
+                <Link href="/teacher/core-office/academic/next-year" className="flex items-center gap-1 text-xs font-bold text-teal-700 hover:text-teal-900 shrink-0">
+                  Add destination classes <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
             )}
             <button onClick={loadPreview} disabled={loadingPreview || !yearId || !termId}
               className="flex items-center gap-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold px-4 py-2 rounded-lg transition-colors">
@@ -233,48 +302,166 @@ export default function PromotionPage() {
                 <p className="text-xs text-slate-400">{toSubmitCount} to submit</p>
               </div>
               {preview.length === 0 && <p className="text-sm text-slate-400">No active enrollments found for this academic year.</p>}
-              <div className="space-y-1.5 max-h-96 overflow-y-auto">
-                {preview.map(r => {
-                  const decision = decisions[r.learner_id] ?? 'promote'
-                  const needsDestination = decision !== 'graduate' && decision !== 'skip'
+
+              {/* Phase 7 (Task F) — school-wide review summary, before any
+                  per-cohort detail. Pure arithmetic over state already held;
+                  no backend call. */}
+              {schoolWideSummary && preview.length > 0 && (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+                  <p className="font-bold text-slate-600 flex items-center gap-1.5"><Layers className="w-3.5 h-3.5" /> Review summary</p>
+                  <p className="text-slate-500">
+                    {schoolWideSummary.byDecision.promote} promote · {schoolWideSummary.byDecision.repeat} repeat ·{' '}
+                    {schoolWideSummary.byDecision.graduate} graduate · {schoolWideSummary.byDecision.skip} skip
+                    {schoolWideSummary.overriddenCount > 0 && ` · ${schoolWideSummary.overriddenCount} individually adjusted`}
+                  </p>
+                  {schoolWideSummary.byDestinationClass.length > 0 && (
+                    <p className="text-slate-400">
+                      Destinations: {schoolWideSummary.byDestinationClass.map(d => `${d.className} (${d.count})`).join(', ')}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Phase 7 (Task A/B/C/D/E) — one cohort section per source
+                  class, each with its own bulk decision + destination +
+                  "Apply to N" action, and a collapsible list of individual
+                  rows for exceptions. Large-school usability (Task G):
+                  cohorts default collapsed once they exceed 8 learners, so
+                  a 400-learner school never renders 400 expanded rows at
+                  once — the bulk control above the fold handles the
+                  ordinary case without expanding anything. */}
+              <div className="space-y-3">
+                {cohorts.map(cohort => {
+                  const form = cohortBulkForm[cohort.className] ?? { decision: 'promote' as PromotionDecision, destinationClassId: '' }
+                  const cohortSummary = summarizeDecisions(cohort.learnerIds, decisions, destinationClassByLearner, overridden, classNameById)
+                  const unmodifiedCount = cohort.learnerIds.length - cohortSummary.overriddenCount
+                  const bulkNeedsDestination = decisionNeedsDestination(form.decision)
+                  const isCollapsed = collapsedCohorts[cohort.className] ?? cohort.learnerIds.length > 8
+
                   return (
-                    <div key={r.learner_id} className="border border-slate-100 rounded-lg px-3 py-2 text-sm space-y-1.5">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="font-medium text-slate-700 truncate">{r.full_name}</p>
-                          <p className="text-xs text-slate-400">{r.admission_number} · {r.current_class}</p>
+                    <div key={cohort.className} className="border border-slate-200 rounded-xl overflow-hidden">
+                      <div className="bg-slate-50 px-3 py-2 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-bold text-slate-800">{cohort.className} — {cohort.learnerIds.length} eligible learner{cohort.learnerIds.length === 1 ? '' : 's'}</p>
+                          <button
+                            type="button"
+                            onClick={() => setCollapsedCohorts(c => ({ ...c, [cohort.className]: !isCollapsed }))}
+                            aria-expanded={!isCollapsed}
+                            className="text-xs font-bold text-slate-500 hover:text-slate-700 flex items-center gap-1"
+                          >
+                            {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                            {isCollapsed ? 'Show learners' : 'Hide learners'}
+                          </button>
                         </div>
-                        <select
-                          value={decision}
-                          onChange={e => setDecisions(d => ({ ...d, [r.learner_id]: e.target.value as PromotionDecision }))}
-                          className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-teal-500"
-                        >
-                          <option value="promote">Promote</option>
-                          <option value="graduate">Graduate</option>
-                          <option value="repeat">Repeat</option>
-                          <option value="skip">Skip</option>
-                        </select>
-                      </div>
-                      {!r.hasReportCard && decision !== 'skip' && (
-                        <p className="text-xs text-amber-600 flex items-center gap-1.5">
-                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> No report card generated for this learner yet — you can still proceed.
+                        <p className="text-xs text-slate-500">
+                          {cohortSummary.byDecision.promote} promote · {cohortSummary.byDecision.repeat} repeat ·{' '}
+                          {cohortSummary.byDecision.graduate} graduate · {cohortSummary.byDecision.skip} skip
+                          {cohortSummary.overriddenCount > 0 && ` · ${cohortSummary.overriddenCount} exception${cohortSummary.overriddenCount === 1 ? '' : 's'}`}
                         </p>
-                      )}
-                      {needsDestination && (
-                        <select
-                          value={destinationClassByLearner[r.learner_id] ?? ''}
-                          onChange={e => setDestinationClassByLearner(d => ({ ...d, [r.learner_id]: e.target.value }))}
-                          disabled={!destinationYearId}
-                          className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-teal-500 disabled:opacity-40"
-                        >
-                          <option value="">{destinationYearId ? 'Select destination class…' : 'Select a destination academic year first'}</option>
-                          {(destinationClasses ?? []).map(c => <option key={c.id} value={c.id}>{c.display_name ?? c.class_name}</option>)}
-                        </select>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <label className="sr-only" htmlFor={`bulk-decision-${cohort.className}`}>Bulk decision for {cohort.className}</label>
+                          <select
+                            id={`bulk-decision-${cohort.className}`}
+                            value={form.decision}
+                            onChange={e => setCohortBulkForm(f => ({ ...f, [cohort.className]: { ...form, decision: e.target.value as PromotionDecision } }))}
+                            className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-teal-500 bg-white"
+                          >
+                            <option value="promote">Promote</option>
+                            <option value="graduate">Graduate</option>
+                            <option value="repeat">Repeat</option>
+                            <option value="skip">Skip</option>
+                          </select>
+                          {bulkNeedsDestination && (
+                            <>
+                              <label className="sr-only" htmlFor={`bulk-destination-${cohort.className}`}>Bulk destination class for {cohort.className}</label>
+                              <select
+                                id={`bulk-destination-${cohort.className}`}
+                                value={form.destinationClassId}
+                                onChange={e => setCohortBulkForm(f => ({ ...f, [cohort.className]: { ...form, destinationClassId: e.target.value } }))}
+                                disabled={!destinationYearId}
+                                className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-teal-500 bg-white disabled:opacity-40"
+                              >
+                                <option value="">{destinationYearId ? 'Destination class…' : 'Select a destination year first'}</option>
+                                {(destinationClasses ?? []).map(c => <option key={c.id} value={c.id}>{c.display_name ?? c.class_name}</option>)}
+                              </select>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => applyCohortBulk(cohort.className, cohort.learnerIds)}
+                            disabled={unmodifiedCount === 0 || (bulkNeedsDestination && !form.destinationClassId)}
+                            className="text-xs font-bold text-white bg-teal-600 hover:bg-teal-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg px-3 py-1.5"
+                          >
+                            Apply to {unmodifiedCount} eligible learner{unmodifiedCount === 1 ? '' : 's'}
+                          </button>
+                        </div>
+                        {cohortSummary.overriddenCount > 0 && (
+                          <p className="text-xs text-slate-400">{cohortSummary.overriddenCount} learner{cohortSummary.overriddenCount === 1 ? ' has' : 's have'} an individual exception and will not be changed by Apply.</p>
+                        )}
+                      </div>
+
+                      {!isCollapsed && (
+                        <div className="p-2 space-y-1.5">
+                          {cohort.learnerIds.map(learnerId => {
+                            const r = preview.find(row => row.learner_id === learnerId)!
+                            const decision = decisions[learnerId] ?? 'promote'
+                            const needsDestination = decisionNeedsDestination(decision)
+                            return (
+                              <div key={r.learner_id} className="border border-slate-100 rounded-lg px-3 py-2 text-sm space-y-1.5">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <p className="font-medium text-slate-700 truncate">{r.full_name}</p>
+                                    <p className="text-xs text-slate-400">{r.admission_number} · {r.current_class}</p>
+                                  </div>
+                                  <label className="sr-only" htmlFor={`decision-${r.learner_id}`}>Decision for {r.full_name}</label>
+                                  <select
+                                    id={`decision-${r.learner_id}`}
+                                    value={decision}
+                                    onChange={e => {
+                                      setDecisions(d => ({ ...d, [r.learner_id]: e.target.value as PromotionDecision }))
+                                      markOverridden(r.learner_id)
+                                    }}
+                                    className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-teal-500"
+                                  >
+                                    <option value="promote">Promote</option>
+                                    <option value="graduate">Graduate</option>
+                                    <option value="repeat">Repeat</option>
+                                    <option value="skip">Skip</option>
+                                  </select>
+                                </div>
+                                {!r.hasReportCard && decision !== 'skip' && (
+                                  <p className="text-xs text-amber-600 flex items-center gap-1.5">
+                                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> No report card generated for this learner yet — you can still proceed.
+                                  </p>
+                                )}
+                                {needsDestination && (
+                                  <>
+                                    <label className="sr-only" htmlFor={`destination-${r.learner_id}`}>Destination class for {r.full_name}</label>
+                                    <select
+                                      id={`destination-${r.learner_id}`}
+                                      value={destinationClassByLearner[r.learner_id] ?? ''}
+                                      onChange={e => {
+                                        setDestinationClassByLearner(d => ({ ...d, [r.learner_id]: e.target.value }))
+                                        markOverridden(r.learner_id)
+                                      }}
+                                      disabled={!destinationYearId}
+                                      className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-teal-500 disabled:opacity-40"
+                                    >
+                                      <option value="">{destinationYearId ? 'Select destination class…' : 'Select a destination academic year first'}</option>
+                                      {(destinationClasses ?? []).map(c => <option key={c.id} value={c.id}>{c.display_name ?? c.class_name}</option>)}
+                                    </select>
+                                  </>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
                       )}
                     </div>
                   )
                 })}
               </div>
+
               {preview.length > 0 && (
                 <>
                   {confirming && (
