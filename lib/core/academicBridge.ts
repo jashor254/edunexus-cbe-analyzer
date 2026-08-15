@@ -58,6 +58,7 @@ import { repos } from '@/lib/repositories'
 import { resolveTeacher, resolveMembership, resolveLegacyStudentId } from '@/lib/core/identity'
 import { asStudentId, type LearnerId, type StudentId } from '@/lib/core/identityTypes'
 import { BridgeAlreadyClaimedError } from '@/lib/core/errors'
+import { logger } from '@/lib/observability/logger'
 import { isSchoolAdmin, getSchoolUser } from '@/lib/core/school-users'
 import { getClass } from '@/lib/core/classes'
 import { getLearner } from '@/lib/core/learners'
@@ -86,11 +87,27 @@ function gradeCodeToNumber(code: string): number {
   return n
 }
 
-// class_code must be globally unique (live UNIQUE constraint) — derived
-// deterministically from the Core class id so repeated calls resolve to
-// the same value rather than colliding or drifting.
-function deterministicClassCode(coreClassId: string): string {
-  return `CORE-${coreClassId.slice(0, 8)}`
+// class_code must be globally unique (live UNIQUE constraint:
+// teacher_classes_class_code_key) — derived deterministically so repeated
+// calls resolve to the same value rather than colliding or drifting.
+//
+// Phase 13A (NEW-01) — this used to be keyed on coreClassId ALONE, but the
+// actual bridge identity this module has always used for lookup/insert is
+// (coreClassId, teacherId) — see findLegacyClassByExternalId's teacher-
+// scoped signature just below, unchanged. A class-only code meant the
+// SECOND subject teacher of any shared class (the default shape of a real
+// secondary-school class — one Math teacher, one English teacher, etc.)
+// collided with the first teacher's row on their very first assessment,
+// surfacing a raw, unhandled unique-violation as a generic 500 — Phase 13's
+// freeze audit reproduced this live. Including the teacher fragment keeps
+// the value deterministic per (class, teacher) — same pair always derives
+// the same code, safe to look up again — while making different teachers
+// of the same class derive different codes. Existing rows are untouched:
+// the lookup below has never read class_code's value, only external_id +
+// teacher_id, so an old-format code already stored for a teacher who
+// bridged before this fix continues to resolve exactly as before.
+function deterministicClassCode(coreClassId: string, teacherId: string): string {
+  return `CORE-${coreClassId.slice(0, 8)}-${teacherId.slice(0, 8)}`
 }
 
 /**
@@ -156,7 +173,7 @@ export async function ensureBridgedClass(
     grade:        gradeNumber,
     subject:      'General', // teacher_classes.subject has no real downstream consumer for grading/ranking/evidence — see module header
     academicYear: await resolveAcademicYearName(schoolId, coreClass.academic_year_id),
-    classCode:    deterministicClassCode(coreClassId),
+    classCode:    deterministicClassCode(coreClassId, teacher.id),
     externalId:   coreClassId,
   })
 
@@ -247,6 +264,63 @@ export async function ensureBridgedLearner(
 
   // Trust origin: `students.id`, returned by the insert that just created it.
   return { legacyStudentId: asStudentId(created.id) }
+}
+
+// ── Legacy roster convergence on learner move (Phase 5) ─────────────────────
+//
+// The gap this closes: Phase 4's moveLearnerToClass() correctly updates
+// canonical learner_enrollments (7A -> 7B), but a learner already bridged
+// into the legacy gradebook (i.e. one who has had at least one assessment
+// recorded before the move) stayed on the OLD class's class_students
+// roster forever — ensureBridgedLearner only ever ADDS a roster row, and
+// until this function, nothing in the codebase ever removed one. A
+// teacher's legacy-roster-backed gradebook/assignments/reports view would
+// keep showing a learner who administratively left their class.
+//
+// Proven safe to delete (see removeLegacyClassRosterMembership's own
+// comment): class_students is a pure current-roster join table with zero
+// downstream foreign keys — every historical academic table references
+// students.id directly, never class_students.id. Removing a row here
+// changes only "is this student currently on this legacy class roster,"
+// never anything historical.
+//
+// Deliberately a no-op, not an error, in the two expected cases: the
+// learner was never bridged at all (no students row yet — the common
+// case, since bridging is lazy-on-first-assessment), or the vacated Core
+// class itself was never bridged by any teacher. An ACTUAL failure (the
+// delete call itself erroring) still throws — callers must not treat this
+// as unconditionally safe to ignore, only conditionally absent.
+export async function removeStaleLegacyRosterMembership(
+  coreLearnerId: LearnerId,
+  vacatedCoreClassId: string
+): Promise<{ removed: number }> {
+  const legacyStudent = await repos.teachers.findLegacyStudentByExternalId(coreLearnerId)
+  if (!legacyStudent) return { removed: 0 } // never bridged — nothing to converge
+
+  // Teacher-agnostic on purpose (§18): more than one teacher_classes row
+  // can legitimately represent the same Core class (each teacher who ever
+  // bridged it gets/reuses their own row, keyed by (external_id,
+  // teacherId) in ensureBridgedClass) — e.g. a class reassigned between
+  // teachers over time, each having bridged it while they held it. All of
+  // them are stale once the learner has left the Core class, so all are
+  // removed; none is skipped as "the wrong one."
+  const legacyClassIds = await repos.teachers.findLegacyClassIdsByExternalId(vacatedCoreClassId)
+  if (legacyClassIds.length === 0) return { removed: 0 } // old class itself was never bridged — nothing to converge
+
+  const removed = await repos.teachers.removeLegacyClassRosterMembership(legacyClassIds, legacyStudent.id)
+
+  if (removed > 0) {
+    logger.info('legacy roster membership removed on canonical class move', {
+      service:            'academic-bridge',
+      core_learner_id:    coreLearnerId,
+      vacated_core_class: vacatedCoreClassId,
+      legacy_class_count: legacyClassIds.length,
+      removed,
+      reason:             'canonical_class_move',
+    })
+  }
+
+  return { removed }
 }
 
 // ── High-level orchestration: Assessment → Evidence → Projection ────────────
