@@ -237,7 +237,12 @@ export async function getLearnerReadiness(
   await getLearner(learnerId, schoolId)
 
   const history = await getLearnerHistory(learnerId, schoolId)
-  const enrollment = history.learner_enrollments.find(e => e.term_id === termId && e.status === 'active')
+  // Phase 4 — `ended_at === null` is now required alongside status='active':
+  // a learner moved earlier this term has a second, historical row for the
+  // same term_id whose status is still 'active' (a move never touches
+  // status, only ended_at — see the enrollment migration's own comment).
+  // Without this, .find() could non-deterministically return the closed row.
+  const enrollment = history.learner_enrollments.find(e => e.term_id === termId && e.status === 'active' && e.ended_at === null)
 
   if (!enrollment) {
     return {

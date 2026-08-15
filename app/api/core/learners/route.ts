@@ -80,6 +80,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const termId = req.nextUrl.searchParams.get('termId') ?? undefined
   const search = req.nextUrl.searchParams.get('search') ?? undefined
 
+  // DR-04 (Phase 10 rehearsal finding) — listLearners only applies the
+  // classId filter when termId is ALSO present (a roster is class+term
+  // scoped, not class-alone); supplying classId without termId used to
+  // silently fall through to the full-school list with no error. A caller
+  // that forgot termId got every learner in the school back with no signal
+  // anything was wrong. Rejected here instead, before the ambiguous read.
+  if (classId && !termId) {
+    return NextResponse.json({ error: 'termId is required when classId is supplied — a class roster is scoped to one term, not the whole class history.' }, { status: 422 })
+  }
+
   const data = await listLearners(schoolId, { status: status ?? undefined, classId, termId, search })
   return NextResponse.json({ data, count: data.length })
 }

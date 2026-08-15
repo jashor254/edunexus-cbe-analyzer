@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { getLearner, updateLearner, getLearnerHistory, enrollLearner, withdrawLearner } from '@/lib/core/learners'
+import { getLearner, updateLearner, getLearnerHistory, enrollLearner, withdrawLearner, moveLearnerToClass } from '@/lib/core/learners'
 import { getLearnerReadiness } from '@/lib/core/learnerOnboarding'
-import { getBridgedLearnerTimeline, getBridgedCareerIntelligence } from '@/lib/core/academicBridge'
-import { requireSchoolMembership, requireSchoolAdmin, requireSchoolStaff } from '@/lib/core/permissions'
+import { getBridgedLearnerTimeline, getBridgedCareerIntelligence, removeStaleLegacyRosterMembership } from '@/lib/core/academicBridge'
+import { requireSchoolMembership, requireSchoolAdmin } from '@/lib/core/permissions'
 import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
 import { z } from 'zod'
 import { asLearnerId } from '@/lib/core/identityTypes'
@@ -27,6 +27,20 @@ const EnrollSchema = z.object({
   class_id: z.string().uuid(),
   term_id: z.string().uuid(),
   academic_year_id: z.string().uuid(),
+})
+
+// Phase 4 (Task E — closing F2). Was body destructuring with no schema at all.
+const WithdrawSchema = z.object({
+  schoolId: z.string().uuid(),
+  termId: z.string().uuid(),
+})
+
+// Phase 4 (Task B) — the one canonical class-move action. No term_id here
+// deliberately: moveLearnerToClass always operates on the school's own
+// current term (server-derived), never a client-supplied one.
+const MoveSchema = z.object({
+  schoolId: z.string().uuid(),
+  class_id: z.string().uuid(),
 })
 
 type Params = { params: Promise<{ id: string }> }
@@ -94,23 +108,65 @@ export async function PATCH(req: NextRequest, { params }: Params): Promise<NextR
     if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
     const { schoolId, ...rest } = parsed.data
     try {
-      await requireSchoolStaff(supabase, schoolId)
+      // Phase 4 (Task D — closing the teacher-boundary leak) — was
+      // requireSchoolStaff, which SCHOOL_STAFF_ROLES includes 'teacher'.
+      // Institutional enrollment is admin-owned; a plain teacher could
+      // otherwise write learner_enrollments rows, i.e. maintain a class
+      // roster themselves.
+      await requireSchoolAdmin(supabase, schoolId)
+      const data = await enrollLearner({ school_id: schoolId, learner_id: id, ...rest })
+      return NextResponse.json({ data })
     } catch (err) {
       return errorResponse(err)
     }
-    const data = await enrollLearner({ school_id: schoolId, learner_id: id, ...rest })
-    return NextResponse.json({ data })
   }
 
   if (body.action === 'withdraw') {
-    const { schoolId, termId } = body
+    const parsed = WithdrawSchema.safeParse(body)
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
+    const { schoolId, termId } = parsed.data
     try {
       await requireSchoolAdmin(supabase, schoolId)
+      await withdrawLearner(id, schoolId, termId)
+      return NextResponse.json({ data: { success: true } })
     } catch (err) {
       return errorResponse(err)
     }
-    await withdrawLearner(id, termId)
-    return NextResponse.json({ data: { success: true } })
+  }
+
+  if (body.action === 'move') {
+    const parsed = MoveSchema.safeParse(body)
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
+    const { schoolId, class_id: destinationClassId } = parsed.data
+    try {
+      await requireSchoolAdmin(supabase, schoolId)
+      const result = await moveLearnerToClass(schoolId, id, destinationClassId)
+
+      // Phase 5 — legacy roster convergence, composed here rather than
+      // inside moveLearnerToClass itself (see that function's own comment
+      // on the module-cycle reason). Canonical institutional truth is
+      // already committed by this point and stays authoritative regardless
+      // of what happens next: a missing/never-bridged legacy mapping is an
+      // expected no-op, not a failure, and an ACTUAL cleanup failure is
+      // logged (removeStaleLegacyRosterMembership's own logger.info on
+      // success; a thrown error here is caught and logged, never surfaced
+      // as if the learner's canonical move itself failed — the principal's
+      // action already succeeded).
+      if (result.moved && result.previousClassId) {
+        try {
+          await removeStaleLegacyRosterMembership(asLearnerId(id), result.previousClassId)
+        } catch (err) {
+          console.error('[core/learners PATCH move] legacy roster convergence failed (canonical move already succeeded)', {
+            learnerId: id, previousClassId: result.previousClassId,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        }
+      }
+
+      return NextResponse.json({ data: result })
+    } catch (err) {
+      return errorResponse(err)
+    }
   }
 
   const parsed = UpdateSchema.safeParse(body)

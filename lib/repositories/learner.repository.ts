@@ -21,7 +21,7 @@ const GUARDIAN_COLS =
   'id, school_id, learner_id, user_id, relationship, full_name, phone, email, national_id, is_primary, can_receive_reports, created_at, updated_at'
 
 const ENROLLMENT_COLS =
-  'id, school_id, learner_id, class_id, term_id, academic_year_id, enrollment_date, status, created_at, updated_at'
+  'id, school_id, learner_id, class_id, term_id, academic_year_id, enrollment_date, status, ended_at, created_at, updated_at'
 
 const PROMOTION_COLS =
   'id, school_id, learner_id, from_class_id, to_class_id, from_academic_year_id, to_academic_year_id, promotion_type, processed_by, notes, promoted_at, created_at, updated_at'
@@ -73,7 +73,7 @@ export class LearnerRepository extends BaseRepository {
       .from('learners')
       .select(`
         ${LEARNER_COLS},
-        learner_enrollments (id, class_id, term_id, academic_year_id, enrollment_date, status,
+        learner_enrollments (id, class_id, term_id, academic_year_id, enrollment_date, status, ended_at,
           classes (id, display_name, grade_id)),
         learner_promotions (id, from_class_id, to_class_id, promotion_type, promoted_at, notes),
         learner_transfers (id, direction, transfer_date, to_school_name, reason)
@@ -256,34 +256,84 @@ export class LearnerRepository extends BaseRepository {
     return created
   }
 
-  // Batched counterpart to upsertEnrollment(), same conflict target and the
-  // same "a learner who moved class this term updates rather than duplicates"
-  // behaviour the single-row version documents.
+  // Batched counterpart to upsertEnrollment() — same "re-enrolling into a
+  // different class preserves history rather than overwriting" behaviour,
+  // same reason (see upsertEnrollment's own comment: native upsert can no
+  // longer target the partial current-enrollment index). Callers
+  // (learnerRoster CSV import, term rollover) always pass rows sharing one
+  // term_id in practice, but this stays correct even if they don't —
+  // current enrollments are looked up per distinct term present in the
+  // batch, not assumed uniform.
   async upsertEnrollments(
     rows: Array<EnrollLearnerInput & { school_id: string }>
   ): Promise<number> {
     if (rows.length === 0) return 0
     const CHUNK = 200
     const today = new Date().toISOString().split('T')[0]
+    const now = new Date().toISOString()
     let count = 0
 
     for (let i = 0; i < rows.length; i += CHUNK) {
-      const chunk = rows.slice(i, i + CHUNK).map(input => ({
-        school_id:        input.school_id,
-        learner_id:       input.learner_id,
-        class_id:         input.class_id,
-        term_id:          input.term_id,
-        academic_year_id: input.academic_year_id,
-        enrollment_date:  today,
-        status:           'active',
-      }))
+      const chunk = rows.slice(i, i + CHUNK)
 
-      const { data, error } = await this.db
-        .from('learner_enrollments')
-        .upsert(chunk, { onConflict: 'learner_id,term_id' })
-        .select('id')
-      if (error) throw new Error(`importLearnerEnrollments: ${error.message}`)
-      count += data?.length ?? 0
+      const byTerm = new Map<string, typeof chunk>()
+      for (const row of chunk) {
+        const forTerm = byTerm.get(row.term_id) ?? []
+        forTerm.push(row)
+        byTerm.set(row.term_id, forTerm)
+      }
+
+      for (const [termId, termRows] of byTerm) {
+        const learnerIds = termRows.map(r => r.learner_id)
+        const { data: currentRows, error: readErr } = await this.db
+          .from('learner_enrollments')
+          .select('id, learner_id, class_id')
+          .eq('term_id', termId)
+          .eq('status', 'active')
+          .is('ended_at', null)
+          .in('learner_id', learnerIds)
+        if (readErr) throw new Error(`importLearnerEnrollments (read current): ${readErr.message}`)
+
+        const currentByLearner = new Map((currentRows ?? []).map(r => [r.learner_id, r]))
+
+        const idsToClose = termRows
+          .map(r => currentByLearner.get(r.learner_id))
+          .filter((c): c is { id: string; learner_id: string; class_id: string } => !!c && c.class_id !== termRows.find(r => r.learner_id === c.learner_id)!.class_id)
+          .map(c => c.id)
+
+        if (idsToClose.length > 0) {
+          const { error: closeErr } = await this.db
+            .from('learner_enrollments')
+            .update({ ended_at: now })
+            .in('id', idsToClose)
+            .is('ended_at', null)
+          if (closeErr) throw new Error(`importLearnerEnrollments (close superseded): ${closeErr.message}`)
+        }
+
+        const toInsert = termRows
+          .filter(r => {
+            const c = currentByLearner.get(r.learner_id)
+            return !c || c.class_id !== r.class_id // no row yet, or moving to a different class
+          })
+          .map(r => ({
+            school_id:        r.school_id,
+            learner_id:       r.learner_id,
+            class_id:         r.class_id,
+            term_id:          r.term_id,
+            academic_year_id: r.academic_year_id,
+            enrollment_date:  today,
+            status:           'active',
+          }))
+
+        if (toInsert.length > 0) {
+          const { data, error: insertErr } = await this.db
+            .from('learner_enrollments')
+            .insert(toInsert)
+            .select('id')
+          if (insertErr) throw new Error(`importLearnerEnrollments (insert): ${insertErr.message}`)
+          count += data?.length ?? 0
+        }
+      }
     }
 
     return count
@@ -309,29 +359,60 @@ export class LearnerRepository extends BaseRepository {
     return found
   }
 
+  // Phase 4 — was a native `.upsert(..., { onConflict: 'learner_id,term_id' })`.
+  // That relied on the total UNIQUE(learner_id, term_id) constraint
+  // 20260814173242_learner_enrollments_current_history.sql replaced with a
+  // partial one (current rows only), which native upsert can't target
+  // through the supabase-js client (its onConflict option is a plain
+  // column list; Postgres needs a matching NON-partial index to infer
+  // against). Rewritten as an explicit find-current/close/insert sequence —
+  // the same shape lib/repositories/teacher.repository.ts's
+  // assignClassSubjectTeacher already uses for class_subjects, including
+  // its close-before-insert ordering (a failure between the two leaves the
+  // learner with NO current enrollment rather than two, and the partial
+  // unique index rejects two regardless).
+  //
+  // Behavioural change, and a deliberate one: the OLD upsert overwrote
+  // class_id on the same row when a caller re-enrolled a learner into a
+  // different class — silently destroying the fact they were ever in the
+  // previous class. This now closes the old row and inserts a new one, so
+  // EVERY re-enrollment (not just the new moveLearnerToClass operation)
+  // preserves history. Re-enrolling into the SAME class stays a true no-op
+  // — no new row, same as before.
   async upsertEnrollment(
     input: EnrollLearnerInput & { school_id: string }
   ): Promise<LearnerEnrollment> {
+    const current = await this.findCurrentEnrollment(input.learner_id, input.term_id)
+    if (current && current.class_id === input.class_id) return current
+
+    if (current) {
+      await this.closeEnrollment(current.id, new Date().toISOString())
+    }
+
     const { data, error } = await this.db
       .from('learner_enrollments')
-      .upsert(
-        {
-          school_id:        input.school_id,
-          learner_id:       input.learner_id,
-          class_id:         input.class_id,
-          term_id:          input.term_id,
-          academic_year_id: input.academic_year_id,
-          enrollment_date:  new Date().toISOString().split('T')[0],
-          status:           'active',
-        },
-        { onConflict: 'learner_id,term_id' }
-      )
+      .insert({
+        school_id:        input.school_id,
+        learner_id:       input.learner_id,
+        class_id:         input.class_id,
+        term_id:          input.term_id,
+        academic_year_id: input.academic_year_id,
+        enrollment_date:  new Date().toISOString().split('T')[0],
+        status:           'active',
+      })
       .select(ENROLLMENT_COLS)
       .single()
     if (error) throw new Error(`enrollLearner: ${error.message}`)
     return data
   }
 
+  // Phase 4 — scoped to the CURRENT row only (`ended_at IS NULL`). Before
+  // `ended_at` existed there was at most one row per (learner_id, term_id)
+  // to touch; now a learner who was moved earlier this term also has a
+  // closed historical row for the same (learner_id, term_id) — without this
+  // scope, withdrawing them would incorrectly relabel that historical row
+  // 'withdrawn' too. Also sets ended_at, since a withdrawn/transferred row
+  // is no longer the learner's current placement either.
   async updateEnrollmentStatus(
     learnerId: string,
     termId: string,
@@ -339,18 +420,25 @@ export class LearnerRepository extends BaseRepository {
   ): Promise<void> {
     const { error } = await this.db
       .from('learner_enrollments')
-      .update({ status })
+      .update({ status, ended_at: new Date().toISOString() })
       .eq('learner_id', learnerId)
       .eq('term_id', termId)
+      .is('ended_at', null)
     if (error) throw new Error(`updateEnrollmentStatus: ${error.message}`)
   }
 
+  // Phase 4 — scoped to CURRENT rows only (`ended_at IS NULL`), so a
+  // transfer-out cannot flip the status of a row a class-move already
+  // closed. Before `ended_at` existed, a moved learner's superseded row
+  // would have been mistakenly relabelled 'withdrawn'/'transferred' even
+  // though it was never actually withdrawn — it was simply superseded.
   async withdrawActiveEnrollments(learnerId: string, status: string): Promise<void> {
     const { error } = await this.db
       .from('learner_enrollments')
-      .update({ status })
+      .update({ status, ended_at: new Date().toISOString() })
       .eq('learner_id', learnerId)
       .eq('status', 'active')
+      .is('ended_at', null)
     if (error) throw new Error(`withdrawActiveEnrollments: ${error.message}`)
   }
 
@@ -364,6 +452,7 @@ export class LearnerRepository extends BaseRepository {
       .eq('class_id', classId)
       .eq('term_id', termId)
       .eq('status', 'active')
+      .is('ended_at', null)
     if (error) throw new Error(`listLearners (by class): ${error.message}`)
     return (data ?? []) as { learner_id: string; learners: unknown }[]
   }
@@ -388,6 +477,7 @@ export class LearnerRepository extends BaseRepository {
       .eq('school_id', schoolId)
       .eq('academic_year_id', academicYearId)
       .eq('status', 'active')
+      .is('ended_at', null)
     if (error) throw new Error(`previewPromotion: ${error.message}`)
     return (data ?? []) as {
       learner_id: string
@@ -407,6 +497,7 @@ export class LearnerRepository extends BaseRepository {
       .eq('learner_id', learnerId)
       .eq('academic_year_id', academicYearId)
       .eq('status', 'active')
+      .is('ended_at', null)
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
@@ -421,8 +512,40 @@ export class LearnerRepository extends BaseRepository {
       .eq('class_id', classId)
       .eq('term_id', termId)
       .eq('status', 'active')
+      .is('ended_at', null)
     if (error) throw new Error(`getClassRoster: ${error.message}`)
     return (data ?? []) as { learners: unknown }[]
+  }
+
+  // Phase 4 — the CURRENT enrollment for one learner in one term (status
+  // 'active' AND ended_at NULL), or null if none. The read half of the
+  // find-current/close/insert sequence upsertEnrollment/moveLearnerToClass
+  // both use instead of a native upsert (see upsertEnrollment's own
+  // comment for why a native upsert stopped being possible).
+  async findCurrentEnrollment(learnerId: string, termId: string): Promise<LearnerEnrollment | null> {
+    const { data, error } = await this.db
+      .from('learner_enrollments')
+      .select(ENROLLMENT_COLS)
+      .eq('learner_id', learnerId)
+      .eq('term_id', termId)
+      .eq('status', 'active')
+      .is('ended_at', null)
+      .maybeSingle()
+    if (error) throw new Error(`findCurrentEnrollment: ${error.message}`)
+    return data
+  }
+
+  // Closes a placement (sets ended_at) without touching status — the
+  // learner was not withdrawn or transferred, their placement was simply
+  // superseded by a later one. See the ended_at column comment in
+  // 20260814173242_learner_enrollments_current_history.sql.
+  async closeEnrollment(id: string, endedAt: string): Promise<void> {
+    const { error } = await this.db
+      .from('learner_enrollments')
+      .update({ ended_at: endedAt })
+      .eq('id', id)
+      .is('ended_at', null) // never re-close an already-closed row
+    if (error) throw new Error(`closeEnrollment: ${error.message}`)
   }
 
   // ── Promotions ─────────────────────────────────────────────────────────────

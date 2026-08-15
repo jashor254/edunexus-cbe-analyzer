@@ -178,7 +178,16 @@ test('onboardLearner: a duplicate admission_number reuses the existing learner r
 
 // ── Learner moved during onboarding (Part 7) ─────────────────────────────────
 
-test('onboardLearner: re-onboarding the same learner into a different class for the same term moves them, not duplicates them', async () => {
+// Phase 4 ("The Term Turns and the Learner Moves") rewrite — was "moves
+// them, not duplicates them," asserting exactly one enrollment row
+// survived (the OLD class_id overwritten in place). That in-place overwrite
+// was precisely the history-destroying bug the Phase 3 audit found and
+// Phase 4's migration (20260814173242_learner_enrollments_current_history.sql)
+// exists to close. The corrected, desired behavior: re-enrolling into a
+// different class now closes the old row (ended_at set, history intact)
+// and opens a new current one — never duplicates the CURRENT roster, but
+// no longer erases where the learner was before.
+test('onboardLearner: re-onboarding the same learner into a different class for the same term preserves history — closes the old enrollment, opens a new current one, never duplicates the CURRENT roster', async () => {
   const { data: secondClass } = await db
     .from('classes')
     .insert({ school_id: schoolId, class_name: 'G7 Moved', display_name: 'G7 Moved', grade_id: (await db.from('classes').select('grade_id').eq('id', classId).single()).data!.grade_id, academic_year_id: academicYearId })
@@ -195,9 +204,15 @@ test('onboardLearner: re-onboarding the same learner into a different class for 
   assert.equal(moved.status, 'complete')
   assert.equal(moved.learnerId, first.learnerId)
 
-  const { data: enrollmentRows } = await db.from('learner_enrollments').select('id, class_id').eq('learner_id', first.learnerId)
-  assert.equal(enrollmentRows?.length, 1) // still exactly one enrollment for this term
-  assert.equal(enrollmentRows?.[0].class_id, secondClass!.id) // now pointing at the new class
+  const { data: enrollmentRows } = await db.from('learner_enrollments').select('id, class_id, ended_at').eq('learner_id', first.learnerId).order('created_at')
+  assert.equal(enrollmentRows?.length, 2, 'the original class placement must survive as closed history, not be overwritten')
+  assert.equal(enrollmentRows?.[0].class_id, classId)
+  assert.ok(enrollmentRows?.[0].ended_at, 'the original placement must be closed')
+  assert.equal(enrollmentRows?.[1].class_id, secondClass!.id)
+  assert.equal(enrollmentRows?.[1].ended_at, null, 'the new placement must be current')
+
+  const currentRows = await db.from('learner_enrollments').select('id').eq('learner_id', first.learnerId).is('ended_at', null)
+  assert.equal(currentRows.data?.length, 1, 'exactly one CURRENT enrollment — the roster is never duplicated')
 })
 
 // ── Failure recovery (Part 7/9) ──────────────────────────────────────────────

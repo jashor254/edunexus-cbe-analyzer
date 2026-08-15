@@ -292,6 +292,8 @@ export type LearnerEnrollment = {
   academic_year_id: string
   enrollment_date: string
   status: EnrollmentStatus
+  /** Phase 4 — NULL = this row is the learner's CURRENT placement for this term. Non-null = superseded by a later placement (a class move), closed at this instant. Independent of `status`. */
+  ended_at: string | null
   created_at: string
   updated_at: string
 }
