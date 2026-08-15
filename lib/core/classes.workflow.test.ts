@@ -19,7 +19,7 @@ import { inviteTeacher, acceptTeacherInvitation } from '@/lib/core/teacherOnboar
 import { createStream, createClass, assignSubjectTeacher, listClassSubjects, listStreams } from '@/lib/core/classes'
 import { assignSubjectToGrade, listGradeSubjects, listSubjects } from '@/lib/core/subjects'
 import { requireSchoolAdmin } from '@/lib/core/permissions'
-import { PermissionDeniedError, MembershipRequiredError } from '@/lib/core/errors'
+import { PermissionDeniedError, MembershipRequiredError, SchoolMismatchError } from '@/lib/core/errors'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_S10_CLASSES_TEST'
 const db = createServiceClient()
@@ -53,6 +53,9 @@ let subjectId: string
 
 let otherSchoolId: string
 let otherAdminEmail: string
+let otherSchoolClassId: string
+let otherSchoolTeacherSchoolUserId: string
+let inactiveTeacherSchoolUserId: string
 
 before(async () => {
   const admin = await mkAuthUser('admin')
@@ -86,6 +89,26 @@ before(async () => {
   otherSchoolId = otherSchool.id
   createdSchoolIds.push(otherSchoolId)
   await repos.schools.addSchoolUser(otherSchoolId, otherAdmin.id, 'school_admin')
+
+  // Task 5 fixtures — a real class and a real teacher at the OTHER school,
+  // to prove assignSubjectTeacher rejects them when supplied against `schoolId`.
+  const otherActivation = await activateSchool(otherSchoolId, { gradeCodes: ['G7'] })
+  if (otherActivation.status !== 'complete') throw new Error(`other-school fixture activation failed: ${otherActivation.error}`)
+  const { data: otherClasses } = await db.from('classes').select('id').eq('school_id', otherSchoolId).limit(1)
+  otherSchoolClassId = otherClasses![0].id
+
+  const otherSchoolTeacherUser = await mkAuthUser('other-school-teacher')
+  await inviteTeacher(otherSchoolId, otherSchoolTeacherUser.email, otherAdmin.id)
+  const otherAccepted = await acceptTeacherInvitation(otherSchoolTeacherUser.id, otherSchoolId, { full_name: 'Other School Teacher' })
+  otherSchoolTeacherSchoolUserId = otherAccepted.schoolUser.id
+
+  // A teacher at THIS school whose membership has since been deactivated
+  // (departed) — assignSubjectTeacher must reject assigning them.
+  const inactiveTeacherUser = await mkAuthUser('inactive-teacher')
+  await inviteTeacher(schoolId, inactiveTeacherUser.email, admin.id)
+  const inactiveAccepted = await acceptTeacherInvitation(inactiveTeacherUser.id, schoolId, { full_name: 'Departed Teacher' })
+  inactiveTeacherSchoolUserId = inactiveAccepted.schoolUser.id
+  await db.from('school_users').update({ is_active: false }).eq('id', inactiveTeacherSchoolUserId)
 })
 
 after(async () => {
@@ -177,4 +200,66 @@ test('requireSchoolAdmin allows the school\'s own admin', async () => {
   const client = await signInAs(adminEmail)
   const membership = await requireSchoolAdmin(client, schoolId)
   assert.equal(membership.role, 'school_admin')
+})
+
+// ── Task 5: assignSubjectTeacher's own cross-school scoping checks ─────────
+// requireSchoolAdmin above only proves the caller's own membership in
+// `schoolId` — these prove assignSubjectTeacher no longer trusts classId/
+// teacherId at face value just because the caller is a real admin
+// SOMEWHERE. Before this fix none of these four rejected.
+
+test('assignSubjectTeacher: same-school teacher/class succeeds (control case)', async () => {
+  const cls = await createClass(schoolId, {
+    grade_id: gradeId,
+    academic_year_id: academicYearId,
+    display_name: `${SYNTHETIC_MARKER} Grade 7 Task5 Control`,
+  })
+  const result = await assignSubjectTeacher(schoolId, cls.id, subjectId, teacherSchoolUserId)
+  assert.equal(result.unchanged, false)
+})
+
+test('assignSubjectTeacher: a class belonging to a DIFFERENT school is rejected', async () => {
+  await assert.rejects(
+    () => assignSubjectTeacher(schoolId, otherSchoolClassId, subjectId, teacherSchoolUserId),
+    SchoolMismatchError
+  )
+})
+
+test('assignSubjectTeacher: a teacher (school_users.id) belonging to a DIFFERENT school is rejected', async () => {
+  const cls = await createClass(schoolId, {
+    grade_id: gradeId,
+    academic_year_id: academicYearId,
+    display_name: `${SYNTHETIC_MARKER} Grade 7 Task5 CrossTeacher`,
+  })
+  await assert.rejects(
+    () => assignSubjectTeacher(schoolId, cls.id, subjectId, otherSchoolTeacherSchoolUserId),
+    SchoolMismatchError
+  )
+})
+
+// Phase 2 correction (was: "a deactivated membership is rejected"). Phase 1
+// rejected ANY inactive membership here, which incidentally also blocked
+// assigning a still-PENDING (invited, not yet accepted) teacher — exactly
+// the "admin pre-provisions before the teacher ever logs in" ordering
+// Phase 2's activation flow depends on. is_active can't distinguish
+// "pending" from "departed" (both are simply `false`), so
+// assignSubjectTeacher no longer treats it as disqualifying — only school
+// membership and role matter. This is a deliberate, evidence-driven
+// change to Phase 1 behavior, not a silent regression — see
+// lib/core/classes.ts's own comment at the same check.
+test('assignSubjectTeacher: an inactive (pending OR departed) membership at THIS school is still ALLOWED — only cross-school is rejected', async () => {
+  const cls = await createClass(schoolId, {
+    grade_id: gradeId,
+    academic_year_id: academicYearId,
+    display_name: `${SYNTHETIC_MARKER} Grade 7 Task5 Inactive`,
+  })
+  const result = await assignSubjectTeacher(schoolId, cls.id, subjectId, inactiveTeacherSchoolUserId)
+  assert.equal(result.unchanged, false)
+})
+
+test('assignSubjectTeacher: cross-school class+teacher together (both wrong) is still rejected, not silently accepted', async () => {
+  await assert.rejects(
+    () => assignSubjectTeacher(schoolId, otherSchoolClassId, subjectId, otherSchoolTeacherSchoolUserId),
+    SchoolMismatchError
+  )
 })

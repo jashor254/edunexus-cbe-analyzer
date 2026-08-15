@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { listSubjects, listGradeSubjects, assignSubjectToGrade, seedGradeSubjectsForSchool } from '@/lib/core/subjects'
-import { assignSubjectTeacher, listClassSubjects } from '@/lib/core/classes'
+import { assignSubjectTeacher, listClassSubjects, getClassSubjectHistory } from '@/lib/core/classes'
 import { requireAuthentication, requireSchoolMembership, requireSchoolAdmin } from '@/lib/core/permissions'
 import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
 import { z } from 'zod'
@@ -51,6 +51,21 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ data })
   }
 
+  // Phase 9 — the orphan Phase 8 identified (getClassSubjectHistory had zero
+  // HTTP caller). Small wiring only: "who has held this post, current and
+  // historical" for the Phase 8 class page's optional "View history" toggle.
+  if (view === 'subject-history' && classId) {
+    const subjectId = req.nextUrl.searchParams.get('subjectId')
+    if (!schoolId || !subjectId) return NextResponse.json({ error: 'schoolId and subjectId required' }, { status: 400 })
+    try {
+      await requireSchoolMembership(supabase, schoolId)
+      const data = await getClassSubjectHistory(schoolId, classId, subjectId)
+      return NextResponse.json({ data })
+    } catch (err) {
+      return errorResponse(err)
+    }
+  }
+
   if (view === 'grade-subjects' && schoolId && gradeId) {
     try {
       await requireSchoolMembership(supabase, schoolId)
@@ -76,10 +91,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
     try {
       await requireSchoolAdmin(supabase, parsed.data.schoolId)
+      // assignSubjectTeacher (lib/core/classes.ts) now independently verifies
+      // classId and teacherId belong to schoolId too — requireSchoolAdmin
+      // above only proves the CALLER's own membership, not that the class/
+      // teacher ids they supplied are this school's. Same try/catch as the
+      // membership check so that SchoolMismatchError also surfaces as a
+      // clean 403, not an unhandled 500.
+      await assignSubjectTeacher(parsed.data.schoolId, parsed.data.classId, parsed.data.subjectId, parsed.data.teacherId)
     } catch (err) {
       return errorResponse(err)
     }
-    await assignSubjectTeacher(parsed.data.schoolId, parsed.data.classId, parsed.data.subjectId, parsed.data.teacherId)
     return NextResponse.json({ data: { success: true } })
   }
 

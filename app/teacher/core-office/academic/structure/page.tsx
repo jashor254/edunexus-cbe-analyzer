@@ -14,8 +14,17 @@
 // This is the "Classes" / "Subjects" activation the Academic Office page
 // previously described as read-only ("Dedicated management screens for
 // editing them are not yet available").
+//
+// Phase 8 (Principal Class Operations) — the inline "pick a class, see its
+// roster, allocate its subjects" panel that used to live at the bottom of
+// this page moved to a real per-class route,
+// /teacher/core-office/academic/structure/[classId]. Keeping both would be
+// exactly the duplicate class-management surface Phase 8 was told not to
+// create; this page now only creates structure (streams/classes/subject-
+// to-grade), and links each class row to its own operations page.
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { Loader2, AlertCircle, CheckCircle2, Plus } from 'lucide-react'
 import type { ClassWithDetails, Grade, Stream, Subject, Term } from '@/types/core'
 import { ADMIN_TIER_ROLES } from '@/lib/core/adminTierRoles'
@@ -28,14 +37,13 @@ type Membership = {
   currentTerm: Term | null
 }
 
-type TeacherOption = { schoolUserId: string; fullName: string | null; email: string | null; status: 'pending' | 'active' }
-
-type ClassSubjectRow = {
-  id: string
-  subject_id: string
-  teacher_id: string
-  subjects: { id: string; name: string; code: string }
-}
+// Phase 4 (Task F) — `joinedAt` distinguishes a genuinely-pending invite
+// (joined_at is only ever stamped on acceptance, so it stays null until
+// then) from a departed teacher (deactivateSchoolUser only flips
+// is_active — joined_at, once set, is never cleared). Both currently
+// collapse to status:'pending' from is_active alone; joinedAt is the
+// existing signal that already tells them apart without any migration.
+type TeacherOption = { schoolUserId: string; fullName: string | null; email: string | null; status: 'pending' | 'active' | 'departed'; joinedAt: string | null }
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { credentials: 'include', ...init })
@@ -64,11 +72,6 @@ export default function AcademicStructurePage() {
   const [gradeSubjectForm, setGradeSubjectForm] = useState({ grade_id: '', subject_id: '' })
   const [savingGradeSubject, setSavingGradeSubject] = useState(false)
 
-  const [allocationClassId, setAllocationClassId] = useState('')
-  const [classSubjects, setClassSubjects] = useState<ClassSubjectRow[] | null>(null)
-  const [allocationForm, setAllocationForm] = useState({ subject_id: '', teacher_id: '' })
-  const [savingAllocation, setSavingAllocation] = useState(false)
-
   useEffect(() => {
     fetchJson<{ membership: Membership | null }>('/api/core/my-membership')
       .then(({ membership }) => setMembership(membership))
@@ -91,20 +94,18 @@ export default function AcademicStructurePage() {
       .then(setSubjects)
       .catch(() => setSubjects([]))
     fetchJson<TeacherOption[]>(`/api/core/teachers?schoolId=${membership.schoolId}&list=true`)
-      .then(list => setTeachers(list.filter(t => t.status === 'active')))
+      // Phase 4 (Task F) — was `t.status === 'active'` only, which
+      // correctly excluded departed teachers but ALSO excluded a
+      // genuinely pending invitee (invited, not yet accepted) from ever
+      // being assignable — the exact "pre-assign before the teacher logs
+      // in" capability Phase 2 built and Phase 3's audit found unreachable
+      // through this picker. A pending row with joinedAt still null has
+      // never been accepted (never departed either, since departure only
+      // ever flips is_active — joinedAt stays set once stamped); that is
+      // the only additional case now included.
+      .then(list => setTeachers(list.filter(t => t.status === 'active' || (t.status === 'pending' && t.joinedAt === null))))
       .catch(() => setTeachers([]))
   }, [membership, isAdminTier, loadClasses])
-
-  const loadClassSubjects = useCallback((schoolId: string, classId: string) => {
-    fetchJson<ClassSubjectRow[]>(`/api/core/subjects?view=class-subjects&schoolId=${schoolId}&classId=${classId}`)
-      .then(setClassSubjects)
-      .catch(e => setError(e instanceof Error ? e.message : 'Failed to load class subjects'))
-  }, [])
-
-  useEffect(() => {
-    if (!membership || !allocationClassId) { setClassSubjects(null); return }
-    loadClassSubjects(membership.schoolId, allocationClassId)
-  }, [membership, allocationClassId, loadClassSubjects])
 
   async function createStream() {
     if (!membership || !streamName.trim()) return
@@ -171,31 +172,6 @@ export default function AcademicStructurePage() {
     }
   }
 
-  async function assignTeacher() {
-    if (!membership || !allocationClassId || !allocationForm.subject_id || !allocationForm.teacher_id) return
-    setSavingAllocation(true); setError(''); setNotice('')
-    try {
-      await fetchJson('/api/core/subjects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'assign-teacher',
-          schoolId: membership.schoolId,
-          classId: allocationClassId,
-          subjectId: allocationForm.subject_id,
-          teacherId: allocationForm.teacher_id,
-        }),
-      })
-      setNotice('Teacher assigned to subject.')
-      setAllocationForm({ subject_id: '', teacher_id: '' })
-      loadClassSubjects(membership.schoolId, allocationClassId)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to assign teacher')
-    } finally {
-      setSavingAllocation(false)
-    }
-  }
-
   if (membership === undefined) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -254,10 +230,11 @@ export default function AcademicStructurePage() {
             <h2 className="text-sm font-black text-slate-900">Classes ({classes?.length ?? 0})</h2>
             <div className="space-y-1.5">
               {(classes ?? []).map(c => (
-                <div key={c.id} className="flex items-center justify-between text-sm border border-slate-100 rounded-lg px-3 py-2">
+                <Link key={c.id} href={`/teacher/core-office/academic/structure/${c.id}`}
+                  className="flex items-center justify-between text-sm border border-slate-100 hover:border-teal-300 hover:bg-teal-50/40 rounded-lg px-3 py-2 transition-colors">
                   <span className="text-slate-700 font-medium">{c.display_name ?? c.class_name}</span>
                   <span className="text-xs text-slate-400">{c.grades?.name ?? '—'}{c.streams?.name ? ` · ${c.streams.name}` : ''}</span>
-                </div>
+                </Link>
               ))}
             </div>
             <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
@@ -330,57 +307,9 @@ export default function AcademicStructurePage() {
             </button>
           </section>
 
-          {/* Teacher → Class + Subject allocation */}
-          <section className="border border-slate-200 rounded-2xl p-4 bg-white space-y-3">
-            <h2 className="text-sm font-black text-slate-900">Allocate Teachers to Class Subjects</h2>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">Class</label>
-              <select value={allocationClassId} onChange={e => setAllocationClassId(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-500">
-                <option value="">Select a class…</option>
-                {(classes ?? []).map(c => <option key={c.id} value={c.id}>{c.display_name ?? c.class_name}</option>)}
-              </select>
-            </div>
-
-            {allocationClassId && (
-              <>
-                <div className="space-y-1.5">
-                  {(classSubjects ?? []).map(cs => {
-                    const t = teachers?.find(t => t.schoolUserId === cs.teacher_id)
-                    return (
-                      <div key={cs.id} className="flex items-center justify-between text-sm border border-slate-100 rounded-lg px-3 py-2">
-                        <span className="text-slate-700 font-medium">{cs.subjects.name}</span>
-                        <span className="text-xs text-slate-400">{t?.fullName ?? t?.email ?? 'Assigned teacher'}</span>
-                      </div>
-                    )
-                  })}
-                  {classSubjects !== null && classSubjects.length === 0 && <p className="text-xs text-slate-400">No subjects allocated for this class yet.</p>}
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">Subject</label>
-                    <select value={allocationForm.subject_id} onChange={e => setAllocationForm(f => ({ ...f, subject_id: e.target.value }))}
-                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-500">
-                      <option value="">Select…</option>
-                      {(subjects ?? []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">Teacher</label>
-                    <select value={allocationForm.teacher_id} onChange={e => setAllocationForm(f => ({ ...f, teacher_id: e.target.value }))}
-                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-500">
-                      <option value="">Select…</option>
-                      {(teachers ?? []).map(t => <option key={t.schoolUserId} value={t.schoolUserId}>{t.fullName ?? t.email}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <button onClick={assignTeacher} disabled={savingAllocation || !allocationForm.subject_id || !allocationForm.teacher_id}
-                  className="flex items-center gap-1.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold px-4 py-2 rounded-lg transition-colors">
-                  {savingAllocation ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Allocate
-                </button>
-              </>
-            )}
-          </section>
+          <p className="text-xs text-slate-400 px-1">
+            Open a class above to view its roster, manage learner moves, and assign teaching coverage.
+          </p>
         </>
       )}
     </div>
