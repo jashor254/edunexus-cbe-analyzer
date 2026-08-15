@@ -148,14 +148,50 @@ export async function proxy(request: NextRequest) {
     // /teacher/setup is open to any logged-in user (completes onboarding)
     if (pathname === '/teacher/setup') return response
 
+    // Phase 2 (admin-provisioned teacher activation) — /teacher/activate
+    // reads and accepts the CALLER's OWN pending invitation(s), open to any
+    // authenticated user regardless of role. Same shape as /teacher/setup
+    // above: a brand-new invitee has neither a teacher-role profile nor a
+    // teachers row yet, so the stricter gate below would otherwise bounce
+    // them before they ever get the chance to accept.
+    //
+    // app/teacher/layout.tsx wraps this route too and runs its OWN
+    // canAccessTeacher-or-adminMembership check as defense in depth — that
+    // check would otherwise re-block exactly the user this carve-out just
+    // admitted, since a pending invitee has neither. Forwarded as a request
+    // header, the same technique already used for the /student/blueprint
+    // teacher-viewer carve-out below, since a Server Component layout has
+    // no direct access to the middleware's own pathname match.
+    if (pathname === '/teacher/activate') {
+      const activateHeaders = new Headers(request.headers)
+      activateHeaders.set('x-teacher-activate-viewer', '1')
+      return NextResponse.next({ request: { headers: activateHeaders } })
+    }
+
     const roles = await getUserRoles(user.id, supabase)
     const isTeacherRole = roles.primary === 'teacher' || roles.secondary === 'teacher'
 
-    // School Office (Sprint 10G): admin-tier school_users members may reach
-    // it even without a teacher-role profile (e.g. a headteacher who does
-    // not also teach) — every other /teacher/* route keeps the stricter
+    // Core institutional admin surfaces (Sprint 10G school office; Phase 1
+    // self-serve onboarding): admin-tier school_users members may reach
+    // these even without a teacher-role profile (e.g. a self-created
+    // principal, or a headteacher who does not also teach). Each of these
+    // routes already gates its own admin-only content client-side via
+    // ADMIN_TIER_ROLES (app/teacher/core-team, core-admissions) or an
+    // inline role check (core-term's headteacher section) — this only
+    // clears the outer middleware door, it grants no new capability.
+    // core-classes (the shared teacher/parent/student/admin Blueprint
+    // render) and core-readiness (a legacy redirect shim to core-office)
+    // are deliberately NOT included here: they're a different kind of
+    // route, not institutional admin surfaces, and widening for them was
+    // never asked for. Every other /teacher/* route keeps the stricter
     // teacher-only gate below, unchanged.
-    if (pathname.startsWith('/teacher/core-office')) {
+    const ADMIN_INSTITUTIONAL_PREFIXES = [
+      '/teacher/core-office',
+      '/teacher/core-team',
+      '/teacher/core-admissions',
+      '/teacher/core-term',
+    ]
+    if (ADMIN_INSTITUTIONAL_PREFIXES.some(prefix => pathname.startsWith(prefix))) {
       const adminMembership = await getSchoolAdminMembership(user.id, supabase)
       if (adminMembership) return response
     }

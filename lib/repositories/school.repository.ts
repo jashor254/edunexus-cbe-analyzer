@@ -101,6 +101,28 @@ export class SchoolRepository extends BaseRepository {
     return data
   }
 
+  // DR-06 (Phase 10 rehearsal finding) — a double-submitted "Create School"
+  // request (a UI double-click, or a browser retry of a dropped response)
+  // used to create a second, fully-activated school for the same person.
+  // Scoped narrowly to a short window and the SAME name, deliberately: a
+  // founder legitimately creating a second, differently-named institution
+  // later must never be blocked by this — only the exact within-seconds
+  // retry Phase 10 actually reproduced.
+  async findRecentByCreatorAndName(createdBy: string, schoolName: string, withinMs = 120_000): Promise<School | null> {
+    const since = new Date(Date.now() - withinMs).toISOString()
+    const { data, error } = await this.db
+      .from('schools')
+      .select(SCHOOL_COLS)
+      .eq('created_by', createdBy)
+      .eq('school_name', schoolName)
+      .gte('created_at', since)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    if (error) throw new Error(`findRecentByCreatorAndName: ${error.message}`)
+    return data
+  }
+
   // ── Institutional entitlement ──────────────────────────────────────────────
 
   // The one query behind school-covered teacher access: every active teacher
@@ -241,15 +263,46 @@ export class SchoolRepository extends BaseRepository {
 
   // ── School Users ───────────────────────────────────────────────────────────
 
+  // Phase 1 self-serve onboarding, Task 4 — was `.maybeSingle()`, which
+  // throws (surfacing as a 500, e.g. GET /api/core/my-membership) the moment
+  // a user has more than one active membership. None of this function's
+  // callers pass a schoolId — they're asking "what school is this person
+  // in" with no context yet — unlike the properly schoolId-scoped
+  // `getSchoolUser(userId, schoolId)` that every authorization check
+  // (requireSchoolMembership/requireSchoolAdmin) already uses instead, which
+  // is unaffected by this whole class of bug.
+  //
+  // Multiple active memberships per user are NOT prevented at creation
+  // time, deliberately: app/admin/core-schools/new (the internal founder
+  // onboarding tool, gated by ADMIN_EMAILS) reuses the same createSchool()
+  // for every school it sets up, with the founder as creatorUserId each
+  // time — the founder legitimately ends up school_admin of many schools.
+  // Refusing a second active membership here would break that tool, not
+  // just harden this one. So instead of preventing the state, this
+  // degrades gracefully when it's encountered: pick the most recently
+  // created active membership deterministically and log the rest, rather
+  // than bricking the caller. This makes reality match what
+  // app/api/core/my-membership/route.ts's own header comment already
+  // claimed ("picks one membership if a user belongs to more than one
+  // school... acceptable at current pilot scale") — that comment described
+  // intended behavior the old `.maybeSingle()` implementation didn't
+  // actually deliver.
   async findSchoolUserByUserId(userId: string): Promise<SchoolUser | null> {
     const { data, error } = await this.db
       .from('school_users')
       .select(SCHOOL_USER_COLS)
       .eq('user_id', userId)
       .eq('is_active', true)
-      .maybeSingle()
+      .order('created_at', { ascending: false })
     if (error) throw new Error(`findSchoolUserByUserId: ${error.message}`)
-    return data
+    if (!data || data.length === 0) return null
+    if (data.length > 1) {
+      console.error('[school.repository] findSchoolUserByUserId: user has multiple active school memberships — picking the most recently created', {
+        userId,
+        schoolIds: data.map(row => row.school_id),
+      })
+    }
+    return data[0]
   }
 
   // Reverse of findSchoolUserByUserId — resolves the auth user_id from a
@@ -423,6 +476,20 @@ export class SchoolRepository extends BaseRepository {
       .eq('school_id', schoolId)
       .eq('is_current', true)
       .single()
+    return data
+  }
+
+  // Phase 4 (Task D — closing F1) — scoped existence check for a
+  // client-supplied term_id, the same shape findClassById already provides
+  // for classId. Returns null (not a throw) for "doesn't exist here" so
+  // callers can produce a clean, typed rejection rather than a raw error.
+  async findTermById(termId: string, schoolId: string): Promise<Term | null> {
+    const { data } = await this.db
+      .from('terms')
+      .select(TERM_COLS)
+      .eq('id', termId)
+      .eq('school_id', schoolId)
+      .maybeSingle()
     return data
   }
 

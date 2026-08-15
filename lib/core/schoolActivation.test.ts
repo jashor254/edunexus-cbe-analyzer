@@ -204,9 +204,15 @@ test('activateSchool: runs the full pipeline end-to-end on a fresh school', asyn
     // Sprint 12 Wave 1 (High 1): a new 'current_term' step, between 'terms'
     // and 'grades', closes the Release Candidate audit's "no school ever
     // ends activation with a current term set" finding.
-    assert.equal(result.steps.length, 7)
-    assert.deepEqual(result.steps.map(s => s.step), ['academic_year', 'terms', 'current_term', 'grades', 'streams', 'classes', 'school_settings'])
+    // Phase 12 (DR-08): a new 'grade_subjects' step at the end closes the
+    // Phase 10 rehearsal's "fresh school has zero subjects until an admin
+    // finds a separate button" finding.
+    assert.equal(result.steps.length, 8)
+    assert.deepEqual(result.steps.map(s => s.step), ['academic_year', 'terms', 'current_term', 'grades', 'streams', 'classes', 'school_settings', 'grade_subjects'])
     assert.ok(result.steps.every(s => s.status !== 'failed'))
+
+    const gradeSubjectsStep = result.steps.find(s => s.step === 'grade_subjects')
+    assert.equal(gradeSubjectsStep?.status, 'created')
 
     const status = await getSchoolActivationStatus(freshId)
     assert.equal(status, 'ACTIVE')

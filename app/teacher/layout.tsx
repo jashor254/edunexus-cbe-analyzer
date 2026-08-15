@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import TeacherSidebar from '@/components/teacher/TeacherSidebar'
 import { VideoOnboardingModal } from '@/components/video-onboarding-modal'
 import { getUserRoles, getSchoolAdminMembership } from '@/lib/auth/getRole'
@@ -22,7 +23,15 @@ export default async function TeacherLayout({ children }: { children: React.Reac
   // one path; mirrored here so this defense-in-depth check doesn't bounce
   // them right back out.
   const adminMembership = await getSchoolAdminMembership(user.id)
-  if (!canAccessTeacher && !adminMembership) redirect('/dashboard')
+
+  // Phase 2: /teacher/activate is open to any authenticated user (proxy.ts
+  // sets x-teacher-activate-viewer for exactly this route) — a brand-new
+  // teacher invitee has neither a teacher-role profile nor a teachers row
+  // nor an ACTIVE admin-tier membership (theirs is still pending), so
+  // without this they would be bounced right back out by the check below.
+  const isActivateViewer = (await headers()).get('x-teacher-activate-viewer') === '1'
+
+  if (!canAccessTeacher && !adminMembership && !isActivateViewer) redirect('/dashboard')
 
   const db = createServiceClient()
 

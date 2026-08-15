@@ -57,6 +57,7 @@ import {
   listClasses,
   createClass,
 } from '@/lib/core/classes'
+import { listGradeSubjects, seedGradeSubjectsForSchool } from '@/lib/core/subjects'
 import type { School, AcademicYear, Term, Grade, Stream, ClassWithDetails } from '@/types/core'
 
 // ── Input shape ─────────────────────────────────────────────────────────────
@@ -92,6 +93,7 @@ export type ActivationStepName =
   | 'streams'
   | 'classes'
   | 'school_settings'
+  | 'grade_subjects'
 
 export type ActivationStepStatus = 'created' | 'already_exists' | 'skipped' | 'failed'
 
@@ -423,6 +425,28 @@ export async function ensureClasses(
   }
 }
 
+// DR-08 (Phase 10 rehearsal finding) — a freshly activated school had zero
+// learning areas assigned to any grade until an admin separately found and
+// clicked "Set Up Default Subjects" on a different screen (Academic
+// Office's readiness checklist), not Academic Structure where classes are
+// created. seedGradeSubjectsForSchool() already existed, already idempotent
+// (bulk upsert on (school_id,grade_id,subject_id)) — this only adds it as
+// a real activation step so a school never starts in that zero-subjects
+// state in the first place. Existence check via the FIRST resolved grade
+// only (a cheap, sufficient proxy — the seed itself upserts, so a
+// re-run on a partially-seeded school is still harmless).
+export async function ensureGradeSubjects(schoolId: string, grades: Grade[]): Promise<{ result: ActivationStepResult }> {
+  if (grades.length === 0) {
+    return { result: { step: 'grade_subjects', status: 'skipped', detail: 'No grades resolved for this school yet — nothing to seed.' } }
+  }
+  const existing = await listGradeSubjects(schoolId, grades[0].id)
+  if (existing.length > 0) {
+    return { result: { step: 'grade_subjects', status: 'already_exists', detail: 'Grade subjects already seeded — left untouched.' } }
+  }
+  await seedGradeSubjectsForSchool(schoolId)
+  return { result: { step: 'grade_subjects', status: 'created', detail: 'Seeded default learning areas for every grade in the KICD catalogue.' } }
+}
+
 export async function ensureSchoolSettings(schoolId: string): Promise<{ result: ActivationStepResult }> {
   const existing = await getSchoolSettingsOrNull(schoolId)
   if (existing) {
@@ -443,7 +467,7 @@ export async function ensureSchoolSettings(schoolId: string): Promise<{ result: 
 
 /**
  * Runs the full activation pipeline for an existing school:
- *   Academic Year → Terms → Grades (resolved) → Streams → Classes → Settings
+ *   Academic Year → Terms → Grades (resolved) → Streams → Classes → Settings → Grade Subjects
  *
  * Every step is idempotent — safe to call repeatedly, including after a
  * partial failure (see module header for the rollback/retry rationale).
@@ -490,10 +514,13 @@ export async function activateSchool(
     const { result: settingsResult } = await ensureSchoolSettings(schoolId)
     steps.push(settingsResult)
 
+    const { result: gradeSubjectsResult } = await ensureGradeSubjects(schoolId, grades)
+    steps.push(gradeSubjectsResult)
+
     return { schoolId, status: 'complete', steps }
   } catch (err) {
-    const failedStep = steps.length < 7
-      ? (['academic_year', 'terms', 'current_term', 'grades', 'streams', 'classes', 'school_settings'] as const)[steps.length]
+    const failedStep = steps.length < 8
+      ? (['academic_year', 'terms', 'current_term', 'grades', 'streams', 'classes', 'school_settings', 'grade_subjects'] as const)[steps.length]
       : undefined
     const message = err instanceof Error ? err.message : String(err)
     if (failedStep) {

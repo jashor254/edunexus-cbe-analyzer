@@ -159,6 +159,18 @@ export default function CoreOfficePage() {
   const [error, setError] = useState('')
   const [logoUploading, setLogoUploading] = useState(false)
   const [logoError, setLogoError] = useState('')
+  // Task 2 (Phase 1 self-serve onboarding) — School Profile editing. Reuses
+  // the existing PATCH /api/core/school unchanged; only the fields
+  // UpdateSchoolSchema (app/api/core/school/route.ts) actually accepts are
+  // editable here. `nemis_code` and `school_type` are deliberately excluded
+  // — the canonical PATCH route does not support updating either, so they
+  // stay read-only in the <dl> below rather than silently no-op'ing.
+  const [editingProfile, setEditingProfile] = useState(false)
+  const [profileForm, setProfileForm] = useState<Partial<Pick<School,
+    'school_name' | 'county' | 'sub_county' | 'ward' | 'address' | 'contact_phone' | 'contact_email' | 'motto'
+  >>>({})
+  const [profileSaving, setProfileSaving] = useState(false)
+  const [profileError, setProfileError] = useState('')
   // Read once, client-side only — a plain flag from the school-creation
   // redirect, not worth a useSearchParams()/Suspense-boundary dependency
   // for a one-time banner. Must be a useEffect, not a lazy useState
@@ -289,6 +301,53 @@ export default function CoreOfficePage() {
       setLogoError(err instanceof Error ? err.message : 'Upload failed')
     } finally {
       setLogoUploading(false)
+    }
+  }
+
+  function startEditingProfile() {
+    if (!school) return
+    setProfileForm({
+      school_name: school.school_name,
+      county: school.county ?? '',
+      sub_county: school.sub_county ?? '',
+      ward: school.ward ?? '',
+      address: school.address ?? '',
+      contact_phone: school.contact_phone ?? '',
+      contact_email: school.contact_email ?? '',
+      motto: school.motto ?? '',
+    })
+    setProfileError('')
+    setEditingProfile(true)
+  }
+
+  async function handleProfileSave() {
+    if (!membership) return
+    setProfileSaving(true)
+    setProfileError('')
+    try {
+      // Empty strings are sent as-is (UpdateSchoolSchema treats them as
+      // valid optional values, e.g. clearing a phone number) except
+      // school_name, which the schema requires non-empty when present.
+      const body: Record<string, string> = { schoolId: membership.schoolId }
+      for (const [key, value] of Object.entries(profileForm)) {
+        if (value === undefined) continue
+        if (key === 'school_name' && !value.trim()) continue
+        body[key] = value
+      }
+      const res = await fetch('/api/core/school', {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error?.formErrors?.[0] ?? json.error ?? 'Save failed')
+      setSchool(json.data as School)
+      setEditingProfile(false)
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : 'Save failed')
+    } finally {
+      setProfileSaving(false)
     }
   }
 
@@ -426,10 +485,117 @@ export default function CoreOfficePage() {
           )}
 
           <div>
-            <h2 className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">School Profile</h2>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xs font-bold uppercase tracking-wide text-slate-400">School Profile</h2>
+              {school && isAdminTier && !editingProfile && (
+                <button
+                  type="button"
+                  onClick={startEditingProfile}
+                  className="text-xs font-bold text-sky-700 hover:text-sky-900"
+                >
+                  Edit
+                </button>
+              )}
+            </div>
             <div className="border border-slate-200 rounded-2xl p-4 bg-white">
               {!school ? (
                 <p className="text-sm text-slate-400">Loading…</p>
+              ) : editingProfile ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="col-span-2 text-xs text-slate-500">
+                      School name
+                      <input
+                        type="text"
+                        value={profileForm.school_name ?? ''}
+                        onChange={e => setProfileForm(f => ({ ...f, school_name: e.target.value }))}
+                        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-800"
+                      />
+                    </label>
+                    <label className="text-xs text-slate-500">
+                      County
+                      <input
+                        type="text"
+                        value={profileForm.county ?? ''}
+                        onChange={e => setProfileForm(f => ({ ...f, county: e.target.value }))}
+                        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-800"
+                      />
+                    </label>
+                    <label className="text-xs text-slate-500">
+                      Sub-county
+                      <input
+                        type="text"
+                        value={profileForm.sub_county ?? ''}
+                        onChange={e => setProfileForm(f => ({ ...f, sub_county: e.target.value }))}
+                        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-800"
+                      />
+                    </label>
+                    <label className="text-xs text-slate-500">
+                      Ward
+                      <input
+                        type="text"
+                        value={profileForm.ward ?? ''}
+                        onChange={e => setProfileForm(f => ({ ...f, ward: e.target.value }))}
+                        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-800"
+                      />
+                    </label>
+                    <label className="text-xs text-slate-500">
+                      Phone
+                      <input
+                        type="text"
+                        value={profileForm.contact_phone ?? ''}
+                        onChange={e => setProfileForm(f => ({ ...f, contact_phone: e.target.value }))}
+                        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-800"
+                      />
+                    </label>
+                    <label className="col-span-2 text-xs text-slate-500">
+                      Email
+                      <input
+                        type="email"
+                        value={profileForm.contact_email ?? ''}
+                        onChange={e => setProfileForm(f => ({ ...f, contact_email: e.target.value }))}
+                        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-800"
+                      />
+                    </label>
+                    <label className="col-span-2 text-xs text-slate-500">
+                      Address
+                      <input
+                        type="text"
+                        value={profileForm.address ?? ''}
+                        onChange={e => setProfileForm(f => ({ ...f, address: e.target.value }))}
+                        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-800"
+                      />
+                    </label>
+                    <label className="col-span-2 text-xs text-slate-500">
+                      Motto
+                      <input
+                        type="text"
+                        value={profileForm.motto ?? ''}
+                        onChange={e => setProfileForm(f => ({ ...f, motto: e.target.value }))}
+                        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-800"
+                      />
+                    </label>
+                  </div>
+                  {profileError && <p className="text-xs text-rose-600">{profileError}</p>}
+                  <div className="flex items-center gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleProfileSave}
+                      disabled={profileSaving}
+                      className="text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 rounded-lg px-3 py-1.5"
+                    >
+                      {profileSaving ? 'Saving…' : 'Save'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setEditingProfile(false); setProfileError('') }}
+                      disabled={profileSaving}
+                      className="text-xs font-bold text-slate-500 hover:text-slate-700"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">

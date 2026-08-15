@@ -25,7 +25,13 @@ function sanitizeReturnTo(raw: string | null): string {
 // Paths whose returnTo is always honored as-is, skipping the role-based
 // override below — either genuinely public, or (for /organizations) because
 // org membership, not profiles.role, is what actually governs access there.
-const PUBLIC_PATHS = ['/pricing', '/legal', '/join', '/shared', '/payment', '/organizations']
+// Phase 2 (admin-provisioned teacher activation) — /teacher/activate joins
+// this list for the same reason /organizations already does: a brand-new
+// invitee's role hasn't been decided by resolveRoleDestination's logic
+// yet (school_users membership, not profiles.role, governs what they can
+// do), and that logic would otherwise override the invite email's intended
+// destination and strand them on a generic dashboard instead.
+const PUBLIC_PATHS = ['/pricing', '/legal', '/join', '/shared', '/payment', '/organizations', '/teacher/activate']
 
 async function resolveRoleDestination(
   db: SupabaseClient,

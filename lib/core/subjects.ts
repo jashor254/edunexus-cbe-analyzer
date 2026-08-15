@@ -45,11 +45,18 @@ export async function seedGradeSubjectsForSchool(schoolId: string): Promise<void
   const rows: Array<{ school_id: string; grade_id: string; subject_id: string; is_compulsory: boolean }> = []
 
   subjects.forEach((s) => {
-    const gradeCodes: string[] = s.category === 'pre_primary'
-      ? ['PP1', 'PP2']
-      : s.category === 'primary'
-        ? ['G1', 'G2', 'G3', 'G4', 'G5', 'G6']
-        : ['G7', 'G8', 'G9']
+    // Phase 1 self-serve onboarding, Task 6 — was a three-way ternary whose
+    // final branch (['G7','G8','G9']) silently caught BOTH
+    // 'junior_secondary' AND 'senior_secondary', since only 'pre_primary'
+    // and 'primary' were ever named. A Senior School's default-subjects
+    // seed landed entirely on grades it doesn't teach, and G10-G12 (the
+    // grades it does teach) got nothing — reproduced live in
+    // lib/core/subjects.seeding.test.ts before this fix.
+    const gradeCodes: string[] =
+      s.category === 'pre_primary'       ? ['PP1', 'PP2'] :
+      s.category === 'primary'           ? ['G1', 'G2', 'G3', 'G4', 'G5', 'G6'] :
+      s.category === 'junior_secondary'  ? ['G7', 'G8', 'G9'] :
+      /* senior_secondary */                ['G10', 'G11', 'G12']
 
     gradeCodes.forEach((code) => {
       if (gradeMap[code]) {

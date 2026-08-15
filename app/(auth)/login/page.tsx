@@ -46,8 +46,11 @@ function LoginContent() {
 
       // /organizations governs access via org membership, not profiles.role —
       // always honor it directly instead of falling through to the personal
-      // teacher/parent/student redirect below.
-      if (_returnTo && _returnTo.startsWith('/organizations')) return _returnTo
+      // teacher/parent/student redirect below. /teacher/activate (Phase 2)
+      // is the same shape: a brand-new or cross-role invitee's pending
+      // school_users invitation, not their profiles.role, is what should
+      // drive where they land right after logging in from an invite email.
+      if (_returnTo && (_returnTo.startsWith('/organizations') || _returnTo.startsWith('/teacher/activate'))) return _returnTo
 
       // Honor saved role preference first
       const savedPreference =

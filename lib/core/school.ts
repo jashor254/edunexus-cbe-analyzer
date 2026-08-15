@@ -18,6 +18,20 @@ export async function createSchool(
   input: Pick<School, 'school_name'> & Partial<Pick<School, 'school_type' | 'county' | 'sub_county' | 'ward' | 'address' | 'contact_phone' | 'contact_email' | 'nemis_code' | 'motto'>>,
   creatorUserId: string
 ): Promise<{ school: School; schoolUser: SchoolUser }> {
+  // DR-06 (Phase 10 rehearsal finding) — resubmitting this request (a UI
+  // double-click, or a browser retry of a dropped response) used to create
+  // a second, fully-activated school for the same principal. Narrowly
+  // scoped to the same creator + same name within the last two minutes, so
+  // it catches exactly that retry without ever blocking a founder who
+  // later, deliberately, creates a second real institution.
+  const recentDuplicate = await repos.schools.findRecentByCreatorAndName(creatorUserId, input.school_name)
+  if (recentDuplicate) {
+    const existingMembership = await repos.teachers.findSchoolUser(creatorUserId, recentDuplicate.id)
+    if (existingMembership) {
+      return { school: recentDuplicate, schoolUser: existingMembership }
+    }
+  }
+
   const school = await repos.schools.create(input, creatorUserId)
 
   void publishEvent({

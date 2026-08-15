@@ -7,6 +7,28 @@ import { Sparkles, Mail, Lock, Loader2, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import { getRoleRedirect, type UserRole } from '@/lib/auth/roleRedirect'
 
+/**
+ * Both signup entry points (Google OAuth, email/password) need to carry the
+ * same onboarding intent through to /auth/callback — most importantly
+ * role=school, which routes a confirmed principal into
+ * /organizations/new?type=school instead of a generic dashboard. Extracted
+ * so it's exercised by one plain unit test (signup.buildAuthCallbackUrl.test.ts)
+ * without needing to render the form or mock Supabase.
+ */
+export function buildAuthCallbackUrl(origin: string, params: {
+  returnTo: string
+  role: string | null
+  productId: string | null
+  secondaryRole: string | null
+}): string {
+  const cbUrl = new URL(`${origin}/auth/callback`)
+  cbUrl.searchParams.set('returnTo', params.returnTo)
+  if (params.role)          cbUrl.searchParams.set('role',           params.role)
+  if (params.productId)     cbUrl.searchParams.set('product',        params.productId)
+  if (params.secondaryRole) cbUrl.searchParams.set('secondary_role', params.secondaryRole)
+  return cbUrl.toString()
+}
+
 const GoogleIcon = () => (
   <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -47,15 +69,14 @@ function SignupForm() {
     setLoading(true)
     setError(null)
 
-    const cbUrl = new URL(`${window.location.origin}/auth/callback`)
-    cbUrl.searchParams.set('returnTo', returnTo)
-    if (role)                            cbUrl.searchParams.set('role',           role)
-    if (productId)                       cbUrl.searchParams.set('product',        productId)
-    if (wantsSecondary && secondaryRole) cbUrl.searchParams.set('secondary_role', secondaryRole)
+    const cbUrl = buildAuthCallbackUrl(window.location.origin, {
+      returnTo, role, productId,
+      secondaryRole: wantsSecondary ? secondaryRole : null,
+    })
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options:  { redirectTo: cbUrl.toString() },
+      options:  { redirectTo: cbUrl },
     })
 
     if (error) {
@@ -69,7 +90,25 @@ function SignupForm() {
     setEmailLoading(true)
     setError(null)
 
-    const { data, error } = await supabase.auth.signUp({ email, password })
+    // Task 3 (Phase 1 self-serve onboarding) — without emailRedirectTo, the
+    // confirmation link Supabase emails falls back to the project's Site
+    // URL, dropping role/returnTo/product/secondary_role entirely: a
+    // 'school' signup confirmed by email landed on a generic destination
+    // instead of /organizations/new?type=school, silently breaking the
+    // one path this whole phase exists to make work. Mirrors exactly the
+    // /auth/callback URL handleGoogleSignup already builds above (same
+    // buildAuthCallbackUrl call), so app/auth/callback/route.ts needs no
+    // changes to handle either origin.
+    const cbUrl = buildAuthCallbackUrl(window.location.origin, {
+      returnTo, role, productId,
+      secondaryRole: wantsSecondary ? secondaryRole : null,
+    })
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: cbUrl },
+    })
     if (error) {
       setError(error.message)
       setEmailLoading(false)
