@@ -120,3 +120,60 @@ test('CAP-003: a single-assessment learner never crashes and never fabricates a 
 test('CAP-003: completely empty scoreHistory is refused, never silently interpreted as zero capability', () => {
   assert.throws(() => extractCapabilityProfile([]), /at least one assessment snapshot/)
 })
+
+// ── CAP-004 — contradictory evidence preserves uncertainty ──────────────────
+//
+// extractCapabilityProfile()'s current per-dimension level/raw_score is
+// always computed from only the LAST snapshot (the deterministic "what do
+// we believe right now" answer — see extractCapabilityProfile's `current =
+// normalized[normalized.length - 1]`), while resilience.raw_score is the
+// one field that reasons across the whole history's trajectory
+// (computeResilience: per-subject first-vs-last delta, >=0.75 strong
+// momentum, >0.25 improving, <-0.25 declining). A genuinely contradictory
+// history (up then back down to where it started) nets to delta=0 —
+// neither improving nor declining — and must not be scored the same as a
+// real sustained improvement that happens to touch the same two endpoints.
+
+test('CAP-004: sustained improvement scores measurably higher resilience than a contradictory up-then-down swing with the same start/end volume', () => {
+  const sustainedImprovement = [{ mathematics: 1 }, { mathematics: 2 }, { mathematics: 4 }]
+  const contradictorySwing   = [{ mathematics: 1 }, { mathematics: 4 }, { mathematics: 1 }]
+
+  const improving = extractCapabilityProfile(sustainedImprovement)
+  const contradictory = extractCapabilityProfile(contradictorySwing)
+
+  assert.ok(
+    improving.resilience.raw_score > contradictory.resilience.raw_score,
+    `sustained improvement (${improving.resilience.raw_score}) must score higher resilience than a contradictory swing that nets to no real change (${contradictory.resilience.raw_score})`
+  )
+})
+
+test('CAP-004: current capability level reflects the most recent evidence, not a historical spike a contradictory swing left behind', () => {
+  // Level 4 in the middle, but the learner's latest demonstrated evidence is
+  // back down at Level 1 — "what is true right now" must not be inflated by
+  // an interim high point that the latest evidence has since contradicted.
+  const spikeThenDrop = [{ mathematics: 1 }, { mathematics: 4 }, { mathematics: 1 }]
+  const profile = extractCapabilityProfile(spikeThenDrop)
+
+  assert.equal(profile.analytical_reasoning.level, 'emerging', 'current level must reflect the latest (Level 1) evidence, not the interim Level 4 spike')
+  assert.equal(profile.analytical_reasoning.raw_score, 0, 'the current raw score is computed only from the most recent snapshot')
+})
+
+// H2B FINDING (reported, not fixed — see closeout report; fixing this would
+// mean redesigning detectTrend()'s algorithm, out of H2B's scope lock):
+// detectTrend() (capabilityExtractor.ts) compares the average of the first
+// half of history against the average of the second half, not "does the
+// latest value exceed the first." For a 3-point spike-then-drop history
+// ([1, 4, 1]), the second half ([4, 1], avg 2.5-normalized) still averages
+// higher than the first half ([1] alone) purely because the interim spike
+// drags the second-half average up — so this genuinely contradictory
+// history (ends exactly where it started) is currently reported as
+// 'accelerating', the single most confident growth label the enum has.
+// This test pins the real, current, deterministic behavior — not the
+// desired one — so a future change to detectTrend() is a deliberate,
+// reviewed decision, not a silent regression either direction.
+test('CAP-004 FINDING: a 3-point spike-then-drop history — which ends exactly where it started — is currently labeled "accelerating," not neutral, by detectTrend()\'s half-average method', () => {
+  const spikeThenDrop = [{ mathematics: 1 }, { mathematics: 4 }, { mathematics: 1 }]
+  const profile = extractCapabilityProfile(spikeThenDrop)
+
+  assert.equal(profile.analytical_reasoning.trend, 'accelerating', 'pins the actual current behavior — see the H2B finding above')
+})

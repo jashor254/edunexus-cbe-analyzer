@@ -15,9 +15,10 @@
 // Run: npx tsx --env-file=.env.local --test lib/projection/equivalenceHarness.integration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { startIngestionRun } from '@/lib/intelligence/ingestionRun'
 import { persistEvidenceBatch, retractEvidence } from '@/lib/intelligence/evidenceLifecycle'
+import { assignmentMarkKey } from '@/lib/intelligence/correctionKey'
 import type { LearnerEvidence } from '@/lib/intelligence/evidence'
 import { resolveLegacyStudentId } from '@/lib/core/identity'
 import { asLearnerId } from '@/lib/core/identityTypes'
@@ -143,13 +144,26 @@ test('Cohort B (retracted evidence): supersession/retraction is honored identica
   const { studentId, coreLearnerId } = await makeSyntheticStudent('cohort-b')
   createdStudentIds.push(studentId)
 
-  // Same claim key (learnerId:subject:assessmentType:academicYear:term) twice
-  // — the second supersedes the first automatically (claimKey() supersession).
+  // H2B fixture correction: the original fixture used evidenceSource:
+  // 'csv_export' with no correctionKey. Under the current Phase E4
+  // correctionGroupKey() rule (evidenceLifecycle.ts), csv_export cannot mint
+  // a correctionKey at all (correctionKey.ts's NAMESPACE_SOURCES), so the two
+  // rows below were never actually in a supersedes relationship — this
+  // cohort was silently testing two independent permanent observations, not
+  // supersession/retraction equivalence at all (see H2A findings, and
+  // EVD-SUP-001 in evidenceSupersessionRetraction.integration.test.ts, which
+  // now owns the dedicated supersession/retraction semantics proof). This
+  // cohort's actual purpose per its name — "honored identically through both
+  // paths" — is EQUIVALENCE, not semantics definition, so it is corrected
+  // here to use a genuine correction-keyed producer (a teacher regrade),
+  // which is the one real-world case that actually supersedes.
+  const assignmentId = crypto.randomUUID()
+  const correctionKey = assignmentMarkKey({ assignmentId, studentId, source: 'teacher_upload' })
   await seedEvidence(studentId, [
-    makeEvidence({ learnerId: studentId, subject: 'mathematics', cbcLevel: 2, term: 1, academicYear: 2026 }),
+    makeEvidence({ learnerId: studentId, subject: 'mathematics', cbcLevel: 2, term: 1, academicYear: 2026, evidenceSource: 'teacher_upload', trustTier: 3, correctionKey }),
   ])
   const secondBatchIds = await seedEvidence(studentId, [
-    makeEvidence({ learnerId: studentId, subject: 'mathematics', cbcLevel: 4, term: 1, academicYear: 2026 }),
+    makeEvidence({ learnerId: studentId, subject: 'mathematics', cbcLevel: 4, term: 1, academicYear: 2026, evidenceSource: 'teacher_upload', trustTier: 3, correctionKey }),
   ])
 
   // Explicitly retract the newer one too, proving retraction (not just
