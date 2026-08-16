@@ -130,7 +130,44 @@ test('detectAccelerationCandidates: a student at risk is never a candidate, rega
   assert.deepEqual(detectAccelerationCandidates(projections, [p], new Map()), [])
 })
 
-test('detectAccelerationCandidates: capability_dimensions (6-dimension trend) still reads from legacy — deliberately not migrated (ADR-0029 engine gap)', () => {
+test('detectAccelerationCandidates: capability-dimension trend is now derived live from Projection (H2D closure), not the raw legacy capability_dimensions column', () => {
+  const p = profile({
+    student_id: 's1',
+    // Deliberately populated with a DIFFERENT, stale legacy value — proves
+    // the function no longer reads this column at all for trend reasoning.
+    capability_dimensions: {
+      analytical_reasoning: { raw_score: 0.1, level: 'emerging', trend: 'declining', confidence: 0.9, last_computed: new Date().toISOString() },
+    },
+  })
+  // Real, rising evidence history for two subjects (mathematics ->
+  // analytical_reasoning, english -> communication) — three snapshots each,
+  // sharp enough second-half rise to cross capabilityExtractor's
+  // detectTrend() momentum threshold and read as 'accelerating'.
+  const bySubject: AcademicValue['bySubject'] = {
+    mathematics: {
+      subject: 'mathematics', latestLevel: 4, trend: 'improving',
+      history: [
+        { level: 1, score: 25, at: '2026-01-01T00:00:00Z', evidenceId: 'e1' },
+        { level: 2, score: 50, at: '2026-02-01T00:00:00Z', evidenceId: 'e2' },
+        { level: 4, score: 95, at: '2026-03-01T00:00:00Z', evidenceId: 'e3' },
+      ],
+    },
+    english: {
+      subject: 'english', latestLevel: 4, trend: 'improving',
+      history: [
+        { level: 1, score: 25, at: '2026-01-01T00:00:00Z', evidenceId: 'e4' },
+        { level: 2, score: 50, at: '2026-02-01T00:00:00Z', evidenceId: 'e5' },
+        { level: 4, score: 95, at: '2026-03-01T00:00:00Z', evidenceId: 'e6' },
+      ],
+    },
+  }
+  const projections = new Map([['s1', projection({}, bySubject)]]) // no substrand-4 data — must qualify on capability trend alone
+  const candidates = detectAccelerationCandidates(projections, [p], new Map([['s1', 'Amina']]))
+  assert.equal(candidates.length, 1)
+  assert.match(candidates[0].reason, /capability dimensions are accelerating/)
+})
+
+test('detectAccelerationCandidates: a student with zero admissible evidence is never a candidate on capability grounds, even with a stale accelerating legacy cache', () => {
   const p = profile({
     student_id: 's1',
     capability_dimensions: {
@@ -138,8 +175,6 @@ test('detectAccelerationCandidates: capability_dimensions (6-dimension trend) st
       communication:        { raw_score: 0.9, level: 'exceptional', trend: 'accelerating', confidence: 0.9, last_computed: new Date().toISOString() },
     },
   })
-  const projections = new Map([['s1', projection({})]]) // no substrand-4 data at all
-  const candidates = detectAccelerationCandidates(projections, [p], new Map([['s1', 'Amina']]))
-  assert.equal(candidates.length, 1)
-  assert.match(candidates[0].reason, /capability dimensions are accelerating/)
+  const projections = new Map([['s1', projection({})]]) // no academic evidence at all
+  assert.deepEqual(detectAccelerationCandidates(projections, [p], new Map([['s1', 'Amina']])), [])
 })

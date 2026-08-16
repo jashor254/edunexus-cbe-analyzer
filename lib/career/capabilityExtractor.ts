@@ -124,6 +124,17 @@ function weightedCapability(
 
 // ── Trend Detection ───────────────────────────────────────────────────────────
 // Takes a series of capability raw_scores (oldest → newest).
+//
+// H2D Decision B (docs/architecture/adr-0029-addendum-h2d-capability-convergence.md):
+// this is the platform's **momentumTrend** concept — "is the learner's
+// recent half of history stronger or weaker than their earlier half."
+// First-half average vs. second-half average, a recency-weighted momentum
+// signal, deliberately not the same question as Projection's
+// computeTrend() (lib/projection/academicProjector.ts), which answers
+// **netTrend** — "what changed from the very first point to the very
+// last." A spike-then-return history can read as momentumTrend
+// 'accelerating' here and netTrend 'stable' there; both are correct
+// answers to different questions. Do not unify these two functions.
 
 function detectTrend(history: number[]): CapabilityTrendDirection {
   if (history.length < 2) return 'stable'

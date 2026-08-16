@@ -210,8 +210,19 @@ test('INTEL-004: Blueprint, Compass and Career all resolve the same canonical id
 })
 
 // ── INTEL-LEGACY-001 — the legacy assessments-table capability path can disagree with the canonical Projection-based path ──
+//
+// H2D Decision A (docs/architecture/adr-0029-addendum-h2d-capability-convergence.md)
+// resolved the USER-FACING side of this: Monday Panel and Attention Feed no
+// longer read learner_profiles.capability_dimensions (the legacy path's
+// output) at all — see lib/learnerIntelligence/canonicalCapability.ts and
+// its own INTEL-CAP-001 proof. This test still pins that
+// computeCapabilityProfile() ITSELF (the function, still called by
+// lib/learnerModel/updater.ts to populate that now-unread legacy column)
+// remains unfiltered by design — a deliberately scoped, forward-only
+// convergence (§17 of the H2D closeout report), not a claim that the
+// legacy writer or table were changed.
 
-test('INTEL-LEGACY-001 FINDING: computeCapabilityProfile() (legacy assessments table) and the Projection-based capability path can disagree for the same learner', async () => {
+test('INTEL-LEGACY-001: computeCapabilityProfile() (legacy assessments table, still written but no longer read by teacher-facing surfaces) and the Projection-based capability path can still disagree at the function level', async () => {
   const studentId = await makeStudent('legacy-divergence')
 
   // Real, confirmed, admissible Evidence Domain signal: a genuine Level 1
@@ -246,9 +257,20 @@ test('INTEL-LEGACY-001 FINDING: computeCapabilityProfile() (legacy assessments t
   )
 })
 
-// ── INTEL-TREND-001 — Career's own trend algorithm can disagree with Projection's (the algorithm Blueprint surfaces) ──
+// ── INTEL-TREND-001 — netTrend vs momentumTrend: two DIFFERENT, both-correct questions (H2D Decision B) ──
+//
+// H2C found this as an unexplained divergence. H2D's Decision B (see
+// docs/architecture/adr-0029-addendum-h2d-capability-convergence.md)
+// ruled it is not a defect: Projection's computeTrend() answers netTrend
+// ("what changed first-to-last") and capabilityExtractor's detectTrend()
+// answers momentumTrend ("is recent history stronger than earlier
+// history") — legitimately different educational questions over the same
+// evidence, now documented at both function definitions. This test now
+// asserts the ACCEPTED architecture: both values are correct for their
+// own question, and no surface may treat one as a corrected version of
+// the other.
 
-test('INTEL-TREND-001 FINDING: for a 1->4->1 contradictory history, capabilityExtractor\'s detectTrend() and Projection\'s computeTrend() disagree', async () => {
+test('INTEL-TREND-001: for a 1->4->1 history, Blueprint\'s netTrend (stable) and Career\'s momentumTrend (accelerating) are both correct — a documented distinction, not a contradiction', async () => {
   const studentId = await makeStudent('trend-divergence')
   await seed(contradictoryMathHistory(studentId)) // 1, 4, 1 — ends exactly where it started
 
@@ -256,20 +278,18 @@ test('INTEL-TREND-001 FINDING: for a 1->4->1 contradictory history, capabilityEx
   const { profile: careerProfile } = await careerCapabilityFor(studentId)
   const bpMath = blueprint.data!.bySubject.find(s => s.subject === 'mathematics')!
 
-  // Projection's computeTrend() (lib/projection/academicProjector.ts) is a
-  // simple first-vs-last comparison: 1 -> 1 is 'stable'. Blueprint surfaces
-  // this value directly — no reinterpretation of its own.
-  assert.equal(bpMath.trend, 'stable', 'Projection/Blueprint: a history that ends exactly where it started is stable, not a trend')
+  // netTrend (Projection's computeTrend(), surfaced directly by Blueprint):
+  // first-vs-last comparison — 1 -> 1 is 'stable'.
+  assert.equal(bpMath.trend, 'stable', 'netTrend: a history that ends exactly where it started is stable — no net change')
 
-  // capabilityExtractor's detectTrend() (H2B finding) instead compares
-  // first-half vs second-half AVERAGE — the interim spike drags the second
-  // half above the first, so the identical evidence reads as 'accelerating'
-  // through Career's own, separate trend algorithm.
-  assert.equal(careerProfile!.analytical_reasoning.trend, 'accelerating', 'Career: the same evidence, through a different algorithm, currently reads as accelerating')
+  // momentumTrend (capabilityExtractor's detectTrend(), surfaced by
+  // Career): first-half vs second-half average — the interim spike drags
+  // the second half above the first, so recent momentum reads as
+  // 'accelerating', independent of net change.
+  assert.equal(careerProfile!.analytical_reasoning.trend, 'accelerating', 'momentumTrend: the learner\'s recent half of history is stronger than their earlier half, regardless of net change')
 
-  // The disagreement itself, pinned explicitly: this is a real
-  // ALGORITHM DIVERGENCE between two independently-implemented trend
-  // functions over identical input, not a difference in purpose. See the
-  // H2C closeout report's detectTrend Decision Packet — not fixed here.
+  // The two values differing is the EXPECTED, documented shape of this
+  // fixture — not a bug to reconcile. netTrend and momentumTrend answer
+  // different questions and are allowed to disagree.
   assert.notEqual(bpMath.trend, careerProfile!.analytical_reasoning.trend)
 })

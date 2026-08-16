@@ -113,6 +113,7 @@
     "lib/learnerBlueprint/snapshot.test.ts",
     "lib/learnerCompetitions/competition.integration.test.ts",
     "lib/learnerInnovation/innovation.integration.test.ts",
+    "lib/learnerIntelligence/canonicalCapability.integration.test.ts",
     "lib/learnerLeadership/leadership.integration.test.ts",
     "lib/learnerPortfolio/portfolio.integration.test.ts",
     "lib/learnerProjects/project.integration.test.ts",

@@ -19,6 +19,7 @@ import type { LearnerProfile, RiskLevel } from '@/lib/learnerModel/types'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import type { LearnerIntelligenceProjection, RiskFlag } from '@/lib/projection/types'
 import { confidenceFromScore, type ConfidenceLevel } from '@/lib/learnerIntelligence/insight'
+import { canonicalCapabilityFor } from '@/lib/learnerIntelligence/canonicalCapability'
 
 // Partial migration (see docs/architecture/migration-ledger.md and Sprint 8A,
 // ADR-0029): the attention list, class trajectory, and every risk-level check
@@ -31,18 +32,26 @@ import { confidenceFromScore, type ConfidenceLevel } from '@/lib/learnerIntellig
 // peer-helper matching are now Projection-sourced too — no longer computed
 // independently from legacy `learner_profiles.knowledge_state`.
 //
-// Two things remain on legacy `learner_profiles`, each a real, still-open
-// engine gap (not an oversight, not "forgot to migrate"):
+// One thing remains on legacy `learner_profiles`, a real, still-open engine
+// gap (not an oversight, not "forgot to migrate"):
 //   - Hidden misconception detection reads `formative_signals` (recent
 //     got_it/confused/lost outcomes) and `confirmed_gaps` — Projection has no
 //     field for "which sub-strands had a recent negative formative signal
 //     across the class"; it only exposes aggregate current mastery level.
-//   - Acceleration candidates' *capability*-trend reasoning
-//     (`capability_dimensions`, 6-dimension breakdown) and `getWeeksAtRisk`
-//     (consecutive-weeks duration from `risk_history`) — Projection's
-//     `capability` projector has no 6-dimension breakdown and `risk` has no
-//     duration tracking. Do not "fix" either by inventing a new computation —
-//     that's new intelligence, not a migration.
+//   - `getWeeksAtRisk` (consecutive-weeks duration from `risk_history`) —
+//     Projection's `risk` projector has no duration tracking. Do not "fix"
+//     either by inventing a new computation — that's new intelligence, not
+//     a migration.
+//
+// H2D closure (docs/architecture/adr-0029-addendum-h2d-capability-convergence.md):
+// acceleration candidates' capability-trend reasoning used to read the raw
+// legacy `capability_dimensions` column directly (no admissibility
+// lifecycle, sourced from the unfiltered `assessments` table). It now
+// derives the same 6-dimension CapabilityProfile shape from the Projection
+// already recomputed above, via capabilityExtractor.ts's sanctioned
+// Projection adapter (projectionToScoreHistory) — the same computation,
+// admissibility-aware input. This was already the "owner" ADR-0029 §3.3
+// named for the 6-dimension breakdown; only the input source changed.
 //
 // Coverage caveat, stated honestly: `academic.bySubStrand` only has entries
 // where confirmed Evidence carries a resolved `sub_strand_id` (ADR-0024's own
@@ -296,10 +305,16 @@ export function detectAccelerationCandidates(
     const risk = projection?.risk?.value.overallRiskLevel ?? 'normal'
     if (risk !== 'normal') continue
 
-    // Capability-trend reasoning deliberately stays on legacy
-    // capability_dimensions — Projection's capability projector has no
-    // 6-dimension breakdown (ADR-0029, a real engine gap, not migrated here).
-    const dims = profile.capability_dimensions as Record<string, { trend?: string; raw_score?: number }>
+    // ADR-0029 §3.3/§3.10 (H2D closure): capability's 6-dimension breakdown
+    // is owned by capabilityExtractor.ts, not by the raw legacy
+    // `capability_dimensions` column — that field is written by
+    // updateFromAssessment()'s unfiltered read of the legacy `assessments`
+    // table (no admissibility lifecycle) and can disagree with the
+    // canonical, evidence-admissible capability every other surface already
+    // uses. Derived here from the SAME Projection already recomputed above
+    // for risk — zero extra DB cost, same 6-dimension shape, sourced from
+    // admissible learner_evidence instead of the raw legacy ledger.
+    const dims = (canonicalCapabilityFor(projection) ?? {}) as unknown as Record<string, { trend?: string; raw_score?: number }>
     const accelerating = Object.values(dims).filter(d => d?.trend === 'accelerating').length
     // Sub-strand mastery count — now Projection-sourced (Sprint 8A).
     const highScores = Object.values(projection?.academic?.value.bySubStrand ?? {})

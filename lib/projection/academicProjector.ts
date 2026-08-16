@@ -9,6 +9,21 @@ import { computeCoverage, computeProjectionConfidence } from './coverage'
 
 export const ACADEMIC_PROJECTION_VERSION = 'academic-v1'
 
+/**
+ * H2D Decision B (docs/architecture/adr-0029-addendum-h2d-capability-convergence.md):
+ * this is the platform's **netTrend** concept — "what is the learner's net
+ * change from their earliest to their latest confirmed evidence." First
+ * value vs. last value, nothing in between matters.
+ *
+ * This is a DIFFERENT question from capabilityExtractor.ts's detectTrend(),
+ * which answers **momentumTrend** — "is the learner's recent half of
+ * history stronger or weaker than their earlier half." A history that
+ * spikes mid-way and returns to its starting point reads as netTrend
+ * 'stable' here but can read as momentumTrend 'accelerating' there — both
+ * are correct answers to their own question; neither is a bug. Do not
+ * unify these two functions — see the ADR addendum for why keeping them
+ * distinct, and clearly named, is the chosen architecture.
+ */
 function computeTrend(levels: number[]): Trend {
   if (levels.length < 2) return 'insufficient_data'
   const earliest = levels[0]

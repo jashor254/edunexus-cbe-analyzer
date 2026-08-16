@@ -16,6 +16,7 @@ import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/r
 import { getClassLearnerProfiles, markGrowthMilestonesNotified } from '@/lib/learnerModel/queries'
 import { findPrerequisiteAlerts } from '@/lib/knowledgeGraph/prerequisiteAlerts'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
+import { canonicalCapabilityFor } from '@/lib/learnerIntelligence/canonicalCapability'
 import type {
   StudentIntelligenceSummary, ClassIntelligencePanel,
   TeachingPatternInsight, PrerequisiteAlert,
@@ -103,12 +104,22 @@ export async function GET(req: Request): Promise<Response> {
       (students ?? []).map(s => [s.id as string, (s.name as string) ?? ''])
     )
 
+    // ADR-0029 §3.3/§3.10 (H2D closure): capability's 6-dimension breakdown
+    // is owned by capabilityExtractor.ts, "not by this raw learner_profiles
+    // field, which is a separately-maintained legacy copy" — the raw
+    // `capability_dimensions` column is written by updateFromAssessment()'s
+    // unfiltered read of the legacy `assessments` table (no admissibility
+    // lifecycle) and can disagree with the canonical, evidence-admissible
+    // capability every other surface (Career Intelligence, Blueprint's
+    // pathway readiness) already uses. Derived here from the SAME
+    // Projection already recomputed above for risk — zero extra DB cost,
+    // same 6-dimension shape (extractCapabilityProfile's output), sourced
+    // from admissible learner_evidence instead of the raw legacy ledger.
     const capabilityMap = new Map(
-      allProfiles.map(p => [
-        p.student_id,
-        p.capability_dimensions as Record<string, { raw_score?: number }>,
-      ])
+      allProfiles.map(p => [p.student_id, canonicalCapabilityFor(projections.get(p.student_id))] as const)
     )
+    const capabilityScoresFor = (studentId: string): Record<string, { raw_score?: number }> =>
+      (capabilityMap.get(studentId) ?? {}) as unknown as Record<string, { raw_score?: number }>
 
     // ── Layer 1: Students needing attention (enhanced) ────────────────────────
     const summaries: StudentIntelligenceSummary[] = atRisk
@@ -130,15 +141,15 @@ export async function GET(req: Request): Promise<Response> {
           .reduce((max, r) => Math.max(max, r.consecutive_weeks ?? 0), 0)
 
         // Peer pairing — strongest on weakest dimension
-        const weakDim = findWeakestDimension(capabilityMap.get(profile.student_id) ?? {})
+        const weakDim = findWeakestDimension(capabilityScoresFor(profile.student_id))
         let peerPairing: string | undefined
 
         if (weakDim) {
           const helper = allProfiles
             .filter(p => p.student_id !== profile.student_id && projectionRisk(p.student_id) === 'normal')
             .sort((a, b) => {
-              const aScore = ((a.capability_dimensions as Record<string, { raw_score?: number }>)[weakDim]?.raw_score ?? 0)
-              const bScore = ((b.capability_dimensions as Record<string, { raw_score?: number }>)[weakDim]?.raw_score ?? 0)
+              const aScore = capabilityScoresFor(a.student_id)[weakDim]?.raw_score ?? 0
+              const bScore = capabilityScoresFor(b.student_id)[weakDim]?.raw_score ?? 0
               return bScore - aScore
             })[0]
 
