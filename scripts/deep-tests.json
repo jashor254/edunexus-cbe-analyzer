@@ -18,6 +18,7 @@
     "lib/assignments/variantGeneration.integration.test.ts",
     "lib/assignments/variants.integration.test.ts",
     "lib/auth/getRole.test.ts",
+    "lib/compass/aiGroundingContract.integration.test.ts",
     "lib/compass/compassAccess.integration.test.ts",
     "lib/compass/compassClaimIdentity.integration.test.ts",
     "lib/compass/compassEvidenceLoop.integration.test.ts",

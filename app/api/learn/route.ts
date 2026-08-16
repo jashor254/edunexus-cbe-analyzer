@@ -402,6 +402,7 @@ export async function POST(req: Request) {
       firstName,
       grade,
       level,
+      levelSource: academicState.source,
       isJunior,
       pathway,
       subject,

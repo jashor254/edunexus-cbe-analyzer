@@ -19,6 +19,17 @@ export interface CompassPromptParams {
   level: 1 | 2 | 3 | 4
   isJunior: boolean
   pathway?: 'STEM' | 'Social Sciences' | 'Arts & Sports' | null
+  /**
+   * H2E AI-CMP-002 — where `level` actually came from
+   * (resolveCompassAcademicLevel's AcademicLevelSource). Only 'projection'
+   * means real, confirmed learner evidence. Every other source (client
+   * hint, legacy tier/overall, resumed session, or the conservative
+   * `'default'` floor) is a fallback guess, not a confirmed mastery
+   * signal — the prompt must say so explicitly rather than handing the
+   * model a bare, confident-looking "Level 2/4" indistinguishable from a
+   * real evidence-derived one.
+   */
+  levelSource?: 'projection' | 'client_hint' | 'legacy_tier' | 'legacy_overall' | 'session' | 'default'
 
   // Session
   subject: string
@@ -164,7 +175,7 @@ NEEDS_REMEDIATION → move to prerequisite support.
 
 ## LEARNER
 
-${p.firstName} | Grade ${p.grade} | Level ${p.level}/4 (${['BE','AE','ME','EE'][p.level - 1]})${!p.isJunior && p.pathway ? ` | Pathway: ${p.pathway}` : ''}
+${p.firstName} | Grade ${p.grade} | Level ${p.level}/4 (${['BE','AE','ME','EE'][p.level - 1]})${!p.isJunior && p.pathway ? ` | Pathway: ${p.pathway}` : ''}${p.levelSource && p.levelSource !== 'projection' ? ` (provisional — no confirmed evidence yet, treat as a starting point only)` : ''}
 ${p.lastSessionSummary ? `Last session: ${p.lastSessionSummary}` : 'First session.'}${p.sessionsWithoutImprovement >= 2 ? `\nNote: ${p.sessionsWithoutImprovement} sessions without improvement — try a different approach.` : ''}
 
 ---

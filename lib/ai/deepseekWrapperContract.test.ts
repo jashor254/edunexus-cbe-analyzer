@@ -24,8 +24,23 @@
 //   exactly once per call outcome — never once per attempt (H0 flagged
 //   this as "claimed tested, never actually was").
 //
-// Gemini-fallback-path logging is NOT covered here (see closeout report —
-// named residual gap, not silently claimed).
+// H2E adds the Gemini-fallback leg, the one gap H2B named as unproven.
+// @google/generative-ai's generateContent() resolves `fetch` from the
+// enclosing module scope with no custom fetchFn passed anywhere in
+// deepseek.ts's call chain (confirmed by reading node_modules/
+// @google/generative-ai/dist/index.js) — the same globalThis.fetch mock
+// already used for DeepSeek transparently intercepts Gemini's real HTTP
+// call too. No SDK-boundary mock, no production code change needed.
+//
+// AI-FB-001 (Gemini fallback): DeepSeek exhausting its retry budget calls
+//   through to Gemini exactly once, under the real unmodified wrapper.
+// AI-FB-002 (context equivalence): the same prompt/system-prompt content
+//   that would have reached DeepSeek reaches Gemini — no context is lost
+//   or altered crossing the fallback boundary.
+// AI-FB-003 (no double side effect): exactly one usage log for the whole
+//   DeepSeek-fail-then-Gemini-succeed sequence (provider: 'gemini'), and
+//   zero usage logs when both providers fail — recordUsage only fires on
+//   a success branch, never per failed attempt.
 //
 // Run: npx tsx --experimental-test-module-mocks --test lib/ai/deepseekWrapperContract.test.ts
 import { test, before, after, mock } from 'node:test'
@@ -59,6 +74,7 @@ let callDeepSeek: typeof import('./deepseek').callDeepSeek
 
 before(async () => {
   process.env.DEEPSEEK_AI_API_KEY = 'sk-fixture'
+  process.env.GOOGLE_GEMINI_API_KEY = 'gemini-fixture'
   ;({ callDeepSeek } = await import('./deepseek'))
 })
 
@@ -106,14 +122,18 @@ test('AI-CONTRACT-002: a retryable transport failure is retried exactly once, th
 })
 
 test('AI-CONTRACT-002: two consecutive retryable failures exhaust the DeepSeek retry budget (exactly 2 attempts) before falling through', async () => {
-  let fetchCalls = 0
-  globalThis.fetch = (async () => { fetchCalls++; throw new Error('fetch failed') }) as typeof fetch
+  let deepseekCalls = 0
+  globalThis.fetch = (async (url: string) => {
+    if (String(url).includes('generativelanguage.googleapis.com')) throw new Error('gemini also fails')
+    deepseekCalls++
+    throw new Error('fetch failed')
+  }) as typeof fetch
 
   await assert.rejects(() => callDeepSeek('prompt', 'system'))
-  // No GOOGLE_GEMINI_API_KEY is configured in this test environment, so the
-  // fallback itself fails fast — what matters here is the DeepSeek leg's
-  // own attempt count, proven regardless of what the fallback does.
-  assert.equal(fetchCalls, 2, 'DeepSeek is attempted exactly twice (first + one retry), never a third time')
+  // Gemini fallback is configured and genuinely attempted (see AI-FB tests
+  // below) and also fails here — what matters in THIS test is the
+  // DeepSeek leg's own attempt count, isolated from what the fallback does.
+  assert.equal(deepseekCalls, 2, 'DeepSeek is attempted exactly twice (first + one retry), never a third time')
 })
 
 test('AI-CONTRACT-002: a non-retryable HTTP error (4xx) is never retried — exactly one attempt', async () => {
@@ -162,4 +182,73 @@ test('AI-CONTRACT-001: a hung transport is aborted at the real 25s bound, conver
 
   assert.equal(content, 'recovered after timeout')
   assert.equal(fetchCalls, 2, 'the aborted first attempt counts as the retryable failure, triggering exactly one retry')
+})
+
+// ── Gemini fallback (AI-FB-001/002/003) ──────────────────────────────────────
+
+function geminiResponse(text: string): Response {
+  return jsonResponse({ candidates: [{ content: { parts: [{ text }] }, finishReason: 'STOP', index: 0 }] })
+}
+
+test('AI-FB-001: DeepSeek exhausting its retry budget falls through to Gemini exactly once, under the real unmodified wrapper', async () => {
+  logCalls.length = 0
+  let deepseekCalls = 0
+  let geminiCalls = 0
+  globalThis.fetch = ((url: string) => {
+    if (String(url).includes('generativelanguage.googleapis.com')) {
+      geminiCalls++
+      return Promise.resolve(geminiResponse('gemini answered'))
+    }
+    deepseekCalls++
+    return Promise.reject(new Error('fetch failed'))
+  }) as typeof fetch
+
+  const content = await callDeepSeek('prompt', 'system')
+
+  assert.equal(content, 'gemini answered')
+  assert.equal(deepseekCalls, 2, 'DeepSeek is still attempted exactly twice before falling through')
+  assert.equal(geminiCalls, 1, 'Gemini is invoked exactly once, never retried a second time by this wrapper')
+})
+
+test('AI-FB-002: the same prompt content that would have reached DeepSeek reaches Gemini — context is not lost or altered crossing the fallback boundary', async () => {
+  const distinctivePrompt = 'H2E-DISTINCTIVE-PROMPT-MARKER: explain fractions to a Grade 7 learner'
+  let geminiRequestBody = ''
+  globalThis.fetch = ((url: string, opts?: RequestInit) => {
+    if (String(url).includes('generativelanguage.googleapis.com')) {
+      geminiRequestBody = String(opts?.body ?? '')
+      return Promise.resolve(geminiResponse('ok'))
+    }
+    return Promise.reject(new Error('fetch failed'))
+  }) as typeof fetch
+
+  await callDeepSeek(distinctivePrompt, 'system')
+
+  assert.ok(geminiRequestBody.includes('H2E-DISTINCTIVE-PROMPT-MARKER'), 'the exact learner-facing prompt content must reach Gemini unaltered, not a generic/placeholder request')
+})
+
+test('AI-FB-003: exactly one usage log for the whole DeepSeek-fail-then-Gemini-succeed sequence, attributed to gemini', async () => {
+  logCalls.length = 0
+  globalThis.fetch = ((url: string) => {
+    if (String(url).includes('generativelanguage.googleapis.com')) return Promise.resolve(geminiResponse('ok'))
+    return Promise.reject(new Error('fetch failed'))
+  }) as typeof fetch
+
+  await callDeepSeek('prompt', 'system')
+
+  const usageLogs = logCalls.filter(c => c.message === 'AI call completed')
+  assert.equal(usageLogs.length, 1, 'a DeepSeek-fail-then-Gemini-succeed sequence must log usage exactly once, not once per provider attempt')
+  assert.equal(usageLogs[0].context.provider, 'gemini')
+})
+
+test('AI-FB-003: when BOTH providers fail, zero usage logs are recorded — no side effect from a failed attempt', async () => {
+  logCalls.length = 0
+  globalThis.fetch = ((url: string) => {
+    if (String(url).includes('generativelanguage.googleapis.com')) return Promise.reject(new Error('gemini network error'))
+    return Promise.reject(new Error('fetch failed'))
+  }) as typeof fetch
+
+  await assert.rejects(() => callDeepSeek('prompt', 'system'))
+
+  const usageLogs = logCalls.filter(c => c.message === 'AI call completed')
+  assert.equal(usageLogs.length, 0, 'recordUsage only fires on a success branch — total failure must never log a fabricated usage record')
 })
