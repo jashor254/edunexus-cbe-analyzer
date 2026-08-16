@@ -92,6 +92,7 @@
     "lib/intelligence/claimIdentityCurriculum.integration.test.ts",
     "lib/intelligence/correctionKey.integration.test.ts",
     "lib/intelligence/correctionKeyValidation.integration.test.ts",
+    "lib/intelligence/crossSurfaceConsistency.integration.test.ts",
     "lib/intelligence/evidenceAndBalanceRls.integration.test.ts",
     "lib/intelligence/evidenceDomain.integration.test.ts",
     "lib/intelligence/evidenceSupersessionRetraction.integration.test.ts",
