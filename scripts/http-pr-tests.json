@@ -1,0 +1,9 @@
+{
+  "description": "HTTP_PR — critical HTTP (D2) DEEP tests, proven 2x consecutive clean-server runs (H1D-4/H1D-3B). Requires a locally built+started Next server pointed at the same local Supabase target as the test process (SAFE-009). Every reclassification of this set must go through scripts/check-deep-pr-classification.mjs, not a silent edit.",
+  "expectedTests": 14,
+  "files": [
+    "lib/testing/schoolEntitlementAccess.http.integration.test.ts",
+    "app/api/teacher/classes/institutionOwnershipEnforcement.http.integration.test.ts",
+    "lib/testing/studentBlueprintSelfAccess.http.integration.test.ts"
+  ]
+}

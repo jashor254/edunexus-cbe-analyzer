@@ -16,6 +16,14 @@ on:
     branches: [main, develop, 'feat/**', 'fix/**', 'refactor/**']
   pull_request:
     branches: [main, develop]
+  # DEEP_NIGHTLY (H1E-B) — 02:00 UTC (~05:00 EAT, off-hours for the primary
+  # Nairobi-timezone dev audience). One run is sufficient; not hourly.
+  schedule:
+    - cron: '0 2 * * *'
+  # Lets HTTP_MAIN/DEEP_NIGHTLY be triggered on demand without waiting for a
+  # main push or the nightly schedule — never depends on production secrets,
+  # same local-only Supabase model as every other job below.
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -88,6 +96,421 @@ jobs:
 
       - name: Architecture check
         run: node scripts/check-architecture.mjs
+
+  # ── Standard tests ────────────────────────────────────────────────────────────
+  # Runs scripts/standard-tests.json (Phase H1A/H1S-FIX/H1C) — every file in it
+  # was individually verified to need zero Supabase/AI/payment/WhatsApp
+  # infrastructure, directly or transitively. The manifest-rot guard runs
+  # first so a file that later acquires a privileged/external-infrastructure
+  # signal fails loudly here instead of running silently unmocked. This job
+  # overrides the workflow-level placeholder Supabase/AI vars to empty rather
+  # than inheriting them — the point is to prove genuine absence, not mere
+  # tolerance of fake values. Never add test:deep or test:reference-school
+  # here — both require an explicitly verified non-production target that
+  # doesn't exist yet (see docs/architecture — Phase H1S).
+  test-standard:
+    name: Standard Tests
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ''
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ''
+      SUPABASE_SERVICE_ROLE_KEY: ''
+      DEEPSEEK_AI_API_KEY: ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Standard manifest guard
+        run: node scripts/check-standard-manifest.mjs
+
+      - name: Standard tests (secret-free)
+        run: npm run test:standard
+
+  # ── DEEP_PR — critical real-infrastructure DB/Auth/RLS invariants ────────────
+  # Phase H1E-A. Runs the 8-file DEEP_PR manifest (scripts/deep-pr-tests.json)
+  # against a Supabase stack this job starts itself, inside the runner, from
+  # scratch — never a remote project, never a repo secret. The bootstrap is
+  # schema-only, deterministic, and reproduces the same canonical fingerprint
+  # every time (Phase H1M/H1D lineage); a fingerprint mismatch here means the
+  # bootstrap or migrations changed and must be reviewed before this gate can
+  # be trusted again, so it fails the job rather than silently continuing.
+  # The classification guard (scripts/check-deep-pr-classification.mjs) fails
+  # loudly if any of these 8 files quietly acquires a dependency (remote
+  # network, .env.local, production client, external provider) outside what
+  # they were proven safe under. The cleanup gate fails the job on ANY
+  # residual synthetic row — this tier does not get to declare itself green
+  # by auto-cleaning after the fact.
+  deep-pr:
+    name: DEEP_PR
+    runs-on: ubuntu-latest
+    env:
+      TEST_SUPABASE_URL: 'http://127.0.0.1:54321'
+      TEST_SUPABASE_PROJECT_REF: 'local-docker'
+      NEXT_PUBLIC_SUPABASE_URL: ''
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ''
+      SUPABASE_SERVICE_ROLE_KEY: ''
+      DEEPSEEK_AI_API_KEY: ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase
+        run: supabase start
+
+      - name: Deterministic local bootstrap
+        run: npm run db:bootstrap:test
+
+      - name: Verify canonical schema fingerprint
+        run: |
+          ACTUAL=$(tail -1 /tmp/*.log 2>/dev/null | grep -oP 'FINGERPRINT=\K[0-9a-f]+' | tail -1)
+          EXPECTED="08388515ac18a5c5facf59593a461a85"
+          echo "expected: $EXPECTED"
+          echo "actual:   $ACTUAL"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::Schema fingerprint mismatch — bootstrap or migrations changed. Review before trusting this gate again."
+            exit 1
+          fi
+
+      - name: Resolve local service-role key
+        run: |
+          KEY=$(supabase status -o json | node -e "process.stdin.on('data',d=>{const j=JSON.parse(d);console.log(j.SERVICE_ROLE_KEY||j.service_role_key)})")
+          echo "TEST_SUPABASE_SERVICE_ROLE_KEY=$KEY" >> "$GITHUB_ENV"
+
+      - name: Preflight — verify local, non-production target
+        run: npx tsx scripts/check-test-target.ts
+
+      - name: DEEP_PR classification guard
+        run: node scripts/check-deep-pr-classification.mjs
+
+      - name: DEEP_PR manifest (expect 105/105)
+        run: node scripts/run-deep-pr.mjs
+
+      - name: Cleanup gate — dry-run reaper, expect 0 residual
+        run: |
+          OUT=$(bash scripts/bootstrap-local-db/reap-synthetic-fixtures.sh)
+          echo "$OUT"
+          if echo "$OUT" | grep -qE '^[1-9][0-9]*$'; then
+            echo "::error::Residual synthetic rows detected after DEEP_PR — a test leaked state."
+            exit 1
+          fi
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop
+
+  # ── HTTP_PR — critical real Next/Auth/DB route boundaries ────────────────────
+  # Phase H1E-A. Separate job/Supabase instance from deep-pr (H1D-3B: no
+  # shared mutated state across jobs, so one suite's leak can't mask
+  # another's). Builds and starts Next with an explicitly isolated env
+  # (never inherits repo .env.local) pointed at the SAME local Supabase this
+  # job's own tests use, then proves that with an executable SAFE-009 check
+  # before running anything — a target mismatch here is exactly the class of
+  # bug that would otherwise let a test "pass" against a session it never
+  # actually validated.
+  http-pr:
+    name: HTTP_PR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase
+        run: supabase start
+
+      - name: Deterministic local bootstrap
+        run: npm run db:bootstrap:test
+
+      - name: Resolve local anon/service-role keys
+        run: |
+          node -e "
+            const s = JSON.parse(require('child_process').execSync('supabase status -o json').toString());
+            const fs = require('fs');
+            fs.appendFileSync(process.env.GITHUB_ENV,
+              'LOCAL_ANON_KEY=' + (s.ANON_KEY || s.anon_key) + '\n' +
+              'LOCAL_SERVICE_ROLE_KEY=' + (s.SERVICE_ROLE_KEY || s.service_role_key) + '\n');
+          "
+
+      - name: Build Next with isolated local env
+        run: |
+          env -i PATH="$PATH" HOME="$HOME" \
+            NEXT_PUBLIC_SUPABASE_URL="http://127.0.0.1:54321" \
+            NEXT_PUBLIC_SUPABASE_ANON_KEY="$LOCAL_ANON_KEY" \
+            SUPABASE_SERVICE_ROLE_KEY="$LOCAL_SERVICE_ROLE_KEY" \
+            RESEND_API_KEY="ci-unset" \
+            npx next build
+
+      - name: Start Next (isolated local env)
+        run: |
+          env -i PATH="$PATH" HOME="$HOME" \
+            NEXT_PUBLIC_SUPABASE_URL="http://127.0.0.1:54321" \
+            NEXT_PUBLIC_SUPABASE_ANON_KEY="$LOCAL_ANON_KEY" \
+            SUPABASE_SERVICE_ROLE_KEY="$LOCAL_SERVICE_ROLE_KEY" \
+            RESEND_API_KEY="ci-unset" \
+            npx next start -p 3100 &
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:3100/api/health && break
+            sleep 1
+          done
+
+      - name: HTTP auth sentinel
+        env:
+          TEST_SUPABASE_URL: 'http://127.0.0.1:54321'
+          TEST_SUPABASE_PROJECT_REF: 'local-docker'
+          TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321'
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.LOCAL_ANON_KEY }}
+          TEST_BASE_URL: 'http://localhost:3100'
+        run: npx tsx scripts/check-http-auth-sentinel.ts
+
+      - name: HTTP base-URL consistency (all 35 files)
+        run: node scripts/check-http-base-url-consistency.mjs
+
+      - name: SAFE-009 — server/test target equality
+        env:
+          TEST_SUPABASE_URL: 'http://127.0.0.1:54321'
+          TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
+          TEST_BASE_URL: 'http://localhost:3100'
+        run: bash scripts/check-http-target-equality.sh
+
+      - name: HTTP_PR classification guard
+        run: node scripts/check-deep-pr-classification.mjs
+
+      - name: HTTP_PR manifest (expect 14/14)
+        env:
+          TEST_SUPABASE_URL: 'http://127.0.0.1:54321'
+          TEST_SUPABASE_PROJECT_REF: 'local-docker'
+          TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321'
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.LOCAL_ANON_KEY }}
+          TEST_BASE_URL: 'http://localhost:3100'
+        run: node scripts/run-http-pr.mjs
+
+      - name: Cleanup gate — dry-run reaper, expect 0 residual
+        run: |
+          OUT=$(bash scripts/bootstrap-local-db/reap-synthetic-fixtures.sh)
+          echo "$OUT"
+          if echo "$OUT" | grep -qE '^[1-9][0-9]*$'; then
+            echo "::error::Residual synthetic rows detected after HTTP_PR — a test leaked state."
+            exit 1
+          fi
+
+      - name: Stop Next
+        if: always()
+        run: fuser -k 3100/tcp || true
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop
+
+  # ── HTTP_MAIN — broader authenticated route coverage, main-branch cadence ────
+  # Phase H1E-B. Same local-only model as http-pr — separate job/Supabase
+  # instance, own bootstrap, own isolated Next server. Runs after merge
+  # (push to main) rather than per-PR, since http-pr already protects the
+  # highest-risk subset on every PR; this widens breadth without slowing
+  # every review cycle. Manual dispatch available for on-demand investigation.
+  http-main:
+    name: HTTP_MAIN
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase
+        run: supabase start
+
+      - name: Deterministic local bootstrap
+        run: npm run db:bootstrap:test
+
+      - name: Resolve local anon/service-role keys
+        run: |
+          node -e "
+            const s = JSON.parse(require('child_process').execSync('supabase status -o json').toString());
+            const fs = require('fs');
+            fs.appendFileSync(process.env.GITHUB_ENV,
+              'LOCAL_ANON_KEY=' + (s.ANON_KEY || s.anon_key) + '\n' +
+              'LOCAL_SERVICE_ROLE_KEY=' + (s.SERVICE_ROLE_KEY || s.service_role_key) + '\n');
+          "
+
+      - name: Build Next with isolated local env
+        run: |
+          env -i PATH="$PATH" HOME="$HOME" \
+            NEXT_PUBLIC_SUPABASE_URL="http://127.0.0.1:54321" \
+            NEXT_PUBLIC_SUPABASE_ANON_KEY="$LOCAL_ANON_KEY" \
+            SUPABASE_SERVICE_ROLE_KEY="$LOCAL_SERVICE_ROLE_KEY" \
+            RESEND_API_KEY="ci-unset" \
+            npx next build
+
+      - name: Start Next (isolated local env)
+        run: |
+          env -i PATH="$PATH" HOME="$HOME" \
+            NEXT_PUBLIC_SUPABASE_URL="http://127.0.0.1:54321" \
+            NEXT_PUBLIC_SUPABASE_ANON_KEY="$LOCAL_ANON_KEY" \
+            SUPABASE_SERVICE_ROLE_KEY="$LOCAL_SERVICE_ROLE_KEY" \
+            RESEND_API_KEY="ci-unset" \
+            npx next start -p 3100 &
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:3100/api/health && break
+            sleep 1
+          done
+
+      - name: HTTP auth sentinel
+        env:
+          TEST_SUPABASE_URL: 'http://127.0.0.1:54321'
+          TEST_SUPABASE_PROJECT_REF: 'local-docker'
+          TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321'
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.LOCAL_ANON_KEY }}
+          TEST_BASE_URL: 'http://localhost:3100'
+        run: npx tsx scripts/check-http-auth-sentinel.ts
+
+      - name: HTTP base-URL consistency (all 35 files)
+        run: node scripts/check-http-base-url-consistency.mjs
+
+      - name: SAFE-009 — server/test target equality
+        env:
+          TEST_SUPABASE_URL: 'http://127.0.0.1:54321'
+          TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
+          TEST_BASE_URL: 'http://localhost:3100'
+        run: bash scripts/check-http-target-equality.sh
+
+      - name: Tier manifest guard
+        run: node scripts/check-tier-manifests.mjs
+
+      - name: HTTP_MAIN manifest (expect 55/55)
+        env:
+          TEST_SUPABASE_URL: 'http://127.0.0.1:54321'
+          TEST_SUPABASE_PROJECT_REF: 'local-docker'
+          TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321'
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.LOCAL_ANON_KEY }}
+          TEST_BASE_URL: 'http://localhost:3100'
+        run: node scripts/run-http-main.mjs
+
+      - name: Cleanup gate — dry-run reaper, expect 0 residual
+        run: |
+          OUT=$(bash scripts/bootstrap-local-db/reap-synthetic-fixtures.sh)
+          echo "$OUT"
+          if echo "$OUT" | grep -qE '^[1-9][0-9]*$'; then
+            echo "::error::Residual synthetic rows detected after HTTP_MAIN — a test leaked state."
+            exit 1
+          fi
+
+      - name: Stop Next
+        if: always()
+        run: fuser -k 3100/tcp || true
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop
+
+  # ── DEEP_NIGHTLY — content-seeded D1 scenarios, scheduled ────────────────────
+  # Phase H1E-B. Requires the deterministic content seed (schema bootstrap
+  # alone deliberately does not provide curriculum/Academy content rows —
+  # see scripts/bootstrap-local-db/seed-test-content.sql). Scheduled rather
+  # than per-PR/per-merge: these scenarios are real and valuable but not
+  # urgent enough to slow every review cycle or every merge.
+  deep-nightly:
+    name: DEEP_NIGHTLY
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    env:
+      TEST_SUPABASE_URL: 'http://127.0.0.1:54321'
+      TEST_SUPABASE_PROJECT_REF: 'local-docker'
+      NEXT_PUBLIC_SUPABASE_URL: ''
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ''
+      SUPABASE_SERVICE_ROLE_KEY: ''
+      DEEPSEEK_AI_API_KEY: ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase
+        run: supabase start
+
+      - name: Deterministic local bootstrap
+        run: npm run db:bootstrap:test
+
+      - name: Deterministic test-content seed
+        run: npm run db:seed:test-content
+
+      - name: Resolve local service-role key
+        run: |
+          KEY=$(supabase status -o json | node -e "process.stdin.on('data',d=>{const j=JSON.parse(d);console.log(j.SERVICE_ROLE_KEY||j.service_role_key)})")
+          echo "TEST_SUPABASE_SERVICE_ROLE_KEY=$KEY" >> "$GITHUB_ENV"
+
+      - name: Preflight — verify local, non-production target
+        run: npx tsx scripts/check-test-target.ts
+
+      - name: Tier manifest guard
+        run: node scripts/check-tier-manifests.mjs
+
+      - name: DEEP_NIGHTLY manifest
+        run: node scripts/run-deep-nightly.mjs
+
+      - name: Cleanup gate — dry-run reaper, expect 0 residual
+        run: |
+          OUT=$(bash scripts/bootstrap-local-db/reap-synthetic-fixtures.sh)
+          echo "$OUT"
+          if echo "$OUT" | grep -qE '^[1-9][0-9]*$'; then
+            echo "::error::Residual synthetic rows detected after DEEP_NIGHTLY — a test leaked state."
+            exit 1
+          fi
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop
 
   # ── Build ─────────────────────────────────────────────────────────────────────
   build:

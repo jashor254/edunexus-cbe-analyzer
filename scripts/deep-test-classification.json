@@ -1,0 +1,2379 @@
+{
+  "files": [
+    {
+      "file": "app/api/feedback/route.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "other"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "app/api/schemes/schemeById.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "school",
+        "teacher",
+        "curriculum"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "app/api/students/create/route.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "learner",
+        "curriculum"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "app/api/teacher/classes/institutionOwnershipEnforcement.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "app/api/teacher/classes/teacherAddStudentPathway.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/academy/reflections.persist.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "curriculum"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/assessments/assessmentType.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "evidence"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/assessments/classAssessmentCorrectionKey.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/assessments/evidencePurpose.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/assessments/reportCardEvidence.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/assignments/create.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "security",
+        "teacher",
+        "parent"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/assignments/evidence.substrand.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/assignments/printRoutes.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "teacher",
+        "evidence"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/assignments/variantGeneration.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "teacher",
+        "learner",
+        "evidence"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/assignments/variants.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "lifecycle"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/auth/getRole.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "RUN_ID_RECOMMENDED"
+    },
+    {
+      "file": "lib/compass/compassAccess.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "teacher",
+        "learner",
+        "evidence"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/compass/compassClaimIdentity.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/compass/compassEvidenceLoop.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "teacher",
+        "learner",
+        "evidence"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/compass/deliveryBinding.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/compass/endSession.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "learner",
+        "evidence"
+      ],
+      "auth": false,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/compass/learnerAgency.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "teacher",
+        "learner",
+        "evidence"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/compass/learnerContext.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "teacher",
+        "learner",
+        "evidence"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/academicActivation.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/academicBridge.assessmentToProjection.workflow.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/academicBridge.multiTeacher.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/academicBridge.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/academicReadMigration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "tenancy",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/assessmentLock.workflow.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/attendanceReportCardIntegration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/autoProvisionCleanup.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/bridgeIntegrity.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": false,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "UNKNOWN",
+      "parallel": "UNKNOWN"
+    },
+    {
+      "file": "lib/core/classes.workflow.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/computeTermSummariesBridge.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/context.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/coreAcademicRlsHardening.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/coreAssessmentTypeIntegrity.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/endOfTermFullChain.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "tenancy",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/granularEndOfTermFlow.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/guardianInvites.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "tenancy",
+        "security"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/identity.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/institutionOwnership.test.ts",
+      "tier": "D1",
+      "domain": [
+        "tenancy",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/learnerLifecycle.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/learnerOnboarding.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/legacyRosterConvergence.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/permissions.assessmentbatch.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/permissions.canmanageassessment.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/permissions.classownership.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/permissions.selforparent.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/permissions.student-parent.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/permissions.teacherclassaccess.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/permissions.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/phase4PilotScenario.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "tenancy",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/promotions.reenrollmentGap.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/promotions.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/reportCardOwnership.security.test.ts",
+      "tier": "D1",
+      "domain": [
+        "tenancy",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/reportCardPublicationGuard.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/reportCardsZeroMark.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/reportCardWithSubjects.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/resolveTeacherGradeBoundaries.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/schoolActivation.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/schoolCreation.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/schoolEntitlement.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/schoolTermClosure.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/schoolUsersRlsRegression.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/securitySprintRlsHardening.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "tenancy",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/selfDeclaredAdmin.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/subjects.seeding.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "RUN_ID_RECOMMENDED"
+    },
+    {
+      "file": "lib/core/teacherActivation.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "tenancy",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/teacherLifecycle.test.ts",
+      "tier": "D1",
+      "domain": [
+        "tenancy",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/teacherOnboarding.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/teachingAssignments.test.ts",
+      "tier": "D1",
+      "domain": [
+        "tenancy",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/termRollover.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/transfers.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/yearProgression.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "tenancy",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/curriculum/assignmentSubstrandId.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "curriculum"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/curriculum/curriculumContext.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "curriculum"
+      ],
+      "auth": false,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/curriculum/pathwayContract.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "teacher",
+        "learner",
+        "career"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "RUN_ID_RECOMMENDED"
+    },
+    {
+      "file": "lib/gradebook/gradebook.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/growth/auth.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "teacher",
+        "growth"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/growth/repositories/school.repository.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "academy",
+        "growth"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "RUN_ID_RECOMMENDED"
+    },
+    {
+      "file": "lib/growth/services/dashboard.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "growth"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "RUN_ID_RECOMMENDED"
+    },
+    {
+      "file": "lib/growth/services/pilotCampaignLaunch.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "school",
+        "growth"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "RUN_ID_RECOMMENDED"
+    },
+    {
+      "file": "lib/growth/services/targeting.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "tenancy",
+        "school",
+        "growth"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "RUN_ID_RECOMMENDED"
+    },
+    {
+      "file": "lib/holiday/holidayPlanner.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/holiday/holidayReturn.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/holiday/notify.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/intelligence/claimIdentityCurriculum.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/intelligence/correctionKey.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "teacher",
+        "learner",
+        "evidence"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/intelligence/correctionKeyValidation.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/intelligence/evidenceAndBalanceRls.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/intelligence/evidenceDomain.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/learnerAchievement/achievement.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "tenancy",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/learnerBlueprint/actionPlan/blueprintExecutionExperience.page.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "identity",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/learnerBlueprint/actionPlan/delivery/assignment.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/learnerBlueprint/actionPlan/delivery/assignment.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/learnerBlueprint/actionPlan/delivery/compass.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/learnerBlueprint/actionPlan/delivery/compass.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/learnerBlueprint/actionPlan/lifecycle.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "security",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/learnerBlueprint/actionPlan/review.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/learnerBlueprint/actionPlan/review.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/learnerBlueprint/actionPlan/reviewWorkspace.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/learnerBlueprint/actionPlan/reviewWorkspace.page.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/learnerBlueprint/composeBlueprint.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/learnerBlueprint/composeRecommendedNextSteps.cutover.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/learnerBlueprint/equivalence.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "learner",
+        "evidence"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/learnerBlueprint/snapshot.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "school",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/learnerCompetitions/competition.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/learnerInnovation/innovation.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "tenancy",
+        "security"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/learnerLeadership/leadership.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "tenancy",
+        "security"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/learnerPortfolio/portfolio.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "tenancy",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/learnerProjects/project.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "tenancy",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/learnerRecord/timeline.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/learnerWellbeing/wellbeing.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "tenancy",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/lessonPlan/teachingWorkflowReliability.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "teacher",
+        "curriculum"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/parentExperience/parentPortal.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/payments/fulfillment.test.ts",
+      "tier": "D1",
+      "domain": [
+        "teacher",
+        "billing"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/payments/subscriptionSelfGrant.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "billing"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/projection/careerPropagation.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/projection/curriculumAware.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/projection/equivalenceHarness.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "learner",
+        "evidence"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/projection/projectionPersistence.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/promotions/promote.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "evidence"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/quiz/quizDelivery.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/quiz/quizEvidence.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/quiz/quizIdentityLock.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/quiz/quiz.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/remarks/evidence.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/repositories/classCalendar.repository.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/repositories/classResource.repository.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/repositories/findSchoolIdByTeacherId.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/repositories/schoolRepository.multiMembership.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "RUN_ID_RECOMMENDED"
+    },
+    {
+      "file": "lib/row/recordOfWorkIntegrity.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/storage/lmsBuckets.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "storage"
+      ],
+      "auth": false,
+      "storage": true,
+      "http": false,
+      "mutatesDb": false,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/teacherReflection/reflection.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/assessmentReviewDashboard.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "school",
+        "teacher",
+        "lifecycle"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/clinicDownload.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "parent",
+        "billing"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/growthSchools.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "security",
+        "school",
+        "growth"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/learnerRosterImport.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "security",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/legacyRosterConvergence.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "identity",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/lmsRoutes.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "security",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": true,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/maryFullCircuit.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/parentExperienceConvergence.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/pilotAvailableStudents.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "security",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/schoolBootstrapAdmin.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "identity",
+        "tenancy",
+        "security"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/schoolEntitlementAccess.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "school",
+        "teacher",
+        "billing"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/schoolHandoff.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "tenancy",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/schoolPayments.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "security",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/schoolProfileEdit.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "tenancy",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/selfServeOnboardingMiddleware.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/sowGenerateContract.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "school",
+        "teacher",
+        "curriculum"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/sowJobState.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "school",
+        "teacher",
+        "curriculum"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/studentBlueprintPdf.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/studentBlueprintSelfAccess.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/studentPageRouting.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "security",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/studentPortfolioAchievements.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/studentTimeline.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "school",
+        "teacher",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/teacherActivation.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "security",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/teacherAttentionDestination.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "identity",
+        "security",
+        "school"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/testing/teacherSelfJoin.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "security",
+        "school",
+        "teacher"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    }
+  ]
+}

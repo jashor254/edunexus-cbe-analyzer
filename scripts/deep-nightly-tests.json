@@ -1,0 +1,15 @@
+{
+  "description": "DEEP_NIGHTLY \u2014 content-seed-dependent D1 scenarios. Requires npm run db:seed:test-content after schema bootstrap, before these tests run. Scheduled, not per-PR/per-merge.",
+  "expectedFiles": 8,
+  "requiresContentSeed": true,
+  "files": [
+    "lib/academy/reflections.persist.test.ts",
+    "lib/curriculum/assignmentSubstrandId.integration.test.ts",
+    "lib/curriculum/curriculumContext.integration.test.ts",
+    "lib/assignments/evidence.substrand.integration.test.ts",
+    "lib/intelligence/claimIdentityCurriculum.integration.test.ts",
+    "lib/intelligence/correctionKeyValidation.integration.test.ts",
+    "lib/projection/curriculumAware.integration.test.ts",
+    "lib/quiz/quizEvidence.integration.test.ts"
+  ]
+}

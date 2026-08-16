@@ -1,0 +1,11 @@
+{
+  "description": "HTTP_MAIN — broader authenticated application-route coverage, runs on push to main (separate job/Supabase instance from HTTP_PR). Proven 2x consecutive clean runs in H1D-3C and reconfirmed in H1E-B.",
+  "expectedTests": 55,
+  "files": [
+    "lib/testing/schoolPayments.http.integration.test.ts",
+    "lib/testing/pilotAvailableStudents.http.integration.test.ts",
+    "lib/testing/schoolHandoff.http.integration.test.ts",
+    "lib/testing/teacherActivation.http.integration.test.ts",
+    "lib/testing/growthSchools.http.integration.test.ts"
+  ]
+}

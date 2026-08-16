@@ -1,0 +1,7 @@
+{
+  "description": "DEEP_SERIAL \u2014 D1 files that assert on a global/shared-table row count (schools, etc.), which no per-test synthetic-data isolation can make parallel-safe. Run with --test-concurrency=1, separately from DEEP_MAIN's default-concurrency batch. Shared resource: unscoped COUNT(*) over a table every other concurrently-running D1 file may also write to.",
+  "expectedFiles": 1,
+  "files": [
+    "lib/core/autoProvisionCleanup.test.ts"
+  ]
+}
