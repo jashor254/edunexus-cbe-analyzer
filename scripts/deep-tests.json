@@ -2,6 +2,7 @@
   "description": "DEEP test manifest \u2014 Phase H1S-FIX. Every file listed here imports createTestServiceClient() (utils/supabase/test-service.ts), which refuses to construct a client without an explicit, verified, non-production TEST_SUPABASE_* target. Run by npm run test:deep, gated by scripts/check-test-target.ts. CAVEAT: for the *.http.integration.test.ts subset, this manifest only protects test-side fixture setup \u2014 the actual HTTP assertions hit a separately-running Next.js server whose own process environment (NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY) is unchanged by this phase. That server must independently be started against a non-production target before those files are fully safe to automate \u2014 see Phase H1S-FIX closeout, deferred to a future DEEP-infrastructure phase.",
   "files": [
     "app/api/feedback/route.http.integration.test.ts",
+    "app/api/payments/callback/route.webhookAuthenticity.integration.test.ts",
     "app/api/schemes/schemeById.http.integration.test.ts",
     "app/api/students/create/route.http.integration.test.ts",
     "app/api/teacher/classes/institutionOwnershipEnforcement.http.integration.test.ts",
@@ -93,6 +94,7 @@
     "lib/intelligence/correctionKeyValidation.integration.test.ts",
     "lib/intelligence/evidenceAndBalanceRls.integration.test.ts",
     "lib/intelligence/evidenceDomain.integration.test.ts",
+    "lib/intelligence/evidenceSupersessionRetraction.integration.test.ts",
     "lib/learnerAchievement/achievement.integration.test.ts",
     "lib/learnerBlueprint/actionPlan/blueprintExecutionExperience.page.http.integration.test.ts",
     "lib/learnerBlueprint/actionPlan/delivery/assignment.http.integration.test.ts",

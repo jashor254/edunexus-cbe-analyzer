@@ -6,6 +6,7 @@
     "lib/assignments/printRoutes.pure.test.ts",
     "lib/attentionFeed/panel.test.ts",
     "lib/attentionFeed/sources.test.ts",
+    "lib/career/capabilityExtractor.test.ts",
     "lib/career/careerEngine.mergeChronologicalScoreHistories.test.ts",
     "lib/career/compassBridgeClobber.test.ts",
     "lib/compass/groupBonus.test.ts",
