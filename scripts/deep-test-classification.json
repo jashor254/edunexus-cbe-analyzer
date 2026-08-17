@@ -1142,6 +1142,20 @@
       "parallel": "SAFE"
     },
     {
+      "file": "lib/lessonPlan/lessonPlansSubStrandId.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "curriculum",
+        "lessonPlan"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
       "file": "lib/curriculum/curriculumContext.integration.test.ts",
       "tier": "D1",
       "domain": [

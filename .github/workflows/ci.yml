@@ -204,7 +204,7 @@ jobs:
       - name: Verify canonical schema fingerprint
         run: |
           ACTUAL=$(tail -n 1 /tmp/*.log 2>/dev/null | grep -oP 'FINGERPRINT=\K[0-9a-f]+' | tail -n 1)
-          EXPECTED="2607880c5259fa7fd480fb2d9e500f6c"
+          EXPECTED="a850020e580d122c0e6aaac2189827de"
           echo "expected: $EXPECTED"
           echo "actual:   $ACTUAL"
           if [ "$ACTUAL" != "$EXPECTED" ]; then
@@ -231,7 +231,7 @@ jobs:
       - name: DEEP_PR classification guard
         run: node scripts/check-deep-pr-classification.mjs
 
-      - name: DEEP_PR manifest (expect 21/21 files, 159 tests)
+      - name: DEEP_PR manifest (expect 22/22 files, 164 tests)
         run: node scripts/run-deep-pr.mjs
 
       - name: Cleanup gate — dry-run reaper, expect 0 residual

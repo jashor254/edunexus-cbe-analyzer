@@ -1,6 +1,6 @@
 # Curriculum Identity Invariants — the Preservation Contract
 
-**Phase**: H5A-1. **Depends on**: H5A-0 (Curriculum Intelligence Reality Audit — read-only), ADR-0024 (Canonical Curriculum Identity). **Purpose**: EduNexus's curriculum structure is fragmented across several parallel representations (see H5A-0). This register does not attempt to unify them. It states one narrower, foundational rule and pins down exactly where the codebase already keeps it, and where it does not yet apply because the identity was never known to begin with.
+**Phase**: H5A-1 → H5A-3. **Depends on**: H5A-0 (Curriculum Intelligence Reality Audit — read-only), ADR-0024 (Canonical Curriculum Identity). **Purpose**: EduNexus's curriculum structure is fragmented across several parallel representations (see H5A-0). This register does not attempt to unify them. It states one narrower, foundational rule and pins down exactly where the codebase already keeps it, and where it does not yet apply because the identity was never known to begin with.
 
 **The foundational rule**:
 
@@ -147,14 +147,59 @@ Format per invariant: ID, statement, why it matters educationally, canonical own
 
 ---
 
-## Downstream note (H5A-3 candidate, not implemented)
+## CUR-SOW-004 — schemes_of_work.lessons JSONB does not silently strip curriculum identity
 
-With `scheme_lessons.sub_strand_id` now real, this phase audited (but did not modify) its two downstream readers:
+**Statement**: Once `GeneratedLesson` carries canonical curriculum identity (`substrandId`, added H5A-2), persisting it into `schemes_of_work.lessons` (JSONB) must not silently remove it.
 
-- **Lesson Plan generation** (`lib/lessonPlan/weeklyGenerator.ts`): reads `GeneratedLesson[]` from `schemes_of_work.lessons` (JSONB), not from the `scheme_lessons` table. Since `GeneratedLesson.substrandId` is now part of that type, the id is already present in the JSONB blob at zero migration cost — but `savePlans()` does not currently copy it into `lesson_plans` (which has no compatible column). Classification: **DOWNSTREAM_PROVENANCE_RECOVERABLE** (the value is sitting right there in memory; wiring it in is code-only, once `lesson_plans` gets a column).
-- **Record of Work seeding** (`lib/row/recordOfWork.ts`): its `scheme_lessons` select (`week, lesson, strand, substrand, learning_outcomes, key_inquiry_questions, learning_resources`) does not fetch the new `sub_strand_id` column, and `row_entries` has no compatible column to receive it either. Classification: **DOWNSTREAM_SCHEMA_BLOCKED**.
+**Audit finding (H5A-3)**: `app/api/sow/save/route.ts`'s Zod schema types `lessons` as `z.array(z.record(z.string(), z.unknown()))` — a loose passthrough, not a stripping schema. `app/teacher/scheme-of-work/new/page.tsx:375` builds the save payload with an object spread (`{ ...l, reflection: ... }`), preserving every field of the generated lesson, including `substrandId`. Postgres JSONB storage is functionally a `JSON.stringify`/`JSON.parse` round trip of whatever object the client sends — traced end to end, nothing in this path drops the field.
 
-Neither was touched this phase, per the explicit scope lock ("do NOT redesign lesson_plans... do NOT redesign row_entries... unless scheme_lessons alone cannot satisfy CUR-SOW-001" — it can). See the H5A-2 closeout's Next Phase recommendation.
+**Canonical owner**: `app/teacher/scheme-of-work/new/page.tsx` (client payload construction), `app/api/sow/save/route.ts` (server-side passthrough schema).
+
+**Current proof (NEW this phase)**: `lib/sow/generatedLessonJsonRoundTrip.pure.test.ts` — a real `substrandId` survives a JSONB-equivalent round trip unchanged; a `null` survives as `null`; an old row's JSON (recorded before H5A-2, genuinely missing the key) parses back with the field simply `undefined`, never coerced or fabricated — and the rest of the row is unaffected.
+
+**CI tier**: STANDARD (`scripts/standard-tests.json`) — pure, no DB, no AI.
+
+**Status**: PROVEN.
+
+**Known limitation**: old `schemes_of_work.lessons` rows (pre-H5A-2) have `lesson.substrandId === undefined` at runtime, not `null`, even though the `GeneratedLesson` type claims the field is always `string | null`. In practice this is harmless — `undefined` object properties are dropped by JSON serialization before reaching PostgREST, so an `undefined` `substrandId` behaves identically to an explicit `null` when written into `sub_strand_id` columns downstream (verified by code trace, not just assumed) — but it is a real gap between the type system's claim and runtime reality for anything that reads old JSONB rows directly rather than through an insert.
+
+---
+
+## Downstream document provenance (H5A-3)
+
+With `scheme_lessons.sub_strand_id` real (H5A-2), this phase determined the correct ownership model for each downstream document — **store** vs. **recover via join** — rather than assuming every table needs its own copy.
+
+### CUR-LP-001 — Lesson Plans store a snapshot of curriculum identity
+
+**Statement**: A lesson plan generated from a `GeneratedLesson` with known canonical curriculum identity retains that exact identity as its own column — a snapshot, not a live pointer to its parent `scheme_lesson`.
+
+**Ownership decision, with evidence (this is the actual work of this phase, not just the DDL)**: H5A-3 first asked whether `lesson_plans` could instead *recover* identity via a join, since `lesson_plans` already has `sow_id` (FK to `schemes_of_work`) plus a real, enforced `UNIQUE (sow_id, week_number, lesson_number)` constraint (`20260807160000_lesson_plans_week_lesson_unique.sql`) — the same composite key `scheme_lessons` uses (`UNIQUE (scheme_id, week, lesson)`), so a join was structurally possible. It was rejected: `lesson_plans.sow_id REFERENCES schemes_of_work(id) ON DELETE SET NULL` — deliberately not `CASCADE`. A lesson plan is designed to **survive** its parent scheme's deletion, orphaned but intact. A join-based recovery would go silently, permanently blank at exactly the moment (scheme deletion) this table's own FK behavior was built to survive — defeating the reason `SET NULL` was chosen over `CASCADE` in the first place. Separately, `scheme_lessons.strand`/`substrand` text (though not `sub_strand_id`) is editable after generation via `PATCH /api/schemes/[id]` — a lesson plan is a historical/generated artifact of what was true *at generation time*, not a live projection that should silently change if a teacher later edits the parent scheme.
+
+**Canonical owner**: `lib/lessonPlan/weeklyGenerator.ts` (`savePlans()` — `sub_strand_id: lesson.substrandId`, direct passthrough from the already-in-memory `GeneratedLesson`, no new resolution logic).
+
+**Current proof (NEW this phase)**: `lib/lessonPlan/lessonPlansSubStrandId.integration.test.ts` — a real `sow_substrands.id` persists exactly; a fabricated id is rejected by the live FK; `null` persists as `null`; a pre-existing-shaped row remains valid; two sub-strands sharing an identical title persist to their own distinct rows.
+
+**CI tier**: DEEP_PR (`scripts/deep-pr-tests.json`, 22 files/164 tests).
+
+**Status**: PROVEN. Schema: `lesson_plans.sub_strand_id uuid REFERENCES sow_substrands(id) ON DELETE RESTRICT`, nullable, additive, no backfill (`supabase/migrations/20260818090000_lesson_plans_sub_strand_id.sql`).
+
+**Known limitation**: same as CUR-EVD-001/CUR-SOW-001 — this closes the gap only for lesson plans generated going forward; historical rows stay `NULL` permanently, by design, never backfilled.
+
+### CUR-ROW-001 — Record of Work provenance: BLOCKED, product/schema decision required
+
+**Statement (candidate, NOT implemented)**: A Record of Work entry created from a scheme lesson with known canonical curriculum identity should retain or deterministically recover that exact identity.
+
+**Audit finding**: unlike `lesson_plans`, `row_entries` has no per-row parent identifier at all beyond `(row_id, week, lesson)` — no `scheme_lesson_id`, no `lesson_plan_id`. Its seeding function, `lib/row/recordOfWork.ts`'s `seedRecordOfWorkEntries()`, picks **one source for the whole scheme** at seed time: `lesson_plans` if any exist for that `scheme_id`, else `scheme_lessons` as fallback ("the richer source wins when both exist" — its own doc comment, ADR-0032 §5) — and **which source was actually used is never persisted anywhere** (the function returns `source: 'lesson_plans' | 'scheme_lessons' | 'none'`, but no column on `records_of_work` or `row_entries` stores it).
+
+This means a join-based recovery attempted later would have to *re-run the same source-priority decision* to know which parent to join through — and could get a **different answer than the one originally used**, if e.g. `lesson_plans` rows were generated after `row_entries` were already seeded from `scheme_lessons` directly. This is genuine, structural ambiguity, not a gap that a single new FK column resolves cleanly: adding `row_entries.sub_strand_id` directly would still leave open *which* upstream source it should be copied from at seed time, and adding a `scheme_lesson_id`/`lesson_plan_id` parent pointer instead (stronger, resolves the "which source" question permanently) is a real architecture choice this phase is not authorized to make unilaterally (§18/§19 of the phase brief: "If a new parent FK is architecturally preferable: STOP and report PRODUCT/SCHEMA DECISION REQUIRED").
+
+Also: `records_of_work.scheme_id REFERENCES schemes_of_work(id) ON DELETE SET NULL` — the same historical-independence signal as `lesson_plans.sow_id`, reinforcing that Records of Work are meant to survive scheme deletion too, which independently rules out pure live-join recovery as a complete answer even once the "which source" ambiguity is resolved.
+
+**Classification**: **PRODUCT/SCHEMA DECISION REQUIRED**. The open question for a future phase: should `row_entries` gain a `scheme_lesson_id`/`lesson_plan_id` FK (records which parent it was actually seeded from, permanently resolving the ambiguity and enabling clean recovery of whatever that parent's curriculum identity is/was) — or a directly duplicated `sub_strand_id` (simpler, but requires deciding a copy-time source-priority rule identical to `seedRecordOfWorkEntries()`'s existing logic, and does nothing to record which source was actually used for a given entry)?
+
+**Status**: NOT IMPLEMENTED. No migration was written for `row_entries` this phase.
+
+**Known limitation**: Record of Work entries — the artifact closest to "what was actually taught," arguably the highest-value place for curriculum identity to survive — remain text-only. This is the most significant open gap this phase leaves behind.
 
 ---
 

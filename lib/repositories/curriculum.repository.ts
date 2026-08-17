@@ -187,6 +187,7 @@ export class CurriculumRepository extends BaseRepository {
       lesson_number: number
       strand: string
       sub_strand: string
+      sub_strand_id: string | null
       learning_outcomes: string[]
       key_inquiry_questions: string[]
       learning_resources: string[]

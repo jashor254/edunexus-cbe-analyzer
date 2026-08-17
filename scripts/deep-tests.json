@@ -86,6 +86,7 @@
     "lib/curriculum/pathwayContract.integration.test.ts",
     "lib/gradebook/gradebook.integration.test.ts",
     "lib/sow/schemeLessonsSubStrandId.integration.test.ts",
+    "lib/lessonPlan/lessonPlansSubStrandId.integration.test.ts",
     "lib/growth/auth.test.ts",
     "lib/growth/repositories/school.repository.integration.test.ts",
     "lib/growth/services/dashboard.integration.test.ts",

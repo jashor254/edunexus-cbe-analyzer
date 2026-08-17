@@ -8673,6 +8673,7 @@ export type Database = {
           step_4: string | null
           strand: string | null
           sub_strand: string | null
+          sub_strand_id: string | null
           taught_date: string | null
           teacher_flagged_followup: string | null
           teacher_id: string | null
@@ -8704,6 +8705,7 @@ export type Database = {
           step_4?: string | null
           strand?: string | null
           sub_strand?: string | null
+          sub_strand_id?: string | null
           taught_date?: string | null
           teacher_flagged_followup?: string | null
           teacher_id?: string | null
@@ -8735,6 +8737,7 @@ export type Database = {
           step_4?: string | null
           strand?: string | null
           sub_strand?: string | null
+          sub_strand_id?: string | null
           taught_date?: string | null
           teacher_flagged_followup?: string | null
           teacher_id?: string | null
@@ -8749,6 +8752,13 @@ export type Database = {
             columns: ["sow_id"]
             isOneToOne: false
             referencedRelation: "schemes_of_work"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_plans_sub_strand_id_fkey"
+            columns: ["sub_strand_id"]
+            isOneToOne: false
+            referencedRelation: "sow_substrands"
             referencedColumns: ["id"]
           },
         ]

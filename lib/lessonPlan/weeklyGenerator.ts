@@ -52,6 +52,10 @@ async function savePlans(
     lesson_number: lesson.lesson,
     strand: lesson.strand,
     sub_strand: lesson.substrand,
+    // Curriculum Identity Preservation Contract (H5A-3, CUR-LP-001) — a
+    // snapshot of the originating GeneratedLesson's canonical identity, or
+    // null. Never re-derived from strand/sub_strand text.
+    sub_strand_id: lesson.substrandId,
     learning_outcomes: lesson.learningOutcomes,
     key_inquiry_questions: lesson.keyInquiryQuestions,
     learning_resources: lesson.learningResources,
