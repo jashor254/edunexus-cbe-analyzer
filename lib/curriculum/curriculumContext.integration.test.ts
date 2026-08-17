@@ -30,6 +30,13 @@ let learningAreaId: string
 let strandId: string
 let subStrandWithOutcomesId: string
 let subStrandWithoutOutcomesId: string
+// H5A-1 CUR-ID-003 (parent-chain integrity) — a second strand under the
+// same synthetic learning area, carrying a sub-strand with the EXACT SAME
+// title as subStrandWithOutcomesId's. If resolveCurriculumContext() ever
+// resolved by name instead of by primary key, these two rows would be the
+// perfect trap for that bug.
+let collisionStrandId: string
+let collisionSubStrandId: string
 
 before(async () => {
   const { data: grade, error: gradeErr } = await db.from('sow_grades').select('id').eq('numeric_grade', 8).limit(1).maybeSingle()
@@ -69,12 +76,26 @@ before(async () => {
     { substrand_id: subStrandWithOutcomesId, outcome: 'Subtract fractions with different denominators', outcome_type: 'skill', order_index: 2 },
   ])
   // subStrandWithoutOutcomesId deliberately gets zero learning outcomes.
+
+  const { data: collisionStrand, error: collisionStrandErr } = await db
+    .from('sow_strands')
+    .insert({ title: `${SYNTHETIC_MARKER}_COLLISION`, learning_area_id: learningAreaId, order_index: 2 })
+    .select('id').single()
+  if (collisionStrandErr) throw collisionStrandErr
+  collisionStrandId = collisionStrand.id
+
+  const { data: collisionSubStrand, error: collisionSubStrandErr } = await db
+    .from('sow_substrands')
+    .insert({ title: 'Fractions (synthetic)', strand_id: collisionStrandId, order_index: 1 })
+    .select('id').single()
+  if (collisionSubStrandErr) throw collisionSubStrandErr
+  collisionSubStrandId = collisionSubStrand.id
 })
 
 after(async () => {
   await db.from('sow_learning_outcomes').delete().in('substrand_id', [subStrandWithOutcomesId, subStrandWithoutOutcomesId])
-  await db.from('sow_substrands').delete().eq('strand_id', strandId)
-  await db.from('sow_strands').delete().eq('id', strandId)
+  await db.from('sow_substrands').delete().in('strand_id', [strandId, collisionStrandId])
+  await db.from('sow_strands').delete().in('id', [strandId, collisionStrandId])
   await db.from('sow_learning_areas').delete().eq('id', learningAreaId)
   console.log('[cleanup] synthetic curriculum-context fixtures removed')
 })
@@ -101,4 +122,22 @@ test('resolveCurriculumContext returns an empty (not fabricated) outcomes list w
 test('resolveCurriculumContext returns null (never a fabricated stand-in) for a sub-strand id that does not exist', async () => {
   const ctx = await resolveCurriculumContext('00000000-0000-0000-0000-000000000000')
   assert.equal(ctx, null)
+})
+
+// H5A-1 CUR-ID-003 — two sub-strands share the exact same title
+// ("Fractions (synthetic)") under two different strands. Resolution is by
+// sow_substrands.id (a primary key), never by title, so each id must
+// resolve to its own strand — never the other one's — even though a
+// name-based lookup could not tell them apart.
+test('resolveCurriculumContext resolves by primary key, not title — same-named sub-strands under different strands do not collide', async () => {
+  const ctxA = await resolveCurriculumContext(subStrandWithOutcomesId)
+  const ctxB = await resolveCurriculumContext(collisionSubStrandId)
+
+  assert.ok(ctxA)
+  assert.ok(ctxB)
+  assert.equal(ctxA!.subStrandTitle, ctxB!.subStrandTitle, 'both share the same title — the interesting case')
+  assert.notEqual(ctxA!.subStrandId, ctxB!.subStrandId)
+  assert.notEqual(ctxA!.strandId, ctxB!.strandId, 'each sub-strand must resolve to its OWN parent strand')
+  assert.equal(ctxA!.strandId, strandId)
+  assert.equal(ctxB!.strandId, collisionStrandId)
 })
