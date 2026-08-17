@@ -7,7 +7,7 @@
 // Run: npx tsx --env-file=.env.local --test lib/core/academicActivation.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { activateSchool } from '@/lib/core/schoolActivation'
 import { createAcademicYear } from '@/lib/core/school'
@@ -15,6 +15,7 @@ import { seedGradeSubjectsForSchool } from '@/lib/core/subjects'
 import { inviteTeacher, acceptTeacherInvitation } from '@/lib/core/teacherOnboarding'
 import { onboardLearner } from '@/lib/core/learnerOnboarding'
 import { getSchoolAcademicReadiness, resolveActiveAcademicYear, resolveActiveTerm } from '@/lib/core/academicActivation'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_9E_ACADEMIC_TEST'
 const db = createServiceClient()
@@ -49,7 +50,9 @@ after(async () => {
   for (const id of createdAuthUserIds) {
     await db.from('teachers').delete().eq('user_id', id)
     await db.from('profiles').delete().eq('id', id)
-    await db.auth.admin.deleteUser(id)
+    await db.from('notification_log').delete().eq('user_id', id)
+    await db.from('platform_events').delete().eq('actor_id', id)
+    await deleteAuthUserOrThrow(db, id)
   }
 })
 
@@ -116,6 +119,16 @@ test('missing subject source: an activated school with classes but no grade_subj
   const activation = await activateSchool(schoolId, { gradeCodes: ['G7'] })
   assert.equal(activation.status, 'complete')
 
+  // H1D-3C: activateSchool now seeds grade_subjects itself as one of its
+  // own steps (DR-08, schoolActivation.ts's ensureGradeSubjects — a
+  // deliberate fix so a freshly-activated school never starts in a
+  // zero-subjects state). This test's actual target is
+  // getSchoolAcademicReadiness's own reporting correctness when subjects
+  // are missing, not activateSchool's behavior — reconstructing that
+  // input state explicitly rather than assuming activation still produces
+  // it, so the readiness-check invariant stays covered.
+  await db.from('grade_subjects').delete().eq('school_id', schoolId)
+
   const readiness = await getSchoolAcademicReadiness(schoolId)
   assert.equal(readiness.classes.count, 1)
   assert.equal(readiness.subjects.allGradesInUseHaveSubjects, false)
@@ -164,6 +177,11 @@ test('no learners: a school with subjects and a ready teacher but zero enrollmen
 test('partially configured school: activated only (no subjects, no teacher, no learners) reports every downstream gap simultaneously', async () => {
   const { schoolId } = await mkSchool()
   await activateSchool(schoolId, { gradeCodes: ['G7'] })
+  // H1D-3C: see the "missing subject source" test above — activateSchool
+  // now always seeds grade_subjects (DR-08); reconstructing the
+  // pre-DR-08 input state explicitly to keep testing the readiness
+  // reporter's own multi-gap logic.
+  await db.from('grade_subjects').delete().eq('school_id', schoolId)
 
   const readiness = await getSchoolAcademicReadiness(schoolId)
   assert.equal(readiness.academicYear.resolved, true)

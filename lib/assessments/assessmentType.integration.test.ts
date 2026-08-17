@@ -12,9 +12,10 @@
 // Run: npx tsx --env-file=.env.local --test lib/assessments/assessmentType.integration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { createAssessment } from './mutations'
 import { repos } from '@/lib/repositories'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_ASSESSMENT_TYPE_TEST'
 const db = createServiceClient()
@@ -54,7 +55,7 @@ after(async () => {
   await db.from('assessment_types').delete().eq('teacher_id', teacherId)
   await db.from('teacher_classes').delete().eq('id', classId)
   await db.from('teachers').delete().eq('id', teacherId)
-  await db.auth.admin.deleteUser(authUserId)
+  await deleteAuthUserOrThrow(db, authUserId)
   console.log('[cleanup] synthetic assessment-type fixtures removed')
 })
 
@@ -120,6 +121,6 @@ test('assessment_types are scoped per teacher — one teacher\'s custom type is 
     assert.equal(otherTeacherTypes.find(t => t.name === 'portfolio_review'), undefined, 'a type created for one teacher must not be visible to another')
   } finally {
     await db.from('teachers').delete().eq('id', otherTeacher!.id)
-    await db.auth.admin.deleteUser(otherAuthUser!.user.id)
+    await deleteAuthUserOrThrow(db, otherAuthUser!.user.id)
   }
 })

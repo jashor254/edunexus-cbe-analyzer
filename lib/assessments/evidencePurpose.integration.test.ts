@@ -13,10 +13,11 @@
 // Run: npx tsx --env-file=.env.local --test lib/assessments/evidencePurpose.integration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { createAssessment, bulkSaveMarks } from './mutations'
 import { recordAssessmentEvidence } from './evidence'
 import { repos } from '@/lib/repositories'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_EVIDENCE_PURPOSE_TEST'
 const db = createServiceClient()
@@ -85,7 +86,7 @@ after(async () => {
   await db.from('students').delete().eq('id', studentId)
   await db.from('teacher_classes').delete().eq('id', classId)
   await db.from('teachers').delete().eq('id', teacherId)
-  await db.auth.admin.deleteUser(authUserId)
+  await deleteAuthUserOrThrow(db, authUserId)
   console.log('[cleanup] synthetic evidence-purpose fixtures removed')
 })
 

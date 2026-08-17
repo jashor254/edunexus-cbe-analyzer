@@ -22,13 +22,14 @@
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { activateSchool } from '@/lib/core/schoolActivation'
 import { createClass, assignSubjectTeacher } from '@/lib/core/classes'
 import { listSubjects } from '@/lib/core/subjects'
 import { inviteSchoolMember, acceptTeacherInvitation, listMyPendingInvitations } from '@/lib/core/teacherOnboarding'
 import { listTeachingAssignmentsForUser } from '@/lib/core/teachingAssignments'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_PHASE2_TEACHER_ACTIVATION_TEST'
 const db = createServiceClient()
@@ -97,12 +98,16 @@ after(async () => {
   if (strayNewTeacher) {
     await db.from('teachers').delete().eq('user_id', strayNewTeacher.id)
     await db.from('profiles').delete().eq('id', strayNewTeacher.id)
-    await db.auth.admin.deleteUser(strayNewTeacher.id)
+    await db.from('notification_log').delete().eq('user_id', strayNewTeacher.id)
+    await db.from('platform_events').delete().eq('actor_id', strayNewTeacher.id)
+    await deleteAuthUserOrThrow(db, strayNewTeacher.id)
   }
   for (const id of createdAuthUserIds) {
     await db.from('teachers').delete().eq('user_id', id)
     await db.from('profiles').delete().eq('id', id)
-    await db.auth.admin.deleteUser(id)
+    await db.from('notification_log').delete().eq('user_id', id)
+    await db.from('platform_events').delete().eq('actor_id', id)
+    await deleteAuthUserOrThrow(db, id)
   }
 })
 

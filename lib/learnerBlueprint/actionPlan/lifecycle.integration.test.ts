@@ -11,7 +11,7 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { ResourceOwnershipError } from '@/lib/core/errors'
 import {
@@ -27,6 +27,7 @@ import {
 import { generateActionCandidate } from './candidateGeneration'
 import type { ProposeBlueprintActionInput } from './types'
 import { asLearnerId } from '@/lib/core/identityTypes'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_ACTIONPLAN_PHASE1_TEST'
 const db = createServiceClient()
@@ -195,7 +196,12 @@ after(async () => {
     await safely(() => db.from('schools').delete().in('id', schoolIds))
   }
   for (const id of [adminUserId, teacherUserId, unrelatedTeacherUserId, otherSchoolTeacherUserId, parentUserId, learnerSelfUserId]) {
-    if (isUuid(id)) await safely(() => db.auth.admin.deleteUser(id))
+    if (isUuid(id)) {
+      await db.from('notification_log').delete().eq('user_id', id)
+      await db.from('platform_events').delete().eq('actor_id', id)
+      await db.from('ingestion_runs').delete().eq('initiated_by', id)
+      await deleteAuthUserOrThrow(db, id)
+    }
   }
 })
 

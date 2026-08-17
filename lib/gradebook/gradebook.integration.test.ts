@@ -11,8 +11,9 @@
 // Run: npx tsx --env-file=.env.local --test lib/gradebook/gradebook.integration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { buildGradebook } from './gradebook'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_LMS_GRADEBOOK_TEST'
 const db = createServiceClient()
@@ -117,7 +118,7 @@ after(async () => {
   if (student1Id) await db.from('students').delete().eq('id', student1Id)
   if (student2Id) await db.from('students').delete().eq('id', student2Id)
   if (teacherId) await db.from('teachers').delete().eq('id', teacherId)
-  if (authUserId) await db.auth.admin.deleteUser(authUserId)
+  if (authUserId) await deleteAuthUserOrThrow(db, authUserId)
 })
 
 test('buildGradebook: one column per assessment and assignment', async () => {

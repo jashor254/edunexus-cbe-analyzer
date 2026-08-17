@@ -14,9 +14,10 @@
 // Run: npx tsx --env-file=.env.local --test lib/holiday/holidayPlanner.integration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { runCsvIngestion } from '@/lib/intelligence/runCsvIngestion'
 import { generateHolidayPlan } from './planner'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_HOLIDAY_PLANNER_TEST'
 const db = createServiceClient()
@@ -92,7 +93,7 @@ after(async () => {
   }
   await db.from('students').delete().in('id', studentIds)
   await db.from('teachers').delete().eq('id', teacherId)
-  await db.auth.admin.deleteUser(authUserId)
+  await deleteAuthUserOrThrow(db, authUserId)
   console.log('[cleanup] synthetic holiday-planner fixtures removed')
 })
 

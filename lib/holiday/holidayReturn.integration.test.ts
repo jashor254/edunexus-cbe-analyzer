@@ -15,11 +15,12 @@
 // Run: npx tsx --env-file=.env.local --test lib/holiday/holidayReturn.integration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { recordHolidayReturn } from './return'
 import { confirmReview } from '@/lib/intelligence/evidenceLifecycle'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { HOLIDAY_ENGAGEMENT_EXTRACTION_METHOD, HOLIDAY_MASTERY_EXTRACTION_METHOD } from './evidenceClaimTypes'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_HOLIDAY_RETURN_TEST'
 const db = createServiceClient()
@@ -71,7 +72,7 @@ after(async () => {
   }
   await db.from('students').delete().eq('id', studentId)
   await db.from('teachers').delete().eq('id', teacherId)
-  await db.auth.admin.deleteUser(authUserId)
+  await deleteAuthUserOrThrow(db, authUserId)
   console.log('[cleanup] synthetic holiday-return fixtures removed')
 })
 

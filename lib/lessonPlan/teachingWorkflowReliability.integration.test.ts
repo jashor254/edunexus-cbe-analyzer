@@ -25,10 +25,11 @@
 
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { signInForHttpTest } from '@/lib/testing/httpAuthTestHelper'
 import { resolveAuthUserForTeacher } from '@/lib/core/identity'
 import { generateWeeklyPlans } from '@/lib/lessonPlan/weeklyGenerator'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const BASE_URL = process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3939'
 const MARKER = 'SYNTHETIC_WORKFLOW_RELIABILITY'
@@ -63,7 +64,7 @@ after(async () => {
     await db.from('schemes_of_work').delete().in('id', schemeIds)
   }
   if (teacherIds.length) await db.from('teachers').delete().in('id', teacherIds)
-  for (const id of userIds) await db.auth.admin.deleteUser(id)
+  for (const id of userIds) await deleteAuthUserOrThrow(db, id)
 })
 
 type Fixture = { authId: string; teacherId: string; email: string; password: string }

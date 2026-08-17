@@ -19,8 +19,9 @@
 // Run with: npx tsx --env-file=.env.local --test lib/curriculum/pathwayContract.integration.test.ts
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { SENIOR_PATHWAYS } from '@/lib/curriculum/subjects'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_PATHWAY_CONTRACT_TEST'
 const db = createServiceClient()
@@ -39,7 +40,7 @@ const createdStudentIds: string[] = []
 
 after(async () => {
   if (createdStudentIds.length) await db.from('students').delete().in('id', createdStudentIds)
-  for (const id of createdUserIds) await db.auth.admin.deleteUser(id)
+  for (const id of createdUserIds) await deleteAuthUserOrThrow(db, id)
 })
 
 test('every SENIOR_PATHWAYS value can be inserted directly into students.current_pathway', async () => {

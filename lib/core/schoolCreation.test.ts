@@ -11,8 +11,9 @@
 
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { createSchool } from '@/lib/core/school'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_DR06_SCHOOL_CREATION_TEST'
 const db = createServiceClient()
@@ -33,7 +34,7 @@ after(async () => {
     await db.from('school_users').delete().eq('school_id', id)
     await db.from('schools').delete().eq('id', id)
   }
-  for (const id of createdAuthUserIds) await db.auth.admin.deleteUser(id)
+  for (const id of createdAuthUserIds) await deleteAuthUserOrThrow(db, id)
 })
 
 test('a same-name retry for the same creator returns the SAME school, not a duplicate', async () => {

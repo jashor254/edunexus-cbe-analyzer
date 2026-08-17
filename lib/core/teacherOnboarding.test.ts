@@ -7,10 +7,11 @@
 // Run: npx tsx --env-file=.env.local --test lib/core/teacherOnboarding.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { activateSchool } from '@/lib/core/schoolActivation'
 import { createAcademicYear } from '@/lib/core/school'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 import {
   inviteTeacher,
   acceptTeacherInvitation,
@@ -68,12 +69,18 @@ after(async () => {
   for (const id of createdAuthUserIds) {
     await db.from('teachers').delete().eq('user_id', id)
     await db.from('profiles').delete().eq('id', id)
+    // inviteTeacher/acceptTeacherInvitation publish notification_log rows
+    // (invite email) and platform_events (actor_id) — real business-logic
+    // side effects of the flow under test, not the universal trigger
+    // side effect deleteAuthUserOrThrow already absorbs.
+    await db.from('notification_log').delete().eq('user_id', id)
+    await db.from('platform_events').delete().eq('actor_id', id)
   }
   for (const id of createdSchoolIds) {
     await db.from('schools').delete().eq('id', id) // cascades school_users/academic_years/classes/etc
   }
   for (const id of createdAuthUserIds) {
-    await db.auth.admin.deleteUser(id)
+    await deleteAuthUserOrThrow(db, id)
   }
 })
 
@@ -127,7 +134,7 @@ test('inviteTeacher: an email with no platform account now gets one created, rat
 
   // Cleanup — this account isn't tracked by the fixture's own createdAuthUserIds.
   await db.from('school_users').delete().eq('id', result.schoolUser.id)
-  await db.auth.admin.deleteUser(created!.id)
+  await deleteAuthUserOrThrow(db, created!.id)
 })
 
 // ── Accept ───────────────────────────────────────────────────────────────────

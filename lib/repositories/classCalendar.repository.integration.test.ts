@@ -7,8 +7,9 @@
 // Run: npx tsx --env-file=.env.local --test lib/repositories/classCalendar.repository.integration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_LMS_CALENDAR_TEST'
 const db = createServiceClient()
@@ -59,7 +60,7 @@ after(async () => {
   if (classId) await db.from('teacher_classes').delete().eq('id', classId)
   if (teacherId) await db.from('teachers').delete().eq('id', teacherId)
   if (otherTeacherId) await db.from('teachers').delete().eq('id', otherTeacherId)
-  if (authUserId) await db.auth.admin.deleteUser(authUserId)
+  if (authUserId) await deleteAuthUserOrThrow(db, authUserId)
 })
 
 test('createEvent + findEventsByClass: a created event is returned for its class', async () => {

@@ -25,9 +25,10 @@
 // Run: npx tsx --env-file=.env.local --test lib/core/reportCardOwnership.security.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { getReportCard, listClassReportCards, generateReportCards } from '@/lib/core/report-cards'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_SH001_OWNERSHIP_TEST'
 const db = createServiceClient()
@@ -141,7 +142,7 @@ async function cleanupSchoolFixture(f: SchoolFixture) {
   await db.from('learners').delete().eq('school_id', f.schoolId)
   await db.from('academic_years').delete().eq('school_id', f.schoolId)
   await db.from('schools').delete().eq('id', f.schoolId)
-  await db.auth.admin.deleteUser(f.authUserId)
+  await deleteAuthUserOrThrow(db, f.authUserId)
 }
 
 before(async () => {

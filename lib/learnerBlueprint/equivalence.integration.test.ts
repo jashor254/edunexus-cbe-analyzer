@@ -20,7 +20,7 @@
 // Run: npx tsx --env-file=.env.local --test lib/learnerBlueprint/equivalence.integration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { startIngestionRun } from '@/lib/intelligence/ingestionRun'
 import { persistEvidenceBatch } from '@/lib/intelligence/evidenceLifecycle'
 import type { LearnerEvidence } from '@/lib/intelligence/evidence'
@@ -29,6 +29,7 @@ import { loadProjectionAccess } from './projectionAccess'
 import { composeLearningCompass } from './composeLearningCompass'
 import { compareProjections, diffsOf } from '@/lib/projection/equivalenceHarness'
 import { asLearnerId, asStudentId } from '@/lib/core/identityTypes'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_BLUEPRINT_EQUIVALENCE_TEST'
 const db = createServiceClient()
@@ -75,7 +76,7 @@ after(async () => {
   if (createdIngestionRunIds.length) await db.from('ingestion_runs').delete().in('id', createdIngestionRunIds)
   if (createdStudentIds.length) await db.from('holiday_plans').delete().in('student_id', createdStudentIds)
   if (createdStudentIds.length) await db.from('students').delete().in('id', createdStudentIds)
-  if (initiatedByUserId) await db.auth.admin.deleteUser(initiatedByUserId)
+  if (initiatedByUserId) await deleteAuthUserOrThrow(db, initiatedByUserId)
 })
 
 async function seedEvidence(studentId: string, evidence: LearnerEvidence[]): Promise<void> {

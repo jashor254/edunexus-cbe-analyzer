@@ -26,7 +26,7 @@
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { persistEvidenceBatch } from '@/lib/intelligence/evidenceLifecycle'
 import { EVIDENCE_SOURCE_TRUST_TIER, type LearnerEvidence } from '@/lib/intelligence/evidence'
@@ -35,6 +35,7 @@ import { readCompassAcademicProjection, resolveCompassSubjectRanking, resolveCom
 import { getOrCreateSession, getNextSubject } from './session'
 import { setTeacherSuggestedTopic } from './objective'
 import { resolveCompassStudentAccess } from './ownership'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_P25_COMPASS_ACCESS_TEST'
 const db = createServiceClient()
@@ -170,7 +171,7 @@ after(async () => {
   }
   if (runIds.length) await safely(() => db.from('ingestion_runs').delete().in('id', runIds))
   if (teacherId) await safely(() => db.from('teachers').delete().eq('id', teacherId))
-  for (const u of [authUserId, otherAuthUserId].filter(Boolean)) await safely(() => db.auth.admin.deleteUser(u))
+  for (const u of [authUserId, otherAuthUserId].filter(Boolean)) await deleteAuthUserOrThrow(db, u)
 })
 
 // ── 1. CASE A — the whole point of G-05 ────────────────────────────────────

@@ -38,8 +38,9 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { resolveOwningSchool } from './institutionOwnership'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_SECURITY_SPRINT_TEST'
 const db = createServiceClient()
@@ -97,7 +98,7 @@ after(async () => {
   if (schoolIds.length > 0) await db.from('schools').delete().in('id', schoolIds)
   await db.from('students').delete().in('id', studentIds)
   await db.from('parent_profiles').delete().eq('id', parentA.id)
-  for (const id of authUserIds) await db.auth.admin.deleteUser(id)
+  for (const id of authUserIds) await deleteAuthUserOrThrow(db, id)
   console.log('[cleanup] synthetic security-sprint fixtures removed')
 })
 

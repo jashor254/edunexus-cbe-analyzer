@@ -5,8 +5,9 @@
 // Run with: npx tsx --env-file=.env.local --test lib/holiday/notify.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { notifyParentOfHolidayReturn } from './notify'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_NOTIFY_TEST'
 const db = createServiceClient()
@@ -31,7 +32,7 @@ after(async () => {
   await db.from('notification_log').delete().eq('user_id', studentId)
   await db.from('students').delete().eq('id', studentId)
   await db.from('teachers').delete().eq('id', teacherId)
-  await db.auth.admin.deleteUser(authUserId)
+  await deleteAuthUserOrThrow(db, authUserId)
 })
 
 test('notifyParentOfHolidayReturn is a safe no-op when no parent phone is on file (never throws, never logs a send)', async () => {

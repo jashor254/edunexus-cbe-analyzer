@@ -11,12 +11,13 @@
 // Run: npx tsx --env-file=.env.local --test lib/quiz/quizDelivery.integration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { recordQuizAutoGradeEvidence } from '@/lib/quiz/quizEvidence'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { replaceQuestions, findQuestionsForTeacher, gradeAndSubmitQuiz } from '@/lib/quiz/quiz'
 import { resolveServedVariantsForStudent, findServedQuestionsForStudent } from '@/lib/quiz/quizDelivery'
 import { createDraftVariants, approveVariant, regenerateVariant } from '@/lib/assignments/variants'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_DELIVERY_TEST'
 const db = createServiceClient()
@@ -95,7 +96,12 @@ after(async () => {
     await db.from('students').delete().eq('id', studentId)
   }
   if (teacherId) await db.from('teachers').delete().eq('id', teacherId)
-  if (authUserId) await db.auth.admin.deleteUser(authUserId)
+  if (authUserId) {
+    await db.from('notification_log').delete().eq('user_id', authUserId)
+    await db.from('platform_events').delete().eq('actor_id', authUserId)
+    await db.from('ingestion_runs').delete().eq('initiated_by', authUserId)
+    await deleteAuthUserOrThrow(db, authUserId)
+  }
 })
 
 test('first open creates exactly one immutable mapping, bound to the approved foundation variant', async () => {

@@ -11,10 +11,11 @@
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { growthRepos } from '@/lib/growth/repositories'
 import { createSchool, updateSchool } from '@/lib/growth/services/schools'
 import { getPilotTargeting } from '@/lib/growth/services/targeting'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const MARKER = 'SYNTHETIC_PE6_TARGETING_TEST'
 const db = createServiceClient()
@@ -38,7 +39,7 @@ after(async () => {
   }
   if (founderId) {
     await db.from('growth_users').delete().eq('id', founderId)
-    await db.auth.admin.deleteUser(founderId)
+    await deleteAuthUserOrThrow(db, founderId)
   }
 })
 

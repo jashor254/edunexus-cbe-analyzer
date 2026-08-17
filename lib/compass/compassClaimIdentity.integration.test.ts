@@ -26,7 +26,7 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import {
   persistEvidenceBatch, confirmReview, rejectReview, retractEvidence,
@@ -36,6 +36,7 @@ import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { recordCompassSessionEvidence } from './evidence'
 import { ENGAGEMENT_EXTRACTION_METHOD, MASTERY_EXTRACTION_METHOD } from './evidenceClaimTypes'
 import { asStudentId } from '@/lib/core/identityTypes'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_P15_CLAIM_IDENTITY_TEST'
 const db = createServiceClient()
@@ -142,7 +143,7 @@ after(async () => {
   }
   if (extraRunIds.length) await safely(() => db.from('ingestion_runs').delete().in('id', extraRunIds))
   if (teacherId) await safely(() => db.from('teachers').delete().eq('id', teacherId))
-  if (authUserId) await safely(() => db.auth.admin.deleteUser(authUserId))
+  if (authUserId) await deleteAuthUserOrThrow(db, authUserId)
 })
 
 // ── 1. Both claims coexist from one session ────────────────────────────────

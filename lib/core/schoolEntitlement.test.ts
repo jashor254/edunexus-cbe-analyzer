@@ -13,10 +13,11 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { resolveSchoolCoverage, setSchoolEntitlement, isEntitlementLive } from '@/lib/core/schoolEntitlement'
 import { deactivateSchoolMembership } from '@/lib/core/school-users'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const MARKER = 'SYNTHETIC_ENTITLEMENT_TEST'
 const db = createServiceClient()
@@ -113,7 +114,7 @@ after(async () => {
     await db.from('school_users').delete().eq('school_id', id)
     await db.from('schools').delete().eq('id', id)
   }
-  for (const id of createdUsers) await db.auth.admin.deleteUser(id)
+  for (const id of createdUsers) await deleteAuthUserOrThrow(db, id)
 })
 
 // ── P0 ────────────────────────────────────────────────────────────────────────

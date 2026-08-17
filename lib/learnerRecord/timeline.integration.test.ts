@@ -12,10 +12,11 @@
 // Run: npx tsx --env-file=.env.local --test lib/learnerRecord/timeline.integration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { getLearnerTimeline } from './timeline'
 import { recordRemarkEvidence } from '@/lib/remarks/evidence'
 import { promoteStudent } from '@/lib/promotions/promote'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_TIMELINE_TEST'
 const db = createServiceClient()
@@ -66,7 +67,7 @@ after(async () => {
   await db.from('student_promotions').delete().eq('student_id', studentId)
   await db.from('students').delete().eq('id', studentId)
   await db.from('teachers').delete().eq('id', teacherId)
-  await db.auth.admin.deleteUser(authUserId)
+  await deleteAuthUserOrThrow(db, authUserId)
   console.log('[cleanup] synthetic timeline fixtures removed')
 })
 
@@ -129,6 +130,6 @@ test('a learner with no history at all gets an empty timeline, not an error', as
     assert.deepEqual(timeline, [])
   } finally {
     await db.from('students').delete().eq('id', emptyStudent!.id)
-    await db.auth.admin.deleteUser(authUser!.user.id)
+    await deleteAuthUserOrThrow(db, authUser!.user.id)
   }
 })

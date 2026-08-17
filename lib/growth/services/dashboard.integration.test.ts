@@ -13,13 +13,14 @@
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { growthRepos } from '@/lib/growth/repositories'
 import { createSchool, changeStage } from '@/lib/growth/services/schools'
 import { logActivity } from '@/lib/growth/services/activities'
 import { createFollowUp } from '@/lib/growth/services/followUps'
 import { createContact } from '@/lib/growth/services/contacts'
 import { getMissionControl } from '@/lib/growth/services/dashboard'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const MARKER = 'SYNTHETIC_PO5_MISSION_CONTROL_TEST'
 const db = createServiceClient()
@@ -50,7 +51,7 @@ after(async () => {
   }
   if (founderId) {
     await db.from('growth_users').delete().eq('id', founderId)
-    await db.auth.admin.deleteUser(founderId)
+    await deleteAuthUserOrThrow(db, founderId)
   }
 })
 

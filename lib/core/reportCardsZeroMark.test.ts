@@ -9,9 +9,10 @@
 // Run: npx tsx --env-file=.env.local --test lib/core/reportCardsZeroMark.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { generateReportCards } from '@/lib/core/report-cards'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_S12_ZEROMARK_TEST'
 const db = createServiceClient()
@@ -90,7 +91,7 @@ after(async () => {
   await db.from('learners').delete().eq('school_id', schoolId)
   await db.from('academic_years').delete().eq('school_id', schoolId)
   if (schoolId) await db.from('schools').delete().eq('id', schoolId)
-  if (authUserId) await db.auth.admin.deleteUser(authUserId)
+  if (authUserId) await deleteAuthUserOrThrow(db, authUserId)
 })
 
 test('generateReportCards: a learner with zero term_subject_summaries gets null overall_score/overall_cbc_level, never a fabricated 0/BE', async () => {

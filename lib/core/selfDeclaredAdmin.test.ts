@@ -13,7 +13,8 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const MARKER = 'SYNTHETIC_ADMIN_ESCALATION'
 const db = createServiceClient()
@@ -83,7 +84,7 @@ after(async () => {
   for (const id of createdUsers) {
     await db.from('token_balances').delete().eq('user_id', id)
     await db.from('teachers').delete().eq('user_id', id)
-    await db.auth.admin.deleteUser(id)
+    await deleteAuthUserOrThrow(db, id)
   }
 })
 

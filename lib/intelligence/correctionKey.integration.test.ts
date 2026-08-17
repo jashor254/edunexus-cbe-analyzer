@@ -18,10 +18,11 @@
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { persistEvidenceBatch } from './evidenceLifecycle'
 import { EVIDENCE_SOURCE_TRUST_TIER, type LearnerEvidence, type CBCLevel } from './evidence'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 import {
   assignmentMarkKey, quizAttemptKey, classAssessmentResultKey, reportCardResultKey,
   correctionKeyNamespace,
@@ -115,7 +116,7 @@ after(async () => {
   }
   if (runIds.length) await safely(() => db.from('ingestion_runs').delete().in('id', runIds))
   if (teacherId) await safely(() => db.from('teachers').delete().eq('id', teacherId))
-  if (authUserId) await safely(() => db.auth.admin.deleteUser(authUserId))
+  if (authUserId) await deleteAuthUserOrThrow(db, authUserId)
 })
 
 // ── Key format + namespace validation (pure) ───────────────────────────────

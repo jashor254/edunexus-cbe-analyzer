@@ -7,11 +7,12 @@
 // Run: npx tsx --env-file=.env.local --test lib/core/learnerOnboarding.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { activateSchool } from '@/lib/core/schoolActivation'
 import { inviteTeacher, acceptTeacherInvitation } from '@/lib/core/teacherOnboarding'
 import { getClassRoster, listLearners } from '@/lib/core/learners'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 import {
   onboardLearner,
   ensureLearnerAdmitted,
@@ -74,7 +75,9 @@ after(async () => {
   for (const id of createdAuthUserIds) {
     await db.from('teachers').delete().eq('user_id', id)
     await db.from('profiles').delete().eq('id', id)
-    await db.auth.admin.deleteUser(id)
+    await db.from('notification_log').delete().eq('user_id', id)
+    await db.from('platform_events').delete().eq('actor_id', id)
+    await deleteAuthUserOrThrow(db, id)
   }
 })
 

@@ -20,7 +20,7 @@ import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { persistEvidenceBatch } from '@/lib/intelligence/evidenceLifecycle'
 import { EVIDENCE_SOURCE_TRUST_TIER, type LearnerEvidence } from '@/lib/intelligence/evidence'
@@ -28,6 +28,7 @@ import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { setTeacherSuggestedTopic } from './objective'
 import { getNextSubject, getOrCreateSession, endSession } from './session'
 import { readCompassAcademicProjection, resolveCompassSubjectRanking } from './learnerContext'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_P25_LEARNER_AGENCY_TEST'
 const db = createServiceClient()
@@ -118,7 +119,7 @@ after(async () => {
   }
   if (runIds.length) await safely(() => db.from('ingestion_runs').delete().in('id', runIds))
   if (teacherId) await safely(() => db.from('teachers').delete().eq('id', teacherId))
-  if (authUserId) await safely(() => db.auth.admin.deleteUser(authUserId))
+  if (authUserId) await deleteAuthUserOrThrow(db, authUserId)
 })
 
 // ── A. The learner cannot alter the teacher's objective or its provenance ──

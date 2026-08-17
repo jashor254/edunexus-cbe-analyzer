@@ -10,8 +10,9 @@
 // Run: npx tsx --env-file=.env.local --test lib/core/schoolActivation.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 import {
   activateSchool,
   ensureAcademicYear,
@@ -43,7 +44,7 @@ before(async () => {
 
 after(async () => {
   if (schoolId) await db.from('schools').delete().eq('id', schoolId)
-  if (creatorUserId) await db.auth.admin.deleteUser(creatorUserId)
+  if (creatorUserId) await deleteAuthUserOrThrow(db, creatorUserId)
 })
 
 async function freshSchool(schoolType: string = 'secondary'): Promise<string> {

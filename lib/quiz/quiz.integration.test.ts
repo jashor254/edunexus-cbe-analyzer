@@ -8,8 +8,9 @@
 // Run: npx tsx --env-file=.env.local --test lib/quiz/quiz.integration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { replaceQuestions, findQuestionsForTeacher, findQuestionsForStudent, gradeAndSubmitQuiz } from './quiz'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_LMS_QUIZ_TEST'
 const db = createServiceClient()
@@ -66,7 +67,7 @@ after(async () => {
   if (classId) await db.from('teacher_classes').delete().eq('id', classId) // cascades assignments/assignment_questions/submissions/class_students
   if (studentId) await db.from('students').delete().eq('id', studentId)
   if (teacherId) await db.from('teachers').delete().eq('id', teacherId)
-  if (authUserId) await db.auth.admin.deleteUser(authUserId)
+  if (authUserId) await deleteAuthUserOrThrow(db, authUserId)
 })
 
 test('replaceQuestions + findQuestionsForTeacher: questions round-trip with correct_index intact', async () => {

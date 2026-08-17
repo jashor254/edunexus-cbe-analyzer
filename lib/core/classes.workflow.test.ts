@@ -12,7 +12,7 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { activateSchool } from '@/lib/core/schoolActivation'
 import { inviteTeacher, acceptTeacherInvitation } from '@/lib/core/teacherOnboarding'
@@ -20,6 +20,7 @@ import { createStream, createClass, assignSubjectTeacher, listClassSubjects, lis
 import { assignSubjectToGrade, listGradeSubjects, listSubjects } from '@/lib/core/subjects'
 import { requireSchoolAdmin } from '@/lib/core/permissions'
 import { PermissionDeniedError, MembershipRequiredError, SchoolMismatchError } from '@/lib/core/errors'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_S10_CLASSES_TEST'
 const db = createServiceClient()
@@ -118,7 +119,9 @@ after(async () => {
   for (const id of createdAuthUserIds) {
     await db.from('teachers').delete().eq('user_id', id)
     await db.from('profiles').delete().eq('id', id)
-    await db.auth.admin.deleteUser(id)
+    await db.from('notification_log').delete().eq('user_id', id)
+    await db.from('platform_events').delete().eq('actor_id', id)
+    await deleteAuthUserOrThrow(db, id)
   }
 })
 

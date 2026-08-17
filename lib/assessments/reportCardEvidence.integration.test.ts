@@ -25,7 +25,7 @@
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { persistEvidenceBatch } from '@/lib/intelligence/evidenceLifecycle'
 import { EVIDENCE_SOURCE_TRUST_TIER, type LearnerEvidence } from '@/lib/intelligence/evidence'
@@ -33,6 +33,7 @@ import { computeConfidence, resolveReviewStatus, AUTO_CONFIRM_THRESHOLD } from '
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { recordReportCardAssessmentEvidence } from './reportCardEvidence'
 import { asStudentId } from '@/lib/core/identityTypes'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_P0B_REPORTCARD_EVIDENCE_TEST'
 const db = createServiceClient()
@@ -127,7 +128,12 @@ after(async () => {
   }
   if (ingestionRunIds.length) await safely(() => db.from('ingestion_runs').delete().in('id', ingestionRunIds))
   if (teacherId) await safely(() => db.from('teachers').delete().eq('id', teacherId))
-  if (authUserId) await safely(() => db.auth.admin.deleteUser(authUserId))
+  if (authUserId) {
+    await db.from('notification_log').delete().eq('user_id', authUserId)
+    await db.from('platform_events').delete().eq('actor_id', authUserId)
+    await db.from('ingestion_runs').delete().eq('initiated_by', authUserId)
+    await deleteAuthUserOrThrow(db, authUserId)
+  }
 })
 
 async function evidenceFor(learnerId: string) {

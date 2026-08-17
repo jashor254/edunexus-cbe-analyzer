@@ -16,10 +16,11 @@
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { recordAssessmentEvidence } from './evidence'
 import { classAssessmentResultKey, correctionKeyNamespace } from '@/lib/intelligence/correctionKey'
 import { compareRow } from '@/lib/intelligence/shadowSupersession'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_E4_CLASS_ASSESSMENT_KEY_TEST'
 const db = createServiceClient()
@@ -124,7 +125,7 @@ after(async () => {
   if (learnerId) await safely(() => db.from('students').delete().eq('id', learnerId))
   if (classId) await safely(() => db.from('teacher_classes').delete().eq('id', classId))
   if (teacherId) await safely(() => db.from('teachers').delete().eq('id', teacherId))
-  if (authUserId) await safely(() => db.auth.admin.deleteUser(authUserId))
+  if (authUserId) await deleteAuthUserOrThrow(db, authUserId)
 })
 
 // ── Scenario A — same assessment result corrected ──────────────────────────

@@ -10,12 +10,13 @@
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { activateSchool } from '@/lib/core/schoolActivation'
 import { onboardLearner } from '@/lib/core/learnerOnboarding'
 import { withdrawLearner, getClassRoster, rollEnrollmentsToTerm } from '@/lib/core/learners'
 import { transferLearner } from '@/lib/core/transfers'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_PHASE4_TERM_ROLLOVER_TEST'
 const db = createServiceClient()
@@ -66,7 +67,7 @@ after(async () => {
   await db.from('learners').delete().eq('school_id', schoolId)
   await db.from('school_users').delete().eq('school_id', schoolId)
   await db.from('schools').delete().eq('id', schoolId)
-  for (const id of createdAuthUserIds) await db.auth.admin.deleteUser(id)
+  for (const id of createdAuthUserIds) await deleteAuthUserOrThrow(db, id)
 })
 
 async function admit(admissionNumber: string, classId: string, termId: string): Promise<string> {

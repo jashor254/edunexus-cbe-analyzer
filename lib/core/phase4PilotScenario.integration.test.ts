@@ -22,7 +22,7 @@
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { activateSchool } from '@/lib/core/schoolActivation'
 import { onboardLearner } from '@/lib/core/learnerOnboarding'
@@ -31,6 +31,7 @@ import { inviteSchoolMember, acceptTeacherInvitation } from '@/lib/core/teacherO
 import { assignSubjectTeacher } from '@/lib/core/classes'
 import { listSubjects } from '@/lib/core/subjects'
 import { SchoolMismatchError } from '@/lib/core/errors'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_PHASE4_PILOT_SCENARIO'
 const db = createServiceClient()
@@ -133,7 +134,9 @@ after(async () => {
   for (const id of createdAuthUserIds) {
     await db.from('teachers').delete().eq('user_id', id)
     await db.from('profiles').delete().eq('id', id)
-    await db.auth.admin.deleteUser(id)
+    await db.from('notification_log').delete().eq('user_id', id)
+    await db.from('platform_events').delete().eq('actor_id', id)
+    await deleteAuthUserOrThrow(db, id)
   }
 })
 

@@ -4,7 +4,7 @@
 // Run with: npx tsx --env-file=.env.local --test lib/core/identity.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import {
   resolveTeacher,
@@ -15,6 +15,7 @@ import {
 } from '@/lib/core/identity'
 import { IdentityResolutionError } from '@/lib/core/errors'
 import { asStudentId } from '@/lib/core/identityTypes'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_IDENTITY_TEST'
 const db = createServiceClient()
@@ -76,7 +77,7 @@ after(async () => {
   await db.from('students').delete().eq('id', studentId)
   await db.from('teachers').delete().eq('id', teacherId)
   for (const id of [teacherUserId, studentUserId, parentUserId, adminUserId]) {
-    await db.auth.admin.deleteUser(id)
+    await deleteAuthUserOrThrow(db, id)
   }
 })
 

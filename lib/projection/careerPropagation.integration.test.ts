@@ -26,11 +26,12 @@
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { runCsvIngestion } from '@/lib/intelligence/runCsvIngestion'
 import { retractEvidence } from '@/lib/intelligence/evidenceLifecycle'
 import { processProjectionEvents } from './eventConsumer'
 import { repos } from '@/lib/repositories'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_CAREER_PROPAGATION_TEST'
 const db = createServiceClient()
@@ -84,7 +85,7 @@ after(async () => {
   await db.from('capability_history').delete().eq('student_id', studentId)
   await db.from('students').delete().eq('id', studentId)
   await db.from('teachers').delete().eq('id', teacherId)
-  await db.auth.admin.deleteUser(authUserId)
+  await deleteAuthUserOrThrow(db, authUserId)
   console.log('[cleanup] synthetic career-propagation fixtures removed')
 })
 

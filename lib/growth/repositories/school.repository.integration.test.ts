@@ -8,9 +8,10 @@
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { growthRepos } from '@/lib/growth/repositories'
 import { createSchool } from '@/lib/growth/services/schools'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const MARKER = 'SYNTHETIC_GROWTH_C0_SCHOOL_TEST'
 const db = createServiceClient()
@@ -32,7 +33,7 @@ after(async () => {
   for (const id of schoolIds) await db.from('growth_schools').delete().eq('id', id)
   if (founderId) {
     await db.from('growth_users').delete().eq('id', founderId)
-    await db.auth.admin.deleteUser(founderId)
+    await deleteAuthUserOrThrow(db, founderId)
   }
 })
 

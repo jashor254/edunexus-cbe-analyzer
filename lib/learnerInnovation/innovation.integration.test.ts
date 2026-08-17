@@ -18,7 +18,7 @@
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { activateSchool } from '@/lib/core/schoolActivation'
 import { onboardLearner } from '@/lib/core/learnerOnboarding'
@@ -36,6 +36,7 @@ import { createOpportunity as createCompetitionOpportunity, registerCompetition,
 import { createNomination, selectForLeadership, getLeadershipSummary } from '@/lib/learnerLeadership/leadership'
 import { composeBlueprint } from '@/lib/learnerBlueprint/composeBlueprint'
 import { asLearnerId } from '@/lib/core/identityTypes'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_13I_INNOVATION_TEST'
 const db = createServiceClient()
@@ -64,7 +65,10 @@ after(async () => {
   for (const id of createdAuthUserIds) {
     await db.from('teachers').delete().eq('user_id', id)
     await db.from('profiles').delete().eq('id', id)
-    await db.auth.admin.deleteUser(id)
+    await db.from('notification_log').delete().eq('user_id', id)
+    await db.from('platform_events').delete().eq('actor_id', id)
+    await db.from('ingestion_runs').delete().eq('initiated_by', id)
+    await deleteAuthUserOrThrow(db, id)
   }
 })
 

@@ -13,9 +13,10 @@
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { resolveMembership } from '@/lib/core/identity'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_PHASE1_MULTI_MEMBERSHIP_TEST'
 const db = createServiceClient()
@@ -47,7 +48,7 @@ after(async () => {
     await db.from('school_users').delete().eq('school_id', schoolId)
     await db.from('schools').delete().eq('id', schoolId)
   }
-  await db.auth.admin.deleteUser(multiUserId)
+  await deleteAuthUserOrThrow(db, multiUserId)
 })
 
 test('findSchoolUserByUserId does not throw for a user with two active memberships', async () => {

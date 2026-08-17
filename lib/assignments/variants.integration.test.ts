@@ -8,8 +8,9 @@
 // Run: npx tsx --env-file=.env.local --test lib/assignments/variants.integration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { replaceQuestions, findQuestionsForTeacher } from '@/lib/quiz/quiz'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 import {
   createDraftVariants, findVariantsForQuestion, findApprovedVariant, findVariantById,
   approveVariant, rejectVariant, regenerateVariant,
@@ -67,7 +68,7 @@ before(async () => {
 after(async () => {
   if (classId) await db.from('teacher_classes').delete().eq('id', classId) // cascades assignments/assignment_questions/variants
   if (teacherId) await db.from('teachers').delete().eq('id', teacherId)
-  if (authUserId) await db.auth.admin.deleteUser(authUserId)
+  if (authUserId) await deleteAuthUserOrThrow(db, authUserId)
 })
 
 test('createDraftVariants + findVariantsForQuestion: round-trips, always status=draft, generated_by=ai by default', async () => {

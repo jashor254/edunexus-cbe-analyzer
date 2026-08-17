@@ -22,8 +22,9 @@
 
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { signInForHttpTest, type SyntheticSession } from '@/lib/testing/httpAuthTestHelper'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 import {
   ensureRecordOfWork,
   seedRecordOfWorkEntries,
@@ -75,7 +76,7 @@ after(async () => {
   if (createdSchemeIds.length) await db.from('records_of_work').delete().in('scheme_id', createdSchemeIds)
   if (createdSchemeIds.length) await db.from('schemes_of_work').delete().in('id', createdSchemeIds)
   if (createdTeacherIds.length) await db.from('teachers').delete().in('id', createdTeacherIds)
-  for (const id of createdUserIds) await db.auth.admin.deleteUser(id)
+  for (const id of createdUserIds) await deleteAuthUserOrThrow(db, id)
 })
 
 type SyntheticTeacher = { authId: string; teacherId: string; email: string; password: string }

@@ -21,9 +21,10 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { canManageAssessment } from '@/lib/core/permissions'
 import { isEduNexusError, ResourceOwnershipError, UnauthorizedError } from '@/lib/core/errors'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_CANMANAGEASSESSMENT_TEST'
 const db = createServiceClient()
@@ -86,7 +87,7 @@ after(async () => {
   await db.from('teacher_classes').delete().eq('id', classId)
   await db.from('teachers').delete().in('id', [teacherAId, teacherBId])
   await db.from('schools').delete().eq('id', schoolId)
-  for (const id of [teacherAUserId, teacherBUserId]) await db.auth.admin.deleteUser(id)
+  for (const id of [teacherAUserId, teacherBUserId]) await deleteAuthUserOrThrow(db, id)
 })
 
 test('the owning teacher can manage the assessment', async () => {

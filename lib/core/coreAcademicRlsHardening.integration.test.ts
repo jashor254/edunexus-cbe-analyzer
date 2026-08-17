@@ -15,8 +15,9 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_PHASE16_RLS_TEST'
 const db = createServiceClient()
@@ -163,7 +164,7 @@ after(async () => {
     await safely(() => db.from('schools').delete().in('id', schoolIds))
   }
   for (const id of [adminAId, teacherAId, parentAId, teacherBId]) {
-    if (isUuid(id)) await safely(() => db.auth.admin.deleteUser(id))
+    if (isUuid(id)) await deleteAuthUserOrThrow(db, id)
   }
 })
 

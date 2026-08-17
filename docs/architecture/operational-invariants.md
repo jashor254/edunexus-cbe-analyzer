@@ -115,17 +115,36 @@ Format per invariant: ID, statement, boundary, failure mode, proof, status.
 
 **Proof**: `lib/testing/deleteAuthUserOrThrow.integration.test.ts` — reproduces the exact silent-leak mechanism against a real local Supabase instance (a `notification_log` row blocking deletion, the bare pattern "succeeds" while the user still exists; the throwing helper surfaces the block immediately), then proves the helper succeeds once the real blocker is removed.
 
-**Deliberately NOT done this phase**: adopting this helper across the ~100 pre-existing DEEP_MAIN files ("do not fix 104 files one by one blindly" — explicit scope lock). Every H4A-and-later new test file that deletes a synthetic auth user uses the throwing helper, so no new leaks are introduced going forward; the pre-existing leak surface is unchanged.
+**Status (superseded by H4A-FIX, below)**: root cause was PROVEN in H4A; adoption at scale and its consequences are now resolved by OPS-TEST-002.
 
-**Recommended fix for a follow-up session** (concrete, not vague): mechanically replace all ~100 bare/`safely()`-wrapped `deleteUser` call sites with `deleteAuthUserOrThrow`, then run DEEP_MAIN once — the newly-thrown errors will point at exactly which per-file FK dependency each leaking file forgot to delete first, information that is currently invisible.
+---
 
-**Status**: **PROVEN** (root cause confirmed with a real reproduction, not re-asserted from the prior doc's smaller `notification_log`-only theory) — **NOT FIXED** at scale. DEEP_MAIN CI promotion remains **NOT READY**.
+## OPS-TEST-002 — every synthetic Auth identity must be deleted or fail the run loudly (H4A-FIX)
+
+**Statement**: every synthetic Auth identity created by a DEEP test must either be deleted successfully by that test, or cause the test run to fail visibly. A cleanup call that silently fails is worse than no cleanup call at all — it creates false assurance.
+
+**What was done**: all 104 DEEP_MAIN files' `deleteUser` call sites (mechanically inventoried, then migrated) now route through the single canonical helper, `lib/testing/deleteAuthUserOrThrow.ts` — no domain-specific variants. The helper additionally deletes the `developer_profiles` row it knows every `createUser()` call unconditionally creates (a universal trigger side effect, not arbitrary state) before attempting `deleteUser`, then throws if the deletion still fails.
+
+**Static guard**: `scripts/check-auth-cleanup-safety.mjs` greps all `*.test.ts` files for a raw, unchecked `.auth.admin.deleteUser(` call. **0 hits inside the 104 DEEP_MAIN files** (confirmed by cross-referencing guard output against `scripts/deep-main-tests.json`). 68 hits remain outside DEEP_MAIN's scope (other test tiers never touched by this phase) — tracked as known future work, not fixed here (out of this phase's scope lock).
+
+**What throw-on-error exposed, and how each was fixed** (owning test's own cleanup sequence, never a global purge):
+
+| Family | Cause | Fix |
+|---|---|---|
+| `notification_log` | invite/notification side effects of production functions under test | delete scoped by `user_id` before `deleteAuthUserOrThrow` |
+| `platform_events` | `publishEvent()` calls during the workflow under test | delete scoped by `actor_id` before `deleteAuthUserOrThrow` |
+| `ingestion_runs` | evidence-ingestion side effects (`startIngestionRun`) | delete scoped by `initiated_by` before `deleteAuthUserOrThrow` |
+| `developer_profiles` | universal `on_auth_user_created` trigger | centralized once, inside the helper itself (not per-file) |
+
+**What throw-on-error exposed that is NOT fixable within this phase's scope**: a structural, by-design immutability barrier — see `docs/architecture/assurance-tiers.md`'s DEEP_MAIN section for the full blocker ledger (`blueprint_snapshots`, `blueprint_action_items`, `learner_achievements`/`_projects`/`_leadership`/`_competitions`/`_innovations`/`_wellbeing_cases`/`_updates`, `portfolio_items`, `teacher_reflections`, `assignment_question_variants`, `learner_transfers`). These tables enforce permanent immutability via unconditional DB triggers (or, for `learner_transfers`, a plain `RESTRICT` FK preserving enrollment history) — 9+ ADRs' worth of deliberate product guarantees. Confirmed empirically: of 83 synthetic schools left after one fresh DEEP_MAIN run, only 9 could be deleted even by raw superuser SQL. Modifying these triggers is out of scope ("do NOT modify product behavior"); no bypass exists that isn't such a modification.
+
+**Verdict**: OPS-TEST-002 as an *implementation* (single helper, throw-on-error, no silent leaks, static guard) is **PROVEN and adopted across all 104 DEEP_MAIN files**. OPS-TEST-002 as a *precondition for CI promotion* ("zero residual, two clean runs") is **NOT ACHIEVABLE** for roughly a third of DEEP_MAIN's files, permanently, by product design — not a bug, not unfinished work. DEEP_MAIN remains a manual/local-only tier; see assurance-tiers.md for the full reasoning and the two real paths forward (accept an explicit residue allowlist, or a future product-level archival/soft-delete mechanism), both deliberately left as policy decisions outside this phase.
 
 ---
 
 ## Run-ID vs self-cleanup (SAFE-006)
 
-Evaluated, not implemented. A `DEEP_RUN_ID` marker letting the reaper safely remove all rows from one run was considered against the now-confirmed root cause: it would not actually fix anything, since the underlying problem is that cleanup code silently fails to detect its own failure, not that fixture identification is ambiguous (the reaper's own pattern-matching was confirmed accurate). A `DEEP_RUN_ID` marker would only make a *post-hoc* sweep easier, not prevent tests from reporting false-green while leaking. **Deferred**: the `deleteAuthUserOrThrow` fix (once adopted at scale) addresses the actual cause; a run-ID marker remains a reasonable *additional* defense-in-depth layer for a future phase, not a substitute.
+Evaluated, not implemented, reconfirmed in H4A-FIX. A `DEEP_RUN_ID` marker letting the reaper safely remove all rows from one run was considered against the now-fully-confirmed root cause: it would not fix anything, since (a) throw-on-error adoption already makes cleanup failure visible per-test, and (b) the remaining residue is permanent by product design, not an attribution-ambiguity problem a run ID could resolve. **Deferred, correctly**: no new evidence from this phase changes that conclusion.
 
 ---
 
@@ -139,6 +158,7 @@ Evaluated, not implemented. A `DEEP_RUN_ID` marker letting the reaper safely rem
 | OPS-WA-001 | PARTIAL → transport contract EXISTING, 1 of 3 failure-logging gaps fixed |
 | OPS-PAY-* | EXISTING (atomicity) / PARTIAL (recovery, not selected — needs new infra) |
 | OPS-ENV-001 | PARTIAL → validator EXISTING and tested, wiring deliberately deferred |
-| OPS-TEST-001 | PROVEN, not fixed at scale — DEEP_MAIN remains NOT READY for CI promotion |
+| OPS-TEST-001 | PROVEN (superseded by OPS-TEST-002's resolution) |
+| OPS-TEST-002 | PROVEN and adopted at scale — DEEP_MAIN's remaining residue is permanent-by-design, not a defect; CI promotion NOT READY, and will not become ready without a policy decision outside this phase's scope |
 
-**H4A's real finding**: operational reliability was the least-protected layer of everything audited across H1–H4. Unlike H3A (where most product-intent boundaries were already deeply proven), this phase found and closed 4 genuinely ABSENT/PARTIAL gaps (cron auth coverage, one cron idempotency case, WhatsApp transport contract, one WhatsApp failure-logging case) and definitively root-caused the harness's own largest remaining known gap (DEEP_MAIN cleanup) with a concrete, actionable fix recipe for a future phase — rather than re-stating the prior document's narrower, insufficient theory.
+**H4A-FIX's real finding**: DEEP_MAIN's cleanup mechanism is now fully sound — every synthetic Auth identity either disappears or fails the run loudly, with one canonical helper and no silent leaks. But the phase's original target (zero residual, CI-promotable) was built on an assumption — that residue was purely a cleanup bug — that turned out to be only partially true. A large, deliberate slice of the product's own evidence-integrity design (immutable blueprint snapshots, decisions, published artifacts, and terminal-status learner records across 9+ ADRs) makes full self-cleaning structurally impossible for the tests that exercise it. Finding that boundary precisely, rather than either forcing a false "clean" result or endlessly chasing an unreachable target, is this phase's actual deliverable.

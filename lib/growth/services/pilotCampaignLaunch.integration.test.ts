@@ -9,12 +9,13 @@
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { growthRepos } from '@/lib/growth/repositories'
 import { createSchool, getSchool } from '@/lib/growth/services/schools'
 import { runImport, type ImportRow } from '@/lib/growth/services/csvImport'
 import { logQuickAction, REPLY_TAG } from '@/lib/growth/services/activities'
 import { getDailyCounters, getEndOfDayReview } from '@/lib/growth/services/campaignProgress'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const MARKER = 'SYNTHETIC_PE7_CAMPAIGN_TEST'
 const db = createServiceClient()
@@ -39,7 +40,7 @@ after(async () => {
   }
   if (founderId) {
     await db.from('growth_users').delete().eq('id', founderId)
-    await db.auth.admin.deleteUser(founderId)
+    await deleteAuthUserOrThrow(db, founderId)
   }
 })
 

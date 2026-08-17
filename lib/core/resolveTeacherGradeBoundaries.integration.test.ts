@@ -16,9 +16,10 @@
 // Run: npx tsx --env-file=.env.local --test lib/core/resolveTeacherGradeBoundaries.integration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { resolveTeacherGradeBoundaries } from '@/lib/core/school'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_4I_BOUNDARY_TEST'
 const db = createServiceClient()
@@ -78,8 +79,8 @@ after(async () => {
   // school_settings and school_users both cascade on school delete
   // (ON DELETE CASCADE per supabase/migrations/20260629_core_foundation.sql)
   if (schoolId) await db.from('schools').delete().eq('id', schoolId)
-  if (bridgedAuthUserId) await db.auth.admin.deleteUser(bridgedAuthUserId)
-  if (unbridgedAuthUserId) await db.auth.admin.deleteUser(unbridgedAuthUserId)
+  if (bridgedAuthUserId) await deleteAuthUserOrThrow(db, bridgedAuthUserId)
+  if (unbridgedAuthUserId) await deleteAuthUserOrThrow(db, unbridgedAuthUserId)
 })
 
 test('BRIDGED: a teacher linked to a school with custom grade_boundaries resolves those exact boundaries', async () => {

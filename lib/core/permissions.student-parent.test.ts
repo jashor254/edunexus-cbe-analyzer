@@ -9,10 +9,11 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { requireStudent, requireParent } from '@/lib/core/permissions'
 import { UnauthorizedError, ResourceOwnershipError } from '@/lib/core/errors'
 import { asStudentId } from '@/lib/core/identityTypes'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_STUDENT_PARENT_PERM_TEST'
 const db = createServiceClient()
@@ -62,7 +63,7 @@ before(async () => {
 after(async () => {
   await db.from('students').delete().in('id', [studentAId, studentBId])
   for (const id of [studentAUserId, parentAUserId, studentBUserId, parentBUserId, outsiderUserId]) {
-    await db.auth.admin.deleteUser(id)
+    await deleteAuthUserOrThrow(db, id)
   }
 })
 

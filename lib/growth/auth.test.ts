@@ -11,9 +11,10 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { requireGrowthUser } from '@/lib/growth/auth'
 import { growthRepos } from '@/lib/growth/repositories'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const MARKER = 'SYNTHETIC_PR2_GROWTH_AUTH_TEST'
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -65,7 +66,7 @@ before(async () => {
 
 after(async () => {
   await db.from('growth_users').delete().in('id', [founderId, teacherLikeId, thirdUserId])
-  for (const id of [founderId, teacherLikeId, thirdUserId]) await db.auth.admin.deleteUser(id)
+  for (const id of [founderId, teacherLikeId, thirdUserId]) await deleteAuthUserOrThrow(db, id)
   process.env.GROWTH_FOUNDER_EMAIL = originalFounderEmail
 })
 

@@ -6,7 +6,7 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import {
   requireAuthentication,
@@ -18,6 +18,7 @@ import {
   canEditReport,
 } from '@/lib/core/permissions'
 import { UnauthorizedError, MembershipRequiredError, PermissionDeniedError, ResourceOwnershipError } from '@/lib/core/errors'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_PERMISSIONS_TEST'
 const db = createServiceClient()
@@ -129,7 +130,7 @@ after(async () => {
   await db.from('school_users').delete().eq('school_id', otherSchoolId)
   await db.from('schools').delete().eq('id', otherSchoolId)
   for (const id of [adminUserId, teacherAUserId, teacherBUserId, outsiderUserId, otherSchoolAdminUserId]) {
-    await db.auth.admin.deleteUser(id)
+    await deleteAuthUserOrThrow(db, id)
   }
 })
 

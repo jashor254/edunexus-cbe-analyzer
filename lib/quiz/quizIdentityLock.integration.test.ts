@@ -10,8 +10,9 @@
 // Run: npx tsx --env-file=.env.local --test lib/quiz/quizIdentityLock.integration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { replaceQuestions, findQuestionsForTeacher, gradeAndSubmitQuiz } from './quiz'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_LOCK_TEST'
 const db = createServiceClient()
@@ -68,7 +69,7 @@ after(async () => {
   if (classId) await db.from('teacher_classes').delete().eq('id', classId)
   if (studentId) await db.from('students').delete().eq('id', studentId)
   if (teacherId) await db.from('teachers').delete().eq('id', teacherId)
-  if (authUserId) await db.auth.admin.deleteUser(authUserId)
+  if (authUserId) await deleteAuthUserOrThrow(db, authUserId)
 })
 
 test('replaceQuestions: an edited question (same id sent back) keeps its id', async () => {

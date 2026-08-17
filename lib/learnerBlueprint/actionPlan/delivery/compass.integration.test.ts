@@ -13,7 +13,7 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { UnauthorizedError, ResourceOwnershipError, NotFoundError, ValidationError, ConflictError, IdentityResolutionError } from '@/lib/core/errors'
 import { deliverBlueprintActionToCompass, type DeliverBlueprintActionToCompassCommand } from './compass'
@@ -21,6 +21,7 @@ import { getNextSubject } from '@/lib/compass/session'
 import { EVIDENCE_BASIS_EMPTY } from '../types'
 import type { BlueprintActionItemRow } from '@/lib/repositories/blueprintActionItem.repository'
 import { asLearnerId, asStudentId, type LearnerId, type StudentId } from '@/lib/core/identityTypes'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_BLUEPRINT_COMPASS_PHASE2C_TEST'
 const db = createServiceClient()
@@ -220,7 +221,10 @@ after(async () => {
   await db.from('school_users').delete().in('school_id', [schoolId, otherSchoolId])
   await db.from('schools').delete().in('id', [schoolId, otherSchoolId])
   for (const id of [adminUserId, teacherUserId, unrelatedTeacherUserId, otherSchoolTeacherUserId, parentUserId, learnerSelfUserId, secondLearnerUserId]) {
-    await db.auth.admin.deleteUser(id)
+    await db.from('notification_log').delete().eq('user_id', id)
+    await db.from('platform_events').delete().eq('actor_id', id)
+    await db.from('ingestion_runs').delete().eq('initiated_by', id)
+    await deleteAuthUserOrThrow(db, id)
   }
 })
 

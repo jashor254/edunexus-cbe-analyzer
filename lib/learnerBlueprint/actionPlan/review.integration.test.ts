@@ -19,7 +19,7 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { UnauthorizedError, ResourceOwnershipError, ConflictError } from '@/lib/core/errors'
 import { deliverBlueprintActionAsAssignment } from './delivery/assignment'
@@ -32,6 +32,7 @@ import type { LearnerEvidence, CBCLevel } from '@/lib/intelligence/evidence'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import type { BlueprintActionItemRow } from '@/lib/repositories/blueprintActionItem.repository'
 import { asLearnerId, asStudentId, type LearnerId, type StudentId } from '@/lib/core/identityTypes'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_BLUEPRINT_REVIEW_PHASE2D_TEST'
 const db = createServiceClient()
@@ -199,7 +200,12 @@ after(async () => {
   // cascade — see comment above.
   await db.from('learners').delete().eq('id', coreLearnerId)
   await db.from('schools').delete().eq('id', schoolId)
-  for (const id of [teacherUserId, unrelatedTeacherUserId]) await db.auth.admin.deleteUser(id)
+  for (const id of [teacherUserId, unrelatedTeacherUserId]) {
+    await db.from('notification_log').delete().eq('user_id', id)
+    await db.from('platform_events').delete().eq('actor_id', id)
+    await db.from('ingestion_runs').delete().eq('initiated_by', id)
+    await deleteAuthUserOrThrow(db, id)
+  }
 })
 
 // ── Preconditions ────────────────────────────────────────────────────────────

@@ -47,22 +47,62 @@ instance from DEEP_PR. Sequence before any test: HTTP auth sentinel
 files (`check-http-base-url-consistency.mjs`), executable SAFE-009
 target-equality proof (`check-http-target-equality.sh`).
 
-## DEEP_MAIN — proven, **not yet wired into CI**
+## DEEP_MAIN — functionally proven, **permanently NOT CI-eligible under the current zero-residual bar** (H4A-FIX)
 
-`scripts/deep-main-tests.json` — 104 files, 820 tests. Proven functionally
-correct: 1 clean combined run (820/820, 0 fail, 7 intentional skips,
-~158s), reconfirmed as individual-file-clean across 10 domain batches in
-H1D-3C. **Blocked from CI enforcement by a real, well-evidenced cleanup
-finding**: at 104-file combined scale, this set leaks substantially (614
-`auth.users`, 192 `schools` rows observed in one run) — almost certainly the
-same `notification_log`-blocks-`deleteUser` FK pattern found and fixed in a
-handful of specific files during H1E-A/H1E-B, present much more widely
-across files never individually cleanup-audited at this scale. Per this
-harness's own rule (never auto-clean then declare success), DEEP_MAIN is
-**not** wired into a hard-fail CI gate until that's fixed. Recommend a
-dedicated cleanup-hardening pass (grep every DEEP_MAIN file for
-`auth.admin.deleteUser` without a preceding `notification_log` clear, same
-pattern as the fixes already applied) before promotion.
+`scripts/deep-main-tests.json` — 104 files, ~858 tests. All 104 files now
+route auth-user cleanup through the single canonical helper,
+`deleteAuthUserOrThrow` (`lib/testing/deleteAuthUserOrThrow.ts`) — see
+OPS-TEST-002 below. `db.auth.admin.deleteUser()` never rejects on a
+server-side/FK error (confirmed by reading `@supabase/auth-js`'s
+`GoTrueAdminApi.js`); it resolves with an unchecked `.error` regardless.
+The old pattern therefore produced false assurance — "cleanup ran" when it
+silently hadn't. The helper throws instead, so a leftover synthetic Auth
+identity now fails the test loudly rather than leaking quietly.
+
+Throw-on-error adoption found and fixed several real, narrow, per-test
+cleanup-ordering gaps (see the blocker ledger below) — but it also
+surfaced a **structural, un-fixable-within-scope blocker**: a large
+fraction of DEEP_MAIN exists specifically to prove that certain tables
+become permanently immutable once a row leaves its initial state. Testing
+that invariant *creates* a row the same invariant then forbids ever
+deleting — no service-role bypass exists, by design.
+
+Confirmed via direct SQL against a fresh, single-run DB: of 83 synthetic
+schools left after one DEEP_MAIN run, only 9 could be deleted (even by a
+raw superuser `DELETE`); 74 were permanently blocked. Blocker ledger (all
+enforced by unconditional DB triggers except the last row, a plain
+`RESTRICT` FK):
+
+| Table | Trigger / constraint | Rule |
+|---|---|---|
+| `blueprint_snapshots` | ADR-0008 Part 3, Sprint 12K | immutable forever, no exception |
+| `blueprint_action_items` | Sprint 12K | immutable once a decision (approved/rejected) is recorded |
+| `learner_achievements` | ADR-0012 Phase 4/11, Sprint 12W | immutable once it leaves `draft` |
+| `learner_projects` | ADR-0013, Sprint 12Z | immutable once it leaves `draft` |
+| `learner_leadership` | ADR-0015, Sprint 13D | immutable once it leaves `nomination` |
+| `learner_competitions` | ADR-0014, Sprint 13B | immutable once it leaves `opportunity` |
+| `learner_innovations` | ADR-0018, Sprint 13I | immutable once it leaves `idea` |
+| `learner_wellbeing_cases` / `_updates` | ADR-0017, Sprint 13G | immutable once it leaves `concern_raised`; updates are append-only |
+| `portfolio_items` | Sprint 12V | immutable once published/archived |
+| `teacher_reflections` | Sprint 12O Phase 5 | immutable once published |
+| `assignment_question_variants` | Sprint 9 | immutable once approved/archived |
+| `learner_transfers` (`from_school_id`/`to_school_id`) | plain `RESTRICT` FK | enrollment-history preservation (see commit `5ef4fdf`) — not a trigger, but same by-design permanence |
+
+None of this is a cleanup bug and none of it is in scope to change — H4A-FIX's
+own scope lock forbids modifying product behavior or redesigning schema, and
+these triggers *are* the product behavior (evidence/decision integrity
+guarantees the domain layer depends on). **Verdict: DEEP_MAIN cannot meet a
+strict zero-residual bar and is not being wired into CI.** It remains a
+manual/local-only tier. The ~30 files with no immutable-domain fixtures
+(core academic bridge, promotions, transfers, term closure, etc.) are now
+fully self-cleaning after this phase's fixes; the ~15 files directly
+exercising an immutable-domain table, plus the handful of `lib/core/*`
+files that trigger a `blueprint_snapshots` row as a downstream side effect
+of the workflow under test, will always leave exactly the rows their own
+assertions require to exist. Any future CI-promotion attempt must either
+accept this residue as expected (allowlist by file, not by silence) or
+introduce a product-level archival/soft-delete escape hatch — both are
+policy decisions outside this phase's scope.
 
 ## DEEP_SERIAL — proven, **not yet wired into CI**
 

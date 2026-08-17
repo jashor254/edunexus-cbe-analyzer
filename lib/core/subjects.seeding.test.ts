@@ -16,10 +16,11 @@
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { activateSchool } from '@/lib/core/schoolActivation'
 import { seedGradeSubjectsForSchool } from '@/lib/core/subjects'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_PHASE1_SUBJECT_SEEDING_TEST'
 const db = createServiceClient()
@@ -60,7 +61,7 @@ after(async () => {
     await db.from('grade_subjects').delete().eq('school_id', id)
     await db.from('schools').delete().eq('id', id)
   }
-  for (const id of createdAuthUserIds) await db.auth.admin.deleteUser(id)
+  for (const id of createdAuthUserIds) await deleteAuthUserOrThrow(db, id)
 })
 
 async function gradeSubjectCountsByGrade(schoolId: string): Promise<Record<string, number>> {

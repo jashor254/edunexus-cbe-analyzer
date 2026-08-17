@@ -25,7 +25,7 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { ConflictError } from '@/lib/core/errors'
 import { proposeBlueprintAction, approveBlueprintAction } from '@/lib/learnerBlueprint/actionPlan/lifecycle'
@@ -37,6 +37,7 @@ import { recordCompassSessionEvidence } from './evidence'
 import { MASTERY_EXTRACTION_METHOD } from './evidenceClaimTypes'
 import { mergeBridgePreservingTeacherIntent } from '@/lib/career/autoReportGenerator'
 import { asLearnerId, asStudentId, type LearnerId, type StudentId } from '@/lib/core/identityTypes'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_P26_DELIVERY_BINDING_TEST'
 const db = createServiceClient()
@@ -150,7 +151,12 @@ after(async () => {
     await safely(() => db.from('school_users').delete().eq('school_id', schoolId))
     await safely(() => db.from('schools').delete().eq('id', schoolId))
   }
-  if (isUuid(teacherUserId)) await safely(() => db.auth.admin.deleteUser(teacherUserId))
+  if (isUuid(teacherUserId)) {
+    await db.from('notification_log').delete().eq('user_id', teacherUserId)
+    await db.from('platform_events').delete().eq('actor_id', teacherUserId)
+    await db.from('ingestion_runs').delete().eq('initiated_by', teacherUserId)
+    await deleteAuthUserOrThrow(db, teacherUserId)
+  }
 })
 
 // ── 1-2. Delivery starts available; the bridge names it ────────────────────

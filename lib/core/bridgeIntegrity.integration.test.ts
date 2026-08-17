@@ -22,7 +22,7 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 
 const db = createServiceClient()
 const SYNTHETIC_MARKER = 'SYNTHETIC_BRIDGE_INTEGRITY_TEST'

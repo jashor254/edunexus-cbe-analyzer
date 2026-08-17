@@ -11,13 +11,14 @@
 // Run: npx tsx --env-file=.env.local --test lib/core/teachingAssignments.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { activateSchool } from '@/lib/core/schoolActivation'
 import { inviteTeacher, acceptTeacherInvitation } from '@/lib/core/teacherOnboarding'
 import { createClass, assignSubjectTeacher, listClassSubjects } from '@/lib/core/classes'
 import { listSubjects } from '@/lib/core/subjects'
 import { deactivateSchoolMembership } from '@/lib/core/school-users'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 import {
   listTeachingAssignmentsForUser,
   groupAssignmentsBySubject,
@@ -158,7 +159,9 @@ after(async () => {
   for (const id of createdAuthUserIds) {
     await db.from('teachers').delete().eq('user_id', id)
     await db.from('profiles').delete().eq('id', id)
-    await db.auth.admin.deleteUser(id)
+    await db.from('notification_log').delete().eq('user_id', id)
+    await db.from('platform_events').delete().eq('actor_id', id)
+    await deleteAuthUserOrThrow(db, id)
   }
 })
 

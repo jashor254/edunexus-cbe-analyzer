@@ -12,9 +12,10 @@
 // Run: npx tsx --env-file=.env.local --test lib/core/reportCardWithSubjects.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { getReportCard } from '@/lib/core/report-cards'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_TD014_REPORT_CARD_TEST'
 const db = createServiceClient()
@@ -136,7 +137,7 @@ after(async () => {
   await db.from('learners').delete().eq('school_id', schoolId)
   await db.from('academic_years').delete().eq('school_id', schoolId)
   await db.from('schools').delete().eq('id', schoolId)
-  await db.auth.admin.deleteUser(authUserId)
+  await deleteAuthUserOrThrow(db, authUserId)
 })
 
 test('single learner, multi-subject: returns the report with both subject summaries attached', async () => {

@@ -14,12 +14,13 @@
 // Run: npx tsx --env-file=.env.local --test lib/core/attendanceReportCardIntegration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { activateSchool } from '@/lib/core/schoolActivation'
 import { onboardLearner } from '@/lib/core/learnerOnboarding'
 import { createAttendanceSession, bulkRecordAttendance } from '@/lib/core/attendance'
 import { generateReportCards, getReportCard } from '@/lib/core/report-cards'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_12B_ATTENDANCE_REPORTCARD_TEST'
 const db = createServiceClient()
@@ -41,7 +42,7 @@ after(async () => {
   for (const id of createdSchoolIds) await db.from('schools').delete().eq('id', id) // cascades everything Core-side, including attendance_sessions/records
   for (const id of createdAuthUserIds) {
     await db.from('profiles').delete().eq('id', id)
-    await db.auth.admin.deleteUser(id)
+    await deleteAuthUserOrThrow(db, id)
   }
 })
 

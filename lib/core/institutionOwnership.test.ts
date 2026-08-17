@@ -6,8 +6,9 @@
 // Run with: npx tsx --env-file=.env.local --test lib/core/institutionOwnership.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { resolveOwningSchool } from '@/lib/core/institutionOwnership'
+import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_INSTITUTIONOWNERSHIP_TEST'
 const db = createServiceClient()
@@ -29,7 +30,7 @@ after(async () => {
     await db.from('schools').delete().in('id', createdSchoolIds)
   }
   for (const id of createdUserIds) {
-    await db.auth.admin.deleteUser(id)
+    await deleteAuthUserOrThrow(db, id)
   }
 })
 
