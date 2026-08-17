@@ -22,7 +22,7 @@ export function allocateLessons({
   let slotPointer = 0
 
   for (const substrand of selectedSubstrands) {
-    const { strandTitle, substrandTitle, lessonsRequired } = substrand
+    const { strandTitle, substrandTitle, substrandId, lessonsRequired } = substrand
     const count = Math.max(1, lessonsRequired || 1)
 
     for (let lessonIndex = 1; lessonIndex <= count; lessonIndex++) {
@@ -37,6 +37,9 @@ export function allocateLessons({
         lesson: currentSlot.lesson,
         strand: strandTitle,
         substrand: substrandTitle,
+        // Curriculum Identity Preservation Contract — carried through
+        // unchanged, never re-derived from strandTitle/substrandTitle.
+        substrandId: substrandId ?? null,
         lessonInSubstrand: lessonIndex,
       })
 

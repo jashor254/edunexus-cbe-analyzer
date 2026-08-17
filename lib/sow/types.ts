@@ -75,6 +75,13 @@ export interface AllocatedLesson {
   lesson: number
   strand: string
   substrand: string
+  // Curriculum Identity Preservation Contract (H5A-1/H5A-2) — the real
+  // sow_substrands.id the teacher selected upstream, carried around the AI
+  // generation call rather than through it. Null only if the upstream
+  // SelectedSubstrand somehow lacked one (no such path exists today, but
+  // this mirrors every other producer's null-safe contract rather than
+  // assuming it can never happen).
+  substrandId: string | null
   lessonInSubstrand: number
 }
 
@@ -83,6 +90,11 @@ export interface GeneratedLesson {
   lesson: number
   strand: string
   substrand: string
+  // Curriculum Identity Preservation Contract (H5A-1/H5A-2) — see
+  // AllocatedLesson.substrandId. AI generation never sees or touches this
+  // field; it is reattached from the allocation slot after generation, so
+  // generated prose cannot alter curriculum identity (CUR-SOW-003).
+  substrandId: string | null
   learningOutcomes: string[]
   learningExperiences: string[]
   keyInquiryQuestions: string[]

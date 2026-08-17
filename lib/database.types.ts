@@ -9839,6 +9839,7 @@ export type Database = {
           reflection: string | null
           scheme_id: string
           strand: string
+          sub_strand_id: string | null
           substrand: string
           updated_at: string | null
           values: string | null
@@ -9857,6 +9858,7 @@ export type Database = {
           reflection?: string | null
           scheme_id: string
           strand: string
+          sub_strand_id?: string | null
           substrand: string
           updated_at?: string | null
           values?: string | null
@@ -9875,6 +9877,7 @@ export type Database = {
           reflection?: string | null
           scheme_id?: string
           strand?: string
+          sub_strand_id?: string | null
           substrand?: string
           updated_at?: string | null
           values?: string | null
@@ -9886,6 +9889,13 @@ export type Database = {
             columns: ["scheme_id"]
             isOneToOne: false
             referencedRelation: "schemes_of_work"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheme_lessons_sub_strand_id_fkey"
+            columns: ["sub_strand_id"]
+            isOneToOne: false
+            referencedRelation: "sow_substrands"
             referencedColumns: ["id"]
           },
         ]

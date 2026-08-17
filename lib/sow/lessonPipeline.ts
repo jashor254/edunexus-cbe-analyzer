@@ -190,7 +190,7 @@ export async function generateSchemePipeline(
     )
 
     for (const { slot, result } of batchResults) {
-      const { week, lesson, strand, substrand } = slot
+      const { week, lesson, strand, substrand, substrandId } = slot
       if (result._validated) {
         const outcomes = result.learning_outcomes || []
         // Feed outcomes to the engine — it extracts verbs and updates its window
@@ -200,6 +200,11 @@ export async function generateSchemePipeline(
           lesson,
           strand,
           substrand,
+          // Curriculum Identity Preservation Contract (CUR-SOW-003) —
+          // reattached from the allocation slot, never from `result` (the AI
+          // output). The AI call above never received or returned this
+          // field, so generated prose cannot alter curriculum identity.
+          substrandId,
           learningOutcomes: outcomes,
           learningExperiences: result.learning_experiences || [],
           keyInquiryQuestions: result.key_inquiry_questions || [],

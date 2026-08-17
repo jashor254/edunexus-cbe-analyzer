@@ -78,6 +78,7 @@
     "lib/projection/engine.test.ts",
     "lib/projection/growthProjector.test.ts",
     "lib/quiz/quiz.pure.test.ts",
+    "lib/sow/lessonAllocator.pure.test.ts",
     "lib/ranking/rankingEngine.test.ts",
     "lib/repositories/getCohortData.ranking.regression.test.ts",
     "lib/repositories/gradeLevelFromScore.grading.regression.test.ts",

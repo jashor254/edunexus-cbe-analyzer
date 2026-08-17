@@ -143,6 +143,10 @@ export async function POST(req: Request) {
         lesson: l.lesson,
         strand: l.strand,
         substrand: l.substrand,
+        // Curriculum Identity Preservation Contract (H5A-2, CUR-SOW-001/002)
+        // — the exact id selected upstream, or null. Never re-resolved here
+        // from l.strand/l.substrand text.
+        sub_strand_id: l.substrandId,
         learning_outcomes: l.learningOutcomes,
         learning_experiences: l.learningExperiences,
         key_inquiry_questions: l.keyInquiryQuestions,
