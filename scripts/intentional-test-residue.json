@@ -1,0 +1,184 @@
+{
+  "description": "H4A-FIX2 \u2014 narrow, per-file registry of DEEP_MAIN synthetic residue that is INTENTIONAL_TERMINAL_RESIDUE, not a cleanup defect: the fixture creates a row a named, verified product invariant then forbids deleting. Each entry's table/invariant was individually confirmed by attempting a raw superuser DELETE against a real leftover row from that file's own fixture (see docs/architecture/assurance-tiers.md's DEEP_MAIN section) \u2014 never assumed from a table name alone. maxSchools bounds how many synthetic schools that file may leave behind (set with modest headroom above one observed run, not exact-counted every subtest \u2014 tighten with a second observed run before relying on it to catch a 1-row regression); anything above it is an unexpected leak, not covered residue. This manifest never uses a table-only or SYNTHETIC_*-wildcard entry (see scripts/validate-intentional-residue.mjs, which enforces that).",
+  "entries": [
+    {
+      "file": "lib/learnerBlueprint/snapshot.test.ts",
+      "fixtureMarker": "SYNTHETIC_12K_BLUEPRINT_SNAPSHOT_TEST",
+      "table": "blueprint_snapshots",
+      "invariant": "ADR-0008 Part 3 (Sprint 12K) \u2014 blueprint_snapshots rows are immutable forever",
+      "maxSchools": 10
+    },
+    {
+      "file": "lib/learnerBlueprint/actionPlan/delivery/assignment.integration.test.ts",
+      "fixtureMarker": "SYNTHETIC_BLUEPRINT_DELIVERY_PHASE2B_TEST",
+      "table": "blueprint_action_items",
+      "invariant": "Sprint 12K \u2014 blueprint_action_items is immutable once a decision is recorded",
+      "maxSchools": 1
+    },
+    {
+      "file": "lib/learnerBlueprint/actionPlan/delivery/compass.integration.test.ts",
+      "fixtureMarker": "SYNTHETIC_BLUEPRINT_COMPASS_PHASE2C_TEST",
+      "table": "blueprint_action_items",
+      "invariant": "Sprint 12K \u2014 blueprint_action_items is immutable once a decision is recorded",
+      "maxSchools": 1
+    },
+    {
+      "file": "lib/learnerBlueprint/actionPlan/review.integration.test.ts",
+      "fixtureMarker": "SYNTHETIC_BLUEPRINT_REVIEW_PHASE2D_TEST",
+      "table": "blueprint_action_items",
+      "invariant": "Sprint 12K \u2014 blueprint_action_items is immutable once a decision is recorded",
+      "maxSchools": 1
+    },
+    {
+      "file": "lib/learnerBlueprint/actionPlan/reviewWorkspace.integration.test.ts",
+      "fixtureMarker": "SYNTHETIC_BLUEPRINT_REVIEW_WORKSPACE_PHASE2E_TEST",
+      "table": "blueprint_action_items",
+      "invariant": "Sprint 12K \u2014 blueprint_action_items is immutable once a decision is recorded",
+      "maxSchools": 1
+    },
+    {
+      "file": "lib/learnerBlueprint/actionPlan/lifecycle.integration.test.ts",
+      "fixtureMarker": "SYNTHETIC_ACTIONPLAN_PHASE1_TEST",
+      "table": "blueprint_action_items",
+      "invariant": "Sprint 12K \u2014 blueprint_action_items is immutable once a decision is recorded",
+      "maxSchools": 1
+    },
+    {
+      "file": "lib/learnerBlueprint/composeRecommendedNextSteps.cutover.test.ts",
+      "fixtureMarker": "SYNTHETIC_CUTOVER_TEST",
+      "table": "blueprint_action_items",
+      "invariant": "Sprint 12K \u2014 blueprint_action_items is immutable once a decision is recorded",
+      "maxSchools": 1
+    },
+    {
+      "file": "lib/compass/deliveryBinding.integration.test.ts",
+      "fixtureMarker": "SYNTHETIC_P26_DELIVERY_BINDING_TEST",
+      "table": "blueprint_action_items",
+      "invariant": "Sprint 12K \u2014 blueprint_action_items is immutable once a decision is recorded",
+      "maxSchools": 1
+    },
+    {
+      "file": "lib/learnerAchievement/achievement.integration.test.ts",
+      "fixtureMarker": "SYNTHETIC_12W_ACHIEVEMENT_TEST",
+      "table": "learner_achievements",
+      "invariant": "ADR-0012 Phase 4/11 (Sprint 12W) \u2014 immutable once it leaves draft",
+      "maxSchools": 4
+    },
+    {
+      "file": "lib/learnerProjects/project.integration.test.ts",
+      "fixtureMarker": "SYNTHETIC_12Z_PROJECT_TEST",
+      "table": "learner_projects",
+      "invariant": "ADR-0013 (Sprint 12Z) \u2014 immutable once it leaves draft",
+      "maxSchools": 4
+    },
+    {
+      "file": "lib/learnerLeadership/leadership.integration.test.ts",
+      "fixtureMarker": "SYNTHETIC_13D_LEADERSHIP_TEST",
+      "table": "learner_leadership",
+      "invariant": "ADR-0015 (Sprint 13D) \u2014 immutable once it leaves nomination",
+      "maxSchools": 8
+    },
+    {
+      "file": "lib/learnerCompetitions/competition.integration.test.ts",
+      "fixtureMarker": "SYNTHETIC_13B_COMPETITION_TEST",
+      "table": "learner_competitions",
+      "invariant": "ADR-0014 (Sprint 13B) \u2014 immutable once it leaves opportunity",
+      "maxSchools": 7
+    },
+    {
+      "file": "lib/learnerInnovation/innovation.integration.test.ts",
+      "fixtureMarker": "SYNTHETIC_13I_INNOVATION_TEST",
+      "table": "learner_innovations",
+      "invariant": "ADR-0018 (Sprint 13I) \u2014 immutable once it leaves idea",
+      "maxSchools": 8
+    },
+    {
+      "file": "lib/learnerWellbeing/wellbeing.integration.test.ts",
+      "fixtureMarker": "SYNTHETIC_13G_WELLBEING_TEST",
+      "table": "learner_wellbeing_cases",
+      "invariant": "ADR-0017 (Sprint 13G) \u2014 immutable once it leaves concern_raised; learner_wellbeing_updates is append-only",
+      "maxSchools": 10
+    },
+    {
+      "file": "lib/learnerPortfolio/portfolio.integration.test.ts",
+      "fixtureMarker": "SYNTHETIC_12V_PORTFOLIO_TEST",
+      "table": "portfolio_items",
+      "invariant": "Sprint 12V \u2014 immutable once published/archived",
+      "maxSchools": 4
+    },
+    {
+      "file": "lib/teacherReflection/reflection.integration.test.ts",
+      "fixtureMarker": "SYNTHETIC_12O_TEACHER_REFLECTION_TEST",
+      "table": "teacher_reflections",
+      "invariant": "Sprint 12O Phase 5 \u2014 immutable once published",
+      "maxSchools": 2
+    },
+    {
+      "file": "lib/assignments/variantGeneration.integration.test.ts",
+      "fixtureMarker": "SYNTHETIC_VARIANT_GEN_TEST",
+      "table": "assignment_question_variants",
+      "invariant": "Sprint 9 \u2014 immutable once approved/archived",
+      "maxSchools": 1
+    },
+    {
+      "file": "lib/core/transfers.test.ts",
+      "fixtureMarker": "SYNTHETIC_S10_TRANSFERS_TEST",
+      "table": "learner_transfers",
+      "invariant": "plain RESTRICT FK (from_school_id/to_school_id) \u2014 enrollment-history preservation, commit 5ef4fdf",
+      "maxSchools": 2
+    },
+    {
+      "file": "lib/core/promotions.test.ts",
+      "fixtureMarker": "SYNTHETIC_S10_PROMOTIONS_TEST",
+      "table": "blueprint_snapshots",
+      "invariant": "ADR-0008 Part 3 (Sprint 12K) \u2014 downstream side effect of the promotion workflow under test, not a direct blueprint test",
+      "maxSchools": 1
+    },
+    {
+      "file": "lib/core/endOfTermFullChain.test.ts",
+      "fixtureMarker": "SYNTHETIC_10A_EOT_CHAIN_TEST",
+      "table": "blueprint_snapshots",
+      "invariant": "ADR-0008 Part 3 (Sprint 12K) \u2014 downstream side effect of the end-of-term workflow under test",
+      "maxSchools": 1
+    },
+    {
+      "file": "lib/core/granularEndOfTermFlow.test.ts",
+      "fixtureMarker": "SYNTHETIC_10A_GRANULAR_TEST",
+      "table": "blueprint_snapshots",
+      "invariant": "ADR-0008 Part 3 (Sprint 12K) \u2014 downstream side effect of the end-of-term workflow under test",
+      "maxSchools": 1
+    },
+    {
+      "file": "lib/core/schoolTermClosure.test.ts",
+      "fixtureMarker": "SYNTHETIC_PHASE12_TERM_CLOSURE_TEST",
+      "table": "blueprint_snapshots",
+      "invariant": "ADR-0008 Part 3 (Sprint 12K) \u2014 downstream side effect of the term-closure workflow under test",
+      "maxSchools": 1
+    },
+    {
+      "file": "lib/core/yearProgression.test.ts",
+      "fixtureMarker": "SYNTHETIC_PHASE6_YEAR_PROGRESSION_TEST",
+      "table": "blueprint_snapshots",
+      "invariant": "ADR-0008 Part 3 (Sprint 12K) \u2014 downstream side effect of the year-progression workflow under test",
+      "maxSchools": 1
+    }
+  ],
+  "notFullyVerifiedYet": {
+    "note": "These DEEP_MAIN files were also observed failing in the same fresh-run investigation but their exact blocking table was not individually re-confirmed by a direct SQL DELETE attempt after the Run 3 rebuild (unlike every entry above). Very likely the same blueprint_snapshots side effect as the lib/core/* entries above, since they exercise adjacent academic-bridge workflows, but 'very likely' does not meet this manifest's own bar (section 6: the blocking mechanism must be verified, not inferred from a table name). Left out of the entries list deliberately rather than guessed into it. Future work: confirm each individually before adding.",
+    "files": [
+      "lib/core/academicBridge.test.ts",
+      "lib/core/academicBridge.multiTeacher.test.ts",
+      "lib/core/academicBridge.assessmentToProjection.workflow.test.ts",
+      "lib/core/academicReadMigration.test.ts",
+      "lib/core/assessmentLock.workflow.test.ts",
+      "lib/core/computeTermSummariesBridge.test.ts",
+      "lib/core/legacyRosterConvergence.test.ts"
+    ]
+  },
+  "knownCleanupDefectNotResidue": {
+    "note": "lib/quiz/quizDelivery.integration.test.ts is NOT intentional residue \u2014 its blocker is ingestion_runs rows still present after the file's own cleanup already deletes ingestion_runs scoped by initiated_by. Root cause is very likely a fire-and-forget/async write racing past the after() hook (the codebase documents this exact pattern elsewhere as 'fire-and-forget contract'), not a product immutability rule. This is a genuine CLEANUP_DEFECT, left open for a future phase, not registered here.",
+    "files": [
+      "lib/quiz/quizDelivery.integration.test.ts"
+    ]
+  }
+}

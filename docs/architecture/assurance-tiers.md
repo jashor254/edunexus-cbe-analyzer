@@ -26,16 +26,46 @@ rather than mere tolerance of placeholder values.
 
 ## DEEP_PR (enforced, every PR)
 
-`scripts/deep-pr-tests.json` — 8 files, 105 tests, `scripts/run-deep-pr.mjs`.
-Highest-risk database/Auth/RLS/Storage invariants: RLS/tenant isolation,
-Evidence lifecycle/immutability, projection persistence + retraction
-exclusion, evidence→review→projection loop, teacher lifecycle, payment
-idempotency (incl. a real concurrent-race test), subscription self-grant
-prevention, Storage bucket privacy. Runs against a Supabase stack the job
-builds from scratch inside the runner — never a remote project, never a repo
-secret. Gated by: deterministic bootstrap, canonical fingerprint check,
+`scripts/deep-pr-tests.json` — 20 files, 154 tests, `scripts/run-deep-pr.mjs`
+(runs `--test-concurrency=1`, see H4A-FIX2 note below). Highest-risk
+database/Auth/RLS/Storage invariants: RLS/tenant isolation, Evidence
+lifecycle/immutability, projection persistence + retraction exclusion,
+evidence→review→projection loop, teacher lifecycle, payment idempotency
+(incl. a real concurrent-race test), subscription self-grant prevention,
+Storage bucket privacy. Runs against a Supabase stack the job builds from
+scratch inside the runner — never a remote project, never a repo secret.
+Gated by: deterministic bootstrap, canonical fingerprint check,
 classification guard (`scripts/check-deep-pr-classification.mjs`), cleanup
 gate (0-residual, `reap-synthetic-fixtures.sh` dry-run).
+
+**H4A-FIX2 — reproven from a fresh environment, 2 consecutive clean runs,
+genuine 0 residual both times** (154/154, 0 fail, 0 skip both runs). The
+gate had silently drifted broken since some earlier point — not from
+anything in H4A-FIX, and not from residue: (1) the committed schema
+fingerprint (`08388515ac18a5c5facf59593a461a85`) no longer matched what the
+deterministic bootstrap actually produces (`e84e429d524729d0885e694bf5a90e60`,
+independently reproduced 5 times across this and the H4A-FIX session); (2)
+`tail -1 /tmp/*.log` is invalid syntax for this repo's GNU coreutils when
+given multiple files (needs `tail -n 1`); (3) the job left
+`NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` blank, which crashes
+`subscriptionSelfGrant.test.ts`'s real anon-client sign-in; (4) it also left
+`SUPABASE_SERVICE_ROLE_KEY` blank, which crashes any file importing the
+`lib/repositories` barrel (`assessmentRepository`'s eager, module-load-time
+client construction — a known wart, not fixed, just given a valid local
+value); (5) `PAYSTACK_WEBHOOK_SECRET` and `RESEND_API_KEY` were never set,
+crashing the webhook-authenticity and teacher-lifecycle files respectively.
+All five fixed in `.github/workflows/ci.yml`, always resolved from the
+job's own local `supabase status`, never a repo secret. A sixth, unrelated
+finding: `eventConsumerDuplicateDelivery.integration.test.ts` asserts an
+exact count from an unscoped global batch read
+(`processProjectionEvents(100)`) — under default multi-file concurrency a
+sibling file's own pending events land in the same batch and inflate the
+count. Fixed by serializing the whole manifest (`--test-concurrency=1` in
+`run-deep-pr.mjs`) rather than rewriting the test's assertion — the same
+shared-global-resource class of problem DEEP_SERIAL already exists for.
+None of these 20 files touch an immutable-domain table, so DEEP_PR never
+needed any residue exception — see OPS-TEST-003 in
+operational-invariants.md for the residue taxonomy this distinction feeds.
 
 ## HTTP_PR (enforced, every PR)
 
@@ -46,6 +76,11 @@ instance from DEEP_PR. Sequence before any test: HTTP auth sentinel
 (`check-http-auth-sentinel.ts`), base-URL consistency across all 35 HTTP
 files (`check-http-base-url-consistency.mjs`), executable SAFE-009
 target-equality proof (`check-http-target-equality.sh`).
+
+**H4A-FIX2** — same `SUPABASE_SERVICE_ROLE_KEY`/`RESEND_API_KEY` gaps as
+DEEP_PR above hit this job's test-side process too (the Next server itself
+was already correctly isolated); fixed the same way. Reproven green,
+14/14, 0 residual, from a fresh environment.
 
 ## DEEP_MAIN — functionally proven, **permanently NOT CI-eligible under the current zero-residual bar** (H4A-FIX)
 
@@ -103,6 +138,20 @@ assertions require to exist. Any future CI-promotion attempt must either
 accept this residue as expected (allowlist by file, not by silence) or
 introduce a product-level archival/soft-delete escape hatch — both are
 policy decisions outside this phase's scope.
+
+**H4A-FIX2** — the "allowlist by file, not by silence" option now exists in
+concrete form: `scripts/intentional-test-residue.json` (23 verified
+entries, one per file+table+cited invariant, each individually confirmed by
+a direct SQL delete attempt, no wildcards) plus
+`scripts/validate-intentional-residue.mjs` guarding its shape. This is
+scaffolding for a future DEEP_MAIN diagnostic pass, not a promotion — the
+reaper (`reap-synthetic-fixtures.sh`) that the enforced PR gates actually
+run was deliberately left untouched, since none of THEIR manifests need any
+residue exception at all. See OPS-TEST-003 in operational-invariants.md for
+the full taxonomy (`CLEAN` / `INTENTIONAL_TERMINAL_RESIDUE` /
+`CLEANUP_DEFECT` / `SHARED_FIXTURE`) and the one file
+(`quizDelivery.integration.test.ts`) that investigation reclassified as a
+genuine `CLEANUP_DEFECT` rather than residue.
 
 ## DEEP_SERIAL — proven, **not yet wired into CI**
 

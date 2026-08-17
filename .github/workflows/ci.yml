@@ -153,10 +153,33 @@ jobs:
     env:
       TEST_SUPABASE_URL: 'http://127.0.0.1:54321'
       TEST_SUPABASE_PROJECT_REF: 'local-docker'
-      NEXT_PUBLIC_SUPABASE_URL: ''
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ''
-      SUPABASE_SERVICE_ROLE_KEY: ''
+      # NEXT_PUBLIC_SUPABASE_URL/ANON_KEY and SUPABASE_SERVICE_ROLE_KEY are
+      # resolved to the LOCAL Supabase instance below (never left blank) —
+      # some DEEP_PR files prove real RLS/authorization behaviour with a
+      # genuine anon-client sign-in (e.g. subscriptionSelfGrant.test.ts), and
+      # 4 files import the shared `lib/repositories` barrel, whose
+      # assessment.repository.ts eagerly constructs a real Supabase client
+      # via these production-named vars AT MODULE IMPORT TIME (a known,
+      # documented architecture wart — see scripts/excluded-tests.json —
+      # not something this job can or should fix). A blank value here
+      # crashes that import for every file in the same combined test
+      # process, not just the one that happens to report it. Still always
+      # local: only ever set from this job's own `supabase status`, never
+      # from repo secrets, so this can't silently point at production.
       DEEPSEEK_AI_API_KEY: ''
+      # app/api/payments/callback/route.webhookAuthenticity.integration.test.ts
+      # computes an HMAC signature with this value and the real route handler
+      # verifies against the same process env var — any shared, non-empty
+      # string proves the real signature-check code path; it is never sent
+      # to Paystack or compared against anything external.
+      PAYSTACK_WEBHOOK_SECRET: 'deep-pr-local-test-webhook-secret'
+      # lib/resend-client.ts throws at MODULE IMPORT TIME if this is unset
+      # (same eager-construction pattern as the repositories barrel above).
+      # teacherLifecycle.test.ts transitively imports it via the teacher
+      # invite flow; no test in this manifest actually sends an email, so
+      # the SDK is never asked to make a real network call — this only
+      # needs to be present, never valid.
+      RESEND_API_KEY: 'ci-unset'
     steps:
       - uses: actions/checkout@v4
 
@@ -180,8 +203,8 @@ jobs:
 
       - name: Verify canonical schema fingerprint
         run: |
-          ACTUAL=$(tail -1 /tmp/*.log 2>/dev/null | grep -oP 'FINGERPRINT=\K[0-9a-f]+' | tail -1)
-          EXPECTED="08388515ac18a5c5facf59593a461a85"
+          ACTUAL=$(tail -n 1 /tmp/*.log 2>/dev/null | grep -oP 'FINGERPRINT=\K[0-9a-f]+' | tail -n 1)
+          EXPECTED="e84e429d524729d0885e694bf5a90e60"
           echo "expected: $EXPECTED"
           echo "actual:   $ACTUAL"
           if [ "$ACTUAL" != "$EXPECTED" ]; then
@@ -189,10 +212,18 @@ jobs:
             exit 1
           fi
 
-      - name: Resolve local service-role key
+      - name: Resolve local anon/service-role keys
         run: |
-          KEY=$(supabase status -o json | node -e "process.stdin.on('data',d=>{const j=JSON.parse(d);console.log(j.SERVICE_ROLE_KEY||j.service_role_key)})")
-          echo "TEST_SUPABASE_SERVICE_ROLE_KEY=$KEY" >> "$GITHUB_ENV"
+          node -e "
+            const s = JSON.parse(require('child_process').execSync('supabase status -o json').toString());
+            const fs = require('fs');
+            const key = s.SERVICE_ROLE_KEY || s.service_role_key;
+            fs.appendFileSync(process.env.GITHUB_ENV,
+              'TEST_SUPABASE_SERVICE_ROLE_KEY=' + key + '\n' +
+              'SUPABASE_SERVICE_ROLE_KEY=' + key + '\n' +
+              'NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321\n' +
+              'NEXT_PUBLIC_SUPABASE_ANON_KEY=' + (s.ANON_KEY || s.anon_key) + '\n');
+          "
 
       - name: Preflight — verify local, non-production target
         run: npx tsx scripts/check-test-target.ts
@@ -200,7 +231,7 @@ jobs:
       - name: DEEP_PR classification guard
         run: node scripts/check-deep-pr-classification.mjs
 
-      - name: DEEP_PR manifest (expect 105/105)
+      - name: DEEP_PR manifest (expect 20/20 files, 154 tests)
         run: node scripts/run-deep-pr.mjs
 
       - name: Cleanup gate — dry-run reaper, expect 0 residual
@@ -304,13 +335,21 @@ jobs:
       - name: HTTP_PR classification guard
         run: node scripts/check-deep-pr-classification.mjs
 
-      - name: HTTP_PR manifest (expect 14/14)
+      - name: HTTP_PR manifest (expect 3/3 files, 14 tests)
         env:
           TEST_SUPABASE_URL: 'http://127.0.0.1:54321'
           TEST_SUPABASE_PROJECT_REF: 'local-docker'
           TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
           NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321'
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.LOCAL_ANON_KEY }}
+          # lib/repositories/assessment.repository.ts eagerly constructs a
+          # real Supabase client via createServiceClient() (the
+          # production-named factory) at MODULE IMPORT TIME — the same
+          # known architecture wart the DEEP_PR job works around. This
+          # test-side process (not the already-isolated Next server) needs
+          # it populated too, still only ever the local instance's own key.
+          SUPABASE_SERVICE_ROLE_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: 'ci-unset'
           TEST_BASE_URL: 'http://localhost:3100'
         run: node scripts/run-http-pr.mjs
 

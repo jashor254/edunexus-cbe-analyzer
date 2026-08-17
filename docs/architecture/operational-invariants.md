@@ -142,6 +142,31 @@ Format per invariant: ID, statement, boundary, failure mode, proof, status.
 
 ---
 
+## OPS-TEST-003 — persistent residue is permitted only when named, registered, bounded, and attributable (H4A-FIX2)
+
+**Statement**: persistent synthetic test residue is permitted only when deletion would violate a named product invariant, and the residue is explicitly registered, bounded, and attributable to the test that created it. This complements OPS-TEST-002 (ordinary fixture → delete or fail); together: ordinary fixture → delete or fail; terminal fixture → explicitly account for persistence.
+
+**Why this phase exists**: H4A-FIX's own regression check ran the wrong DEEP_PR manifest (`scripts/deep-tests.json`, a broader legacy set never wired into CI) instead of the one `deep-pr` actually enforces (`scripts/deep-pr-tests.json`, 20 files/154 tests via `scripts/run-deep-pr.mjs`) — so its "119 failures" finding was a false signal, not evidence the real PR gates were broken. Re-running the *actual* enforced gates from a fresh environment found they were, but for reasons unrelated to residue: a stale schema-fingerprint constant in `.github/workflows/ci.yml`, a portability bug in its `tail -1` usage, and several DEEP_PR/HTTP_PR files needing env vars (`NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `PAYSTACK_WEBHOOK_SECRET`, `RESEND_API_KEY`) the job never supplied. One further finding was real concurrency contamination: `eventConsumerDuplicateDelivery.integration.test.ts` asserts an exact count from `processProjectionEvents(100)`, an unscoped global batch read — under default multi-file concurrency a sibling file's own pending events land in the same batch. All of these are fixed; see "Files changed" in the H4A-FIX2 closeout for the exact diff. None of DEEP_PR/HTTP_PR's 23 files touch an immutable-domain table, so neither gate needed any residue exception at all — both reach genuine 0 residual.
+
+**Taxonomy** (four buckets, no generic `KNOWN_RESIDUAL`):
+
+| Bucket | Meaning |
+|---|---|
+| `CLEAN` | test removes all synthetic state it owns |
+| `INTENTIONAL_TERMINAL_RESIDUE` | test creates state a product invariant deliberately prohibits deleting once terminal, and the test exists specifically to exercise that invariant |
+| `CLEANUP_DEFECT` | state should be removable but cleanup failed or was incomplete — a real bug, not registered as intentional |
+| `SHARED_FIXTURE` | state intentionally belongs to a broader test environment, not one test (not currently used by any DEEP_MAIN/DEEP_PR/HTTP_PR file) |
+
+**INTENTIONAL_TERMINAL_RESIDUE criteria** (all must hold, or it's a `CLEANUP_DEFECT` instead): the row belongs to the current synthetic fixture; a named DB/application invariant prevents its deletion; the test explicitly exercises that invariant; the blocking mechanism is verified by direct SQL, not inferred from a table name; the test leaves no other, unrelated removable state behind.
+
+**Registry**: `scripts/intentional-test-residue.json` — 23 entries, each scoped to one DEEP_MAIN file, one table, one cited invariant (ADR/Sprint), and a bounded `maxSchools`. No table-only or `SYNTHETIC_*`-wildcard entry is possible — `scripts/validate-intentional-residue.mjs` enforces every entry's file exists and is actually in `scripts/deep-main-tests.json`, its `fixtureMarker` appears literally in that file, and `maxSchools` is a positive integer. 7 further files were observed failing in the same investigation but are deliberately left OUT of the registry (`notFullyVerifiedYet` in the JSON) because their blocking table was not individually re-confirmed by direct SQL — "very likely the same blueprint_snapshots side effect" is not the same as verified, and this registry's own bar requires verified. One file (`lib/quiz/quizDelivery.integration.test.ts`) was investigated and reclassified as `CLEANUP_DEFECT`, not residue — its `ingestion_runs` blocker survives that file's own scoped cleanup, most likely a fire-and-forget async write racing past the `after()` hook, not a product invariant. Left open for a future phase, not registered here.
+
+**Reaper**: deliberately NOT extended this phase. `scripts/bootstrap-local-db/reap-synthetic-fixtures.sh` is the script the enforced `deep-pr`/`http-pr`/`http-main`/`deep-nightly` CI gates actually run as their cleanup dry-run, and none of those manifests touch an immutable-domain table — so it correctly expects and finds 0 residual today, with no classification logic needed. Teaching it to distinguish intentional from unexpected residue only matters for a *future* DEEP_MAIN diagnostic pass (never CI-enforced this phase — see assurance-tiers.md), and the task's own scope lock ("extend the residue detector only if necessary... do not redesign the reaper broadly") weighs against doing that speculatively. Deferred, not forgotten: `scripts/intentional-test-residue.json` is already in the right shape to drive that extension when a DEEP_MAIN diagnostic pass is actually built.
+
+**Status**: PROVEN and registered for the 23 verified DEEP_MAIN files. STANDARD/DEEP_PR/HTTP_PR need no exception under this invariant — all three reach genuine 0 residual, not a residue-manifest-excused pass.
+
+---
+
 ## Run-ID vs self-cleanup (SAFE-006)
 
 Evaluated, not implemented, reconfirmed in H4A-FIX. A `DEEP_RUN_ID` marker letting the reaper safely remove all rows from one run was considered against the now-fully-confirmed root cause: it would not fix anything, since (a) throw-on-error adoption already makes cleanup failure visible per-test, and (b) the remaining residue is permanent by product design, not an attribution-ambiguity problem a run ID could resolve. **Deferred, correctly**: no new evidence from this phase changes that conclusion.
@@ -160,5 +185,6 @@ Evaluated, not implemented, reconfirmed in H4A-FIX. A `DEEP_RUN_ID` marker letti
 | OPS-ENV-001 | PARTIAL → validator EXISTING and tested, wiring deliberately deferred |
 | OPS-TEST-001 | PROVEN (superseded by OPS-TEST-002's resolution) |
 | OPS-TEST-002 | PROVEN and adopted at scale — DEEP_MAIN's remaining residue is permanent-by-design, not a defect; CI promotion NOT READY, and will not become ready without a policy decision outside this phase's scope |
+| OPS-TEST-003 | PROVEN — residue taxonomy formalized, 23-entry verified registry built and guarded; STANDARD/DEEP_PR/HTTP_PR restored to genuine 0-residual green (no exception needed) after fixing a stale CI fingerprint, a `tail` portability bug, missing env vars, and one real cross-file concurrency race |
 
 **H4A-FIX's real finding**: DEEP_MAIN's cleanup mechanism is now fully sound — every synthetic Auth identity either disappears or fails the run loudly, with one canonical helper and no silent leaks. But the phase's original target (zero residual, CI-promotable) was built on an assumption — that residue was purely a cleanup bug — that turned out to be only partially true. A large, deliberate slice of the product's own evidence-integrity design (immutable blueprint snapshots, decisions, published artifacts, and terminal-status learner records across 9+ ADRs) makes full self-cleaning structurally impossible for the tests that exercise it. Finding that boundary precisely, rather than either forcing a false "clean" result or endlessly chasing an unreachable target, is this phase's actual deliverable.
