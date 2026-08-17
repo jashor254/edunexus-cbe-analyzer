@@ -1,6 +1,19 @@
 // lib/config/env.ts
 // Server-only — NEVER import this from client components or client.ts files.
-// Validates all env vars at startup so missing keys fail fast with a clear message.
+//
+// H4A / OPS-ENV-001 — validates required env vars, but as a pure function,
+// not a top-level import-time side effect. Confirmed (H4A audit) this
+// module is currently imported nowhere in the real app — no production
+// startup path actually calls validateEnv() today. Deliberately not wired
+// this phase: the "required" set below (in particular
+// DEEPSEEK_AI_API_KEY) directly conflicts with the harness's own
+// foundational guarantee that the STANDARD test tier runs with zero AI/
+// Supabase/payment credentials (docs/architecture/assurance-tiers.md) —
+// wiring this into any code path STANDARD tests could reach would break
+// that guarantee. A future phase should first reconcile the "critical set"
+// with the harness's own environment models (Supabase URL/key are
+// plausibly always-critical; DeepSeek/Paystack are legitimately optional
+// in some real environments) before wiring startup validation anywhere.
 
 import { z } from 'zod'
 
@@ -17,19 +30,26 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 })
 
-const parsed = envSchema.safeParse({
-  DEEPSEEK_AI_API_KEY:           process.env.DEEPSEEK_AI_API_KEY,
-  NEXT_PUBLIC_SUPABASE_URL:      process.env.NEXT_PUBLIC_SUPABASE_URL,
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  SUPABASE_SERVICE_ROLE_KEY:     process.env.SUPABASE_SERVICE_ROLE_KEY,
-  PAYSTACK_PUBLIC_KEY:           process.env.PAYSTACK_PUBLIC_KEY,
-  PAYSTACK_SECRET_KEY:           process.env.PAYSTACK_SECRET_KEY,
-  NODE_ENV:                      process.env.NODE_ENV,
-})
+export type ValidatedEnv = z.infer<typeof envSchema>
 
-if (!parsed.success) {
-  const missing = parsed.error.issues.map(i => `  • ${i.path.join('.')}: ${i.message}`).join('\n')
-  throw new Error(`Missing or invalid environment variables:\n${missing}\n\nCheck your .env.local file and restart the server.`)
+export type EnvValidationResult =
+  | { ok: true; env: ValidatedEnv }
+  | { ok: false; message: string }
+
+/** Pure — takes an explicit vars object rather than reading process.env itself, so it's testable without process-spawning tricks. */
+export function validateEnv(vars: Record<string, string | undefined>): EnvValidationResult {
+  const parsed = envSchema.safeParse(vars)
+  if (!parsed.success) {
+    const missing = parsed.error.issues.map(i => `  • ${i.path.join('.')}: ${i.message}`).join('\n')
+    return { ok: false, message: `Missing or invalid environment variables:\n${missing}\n\nCheck your .env.local file and restart the server.` }
+  }
+  return { ok: true, env: parsed.data }
 }
 
-export const env = parsed.data
+/** Fail-closed entry point for a real startup path, when one is deliberately wired to call it. Not called anywhere today — see the module header. */
+export function validateEnvOrThrow(vars: Record<string, string | undefined> = process.env): ValidatedEnv {
+  const result = validateEnv(vars)
+  if (result.ok === true) return result.env
+  const failure = result as { ok: false; message: string }
+  throw new Error(failure.message)
+}

@@ -1,6 +1,8 @@
 {
   "description": "DEEP test manifest \u2014 Phase H1S-FIX. Every file listed here imports createTestServiceClient() (utils/supabase/test-service.ts), which refuses to construct a client without an explicit, verified, non-production TEST_SUPABASE_* target. Run by npm run test:deep, gated by scripts/check-test-target.ts. CAVEAT: for the *.http.integration.test.ts subset, this manifest only protects test-side fixture setup \u2014 the actual HTTP assertions hit a separately-running Next.js server whose own process environment (NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY) is unchanged by this phase. That server must independently be started against a non-production target before those files are fully safe to automate \u2014 see Phase H1S-FIX closeout, deferred to a future DEEP-infrastructure phase.",
   "files": [
+    "app/api/cron/cronAuthBoundary.integration.test.ts",
+    "app/api/cron/quotaAlertsIdempotency.integration.test.ts",
     "app/api/feedback/route.http.integration.test.ts",
     "app/api/payments/callback/route.webhookAuthenticity.integration.test.ts",
     "app/api/schemes/schemeById.http.integration.test.ts",
@@ -26,6 +28,7 @@
     "lib/compass/endSession.integration.test.ts",
     "lib/compass/learnerAgency.integration.test.ts",
     "lib/compass/learnerContext.integration.test.ts",
+    "lib/config/env.test.ts",
     "lib/core/academicActivation.test.ts",
     "lib/core/academicBridge.assessmentToProjection.workflow.test.ts",
     "lib/core/academicBridge.multiTeacher.test.ts",
@@ -127,6 +130,7 @@
     "lib/projection/careerPropagation.integration.test.ts",
     "lib/projection/curriculumAware.integration.test.ts",
     "lib/projection/equivalenceHarness.integration.test.ts",
+    "lib/projection/eventConsumerDuplicateDelivery.integration.test.ts",
     "lib/projection/projectionPersistence.integration.test.ts",
     "lib/promotions/promote.integration.test.ts",
     "lib/quiz/quizDelivery.integration.test.ts",
@@ -143,6 +147,7 @@
     "lib/teacherReflection/reflection.integration.test.ts",
     "lib/testing/assessmentReviewDashboard.http.integration.test.ts",
     "lib/testing/clinicDownload.http.integration.test.ts",
+    "lib/testing/deleteAuthUserOrThrow.integration.test.ts",
     "lib/testing/growthSchools.http.integration.test.ts",
     "lib/testing/learnerRosterImport.http.integration.test.ts",
     "lib/testing/legacyRosterConvergence.http.integration.test.ts",
@@ -165,6 +170,7 @@
     "lib/testing/studentTimeline.http.integration.test.ts",
     "lib/testing/teacherActivation.http.integration.test.ts",
     "lib/testing/teacherAttentionDestination.integration.test.ts",
-    "lib/testing/teacherSelfJoin.http.integration.test.ts"
+    "lib/testing/teacherSelfJoin.http.integration.test.ts",
+    "lib/whatsapp/client.test.ts"
   ]
 }

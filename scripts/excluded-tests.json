@@ -25,6 +25,7 @@
     "lib/learnerIntelligence/careerMode.pure.test.ts",
     "lib/learningSignal/didLearningTakePlace.test.ts",
     "lib/remedial/planner.test.ts",
-    "lib/remedial/plannerRouterMigration.test.ts"
+    "lib/remedial/plannerRouterMigration.test.ts",
+    "lib/whatsapp/senderFailureLogging.integration.test.ts"
   ]
 }

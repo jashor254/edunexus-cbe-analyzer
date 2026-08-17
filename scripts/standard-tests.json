@@ -95,6 +95,7 @@
     "lib/teacherWorkspace/classInsightsProjectionPure.test.ts",
     "lib/teacherWorkspace/classListProjectionPure.test.ts",
     "lib/teacherWorkspace/standing.test.ts",
+    "lib/whatsapp/client.test.ts",
     "scripts/growth/config/config.test.ts",
     "scripts/growth/enrich/confidence.test.ts",
     "scripts/growth/enrich/contactExtraction.test.ts",

@@ -87,6 +87,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
           event_type:      'org.quota.warning',
           resource_type:   'organization',
           resource_id:     org.id,
+          // H4A / OPS-CRON-002 — this route runs hourly and re-evaluates
+          // every still-active org; without an idempotency key, an org
+          // that remains over threshold across multiple runs the same day
+          // would get a fresh, unguarded org.quota.warning event every
+          // single run. Scoped to one alert per org per day, matching the
+          // pattern already used by this file's sibling cron routes
+          // (parent-pulse, term-readiness, billing-renewals).
+          idempotency_key: `org.quota.warning:${org.id}:${todayStr.slice(0, 10)}`,
           payload: {
             daily_used:   daily,
             daily_quota:  org.api_quota_daily,

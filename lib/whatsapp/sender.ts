@@ -153,6 +153,20 @@ export async function sendAssignmentMarkedWhatsApp(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[sendAssignmentMarkedWhatsApp]', message)
+    // H4A / OPS-WA-001 — a thrown transport error (network failure/timeout,
+    // sendWhatsAppTemplate has no internal try/catch of its own) previously
+    // left no notification_log row at all, unlike a failure the provider
+    // itself reports via a 4xx/5xx response — a real observability gap
+    // where the platform's own delivery record couldn't distinguish
+    // "never attempted" from "attempted and failed at the network level."
+    await logAttempt({
+      userId:       params.userId ?? null,
+      type:         'assignment_marked',
+      referenceId:  params.submissionId,
+      phoneNumber:  params.parentPhone,
+      success:      false,
+      errorMessage: message,
+    }).catch(logErr => console.error('[sendAssignmentMarkedWhatsApp] failed to record failure log', logErr))
     return { success: false, error: message }
   }
 }

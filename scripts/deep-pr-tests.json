@@ -1,7 +1,8 @@
 {
   "description": "DEEP_PR — critical in-process (D1) DEEP tests, proven 2x consecutive fresh-bootstrap clean (H1D-3/H1D-4/H1D-3B). Runs against local disposable Supabase only. No Next server required. Every reclassification of this set must go through scripts/check-deep-pr-classification.mjs, not a silent edit.",
-  "expectedTests": 133,
+  "expectedTests": 154,
   "files": [
+    "lib/config/env.test.ts",
     "lib/core/schoolUsersRlsRegression.integration.test.ts",
     "lib/intelligence/evidenceDomain.integration.test.ts",
     "lib/projection/projectionPersistence.integration.test.ts",
@@ -16,6 +17,10 @@
     "lib/career/capabilityIdentityIsolation.integration.test.ts",
     "lib/intelligence/crossSurfaceConsistency.integration.test.ts",
     "lib/learnerIntelligence/canonicalCapability.integration.test.ts",
-    "lib/compass/aiGroundingContract.integration.test.ts"
+    "lib/compass/aiGroundingContract.integration.test.ts",
+    "app/api/cron/cronAuthBoundary.integration.test.ts",
+    "app/api/cron/quotaAlertsIdempotency.integration.test.ts",
+    "lib/projection/eventConsumerDuplicateDelivery.integration.test.ts",
+    "lib/testing/deleteAuthUserOrThrow.integration.test.ts"
   ]
 }
