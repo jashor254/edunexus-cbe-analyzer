@@ -1147,6 +1147,86 @@ export class TeacherRepository extends BaseRepository {
     return data?.length ?? 0
   }
 
+  // ── Phase 1C: institutional learner -> legacy compatibility student ────────
+  // See lib/core/assignmentLearnerBridge.ts for the full rationale. Reuses
+  // the same `students.external_id` bridge column IDENTITY-1 Phase 1-3
+  // already made canonical (via lib/core/identity.ts::resolveLegacyStudentId
+  // for reads) — this is a second, independent WRITE path for the Assignment
+  // domain, deliberately not routed through lib/core/academicBridge.ts's own
+  // `insertLegacyStudent`, matching the same boundary Phase 1B already drew
+  // for the class side.
+
+  /**
+   * Creates the compatibility `students` row for a Core learner, scoped to
+   * `schoolId` (the one write-path difference from academicBridge.ts's own
+   * `insertLegacyStudent`, which never sets `school_id` — see module header
+   * for why that's a deliberate, additive improvement, not a correction of
+   * existing rows). Throws {@link BridgeAlreadyClaimedError} — never a bare
+   * `Error` — when a concurrent caller wins the same `uq_students_external_id_bridge`
+   * race; the caller recovers by re-reading via `resolveLegacyStudentId`.
+   */
+  async insertAssignmentCompatibilityStudent(input: {
+    name: string
+    grade: number
+    level: string
+    schoolId: string
+    externalId: string
+    upi?: string | null
+  }): Promise<{ id: string }> {
+    const { data, error } = await this.db
+      .from('students')
+      .insert({
+        name:            input.name,
+        grade:           input.grade,
+        level:           input.level,
+        curriculum_type: 'cbc',
+        added_by:        'system',
+        school_id:       input.schoolId,
+        external_id:     input.externalId,
+        upi:             input.upi ?? null,
+      })
+      .select('id')
+      .single()
+    if (error) {
+      if (error.code === '23505' && error.message.includes('uq_students_external_id_bridge')) {
+        throw new BridgeAlreadyClaimedError(input.externalId)
+      }
+      throw new Error(`insertAssignmentCompatibilityStudent: ${error.message}`)
+    }
+    return data
+  }
+
+  /** Every `students.id` currently on a compatibility class's roster — used by roster-sync to compute who to remove (present on the legacy roster but no longer in the current Core enrollment). */
+  async findClassStudentIds(teacherClassId: string): Promise<string[]> {
+    const { data, error } = await this.db
+      .from('class_students')
+      .select('student_id')
+      .eq('class_id', teacherClassId)
+    if (error) throw new Error(`findClassStudentIds: ${error.message}`)
+    return (data ?? []).map((r) => r.student_id as string)
+  }
+
+  /**
+   * Removes a specific set of students from one compatibility class's
+   * roster. Scoped to exactly one `teacherClassId` and an explicit,
+   * caller-resolved student id set (never a bare student_id match across
+   * classes) — same safety shape as {@link removeLegacyClassRosterMembership},
+   * proven safe by the same precedent (`class_students` has zero downstream
+   * foreign keys; every historical academic table references `students.id`
+   * directly, never `class_students.id`).
+   */
+  async removeLegacyClassRosterMembershipForStudents(teacherClassId: string, studentIds: string[]): Promise<number> {
+    if (studentIds.length === 0) return 0
+    const { data, error } = await this.db
+      .from('class_students')
+      .delete()
+      .eq('class_id', teacherClassId)
+      .in('student_id', studentIds)
+      .select('id')
+    if (error) throw new Error(`removeLegacyClassRosterMembershipForStudents: ${error.message}`)
+    return data?.length ?? 0
+  }
+
   /**
    * A single teaching tenure by its own id, with everything
    * `ensureAssignmentCompatibilityClass` needs to authorize and build a
