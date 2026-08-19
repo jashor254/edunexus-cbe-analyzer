@@ -598,6 +598,16 @@ export class LearnerRepository extends BaseRepository {
     return data
   }
 
+  async findTransferById(transferId: string): Promise<LearnerTransfer | null> {
+    const { data, error } = await this.db
+      .from('learner_transfers')
+      .select(TRANSFER_COLS)
+      .eq('id', transferId)
+      .maybeSingle()
+    if (error) throw new Error(`findTransferById: ${error.message}`)
+    return data
+  }
+
   async listTransfers(learnerId: string): Promise<LearnerTransfer[]> {
     const { data, error } = await this.db
       .from('learner_transfers')

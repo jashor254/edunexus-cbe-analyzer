@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { admitLearner, listLearners } from '@/lib/core/learners'
+import { admitLearner, admitTransferredLearner, listLearners } from '@/lib/core/learners'
 import { onboardLearner } from '@/lib/core/learnerOnboarding'
 import { requireSchoolMembership, requireSchoolAdmin } from '@/lib/core/permissions'
-import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
+import { UnauthorizedError, isEduNexusError, PermissionDeniedError } from '@/lib/core/errors'
+import { repos } from '@/lib/repositories'
 import { z } from 'zod'
 
 const AdmitSchema = z.object({
@@ -25,6 +26,12 @@ const AdmitSchema = z.object({
     email: z.string().email().optional(),
     national_id: z.string().optional(),
   }),
+  // Phase 2D Step 9 — optional transfer-continuity token. When present,
+  // admission is routed through admitTransferredLearner (below) instead of
+  // admitLearner, so the new learners row is bound to the SAME durable
+  // learner_identity as the school the learner is transferring from,
+  // rather than minting a fresh one.
+  transferToken: z.string().min(1).optional(),
 })
 
 // Sprint 9D: the full Administration→Academics onboarding pipeline
@@ -119,11 +126,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const parsed = AdmitSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
-  const { schoolId, ...input } = parsed.data
+  const { schoolId, transferToken, ...input } = parsed.data
+  let userId: string
   try {
-    await requireSchoolAdmin(supabase, schoolId)
+    userId = (await requireSchoolAdmin(supabase, schoolId)).userId
   } catch (err) {
     return errorResponse(err)
+  }
+
+  if (transferToken) {
+    const actor = await repos.teachers.findSchoolUser(userId, schoolId)
+    if (!actor) return errorResponse(new PermissionDeniedError('No active school membership found for this admin action.'))
+
+    const result = await admitTransferredLearner(schoolId, actor.id, input, transferToken)
+    if (result.status !== 'admitted') {
+      // Step 12 — no PII/history is ever surfaced here; the failure reason
+      // is limited to the token's own lifecycle state.
+      return NextResponse.json({ error: `Transfer token ${result.status.replace(/_/g, ' ')}.` }, { status: 422 })
+    }
+    return NextResponse.json({ data: result.learner }, { status: 201 })
   }
 
   const data = await admitLearner(schoolId, input)

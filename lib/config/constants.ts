@@ -67,7 +67,16 @@ export const API_ROUTES = {
   MPESA_STK: "/api/payments/mpesa/stk"
 } as const;
 
-// 6. SHARED INTERFACES (The Core Data Model)
+// 6. LEARNER IDENTITY / TRANSFER CONTINUITY (Phase 2D)
+// TTL for a transfer-continuity token (lib/core/transferTokens.ts). Chosen
+// to match the closest existing canonical pattern in this codebase —
+// core_guardian_invites.expires_at's 7-day window (supabase/migrations/
+// 20260722_core_guardian_invites.sql) — widened to 14 days because an
+// inter-school transfer is a slower, paperwork-bound process on the
+// receiving school's side than a parent tapping one WhatsApp link.
+export const TRANSFER_TOKEN_TTL_DAYS = 14;
+
+// 7. SHARED INTERFACES (The Core Data Model)
 // Hii inasaidia kuzuia "Property does not exist" errors
 export interface CareerData {
   id: string;

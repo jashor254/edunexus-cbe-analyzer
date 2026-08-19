@@ -2,6 +2,8 @@ import { repos } from '@/lib/repositories'
 import { createGuardianInvite } from '@/lib/core/guardianInvites'
 import { getCurrentTerm } from '@/lib/core/school'
 import { SchoolMismatchError, ValidationError } from '@/lib/core/errors'
+import { mintFreshIdentityForLearner, linkLearnerToExistingIdentity } from '@/lib/core/learnerIdentity'
+import { consumeLearnerTransferToken, attachConsumedTransferLearner } from '@/lib/core/transfers'
 import type {
   Learner,
   LearnerWithGuardians,
@@ -15,11 +17,23 @@ import type {
 
 // ── Admission ─────────────────────────────────────────────────────────────────
 
+/**
+ * Ordinary new admission (Phase 2D Step 6): mints a brand-new durable
+ * `learner_identities` row and binds it to the new `learners` row with
+ * reason `admission_default` — every learner leaves this function with a
+ * durable identity, none left null for a later pass to worry about.
+ * `actorSchoolUserId` is optional and, when supplied, is recorded as
+ * `learner_identity_links.linked_by`; existing callers that don't pass it
+ * (unchanged call sites) simply get `linked_by: null`, which the schema
+ * allows — this is additive, not a breaking change to any existing caller.
+ */
 export async function admitLearner(
   schoolId: string,
-  input: AdmitLearnerInput
+  input: AdmitLearnerInput,
+  actorSchoolUserId?: string
 ): Promise<LearnerWithGuardians> {
   const learner = await repos.learners.insert(schoolId, input)
+  await mintFreshIdentityForLearner(learner.id, 'admission_default', actorSchoolUserId ?? null)
 
   if (!input.guardian) return { ...learner, learner_guardians: [] }
 
@@ -44,6 +58,67 @@ export async function admitLearner(
   )
 
   return { ...learner, learner_guardians: [guardian] }
+}
+
+export type AdmitTransferredLearnerResult =
+  | { status: 'admitted'; learner: LearnerWithGuardians; learnerIdentityId: string }
+  | { status: 'invalid' | 'expired' | 'already_consumed' | 'wrong_school' }
+
+/**
+ * Phase 2D Step 9 — receiving-school admission carrying a transfer
+ * continuity token. Distinct function from `admitLearner` (rather than a
+ * branch inside it) so the two admission shapes — "new to EduNexus
+ * entirely" vs. "continuing from another school" — stay simple to reason
+ * about independently; both still end at the same `repos.learners.insert`
+ * write.
+ *
+ * Ordering matters for race safety (Step 10): the token is validated AND
+ * reserved (`consumeLearnerTransferToken`) BEFORE this function creates
+ * any `learners` row. A caller that loses the reservation race returns
+ * `'already_consumed'` immediately — it never reaches `repos.learners.insert`,
+ * so a 5-way concurrent call produces exactly one new `learners` row, not five.
+ */
+export async function admitTransferredLearner(
+  schoolId: string,
+  actorSchoolUserId: string,
+  input: AdmitLearnerInput,
+  rawTransferToken: string
+): Promise<AdmitTransferredLearnerResult> {
+  const consumption = await consumeLearnerTransferToken(schoolId, rawTransferToken)
+  if (consumption.status !== 'consumed') return { status: consumption.status }
+
+  // No reuse of the old learners.id (Step 9) — always a fresh row via the
+  // same insert path as ordinary admission.
+  const learner = await repos.learners.insert(schoolId, input)
+
+  await linkLearnerToExistingIdentity(
+    learner.id,
+    consumption.learnerIdentityId,
+    'transfer_token',
+    actorSchoolUserId,
+    consumption.transferId
+  )
+  await attachConsumedTransferLearner(rawTransferToken, learner.id)
+
+  if (!input.guardian) {
+    return { status: 'admitted', learner: { ...learner, learner_guardians: [] }, learnerIdentityId: consumption.learnerIdentityId }
+  }
+
+  const guardian = await repos.learners.insertGuardian(schoolId, learner.id, {
+    user_id: null,
+    relationship: input.guardian.relationship,
+    full_name: input.guardian.full_name,
+    phone: input.guardian.phone,
+    email: input.guardian.email ?? null,
+    national_id: input.guardian.national_id ?? null,
+    is_primary: true,
+    can_receive_reports: true,
+  })
+  createGuardianInvite(schoolId, guardian.id).catch(err =>
+    console.error('[learners] createGuardianInvite failed:', err instanceof Error ? err.message : String(err))
+  )
+
+  return { status: 'admitted', learner: { ...learner, learner_guardians: [guardian] }, learnerIdentityId: consumption.learnerIdentityId }
 }
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────

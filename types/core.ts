@@ -106,6 +106,11 @@ export type PromotionType = 'promoted' | 'repeated' | 'graduated'
 
 export type TransferDirection = 'in' | 'out'
 
+// ── Durable learner identity (Phase 2D) ─────────────────────────────────────
+
+/** Allowed provenance reasons for a `learner_identity_links` row — no others (Phase 2D Step 1). */
+export type LearnerIdentityLinkageReason = 'admission_default' | 'transfer_token' | 'admin_correction'
+
 export type CbcLevel = 'EE' | 'ME' | 'AE' | 'BE'
 
 export type GradingType = 'marks' | 'cbc_level' | 'both'
@@ -464,6 +469,59 @@ export type TransferLearnerInput = {
   reason?: string
   document_urls?: string[]
 }
+
+// ── Durable learner identity (Phase 2D) ─────────────────────────────────────
+
+/** `learner_identities` — minimal, PII-free durable identity that survives inter-school transfer. */
+export type LearnerIdentity = {
+  id: string
+  created_at: string
+  updated_at: string
+}
+
+/** `learner_identity_links` — audit trail of which durable identity a school-owned `learners` row points to, and why. Supersede-never-edit. */
+export type LearnerIdentityLink = {
+  id: string
+  learner_id: string
+  learner_identity_id: string
+  linked_by: string | null
+  linked_at: string
+  linkage_reason: LearnerIdentityLinkageReason
+  transfer_id: string | null
+  superseded_at: string | null
+  superseded_by_link_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** `learner_transfer_tokens` — single-use transfer-continuity handshake. `token_hash` only; the raw token is never persisted. */
+export type LearnerTransferToken = {
+  id: string
+  transfer_id: string
+  token_hash: string
+  expires_at: string
+  consumed_at: string | null
+  consumed_by_learner_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * `transferLearner`'s return shape — a superset of `LearnerTransfer` (Phase
+ * 2D, additive, does not change existing callers' behavior). For
+ * `direction: 'out'`, also carries the one-time raw transfer-continuity
+ * token (Step 7) — never persisted anywhere, returned exactly once through
+ * this call. `direction: 'in'` transfers (this route's historical-record
+ * path, distinct from token-based admission continuity) carry neither.
+ */
+export type TransferLearnerResult = LearnerTransfer & {
+  transferToken?: string
+  transferTokenExpiresAt?: string
+}
+
+export type TransferInConsumptionResult =
+  | { status: 'consumed'; learnerIdentityId: string; sourceLearnerId: string; fromSchoolId: string; transferId: string }
+  | { status: 'invalid' | 'expired' | 'already_consumed' | 'wrong_school' }
 
 // ── Institutional teaching assignment ────────────────────────────────────────
 
