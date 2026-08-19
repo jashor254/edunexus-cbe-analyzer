@@ -31,15 +31,22 @@ if (guard.status !== 0) {
 
 const manifest = JSON.parse(readFileSync(join(__dirname, 'standard-tests.json'), 'utf8'))
 
-// utils/supabase/test-service.test.ts is deliberately NOT in the manifest
-// (and never should be): it's the safety-validation test for
-// createTestServiceClient() itself, so it legitimately contains the exact
-// strings (TEST_SUPABASE_*, createTestServiceClient) the manifest
-// rot-guard treats as privileged-infrastructure signals everywhere else.
-// It is still fully STANDARD-safe — pure function tests plus one client
-// construction that makes no network call — so it runs here alongside the
-// manifest rather than being scanned by the guard.
-const files = [...manifest.files, 'utils/supabase/test-service.test.ts']
+// utils/supabase/test-service.test.ts and utils/supabase/service.test.ts
+// are deliberately NOT in the manifest (and never should be): they are the
+// safety-validation tests for createTestServiceClient() and the Phase 2C
+// Step 0 production guard inside createServiceClient() itself, so they
+// legitimately contain the exact strings (TEST_SUPABASE_*,
+// createTestServiceClient, createServiceClient, SUPABASE_SERVICE_ROLE_KEY)
+// the manifest rot-guard treats as privileged-infrastructure signals
+// everywhere else. Both are still fully STANDARD-safe — pure env-var
+// manipulation plus client construction that makes no network call — so
+// they run here alongside the manifest rather than being scanned by the
+// guard.
+const files = [
+  ...manifest.files,
+  'utils/supabase/test-service.test.ts',
+  'utils/supabase/service.test.ts',
+]
 
 // Deliberately no --env-file=.env.local — STANDARD tests must require zero
 // Supabase/AI/payment/WhatsApp credentials. If a file secretly needs one,

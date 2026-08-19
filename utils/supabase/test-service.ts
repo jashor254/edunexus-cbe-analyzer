@@ -1,27 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
+import { KNOWN_PRODUCTION_PROJECT_REF, extractProjectRef } from './productionRef'
 
-// The production Supabase project ref this repository's .env.local and
-// .env.production both resolve to today (see docs/architecture — Phase H1S
-// test-environment-safety audit). Automated tests must never be allowed to
-// resolve to this ref, regardless of which TEST_* variables produced it.
-const KNOWN_PRODUCTION_PROJECT_REF = 'lpxrfbmzncaztpmyqzkc'
-
-// A local Supabase CLI instance has no hosted <ref>.supabase.co URL — it
-// serves from http://127.0.0.1:<port> (or http://localhost:<port>). There is
-// no way to confuse this host with a production hosted project (disjoint URL
-// shape entirely), so recognizing it does not weaken the production-ref
-// check below — it only adds a second, equally explicit target class.
-// TEST_SUPABASE_PROJECT_REF must be exactly 'local-docker' for this class,
-// so a typo'd or copy-pasted hosted ref can never silently match a local URL.
-const LOCAL_DOCKER_REF = 'local-docker'
-
-function extractProjectRef(url: string): string | null {
-  const hosted = url.match(/^https:\/\/([a-z0-9]+)\.supabase\.co\/?$/)
-  if (hosted) return hosted[1]
-  const local = url.match(/^https?:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?\/?$/)
-  if (local) return LOCAL_DOCKER_REF
-  return null
-}
+// TEST_SUPABASE_PROJECT_REF must be exactly 'local-docker' to match a local
+// Docker URL, so a typo'd or copy-pasted hosted ref can never silently match
+// it. See utils/supabase/productionRef.ts for the shared ref-recognition
+// logic (also used by utils/supabase/service.ts's own production guard).
 
 // A flat shape rather than a discriminated union — kept simple and
 // unambiguous for both branches to consume directly.
