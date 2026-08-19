@@ -8,7 +8,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiNotFound, apiBadRequest, apiForbidden } from '@/lib/api/response'
 import { publishEvent } from '@/lib/events'
-import { requireAuthentication, requireStudent } from '@/lib/core/permissions'
+import { requireAuthentication, requireStudent, requireClassMembership } from '@/lib/core/permissions'
 import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
 import { UPLOAD_LIMITS, isAllowedUploadType } from '@/lib/config/uploads'
 
@@ -55,12 +55,23 @@ export async function POST(req: Request) {
 
     const { data: assignment } = await db
       .from('assignments')
-      .select('id, status')
+      .select('id, status, class_id')
       .eq('id', assignmentId)
       .single()
 
     if (!assignment) return apiNotFound('Assignment not found')
     if (assignment.status === 'closed') return apiError('Assignment is closed', 400)
+
+    // Phase 0 containment: must run BEFORE any Storage upload — an
+    // ineligible learner must never leave a durable Storage object, even a
+    // rejected one. The assignment's own class_id (never a client-supplied
+    // one) is the authority for which class owns it.
+    try {
+      await requireClassMembership(studentId, assignment.class_id, db)
+    } catch (err) {
+      if (isEduNexusError(err)) return apiForbidden()
+      throw err
+    }
 
     const { data: existing } = await db
       .from('assignment_submissions')
@@ -69,16 +80,9 @@ export async function POST(req: Request) {
       .eq('student_id', studentId)
       .single()
 
-    let classId = existing?.class_id as string | undefined
-    if (!classId) {
-      const { data: classLink } = await db
-        .from('class_students')
-        .select('class_id')
-        .eq('student_id', studentId)
-        .single()
-      if (!classLink) return apiError('Student not in any class', 400)
-      classId = classLink.class_id
-    }
+    // class_id is always the already-verified assignment.class_id — never
+    // re-derived from a separate, unscoped class_students lookup.
+    const classId = assignment.class_id
 
     const ext = file.name.split('.').pop() || 'bin'
     const objectPath = `${assignmentId}/${studentId}/${Date.now()}.${ext}`

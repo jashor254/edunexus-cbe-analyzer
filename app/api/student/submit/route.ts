@@ -3,7 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiNotFound, apiBadRequest } from '@/lib/api/response'
 import { publishEvent } from '@/lib/events'
-import { requireAuthentication, requireStudent } from '@/lib/core/permissions'
+import { requireAuthentication, requireStudent, requireClassMembership } from '@/lib/core/permissions'
 import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
 
 const SubmitSchema = z.object({
@@ -41,13 +41,25 @@ export async function POST(req: Request) {
     // Verify the assignment exists and is active
     const { data: assignment } = await db
       .from('assignments')
-      .select('id, status')
+      .select('id, status, class_id')
       .eq('id', assignmentId)
       .single()
 
     if (!assignment) return apiNotFound('Assignment not found')
     if (assignment.status === 'closed') {
       return apiError('Assignment is closed', 400)
+    }
+
+    // Phase 0 containment: identity alone ("this is your own studentId") is
+    // not eligibility. The assignment's own class_id — never a client-
+    // supplied one — is the authority for which class owns it; the learner
+    // must be a current class_students member of that exact class. Runs
+    // before any submission write, so an ineligible learner leaves no row.
+    try {
+      await requireClassMembership(studentId, assignment.class_id, db)
+    } catch (err) {
+      if (isEduNexusError(err)) return apiError('You are not enrolled in the class this assignment belongs to', 403)
+      throw err
     }
 
     // Build the update payload
@@ -84,21 +96,16 @@ export async function POST(req: Request) {
       submission = data
       opError = error
     } else {
-      // Pre-create row for edge cases where submission row was not pre-populated
-      const { data: classLink } = await db
-        .from('class_students')
-        .select('class_id')
-        .eq('student_id', studentId)
-        .single()
-
-      if (!classLink) return apiError('Student not in any class', 400)
-
+      // Pre-create row for edge cases where submission row was not
+      // pre-populated. class_id comes from the already-verified assignment
+      // row above (requireClassMembership just proved this student belongs
+      // to it) — no separate class_students lookup needed here.
       const { data, error } = await db
         .from('assignment_submissions')
         .insert({
           assignment_id: assignmentId,
           student_id: studentId,
-          class_id: classLink.class_id,
+          class_id: assignment.class_id,
           ...updatePayload,
         })
         .select()

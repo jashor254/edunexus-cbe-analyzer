@@ -144,6 +144,40 @@ export async function requireStudent(client: SupabaseClient, studentId: string):
   return user
 }
 
+/**
+ * Throws {@link ResourceOwnershipError} unless `studentId` is a current
+ * `class_students` member of `classId`. This is the canonical "is this
+ * learner eligible to act on something owned by this class" gate — used by
+ * every assignment-submission entry point (typed, file, quiz) to prove a
+ * learner is enrolled in the class that owns the target assignment, not
+ * merely that they are who they claim to be.
+ *
+ * Deliberately takes a server-resolved `classId` (e.g. `assignments.class_id`,
+ * loaded from the DB by the caller immediately beforehand), never a
+ * client-supplied one — the assignment row itself is the only authority for
+ * which class owns it (Phase 0 containment,
+ * docs/architecture — legacy assignment domain audit). Already the exact
+ * check `app/api/student/assignments/[id]/questions/route.ts` re-implements
+ * inline; this is the single canonical version other call sites should share
+ * rather than re-deriving (Engineering Rule 4 — "never duplicate
+ * authorization").
+ *
+ * Deliberately legacy-space only: `students.id` / `class_students`, never
+ * Core `learners.id` / `learner_enrollments`. Do not widen this to accept a
+ * Core learner id — the assignment domain's identity space is `students.id`
+ * throughout, a documented deliberate pilot-era deferral, not a bug.
+ */
+export async function requireClassMembership(studentId: string, classId: string, dbOverride?: SupabaseClient): Promise<void> {
+  const db = dbOverride ?? createServiceClient()
+  const { data: membership } = await db
+    .from('class_students')
+    .select('id')
+    .eq('class_id', classId)
+    .eq('student_id', studentId)
+    .maybeSingle()
+  if (!membership) throw new ResourceOwnershipError('This learner is not enrolled in the class this assignment belongs to.')
+}
+
 // ── can* — capability checks, return boolean ────────────────────────────────
 
 /**

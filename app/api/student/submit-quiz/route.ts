@@ -8,7 +8,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound, apiBadRequest } from '@/lib/api/response'
 import { publishEvent } from '@/lib/events'
-import { requireAuthentication, requireStudent } from '@/lib/core/permissions'
+import { requireAuthentication, requireStudent, requireClassMembership } from '@/lib/core/permissions'
 import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
 import { gradeAndSubmitQuiz } from '@/lib/quiz/quiz'
 import { recordQuizAutoGradeEvidence } from '@/lib/quiz/quizEvidence'
@@ -55,6 +55,17 @@ export async function POST(req: Request) {
     if (!assignment) return apiNotFound('Assignment not found')
     if (!assignment.is_quiz) return apiBadRequest('This assignment is not a quiz')
     if (assignment.status === 'closed') return apiError('Assignment is closed', 400)
+
+    // Phase 0 containment: must run BEFORE grading — an ineligible learner
+    // must never cause a score, a 'marked' status, or quiz_auto_grade
+    // Evidence to be created. The assignment's own class_id (never a
+    // client-supplied one) is the authority for which class owns it.
+    try {
+      await requireClassMembership(studentId, assignment.class_id, db)
+    } catch (err) {
+      if (isEduNexusError(err)) return apiForbidden()
+      throw err
+    }
 
     const { submission, grade } = await gradeAndSubmitQuiz({
       assignmentId,
