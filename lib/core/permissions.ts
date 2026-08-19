@@ -30,6 +30,7 @@ import {
   resolveStudent,
   resolveParent,
   resolveLegacyStudentId,
+  resolveTeachingTenure,
   type CurrentUser,
   type ResolvedMembership,
 } from '@/lib/core/identity'
@@ -121,6 +122,98 @@ export async function requireClassTeacher(client: SupabaseClient, classId: strin
 
   if (!data) throw new ResourceOwnershipError('You are not the teacher of this class.')
   return user
+}
+
+/**
+ * The authoritative context an institutional (school-assigned) assignment is
+ * created under — everything downstream (compatibility class/roster
+ * resolution, subject text, event payload) derives from this, never from
+ * client-supplied school/class/subject data (RAS §8, CLAUDE.md "never trust
+ * userId from a request body" generalized to every identity in this chain).
+ */
+export type InstitutionalAssignmentAuthority = {
+  schoolId: string
+  /** `school_users.id` — the membership `class_subjects.teacher_id` points to. */
+  schoolUserId: string
+  classSubjectId: string
+  /** `classes.id` — the Core class this tenure teaches. */
+  coreClassId: string
+  subjectId: string
+  /** Canonical Core subject name — the only subject text an institutional assignment may carry (Step 7). */
+  subjectName: string
+  /** The auth user id holding this tenure — always equal to the authenticated caller by the time this returns. */
+  teacherUserId: string
+}
+
+/**
+ * Throws unless `classSubjectId` is a CURRENT teaching tenure
+ * (`class_subjects` row) held by the authenticated user, through an active
+ * school membership whose role permits teaching. This is institutional
+ * assignment authority's one gate (Phase 1D Step 3) — the compatibility
+ * bridge (`ensureAssignmentCompatibilityClass`/`syncAssignmentCompatibilityRoster`,
+ * `lib/core/assignmentCompatibilityBridge.ts` / `assignmentLearnerBridge.ts`)
+ * is storage machinery a caller resolves AFTER this succeeds, never a
+ * substitute for it — legacy `teacher_classes.teacher_id` ownership of the
+ * eventual compatibility class is never consulted here and never grants
+ * authority (Step 4/6: "institutional authority -> compatibility
+ * resolution", never the reverse).
+ *
+ * Throws:
+ *  - `UnauthorizedError` — no authenticated session.
+ *  - `ResourceOwnershipError` — `classSubjectId` does not exist, is not held
+ *    by the authenticated user, or is not current (`ended_at` non-null — a
+ *    departed/replaced tenure, Step 10/11's departed-teacher proof).
+ *  - `MembershipRequiredError` — the owning school membership is inactive
+ *    (Step 10's "membership deactivated" branch, and Step 12's reinstatement
+ *    case: reinstated membership with no new current tenure still has no
+ *    tenure to pass the previous check with).
+ *  - `PermissionDeniedError` — the membership is active but its role does
+ *    not permit teaching (not `SCHOOL_STAFF_ROLES`).
+ *
+ * Never trusts a caller-supplied `schoolId`/`coreClassId`/`subjectId` — every
+ * field on the returned value is derived from `classSubjectId` alone via
+ * `resolveTeachingTenure`, then cross-checked against the authenticated
+ * user (Step 13/14: wrong class/subject/school and multi-school proofs all
+ * reduce to "does `classSubjectId` name a tenure this exact user holds").
+ */
+export async function requireInstitutionalAssignmentAuthority(
+  client: SupabaseClient,
+  classSubjectId: string,
+): Promise<InstitutionalAssignmentAuthority> {
+  const user = await requireAuthentication(client)
+
+  const tenure = await resolveTeachingTenure(classSubjectId)
+  if (!tenure || tenure.membershipUserId !== user.id) {
+    // Deliberately indistinguishable from "no such tenure" (matches
+    // `requireClassTeacher`'s existing not-found/not-yours conflation) —
+    // never confirms to a caller that a `classSubjectId` they don't hold
+    // exists at all.
+    throw new ResourceOwnershipError('You do not hold this teaching assignment.')
+  }
+  if (tenure.endedAt !== null) {
+    throw new ResourceOwnershipError('This teaching assignment has ended and no longer grants assignment-creation authority.')
+  }
+  if (!tenure.membershipIsActive) {
+    throw new MembershipRequiredError('Your school membership is not active.')
+  }
+
+  const membership = await resolveMembership(user.id, tenure.schoolId)
+  if (!membership || !membership.isActive) {
+    throw new MembershipRequiredError()
+  }
+  if (!SCHOOL_STAFF_ROLES.includes(membership.role)) {
+    throw new PermissionDeniedError('Your role does not permit creating assignments.')
+  }
+
+  return {
+    schoolId: tenure.schoolId,
+    schoolUserId: tenure.schoolUserId,
+    classSubjectId: tenure.classSubjectId,
+    coreClassId: tenure.coreClassId,
+    subjectId: tenure.subjectId,
+    subjectName: tenure.subjectName,
+    teacherUserId: user.id,
+  }
 }
 
 /** Throws {@link ResourceOwnershipError} unless the authenticated user is a parent/guardian of `studentId` (legacy `students.parent_user_id` or Core `learner_guardians`, per {@link resolveParent}). */

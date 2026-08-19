@@ -5,12 +5,22 @@ import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } fr
 import { timedQuery } from '@/lib/observability/queryTiming'
 import { requireAuthentication } from '@/lib/core/permissions'
 import { resolveTeacher } from '@/lib/core/identity'
-import { UnauthorizedError, ForbiddenError } from '@/lib/core/errors'
+import { UnauthorizedError, ForbiddenError, ValidationError } from '@/lib/core/errors'
 import { createAssignment } from '@/lib/assignments/create'
 
 const CreateAssignmentSchema = z.object({
-  class_id:              z.string().uuid(),
+  // Exactly one of class_id (Solo Teacher — legacy teacher_classes.id) or
+  // class_subject_id (institutional — a current class_subjects teaching
+  // tenure) must be present. Never both, never neither (Phase 1D) — the
+  // route only shape-validates that; `createAssignment` enforces it as a
+  // business rule and is the only place that decides which authority path
+  // runs.
+  class_id:              z.string().uuid().optional(),
+  class_subject_id:      z.string().uuid().optional(),
   title:                 z.string().min(1),
+  // Institutional mode ignores/overwrites this with the Core subject name —
+  // still required here so Solo Teacher mode (which has no other subject
+  // source) keeps working unchanged.
   subject:               z.string().min(1),
   topic:                 z.string().min(1),
   // ADR-0024 Sprint A Objective 3 — the canonical curriculum reference the
@@ -106,10 +116,14 @@ export async function POST(req: Request) {
 
     const parsed = CreateAssignmentSchema.safeParse(await req.json())
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
-    const { class_id, title, subject, topic, substrand_id, instructions, due_date, type, max_score, is_quiz, is_adaptive, is_compass_guided, is_holiday_assignment, holiday_period, lesson_plan_id } = parsed.data
+    const { class_id, class_subject_id, title, subject, topic, substrand_id, instructions, due_date, type, max_score, is_quiz, is_adaptive, is_compass_guided, is_holiday_assignment, holiday_period, lesson_plan_id } = parsed.data
+    if (!!class_id === !!class_subject_id) {
+      return apiBadRequest('Exactly one of class_id or class_subject_id must be provided.')
+    }
 
     const { assignment } = await createAssignment(supabase, {
       classId: class_id,
+      classSubjectId: class_subject_id,
       title,
       subject,
       topic,
@@ -130,6 +144,7 @@ export async function POST(req: Request) {
   } catch (e: unknown) {
     if (e instanceof UnauthorizedError) return apiUnauthorized()
     if (e instanceof ForbiddenError) return apiForbidden()
+    if (e instanceof ValidationError) return apiBadRequest(e.message)
     console.error('[teacher/assignments POST]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')
   }

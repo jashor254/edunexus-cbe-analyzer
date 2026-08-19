@@ -14,6 +14,32 @@ type SubstrandItem = {
   strandTitle: string
 }
 
+// Mirrors lib/core/teachingAssignments.ts's TeachingContext/TeachingAssignment
+// shapes (GET /api/teacher/teaching-assignments) — not imported directly
+// since this is a client component and that module pulls in server-only
+// repositories.
+type InstitutionalAssignment = {
+  assignmentId: string
+  schoolId: string
+  schoolName: string
+  classId: string
+  className: string
+  gradeCode: string | null
+  streamName: string | null
+  subjectId: string
+  subjectName: string
+}
+type TeachingContext =
+  | { kind: 'school'; assignments: InstitutionalAssignment[] }
+  | { kind: 'school_unassigned'; schoolIds: string[] }
+  | { kind: 'solo' }
+
+function gradeCodeToNumber(code: string | null): number | null {
+  if (!code) return null
+  const n = Number(code.replace(/^[A-Za-z]+/, ''))
+  return Number.isNaN(n) ? null : n
+}
+
 type AssignmentMode = 'kicd' | 'custom'
 
 type CreatedAssignment = {
@@ -57,6 +83,27 @@ function NewAssignmentForm() {
   const planWeek      = searchParams.get('week') || ''
 
   const [assignmentMode, setAssignmentMode] = useState<AssignmentMode>('kicd')
+
+  // Phase 1D Step 8 — institutional teachers arrive with their School ->
+  // My Teaching context already established; they pick from what the school
+  // assigned them (class_subjects), never a free-text subject or a
+  // teacher-created legacy class. `teachingContext === null` means "not
+  // loaded yet" (render nothing institutional-specific until known);
+  // 'solo'/'school_unassigned' both fall back to the pre-existing legacy
+  // teacher_classes flow below, unchanged.
+  const [teachingContext, setTeachingContext] = useState<TeachingContext | null>(null)
+  const [institutionalAssignmentId, setInstitutionalAssignmentId] = useState('')
+
+  useEffect(() => {
+    fetch('/api/teacher/teaching-assignments')
+      .then(r => r.json())
+      .then(d => { if (d.data) setTeachingContext(d.data as TeachingContext) })
+      .catch(() => setTeachingContext({ kind: 'solo' }))
+  }, [])
+
+  const isInstitutional = teachingContext?.kind === 'school'
+  const institutionalAssignments = teachingContext?.kind === 'school' ? teachingContext.assignments : []
+  const selectedInstitutionalAssignment = institutionalAssignments.find(a => a.assignmentId === institutionalAssignmentId) ?? null
 
   const [classes, setClasses] = useState<{ id: string; name: string; grade: number; subject: string }[]>([])
   // True whenever `class_id` was picked for the teacher rather than by them —
@@ -113,7 +160,11 @@ function NewAssignmentForm() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planId])
 
+  // Legacy (Solo Teacher / school_unassigned) class source — Phase 1D Step 8:
+  // never fetched or shown for an institutional teacher, who picks from
+  // their School -> My Teaching assignments instead (below).
   useEffect(() => {
+    if (teachingContext === null || isInstitutional) return
     fetch('/api/teacher/classes')
       .then(r => r.json())
       .then(d => {
@@ -132,22 +183,27 @@ function NewAssignmentForm() {
           }
         }
       })
-  }, [prefillClassId])
+  }, [prefillClassId, teachingContext, isInstitutional])
 
-  // Auto-fill subject from selected class (only when not pre-filled from plan)
+  // Auto-fill subject from selected class (Solo Teacher mode only — when not
+  // pre-filled from plan). Institutional mode never free-fills `form.subject`;
+  // it is derived from the selected class_subjects assignment directly.
   useEffect(() => {
+    if (isInstitutional) return
     const cls = classes.find(c => c.id === form.class_id)
     if (cls && !form.subject) {
       setForm(p => ({ ...p, subject: cls.subject }))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.class_id, classes])
+  }, [form.class_id, classes, isInstitutional])
 
-  // Fetch substrands when class or subject changes
+  // Fetch substrands when class/subject (or, in institutional mode, the
+  // selected teaching assignment) changes.
   useEffect(() => {
-    const cls = classes.find(c => c.id === form.class_id)
-    const grade = cls?.grade
-    const subject = form.subject
+    const grade = isInstitutional
+      ? gradeCodeToNumber(selectedInstitutionalAssignment?.gradeCode ?? null) ?? undefined
+      : classes.find(c => c.id === form.class_id)?.grade
+    const subject = isInstitutional ? (selectedInstitutionalAssignment?.subjectName ?? '') : form.subject
 
     if (!grade || !subject || subject.toLowerCase() === 'all subjects') {
       setSubstrands([])
@@ -180,7 +236,7 @@ function NewAssignmentForm() {
       .catch(() => setSubstrands([]))
       .finally(() => setSubstrandsLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.class_id, form.subject, classes])
+  }, [form.class_id, form.subject, classes, isInstitutional, institutionalAssignmentId])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -204,7 +260,11 @@ function NewAssignmentForm() {
     e.preventDefault()
     setError('')
 
-    if (!form.class_id) { setError('Please select a class'); return }
+    if (isInstitutional) {
+      if (!institutionalAssignmentId) { setError('Please select a class and subject'); return }
+    } else if (!form.class_id) {
+      setError('Please select a class'); return
+    }
     if (!form.due_date) { setError('Due date is required'); return }
 
     if (assignmentMode === 'kicd') {
@@ -220,9 +280,18 @@ function NewAssignmentForm() {
     // selects a sub-strand (substrandId local state, set at the dropdown
     // onClick above) — carry it through so the assignment persists the
     // canonical curriculum reference, not just the display title in `topic`.
-    const payload = assignmentMode === 'custom'
+    //
+    // Phase 1D — institutional mode sends class_subject_id (never class_id)
+    // and lets the server derive/overwrite `subject` from Core; `class_id`
+    // is simply omitted rather than sent as some legacy id, so the two
+    // identity spaces can never collide on the wire (Step 2).
+    const basePayload = assignmentMode === 'custom'
       ? { ...form, topic: 'Custom', substrand_id: null }
       : { ...form, substrand_id: substrandId || null }
+    const { class_id: _legacyClassId, ...basePayloadWithoutClassId } = basePayload
+    const payload = isInstitutional
+      ? { ...basePayloadWithoutClassId, class_subject_id: institutionalAssignmentId, subject: selectedInstitutionalAssignment?.subjectName ?? basePayload.subject }
+      : basePayload
 
     setLoading(true)
     try {
@@ -239,11 +308,13 @@ function NewAssignmentForm() {
         return
       }
 
-      const cls = classes.find(c => c.id === form.class_id)
+      const className = isInstitutional
+        ? (selectedInstitutionalAssignment?.className ?? 'Your Class')
+        : (classes.find(c => c.id === form.class_id)?.name ?? 'Your Class')
       setCreated({
         id:          data.data.assignment.id,
-        className:   cls?.name ?? 'Your Class',
-        subject:     form.subject,
+        className,
+        subject:     isInstitutional ? (selectedInstitutionalAssignment?.subjectName ?? form.subject) : form.subject,
         topic:       assignmentMode === 'custom' ? 'Custom' : form.topic,
         dueDate:     form.due_date,
         mode:        assignmentMode,
@@ -433,38 +504,79 @@ function NewAssignmentForm() {
             />
           </div>
 
-          {/* Class */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5">
-              Class <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={form.class_id}
-              onChange={e => { setForm(p => ({ ...p, class_id: e.target.value })); setClassAutoSelected(false) }}
-              className={`w-full px-4 py-3 rounded-xl border outline-none text-gray-900 bg-white ${classAutoSelected ? 'border-amber-300 focus:border-amber-500' : 'border-gray-200 focus:border-teal-500'}`}
-              required
-            >
-              <option value="">Select a class...</option>
-              {classes.map(c => (
-                <option key={c.id} value={c.id}>{c.name} (Grade {c.grade})</option>
-              ))}
-            </select>
-            {classAutoSelected && (
-              <p className="text-xs font-bold text-amber-600 mt-1.5">
-                We guessed this class — please confirm it&rsquo;s the right one before creating the assignment.
+          {/* Class & Subject — institutional teachers pick from what their
+              school assigned them (class_subjects); Solo Teacher mode keeps
+              the original legacy teacher_classes dropdown + free/typed
+              subject. Phase 1D Step 8/9. */}
+          {isInstitutional ? (
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                Class &amp; Subject <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={institutionalAssignmentId}
+                onChange={e => {
+                  setInstitutionalAssignmentId(e.target.value)
+                  setForm(p => ({ ...p, topic: '' }))
+                  setSubstrandId('')
+                  setSubstrandSearch('')
+                }}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-teal-500 outline-none text-gray-900 bg-white"
+                required
+              >
+                <option value="">Select from your teaching assignments...</option>
+                {institutionalAssignments.map(a => (
+                  <option key={a.assignmentId} value={a.assignmentId}>
+                    {a.subjectName} — {a.className}{a.streamName ? ` ${a.streamName}` : ''} ({a.schoolName})
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1.5">
+                Assigned by your school — School → My Teaching.
               </p>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                Class <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={form.class_id}
+                onChange={e => { setForm(p => ({ ...p, class_id: e.target.value })); setClassAutoSelected(false) }}
+                className={`w-full px-4 py-3 rounded-xl border outline-none text-gray-900 bg-white ${classAutoSelected ? 'border-amber-300 focus:border-amber-500' : 'border-gray-200 focus:border-teal-500'}`}
+                required
+              >
+                <option value="">Select a class...</option>
+                {classes.map(c => (
+                  <option key={c.id} value={c.id}>{c.name} (Grade {c.grade})</option>
+                ))}
+              </select>
+              {classAutoSelected && (
+                <p className="text-xs font-bold text-amber-600 mt-1.5">
+                  We guessed this class — please confirm it&rsquo;s the right one before creating the assignment.
+                </p>
+              )}
+            </div>
+          )}
 
           {assignmentMode === 'kicd' ? (
             <>
               <div className="grid grid-cols-2 gap-4">
-                {/* Subject */}
+                {/* Subject — institutional mode: read-only, derived from the
+                    selected teaching assignment above (Step 7: Core subject
+                    authority, never a free-typed/selected string). */}
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1.5">
                     Subject <span className="text-red-500">*</span>
                   </label>
-                  {(() => {
+                  {isInstitutional ? (
+                    <input
+                      value={selectedInstitutionalAssignment?.subjectName ?? ''}
+                      readOnly
+                      placeholder="Select a class & subject above"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-500"
+                    />
+                  ) : (() => {
                     const cls = classes.find(c => c.id === form.class_id)
                     const grade = cls?.grade ?? 0
                     const subjects =

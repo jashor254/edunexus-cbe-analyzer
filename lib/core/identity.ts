@@ -289,3 +289,49 @@ export async function resolveOwnCoreLearnerId(userId: string): Promise<LearnerId
   // one place in the codebase where that direction is resolved.
   return asLearnerIdOrNull(row?.external_id ?? null)
 }
+
+/** One institutional teaching TENURE (`class_subjects` row), resolved for authority purposes — see {@link resolveTeachingTenure}. */
+export type ResolvedTeachingTenure = {
+  /** `class_subjects.id` — the tenure itself. */
+  classSubjectId: string
+  schoolId: string
+  /** `school_users.id` that `class_subjects.teacher_id` points to — NOT the auth user id. */
+  schoolUserId: string
+  /** The auth user who holds this tenure's membership — compare against `resolveCurrentUser(...).id`, never trust a caller-supplied id. */
+  membershipUserId: string
+  membershipIsActive: boolean
+  /** Non-null means this tenure is closed — a departed/replaced teaching assignment, never current. */
+  endedAt: string | null
+  coreClassId: string
+  className: string
+  subjectId: string
+  subjectName: string
+}
+
+/**
+ * Resolves one teaching tenure (`class_subjects` row) by id — the "who/what"
+ * half of institutional assignment authority (Phase 1D). Answers "does this
+ * tenure exist, who holds it, is it current" only; whether the CALLER may
+ * act on it is `lib/core/permissions.ts::requireInstitutionalAssignmentAuthority`'s
+ * job, never this function's.
+ *
+ * Thin wrapper over `repos.teachers.findTenureForCompatibilityBridge` (Phase
+ * 1B's own tenure lookup) — reused rather than re-queried so the two Phase
+ * 1B/1D consumers of "what is this tenure" can never drift out of agreement.
+ */
+export async function resolveTeachingTenure(classSubjectId: string): Promise<ResolvedTeachingTenure | null> {
+  const tenure = await repos.teachers.findTenureForCompatibilityBridge(classSubjectId)
+  if (!tenure) return null
+  return {
+    classSubjectId: tenure.id,
+    schoolId: tenure.schoolId,
+    schoolUserId: tenure.teacherMembershipId,
+    membershipUserId: tenure.membershipUserId,
+    membershipIsActive: tenure.membershipIsActive,
+    endedAt: tenure.endedAt,
+    coreClassId: tenure.classId,
+    className: tenure.className,
+    subjectId: tenure.subjectId,
+    subjectName: tenure.subjectName,
+  }
+}
