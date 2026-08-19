@@ -201,4 +201,128 @@ export class AssignmentRepository extends BaseRepository {
       return latest
     }, null)
   }
+
+  /**
+   * Phase 2 — Institutional Learner Portal Discovery, Step 8/11/12.
+   *
+   * The recipient-materialization signal `fanOutPendingSubmissions` (above)
+   * already creates at assignment-creation time: one `assignment_submissions`
+   * row per student who was on the class roster AT THAT MOMENT. This is a
+   * strictly more precise and more durable eligibility signal than
+   * `class_students` membership (which is a mutable, roster-synced-on-demand
+   * table — see lib/core/assignmentLearnerBridge.ts's roster-sync comments)
+   * for the institutional discovery path specifically, because it:
+   *   - naturally EXCLUDES an assignment created before a learner joined the
+   *     class (they were never fanned into it — no submission row exists);
+   *   - naturally INCLUDES an assignment created while enrolled even after
+   *     the learner later transfers out (their submission row is never
+   *     deleted — `syncAssignmentCompatibilityRoster` only reconciles
+   *     `class_students`, never touches `assignment_submissions`);
+   *   - naturally EXCLUDES any assignment created after a learner has left
+   *     the class (roster sync removes them from `class_students` before the
+   *     next fan-out runs, so they are not in the new fan-out set).
+   *   - survives teacher replacement transparently: a departed teacher's
+   *     compatibility class keeps its own historical submission rows; a
+   *     replacement teacher's new compatibility class (Phase 1B: a NEW
+   *     tenure gets its OWN bridge row) produces its own new submission rows
+   *     for the same student — both surface here via a single `student_id`
+   *     join, with no need to enumerate which compatibility class or which
+   *     teaching tenure produced which assignment.
+   *
+   * Filtered to `assignments.status = 'active'`, mirroring the legacy
+   * app/api/student/assignments/route.ts filter exactly (Step 20 — no new
+   * status model introduced). One query, `!inner` join so the status filter
+   * applies to the embedded resource — no N+1 regardless of how many
+   * assignments or students are involved (Step 21).
+   */
+  async findSubmissionsWithAssignmentsForStudents(studentIds: string[]): Promise<Array<{
+    id: string
+    assignment_id: string
+    student_id: string
+    status: string
+    score: number | null
+    submitted_at: string | null
+    marked_at: string | null
+    assignments: {
+      id: string
+      class_id: string
+      title: string
+      topic: string
+      instructions: string
+      type: string
+      is_compass_guided: boolean | null
+      is_quiz: boolean
+      max_score: number | null
+      due_date: string
+      status: string
+      created_at: string
+      teacher_classes: { name: string | null; grade: number | null; subject: string | null } | null
+      teachers: { full_name: string | null } | null
+    }
+  }>> {
+    if (studentIds.length === 0) return []
+    const { data, error } = await this.db
+      .from('assignment_submissions')
+      .select(`
+        id, assignment_id, student_id, status, score, submitted_at, marked_at,
+        assignments!inner (
+          id, class_id, title, topic, instructions, type, is_compass_guided, is_quiz,
+          max_score, due_date, status, created_at,
+          teacher_classes (name, grade, subject),
+          teachers (full_name)
+        )
+      `)
+      .in('student_id', studentIds)
+      .eq('assignments.status', 'active')
+      .order('due_date', { referencedTable: 'assignments', ascending: true })
+    if (error) throw new Error(`findSubmissionsWithAssignmentsForStudents: ${error.message}`)
+    return (data ?? []) as unknown as Array<{
+      id: string
+      assignment_id: string
+      student_id: string
+      status: string
+      score: number | null
+      submitted_at: string | null
+      marked_at: string | null
+      assignments: {
+        id: string
+        class_id: string
+        title: string
+        topic: string
+        instructions: string
+        type: string
+        is_compass_guided: boolean | null
+        is_quiz: boolean
+        max_score: number | null
+        due_date: string
+        status: string
+        created_at: string
+        teacher_classes: { name: string | null; grade: number | null; subject: string | null } | null
+        teachers: { full_name: string | null } | null
+      }
+    }>
+  }
+
+  /**
+   * A single submission row (if any) belonging to one of `studentIds`
+   * against one specific `assignmentId` — the per-assignment READ-
+   * authorization check Phase 2 Step 23/24 needs (does ANY of this
+   * identity's current compatibility students have a materialized
+   * recipient relationship with this exact assignment), distinct from
+   * {@link findSubmissionsWithAssignmentsForStudents}'s list-projection use.
+   * Batched over `studentIds` (never one query per id) even though that set
+   * is normally 1-2 rows (dual-active enrollment, Step 17).
+   */
+  async findSubmissionForStudentsAndAssignment(studentIds: string[], assignmentId: string): Promise<{ id: string; student_id: string } | null> {
+    if (studentIds.length === 0) return null
+    const { data, error } = await this.db
+      .from('assignment_submissions')
+      .select('id, student_id')
+      .in('student_id', studentIds)
+      .eq('assignment_id', assignmentId)
+      .limit(1)
+      .maybeSingle()
+    if (error) throw new Error(`findSubmissionForStudentsAndAssignment: ${error.message}`)
+    return data
+  }
 }

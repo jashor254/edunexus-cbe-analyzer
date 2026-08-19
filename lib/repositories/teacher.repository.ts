@@ -1316,6 +1316,45 @@ export class TeacherRepository extends BaseRepository {
   }
 
   /**
+   * Phase 2 Step 6 — EVERY teaching-tenure compatibility bridge a Core
+   * `classId` has ever had (current AND historical `class_subjects` rows),
+   * not just the current one `findAssignmentCompatibilityBridge` resolves
+   * for a single tenure. A Core class legitimately accumulates more than one
+   * compatibility class over time — one per `class_subjects` tenure (Peter's
+   * tenure -> bridge A, Mary's replacement tenure -> bridge B) — because
+   * Phase 1B never repoints an existing bridge row to a new tenure.
+   *
+   * Read-only, never creates anything (a `class_subjects` tenure with no
+   * bridge row yet — never had an institutional assignment created under
+   * it — surfaces with `teacherClassId: null`, not filtered out, so a
+   * caller can tell "no institutional assignment history" apart from "not
+   * queried"). GET-safe: no call to `ensureAssignmentCompatibilityClass`
+   * anywhere in this path.
+   */
+  async findAssignmentCompatibilityBridgesForClass(classId: string): Promise<Array<{
+    classSubjectId: string
+    teacherClassId: string | null
+    endedAt: string | null
+  }>> {
+    const { data, error } = await this.db
+      .from('class_subjects')
+      .select('id, ended_at, class_subject_legacy_bridge (teacher_class_id)')
+      .eq('class_id', classId)
+    if (error) throw new Error(`findAssignmentCompatibilityBridgesForClass: ${error.message}`)
+    type Row = { id: string; ended_at: string | null; class_subject_legacy_bridge: { teacher_class_id: string } | { teacher_class_id: string }[] | null }
+    return ((data ?? []) as unknown as Row[]).map(row => {
+      const bridge = Array.isArray(row.class_subject_legacy_bridge)
+        ? row.class_subject_legacy_bridge[0] ?? null
+        : row.class_subject_legacy_bridge
+      return {
+        classSubjectId: row.id,
+        teacherClassId: bridge?.teacher_class_id ?? null,
+        endedAt: row.ended_at,
+      }
+    })
+  }
+
+  /**
    * Creates the compatibility `teacher_classes` row for a teaching tenure.
    * Institution-linked (unlike a genuine Solo Teacher class): `school_id` is
    * always set, `external_id` is deliberately left NULL — this bridge never

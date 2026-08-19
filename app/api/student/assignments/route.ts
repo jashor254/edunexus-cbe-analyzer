@@ -4,6 +4,8 @@ import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
 import { requireAuthentication, requireStudent, requireParent } from '@/lib/core/permissions'
 import { UnauthorizedError } from '@/lib/core/errors'
 import { asStudentId } from '@/lib/core/identityTypes'
+import { resolveAuthenticatedLearnerIdentity } from '@/lib/core/learnerAccounts'
+import { listAssignmentsForAuthenticatedLearner } from '@/lib/core/assignmentDiscovery'
 
 /**
  * Preserves the exact original union check
@@ -30,6 +32,24 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url)
     const studentId = searchParams.get('studentId')
+
+    // Phase 2 — Institutional Learner Portal Discovery (Step 3/10/12).
+    // Precedence: an active institutional learner account takes the
+    // institutional discovery path; everything below (self/parent by
+    // legacy `students.user_id`/`parent_user_id`) is completely untouched
+    // and only reached when this identity has no active learner account —
+    // Step 18's Solo-learner regression requirement. Never consulted when
+    // an explicit `studentId` is supplied (that is always the legacy/parent
+    // query shape — an institutional learner never supplies one, Step 10:
+    // institutional discovery requires only authenticated identity, never a
+    // client-supplied id as authority).
+    if (!studentId) {
+      const learnerIdentityId = await resolveAuthenticatedLearnerIdentity(userId)
+      if (learnerIdentityId) {
+        const assignments = await listAssignmentsForAuthenticatedLearner(userId)
+        return apiSuccess({ assignments })
+      }
+    }
 
     const db = createServiceClient()
 

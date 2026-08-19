@@ -8,6 +8,7 @@ import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound } from
 import { requireAuthentication } from '@/lib/core/permissions'
 import { UnauthorizedError } from '@/lib/core/errors'
 import { findServedQuestionsForStudent } from '@/lib/quiz/quizDelivery'
+import { resolveInstitutionalAssignmentReadAccess } from '@/lib/core/assignmentDiscovery'
 
 export async function GET(
   _req: Request,
@@ -37,23 +38,45 @@ export async function GET(
       .select('id, name')
       .eq('user_id', userId)
       .maybeSingle()
-    if (!student) return apiForbidden()
 
-    const { data: link } = await db
-      .from('class_students')
-      .select('id')
-      .eq('class_id', assignment.class_id)
-      .eq('student_id', student.id)
-      .maybeSingle()
-    if (!link) return apiForbidden()
+    let studentId: string
+    let learnerName: string
+
+    if (student) {
+      const { data: link } = await db
+        .from('class_students')
+        .select('id')
+        .eq('class_id', assignment.class_id)
+        .eq('student_id', student.id)
+        .maybeSingle()
+      if (!link) return apiForbidden()
+      studentId = student.id
+      learnerName = student.name?.trim() || 'Student'
+    } else {
+      // Phase 2 — Step 23/24: an institutional learner has no
+      // `students.user_id` row at all (that column is legacy/Solo-only).
+      // Read authorization instead follows the same recipient-materialization
+      // signal assignment discovery uses — a compatibility student of this
+      // identity's current enrollment must already have an
+      // `assignment_submissions` row for this exact assignment.
+      const access = await resolveInstitutionalAssignmentReadAccess(userId, id)
+      if (!access) return apiForbidden()
+      const { data: compatStudent } = await db
+        .from('students')
+        .select('name')
+        .eq('id', access.studentId)
+        .maybeSingle()
+      studentId = access.studentId
+      learnerName = compatStudent?.name?.trim() || 'Student'
+    }
 
     // Sprint 9 Slice 3: resolves (once) and serves this student's bound
     // adaptive variant per question, falling back to the canonical question
     // exactly as findQuestionsForStudent always did when no variant applies.
     const questions = await findServedQuestionsForStudent({
       assignmentId: id,
-      studentId: student.id,
-      learnerName: student.name?.trim() || 'Student',
+      studentId,
+      learnerName,
     })
     return apiSuccess({ questions })
   } catch (e: unknown) {

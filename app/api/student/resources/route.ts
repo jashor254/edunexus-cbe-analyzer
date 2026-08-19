@@ -8,6 +8,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
 import { requireAuthentication } from '@/lib/core/permissions'
 import { UnauthorizedError } from '@/lib/core/errors'
+import { resolveInstitutionalCompatibilityStudentIds } from '@/lib/core/assignmentDiscovery'
 
 export async function GET() {
   try {
@@ -27,7 +28,14 @@ export async function GET() {
       .select('id')
       .or(`user_id.eq.${userId},parent_user_id.eq.${userId}`)
 
-    const studentIds = (students ?? []).map(s => s.id)
+    // Phase 2 — Step 25: additive institutional branch. A compatibility
+    // student (Phase 1C) never has `user_id`/`parent_user_id` set, so it can
+    // never appear in the legacy query above — union, not override, keeps
+    // Solo/parent behavior byte-for-byte unchanged (Step 18) while adding
+    // institutional coverage for a learner with no legacy `students` row at all.
+    const institutionalStudentIds = await resolveInstitutionalCompatibilityStudentIds(userId)
+
+    const studentIds = [...new Set([...(students ?? []).map(s => s.id), ...institutionalStudentIds])]
     if (!studentIds.length) return apiSuccess({ resources: [] })
 
     const { data: classLinks } = await db
