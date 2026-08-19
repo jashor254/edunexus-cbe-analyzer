@@ -26,6 +26,7 @@ import { IntelligenceRepository } from './intelligence.repository'
 import { JobRepository } from './job.repository'
 import { KnowledgeGraphRepository } from './knowledge-graph.repository'
 import { LeadershipRepository } from './leadership.repository'
+import { LearnerAccountsRepository } from './learnerAccounts.repository'
 import { LearnerIdentityRepository } from './learnerIdentity.repository'
 import { LearnerIntelligenceRepository } from './learner-intelligence.repository'
 import { LearnerModelRepository } from './learner-model.repository'
@@ -80,6 +81,7 @@ export const repos = {
   // after-the-fact recognition, ADR-0012) are related but never the same
   // domain, mirroring the identical `competitions`/`achievements` split.
   leadership:          new LeadershipRepository(),
+  learnerAccounts:     new LearnerAccountsRepository(),
   learnerIdentity:     new LearnerIdentityRepository(),
   learnerIntelligence: new LearnerIntelligenceRepository(),
   learnerModel:        new LearnerModelRepository(),

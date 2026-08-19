@@ -523,6 +523,58 @@ export type TransferInConsumptionResult =
   | { status: 'consumed'; learnerIdentityId: string; sourceLearnerId: string; fromSchoolId: string; transferId: string }
   | { status: 'invalid' | 'expired' | 'already_consumed' | 'wrong_school' }
 
+// ── Learner account foundation (Phase 2B-RESUME) ────────────────────────────
+
+export type LearnerAccountStatus = 'active' | 'suspended'
+
+/**
+ * `learner_accounts` — the authenticated learner identity anchor.
+ * `learner_identity_id` (Phase 2D's durable identity), not `learners.id`,
+ * is the binding — the account survives inter-school transfer because the
+ * durable identity does. Deliberately carries no school_id, no current
+ * learners.id, no token, no password.
+ */
+export type LearnerAccount = {
+  id: string
+  learner_identity_id: string
+  user_id: string
+  status: LearnerAccountStatus
+  activated_at: string
+  suspended_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type LearnerAccountInvitePurpose = 'activation' | 'recovery'
+
+/** `learner_account_invites` — ephemeral school-issued authorization to activate (or recover) a learner account. `token_hash` only; the raw token is never persisted. */
+export type LearnerAccountInvite = {
+  id: string
+  learner_identity_id: string
+  school_id: string
+  token_hash: string
+  purpose: LearnerAccountInvitePurpose
+  expires_at: string
+  used_at: string | null
+  issued_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type IssueLearnerAccountActivationResult =
+  | { status: 'issued'; inviteId: string; token: string; expiresAt: string }
+  | { status: 'already_active' }
+
+/** Session tokens minted by the auth bootstrap (Step 7/8) — handed back exactly once so the caller (API route) can establish the browser session; never persisted. */
+export type LearnerAccountSession = {
+  accessToken: string
+  refreshToken: string
+}
+
+export type ClaimLearnerAccountActivationResult =
+  | { status: 'claimed'; learnerAccountId: string; learnerIdentityId: string; session: LearnerAccountSession }
+  | { status: 'invalid' | 'expired' | 'already_used' | 'already_active' | 'user_already_bound' }
+
 // ── Institutional teaching assignment ────────────────────────────────────────
 
 /**

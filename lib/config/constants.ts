@@ -76,6 +76,27 @@ export const API_ROUTES = {
 // receiving school's side than a parent tapping one WhatsApp link.
 export const TRANSFER_TOKEN_TTL_DAYS = 14;
 
+// 6b. LEARNER ACCOUNT ACTIVATION (Phase 2B-RESUME)
+// TTL for a `learner_account_invites` activation token
+// (lib/core/learnerAccounts.ts). Matches core_guardian_invites.expires_at's
+// 7-day window (supabase/migrations/20260722_core_guardian_invites.sql) —
+// the closest existing analog: a school hands a learner/guardian a
+// one-time code to redeem, same shape and same urgency as a guardian
+// invite, unlike the slower 14-day inter-school transfer handshake above.
+export const LEARNER_ACCOUNT_INVITE_TTL_DAYS = 7;
+
+// The synthetic email domain used to bootstrap a real Supabase `auth.users`
+// identity for a learner who has no personal email/phone on file (Phase
+// 2B-RESUME Step 7/8 — verified against local Supabase: admin.createUser()
+// with no password + admin.generateLink({type:'magiclink'}) +
+// anon-client verifyOtp({token_hash}) establishes a real session with zero
+// email ever sent). `.invalid` is the IANA-reserved TLD for addresses that
+// are guaranteed never to resolve (RFC 2606) — deliberate, so this can
+// never collide with, or be mistaken for, a real deliverable address. The
+// local-part is always `learner-<learner_identity_id>`, so the email is
+// fully deterministic from the durable identity and carries no PII.
+export const LEARNER_SYNTHETIC_AUTH_EMAIL_DOMAIN = "learner.internal.edunexus.invalid";
+
 // 7. SHARED INTERFACES (The Core Data Model)
 // Hii inasaidia kuzuia "Property does not exist" errors
 export interface CareerData {
