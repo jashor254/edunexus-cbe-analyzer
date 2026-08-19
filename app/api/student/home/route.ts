@@ -8,6 +8,10 @@ import { apiSuccess, apiError } from '@/lib/api/response'
 import { requireAuthentication } from '@/lib/core/permissions'
 import { UnauthorizedError } from '@/lib/core/errors'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
+import {
+  resolveCurrentInstitutionalCompatibilityStudentId,
+  listAssignmentsForAuthenticatedLearner,
+} from '@/lib/core/assignmentDiscovery'
 
 // Sprint 1B Batch G note: only the top-level auth check below is migrated.
 // The student-fetch query needs grade/school/current_pathway/curriculum_type
@@ -130,12 +134,41 @@ export async function GET(): Promise<Response> {
 
     const db = createServiceClient()
 
-    // Student record — must be directly linked to this user account
-    const { data: student } = await db
+    // Student record — legacy/Solo self-link first (untouched, Step 15
+    // regression: this branch and its query are byte-identical to before).
+    const { data: legacyStudent } = await db
       .from('students')
       .select('id, name, grade, school, current_pathway, curriculum_type')
       .eq('user_id', userId)
       .maybeSingle()
+
+    let student = legacyStudent
+    let isInstitutional = false
+
+    // Phase 3A — Part C: `students.user_id` is NEVER set for an institutional
+    // (Core `learner_accounts`) learner's compatibility row (see
+    // lib/core/assignmentDiscovery.ts's header) — this route had no
+    // institutional branch at all, so an institutional learner got a bare
+    // 404 here regardless of the pending-assignments widget below. Resolving
+    // their CURRENT compatibility `students.id` (same table, same columns —
+    // just a different WHERE clause) lets every downstream query in this
+    // route keep operating completely unchanged, since they already all key
+    // off `studentId` in the same legacy id-space this row lives in. No
+    // dashboard redesign: only the identity resolution changes.
+    if (!student) {
+      const compatStudentId = await resolveCurrentInstitutionalCompatibilityStudentId(userId)
+      if (compatStudentId) {
+        const { data: compatStudent } = await db
+          .from('students')
+          .select('id, name, grade, school, current_pathway, curriculum_type')
+          .eq('id', compatStudentId)
+          .maybeSingle()
+        if (compatStudent) {
+          student = compatStudent
+          isInstitutional = true
+        }
+      }
+    }
 
     if (!student) return apiError('No student profile found', 404)
 
@@ -226,7 +259,31 @@ export async function GET(): Promise<Response> {
     const classIds = (classLinks ?? []).map(c => c.class_id as string)
     let pendingAssignments: StudentHomeData['pendingAssignments'] = []
 
-    if (classIds.length > 0) {
+    if (isInstitutional) {
+      // Phase 3A — Part C (Step 12): MUST NOT reimplement assignment
+      // eligibility here — a `class_students`-membership join has exactly
+      // the transfer-durability gap Finding 2 already identified elsewhere
+      // (current roster only, unlike `assignment_submissions` existence).
+      // Reuse the one canonical Phase 2 discovery projection so this widget
+      // can never disagree with `/api/student/assignments`.
+      const now = new Date()
+      pendingAssignments = (await listAssignmentsForAuthenticatedLearner(userId))
+        .slice()
+        .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
+        .slice(0, 5)
+        .map(a => {
+          const due      = new Date(a.due_date)
+          const daysLeft = Math.ceil((due.getTime() - now.getTime()) / 86_400_000)
+          return {
+            id:        a.id,
+            title:     a.title,
+            subject:   formatSubject(a.teacher_classes?.subject ?? a.topic ?? 'Assignment'),
+            dueDate:   a.due_date,
+            daysLeft,
+            isOverdue: daysLeft < 0,
+          }
+        })
+    } else if (classIds.length > 0) {
       const now = new Date()
       const { data: asgn } = await db
         .from('assignments')

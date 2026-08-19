@@ -1316,6 +1316,50 @@ export class TeacherRepository extends BaseRepository {
   }
 
   /**
+   * Phase 3A — Part A. The reverse of {@link findAssignmentCompatibilityBridge}:
+   * given a legacy compatibility `teacher_classes.id` (what
+   * `assignments.class_id` actually points at), resolves the ONE teaching
+   * TENURE (`class_subjects.id`) it was created under. Safe because
+   * `class_subject_legacy_bridge.teacher_class_id` carries its own
+   * `UNIQUE` constraint (migration `20260818120000_assignment_class_subject_bridge.sql`)
+   * — at most one tenure ever claims a given compatibility class. Returns
+   * `null` for a `teacher_classes` row with no bridge at all (a genuine
+   * Solo/private teacher class, or an institutional assignment predating
+   * Phase 1B) — callers must treat that as "no institutional read-authority
+   * signal available here," never as an error.
+   */
+  async findCompatibilityBridgeByTeacherClassId(teacherClassId: string): Promise<{ classSubjectId: string } | null> {
+    const { data, error } = await this.db
+      .from('class_subject_legacy_bridge')
+      .select('class_subject_id')
+      .eq('teacher_class_id', teacherClassId)
+      .maybeSingle()
+    if (error) throw new Error(`findCompatibilityBridgeByTeacherClassId: ${error.message}`)
+    return data ? { classSubjectId: data.class_subject_id as string } : null
+  }
+
+  /**
+   * Phase 3A — Part A. The id of the CURRENT (`ended_at IS NULL`) teaching
+   * tenure for a given Core `classId`+`subjectId`, or `null` if that post is
+   * vacant right now. Exactly the read `assignClassSubjectTeacher` already
+   * performs before deciding whether to close an outgoing tenure — reused
+   * here, not re-derived, and safe for the same reason: the partial unique
+   * index `class_subjects_current_assignment_uniq` guarantees at most one
+   * row can ever match.
+   */
+  async findCurrentTenureIdForClassSubject(classId: string, subjectId: string): Promise<string | null> {
+    const { data, error } = await this.db
+      .from('class_subjects')
+      .select('id')
+      .eq('class_id', classId)
+      .eq('subject_id', subjectId)
+      .is('ended_at', null)
+      .maybeSingle()
+    if (error) throw new Error(`findCurrentTenureIdForClassSubject: ${error.message}`)
+    return data ? (data.id as string) : null
+  }
+
+  /**
    * Phase 2 Step 6 — EVERY teaching-tenure compatibility bridge a Core
    * `classId` has ever had (current AND historical `class_subjects` rows),
    * not just the current one `findAssignmentCompatibilityBridge` resolves

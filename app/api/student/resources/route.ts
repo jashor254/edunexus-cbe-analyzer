@@ -8,7 +8,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
 import { requireAuthentication } from '@/lib/core/permissions'
 import { UnauthorizedError } from '@/lib/core/errors'
-import { resolveInstitutionalCompatibilityStudentIds } from '@/lib/core/assignmentDiscovery'
+import { resolveInstitutionalCompatibilityStudentIds, listAssignmentsForAuthenticatedLearner } from '@/lib/core/assignmentDiscovery'
 
 export async function GET() {
   try {
@@ -42,8 +42,25 @@ export async function GET() {
       .from('class_students')
       .select('class_id')
       .in('student_id', studentIds)
+    const currentClassIds = (classLinks ?? []).map(c => c.class_id as string)
 
-    const classIds = [...new Set((classLinks ?? []).map(c => c.class_id))]
+    // Phase 3A — Part B: `class_students` alone only proves CURRENT roster
+    // membership, which the Phase 1B/1C roster-sync mechanism intentionally
+    // removes for a transferred-out learner — the same distinction Finding 2
+    // identified between this route and assignment discovery. Resources are
+    // generic class materials, not assignment-specific rows (`class_resources`
+    // carries no assignment id), so there is no per-resource lifecycle to
+    // classify here (Step 8) — the fix is durable CLASS-level eligibility:
+    // any compatibility class this identity has a legitimate, durable
+    // assignment relationship with (the exact signal `assignmentDiscovery.ts`
+    // already uses, reused rather than reimplemented) keeps its resources
+    // visible even after a transfer, alongside whatever is still currently
+    // enrolled. Union, never override — Solo/parent legacy behavior above is
+    // completely unaffected (their classIds only ever come from `class_students`).
+    const durableAssignments = await listAssignmentsForAuthenticatedLearner(userId)
+    const durableClassIds = durableAssignments.map(a => a.class_id)
+
+    const classIds = [...new Set([...currentClassIds, ...durableClassIds])]
     if (!classIds.length) return apiSuccess({ resources: [] })
 
     const { data: resources, error } = await db

@@ -31,6 +31,7 @@ import {
   resolveParent,
   resolveLegacyStudentId,
   resolveTeachingTenure,
+  resolveCurrentTenureForCompatibilityClass,
   type CurrentUser,
   type ResolvedMembership,
 } from '@/lib/core/identity'
@@ -235,6 +236,46 @@ export async function requireStudent(client: SupabaseClient, studentId: string):
     throw new ResourceOwnershipError('This is not your own learner record.')
   }
   return user
+}
+
+/**
+ * Phase 3A — Part A. READ-only authorization for an EXISTING assignment's
+ * detail (`app/api/teacher/assignments/[id]` GET) — distinct in kind from
+ * {@link requireInstitutionalAssignmentAuthority}, which is CREATE-time
+ * authority keyed on a `classSubjectId` the caller must currently hold
+ * exactly. An assignment's authorized readers are broader than that: the
+ * caller's own separate `assignments.teacher_id === teacher.id` check
+ * (the historical creator, unchanged forever) already grants read access
+ * and is NOT reproduced here — this function answers only the second,
+ * previously-missing half: does the CALLER currently hold the teaching
+ * tenure for the same Core class+subject the assignment's compatibility
+ * class was created under, even if they did not create it themselves
+ * (a replacement teacher's legitimate read access to a departed
+ * predecessor's assignment).
+ *
+ * Never grants or implies MARK authority — the mark route's own
+ * creator-only check (`assignments.teacher_id`) is untouched by this
+ * function and by every caller of it (Step 6).
+ *
+ * Composes {@link resolveCurrentTenureForCompatibilityClass} (the "who"
+ * resolution) with the one authorization decision this function adds:
+ * does that current tenure's membership belong to `userId`, is it active,
+ * and is it genuinely current (`endedAt === null`) — the same shape of
+ * check {@link requireInstitutionalAssignmentAuthority} performs, but as a
+ * boolean over a tenure this caller may not hold at all, never a throw.
+ *
+ * Returns `false` — never throws — for: no compatibility bridge (a genuine
+ * Solo/private teacher class, or a pre-Phase-1B institutional assignment —
+ * the creator check is the only applicable path for those, by design); a
+ * vacant class/subject post; an inactive membership; or a current tenure
+ * held by a different user. A departed teacher who is neither the creator
+ * nor the current tenure holder is correctly denied here (Step 5).
+ */
+export async function isCurrentTenureHolderForAssignmentClass(userId: string, assignmentClassId: string): Promise<boolean> {
+  const currentTenure = await resolveCurrentTenureForCompatibilityClass(assignmentClassId)
+  if (!currentTenure) return false
+  if (currentTenure.endedAt !== null || !currentTenure.membershipIsActive) return false
+  return currentTenure.membershipUserId === userId
 }
 
 /**

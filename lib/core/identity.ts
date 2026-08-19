@@ -335,3 +335,43 @@ export async function resolveTeachingTenure(classSubjectId: string): Promise<Res
     subjectName: tenure.subjectName,
   }
 }
+
+/**
+ * Phase 3A — Part A ("who currently holds the class/subject an existing
+ * assignment's legacy compatibility class was created under"). Given a
+ * legacy `teacher_classes.id` — exactly what `assignments.class_id` stores
+ * — resolves backward through the Phase 1B bridge to the ONE teaching
+ * tenure it was created for, then forward again to whichever tenure
+ * (possibly a different one, if a replacement has since happened) CURRENTLY
+ * holds that same Core class+subject. This is deliberately a two-hop
+ * resolution, not a shortcut: an assignment's compatibility class is
+ * permanently tied to the tenure that created it (Peter's), but "who reads
+ * it now" needs the class/subject's CURRENT tenure (possibly Mary's) —
+ * these are the same Core class+subject but not the same `class_subjects`
+ * row once a replacement has occurred.
+ *
+ * Returns `null` — never throws — for: no bridge for this compatibility
+ * class (a genuine Solo/private teacher class, or an institutional
+ * assignment that predates Phase 1B); the original tenure fails to
+ * resolve; or the class/subject post is currently vacant (no current
+ * tenure at all). A `null` result carries no authorization meaning by
+ * itself — `lib/core/permissions.ts` decides what a caller may infer from
+ * it; this function only answers "who," per this module's own header.
+ */
+export async function resolveCurrentTenureForCompatibilityClass(
+  teacherClassId: string
+): Promise<ResolvedTeachingTenure | null> {
+  const bridge = await repos.teachers.findCompatibilityBridgeByTeacherClassId(teacherClassId)
+  if (!bridge) return null
+
+  const originalTenure = await resolveTeachingTenure(bridge.classSubjectId)
+  if (!originalTenure) return null
+
+  const currentTenureId = await repos.teachers.findCurrentTenureIdForClassSubject(
+    originalTenure.coreClassId,
+    originalTenure.subjectId
+  )
+  if (!currentTenureId) return null
+
+  return resolveTeachingTenure(currentTenureId)
+}

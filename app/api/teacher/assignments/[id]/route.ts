@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound } from '@/lib/api/response'
-import { requireAuthentication } from '@/lib/core/permissions'
+import { requireAuthentication, isCurrentTenureHolderForAssignmentClass } from '@/lib/core/permissions'
 import { resolveTeacher } from '@/lib/core/identity'
 import { UnauthorizedError } from '@/lib/core/errors'
 
@@ -30,14 +30,31 @@ export async function GET(
 
     const db = createServiceClient()
 
+    // Phase 3A — Part A: fetch by id alone, then decide READ access below.
+    // Loading unconditionally (rather than filtering by teacher_id in the
+    // query, as before) is required so the second, previously-missing
+    // access path — the CURRENT teaching-tenure holder for the same Core
+    // class+subject, who may not be this assignment's original creator —
+    // has an assignment.class_id to resolve against at all. This does NOT
+    // widen who may see the row: the explicit check below still denies
+    // unrelated/cross-school/departed teachers exactly as the query-level
+    // filter did.
     const { data: assignment } = await db
       .from('assignments')
       .select(`*, teacher_classes(name, grade, subject)`)
       .eq('id', id)
-      .eq('teacher_id', teacher.id)
-      .single()
+      .maybeSingle()
 
     if (!assignment) return apiNotFound('Assignment not found')
+
+    // READ authority only — never mark/write authority (Step 6, PATCH below
+    // is untouched). Original creator (legacy, unchanged) OR the teacher who
+    // currently holds the teaching tenure for the same Core class+subject
+    // this assignment's compatibility class was created under (Phase 1B/1D
+    // composition — see isCurrentTenureHolderForAssignmentClass).
+    const isCreator = assignment.teacher_id === teacher.id
+    const isCurrentTenureHolder = !isCreator && await isCurrentTenureHolderForAssignmentClass(userId, assignment.class_id as string)
+    if (!isCreator && !isCurrentTenureHolder) return apiNotFound('Assignment not found')
 
     // Get all submissions with student info
     const { data: submissions } = await db

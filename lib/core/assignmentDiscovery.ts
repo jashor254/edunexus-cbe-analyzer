@@ -123,6 +123,39 @@ export async function resolveInstitutionalCompatibilityStudentIds(userId: string
   return bridged.map(row => row.id)
 }
 
+/**
+ * Phase 3A — Part C. Resolves the SINGLE compatibility `students.id`
+ * belonging to this identity's CURRENTLY active school-local learner
+ * record — for surfaces that need a "who is this learner right now"
+ * profile (grade/school/name to feed the existing legacy-keyed
+ * assessments/compass_sessions/projection queries), as distinct from
+ * {@link resolveInstitutionalCompatibilityStudentIds}'s deliberately
+ * broader "every compatibility student this identity has ever held," which
+ * exists for durable assignment/resource READ eligibility, not identity.
+ *
+ * Returns `null` — never throws — for: no learner account; no currently
+ * active school-local record; or an active record with no compatibility
+ * student mapping yet (same "genuine, not-yet-fanned-out" case
+ * {@link resolveInstitutionalCompatibilityStudentIds}'s header documents).
+ *
+ * If more than one school-local record is currently active (a multi-school
+ * active learner), the first is used — a documented simplification for a
+ * "pick one current profile to show" question, never an authorization
+ * decision; nothing downstream of this treats the choice as anything but
+ * "a" current profile.
+ */
+export async function resolveCurrentInstitutionalCompatibilityStudentId(userId: string): Promise<string | null> {
+  const learnerIdentityId = await resolveAuthenticatedLearnerIdentity(userId)
+  if (!learnerIdentityId) return null
+
+  const allRecords = await resolveAllCoreLearnersForAuthenticatedUser(userId)
+  const activeRecords = allRecords.filter(r => r.status === 'active')
+  if (activeRecords.length === 0) return null
+
+  const bridged = await repos.teachers.findLegacyStudentsByExternalIds(activeRecords.map(r => r.id))
+  return bridged[0]?.id ?? null
+}
+
 export type LearnerAssignmentListItem = {
   id: string
   class_id: string
