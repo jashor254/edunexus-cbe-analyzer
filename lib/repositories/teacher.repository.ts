@@ -1,5 +1,5 @@
 import { BaseRepository } from './base'
-import { BridgeAlreadyClaimedError } from '@/lib/core/errors'
+import { BridgeAlreadyClaimedError, AssignmentBridgeAlreadyClaimedError } from '@/lib/core/errors'
 import type {
   ClassWithDetails,
   Stream,
@@ -1145,5 +1145,170 @@ export class TeacherRepository extends BaseRepository {
       .select('id')
     if (error) throw new Error(`removeLegacyClassRosterMembership: ${error.message}`)
     return data?.length ?? 0
+  }
+
+  /**
+   * A single teaching tenure by its own id, with everything
+   * `ensureAssignmentCompatibilityClass` needs to authorize and build a
+   * compatibility class: the tenure itself (including `ended_at`, unlike
+   * {@link listTeachingAssignmentsByUser} which filters it away), and the
+   * owning membership's `user_id`/`is_active` (the tenure row alone cannot
+   * answer "is this teacher still employed here").
+   */
+  async findTenureForCompatibilityBridge(classSubjectId: string): Promise<{
+    id: string
+    schoolId: string
+    classId: string
+    className: string
+    gradeCode: string | null
+    academicYearId: string | null
+    subjectId: string
+    subjectName: string
+    teacherMembershipId: string
+    membershipUserId: string
+    membershipIsActive: boolean
+    endedAt: string | null
+  } | null> {
+    const { data, error } = await this.db
+      .from('class_subjects')
+      .select(`
+        id, school_id, class_id, subject_id, teacher_id, ended_at,
+        classes (class_name, display_name, academic_year_id, grades (code)),
+        subjects (id, name),
+        school_users (user_id, is_active)
+      `)
+      .eq('id', classSubjectId)
+      .maybeSingle()
+    if (error) throw new Error(`findTenureForCompatibilityBridge: ${error.message}`)
+    if (!data) return null
+
+    type Row = {
+      id: string
+      school_id: string
+      class_id: string
+      subject_id: string
+      teacher_id: string
+      ended_at: string | null
+      classes: {
+        class_name: string | null
+        display_name: string | null
+        academic_year_id: string | null
+        grades: { code: string } | null
+      } | null
+      subjects: { id: string; name: string } | null
+      school_users: { user_id: string; is_active: boolean } | null
+    }
+    const row = data as unknown as Row
+    if (!row.classes || !row.subjects || !row.school_users) return null
+
+    return {
+      id:                  row.id,
+      schoolId:            row.school_id,
+      classId:             row.class_id,
+      className:           row.classes.display_name ?? row.classes.class_name ?? '',
+      gradeCode:           row.classes.grades?.code ?? null,
+      academicYearId:      row.classes.academic_year_id,
+      subjectId:           row.subjects.id,
+      subjectName:         row.subjects.name,
+      teacherMembershipId: row.teacher_id,
+      membershipUserId:    row.school_users.user_id,
+      membershipIsActive:  row.school_users.is_active,
+      endedAt:             row.ended_at,
+    }
+  }
+
+  // ── Phase 1B: institutional -> legacy assignment-class compatibility bridge ─
+  // See supabase/migrations/20260818120000_assignment_class_subject_bridge.sql
+  // and lib/core/assignmentCompatibilityBridge.ts for the full rationale.
+  // Deliberately NOT part of the Sprint 9F academicBridge.ts section above —
+  // this is a second, independent bridge keyed on the teaching TENURE
+  // (class_subjects.id), not on (coreClassId, teacherId).
+
+  /** The existing compatibility class for this teaching tenure, if one has already been created. */
+  async findAssignmentCompatibilityBridge(classSubjectId: string): Promise<{ teacherClassId: string } | null> {
+    const { data, error } = await this.db
+      .from('class_subject_legacy_bridge')
+      .select('teacher_class_id')
+      .eq('class_subject_id', classSubjectId)
+      .maybeSingle()
+    if (error) throw new Error(`findAssignmentCompatibilityBridge: ${error.message}`)
+    return data ? { teacherClassId: data.teacher_class_id as string } : null
+  }
+
+  /**
+   * Creates the compatibility `teacher_classes` row for a teaching tenure.
+   * Institution-linked (unlike a genuine Solo Teacher class): `school_id` is
+   * always set, `external_id` is deliberately left NULL — this bridge never
+   * writes or reads `teacher_classes.external_id`, which belongs entirely to
+   * the separate, unrelated `academicBridge.ts` mechanism.
+   */
+  /**
+   * Throws {@link AssignmentBridgeAlreadyClaimedError} — never a bare
+   * `Error` — when a concurrent caller for the SAME tenure already claimed
+   * `class_code` (deterministic per `classSubjectId`, see
+   * `deterministicClassCode`) first. This is the other half of Step 6's
+   * race safety alongside {@link insertAssignmentCompatibilityBridge}: the
+   * bridge-table unique constraint alone is not enough, because two
+   * concurrent callers both pass the "no existing bridge yet" check and
+   * both then attempt to INSERT a `teacher_classes` row before either gets
+   * to the bridge insert — `teacher_classes_class_code_key` is what
+   * actually rejects the loser here, one insert earlier than the bridge
+   * table's own constraint would.
+   */
+  async insertAssignmentCompatibilityTeacherClass(input: {
+    classSubjectId: string
+    teacherId: string
+    schoolId: string
+    name: string
+    grade: number
+    subject: string
+    academicYear: string
+    classCode: string
+  }): Promise<{ id: string }> {
+    const { data, error } = await this.db
+      .from('teacher_classes')
+      .insert({
+        teacher_id:    input.teacherId,
+        school_id:     input.schoolId,
+        name:          input.name,
+        grade:         input.grade,
+        subject:       input.subject,
+        academic_year: input.academicYear,
+        class_code:    input.classCode,
+      })
+      .select('id')
+      .single()
+    if (error) {
+      if (error.code === '23505' && error.message.includes('teacher_classes_class_code_key')) {
+        throw new AssignmentBridgeAlreadyClaimedError(input.classSubjectId)
+      }
+      throw new Error(`insertAssignmentCompatibilityTeacherClass: ${error.message}`)
+    }
+    return data
+  }
+
+  /**
+   * Claims the bridge row linking a teaching tenure to its compatibility
+   * class. Throws {@link AssignmentBridgeAlreadyClaimedError} — never a bare
+   * `Error` — when `class_subject_legacy_bridge`'s
+   * `UNIQUE (class_subject_id)` constraint rejects a concurrent duplicate;
+   * the caller recovers by re-reading via {@link findAssignmentCompatibilityBridge}.
+   */
+  async insertAssignmentCompatibilityBridge(input: {
+    classSubjectId: string
+    teacherClassId: string
+  }): Promise<{ id: string; teacherClassId: string }> {
+    const { data, error } = await this.db
+      .from('class_subject_legacy_bridge')
+      .insert({ class_subject_id: input.classSubjectId, teacher_class_id: input.teacherClassId })
+      .select('id, teacher_class_id')
+      .single()
+    if (error) {
+      if (error.code === '23505' && error.message.includes('class_subject_legacy_bridge_class_subject_id_key')) {
+        throw new AssignmentBridgeAlreadyClaimedError(input.classSubjectId)
+      }
+      throw new Error(`insertAssignmentCompatibilityBridge: ${error.message}`)
+    }
+    return { id: data.id as string, teacherClassId: data.teacher_class_id as string }
   }
 }

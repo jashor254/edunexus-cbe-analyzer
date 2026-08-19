@@ -166,6 +166,21 @@ export class BridgeAlreadyClaimedError extends ConflictError {
   }
 }
 
+/**
+ * A concurrent request already created the assignment compatibility bridge
+ * (`class_subject_legacy_bridge`) for this teaching tenure (Phase 1B,
+ * `lib/core/assignmentCompatibilityBridge.ts`). The table's
+ * `UNIQUE (class_subject_id)` constraint makes this a real, reachable
+ * `23505`, not a theoretical one — mirrors {@link BridgeAlreadyClaimedError}'s
+ * shape exactly, distinct so the compatibility-bridge helper can catch only
+ * this violation and recover by re-reading the winner's row.
+ */
+export class AssignmentBridgeAlreadyClaimedError extends ConflictError {
+  constructor(readonly classSubjectId: string) {
+    super(`Teaching assignment ${classSubjectId} was already bridged by a concurrent request.`)
+  }
+}
+
 /** True for any error this module defines — useful for a single catch-and-map in a route. */
 export function isEduNexusError(err: unknown): err is EduNexusError {
   return err instanceof EduNexusError
