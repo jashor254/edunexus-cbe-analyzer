@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Clock, CheckCircle2, Trophy, Compass, FileText, X, Send, Paperclip } from 'lucide-react'
+import { Clock, CheckCircle2, Trophy, Compass, FileText, X, Send, Paperclip, Download } from 'lucide-react'
 import { friendlyMessage } from '@/lib/errors/friendlyMessage'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -476,6 +476,18 @@ function AssignmentCard({
               </button>
             </>
           )}
+          {/* Phase 3 — intermittent-connectivity delivery: no extra
+              class/learner selection, no separate approval step at
+              download time (the assignment is already published and the
+              learner is already authorized, same as the buttons above).
+              Server derives authorization from the session alone. */}
+          <a
+            href={`/api/student/assignments/${item.id}/pdf`}
+            download
+            className="flex items-center gap-2 border border-gray-200 text-gray-700 bg-white px-4 py-2.5 rounded-xl font-black text-sm hover:bg-gray-50 transition"
+          >
+            <Download className="w-4 h-4" /> Download PDF
+          </a>
         </div>
 
         {item.is_holiday_assignment && item.holiday_period && (

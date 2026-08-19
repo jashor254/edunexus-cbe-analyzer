@@ -325,4 +325,67 @@ export class AssignmentRepository extends BaseRepository {
     if (error) throw new Error(`findSubmissionForStudentsAndAssignment: ${error.message}`)
     return data
   }
+
+  /**
+   * PHASE 3 — read-only content projection for the learner-facing assignment
+   * PDF. Deliberately its own narrow select (never ASSIGNMENT_COLS, which
+   * carries no school/teacher context) — only the fields Step 2's PDF
+   * semantics call for, joined once, no per-field follow-up query. This
+   * method performs no authorization; callers must already hold a proven
+   * read-access grant (resolveInstitutionalAssignmentReadAccess for
+   * institutional learners, the legacy self/parent check otherwise) before
+   * calling it.
+   */
+  async findPdfContext(assignmentId: string): Promise<{
+    id: string
+    class_id: string
+    title: string
+    subject: string
+    topic: string
+    instructions: string
+    due_date: string
+    type: string
+    is_quiz: boolean
+    max_score: number | null
+    updated_at: string | null
+    teacher_classes: { name: string | null; grade: number | null; subject: string | null; school_id: string | null } | null
+    teachers: { full_name: string | null } | null
+  } | null> {
+    const { data, error } = await this.db
+      .from('assignments')
+      .select(`
+        id, class_id, title, subject, topic, instructions, due_date, type, is_quiz, max_score, updated_at,
+        teacher_classes (name, grade, subject, school_id),
+        teachers (full_name)
+      `)
+      .eq('id', assignmentId)
+      .maybeSingle()
+    if (error) return null
+    return data as unknown as {
+      id: string
+      class_id: string
+      title: string
+      subject: string
+      topic: string
+      instructions: string
+      due_date: string
+      type: string
+      is_quiz: boolean
+      max_score: number | null
+      updated_at: string | null
+      teacher_classes: { name: string | null; grade: number | null; subject: string | null; school_id: string | null } | null
+      teachers: { full_name: string | null } | null
+    } | null
+  }
+
+  /** School display name for the PDF header — best-effort, never authorization-relevant. */
+  async findSchoolName(schoolId: string): Promise<string | null> {
+    const { data, error } = await this.db
+      .from('schools')
+      .select('school_name')
+      .eq('id', schoolId)
+      .maybeSingle()
+    if (error) throw new Error(`findSchoolName: ${error.message}`)
+    return data?.school_name ?? null
+  }
 }
