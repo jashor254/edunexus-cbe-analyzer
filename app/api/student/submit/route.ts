@@ -5,6 +5,7 @@ import { apiSuccess, apiError, apiUnauthorized, apiNotFound, apiBadRequest } fro
 import { publishEvent } from '@/lib/events'
 import { requireAuthentication, requireStudent, requireClassMembership } from '@/lib/core/permissions'
 import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
+import { resolveInstitutionalAssignmentReadAccess } from '@/lib/core/assignmentDiscovery'
 
 const SubmitSchema = z.object({
   assignmentId:        z.string().uuid(),
@@ -28,14 +29,29 @@ export async function POST(req: Request) {
 
     const parsed = SubmitSchema.safeParse(await req.json())
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'assignmentId and studentId are required')
-    const { assignmentId, studentId, work_text, compass_session_id } = parsed.data
+    const { assignmentId, studentId: requestedStudentId, work_text, compass_session_id } = parsed.data
 
-    // Verify student belongs to this user
+    // Verify student belongs to this user. Legacy/Solo learners resolve via
+    // `students.user_id` (requireStudent, unchanged). An institutional
+    // learner has no such row (`user_id` is NULL on their Phase 1C
+    // compatibility row) — Phase 2.5 fallback: prove a durable
+    // `assignment_submissions` row already exists for THIS exact assignment,
+    // across every compatibility student id this authenticated identity has
+    // ever legitimately held (resolveInstitutionalAssignmentReadAccess, the
+    // same recipient-materialization signal Phase 2's read path uses). The
+    // client-supplied studentId is never trusted once we fall to this
+    // branch — the resolved id below is the only one used downstream.
+    let studentId: string
+    let isInstitutional = false
     try {
-      await requireStudent(supabase, studentId)
+      await requireStudent(supabase, requestedStudentId)
+      studentId = requestedStudentId
     } catch (err) {
-      if (isEduNexusError(err)) return apiError('Student not found', 403)
-      throw err
+      if (!isEduNexusError(err)) throw err
+      const access = await resolveInstitutionalAssignmentReadAccess(userId, assignmentId)
+      if (!access) return apiError('Student not found', 403)
+      studentId = access.studentId
+      isInstitutional = true
     }
 
     // Verify the assignment exists and is active
@@ -55,11 +71,23 @@ export async function POST(req: Request) {
     // supplied one — is the authority for which class owns it; the learner
     // must be a current class_students member of that exact class. Runs
     // before any submission write, so an ineligible learner leaves no row.
-    try {
-      await requireClassMembership(studentId, assignment.class_id, db)
-    } catch (err) {
-      if (isEduNexusError(err)) return apiError('You are not enrolled in the class this assignment belongs to', 403)
-      throw err
+    //
+    // Institutional branch skips this: `class_students` is a mutable,
+    // opportunistically-synced-on-next-assignment-creation table (Phase
+    // 1B/1C), never touched at transfer time — a legitimate historical
+    // resubmission after a transfer can find its old membership row already
+    // deleted (or, just as easily, still present when it should not
+    // authorize anything new). The durable `assignment_submissions` row
+    // already proven above by resolveInstitutionalAssignmentReadAccess IS
+    // the eligibility signal for this branch (see
+    // lib/core/assignmentDiscovery.ts's header) — do not invent a second one.
+    if (!isInstitutional) {
+      try {
+        await requireClassMembership(studentId, assignment.class_id, db)
+      } catch (err) {
+        if (isEduNexusError(err)) return apiError('You are not enrolled in the class this assignment belongs to', 403)
+        throw err
+      }
     }
 
     // Build the update payload

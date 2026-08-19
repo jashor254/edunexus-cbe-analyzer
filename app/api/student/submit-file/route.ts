@@ -11,6 +11,7 @@ import { publishEvent } from '@/lib/events'
 import { requireAuthentication, requireStudent, requireClassMembership } from '@/lib/core/permissions'
 import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
 import { UPLOAD_LIMITS, isAllowedUploadType } from '@/lib/config/uploads'
+import { resolveInstitutionalAssignmentReadAccess } from '@/lib/core/assignmentDiscovery'
 
 const BUCKET = 'assignment-submissions'
 
@@ -24,14 +25,13 @@ export async function POST(req: Request) {
       if (err instanceof UnauthorizedError) return apiUnauthorized()
       throw err
     }
-    void userId
 
     const form = await req.formData()
     const assignmentId = form.get('assignmentId')
-    const studentId = form.get('studentId')
+    const requestedStudentId = form.get('studentId')
     const file = form.get('file')
 
-    if (typeof assignmentId !== 'string' || typeof studentId !== 'string') {
+    if (typeof assignmentId !== 'string' || typeof requestedStudentId !== 'string') {
       return apiBadRequest('assignmentId and studentId are required')
     }
     if (!(file instanceof File)) {
@@ -44,11 +44,25 @@ export async function POST(req: Request) {
       return apiBadRequest('Unsupported file type — use a photo or PDF')
     }
 
+    // Legacy/Solo learners resolve via `students.user_id` (requireStudent,
+    // unchanged). An institutional learner has no such row — Phase 2.5
+    // fallback: prove a durable `assignment_submissions` row already exists
+    // for this exact assignment (resolveInstitutionalAssignmentReadAccess,
+    // same signal Phase 2's read path uses). Must complete BEFORE any
+    // Storage upload — an ineligible caller must never leave a durable
+    // Storage object, even a rejected one. Client-supplied studentId is
+    // never trusted once this falls to the institutional branch.
+    let studentId: string
+    let isInstitutional = false
     try {
-      await requireStudent(supabase, studentId)
+      await requireStudent(supabase, requestedStudentId)
+      studentId = requestedStudentId
     } catch (err) {
-      if (isEduNexusError(err)) return apiForbidden()
-      throw err
+      if (!isEduNexusError(err)) throw err
+      const access = await resolveInstitutionalAssignmentReadAccess(userId, assignmentId)
+      if (!access) return apiForbidden()
+      studentId = access.studentId
+      isInstitutional = true
     }
 
     const db = createServiceClient()
@@ -66,11 +80,18 @@ export async function POST(req: Request) {
     // ineligible learner must never leave a durable Storage object, even a
     // rejected one. The assignment's own class_id (never a client-supplied
     // one) is the authority for which class owns it.
-    try {
-      await requireClassMembership(studentId, assignment.class_id, db)
-    } catch (err) {
-      if (isEduNexusError(err)) return apiForbidden()
-      throw err
+    //
+    // Institutional branch skips this — see app/api/student/submit/route.ts's
+    // identical comment: class_students is not a reliable transfer-safe
+    // signal; the durable assignment_submissions row already proven above
+    // is the eligibility signal for this branch.
+    if (!isInstitutional) {
+      try {
+        await requireClassMembership(studentId, assignment.class_id, db)
+      } catch (err) {
+        if (isEduNexusError(err)) return apiForbidden()
+        throw err
+      }
     }
 
     const { data: existing } = await db

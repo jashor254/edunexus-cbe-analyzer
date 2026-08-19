@@ -13,6 +13,7 @@ import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
 import { gradeAndSubmitQuiz } from '@/lib/quiz/quiz'
 import { recordQuizAutoGradeEvidence } from '@/lib/quiz/quizEvidence'
 import { buildAdaptiveProvenance } from '@/lib/assignments/adaptiveProvenance'
+import { resolveInstitutionalAssignmentReadAccess } from '@/lib/core/assignmentDiscovery'
 
 const SubmitQuizSchema = z.object({
   assignmentId: z.string().uuid(),
@@ -36,13 +37,30 @@ export async function POST(req: Request) {
 
     const parsed = SubmitQuizSchema.safeParse(await req.json())
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
-    const { assignmentId, studentId, answers } = parsed.data
+    const { assignmentId, studentId: requestedStudentId, answers } = parsed.data
 
+    // Legacy/Solo learners resolve via `students.user_id` (requireStudent,
+    // unchanged). An institutional learner has no such row — Phase 2.5
+    // fallback: prove a durable `assignment_submissions` row already exists
+    // for this exact assignment (resolveInstitutionalAssignmentReadAccess,
+    // same signal Phase 2's read path uses). Must complete BEFORE grading —
+    // an ineligible caller must never cause a score, a 'marked' status, or
+    // quiz_auto_grade Evidence to be created. Client-supplied studentId is
+    // never trusted once this falls to the institutional branch; the
+    // resolved id below (the caller's own compatibility students.id) is
+    // what grading, the submission row, and downstream evidence attribution
+    // all key on.
+    let studentId: string
+    let isInstitutional = false
     try {
-      await requireStudent(supabase, studentId)
+      await requireStudent(supabase, requestedStudentId)
+      studentId = requestedStudentId
     } catch (err) {
-      if (isEduNexusError(err)) return apiForbidden()
-      throw err
+      if (!isEduNexusError(err)) throw err
+      const access = await resolveInstitutionalAssignmentReadAccess(userId, assignmentId)
+      if (!access) return apiForbidden()
+      studentId = access.studentId
+      isInstitutional = true
     }
 
     const db = createServiceClient()
@@ -60,11 +78,18 @@ export async function POST(req: Request) {
     // must never cause a score, a 'marked' status, or quiz_auto_grade
     // Evidence to be created. The assignment's own class_id (never a
     // client-supplied one) is the authority for which class owns it.
-    try {
-      await requireClassMembership(studentId, assignment.class_id, db)
-    } catch (err) {
-      if (isEduNexusError(err)) return apiForbidden()
-      throw err
+    //
+    // Institutional branch skips this — see app/api/student/submit/route.ts's
+    // identical comment: class_students is not a reliable transfer-safe
+    // signal; the durable assignment_submissions row already proven above
+    // is the eligibility signal for this branch.
+    if (!isInstitutional) {
+      try {
+        await requireClassMembership(studentId, assignment.class_id, db)
+      } catch (err) {
+        if (isEduNexusError(err)) return apiForbidden()
+        throw err
+      }
     }
 
     const { submission, grade } = await gradeAndSubmitQuiz({
