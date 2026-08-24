@@ -94,6 +94,7 @@
     "lib/learnerIntelligence/careerMode.pure.test.ts",
     "lib/learnerWellbeing/wellbeingBoundary.architecture.test.ts",
     "lib/parentExperience/actions.pure.test.ts",
+    "lib/parentExperience/attentionAction.test.ts",
     "lib/parentExperience/growthTimeline.pure.test.ts",
     "lib/pathwayCalculator.stemGate.test.ts",
     "lib/payments/pricingSurface.test.ts",
