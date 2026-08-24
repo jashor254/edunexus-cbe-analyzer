@@ -78,6 +78,11 @@ export default function DashboardNavbar({ isStudent = false }: { isStudent?: boo
       return isStudent ? { ...link, href: assignmentsHref } : { ...link, href: assignmentsHref, label: 'Children' }
     }
     if (link.label === 'Careers')     return { ...link, href: careersHref }
+    // Parent Portal Phase P3 Step 7 — for a parent, bare "Compass" reads as
+    // an invitation to start a tutoring session themselves, which Phase P2
+    // already blocks server-side. Students keep the literal label: it's
+    // still their own session to start.
+    if (link.label === 'Compass' && !isStudent) return { ...link, label: 'Compass Progress' }
     return link
   }
   const navLinks = [
