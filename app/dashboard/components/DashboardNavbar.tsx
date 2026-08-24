@@ -69,7 +69,14 @@ export default function DashboardNavbar({ isStudent = false }: { isStudent?: boo
   // unique across navLinks/bottomNav and must never be used as a React key.
   // Labels are unique in every combination, so they are the key.
   const applyOverrides = <T extends { label: string; href: string }>(link: T): T => {
-    if (link.label === 'Assignments') return { ...link, href: assignmentsHref }
+    // Parent Entry Convergence (P1): for a parent, this nav item is the
+    // entry to /child (the whole "which of my children, and what's going
+    // on with them" flow) — "Assignments" was a role-confused label
+    // (Parent Portal Audit P0 §4/§36 #2). Students keep the literal label:
+    // it still points at /learn, where their own assignments render.
+    if (link.label === 'Assignments') {
+      return isStudent ? { ...link, href: assignmentsHref } : { ...link, href: assignmentsHref, label: 'Children' }
+    }
     if (link.label === 'Careers')     return { ...link, href: careersHref }
     return link
   }
