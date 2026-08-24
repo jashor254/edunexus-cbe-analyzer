@@ -5,7 +5,7 @@ import { checkFeatureAccess } from '@/lib/payments/access'
 import { type FeatureKey } from '@/lib/payments/config'
 import { endSession } from '@/lib/compass/session'
 import { resolveCompassAcademicLevelFor } from '@/lib/compass/learnerContext'
-import { resolveCompassStudentAccess, resolveSessionOwnership } from '@/lib/compass/ownership'
+import { resolveCompassMutationAccess, resolveSessionOwnership } from '@/lib/compass/ownership'
 import { recordCompassSessionEvidence } from '@/lib/compass/evidence'
 import { completeDeliveryForSession } from '@/lib/compass/deliveryBinding'
 import { awardCompassGroupBonus } from '@/lib/compass/groupBonus'
@@ -79,7 +79,10 @@ export async function POST(req: Request): Promise<Response> {
 
     const db = createServiceClient()
 
-    const ownership = await resolveCompassStudentAccess(access.userId, studentId)
+    // Phase P2 — session completion writes XP, ending_level, the Learner
+    // Model, and Evidence (recordCompassSessionEvidence below). Same
+    // mutation boundary as /api/learn POST — see resolveCompassMutationAccess.
+    const ownership = await resolveCompassMutationAccess(access.userId, studentId)
     if (!ownership.allowed) return apiForbidden()
 
     const sessionOwned = await resolveSessionOwnership(sessionId, studentId)

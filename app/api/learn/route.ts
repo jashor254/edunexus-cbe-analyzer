@@ -2,9 +2,9 @@
 import { createServiceClient } from '@/utils/supabase/service'
 import { streamDeepSeek } from '@/lib/ai/deepseek'
 import { getOrCreateSession, readSession, writeSession, resolveSubject, recordExchange } from '@/lib/compass/session'
-import { resolveCompassAcademicLevelFor } from '@/lib/compass/learnerContext'
+import { resolveCompassLearnerIntelligence } from '@/lib/compass/learnerContext'
 import { bindDeliveryToSession } from '@/lib/compass/deliveryBinding'
-import { resolveCompassStudentAccess, resolveSessionOwnership } from '@/lib/compass/ownership'
+import { resolveCompassMutationAccess, resolveSessionOwnership } from '@/lib/compass/ownership'
 import { buildCompassPrompt, type CompassPromptParams, type KnowledgeContextBlock } from '@/lib/compass/prompt'
 import type { RootCauseResult } from '@/lib/knowledgeGraph/types'
 import { getGradeTopics } from '@/lib/compass/topics'
@@ -176,7 +176,13 @@ export async function POST(req: Request) {
 
     // ── Ownership: verify this student belongs to the authenticated user ───────
     if (!studentResult.data) return apiError('Student not found', 404)
-    const ownership = await resolveCompassStudentAccess(access.userId, studentId)
+    // Phase P2 — a Compass tutoring turn is a MUTATION (transcript, session
+    // state, and ultimately learner_evidence via recordCompassSessionEvidence
+    // in /api/learn/end). A parent may view Compass progress but must not be
+    // able to drive a session and mint learner-attributed Evidence/XP — see
+    // resolveCompassMutationAccess's header and
+    // docs/architecture/parent-portal-p2-compass-actor-boundary.md.
+    const ownership = await resolveCompassMutationAccess(access.userId, studentId)
     if (!ownership.allowed) return apiError('Access denied', 403)
 
     // ── Ownership: verify the supplied session belongs to THIS student ────────
@@ -250,11 +256,19 @@ export async function POST(req: Request) {
     // shown "Level 2" on the picker and taught at Level 3 in the same
     // session. `academicState.source` records which source actually won.
     const subjectTiers = (ctx?.subject_tiers ?? {}) as Record<string, string>
-    const academicState = await resolveCompassAcademicLevelFor(studentId, subject, {
-      subjectTiers,
-      overallLevel: (ctx?.overall_level as number | null) ?? null,
-      sessionLevel: savedSession?.overallLevel ?? null,
-      clientHint: typeof subjectLevel === 'number' ? subjectLevel : null,
+    // Phase 4 (Blueprint/Compass Intelligence Convergence): one Projection
+    // read now resolves both the tutoring level (unchanged precedence
+    // chain) and subject-scoped persistent intelligence (capability
+    // level, trajectory, risk factors) — see lib/compass/learnerContext.ts.
+    const { academic: academicState, persistent: persistentIntelligence } = await resolveCompassLearnerIntelligence({
+      learnerId: studentId,
+      subject,
+      legacy: {
+        subjectTiers,
+        overallLevel: (ctx?.overall_level as number | null) ?? null,
+        sessionLevel: savedSession?.overallLevel ?? null,
+        clientHint: typeof subjectLevel === 'number' ? subjectLevel : null,
+      },
     })
     const level = academicState.level
 
@@ -403,6 +417,7 @@ export async function POST(req: Request) {
       grade,
       level,
       levelSource: academicState.source,
+      persistentIntelligence,
       isJunior,
       pathway,
       subject,

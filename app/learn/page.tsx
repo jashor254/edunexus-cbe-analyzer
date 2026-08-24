@@ -495,7 +495,20 @@ function LearnContent() {
         }),
       })
 
-      if (!res.ok) return
+      if (!res.ok) {
+        // Phase P2 — a 403 here (e.g. a parent viewing on their child's
+        // behalf, who may observe Compass but not drive a session) must not
+        // read as a stuck spinner or silent nothing. Same visible-error
+        // pattern sendMessage() already uses below.
+        setMessages([{
+          id:      `err-${Date.now()}`,
+          role:    'compass',
+          content: res.status === 403
+            ? "This account can't start a Compass session for this learner. Compass sessions are for the learner themselves."
+            : 'Something went wrong. Please try again.',
+        }])
+        return
+      }
 
       const newSessionId = res.headers.get('X-Session-Id')
       if (newSessionId) setSessionId(newSessionId)
