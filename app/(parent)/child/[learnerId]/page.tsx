@@ -16,8 +16,30 @@ import { repos } from '@/lib/repositories'
 import { composeBlueprint } from '@/lib/learnerBlueprint/composeBlueprint'
 import { getLatestBlueprintSnapshot } from '@/lib/learnerBlueprint/snapshot'
 import { PARENT_STATUS_LABEL } from '@/lib/parentExperience/terminology'
+import { resolveLegacyStudentId } from '@/lib/core/identity'
+import { buildParentHomeAttentionAction, summarizeAssignmentAttention, type AssignmentAttentionSummary } from '@/lib/parentExperience/attentionAction'
 import ParentActionCard from '@/components/parent/ParentActionCard'
+import ParentAttentionSection from '@/components/parent/ParentAttentionSection'
 import { asLearnerId } from '@/lib/core/identityTypes'
+
+/**
+ * Parent Portal Phase P4 — the one new server-side read this phase adds to
+ * Home: a cheap assignment-attention summary. Reuses the existing, already
+ * batched `repos.assignments.findSubmissionsWithAssignmentsForStudents()`
+ * (one query, no loop) rather than duplicating its logic — the same
+ * function `lib/core/assignmentDiscovery.ts` already calls for the
+ * learner's own view. Returns `{ summary: null, failed: true }` on a
+ * genuine read error (never coerced to a false "zero" — mission Step 35).
+ */
+async function loadAssignmentAttention(legacyStudentId: string | null): Promise<{ summary: AssignmentAttentionSummary; failed: boolean }> {
+  if (!legacyStudentId) return { summary: { overdueCount: 0, dueSoonCount: 0 }, failed: false }
+  try {
+    const rows = await repos.assignments.findSubmissionsWithAssignmentsForStudents([legacyStudentId])
+    return { summary: summarizeAssignmentAttention(rows, new Date()), failed: false }
+  } catch {
+    return { summary: null, failed: true }
+  }
+}
 
 export default async function ParentHomePage({
   params,
@@ -65,6 +87,27 @@ export default async function ParentHomePage({
 
   const latestSnapshot = await getLatestBlueprintSnapshot(learnerId, schoolId).catch(() => null)
 
+  // Phase P4: the one new read this phase adds — a cheap, batched
+  // assignment-attention summary. Everything else feeding
+  // buildParentHomeAttentionAction() below is already-composed Blueprint
+  // data (attendance, risk, recommendedNextSteps) — no second Blueprint
+  // composition, no Projection recomputation here.
+  const legacyStudentId = await resolveLegacyStudentId(learnerId).catch(() => null)
+  const { summary: assignmentAttention, failed: assignmentCheckFailed } = await loadAssignmentAttention(legacyStudentId)
+
+  const recommendedActions = blueprint.recommendedNextSteps.status === 'available' && blueprint.recommendedNextSteps.data
+    ? blueprint.recommendedNextSteps.data.actions
+    : []
+
+  const attentionAction = buildParentHomeAttentionAction({
+    learnerId,
+    attendance: blueprint.attendance,
+    risk: blueprint.risk,
+    recommendedActions,
+    assignmentAttention,
+    assignmentCheckFailed,
+  })
+
   const identity = blueprint.identity.data
   const name = identity?.learnerName ?? 'Your child'
 
@@ -75,8 +118,16 @@ export default async function ParentHomePage({
         <p className="text-xs text-gray-400">{identity?.currentClassName ?? identity?.schoolName ?? ''}</p>
       </div>
 
-      {blueprint.recommendedNextSteps.status === 'available' && blueprint.recommendedNextSteps.data && (
-        <ParentActionCard actions={blueprint.recommendedNextSteps.data.actions} />
+      <ParentAttentionSection
+        primaryAttention={attentionAction.primaryAttention}
+        secondaryAttention={attentionAction.secondaryAttention}
+        zeroAttention={attentionAction.zeroAttention}
+        assignmentCheckFailedNote={attentionAction.assignmentCheckFailedNote}
+        learnerId={learnerId}
+      />
+
+      {attentionAction.actions.length > 0 && (
+        <ParentActionCard actions={attentionAction.actions} title="What Can I Do?" />
       )}
 
       <Link

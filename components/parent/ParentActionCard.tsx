@@ -33,10 +33,10 @@ const PRIORITY_STYLE: Record<ParentAction['priority'], string> = {
   completed: 'bg-gray-100 text-gray-500 border-gray-200',
 }
 
-export default function ParentActionCard({ actions }: { actions: ParentAction[] }) {
+export default function ParentActionCard({ actions, title = "Today's Actions" }: { actions: ParentAction[]; title?: string }) {
   return (
     <div className="space-y-2">
-      <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wide">Today&apos;s Actions</h2>
+      <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wide">{title}</h2>
       {actions.map((action, i) => (
         <Link
           key={i}
