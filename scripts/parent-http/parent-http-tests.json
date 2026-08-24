@@ -1,10 +1,11 @@
 {
-  "description": "Parent Portal HTTP integration manifest — run via `npm run test:parent-http`, which boots scripts/parent-http/run-parent-http-harness.mjs (local Supabase + isolated `next dev --webpack`) before executing these files. Every file here is a *.http.integration.test.ts suite that needs a real running Next server, not a lib-level integration test. Kept separate from scripts/deep-tests.json's broader DEEP set and scripts/http-main-tests.json/http-pr-tests.json (unrelated CI waves) — this manifest is scoped to Parent Portal phases (P1/P2/P3/P3.5) only, per the P3.5 mission's explicit 'stay scoped to parent HTTP integration support' instruction.",
+  "description": "Parent Portal HTTP integration manifest — run via `npm run test:parent-http`, which boots scripts/parent-http/run-parent-http-harness.mjs (local Supabase + isolated `next dev --webpack`) before executing these files. Every file here is a *.http.integration.test.ts suite that needs a real running Next server, not a lib-level integration test. Kept separate from scripts/deep-tests.json's broader DEEP set and scripts/http-main-tests.json/http-pr-tests.json (unrelated CI waves) — this manifest is scoped to Parent Portal phases (P1/P2/P3/P3.5/P4) only, per the P3.5 mission's explicit 'stay scoped to parent HTTP integration support' instruction.",
   "files": [
     "lib/testing/parentPortalP1Convergence.http.integration.test.ts",
     "lib/testing/parentExperienceConvergence.http.integration.test.ts",
     "lib/testing/parentCompassActorBoundary.http.integration.test.ts",
     "lib/testing/parentChildContextConvergence.http.integration.test.ts",
-    "lib/testing/parentLearnViewerRole.http.integration.test.ts"
+    "lib/testing/parentLearnViewerRole.http.integration.test.ts",
+    "lib/testing/parentAttentionAction.http.integration.test.ts"
   ]
 }
