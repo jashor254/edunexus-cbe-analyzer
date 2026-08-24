@@ -115,18 +115,6 @@ export default async function ParentHomePage({
         href={`/child/${learnerId}/full`}
         className="block bg-white rounded-2xl border border-gray-100 p-4 hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:outline-none transition-colors"
       >
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Learning Compass</p>
-        <p className="text-sm text-gray-900 mt-1">
-          {blueprint.learningCompass.data?.currentLearningFocus
-            ? `Currently focused on ${blueprint.learningCompass.data.currentLearningFocus.subject}`
-            : PARENT_STATUS_LABEL[blueprint.learningCompass.status]}
-        </p>
-      </Link>
-
-      <Link
-        href={`/child/${learnerId}/full`}
-        className="block bg-white rounded-2xl border border-gray-100 p-4 hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:outline-none transition-colors"
-      >
         <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Career Exploration</p>
         <p className="text-sm text-gray-900 mt-1">
           {blueprint.career.data?.careerCluster ?? PARENT_STATUS_LABEL[blueprint.career.status]}
@@ -156,8 +144,12 @@ export default async function ParentHomePage({
         href={`/child/${learnerId}/progress`}
         className="block bg-white rounded-2xl border border-gray-100 p-4 hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:outline-none transition-colors"
       >
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Compass Progress</p>
-        <p className="text-sm text-gray-900 mt-1">Completed Compass sessions by subject →</p>
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Learning Compass</p>
+        <p className="text-sm text-gray-900 mt-1">
+          {blueprint.learningCompass.data?.currentLearningFocus
+            ? `Currently focused on ${blueprint.learningCompass.data.currentLearningFocus.subject} — see completed sessions →`
+            : 'Completed Compass sessions by subject →'}
+        </p>
       </Link>
 
       <Link
