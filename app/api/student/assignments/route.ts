@@ -1,7 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
-import { requireAuthentication, requireStudent, requireParent } from '@/lib/core/permissions'
+import { requireAuthentication, requireStudent, requireParentOfLegacyStudent } from '@/lib/core/permissions'
 import { UnauthorizedError } from '@/lib/core/errors'
 import { asStudentId } from '@/lib/core/identityTypes'
 import { resolveAuthenticatedLearnerIdentity } from '@/lib/core/learnerAccounts'
@@ -12,11 +12,19 @@ import { listAssignmentsForAuthenticatedLearner } from '@/lib/core/assignmentDis
  * (`.or(user_id.eq,parent_user_id.eq)`) for a specific studentId, composed
  * from the canonical self/parent gates rather than reimplemented — same
  * pattern as app/api/parent/assessments/process and whatsapp-optin (Batch F).
+ *
+ * Parent Portal Phase P1: uses {@link requireParentOfLegacyStudent}, not bare
+ * `requireParent`, so an institutional-only guardian (linked via
+ * `learner_guardians`, never `students.parent_user_id`) is recognized for a
+ * bridged compatibility `studentId` — exactly what `/child/[learnerId]/
+ * assignments` passes here after its own page-level `requireParent(learnerId)`
+ * already succeeded. See requireParentOfLegacyStudent's own doc for why the
+ * plain check alone can't see this case.
  */
 async function isSelfOrParentOf(client: Awaited<ReturnType<typeof createClient>>, studentId: string): Promise<boolean> {
   try { await requireStudent(client, studentId); return true } catch { /* fall through */ }
   // Trust origin: this id is used against `students` / `class_students` below.
-  try { await requireParent(client, asStudentId(studentId)); return true } catch { return false }
+  try { await requireParentOfLegacyStudent(client, asStudentId(studentId)); return true } catch { return false }
 }
 
 export async function GET(req: Request) {

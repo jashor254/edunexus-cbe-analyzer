@@ -10,7 +10,7 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
-import { requireAuthentication, requireParent } from '@/lib/core/permissions'
+import { requireAuthentication, requireParentOfLegacyStudent } from '@/lib/core/permissions'
 import { UnauthorizedError, ResourceOwnershipError } from '@/lib/core/errors'
 import { buildGradebook, type GradebookColumn, type GradebookRow } from '@/lib/gradebook/gradebook'
 import { asStudentId } from '@/lib/core/identityTypes'
@@ -32,7 +32,11 @@ export async function GET(req: NextRequest) {
     const supabase = await createClient()
     try {
       await requireAuthentication(supabase)
-      await requireParent(supabase, asStudentId(studentId))  // trust origin: class_students.student_id → students
+      // Parent Portal Phase P1: requireParentOfLegacyStudent (not bare
+      // requireParent) so an institutional-only guardian — linked via
+      // learner_guardians, never students.parent_user_id — is recognized
+      // for this bridged compatibility studentId (P0 §26 follow-up).
+      await requireParentOfLegacyStudent(supabase, asStudentId(studentId))  // trust origin: class_students.student_id → students
     } catch (err) {
       if (err instanceof UnauthorizedError) return apiUnauthorized()
       if (err instanceof ResourceOwnershipError) return apiForbidden()
