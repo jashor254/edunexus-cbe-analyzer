@@ -14,6 +14,7 @@
     "test": "node scripts/run-standard-tests.mjs",
     "test:standard": "node scripts/run-standard-tests.mjs",
     "test:deep": "node scripts/run-deep-tests.mjs",
+    "test:parent-http": "node scripts/parent-http/run-parent-http-harness.mjs",
     "test:report": "tsx scripts/test-report.ts",
     "career:audit": "tsx scripts/career-corpus-audit.ts",
     "sow:grade10-bio-t1": "tsx scripts/generateGrade10BiologyTerm1.ts",
