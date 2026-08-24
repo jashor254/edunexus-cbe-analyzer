@@ -40,6 +40,7 @@ import {
   type LearnerId,
   type StudentId,
 } from '@/lib/core/identityTypes'
+import { resolveInstitutionalCompatibilityStudentIds } from '@/lib/core/assignmentDiscovery'
 
 export type CurrentUser = {
   id: string
@@ -174,6 +175,57 @@ export async function resolveStudent(userId: string, client?: SupabaseClient): P
 }
 
 /**
+ * Every `students.id` this authenticated user may legitimately act as for a
+ * learner-portal feature that operates entirely in the legacy `students.id`
+ * space (Compass, Career Intelligence — Phase 0 audit finding: neither reads
+ * Core `learners`/`learner_accounts` at all). Union of:
+ *
+ *   - the legacy self link (`students.user_id === userId`), and — when
+ *     `opts.includeParent` is set — the parent link (`students.parent_user_id`)
+ *   - the institutional Phase 1C compatibility bridge
+ *     ({@link resolveInstitutionalCompatibilityStudentIds}, already the
+ *     canonical resolver `lib/core/assignmentDiscovery.ts` and
+ *     `app/api/student/home/route.ts` use for this exact bridge — not
+ *     duplicated here, only reused)
+ *
+ * `includeParent` defaults to `false` to preserve each existing caller's own
+ * legacy semantics exactly (most Career routes only ever authorized the
+ * learner themselves, not their parent, on this identity check — this
+ * function widens WHICH identity space is reachable, not WHO within it,
+ * unless a caller explicitly opts in).
+ *
+ * Returns `[]`, never throws, for a user with none of these relationships
+ * (a teacher, an unrelated guardian, etc.) — same "empty means no, not an
+ * error" contract as {@link resolveParent}.
+ */
+export async function resolveOwnedLegacyStudentIds(
+  userId: string,
+  client?: SupabaseClient,
+  opts: { includeParent?: boolean } = {}
+): Promise<StudentId[]> {
+  const db = client ?? createServiceClient()
+  const legacyQuery = db.from('students').select('id')
+  const legacyPromise = opts.includeParent
+    ? legacyQuery.or(`user_id.eq.${userId},parent_user_id.eq.${userId}`)
+    : legacyQuery.eq('user_id', userId)
+
+  const [{ data: legacyRows }, institutionalIds] = await Promise.all([
+    legacyPromise,
+    resolveInstitutionalCompatibilityStudentIds(userId),
+  ])
+
+  const merged = (legacyRows ?? []).map(r => asStudentId(r.id as string))
+  const seen = new Set<string>(merged)
+  for (const id of institutionalIds) {
+    if (!seen.has(id)) {
+      seen.add(id)
+      merged.push(asStudentId(id))
+    }
+  }
+  return merged
+}
+
+/**
  * Resolves every learner this user is a parent/guardian of, across both
  * surviving guardian systems (Stage 0.5): the legacy `students.parent_user_id`
  * link (de facto canonical, real usage) and Core's `learner_guardians` table
@@ -198,6 +250,67 @@ export async function resolveParent(userId: string, client?: SupabaseClient): Pr
     studentIds: (legacyStudents ?? []).map(s => asStudentId(s.id)),
     coreLearnerIds: coreLearnerIds.map(asLearnerId),
   }
+}
+
+/**
+ * Every legacy `students.id` this authenticated user may read family-wide,
+ * learner-portal-shaped data through (Parent Portal Phase P1 — Parent Entry
+ * + Institutional Family Data Convergence). This is the single canonical
+ * extension point the four `/api/student/{resources,materials,calendar,
+ * announcements}` routes were each independently missing an institutional-
+ * guardian branch for (Parent Portal Super Audit P0 §26/§36 #1) — a Core-only
+ * guardian's `resolveParent().coreLearnerIds` never appeared in any of them,
+ * because none resolved a guardian-held Core learner back into the legacy
+ * `students.id` space those routes are keyed on.
+ *
+ * Union of three sources, none of which duplicate a query the caller would
+ * otherwise run itself:
+ *   1. Legacy self + parent (`students.user_id` / `students.parent_user_id`)
+ *      — the original, untouched query every one of these four routes has
+ *      always run. A legacy-only learner/parent's result is byte-identical
+ *      to before this function existed.
+ *   2. Institutional SELF ({@link resolveInstitutionalCompatibilityStudentIds})
+ *      — already correct and already wired into `/api/student/resources`;
+ *      folded in here so all four routes agree rather than three of them
+ *      omitting it.
+ *   3. Institutional GUARDIAN — the actual gap: `resolveParent(userId)`'s
+ *      `coreLearnerIds`, bridged to their Phase 1C compatibility
+ *      `students.id` via the same batched `findLegacyStudentsByExternalIds`
+ *      primitive `resolveInstitutionalCompatibilityStudentIds` itself uses
+ *      (never a per-learner loop, never re-queried per caller).
+ *
+ * A Core learner with no compatibility `students` row yet (never bridged —
+ * no assessment/assignment history) simply contributes nothing from branch
+ * 3, exactly like {@link resolveLegacyStudentId}'s own documented "no bridge
+ * yet" case — not an error, not a reason to fail the whole union.
+ *
+ * Deliberately does NOT swallow a failure in the guardian bridge query the
+ * way {@link resolveParent}'s own `catch(() => [])` on `listGuardianLearners`
+ * does — that existing swallow is out of scope for this phase (its blast
+ * radius is every `resolveParent` caller, not just these four routes), but
+ * this function's own new bridge lookup is allowed to throw, so a genuine
+ * DB failure here surfaces as a 500 to the caller rather than masquerading
+ * as "this family has nothing posted."
+ */
+export async function resolveFamilyStudentIds(userId: string, client?: SupabaseClient): Promise<StudentId[]> {
+  const db = client ?? createServiceClient()
+
+  const [{ data: legacyRows }, institutionalSelfIds, parent] = await Promise.all([
+    db.from('students').select('id').or(`user_id.eq.${userId},parent_user_id.eq.${userId}`),
+    resolveInstitutionalCompatibilityStudentIds(userId),
+    resolveParent(userId, db),
+  ])
+
+  const bridged = parent.coreLearnerIds.length
+    ? await repos.teachers.findLegacyStudentsByExternalIds(parent.coreLearnerIds)
+    : []
+
+  const merged = new Set<string>()
+  for (const row of legacyRows ?? []) merged.add(row.id as string)
+  for (const id of institutionalSelfIds) merged.add(id)
+  for (const row of bridged) merged.add(row.id)
+
+  return [...merged].map(asStudentId)
 }
 
 /** Thin wrapper over the existing canonical `getSchoolUser` — kept here so every identity lookup has one entry point. */
@@ -287,6 +400,22 @@ export async function resolveOwnCoreLearnerId(userId: string): Promise<LearnerId
   // Trust origin: `students.external_id`, which holds a `learners.id`. This is
   // the reverse of `resolveLegacyStudentId` — StudentId -> LearnerId — and the
   // one place in the codebase where that direction is resolved.
+  return asLearnerIdOrNull(row?.external_id ?? null)
+}
+
+/**
+ * Resolves the Core `learners.id` for an ALREADY-RESOLVED `students.id` —
+ * the same students.external_id -> learners.id bridge
+ * {@link resolveOwnCoreLearnerId} performs, but for a caller that has
+ * already done its own ownership resolution (e.g. Phase 1's institutional-
+ * compatibility branch, which resolves a legacy-space `students.id` through
+ * a different path than the "find owned" scan above) and only needs the
+ * reverse bridge, not a second ownership decision. Returns `null` for a
+ * Solo/legacy-only student never onboarded through Core — a legitimate,
+ * common state, not an error (lib/studentHome/composeStudentHome.ts, Phase 7).
+ */
+export async function resolveCoreLearnerIdForStudentId(studentId: string): Promise<LearnerId | null> {
+  const [row] = await repos.teachers.findExternalIdsByStudentIds([studentId])
   return asLearnerIdOrNull(row?.external_id ?? null)
 }
 

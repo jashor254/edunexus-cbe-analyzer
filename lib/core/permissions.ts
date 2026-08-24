@@ -30,12 +30,14 @@ import {
   resolveStudent,
   resolveParent,
   resolveLegacyStudentId,
+  resolveCoreLearnerIdForStudentId,
   resolveTeachingTenure,
   resolveCurrentTenureForCompatibilityClass,
+  resolveOwnedLegacyStudentIds,
   type CurrentUser,
   type ResolvedMembership,
 } from '@/lib/core/identity'
-import { identityIsIn, type LearnerId, type StudentId, type AnyLearnerIdentity } from '@/lib/core/identityTypes'
+import { identityIsIn, asStudentId, type LearnerId, type StudentId, type AnyLearnerIdentity } from '@/lib/core/identityTypes'
 import {
   UnauthorizedError,
   MembershipRequiredError,
@@ -226,6 +228,43 @@ export async function requireParent(client: SupabaseClient, studentId: AnyLearne
   const isLinked = identityIsIn(parent.studentIds, studentId) || identityIsIn(parent.coreLearnerIds, studentId)
   if (!isLinked) throw new ResourceOwnershipError('You are not a registered guardian of this learner.')
   return user
+}
+
+/**
+ * {@link requireParent} variant for a caller holding a legacy `students.id`
+ * that may be a Phase 1C compatibility row for a Core learner the guardian
+ * links ONLY via `learner_guardians` — never via `students.parent_user_id`
+ * (Parent Portal Phase P1, following up P0 §26/§36's flagged-but-unverified
+ * suspicion about `/child/[learnerId]/assignments` and `/gradebook`).
+ *
+ * `requireParent`'s own check can't see this case: `resolveParent`'s
+ * `studentIds` is populated ONLY from `parent_user_id`, and a bridged
+ * compatibility id is a different UUID entirely from any `coreLearnerIds`
+ * entry (`students.id` vs. `learners.id`, never equal even though one
+ * bridges to the other via `students.external_id`) — `identityIsIn`'s plain
+ * string-membership test can never match it directly. Confirmed live: the
+ * `/child/[learnerId]/assignments` and `/gradebook` pages pass this exact
+ * bridged id to `/api/student/assignments` and `/api/parent/gradebook`
+ * respectively, after the PAGE's own `requireParent(learnerId)` already
+ * succeeded — an institutional-only guardian would pass the page and then
+ * get a 403 from the API underneath it.
+ *
+ * Tries the direct check first (unchanged for every legacy-linked caller,
+ * zero extra cost), and only on failure resolves the reverse bridge
+ * ({@link resolveCoreLearnerIdForStudentId}) and re-checks against that
+ * Core learner id. Additive only: a legacy-only guardian's access is
+ * exactly what {@link requireParent} already granted; this only adds a
+ * second, independent path to an ALLOW, never a new path to a DENY.
+ */
+export async function requireParentOfLegacyStudent(client: SupabaseClient, studentId: StudentId): Promise<CurrentUser> {
+  try {
+    return await requireParent(client, studentId)
+  } catch (err) {
+    if (!(err instanceof ResourceOwnershipError)) throw err
+    const coreLearnerId = await resolveCoreLearnerIdForStudentId(studentId)
+    if (!coreLearnerId) throw err
+    return await requireParent(client, coreLearnerId)
+  }
 }
 
 /** Throws {@link ResourceOwnershipError} unless the authenticated user's own student record is `studentId` (student-portal self-access). */
@@ -430,6 +469,34 @@ async function isCurrentTeacherOfStudent(teacherId: string, studentId: string): 
  * satisfied by a teacher at a different school. Isolation for the Core-space
  * branches above (self/admin/parent) is unaffected by this change.
  */
+/**
+ * Authorizes `userId` against a legacy-keyed `students.id` for a
+ * learner-portal feature that operates entirely in that identity space —
+ * Compass and Career Intelligence, per the Phase 0 audit's finding that
+ * both key exclusively on `students.id` and neither consults Core
+ * `learners`/`learner_accounts` at all. Built on
+ * {@link resolveOwnedLegacyStudentIds} (identity.ts) — this function makes
+ * no table query of its own (Engineering Rule 4): every Compass/Career route
+ * that used to re-derive `student.user_id === userId` (and sometimes
+ * `parent_user_id`) inline now calls this one function instead, so the two
+ * identity spaces (legacy self/parent link, institutional Phase 1C
+ * compatibility bridge) are checked identically everywhere, not
+ * independently per route.
+ *
+ * `includeParent` defaults to `false` — most of these routes only ever
+ * authorized the learner themselves; pass `true` only where the existing
+ * route already extended that to the parent (`career/capability`), to keep
+ * this a pure widening of identity SPACE, not of WHO within it.
+ */
+export async function canAccessLegacyStudent(
+  userId: string,
+  studentId: string,
+  opts: { includeParent?: boolean } = {}
+): Promise<boolean> {
+  const owned = await resolveOwnedLegacyStudentIds(userId, undefined, opts)
+  return identityIsIn(owned, asStudentId(studentId))
+}
+
 export async function canViewLearner(client: SupabaseClient, schoolId: string, studentId: StudentId): Promise<boolean> {
   const user = await requireAuthentication(client)
 
