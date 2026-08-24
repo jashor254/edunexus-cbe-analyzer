@@ -50,10 +50,11 @@ interface Assignment {
 }
 
 interface StudentData {
-  id:        string
-  firstName: string
-  grade:     number
-  subjects:  SubjectCard[]
+  id:         string
+  firstName:  string
+  grade:      number
+  subjects:   SubjectCard[]
+  viewerRole: ViewerRole
 }
 
 interface Message {
@@ -77,6 +78,14 @@ interface StudentSummaryCard {
   grade:     number
 }
 
+// Parent Portal Phase P3 Step 6 — who is viewing this Compass screen.
+// 'parent' means a guardian viewing on the learner's behalf: `/api/learn`
+// POST is already blocked server-side for this role (Phase P2's
+// `resolveCompassMutationAccess`), so the UI renders subject cards as
+// read-only instead of letting a parent tap into a session that will only
+// 403 after the fact.
+type ViewerRole = 'parent' | 'learner' | 'teacher'
+
 type StudentApiResponse = {
   id:              string
   firstName:       string
@@ -86,6 +95,7 @@ type StudentApiResponse = {
   subjects:        Array<{ key: string; level: Level; recommended: boolean; teacherSuggested: boolean; subtopic: string | null }>
   needsAssessment?: boolean
   hasTeacher?:      boolean
+  viewerRole?:      ViewerRole
 }
 
 type StudentListApiResponse = {
@@ -341,10 +351,11 @@ function LearnContent() {
 
         const studentId = d.id
         setStudent({
-          id:        studentId,
-          firstName: d.firstName,
-          grade:     d.grade,
-          subjects:  d.subjects.map(s => ({ ...s, label: toLabel(s.key) })),
+          id:         studentId,
+          firstName:  d.firstName,
+          grade:      d.grade,
+          subjects:   d.subjects.map(s => ({ ...s, label: toLabel(s.key) })),
+          viewerRole: d.viewerRole ?? 'learner',
         })
 
         // Fetch assignments in parallel
@@ -379,10 +390,11 @@ function LearnContent() {
       }
 
       setStudent({
-        id:        d.id,
-        firstName: d.firstName,
-        grade:     d.grade,
-        subjects:  d.subjects.map(s => ({ ...s, label: toLabel(s.key) })),
+        id:         d.id,
+        firstName:  d.firstName,
+        grade:      d.grade,
+        subjects:   d.subjects.map(s => ({ ...s, label: toLabel(s.key) })),
+        viewerRole: d.viewerRole ?? 'learner',
       })
       fetch(`/api/student/assignments?studentId=${d.id}`, { credentials: 'include' })
         .then(r => r.json())
@@ -457,6 +469,10 @@ function LearnContent() {
 
   // Start session — sends the opening message automatically
   const startSession = useCallback(async (card: SubjectCard) => {
+    // Parent Portal Phase P3 Step 6 — client-side mirror of Phase P2's
+    // server-side `resolveCompassMutationAccess` block: a parent viewing on
+    // the learner's behalf never gets as far as the POST that would 403.
+    if (student?.viewerRole === 'parent') return
     setActiveSubject(card)
     setMessages([])
     setConversationHistory([])
@@ -997,7 +1013,9 @@ function LearnContent() {
           <div className="max-w-lg mx-auto">
             <div className="flex items-start justify-between mb-1">
               <h2 className="text-2xl font-black text-white">
-                Hey {student?.firstName ?? 'there'}.
+                {student?.viewerRole === 'parent'
+                  ? `${student.firstName}'s Learning Compass`
+                  : `Hey ${student?.firstName ?? 'there'}.`}
               </h2>
               {/* Session count — shown after completing a session */}
               {sessionResult && sessionResult.totalSessions >= 1 && (
@@ -1007,7 +1025,30 @@ function LearnContent() {
                 </div>
               )}
             </div>
-            <p className="text-white/50 text-sm mb-6">What would you like to work on today?</p>
+            <p className="text-white/50 text-sm mb-6">
+              {student?.viewerRole === 'parent'
+                ? "Here's what they're working on."
+                : 'What would you like to work on today?'}
+            </p>
+
+            {/* Parent Portal Phase P3 Step 6 — a parent viewing on their
+                child's behalf can see the subject list but cannot start a
+                session here (Phase P2's resolveCompassMutationAccess
+                already blocks this server-side; this makes the same
+                boundary honest up front instead of after a 403). */}
+            {student?.viewerRole === 'parent' && (
+              <div className="mb-6 px-4 py-3 bg-violet-500/10 border border-violet-500/25 rounded-2xl flex items-start gap-3">
+                <div className="w-7 h-7 shrink-0 bg-violet-500/20 rounded-full flex items-center justify-center mt-0.5">
+                  <Compass className="w-3.5 h-3.5 text-violet-400" />
+                </div>
+                <div>
+                  <p className="text-violet-200 text-sm font-bold">You&apos;re viewing on {student.firstName}&apos;s behalf</p>
+                  <p className="text-violet-200/60 text-xs mt-0.5">
+                    Compass sessions are for {student.firstName} to do themselves. Subjects below show their current level — tap Compass Progress from their Home page for full session history.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Teacher recommendation banner */}
             {student?.subjects.some(s => s.teacherSuggested) && (
@@ -1056,8 +1097,12 @@ function LearnContent() {
                   <button
                     key={card.key}
                     onClick={() => startSession(card)}
+                    disabled={student!.viewerRole === 'parent'}
+                    aria-disabled={student!.viewerRole === 'parent'}
                     className={`group w-full flex items-center justify-between px-4 py-4 border rounded-2xl text-left transition-all ${
-                      card.teacherSuggested
+                      student!.viewerRole === 'parent'
+                        ? 'bg-white/3 border-white/5 cursor-default'
+                        : card.teacherSuggested
                         ? 'bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20'
                         : 'bg-white/5 hover:bg-violet-500/10 border-white/8 hover:border-violet-500/30'
                     }`}

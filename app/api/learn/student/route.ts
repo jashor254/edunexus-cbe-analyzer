@@ -4,8 +4,9 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiForbidden } from '@/lib/api/response'
 import { tierToLevel } from '@/lib/compass/session'
 import { readCompassAcademicProjection, resolveCompassSubjectRanking } from '@/lib/compass/learnerContext'
-import { resolveCompassStudentAccess } from '@/lib/compass/ownership'
+import { resolveCompassStudentAccess, type OwnershipVia } from '@/lib/compass/ownership'
 import { repos } from '@/lib/repositories'
+import { resolveCurrentInstitutionalCompatibilityStudentId } from '@/lib/core/assignmentDiscovery'
 
 function formatFirstName(name: string | null): string {
   return ((name ?? '').split(' ')[0] || 'there')
@@ -61,7 +62,7 @@ export async function GET(req: Request) {
     }
     if (!data) return apiError('Student not found', 404)
 
-    return await shapeAndReturn(data as Record<string, unknown>)
+    return await shapeAndReturn(data as Record<string, unknown>, ownership.via)
   }
 
   // ── Auto-select or picker ────────────────────────────────────────────────────
@@ -75,6 +76,25 @@ export async function GET(req: Request) {
     console.error('[learn/student] list error:', err)
     return apiError('Failed to load students', 500)
   }
+
+  // Institutional (Core learner_accounts) learners have no `user_id`/
+  // `parent_user_id` on their Phase 1C compatibility `students` row, so
+  // findOwnedStudents above always returns empty for them (Phase 1 —
+  // Institutional Identity Convergence). Fall back to their current
+  // compatibility student the same way app/api/student/home/route.ts and
+  // app/api/students/list/route.ts already do.
+  if (!allStudents || allStudents.length === 0) {
+    const compatStudentId = await resolveCurrentInstitutionalCompatibilityStudentId(user.id)
+    if (compatStudentId) {
+      const { data: compatStudent } = await db
+        .from('students')
+        .select('id, name, grade')
+        .eq('id', compatStudentId)
+        .maybeSingle()
+      if (compatStudent) allStudents = [compatStudent]
+    }
+  }
+
   if (!allStudents || allStudents.length === 0) return apiError('Student not found', 404)
 
   // 2+ students → return picker list for the frontend to render a selector
@@ -100,7 +120,14 @@ export async function GET(req: Request) {
   }
   if (!data) return apiError('Student not found', 404)
 
-  return await shapeAndReturn(data as Record<string, unknown>)
+  // Parent Portal Phase P3 — a single auto-selected student still needs a
+  // viewer role for the `/learn` client to know whether it's rendering for
+  // the learner or a parent viewing on the learner's behalf (Step 6).
+  // `findOwnedStudents` above already proves ownership; this is one extra
+  // resolution to recover WHICH relationship, not a new access check — a
+  // parent already couldn't reach this branch without being authorized.
+  const ownership = await resolveCompassStudentAccess(user.id, allStudents[0].id as string)
+  return await shapeAndReturn(data as Record<string, unknown>, ownership.allowed ? ownership.via : 'learner')
 }
 
 // ── Shape a fully-fetched student row into the API response ───────────────────
@@ -111,7 +138,16 @@ export async function GET(req: Request) {
 // `getNextSubject()` uses for ranking. All three switched together
 // deliberately — a learner must not see "Level 2" on a card and then be
 // taught at Level 3 in the session that card opens.
-async function shapeAndReturn(data: Record<string, unknown>) {
+async function shapeAndReturn(data: Record<string, unknown>, via: OwnershipVia) {
+  // Parent Portal Phase P3 Step 6 — the `/learn` client renders differently
+  // for a parent viewing their child's Compass than for the learner (or a
+  // teacher running a diagnostic session): a parent may see the subject
+  // list but not start a session (`resolveCompassMutationAccess`, Phase
+  // P2, already enforces this server-side on `/api/learn` POST — this
+  // field only lets the UI present that boundary honestly up front instead
+  // of after a 403).
+  const viewerRole: 'parent' | 'learner' | 'teacher' = via === 'parent' ? 'parent' : via === 'learner' ? 'learner' : 'teacher'
+
   const raw = data.student_learning_context
   const ctx = (Array.isArray(raw) ? raw[0] : raw) as Record<string, unknown> | null
 
@@ -175,6 +211,7 @@ async function shapeAndReturn(data: Record<string, unknown>) {
       subjects:        [],
       needsAssessment: true,
       hasTeacher:      Boolean(data.teacher_id),
+      viewerRole,
     })
   }
 
@@ -223,5 +260,6 @@ async function shapeAndReturn(data: Record<string, unknown>) {
     isJunior,
     pathway:   pathwayRaw,
     subjects,
+    viewerRole,
   })
 }
