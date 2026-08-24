@@ -7,6 +7,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
 import { requireAuthentication } from '@/lib/core/permissions'
 import { UnauthorizedError } from '@/lib/core/errors'
+import { resolveFamilyStudentIds } from '@/lib/core/identity'
 
 export async function GET() {
   try {
@@ -21,12 +22,10 @@ export async function GET() {
 
     const db = createServiceClient()
 
-    const { data: students } = await db
-      .from('students')
-      .select('id')
-      .or(`user_id.eq.${userId},parent_user_id.eq.${userId}`)
-
-    const studentIds = (students ?? []).map(s => s.id)
+    // Parent Portal Phase P1: legacy self+parent, institutional self, AND
+    // institutional GUARDIAN — see lib/core/identity.ts's
+    // resolveFamilyStudentIds for the full rationale (P0 §26).
+    const studentIds = await resolveFamilyStudentIds(userId, db)
     if (!studentIds.length) return apiSuccess({ materials: [] })
 
     const { data: classLinks } = await db

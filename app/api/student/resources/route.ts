@@ -8,7 +8,8 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
 import { requireAuthentication } from '@/lib/core/permissions'
 import { UnauthorizedError } from '@/lib/core/errors'
-import { resolveInstitutionalCompatibilityStudentIds, listAssignmentsForAuthenticatedLearner } from '@/lib/core/assignmentDiscovery'
+import { resolveFamilyStudentIds } from '@/lib/core/identity'
+import { listAssignmentsForAuthenticatedLearner } from '@/lib/core/assignmentDiscovery'
 
 export async function GET() {
   try {
@@ -23,19 +24,12 @@ export async function GET() {
 
     const db = createServiceClient()
 
-    const { data: students } = await db
-      .from('students')
-      .select('id')
-      .or(`user_id.eq.${userId},parent_user_id.eq.${userId}`)
-
-    // Phase 2 — Step 25: additive institutional branch. A compatibility
-    // student (Phase 1C) never has `user_id`/`parent_user_id` set, so it can
-    // never appear in the legacy query above — union, not override, keeps
-    // Solo/parent behavior byte-for-byte unchanged (Step 18) while adding
-    // institutional coverage for a learner with no legacy `students` row at all.
-    const institutionalStudentIds = await resolveInstitutionalCompatibilityStudentIds(userId)
-
-    const studentIds = [...new Set([...(students ?? []).map(s => s.id), ...institutionalStudentIds])]
+    // Parent Portal Phase P1: legacy self+parent, institutional self, AND
+    // institutional GUARDIAN (a Core-only guardian's linked learners,
+    // bridged to their compatibility `students.id`) — the union this route
+    // was missing a third of (P0 §26). Byte-identical for every caller this
+    // route already served correctly.
+    const studentIds = await resolveFamilyStudentIds(userId, db)
     if (!studentIds.length) return apiSuccess({ resources: [] })
 
     const { data: classLinks } = await db
