@@ -13,6 +13,7 @@ import { UnauthorizedError, ResourceOwnershipError } from '@/lib/core/errors'
 import { repos } from '@/lib/repositories'
 import StudentHolidayPlan from '@/components/student/StudentHolidayPlan'
 import { asLearnerId } from '@/lib/core/identityTypes'
+import ChildContextHeader from '@/components/parent/ChildContextHeader'
 
 export default async function ParentHolidayPage({
   params,
@@ -50,6 +51,7 @@ export default async function ParentHolidayPage({
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
+      <ChildContextHeader learnerId={learnerId} />
       <Link href={`/child/${learnerId}`} className="text-sm text-gray-400 hover:text-gray-600 font-medium">
         ← Back
       </Link>

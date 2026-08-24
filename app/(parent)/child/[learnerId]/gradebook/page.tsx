@@ -10,6 +10,7 @@ import { UnauthorizedError, ResourceOwnershipError } from '@/lib/core/errors'
 import { repos } from '@/lib/repositories'
 import ParentGradebookClient from './ParentGradebookClient'
 import { asLearnerId } from '@/lib/core/identityTypes'
+import ChildContextHeader from '@/components/parent/ChildContextHeader'
 
 export default async function ParentGradebookPage({
   params,
@@ -47,6 +48,7 @@ export default async function ParentGradebookPage({
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
+      <ChildContextHeader learnerId={learnerId} />
       <div className="mb-6">
         <Link href={`/child/${learnerId}`} className="text-sm text-gray-400 hover:text-gray-600 font-medium">
           ← Back

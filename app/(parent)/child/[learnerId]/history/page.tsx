@@ -19,6 +19,7 @@ import type { BlueprintSnapshotType } from '@/lib/repositories/blueprintSnapshot
 import { compareSnapshots } from '@/lib/parentExperience/growthTimeline'
 import { PARENT_STATUS_LABEL } from '@/lib/parentExperience/terminology'
 import { asLearnerId } from '@/lib/core/identityTypes'
+import ChildContextHeader from '@/components/parent/ChildContextHeader'
 
 const SNAPSHOT_TYPE_LABEL: Record<BlueprintSnapshotType, string> = {
   report_card_publication: 'Report Card Time',
@@ -71,6 +72,7 @@ export default async function ParentGrowthTimelinePage({
 
   return (
     <div className="max-w-2xl mx-auto space-y-3 py-6 px-4">
+      <ChildContextHeader learnerId={learnerId} />
       <div className="mb-4">
         <h1 className="text-lg font-black text-gray-900">Growth Timeline</h1>
         <p className="text-xs text-gray-400">Every recorded moment in your child&apos;s learning journey, newest first.</p>

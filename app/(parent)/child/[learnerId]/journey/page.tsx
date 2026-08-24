@@ -17,6 +17,7 @@ import { repos } from '@/lib/repositories'
 import { listBlueprintSnapshots } from '@/lib/learnerBlueprint/snapshot'
 import { buildMilestones } from '@/lib/parentExperience/growthTimeline'
 import { asLearnerId } from '@/lib/core/identityTypes'
+import ChildContextHeader from '@/components/parent/ChildContextHeader'
 
 export default async function ParentGrowthJourneyPage({
   params,
@@ -65,6 +66,7 @@ export default async function ParentGrowthJourneyPage({
 
   return (
     <div className="max-w-2xl mx-auto space-y-3 py-6 px-4">
+      <ChildContextHeader learnerId={learnerId} />
       <div className="mb-4">
         <h1 className="text-lg font-black text-gray-900">How Has My Child Grown?</h1>
         <p className="text-xs text-gray-400">A look at the key moments that make up your child&apos;s learning journey so far.</p>
