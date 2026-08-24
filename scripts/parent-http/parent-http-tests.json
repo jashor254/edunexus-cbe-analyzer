@@ -4,6 +4,7 @@
     "lib/testing/parentPortalP1Convergence.http.integration.test.ts",
     "lib/testing/parentExperienceConvergence.http.integration.test.ts",
     "lib/testing/parentCompassActorBoundary.http.integration.test.ts",
-    "lib/testing/parentChildContextConvergence.http.integration.test.ts"
+    "lib/testing/parentChildContextConvergence.http.integration.test.ts",
+    "lib/testing/parentLearnViewerRole.http.integration.test.ts"
   ]
 }
