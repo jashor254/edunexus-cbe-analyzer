@@ -673,7 +673,7 @@ function StudentCard({
             </p>
             <a
               href={`https://wa.me/?text=${encodeURIComponent(
-                `Hi! I'm using EduNexus for ${student.name} — it's an AI learning platform for CBC students that gives personalised tutoring and clinical performance reports.\n\nWhen their teacher is on EduNexus too, the platform aligns directly with what's being taught in class and I get notified the moment work is marked.\n\nWould you consider joining? It's completely free for teachers:\nhttps://edunexus.co.ke/signup?role=teacher\n\nThank you! 🙏`
+                `Hi! I'm using EduNexus for ${student.name} — it's an AI learning platform for CBC students that gives personalised tutoring and Learner Intelligence Reports.\n\nWhen their teacher is on EduNexus too, the platform aligns directly with what's being taught in class and I get notified the moment work is marked.\n\nWould you consider joining? It's completely free for teachers:\nhttps://edunexus.co.ke/signup?role=teacher\n\nThank you! 🙏`
               )}`}
               target="_blank"
               rel="noopener noreferrer"
@@ -1199,8 +1199,8 @@ export default function DashboardPage() {
               },
               {
                 icon: BarChart3,
-                title: 'Academic Clinic',
-                sub: 'Clinic reports · parent verified',
+                title: 'Learner Intelligence Reports',
+                sub: 'Parent verified',
                 gradient: 'from-violet-500 to-purple-500',
                 shadow: 'shadow-violet-500/20',
                 href: '/dashboard/clinic',
@@ -1430,7 +1430,7 @@ export default function DashboardPage() {
           <div className="bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-200 rounded-2xl p-6 text-center">
             <p className="font-black text-slate-900 text-lg mb-2">🚀 Ready to unlock full access?</p>
             <p className="text-slate-500 mb-5 text-sm">
-              Get unlimited Learning Compass sessions, Academic Clinic reports, and more.
+              Get unlimited Learning Compass sessions, Learner Intelligence Reports, and more.
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <Link

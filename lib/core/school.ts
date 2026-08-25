@@ -41,7 +41,7 @@ export async function createSchool(
     actor_id:        creatorUserId,
     payload:         { school_name: school.school_name, school_type: school.school_type, county: school.county },
     idempotency_key: `organization.created:${school.id}`,
-  }).catch(err => console.error('[events] organization.created:', err instanceof Error ? err.message : String(err)))
+  }).catch(err => logger.warn('[events] organization.created publish failed', { event_type: 'organization.created' }, err))
 
   const schoolUser = await addSchoolUser(school.id, creatorUserId, 'school_admin', creatorUserId)
   return { school, schoolUser }

@@ -46,7 +46,7 @@ const steps: Step[] = [
     highlight: '✨ First session is on us — no card needed',
   },
   {
-    title: 'Academic Clinic Reports 📊',
+    title: 'Learner Intelligence Reports 📊',
     description:
       'Personalised reports that pinpoint exactly which competency strands your child is struggling with. Share with their teacher in one click.',
     icon: '📊',

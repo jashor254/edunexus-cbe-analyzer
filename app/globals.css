@@ -24,6 +24,16 @@
   --color-nexusteal-600: #00897a;
 
   --color-nexus-ink: #0e1322;
+
+  /* Brass — the one primary "take action" color across the marketing
+     site, distinct from trustblue/amber/teal which identify audience
+     (school/teacher/family). A muted institutional gold reads as
+     academic prestige rather than generic tech-SaaS teal. */
+  --color-brass-300: #e6cf9c;
+  --color-brass-400: #d8b876;
+  --color-brass-500: #c9a255;
+  --color-brass-600: #a9843f;
+  --color-brass-700: #866831;
 }
 
 @media (prefers-color-scheme: dark) {

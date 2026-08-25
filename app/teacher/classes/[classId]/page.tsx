@@ -1157,10 +1157,10 @@ function ClinicReportsTab({
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 className="font-black text-violet-800 mb-1 flex items-center gap-2 text-base">
-              <FlaskConical className="w-5 h-5" /> Academic Clinic Reports
+              <FlaskConical className="w-5 h-5" /> Learner Intelligence Reports
             </h3>
             <p className="text-sm text-violet-700">
-              Generate a 7-page diagnostic report per student. Parents receive WhatsApp + email automatically.
+              Generate a Learner Intelligence Report per student. Parents receive WhatsApp + email automatically.
             </p>
           </div>
           {phase === 'idle' && eligible.length > 0 && (
@@ -1210,7 +1210,7 @@ function ClinicReportsTab({
           <h4 className="font-black text-gray-800 mb-3">What this does:</h4>
           <ul className="space-y-2 text-sm text-gray-600">
             {[
-              'Generates a 7-page Academic Clinic Report per student',
+              'Generates a Learner Intelligence Report per student',
               'Sends WhatsApp message to parent with report summary',
               'Sends email with PDF report attached to parent',
               'Sets up personalised Learning Compass session for every student',
@@ -1272,7 +1272,7 @@ function ClinicReportsTab({
         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
             <h3 className="font-black text-gray-900">
-              {phase === 'running' ? 'Generating Academic Clinic Reports…' : '✅ Reports Complete'}
+              {phase === 'running' ? 'Generating Learner Intelligence Reports…' : '✅ Reports Complete'}
             </h3>
             {phase === 'running' && (
               <span className="text-sm text-gray-500">
@@ -1439,7 +1439,7 @@ type MondayStudent = {
   student_id:         string
   student_name:       string
   risk_level:         string
-  top_flags:          Array<{ type: string; detail: string }>
+  top_flags:          Array<{ subject: string; severity: string; reason: string }>
   action:             string
   compass_suggestion: string | null
   peer_pairing:       string | null

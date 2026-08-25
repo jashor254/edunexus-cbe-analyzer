@@ -75,7 +75,6 @@ export default function SOWPage() {
         {step === 3 && (
           <Step3Structure
             onComplete={(ls, ts) => {
-              console.log('[page] Step3 complete, lessonsPerWeek:', ts.lessonsPerWeek)
               setLessonStructure(ls)
               setTermSchedule(ts)
               setTimeline(applyBreaksToSchedule(ts, []))

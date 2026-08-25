@@ -1,5 +1,6 @@
 import { repos } from '@/lib/repositories'
 import { publishEvent } from '@/lib/events'
+import { logger } from '@/lib/observability/logger'
 import { SchoolMismatchError, ValidationError } from '@/lib/core/errors'
 import type { SchoolUser, SchoolUserRole } from '@/types/core'
 
@@ -37,7 +38,7 @@ export async function addSchoolUser(
       school_id:      schoolId,
     },
     idempotency_key: `organization.member.invited:${schoolUser.id}`,
-  }).catch(err => console.error('[events] organization.member.invited:', err instanceof Error ? err.message : String(err)))
+  }).catch(err => logger.warn('[events] organization.member.invited publish failed', { event_type: 'organization.member.invited' }, err))
 
   return schoolUser
 }

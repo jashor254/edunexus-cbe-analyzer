@@ -1396,5 +1396,3 @@ export class AssessmentRepository extends BaseRepository {
     }
   }
 }
-
-export const assessmentRepository = new AssessmentRepository()

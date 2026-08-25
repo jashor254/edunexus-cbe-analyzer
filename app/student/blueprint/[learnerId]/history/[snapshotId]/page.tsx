@@ -75,6 +75,9 @@ export default async function BlueprintSnapshotPage({
       blueprint={snapshot.blueprint_payload}
       validation={validateBlueprint(snapshot.blueprint_payload)}
       learnerId={learnerId}
+      // Gated above by requireSchoolStaff — this page is never reached by a
+      // student or parent viewer, so 'teacher' is not a guess.
+      viewer="teacher"
       historicalMeta={{
         snapshotId: snapshot.id,
         snapshotDate: snapshot.created_at,

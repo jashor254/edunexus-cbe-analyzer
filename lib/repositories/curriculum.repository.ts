@@ -618,5 +618,3 @@ export class CurriculumRepository extends BaseRepository {
     return (data ?? []) as Array<{ id: string; title: string; subject: string; grade: number; strand: string; sub_strand: string }>
   }
 }
-
-export const curriculumRepository = new CurriculumRepository()
