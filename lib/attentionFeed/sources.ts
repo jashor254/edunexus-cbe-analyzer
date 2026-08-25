@@ -21,6 +21,19 @@ function riskToSeverity(risk: RiskLevel): AttentionSeverity | null {
 }
 
 /**
+ * Phase 3.5 (Risk Consumer Convergence): reads a top_flags entry's reason
+ * text across both shapes — Projection's current `{reason}` and the legacy
+ * `{detail}` shape a monday_panel_cache row written before this migration
+ * may still carry (this table has no freshness filter in
+ * fetchMondayPanelRows, unlike the Monday Panel route's own 24h
+ * valid_until check). Returns '' for neither present, never `undefined`
+ * in the joined string.
+ */
+function readFlagReason(flag: { reason?: string; detail?: string }): string {
+  return flag.reason ?? flag.detail ?? ''
+}
+
+/**
  * Where a per-learner attention item sends the teacher.
  *
  * Every `student_id` reaching this module comes from the legacy space
@@ -210,7 +223,14 @@ export function mapMondayStudentRisk(rows: MondayPanelRow[]): AttentionItem[] {
     const week = weekBucketOf(row.generated_at)
     const withReason = (row.panel_data?.students_needing_attention ?? []).map((s: StudentIntelligenceSummary) => ({
       ...s,
-      reason: s.top_flags.map((f) => f.detail).join('; ') || s.action,
+      // Phase 3.5 — top_flags is now sourced from Projection's own RiskFlag
+      // ({subject, severity, reason}), not the legacy {type, detail} shape.
+      // monday_panel_cache rows written before this migration (this table
+      // has no freshness filter here, unlike the Monday Panel route's own
+      // 24h valid_until check) still carry the OLD shape until their class
+      // next regenerates a panel — read defensively so a stale cached row
+      // degrades to "" (falls through to s.action) rather than "undefined".
+      reason: s.top_flags.map((f) => readFlagReason(f)).filter(Boolean).join('; ') || s.action,
     }))
     const eligible = withReason.filter((s) => riskToSeverity(s.risk_level))
     const { individual, shared } = collapseSharedReasons<StudentIntelligenceSummary & { reason: string }>(eligible)

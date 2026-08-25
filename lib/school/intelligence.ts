@@ -25,6 +25,15 @@ import type {
 // oversight. avg_capability_dimensions must not be migrated by routing it
 // through the Blueprint/Career Intelligence capability adapter — that shim is
 // explicitly scoped to those two consumers only.
+//
+// Phase 3.5 (Risk Consumer Convergence): computeTeacherActivity()'s
+// `at_risk_students` count below is now sourced from the same Projection
+// Engine `computeSchoolIntelligence()` already uses above, for the same
+// reason — a Principal Dashboard render must not describe risk using two
+// different authorities for two different widgets. `at_risk_resolved`
+// (needs resolution/duration history) stays on legacy `risk_history`, same
+// documented gap as persistent_risk_count above — Projection is stateless
+// and has no concept of "resolved."
 
 // ── Main: compute full school intelligence ────────────────────────────────────
 
@@ -314,8 +323,19 @@ export async function computeTeacherActivity(
 
       const profiles = await repos.schools.findLearnerRiskProfiles(studentIds)
 
+      // Risk LEVEL: Projection Engine (same source computeSchoolIntelligence()
+      // uses), not the legacy p.overall_risk_level — see module header.
+      const riskLevels = await Promise.all(
+        studentIds.map(async id => {
+          const projection = await recomputeLearnerProjection(id)
+          return projection.risk?.value.overallRiskLevel ?? 'normal'
+        })
+      )
+      atRisk += riskLevels.filter(level => level === 'at_risk' || level === 'critical').length
+
+      // Resolution history has no Projection equivalent (stateless engine,
+      // no duration/resolution tracking) — stays on the legacy path.
       for (const p of profiles) {
-        if (['at_risk', 'critical'].includes(p.overall_risk_level as string)) atRisk++
         const history = (p.risk_history as Array<{ resolved_at?: string }>) ?? []
         if (history.some(r => r.resolved_at)) atRiskResolved++
       }

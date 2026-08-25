@@ -5,6 +5,15 @@
 // EIOS Principle: The Learner Model is the only permanent source of truth.
 // Every interaction either updates it, reads from it, validates it,
 // or improves confidence in it. Nothing bypasses it.
+//
+// Phase 3.5 (Risk Consumer Convergence) exception: StudentIntelligenceSummary's
+// `top_flags` below is intentionally typed against the canonical Projection
+// Engine's own RiskFlag (lib/projection/types.ts), not this file's legacy
+// RiskFlag — Monday Panel's risk level and its flag/detail text must describe
+// the SAME risk authority, never a level from one system and reasons from
+// another (see app/api/teacher/monday-panel/route.ts).
+
+import type { RiskFlag as ProjectionRiskFlag } from '@/lib/projection/types'
 
 export type RiskLevel = 'normal' | 'watch' | 'at_risk' | 'critical'
 
@@ -278,7 +287,8 @@ export type StudentIntelligenceSummary = {
   student_id:           string
   student_name:         string
   risk_level:           RiskLevel
-  top_flags:            RiskFlag[]
+  /** Sourced from the SAME Projection risk flags that determined risk_level — see module header. */
+  top_flags:            ProjectionRiskFlag[]
   action:               string          // one sentence: what to do
   peer_pairing?:        string          // who can help them and why
   compass_suggestion?:  string          // specific topic to assign

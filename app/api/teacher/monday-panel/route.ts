@@ -26,6 +26,7 @@ import type { LearnerIntelligenceProjection } from '@/lib/projection/types'
 import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissions'
 import { resolveTeacher } from '@/lib/core/identity'
 import { UnauthorizedError } from '@/lib/core/errors'
+import { buildAction } from './buildAction'
 
 export async function GET(req: Request): Promise<Response> {
   try {
@@ -126,9 +127,18 @@ export async function GET(req: Request): Promise<Response> {
       .sort((a, b) => riskOrder[projectionRisk(b.student_id)] - riskOrder[projectionRisk(a.student_id)])
       .slice(0, 8)
       .map(profile => {
-        const name    = nameMap.get(profile.student_id) ?? `Student (${profile.student_id.slice(-4)})`
-        const topFlag = profile.risk_flags?.[0]
-        const flags   = profile.risk_flags ?? []
+        const name = nameMap.get(profile.student_id) ?? `Student (${profile.student_id.slice(-4)})`
+
+        // Phase 3.5 — Risk Consumer Convergence: flags now come from the
+        // SAME Projection risk computation that determined this student's
+        // risk_level above (projectionRisk()), not the legacy
+        // learner_profiles.risk_flags — those two could previously describe
+        // different concerns for the same student (Phase 3 finding). A
+        // Projection-driven at_risk/critical entry always has >=1 flag by
+        // construction (riskProjector.ts derives overallRiskLevel FROM
+        // flags.length), so this is never empty for a student on this list.
+        const flags   = projections.get(profile.student_id)?.risk?.value.flags ?? []
+        const topFlag = flags[0]
 
         // How many consecutive weeks at risk — from risk_history. Duration
         // itself has no Projection equivalent (documented gap), but "is this
@@ -407,25 +417,6 @@ function buildTrajectoryMessage(
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function buildAction(
-  flag: { type: string; substrand?: string; detail: string } | undefined,
-  firstName: string
-): string {
-  if (!flag) return `Check in with ${firstName} this week — their profile is incomplete.`
-  switch (flag.type) {
-    case 'missing_prerequisite':
-      return `${firstName} is missing "${flag.substrand}". Re-teach this first — 15 minutes unlocks the next topic.`
-    case 'declining_performance':
-      return `${firstName}'s performance is declining. Brief one-on-one: ask what feels hard. Adjust pace or method before the next assessment.`
-    case 'multiple_weak_substrands':
-      return `${firstName} has multiple weak areas. Focus on one substrand at a time — start with the most recently taught.`
-    case 'disengaged':
-      return `${firstName} hasn't been active. A direct check-in today matters more than any Compass session. Personal contact first.`
-    default:
-      return `${firstName} needs attention: ${flag.detail.slice(0, 100)}`
-  }
-}
 
 function findWeakestDimension(dims: Record<string, { raw_score?: number }>): string | null {
   const order = [
