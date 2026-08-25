@@ -1,4 +1,31 @@
 // app/api/assessments/create/route.ts
+//
+// DEPRECATED — DEAD, SAFE REMOVAL CANDIDATE (Phase 5.5 audit, learner-
+// intelligence-authority series). Confirmed by convergent evidence, not a
+// single grep: zero UI callers found by direct source search across the
+// entire app/ tree; independently confirmed dead across six separate prior
+// audits already in this repo (docs/implementation-wave-3-educational-
+// truth-convergence.md, docs/architecture/adr-0029-addendum-h2d-capability-
+// convergence.md, docs/architecture/migration-ledger.md, docs/architecture/
+// learner-record-layer-review.md, docs/pilot-readiness-wave-1-teacher-
+// classroom-journey.md, docs/engineering/sprint-3-assessment-domain-
+// audit.md); the developer-portal's own public API documentation
+// (edunexus-devportal/content/docs/) never references it either, so it is
+// not an external contract. The real, live parent-facing assessment intake
+// (app/dashboard/assessments/add/page.tsx) writes directly to `assessments`
+// via a raw client-side insert (itself a separately-flagged architecture
+// issue, not this route's problem) and then calls
+// POST /api/parent/assessments/process, which DOES emit canonical Evidence
+// (recordReportCardAssessmentEvidence) — so today's real production
+// assessment-intake surfaces are Evidence-covered; only this specific,
+// apparently-uncalled route is not. This route itself was NOT extended to
+// emit Evidence (per the Phase 5.5 mandate: fix the writer only if it is
+// live) and was NOT deleted (repository convention throughout this
+// codebase's own prior audits is to flag, not silently remove, an
+// undecided legacy route — see sprint-3-assessment-domain-audit.md's own
+// "Not Yet Decided" status for this exact route). If a future audit
+// reconfirms zero callers and no external usage, this is the safe-removal
+// candidate to act on.
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
