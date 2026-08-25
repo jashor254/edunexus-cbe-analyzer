@@ -205,5 +205,3 @@ export class KnowledgeGraphRepository extends BaseRepository {
     return data ? { id: data.id as string, node_id: data.node_id as string, concept: data.name as string } : null
   }
 }
-
-export const knowledgeGraphRepository = new KnowledgeGraphRepository()

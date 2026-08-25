@@ -377,6 +377,43 @@ export class CareerRepository extends BaseRepository {
     return { queued: true, requestCount: 1 }
   }
 
+  /**
+   * Exact-identity dedup check, run BEFORE paying for another LLM call.
+   * Only a `pending` row is eligible for reuse — its payload is a still-valid,
+   * not-yet-decided AI draft. A `rejected`/`published` row for this slug is
+   * deliberately NOT reused here (a human already made a call on it; either
+   * it's canonical already — findCareerBySlug would have caught that upstream
+   * — or a reviewer rejected it and a fresh attempt is a separate judgment
+   * call, not this function's to make). This is identity-exact reuse (same
+   * slugify() output), never semantic/alias dedup — see
+   * docs/architecture/phase9-career-discovery-audit.md §6/§8.
+   */
+  async findPendingCareerReviewBySlug(slug: string): Promise<{
+    id: string
+    request_count: number
+    payload: Record<string, unknown> | null
+  } | null> {
+    const { data } = await this.db
+      .from('career_review_queue')
+      .select('id, request_count, payload')
+      .eq('slug', slug)
+      .eq('status', 'pending')
+      .maybeSingle()
+    if (!data) return null
+    return data as { id: string; request_count: number; payload: Record<string, unknown> | null }
+  }
+
+  /** Records another identical request against an already-queued pending review, with no new LLM call. */
+  async incrementCareerReviewDemand(id: string, currentRequestCount: number): Promise<number> {
+    const requestCount = currentRequestCount + 1
+    const { error } = await this.db
+      .from('career_review_queue')
+      .update({ request_count: requestCount, updated_at: new Date().toISOString() })
+      .eq('id', id)
+    if (error) throw new Error(`Failed to record career demand: ${error.message}`)
+    return requestCount
+  }
+
   /** Pending careers awaiting human review, most-requested first. */
   async listPendingCareerReviews(limit = 50): Promise<Array<{
     id: string
@@ -563,5 +600,3 @@ export class CareerRepository extends BaseRepository {
     if (error) throw new Error(`Failed to upsert clinic report: ${error.message}`)
   }
 }
-
-export const careerRepository = new CareerRepository()

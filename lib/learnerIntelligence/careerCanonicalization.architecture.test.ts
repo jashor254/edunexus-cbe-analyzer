@@ -98,7 +98,14 @@ test('the three former deprecated-path consumers now import the canonical Career
     path.join(ROOT, 'app/api/career/[slug]/route.ts'),
     path.join(ROOT, 'lib/career/clinicReportBuilder.ts'),
   ]
-  const canonicalImportPattern = /from ['"]@\/lib\/(learnerIntelligence\/careerIntelligence|career\/capabilityMatchEngine)['"]/
+  // Career Intelligence Canonical Boundary Purity Audit / small fix split
+  // lib/learnerIntelligence/careerIntelligence.ts into a pure reasoning
+  // module and a sibling lib/learnerIntelligence/careerIntelligenceOrchestration.ts
+  // for the DB/Projection/AI-backed operations (including
+  // resolveCanonicalCareerMatches, which these 3 files call) — both remain
+  // "the canonical Career service," never the deprecated path this test
+  // exists to keep gone.
+  const canonicalImportPattern = /from ['"]@\/lib\/(learnerIntelligence\/careerIntelligence(Orchestration)?|career\/capabilityMatchEngine)['"]/
 
   for (const file of migratedFiles) {
     const src = CONTENTS.get(file)
@@ -106,7 +113,7 @@ test('the three former deprecated-path consumers now import the canonical Career
     assert.match(
       src!,
       canonicalImportPattern,
-      `${path.relative(ROOT, file)} must import from the canonical Career service (lib/learnerIntelligence/careerIntelligence.ts or lib/career/capabilityMatchEngine.ts)`,
+      `${path.relative(ROOT, file)} must import from the canonical Career service (lib/learnerIntelligence/careerIntelligence.ts, lib/learnerIntelligence/careerIntelligenceOrchestration.ts, or lib/career/capabilityMatchEngine.ts)`,
     )
   }
 })

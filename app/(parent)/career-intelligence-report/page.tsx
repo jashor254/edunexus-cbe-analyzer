@@ -622,7 +622,7 @@ export default function CareerIntelligenceReportPage() {
                 className="inline-flex items-center gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold px-5 py-3 rounded-xl transition-all shadow-lg hover:shadow-violet-500/20 text-sm"
               >
                 <Zap className="w-4 h-4" />
-                Start Learning Compass
+                View Learning Compass Progress
               </Link>
             </div>
           </div>

@@ -64,11 +64,15 @@ test('no file under lib/learnerBlueprint/ (other than composeInnovation.ts and i
   assert.deepEqual(offenders.map(f => path.relative(ROOT, f)), [])
 })
 
-test('composeInnovation() reads only getInnovationsSummary — never the repository or raw tables directly', () => {
-  const content = readFileSync(path.join(ROOT, 'lib/learnerBlueprint/composeInnovation.ts'), 'utf8')
-  assert.doesNotMatch(content, /repos\.innovations|from ['"]@\/lib\/repositories\/innovation\.repository['"]/)
-  assert.match(content, /getInnovationsSummary/)
-})
+// composeInnovation.ts was deliberately deleted in 09e224c ("refactor: strip
+// over-engineering from the Blueprint pipeline") — Blueprint no longer
+// composes Projects/Competitions/Leadership/Innovations sections at all,
+// because none of the four has ever had a write path or page in app/ (see
+// composeBlueprint.ts's header comment). This domain's other boundary tests
+// above and below still hold; only the assertion that named the now-deleted
+// file is gone. If Innovation ever grows a real write path and regains a
+// Blueprint composer (composeBlueprint.ts calls this "a five-line change"),
+// restore an equivalent assertion against the new composer file.
 
 test('no file anywhere outside lib/learnerInnovation/ imports repos.innovations or the InnovationRepository, except its own registration in repositories/index.ts and the sanctioned Blueprint composer', () => {
   const allowed = new Set([

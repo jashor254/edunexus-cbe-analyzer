@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import JourneyLinks from '@/components/student/JourneyLinks'
 import {
@@ -205,7 +205,7 @@ function CapabilityMatchCard({ match }: { match: CapabilityCareerMatch }) {
 
   return (
     <Link
-      href={`/student/career/${match.career_slug}`}
+      href={`/student/career/${match.career_slug}?source=career_match`}
       className={`group block bg-gradient-to-br ${style.glow} border ${style.border} rounded-2xl p-5 hover:opacity-90 transition-all space-y-3`}
     >
       <div className="flex items-center justify-between gap-2">
@@ -446,7 +446,7 @@ function CareerCard({ career }: { career: CareerSummary }) {
 
   return (
     <Link
-      href={`/student/career/${career.slug}`}
+      href={`/student/career/${career.slug}?source=explorer`}
       className="group block bg-white/5 border border-white/10 rounded-2xl p-5 hover:bg-white/10 hover:border-violet-500/40 transition-all"
     >
       <div className="flex items-start justify-between gap-3 mb-3">
@@ -650,6 +650,37 @@ export default function CareerPage() {
 
   useEffect(() => { loadCareers() }, [loadCareers])
 
+  // Search demand telemetry (Phase 9.1) — deliberately decoupled from the
+  // fetch above so the real search stays exactly as responsive as it is
+  // today (no UX change). This reports the already-fetched result once the
+  // learner's query/filters have been stable for 600ms and a real response
+  // has landed — never once per keystroke, never a second DB search, never a
+  // trigger for unknown-career AI generation (it only reads `careers` state
+  // the fetch above already produced).
+  const lastTrackedKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (loading) return
+    const timer = setTimeout(() => {
+      const normalizedQuery = query.trim().toLowerCase().replace(/\s+/g, ' ')
+      const isMeaningfulSearch = normalizedQuery.length > 0 || Boolean(category) || Boolean(pathway)
+      if (!isMeaningfulSearch) return
+
+      const key = `${normalizedQuery}|${category}|${pathway}`
+      if (lastTrackedKeyRef.current === key) return
+      lastTrackedKeyRef.current = key
+
+      fetch('/api/career/search/track', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query, category, pathway,
+          resultCount: careers.length,
+        }),
+      }).catch(() => { /* telemetry only — never surface to the learner */ })
+    }, 600)
+    return () => clearTimeout(timer)
+  }, [query, category, pathway, careers, loading])
+
   return (
     <div className="min-h-screen bg-[#0a0a14]">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-10">
@@ -731,7 +762,7 @@ export default function CareerPage() {
                   </div>
                 )}
                 <p className="text-white/25 text-xs">
-                  Requires at least one assessment. Add assessments in the Academic Clinic first.
+                  Requires at least one assessment. Ask your teacher or parent to record one for you first.
                 </p>
               </div>
             )}

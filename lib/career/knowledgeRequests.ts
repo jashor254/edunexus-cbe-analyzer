@@ -35,14 +35,22 @@
 // educational actions: the system may propose, a human decides.
 
 import { repos } from '@/lib/repositories'
+import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
+import { logAICall } from '@/lib/ai/logger'
 import { generateCareerProfile, getCareerBySlug, slugify } from './careerEngine'
 import { buildProvisionalPreview } from './provisionalPreview'
 import type { ProvisionalCareerPreview } from './provisionalPreview'
 import type { Career } from './types'
 
+const AI_GENERATION_FEATURE = 'career_knowledge_request' as const
+
 export type CareerKnowledgeRequest =
   | { status: 'known'; career: Career }
   | { status: 'provisional'; preview: ProvisionalCareerPreview; newlyQueued: boolean; requestCount: number }
+  // Only reached on the AI-generation branch — canonical slug/title hits and
+  // exact-pending-queue reuse never touch the rate limit, so ordinary search
+  // is never rate-limited by this.
+  | { status: 'rate_limited'; resetAt: string }
 
 /**
  * Answer a learner's career query.
@@ -69,9 +77,66 @@ export async function requestCareerKnowledge(
   const byTitle = await repos.careers.findCareerByTitleLike(trimmed)
   if (byTitle) return { status: 'known', career: byTitle }
 
-  // Not in the corpus. Generate a candidate for a human to review — never for
-  // the learner to be shown as fact, and never for the match engine to use.
-  const generated = await generateCareerProfile(trimmed)
+  // Exact-identity dedup, BEFORE paying for another LLM call: someone else's
+  // (or this same learner's) earlier search for the identical slug is still
+  // sitting in the review queue, unreviewed — reuse that draft instead of
+  // generating a second one. See career.repository.ts's
+  // findPendingCareerReviewBySlug doc comment for why only `pending` rows
+  // qualify. This is NOT semantic dedup: "AI engineer" and "AI developer"
+  // still each pay for their own generation, deliberately (Phase 9 §8).
+  const existingPending = await repos.careers.findPendingCareerReviewBySlug(slug)
+  if (existingPending && existingPending.payload) {
+    const requestCount = await repos.careers.incrementCareerReviewDemand(
+      existingPending.id,
+      existingPending.request_count,
+    )
+    return {
+      status: 'provisional',
+      newlyQueued: false,
+      requestCount,
+      preview: buildProvisionalPreview(
+        existingPending.payload as unknown as Omit<Career, 'id' | 'created_at' | 'updated_at'>,
+      ),
+    }
+  }
+
+  // Not in the corpus and no reusable draft queued. This is the expensive,
+  // ungrounded path (Phase 9 §21/§22) — cap it per learner per day so a burst
+  // of distinct unknown queries can't create unbounded spend. Canonical
+  // search above this line is never affected.
+  if (requestedBy) {
+    const rateCheck = await checkDailyCallLimit(requestedBy, AI_GENERATION_FEATURE)
+    if (rateCheck.allowed === false) {
+      return { status: 'rate_limited', resetAt: rateCheck.resetAt }
+    }
+  }
+
+  // Generate a candidate for a human to review — never for the learner to be
+  // shown as fact, and never for the match engine to use.
+  const start = Date.now()
+  let generated: Awaited<ReturnType<typeof generateCareerProfile>>
+  try {
+    generated = await generateCareerProfile(trimmed)
+  } catch (err) {
+    await logAICall({
+      feature:   AI_GENERATION_FEATURE,
+      model:     'deepseek-chat',
+      prompt:    trimmed,
+      latencyMs: Date.now() - start,
+      success:   false,
+      error:     (err as Error).message,
+      userId:    requestedBy ?? undefined,
+    })
+    throw err
+  }
+  await logAICall({
+    feature:   AI_GENERATION_FEATURE,
+    model:     'deepseek-chat',
+    prompt:    trimmed,
+    latencyMs: Date.now() - start,
+    success:   true,
+    userId:    requestedBy ?? undefined,
+  })
 
   const { queued, requestCount } = await repos.careers.enqueueCareerReview({
     slug:         generated.slug,

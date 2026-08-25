@@ -4,10 +4,12 @@ import { useEffect, useState } from 'react'
 import { Loader2, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import type { ConfidenceLevel, Insight } from '@/lib/learnerIntelligence/insight'
 import type {
-  CareerIntelligence as CareerIntelligenceData,
   CareerFamilyInsight,
   CareerMatchInsight,
 } from '@/lib/learnerIntelligence/careerIntelligence'
+import type {
+  CareerIntelligence as CareerIntelligenceData,
+} from '@/lib/learnerIntelligence/careerIntelligenceOrchestration'
 
 const CONFIDENCE_STYLE: Record<ConfidenceLevel, string> = {
   High:   'bg-emerald-50 text-emerald-700 border-emerald-200',

@@ -8,7 +8,6 @@
 // The trend IS the signal.
 
 import { normalizeSubjectScores } from '@/lib/pathwayCalculator'
-import { repos } from '@/lib/repositories'
 import { COS_DISCLAIMER } from './types'
 import type {
   CapabilityProfile, CapabilityScore,
@@ -36,10 +35,17 @@ const COMMUNICATION_WEIGHTS: Record<string, number> = {
   kiswahili:                     0.30,
   social_studies:                0.12,
   history:                       0.10,
+  // 8-4-4's History & Government is a distinct subject from CBC's History &
+  // Citizenship (see SUBJECT_KEY_ALIASES in lib/pathwayCalculator.ts) but
+  // tests the same civics/communication-about-society skill — same weight.
+  history_and_government:        0.10,
   cre:                           0.08,
   christian_religious_education: 0.08,
   ire:                           0.08,
   islamic_religious_education:   0.08,
+  // HRE (Hindu Religious Education) is the third KCSE religion option
+  // alongside CRE/IRE, same subject category — same weight as those.
+  hre:                           0.08,
 }
 
 const CREATIVE_WEIGHTS: Record<string, number> = {
@@ -71,6 +77,13 @@ const SOCIAL_WEIGHTS: Record<string, number> = {
   christian_religious_education: 0.15,
   ire:                           0.15,
   islamic_religious_education:   0.15,
+  // HRE — same weight as CRE/IRE, same subject category.
+  hre:                           0.15,
+  // Business Studies (commerce/economics/accounting) is fundamentally about
+  // understanding markets, organisations and people transacting — social
+  // reasoning applied to commerce, not pure quantitative manipulation.
+  // Weighted alongside CRE/IRE/HRE as a supporting (not primary) contributor.
+  business_studies:              0.15,
   kiswahili:                     0.10,
   english:                       0.08,
 }
@@ -359,41 +372,6 @@ export function extractCapabilityProfile(
     assessment_count:  scoreHistory.length,
     disclaimer:        COS_DISCLAIMER,
   }
-}
-
-// ── Canonical capability computation ───────────────────────────────────────────
-// The single source of truth for "what is this student's capability profile
-// right now" from the `assessments` table. Every consumer that needs a
-// capability profile derived from assessment history — the Learner Model
-// (lib/learnerModel/updater.ts), the Career Operating System's persisted
-// profile (lib/career/careerEngine.ts), and the on-demand career/capability
-// API routes — calls this instead of independently querying `assessments`
-// and calling extractCapabilityProfile() themselves. This does not change
-// where results are persisted (each caller keeps its own storage target),
-// only how the input scoreHistory is built, so every persisted profile is
-// computed the same way for the same student at the same point in time.
-//
-// Returns null (never a fabricated profile) when there is no assessment
-// evidence yet — missing evidence is not negative evidence.
-export async function computeCapabilityProfile(
-  studentId:       string,
-  currentSnapshot?: Record<string, number>,
-): Promise<CapabilityProfile | null> {
-  const history = await repos.learnerModel.findAssessmentHistory(studentId)
-  const scoreHistory = history.map(r => r.subject_scores)
-
-  // A just-submitted assessment may not yet be visible to this query (read
-  // replica lag, or the caller has it in-hand before the write settles) —
-  // append it if it isn't already the most recent entry.
-  if (currentSnapshot && (
-    scoreHistory.length === 0 ||
-    JSON.stringify(scoreHistory[scoreHistory.length - 1]) !== JSON.stringify(currentSnapshot)
-  )) {
-    scoreHistory.push(currentSnapshot)
-  }
-
-  if (scoreHistory.length === 0) return null
-  return extractCapabilityProfile(scoreHistory)
 }
 
 // ── Capability narrative helpers ───────────────────────────────────────────────

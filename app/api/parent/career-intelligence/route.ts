@@ -6,7 +6,8 @@ import { apiSuccess, apiError, apiUnauthorized, apiBadRequest, apiNotFound } fro
 import { getAllCareersWithCOS } from '@/lib/career/careerEngine'
 import { computeCapabilityMatches } from '@/lib/career/capabilityMatchEngine'
 import { buildParentIntelligence } from '@/lib/career/parentIntelligence'
-import { careerModeForGrade, resolveFreshCapabilityProfile } from '@/lib/learnerIntelligence/careerIntelligence'
+import { careerModeForGrade } from '@/lib/learnerIntelligence/careerIntelligence'
+import { resolveFreshCapabilityProfile } from '@/lib/learnerIntelligence/careerIntelligenceOrchestration'
 import { requireAuthentication } from '@/lib/core/permissions'
 import { UnauthorizedError } from '@/lib/core/errors'
 

@@ -9,7 +9,7 @@ import { createClient } from '@/utils/supabase/server'
 import { isAdmin } from '@/lib/auth/isAdmin'
 import { getStudentAccessInfo } from '@/lib/learnerModel'
 import { isTeacherOfLearner } from '@/lib/api/middleware'
-import { buildCareerIntelligence } from '@/lib/learnerIntelligence/careerIntelligence'
+import { buildCareerIntelligence } from '@/lib/learnerIntelligence/careerIntelligenceOrchestration'
 
 const QuerySchema = z.object({
   studentId: z.string().uuid(),

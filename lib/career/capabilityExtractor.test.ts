@@ -158,6 +158,61 @@ test('CAP-004: current capability level reflects the most recent evidence, not a
   assert.equal(profile.analytical_reasoning.raw_score, 0, 'the current raw score is computed only from the most recent snapshot')
 })
 
+// ── 8-4-4 compatibility — real KCSE subjects contribute capability evidence ──
+//
+// Audit finding: Business Studies and History & Government (real, common
+// 8-4-4/KCSE subjects) previously had no entry in any weight map at all —
+// evidence for those subjects was silently dropped, weakening confidence
+// for 8-4-4 learners relative to CBC learners for no principled reason.
+
+test('8-4-4 compatibility: a realistic KCSE snapshot yields evidence from every subject, including Business Studies and History & Government', () => {
+  const kcseSnapshot = [{
+    mathematics: 3, english: 3, kiswahili: 3,
+    biology: 3, chemistry: 3, physics: 3,
+    business_studies: 3, history_and_government: 3,
+  }]
+
+  const profile = extractCapabilityProfile(kcseSnapshot)
+
+  // Science/language subjects still map — unchanged behaviour.
+  assert.ok(profile.analytical_reasoning.confidence > 0, 'mathematics/physics/chemistry/biology must still contribute analytical evidence')
+  assert.ok(profile.communication.confidence > 0, 'english/kiswahili must still contribute communication evidence')
+
+  // The two previously-dropped subjects now contribute evidence somewhere.
+  const allEvidence = [
+    ...profile.communication.evidence,
+    ...profile.social_intelligence.evidence,
+  ].join(' ').toLowerCase()
+  assert.ok(allEvidence.includes('business studies'), 'Business Studies must now appear as capability evidence')
+  assert.ok(allEvidence.includes('history and government'), 'History & Government must now appear as capability evidence')
+})
+
+test('8-4-4 compatibility: Business Studies alone is enough for non-zero social_intelligence confidence', () => {
+  const businessOnly = [{ business_studies: 3 }]
+  const profile = extractCapabilityProfile(businessOnly)
+  assert.ok(profile.social_intelligence.confidence > 0, 'Business Studies is weighted in SOCIAL_WEIGHTS and must not fall back to the zero-evidence estimate')
+})
+
+test('8-4-4 compatibility: History & Government alone is enough for non-zero communication confidence', () => {
+  const historyOnly = [{ history_and_government: 3 }]
+  const profile = extractCapabilityProfile(historyOnly)
+  assert.ok(profile.communication.confidence > 0, 'History & Government is weighted in COMMUNICATION_WEIGHTS and must not fall back to the zero-evidence estimate')
+})
+
+test('8-4-4 compatibility: existing CBC/science subject weighting is unchanged by the new entries', () => {
+  // Adding business_studies/history_and_government/hre only touched
+  // COMMUNICATION_WEIGHTS and SOCIAL_WEIGHTS — ANALYTICAL_WEIGHTS (and its
+  // maxWeight denominator) must be byte-identical to before this patch.
+  const mathOnly = extractCapabilityProfile([{ mathematics: 3 }])
+  const mathAndBiology = extractCapabilityProfile([{ mathematics: 3, biology: 3 }])
+  assert.ok(
+    mathAndBiology.analytical_reasoning.confidence > mathOnly.analytical_reasoning.confidence,
+    'adding a second analytical subject must still raise analytical confidence — the analytical weight map was not touched by this patch',
+  )
+  assert.ok(Math.abs(mathOnly.analytical_reasoning.raw_score - mathAndBiology.analytical_reasoning.raw_score) < 1e-9,
+    'mathematics alone at Level 3 normalises to the same ~0.667 score with or without biology present, since the weighted average only includes observed subjects')
+})
+
 // H2B FINDING (reported, not fixed — see closeout report; fixing this would
 // mean redesigning detectTrend()'s algorithm, out of H2B's scope lock):
 // detectTrend() (capabilityExtractor.ts) compares the average of the first

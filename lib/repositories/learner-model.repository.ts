@@ -633,5 +633,3 @@ export class LearnerModelRepository extends BaseRepository {
     }))
   }
 }
-
-export const learnerModelRepository = new LearnerModelRepository()
