@@ -45,6 +45,13 @@ export type WellKnownEventType =
   | 'student.knowledge_graph.updated'
   | 'student.career_recommendation.updated'
   | 'student.career_pathway.changed'
+  // Career search demand telemetry (Phase 9.1) — observational only, never a
+  // write path into learner_evidence/Projection/capability/interest. See
+  // docs/architecture/phase9-career-discovery-audit.md §36/§37.
+  | 'student.career_search.performed'
+  | 'student.career_search.no_result'
+  | 'student.career_result.opened'
+  | 'student.career_interest.saved'
   // Parent events
   | 'parent.observation.submitted'
   | 'parent.pulse.generated'
@@ -173,6 +180,38 @@ export type StudentCareerRecommendationUpdatedPayload = {
   student_id: string
   top_career_slug: string
   match_count: number
+}
+
+// ── Career search demand telemetry (Phase 9.1) ──────────────────────────────
+// query/normalizedQuery are search-box free text only — never a prompt,
+// AI response, capability/risk figure, or any other learner-intelligence
+// field (Phase 9.1 §25).
+
+export type StudentCareerSearchPerformedPayload = {
+  query: string
+  normalizedQuery: string
+  category: string
+  pathway: string
+  resultCount: number
+}
+
+export type StudentCareerSearchNoResultPayload = {
+  query: string
+  normalizedQuery: string
+  category: string
+  pathway: string
+}
+
+export type StudentCareerResultOpenedPayload = {
+  careerSlug: string
+  careerId: string
+  source: string
+}
+
+export type StudentCareerInterestSavedPayload = {
+  careerSlug: string
+  careerId: string | null
+  interestLevel: number
 }
 
 export type BillingPaymentSucceededPayload = {
