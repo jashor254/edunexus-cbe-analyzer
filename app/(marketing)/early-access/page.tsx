@@ -55,7 +55,7 @@ const PLANS = [
       'Unlimited tutoring sessions',
       "Learning Compass that adapts to your child's pace",
       'All CBC subjects',
-      'Academic Clinic reports',
+      'Learner Intelligence Reports',
       'Holiday learning plan',
       'Share with teacher',
       'Track 1 student',

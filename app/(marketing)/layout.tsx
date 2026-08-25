@@ -32,7 +32,7 @@ function MarketingNav() {
       data-marketing-nav="true"
       className={`sticky top-0 z-40 transition-all duration-300 ${
         scrolled
-          ? 'bg-black/80 backdrop-blur-xl border-b border-white/10'
+          ? 'bg-nexus-ink/90 backdrop-blur-xl border-b border-white/10'
           : 'bg-transparent border-b border-white/10'
       }`}
     >
@@ -82,7 +82,7 @@ function MarketingNav() {
           </Link>
           <Link
             href="/signup"
-            className={`text-sm font-bold bg-nexusteal-600 hover:bg-nexusteal-500 text-white px-5 py-2.5 rounded-full transition-colors ${FOCUS_RING}`}
+            className={`text-sm font-bold bg-brass-500 hover:bg-brass-400 text-nexus-ink px-5 py-2.5 rounded-full transition-colors ${FOCUS_RING}`}
           >
             Get Started Free
           </Link>
@@ -100,7 +100,7 @@ function MarketingNav() {
 
       {/* Mobile dropdown */}
       {menuOpen && (
-        <div className="lg:hidden bg-black/95 border-b border-white/10">
+        <div className="lg:hidden bg-nexus-ink/95 border-b border-white/10">
           <div className="max-w-[1100px] mx-auto px-6 py-4 flex flex-col gap-1">
             {[
               { href: '/schools',   label: 'For Schools'      },
@@ -126,7 +126,7 @@ function MarketingNav() {
               <Link
                 href="/signup"
                 onClick={() => setMenuOpen(false)}
-                className={`block text-center text-sm font-bold bg-nexusteal-600 hover:bg-nexusteal-500 text-white py-3 rounded-full transition-colors ${FOCUS_RING}`}
+                className={`block text-center text-sm font-bold bg-brass-500 hover:bg-brass-400 text-nexus-ink py-3 rounded-full transition-colors ${FOCUS_RING}`}
               >
                 Get Started Free
               </Link>
@@ -141,7 +141,7 @@ function MarketingNav() {
 // ─── Footer ────────────────────────────────────────────────────────────────────
 function MarketingFooter() {
   return (
-    <footer className="bg-black border-t border-white/10 pt-16 pb-8">
+    <footer className="bg-nexus-ink border-t border-white/10 pt-16 pb-8">
       <div className="max-w-[1100px] mx-auto px-6">
         <div className="flex flex-col md:flex-row justify-between gap-10 mb-12">
           {/* Left — logo + tagline */}

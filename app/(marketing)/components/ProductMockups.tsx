@@ -147,7 +147,7 @@ export function AcademicClinicMockup() {
               <FileText className="w-4 h-4 text-white" />
             </div>
             <div>
-              <div className="text-xs font-black text-white">Academic Clinic Report</div>
+              <div className="text-xs font-black text-white">Learner Intelligence Report</div>
               <div className="text-[10px] text-white/40">Term 2, 2025 · Grade 8</div>
             </div>
           </div>
@@ -178,7 +178,7 @@ export function AcademicClinicMockup() {
 
         {/* Footer */}
         <div className="px-4 py-3 border-t border-white/10 bg-white/3">
-          <p className="text-[10px] text-white/50 mb-2">Clinic Report · Parent Verified</p>
+          <p className="text-[10px] text-white/50 mb-2">Learner Intelligence Report · Parent Verified</p>
           <div className="flex gap-2">
             <button tabIndex={-1} aria-hidden="true" className="flex-1 flex items-center justify-center gap-1.5 bg-linear-to-r from-violet-500 to-purple-500 text-white py-2 rounded-xl text-[11px] font-black">
               <Download className="w-3 h-3" /> Download PDF

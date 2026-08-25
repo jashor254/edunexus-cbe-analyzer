@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     'mbinu za kusoma',
     'maamuzi ya taaluma',
     'EduNexus',
-    'CBC Academic Clinic'
+    'CBC Learner Intelligence Report'
   ],
   authors: [{ name: 'EduNexus Team', url: 'https://edunexus.co.ke' }],
   creator: 'EduNexus Kenya',
@@ -142,7 +142,7 @@ export default function RootLayout({
               ],
               "offers": {
                 "@type": "Offer",
-                "description": "Academic Clinic Report - Uchambuzi kamili wa masomo ya mtoto wako",
+                "description": "Learner Intelligence Report - Uchambuzi kamili wa masomo ya mtoto wako",
                 "price": "500",
                 "priceCurrency": "KES"
               }

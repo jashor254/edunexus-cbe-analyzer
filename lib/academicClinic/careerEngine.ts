@@ -2530,12 +2530,17 @@ const KENYA_DISRUPTION: Record<string, KenyaDisruptionAssessment> = {
 // SECTION 7 — CAREER DATABASE HELPERS
 // ============================================================
 
-export function findCareerByName(careerName: string): CareerData | null {
+// Phase 9.1.7 — additionalCareers mirrors matchCareers()'s pattern (canonical
+// Postgres careers CAREER_DATABASE does not already represent, pre-fetched
+// and adapted by the caller). Exact/substring name resolution only — no
+// aliases or fuzzy semantics were added, per Phase 9.1.7 §21.
+export function findCareerByName(careerName: string, additionalCareers: CareerData[] = []): CareerData | null {
   const normalized = careerName.toLowerCase().trim()
+  const pool = [...CAREER_DATABASE, ...additionalCareers]
   return (
-    CAREER_DATABASE.find(c => c.name.toLowerCase() === normalized) ||
-    CAREER_DATABASE.find(c => c.name.toLowerCase().includes(normalized) || normalized.includes(c.name.toLowerCase())) ||
-    CAREER_DATABASE.find(c => c.id === normalized.replace(/\s+/g, '_')) ||
+    pool.find(c => c.name.toLowerCase() === normalized) ||
+    pool.find(c => c.name.toLowerCase().includes(normalized) || normalized.includes(c.name.toLowerCase())) ||
+    pool.find(c => c.id === normalized.replace(/\s+/g, '_')) ||
     null
   )
 }
@@ -2568,11 +2573,18 @@ export class CareerEngine {
     cbcScores: Record<string, number>,
     performanceTier: 'high' | 'mid' | 'low',
     _curriculumType: 'cbc' | 'igcse' = 'cbc',
-    currentPathway?: string
+    currentPathway?: string,
+    // Phase 9.1.6 — canonical Postgres careers CAREER_DATABASE does not
+    // already represent (see canonicalCareerAdapter.ts), pre-fetched and
+    // adapted by the caller so this method stays a pure function with zero
+    // I/O of its own. Every existing caller omitting this parameter gets
+    // byte-identical behavior to before this phase — CAREER_DATABASE and
+    // its 40 entries are completely untouched.
+    additionalCareers: CareerData[] = []
   ): CareerMatch[] {
     const studentPathway = currentPathway ? normalizePathway(currentPathway) : null
 
-    const scored = CAREER_DATABASE
+    const scored = [...CAREER_DATABASE, ...additionalCareers]
       .filter(career => {
         if (!studentPathway) return true
         return normalizePathway(career.pathway) === studentPathway
@@ -2889,9 +2901,12 @@ export interface DreamCareerAnalysis {
 export function analyzeDreamCareer(
   dreamCareerInput: string,
   cbcScores:        Record<string, number>,
-  _currentPathway?: string
+  _currentPathway?: string,
+  // Phase 9.1.7 — same additive pattern as matchCareers(). Optional; omitting
+  // it reproduces the exact pre-Phase-9.1.7 behavior.
+  additionalCareers: CareerData[] = []
 ): DreamCareerAnalysis {
-  const career = findCareerByName(dreamCareerInput)
+  const career = findCareerByName(dreamCareerInput, additionalCareers)
 
   if (!career) {
     return {
@@ -2946,7 +2961,7 @@ export function analyzeDreamCareer(
   const estimatedTerms = maxGap * 2
 
   const pathwayKey = normalizePathway(career.pathway)
-  const alternatives = CAREER_DATABASE
+  const alternatives = [...CAREER_DATABASE, ...additionalCareers]
     .filter(c => normalizePathway(c.pathway) === pathwayKey && c.name !== career.name)
     .map(c => {
       const altScores = c.matchRequirements.primarySubjects

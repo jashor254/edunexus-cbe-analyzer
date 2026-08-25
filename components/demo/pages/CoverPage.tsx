@@ -22,13 +22,13 @@ export default function CoverPage() {
           <div className="text-amber-500 text-xs font-black tracking-[0.25em] uppercase mb-0.5">
             EduNexus
           </div>
-          <div className="text-white text-2xl font-black leading-tight">Academic Clinic</div>
+          <div className="text-white text-2xl font-black leading-tight">Learner Intelligence Report</div>
         </div>
 
         {/* Center — fills remaining space */}
         <div className="flex-1 flex flex-col items-center justify-center py-6 text-center">
           <div className="text-amber-500 text-[11px] font-black tracking-[0.3em] uppercase mb-6">
-            Academic Clinic Report
+            Learner Intelligence Report
           </div>
 
           <div className="text-white text-4xl md:text-6xl font-black mb-2 leading-none">

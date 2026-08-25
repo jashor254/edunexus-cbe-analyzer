@@ -22,7 +22,7 @@ export default function KcseCoverPage() {
           <div className="text-amber-500 text-xs font-black tracking-[0.25em] uppercase mb-0.5">
             EduNexus
           </div>
-          <div className="text-white text-2xl font-black leading-tight">Academic Clinic</div>
+          <div className="text-white text-2xl font-black leading-tight">Learner Intelligence Report</div>
         </div>
 
         {/* Center */}

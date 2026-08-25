@@ -11,7 +11,7 @@ export default function PageHeader({ page, tall = false }: Props) {
     >
       <div>
         <div className="text-amber-500 text-[10px] font-black tracking-[0.2em] uppercase">
-          EduNexus Academic Clinic
+          EduNexus Learner Intelligence Report
         </div>
         <div className="text-slate-300 text-xs mt-0.5">
           {STUDENT.name} · Grade {STUDENT.grade}

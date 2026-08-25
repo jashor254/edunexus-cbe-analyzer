@@ -135,7 +135,7 @@ function PageHeader({ name, pageLabel }: { name: string; pageLabel: string }) {
       <View style={S.pageHeader}>
         <View>
           <Text style={S.pageHeaderBrand}>EDUNEXUS · ACADEMIC CLINIC</Text>
-          <Text style={S.pageHeaderName}>{name} — Clinic Report</Text>
+          <Text style={S.pageHeaderName}>{name} — Learner Intelligence Report</Text>
         </View>
         <View style={S.pageHeaderRight}>
           <Text style={S.pageHeaderPage}>{pageLabel}</Text>
@@ -149,7 +149,7 @@ function PageHeader({ name, pageLabel }: { name: string; pageLabel: string }) {
 function PageFooter({ date }: { date: string }) {
   return (
     <View style={S.pageFooter} fixed>
-      <Text style={S.pageFooterText}>EduNexus Clinic Report · Generated {date}</Text>
+      <Text style={S.pageFooterText}>EduNexus Learner Intelligence Report · Generated {date}</Text>
       <Text style={S.pageFooterText}>edunexus.co.ke · CONFIDENTIAL</Text>
     </View>
   )
@@ -161,7 +161,7 @@ function SeniorHealthCheckPage({ report }: { report: ClinicReport }) {
   const date = new Date(report.generated_at).toLocaleDateString('en-KE', {
     day: 'numeric', month: 'long', year: 'numeric',
   })
-  const gradeLabel   = `Grade ${report.grade} — CBC Senior`
+  const gradeLabel   = report.curriculumLabel
   const statusColors = healthStatusColors(report.overall_level)
   const firstName    = report.student_name.split(' ')[0]
 
@@ -170,7 +170,7 @@ function SeniorHealthCheckPage({ report }: { report: ClinicReport }) {
       {/* Navy cover header */}
       <View style={{ backgroundColor: C.navy, paddingHorizontal: 36, paddingVertical: 24, borderBottomWidth: 3, borderBottomColor: C.gold }}>
         <Text style={{ fontSize: 9, color: C.gold, letterSpacing: 3, marginBottom: 4 }}>EDUNEXUS · ACADEMIC CLINIC</Text>
-        <Text style={{ fontSize: 22, fontWeight: 700, color: C.white }}>Student Clinic Report</Text>
+        <Text style={{ fontSize: 22, fontWeight: 700, color: C.white }}>Learner Intelligence Report</Text>
       </View>
       <View style={S.goldLine} />
 
@@ -572,15 +572,13 @@ function CoverPage({ report }: { report: ClinicReport }) {
   const date = new Date(report.generated_at).toLocaleDateString('en-KE', {
     day: 'numeric', month: 'long', year: 'numeric',
   })
-  const gradeLabel = report.grade <= 9
-    ? `Grade ${report.grade} — CBC Junior`
-    : `Grade ${report.grade} — CBC Senior`
+  const gradeLabel = report.curriculumLabel
 
   return (
     <Page size="A4" style={S.coverPage}>
       <View style={S.coverHeader}>
         <Text style={S.coverBrand}>EDUNEXUS · ACADEMIC CLINIC</Text>
-        <Text style={S.coverTitle}>Student Clinic Report</Text>
+        <Text style={S.coverTitle}>Learner Intelligence Report</Text>
       </View>
 
       <View style={S.coverBody}>
@@ -634,7 +632,7 @@ function CoverPage({ report }: { report: ClinicReport }) {
       </View>
 
       <View style={S.coverFooter}>
-        <Text style={S.coverFooterText}>Generated {date} · EduNexus Academic Clinic · CONFIDENTIAL</Text>
+        <Text style={S.coverFooterText}>Generated {date} · EduNexus Learner Intelligence Report · CONFIDENTIAL</Text>
       </View>
     </Page>
   )
@@ -852,9 +850,9 @@ function SkillsParentPage({ report }: { report: ClinicReport }) {
 
 export const ClinicReportPDF = ({ report }: { report: ClinicReport }) => (
   <Document
-    title={`EduNexus Clinic Report — ${report.student_name}`}
-    author="EduNexus Academic Clinic"
-    subject="CBC Student Clinic Report"
+    title={`EduNexus Learner Intelligence Report — ${report.student_name}`}
+    author="EduNexus Learner Intelligence Report"
+    subject="CBC Learner Intelligence Report"
   >
     {report.section === 'senior' ? (
       <>

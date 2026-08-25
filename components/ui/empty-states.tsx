@@ -164,9 +164,9 @@ export function NoClinicReportEmpty({
   return (
     <div className="bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 rounded-[50px] p-16 text-center border-4 border-dashed border-emerald-200">
       <div className="text-8xl mb-8">📊</div>
-      <h2 className="text-5xl font-black uppercase mb-6">Academic Clinic Report</h2>
+      <h2 className="text-5xl font-black uppercase mb-6">Learner Intelligence Report</h2>
       <p className="text-xl text-slate-600 mb-10 max-w-2xl mx-auto">
-        Generate a comprehensive Academic Clinic report for {studentName}. 
+        Generate a Learner Intelligence Report for {studentName}.
         Perfect for parent-teacher meetings and holiday planning!
       </p>
 
@@ -175,20 +175,27 @@ export function NoClinicReportEmpty({
         className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-12 py-6 rounded-full font-black uppercase text-xl hover:scale-105 transition-all shadow-2xl mb-12 inline-flex items-center gap-3"
       >
         <FileText className="w-6 h-6" />
-        Generate Clinic Report
+        Generate Report
       </button>
 
-      {/* Report Includes */}
+      {/* Report Includes — Phase 3.1: each line must match what the report
+          actually renders (lib/academicClinic/pdfGenerator.tsx). The prior
+          copy overstated the career count, the holiday-plan length, and
+          claimed intervention pricing and salary detail the PDF does not
+          contain — the report shows at most 3 careers, a 3-week holiday
+          plan, no pricing figures, and the PDF's own text already directs
+          parents to the dashboard for salary/AI-impact depth rather than
+          claiming that depth is in the PDF itself. */}
       <div className="bg-white rounded-3xl p-8 max-w-3xl mx-auto border-2 border-emerald-200">
         <h3 className="font-black uppercase mb-6">Your Report Includes:</h3>
         <div className="grid md:grid-cols-2 gap-4 text-left">
           {[
-            { icon: '🎯', title: 'Pathway Analysis', desc: 'CBC pathway recommendation with confidence score' },
-            { icon: '💼', title: 'Top 5 Careers', desc: 'AI-matched careers with Kenyan market data' },
-            { icon: '⚠️', title: 'Critical Gaps', desc: 'Urgent interventions needed with costs' },
-            { icon: '📅', title: '90-Day Plan', desc: 'Actionable steps with Kenyan resources' },
-            { icon: '🇰🇪', title: 'Kenyan Context', desc: 'Universities, TVET, real salary expectations' },
-            { icon: '🔮', title: 'Future Impact', desc: 'Future-proof career survival strategies' },
+            { icon: '🎯', title: 'Pathway Analysis', desc: 'CBC pathway readiness with a confidence level (Junior School)' },
+            { icon: '💼', title: 'Top 3 Careers', desc: 'Evidence-matched career alignment (Senior School)' },
+            { icon: '⚠️', title: 'Priority Gaps', desc: 'Subjects needing focused support' },
+            { icon: '📅', title: '3-Week Holiday Plan', desc: 'Actionable steps for the school break' },
+            { icon: '🇰🇪', title: 'Career Details', desc: 'Deeper match analysis, salary and AI-impact data in your dashboard' },
+            { icon: '🔮', title: 'Future Impact', desc: 'AI-impact outlook per career (Senior School)' },
           ].map((item, i) => (
             <div key={i} className="flex items-start gap-3 bg-emerald-50 p-4 rounded-2xl">
               <div className="text-3xl">{item.icon}</div>
@@ -202,7 +209,7 @@ export function NoClinicReportEmpty({
 
         <div className="mt-8 p-4 bg-amber-50 border-l-4 border-amber-400 rounded-lg text-left">
           <p className="text-xs text-amber-800">
-            <span className="font-black">💡 Pro Tip:</span> Generate this report before Academic Clinic Day 
+            <span className="font-black">💡 Pro Tip:</span> Generate this report before your next parent-teacher meeting 
             to have focused, data-driven conversations with teachers!
           </p>
         </div>
@@ -292,7 +299,7 @@ export function NoSubscriptionState({ onSubscribe, onBuyTokens }: {
         <div className="text-7xl mb-4">🔒</div>
         <h3 className="text-4xl font-black uppercase mb-4">Premium Feature</h3>
         <p className="text-xl text-slate-700">
-          Unlock personalised career guidance and Academic Clinic reports
+          Unlock personalised career guidance and Learner Intelligence Reports
         </p>
       </div>
 

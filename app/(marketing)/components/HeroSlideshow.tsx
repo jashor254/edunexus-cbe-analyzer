@@ -26,7 +26,7 @@ const SLIDES = [
   },
   {
     id: 1,
-    label: '📋 Academic Clinic',
+    label: '📋 Learner Intelligence Report',
     sublabel: 'Exact gaps identified',
     color: 'from-violet-500 to-purple-500',
     glowColor: 'from-violet-500/20 to-purple-500/20',

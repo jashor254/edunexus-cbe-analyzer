@@ -11,10 +11,13 @@ import {
   calculateVitals,
   generateActionPlan,
   generateJuniorGuidance,
-  generateSeniorGuidance,
   formatSubjectName,
 } from '@/lib/academicClinic/reportGenerator'
+import { buildSeniorGuidanceFromCanonical } from '@/lib/academicClinic/canonicalSeniorGuidance'
+import { resolveCanonicalGrowthInput } from '@/lib/academicClinic/canonicalTrajectory'
+import { resolveCanonicalCareerMatches } from '@/lib/learnerIntelligence/careerIntelligenceOrchestration'
 import { CareerEngine } from '@/lib/academicClinic/careerEngine'
+import { adaptCanonicalCareersForClinic } from '@/lib/academicClinic/canonicalCareerAdapter'
 import { generateAcademicClinicPDF } from '@/lib/academicClinic/pdfGenerator'
 import type { SubjectProgress, StudentProfile } from '@/lib/academicClinic/types'
 import { analyseStudentRootCauses } from '@/lib/knowledgeGraph'
@@ -223,8 +226,49 @@ export async function runAssessmentPipeline({
     const actionPlan  = generateActionPlan(subjects)
     const firstName   = student.name.split(' ')[0]
     const jGuidance   = isJunior  ? generateJuniorGuidance(subjects)           : undefined
-    const sGuidance   = !isJunior ? generateSeniorGuidance(subjects, firstName, student.grade, (student as { current_pathway?: string | null }).current_pathway ?? undefined) : undefined
-    const report      = generateReport(studentProfile, subjects, vitals, actionPlan, [], jGuidance, sGuidance, knowledgeRootCauses.length > 0 ? knowledgeRootCauses : undefined)
+    // additionalCareers still needed for analyzeDreamCareer() inside
+    // generateReport() below (Phase 9.1.6/9.1.7) — dream-career analysis
+    // remains on the legacy CareerEngine corpus, out of Phase 2.1's scope
+    // (Decision 2 covers the primary top-careers list, not this separate
+    // feature — see the Phase 2.1 closeout's remaining-limitations section).
+    let additionalCareers: import('@/lib/academicClinic/careerEngine').CareerData[] = []
+    if (!isJunior) {
+      try {
+        const canonicalCareers = await repos.careers.getAllCareersWithCOS()
+        additionalCareers = adaptCanonicalCareersForClinic(canonicalCareers)
+      } catch (err) {
+        console.error('[assessmentPipeline] canonical career fetch failed (non-fatal — falls back to CAREER_DATABASE only):', err)
+      }
+    }
+    // Phase 2.1 (Decision 2 — one canonical career-ranking owner): the
+    // top-careers list a parent actually sees now comes from
+    // resolveCanonicalCareerMatches(), not the legacy CareerEngine. Errors
+    // here are non-fatal — the report still generates, with an honest
+    // "insufficient evidence" section, same shape as the zero-evidence path.
+    let sGuidance: import('./types').SeniorGuidance | undefined
+    if (!isJunior) {
+      try {
+        const canonical = await resolveCanonicalCareerMatches(student.id)
+        sGuidance = buildSeniorGuidanceFromCanonical(canonical, subjects, firstName, student.grade)
+      } catch (err) {
+        console.error('[assessmentPipeline] canonical career match resolution failed (non-fatal — report still generates):', err)
+        sGuidance = buildSeniorGuidanceFromCanonical({ matches: [], mode: 'planning', insufficientEvidence: true, generatedAt: null }, subjects, firstName, student.grade)
+      }
+    }
+    // Phase 2.2 (canonical trajectory closure): this is the exact pipeline
+    // that previously passed a hardcoded [] for assessment history,
+    // structurally preventing 'IMPROVING' from ever being reachable here —
+    // trajectory now comes from canonical Projection instead of that raw
+    // history array. Non-fatal on error: the report still generates with
+    // the legacy no-history-supplied fallback (current-state severity read,
+    // no fabricated direction) rather than failing the whole delivery.
+    let canonicalGrowth: import('./reportGenerator').CanonicalGrowthInput | null = null
+    try {
+      canonicalGrowth = await resolveCanonicalGrowthInput(student.id)
+    } catch (err) {
+      console.error('[assessmentPipeline] canonical growth resolution failed (non-fatal — report still generates):', err)
+    }
+    const report      = generateReport(studentProfile, subjects, vitals, actionPlan, [], jGuidance, sGuidance, knowledgeRootCauses.length > 0 ? knowledgeRootCauses : undefined, additionalCareers, canonicalGrowth)
 
     const pdfBlob   = await generateAcademicClinicPDF(report)
     const pdfBuffer = Buffer.from(await pdfBlob.arrayBuffer())

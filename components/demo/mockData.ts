@@ -123,10 +123,10 @@ export const STUDENT = {
   name: 'Brian Otieno',
   grade: 9,
   school: 'Nairobi Academy',
-  term: 1,
+  term: 2,
   year: 2026,
   reportId: 'EC-2026-BT9K2M',
-  generatedDate: '19 May 2026',
+  generatedDate: '10 August 2026',
   overallLevel: 3.2,
   overallLabel: 'Proficient',
   trajectory: 'IMPROVING',
@@ -137,7 +137,7 @@ export const STUDENT = {
 
 export const PAGE_TITLES = [
   'Cover',
-  'Clinical Overview',
+  'Academic Summary',
   'Subject Matrix',
   'Pathway Analysis',
   'Holiday Plan',

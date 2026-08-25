@@ -132,7 +132,7 @@ export default function KcseTeacherPage() {
 
         {/* Report footer */}
         <div className="bg-[#1a2744] rounded-xl px-4 py-2.5 text-center">
-          <div className="text-slate-300 text-xs mb-0.5">KCSE Readiness Report — EduNexus Academic Clinic</div>
+          <div className="text-slate-300 text-xs mb-0.5">KCSE Readiness — EduNexus Learner Intelligence Report</div>
           <div className="text-slate-400 text-[10px]">edunexus.co.ke · Report ID: {KCSE_STUDENT.reportId}</div>
           <div className="text-slate-500 text-[10px] mt-0.5">CONFIDENTIAL — For School and Parent Use Only</div>
         </div>

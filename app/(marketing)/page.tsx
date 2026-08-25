@@ -5,7 +5,6 @@ import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
   ArrowRight,
-  Search,
   School,
   GraduationCap,
   Users,
@@ -20,7 +19,7 @@ const OVERVIEW_CARDS = [
   {
     icon: School,
     title: 'Every classroom, one picture.',
-    body: "Not just end-of-term averages — what's happening in every class, every week.",
+    body: "What's happening in every class, every week — not just the end-of-term average.",
     href: '/schools',
     label: 'For school leaders',
     tag: 'Schools',
@@ -82,9 +81,8 @@ export default function LandingPage() {
   const [selectedRole, setSelectedRole] = useState<SelectedRole>(null)
 
   type HeroVariant = {
-    badgeIcon:     typeof Search
-    badge:         string
-    badgeClass:    string
+    kicker:        string
+    kickerClass:   string
     line1:         string
     line2:         string
     gradientLine:  string
@@ -99,9 +97,8 @@ export default function LandingPage() {
 
   const hero: HeroVariant =
     selectedRole === 'teacher' ? {
-      badgeIcon:     GraduationCap,
-      badge:         'For Teachers',
-      badgeClass:    'bg-amber-500/10 border-amber-500/20 text-amber-300',
+      kicker:        'For Teachers',
+      kickerClass:   'text-amber-400',
       line1:         'Plan your full term.',
       line2:         'Before the bell rings Monday.',
       gradientLine:  'EduNexus handles the paperwork.',
@@ -114,12 +111,11 @@ export default function LandingPage() {
       roleColor:     'amber',
     }
     : selectedRole === 'family' ? {
-      badgeIcon:     Users,
-      badge:         'For Families',
-      badgeClass:    'bg-teal-500/10 border-teal-500/20 text-teal-300',
+      kicker:        'For Families',
+      kickerClass:   'text-teal-400',
       line1:         'Finally know',
       line2:         'where your child truly stands.',
-      gradientLine:  'Not just their marks. Their potential.',
+      gradientLine:  'Their real potential, not just a mark on a report.',
       lineClass:     'text-teal-400',
       subtitle:      "The Learner Blueprint shows you exactly which strands are holding your child back — and a precise plan to close the gap before next term.",
       ctaHref:       '/signup?role=parent',
@@ -129,9 +125,8 @@ export default function LandingPage() {
       roleColor:     'teal',
     }
     : {
-      badgeIcon:     Search,
-      badge:         'Catch it early. Change the outcome.',
-      badgeClass:    'bg-trustblue-500/10 border-trustblue-500/20 text-trustblue-300',
+      kicker:        'Catch it early. Change the outcome.',
+      kickerClass:   'text-trustblue-300',
       line1:         'Schools should never',
       line2:         'discover a problem too late.',
       gradientLine:  'EduNexus shortens that gap.',
@@ -186,142 +181,105 @@ export default function LandingPage() {
   return (
     <>
       {/* ── TRANSFORMATION (HERO) ─────────────────────────────────────────────── */}
-      <section className="pt-16 md:pt-24 pb-16 md:pb-24 bg-white/3">
-        <div className="max-w-[820px] mx-auto px-6 text-center">
+      <section className="pt-16 md:pt-24 pb-16 md:pb-24 bg-white/3 overflow-hidden">
+        <div className="max-w-290 mx-auto px-6">
+          <div className="grid lg:grid-cols-[1.35fr_0.65fr] gap-12 lg:gap-16 items-center">
 
-          <p className="text-white/40 text-sm font-semibold tracking-wide mb-8">
-            Every learner has potential that marks alone cannot measure.
-          </p>
+            <div className="text-center lg:text-left">
 
-          {/* Role selector */}
-          <div
-            className="flex justify-center gap-2 mb-6 overflow-x-auto [&::-webkit-scrollbar]:hidden"
-            style={{ scrollbarWidth: 'none' }}
-          >
-            {ROLES.map((r) => (
-              <button
-                key={r.id}
-                onClick={() => setSelectedRole(selectedRole === r.id ? null : r.id)}
-                className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold border transition-all whitespace-nowrap ${FOCUS_RING} ${
-                  selectedRole === r.id
-                    ? r.id === 'school'
-                      ? 'bg-trustblue-500/15 border-trustblue-500/35 text-trustblue-300'
-                      : r.id === 'teacher'
-                      ? 'bg-amber-500/15 border-amber-500/35 text-amber-300'
-                      : 'bg-teal-500/15 border-teal-500/35 text-teal-300'
-                    : 'bg-white/5 border-white/10 text-white/40 hover:border-white/20 hover:text-white/60'
-                }`}
+              <p className="text-white/40 text-sm font-semibold tracking-wide mb-8">
+                Every learner has potential that marks alone cannot measure.
+              </p>
+
+              {/* Role selector */}
+              <div
+                className="flex justify-center lg:justify-start gap-2 mb-5 overflow-x-auto [&::-webkit-scrollbar]:hidden"
+                style={{ scrollbarWidth: 'none' }}
               >
-                <r.icon className="w-3.5 h-3.5" />
-                {r.label}
-              </button>
-            ))}
-          </div>
+                {ROLES.map((r) => (
+                  <button
+                    key={r.id}
+                    onClick={() => setSelectedRole(selectedRole === r.id ? null : r.id)}
+                    className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold border transition-all whitespace-nowrap ${FOCUS_RING} ${
+                      selectedRole === r.id
+                        ? r.id === 'school'
+                          ? 'bg-trustblue-500/15 border-trustblue-500/35 text-trustblue-300'
+                          : r.id === 'teacher'
+                          ? 'bg-amber-500/15 border-amber-500/35 text-amber-300'
+                          : 'bg-teal-500/15 border-teal-500/35 text-teal-300'
+                        : 'bg-white/5 border-white/10 text-white/40 hover:border-white/20 hover:text-white/60'
+                    }`}
+                  >
+                    <r.icon className="w-3.5 h-3.5" />
+                    {r.label}
+                  </button>
+                ))}
+              </div>
 
-          <div className={`inline-flex items-center gap-2 ${hero.badgeClass} border px-4 py-1.5 rounded-full text-sm font-semibold mb-8 transition-all`}>
-            <hero.badgeIcon className="w-3.5 h-3.5" />
-            {hero.badge}
-          </div>
+              <p className={`text-sm font-bold uppercase tracking-wide mb-4 transition-all ${hero.kickerClass}`}>
+                {hero.kicker}
+              </p>
 
-          <h1
-            className={`${montserrat.className} font-extrabold leading-[1.05] tracking-[-0.02em] mb-6`}
-            style={{ fontSize: 'clamp(44px, 7vw, 72px)' }}
-          >
-            <span className="block text-white">{hero.line1}</span>
-            <span className="block text-white">{hero.line2}</span>
-            <span className={`block ${hero.lineClass} mt-1 transition-all`}>
-              {hero.gradientLine}
-            </span>
-          </h1>
+              <h1
+                className={`${montserrat.className} font-extrabold leading-[1.05] tracking-[-0.02em] mb-6`}
+                style={{ fontSize: 'clamp(36px, 4.2vw, 54px)' }}
+              >
+                <span className="block text-white">{hero.line1}</span>
+                <span className="block text-white">{hero.line2}</span>
+                <span className={`block ${hero.lineClass} mt-1 transition-all`}>
+                  {hero.gradientLine}
+                </span>
+              </h1>
 
-          <p className="text-[18px] md:text-[20px] text-white/60 max-w-140 mx-auto mb-8 leading-relaxed">
-            {hero.subtitle}
-          </p>
+              <p className="text-[18px] md:text-[20px] text-white/60 max-w-140 mx-auto lg:mx-0 mb-8 leading-relaxed">
+                {hero.subtitle}
+              </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6 mt-2">
-            <Link
-              href={hero.ctaHref}
-              className={`inline-flex items-center gap-2 bg-nexusteal-600 text-white px-8 py-4 rounded-full font-bold hover:bg-nexusteal-500 hover:scale-105 transition-all shadow-2xl shadow-nexusteal-600/30 ${FOCUS_RING}`}
-            >
-              {hero.ctaLabel}
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-            {hero.secondary && (
-              hero.secondary.action === 'demo' ? (
-                <button
-                  onClick={() => setDemoOpen(true)}
-                  className={`text-trustblue-300 hover:text-trustblue-400 font-semibold transition-colors rounded ${FOCUS_RING}`}
+              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-6 mt-2">
+                <Link
+                  href={hero.ctaHref}
+                  className={`inline-flex items-center gap-2 bg-brass-500 text-nexus-ink px-8 py-4 rounded-full font-bold hover:bg-brass-400 hover:scale-105 transition-all shadow-2xl shadow-brass-600/30 ${FOCUS_RING}`}
                 >
-                  {hero.secondary.label}
-                </button>
-              ) : (
-                <a
-                  href={hero.secondary.href}
-                  className={`text-trustblue-300 hover:text-trustblue-400 font-semibold transition-colors rounded ${FOCUS_RING}`}
-                >
-                  {hero.secondary.label}
-                </a>
-              )
-            )}
-          </div>
-
-          <p className="text-sm text-white/40">{hero.trust}</p>
-
-          {/* Audience benefit cards — each is the direct entry point for that audience */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-14 max-w-190 mx-auto text-left">
-            {[
-              {
-                icon: School,
-                who: 'For Schools',
-                body: 'One platform showing every learner\'s progress, every teacher\'s planning, every classroom\'s performance.',
-                href: '/signup?role=school',
-                external: false,
-                cta: 'Get started',
-                iconClass: 'text-trustblue-400',
-              },
-              {
-                icon: GraduationCap,
-                who: 'For Teachers',
-                body: 'Plan your full term before Monday. Teach knowing exactly where every learner is.',
-                href: '/signup?role=teacher',
-                external: false,
-                cta: 'Get started',
-                iconClass: 'text-amber-400',
-              },
-              {
-                icon: Users,
-                who: 'For Families',
-                body: 'Stop guessing. Know exactly which strand is holding your child back — and what to do about it.',
-                href: '/signup?role=parent',
-                external: false,
-                cta: 'Get started',
-                iconClass: 'text-teal-400',
-              },
-            ].map((card) => {
-              const cardClass = `group bg-white/4 border border-white/10 hover:border-white/25 hover:bg-white/6 rounded-2xl px-5 py-4 transition-all block ${FOCUS_RING}`
-              const inner = (
-                <>
-                  <card.icon className={`w-6 h-6 ${card.iconClass} mb-2`} />
-                  <div className="text-xs font-bold text-white/40 uppercase tracking-widest mb-1">{card.who}</div>
-                  <p className="text-sm text-white/65 leading-relaxed mb-2">{card.body}</p>
-                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-white/50 group-hover:text-white/80">
-                    {card.cta}
-                    <ArrowRight className="w-3 h-3" />
-                  </span>
-                </>
-              )
-              return card.external ? (
-                <a key={card.who} href={card.href} target="_blank" rel="noopener noreferrer" className={cardClass}>
-                  {inner}
-                </a>
-              ) : (
-                <Link key={card.who} href={card.href} className={cardClass}>
-                  {inner}
+                  {hero.ctaLabel}
+                  <ArrowRight className="w-4 h-4" />
                 </Link>
-              )
-            })}
-          </div>
+                {hero.secondary && (
+                  hero.secondary.action === 'demo' ? (
+                    <button
+                      onClick={() => setDemoOpen(true)}
+                      className={`text-trustblue-300 hover:text-trustblue-400 font-semibold transition-colors rounded ${FOCUS_RING}`}
+                    >
+                      {hero.secondary.label}
+                    </button>
+                  ) : (
+                    <a
+                      href={hero.secondary.href}
+                      className={`text-trustblue-300 hover:text-trustblue-400 font-semibold transition-colors rounded ${FOCUS_RING}`}
+                    >
+                      {hero.secondary.label}
+                    </a>
+                  )
+                )}
+              </div>
 
+              <p className="text-sm text-white/40">{hero.trust}</p>
+
+            </div>
+
+            {/* Real product visual — a live Learner Blueprint, not decoration */}
+            <div className="hidden lg:flex justify-end">
+              <div className="relative">
+                <div
+                  className="absolute -inset-x-10 -inset-y-16 -z-10 opacity-60"
+                  style={{
+                    background: 'radial-gradient(circle at 60% 40%, color-mix(in srgb, var(--color-nexusteal-500) 18%, transparent), transparent 70%)',
+                  }}
+                />
+                <BlueprintCardMockup />
+              </div>
+            </div>
+
+          </div>
         </div>
       </section>
 
@@ -348,29 +306,24 @@ export default function LandingPage() {
       <section id="evidence" className="bg-white/5 py-20 md:py-28">
         <div className="max-w-275 mx-auto px-6">
 
-          <div className="grid md:grid-cols-2 gap-16 items-center mb-20 md:mb-24">
-            <div className="order-2 md:order-1 flex justify-center">
-              <BlueprintCardMockup />
-            </div>
-            <div className="order-1 md:order-2">
-              <span className="text-xs font-bold text-nexusteal-400 uppercase tracking-widest mb-3 block">
-                The Evidence — Schools, Teachers &amp; Families
-              </span>
-              <h2 className={`${montserrat.className} text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5`}>
-                Discovered while there<br />was still time to fix it.
-              </h2>
-              <p className="text-white/60 leading-relaxed mb-8">
-                A strand-by-strand intelligence profile every term — teacher, parent, and school
-                leadership all reading the same evidence.
-              </p>
-              <Link
-                href="/learner-blueprint"
-                className={`inline-flex items-center gap-2 bg-white/8 border border-nexusteal-500/25 hover:bg-white/14 hover:border-nexusteal-400/40 text-white px-7 py-3.5 rounded-full font-bold transition-all ${FOCUS_RING}`}
-              >
-                Explore the Learner Blueprint
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
+          <div className="text-center max-w-140 mx-auto mb-14 md:mb-16">
+            <span className="text-xs font-bold text-nexusteal-400 uppercase tracking-widest mb-3 block">
+              The Evidence — Schools, Teachers &amp; Families
+            </span>
+            <h2 className={`${montserrat.className} text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5`}>
+              Discovered while there was still time to fix it.
+            </h2>
+            <p className="text-white/60 leading-relaxed mb-8">
+              A strand-by-strand intelligence profile every term — teacher, parent, and school
+              leadership all reading the same evidence.
+            </p>
+            <Link
+              href="/learner-blueprint"
+              className={`inline-flex items-center gap-2 bg-white/8 border border-brass-500/25 hover:bg-white/14 hover:border-brass-400/40 text-white px-7 py-3.5 rounded-full font-bold transition-all ${FOCUS_RING}`}
+            >
+              Explore the Learner Blueprint
+              <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -482,7 +435,7 @@ export default function LandingPage() {
               href={closing.href}
               target="_blank"
               rel="noopener noreferrer"
-              className={`inline-flex items-center gap-2 bg-nexusteal-600 text-white px-10 py-4 rounded-full font-bold text-lg hover:bg-nexusteal-500 hover:scale-105 transition-all shadow-2xl shadow-nexusteal-600/30 ${FOCUS_RING}`}
+              className={`inline-flex items-center gap-2 bg-brass-500 text-nexus-ink px-10 py-4 rounded-full font-bold text-lg hover:bg-brass-400 hover:scale-105 transition-all shadow-2xl shadow-brass-600/30 ${FOCUS_RING}`}
             >
               {closing.label}
               <ArrowRight className="w-5 h-5" />
@@ -490,7 +443,7 @@ export default function LandingPage() {
           ) : (
             <Link
               href={closing.href}
-              className={`inline-flex items-center gap-2 bg-nexusteal-600 text-white px-10 py-4 rounded-full font-bold text-lg hover:bg-nexusteal-500 hover:scale-105 transition-all shadow-2xl shadow-nexusteal-600/30 ${FOCUS_RING}`}
+              className={`inline-flex items-center gap-2 bg-brass-500 text-nexus-ink px-10 py-4 rounded-full font-bold text-lg hover:bg-brass-400 hover:scale-105 transition-all shadow-2xl shadow-brass-600/30 ${FOCUS_RING}`}
             >
               {closing.label}
               <ArrowRight className="w-5 h-5" />

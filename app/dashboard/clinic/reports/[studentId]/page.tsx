@@ -3,6 +3,8 @@ export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
+import { adaptCanonicalCareersForClinic } from '@/lib/academicClinic/canonicalCareerAdapter'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -27,7 +29,6 @@ import {
   calculateVitals,
   generateActionPlan,
   generateJuniorGuidance,
-  generateSeniorGuidance,
   type SubjectProgress,
   type StudentProfile,
   type Vitals,
@@ -35,6 +36,10 @@ import {
   type JuniorGuidance,
   type SeniorGuidance
 } from '@/lib/academicClinic/reportGenerator'
+import { buildSeniorGuidanceFromCanonical } from '@/lib/academicClinic/canonicalSeniorGuidance'
+import { resolveCanonicalGrowthInput } from '@/lib/academicClinic/canonicalTrajectory'
+import { resolveCanonicalCareerMatches } from '@/lib/learnerIntelligence/careerIntelligenceOrchestration'
+import type { CanonicalGrowthInput } from '@/lib/academicClinic/reportGenerator'
 import { DownloadReportButton } from '@/components/clinic/DownloadReportButton'
 
 export default async function StudentReportPage({
@@ -149,8 +154,48 @@ export default async function StudentReportPage({
 
   // Generate guidance based on grade level
   const isJunior = student.grade <= 9
+
+  // Phase 9.1.7 — canonical careers CAREER_DATABASE does not already
+  // represent, so this surface (like assessmentPipeline.ts, Phase 9.1.6)
+  // also sees careers published after the one-off migration, in both normal
+  // matching and dream-career lookup.
+  let additionalCareers: import('@/lib/academicClinic/careerEngine').CareerData[] = []
+  try {
+    const canonicalCareers = await repos.careers.getAllCareersWithCOS()
+    additionalCareers = adaptCanonicalCareersForClinic(canonicalCareers)
+  } catch (err) {
+    console.error('[clinic/reports] canonical career fetch failed (non-fatal — falls back to CAREER_DATABASE only):', err)
+  }
+
   const juniorGuidance: JuniorGuidance | undefined = isJunior ? generateJuniorGuidance(subjectProgress) : undefined
-  const seniorGuidance: SeniorGuidance | undefined = !isJunior ? generateSeniorGuidance(subjectProgress, undefined, student.grade, student.current_pathway ?? undefined) : undefined
+
+  // Phase 2.1 (Decision 2 — one canonical career-ranking owner): this is the
+  // nav-reachable "View Report" surface (4 real entry points into this
+  // route, per the Phase 2 caller map) — it now sources top careers from
+  // resolveCanonicalCareerMatches(), the same canonical engine the
+  // download route and the auto-emailed pipeline now use, instead of the
+  // legacy CareerEngine.
+  let seniorGuidance: SeniorGuidance | undefined
+  if (!isJunior) {
+    try {
+      const canonical = await resolveCanonicalCareerMatches(student.id)
+      seniorGuidance = buildSeniorGuidanceFromCanonical(canonical, subjectProgress, student.name?.split(' ')[0] ?? 'This student', student.grade)
+    } catch (err) {
+      console.error('[clinic/reports] canonical career match resolution failed (non-fatal — page still renders):', err)
+      seniorGuidance = buildSeniorGuidanceFromCanonical({ matches: [], mode: 'planning', insufficientEvidence: true, generatedAt: null }, subjectProgress, student.name?.split(' ')[0] ?? 'This student', student.grade)
+    }
+  }
+
+  // Phase 2.2 (canonical trajectory closure, Step 22 — cross-surface
+  // consistency): same canonical Projection growth/risk read the other two
+  // live report paths now use, so this nav-reachable surface can't disagree
+  // with the auto-emailed report or the paid download for the same learner.
+  let canonicalGrowth: CanonicalGrowthInput | null = null
+  try {
+    canonicalGrowth = await resolveCanonicalGrowthInput(student.id)
+  } catch (err) {
+    console.error('[clinic/reports] canonical growth resolution failed (non-fatal — page still renders):', err)
+  }
 
   // Generate final report
   const report = generateReport(
@@ -160,7 +205,10 @@ export default async function StudentReportPage({
     actionPlan,
     assessments,
     juniorGuidance,
-    seniorGuidance
+    seniorGuidance,
+    undefined,
+    additionalCareers,
+    canonicalGrowth
   )
 
   // Access status. Both reads here were querying columns that do not exist —
@@ -309,8 +357,13 @@ export default async function StudentReportPage({
           </div>
         </div>
 
-        {/* Guidance Section */}
-        {isJunior && report.juniorGuidance && (
+        {/* Guidance Section — pilot gate fix (2026-08-25): a zero-evidence
+            learner used to see this same card headlined with a confident
+            "Pathway Recommendation" (recommendedPathway defaulted to 'Arts
+            & Sports Science' via a NaN-average comparison that always fell
+            through). Render the honest insufficient-evidence state instead
+            of the recommendation heading/reasoning in that case. */}
+        {isJunior && report.juniorGuidance && !report.juniorGuidance.insufficientEvidence && (
           <div className="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-3xl p-8 text-white">
             <h2 className="text-2xl font-black mb-4 flex items-center gap-2">
               <Target className="w-6 h-6" />
@@ -318,7 +371,7 @@ export default async function StudentReportPage({
             </h2>
             <p className="text-xl font-bold mb-4">{report.juniorGuidance.recommendedPathway}</p>
             <p className="text-indigo-100 mb-4">{report.juniorGuidance.reasoning}</p>
-            
+
             {report.juniorGuidance.strengths.length > 0 && (
               <div className="mt-4">
                 <p className="font-bold mb-2">💪 Strengths:</p>
@@ -329,6 +382,18 @@ export default async function StudentReportPage({
                 </ul>
               </div>
             )}
+          </div>
+        )}
+        {isJunior && report.juniorGuidance?.insufficientEvidence && (
+          <div className="bg-slate-100 rounded-3xl p-8 text-slate-700">
+            <h2 className="text-2xl font-black mb-4 flex items-center gap-2">
+              <Target className="w-6 h-6" />
+              Pathway Recommendation
+            </h2>
+            <p className="text-slate-600">
+              Not enough evidence yet to recommend a pathway. Once at least one subject assessment is
+              recorded for this learner, a pathway recommendation will appear here.
+            </p>
           </div>
         )}
 
@@ -394,12 +459,12 @@ export default async function StudentReportPage({
           </div>
         </div>
 
-        {/* Clinical Assessment */}
+        {/* Academic Summary */}
         {report.clinicalOverview && (
           <div className="bg-amber-50 border-l-4 border-amber-400 rounded-2xl p-6">
             <h2 className="font-black text-slate-900 mb-3 flex items-center gap-2">
               <Brain className="w-5 h-5 text-amber-600" />
-              Clinical Assessment
+              Academic Summary
             </h2>
             <p className="text-slate-700 leading-relaxed">
               {report.clinicalOverview.clinicalParagraph}

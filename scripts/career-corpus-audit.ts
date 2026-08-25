@@ -27,6 +27,18 @@
 // a live pipeline. Until that is done deliberately, this script at least makes
 // the drift visible instead of silent.
 //
+// Phase 9.1.6 update: this drift for the EXISTING 40 CAREER_DATABASE careers
+// is still real and unresolved (rewriting their scores would require
+// reconstructing `kenyaShortageScore` and precise `minimumLevels`, neither of
+// which survives in Postgres — see canonicalCareerAdapter.ts's header). What
+// changed is additive only: CareerEngine.matchCareers() now ALSO scores any
+// canonical Postgres career CAREER_DATABASE doesn't already represent (via
+// lib/academicClinic/canonicalCareerAdapter.ts, wired in
+// assessmentPipeline.ts), so a career published after this audit script was
+// written is no longer invisible to Academic Clinic. It just doesn't fix the
+// near-duplicate/independently-authored problem this script documents below
+// for the 40 that were already there.
+//
 // It also catches a second problem that has nothing to do with the split: the
 // `careers` table contains near-duplicate rows. Two careers with the same
 // category and the same capability cluster score almost identically, so a

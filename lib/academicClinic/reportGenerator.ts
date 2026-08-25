@@ -1,7 +1,7 @@
 // lib/academicClinic/reportGenerator.ts
 
-import { CareerEngine, analyzeDreamCareer } from './careerEngine'
-import { calculateJuniorPathwayAffinity, formatSubjectName as pathwayFormatSubjectName } from '@/lib/pathwayCalculator'
+import { CareerEngine, analyzeDreamCareer, type CareerData } from './careerEngine'
+import { calculateJuniorPathwayAffinity, formatSubjectName as pathwayFormatSubjectName, PATHWAY_RULES } from '@/lib/pathwayCalculator'
 import {
   StudentProfile,
   SubjectProgress,
@@ -112,10 +112,10 @@ export function getLevelLabel(level: number): string {
 
 const CLINICAL_OBS: Record<string, Record<number, string>> = {
   mathematics: {
-    1: 'Critical gap in mathematical foundations. Clinical recommendation: daily 15-minute structured practice targeting number operations, fractions, and algebraic thinking.',
+    1: 'Critical gap in mathematical foundations. Recommended focus: daily 15-minute structured practice targeting number operations, fractions, and algebraic thinking.',
     2: 'Developing mathematical competency with identifiable procedural gaps. Structured support in problem-solving strategies and concept application is indicated.',
     3: 'Demonstrates proficient mathematical reasoning. Trajectory indicates readiness for advanced problem-solving and applied quantitative work.',
-    4: 'Exceptional mathematical aptitude identified. Clinical recommendation: advanced enrichment through competition mathematics and applied STEM projects.',
+    4: 'Exceptional mathematical aptitude identified. Recommended focus: advanced enrichment through competition mathematics and applied STEM projects.',
   },
   core_mathematics: {
     1: 'Critical gap in core mathematical foundations. Priority intervention required in number sense, algebraic reasoning, and mathematical communication.',
@@ -124,7 +124,7 @@ const CLINICAL_OBS: Record<string, Record<number, string>> = {
     4: 'Exceptional aptitude in core mathematics. Strong candidate for advanced mathematics tracks and STEM-oriented university programmes.',
   },
   essential_mathematics: {
-    1: 'Foundational numeracy gaps identified as a priority intervention area. Concrete, practical mathematics in real-world contexts is clinically recommended.',
+    1: 'Foundational numeracy gaps identified as a priority intervention area. Concrete, practical mathematics in real-world contexts is recommended.',
     2: 'Developing numerical and functional competency. Structured practical application of mathematics concepts will build confidence and fluency.',
     3: 'Demonstrates functional mathematical competency. Positive trajectory for applied contexts in business, finance, and vocational pathways.',
     4: 'Exceptional practical mathematical aptitude. Outstanding foundation for business, finance, and technical career pathways.',
@@ -133,10 +133,10 @@ const CLINICAL_OBS: Record<string, Record<number, string>> = {
     1: 'Critical gaps in English language competency identified. Priority intervention in reading comprehension, vocabulary development, and written expression is indicated.',
     2: 'Developing English language proficiency with emerging communication ability. A structured reading programme with teacher-supported writing tasks will accelerate progress.',
     3: 'Demonstrates proficient English competency. Strong academic communication foundation well-suited for humanities and professional pathways.',
-    4: 'Exceptional English language aptitude. Clinical recommendation: advanced reading programmes, essay competitions, and debate club engagement.',
+    4: 'Exceptional English language aptitude. Recommended focus: advanced reading programmes, essay competitions, and debate club engagement.',
   },
   kiswahili_ksl: {
-    1: 'Emerging Kiswahili competency identified as a priority intervention area. Daily reading and structured oral practice is clinically recommended.',
+    1: 'Emerging Kiswahili competency identified as a priority intervention area. Daily reading and structured oral practice is recommended.',
     2: 'Developing Kiswahili language skills with gaps in written expression. Regular engagement with Kiswahili literature and grammar exercises is indicated.',
     3: 'Demonstrates proficient Kiswahili competency. Solid national language foundation for communication and civic engagement.',
     4: 'Exceptional Kiswahili language aptitude. Outstanding linguistic asset for law, diplomacy, and communication pathways.',
@@ -148,7 +148,7 @@ const CLINICAL_OBS: Record<string, Record<number, string>> = {
     4: 'Exceptional Kiswahili aptitude. A significant linguistic asset across multiple career and civic pathways.',
   },
   integrated_science: {
-    1: 'Critical gap in scientific reasoning and process skills. Practical laboratory engagement and concept mapping are clinically recommended to build foundational understanding.',
+    1: 'Critical gap in scientific reasoning and process skills. Practical laboratory engagement and concept mapping are recommended to build foundational understanding.',
     2: 'Emerging scientific competency. Structured inquiry-based learning and regular practical work will strengthen conceptual and procedural science skills.',
     3: 'Demonstrates proficient scientific thinking and investigative reasoning. Strong trajectory for specialisation in biology, chemistry, or physics.',
     4: 'Exceptional scientific aptitude identified. Strong STEM pathway candidate — science fair participation and advanced projects are recommended.',
@@ -166,7 +166,7 @@ const CLINICAL_OBS: Record<string, Record<number, string>> = {
     4: 'Exceptional chemistry aptitude. Medicine, chemical engineering, pharmacy, and materials science pathways are strongly indicated.',
   },
   physics: {
-    1: 'Critical gap in physics reasoning. Practical experiments and real-world problem applications are clinically recommended to build conceptual foundations.',
+    1: 'Critical gap in physics reasoning. Practical experiments and real-world problem applications are recommended to build conceptual foundations.',
     2: 'Emerging physics competency with gaps in applied problem-solving. Structured support in mechanics, waves, and electricity is indicated.',
     3: 'Demonstrates proficient physics understanding. Strong trajectory for engineering, architecture, and applied technology pathways.',
     4: 'Exceptional physics aptitude. Engineering, aerospace, computer science, and applied sciences are strongly indicated career pathways.',
@@ -178,13 +178,13 @@ const CLINICAL_OBS: Record<string, Record<number, string>> = {
     4: 'Exceptional computing aptitude identified. Software engineering, data science, and cybersecurity pathways are strongly indicated.',
   },
   social_studies: {
-    1: 'Emerging social studies competency. Structured engagement with civic, cultural, and historical concepts is clinically recommended.',
+    1: 'Emerging social studies competency. Structured engagement with civic, cultural, and historical concepts is recommended.',
     2: 'Developing social understanding with gaps in civic reasoning and historical context. Regular reading of structured summaries will build competency.',
     3: 'Demonstrates proficient social and civic knowledge. Strong foundation for humanities, law, and public service pathways.',
     4: 'Exceptional social studies aptitude. Law, governance, education, diplomacy, and development studies are strongly indicated.',
   },
   history_citizenship: {
-    1: 'Priority intervention in historical reasoning and civic understanding. Narrative-based, story-driven learning is clinically recommended.',
+    1: 'Priority intervention in historical reasoning and civic understanding. Narrative-based, story-driven learning is recommended.',
     2: 'Developing historical competency. Structured review of key events, timelines, and civic frameworks will build deeper understanding.',
     3: 'Demonstrates proficient understanding of history and citizenship. Excellent foundation for social sciences and civic leadership.',
     4: 'Exceptional historical and civic aptitude. Law, political science, diplomacy, and public administration are strongly indicated.',
@@ -208,7 +208,7 @@ const CLINICAL_OBS: Record<string, Record<number, string>> = {
     4: 'Exceptional creative and athletic aptitude. Sports science, graphic design, performing arts, and coaching pathways are strongly indicated.',
   },
   agriculture_nutrition: {
-    1: 'Priority intervention in agriculture and nutrition concepts. Practical farm-based and kitchen-based learning activities are clinically recommended.',
+    1: 'Priority intervention in agriculture and nutrition concepts. Practical farm-based and kitchen-based learning activities are recommended.',
     2: 'Developing agricultural and nutritional competency. Hands-on field engagement and structured nutritional case studies will strengthen understanding.',
     3: 'Demonstrates proficient agricultural and nutritional knowledge. Good foundation for agribusiness, food science, and environmental sustainability.',
     4: 'Exceptional aptitude in agriculture and nutrition. Agribusiness, food technology, nutritional science, and environmental management are strongly indicated.',
@@ -246,10 +246,10 @@ const CLINICAL_OBS: Record<string, Record<number, string>> = {
 }
 
 const DEFAULT_OBS: Record<number, string> = {
-  1: 'Priority intervention area identified. Structured and targeted support is clinically recommended to address foundational gaps in this subject.',
+  1: 'Priority intervention area identified. Structured and targeted support is recommended to address foundational gaps in this subject.',
   2: 'Emerging competency with identifiable gaps. Consistent structured practice will support progression toward proficiency.',
   3: 'Demonstrates proficient competency. Trajectory indicates steady and sustainable academic progress in this subject.',
-  4: 'Exceptional aptitude demonstrated. Enrichment, advanced engagement, and leadership opportunities are clinically recommended.',
+  4: 'Exceptional aptitude demonstrated. Enrichment, advanced engagement, and leadership opportunities are recommended.',
 }
 
 export function getClinicalObservation(subject: string, level: number): string {
@@ -284,7 +284,7 @@ function buildClinicalParagraph(firstName: string, subjects: SubjectProgress[], 
       (weak2.length > 0
         ? `${weak2[0]} represents an emerging challenge that warrants targeted attention to maintain the overall trajectory. `
         : '') +
-      `Clinical recommendation: sustain high performance through advanced enrichment and competition exposure while proactively closing any emerging gaps.`
+      `Recommended focus: sustain high performance through advanced enrichment and competition exposure while proactively closing any emerging gaps.`
   }
   if (avg >= 3.0) {
     return `${firstName} demonstrates strong and consistent academic competency, with a well-rounded performance profile across assessed subjects. ` +
@@ -300,7 +300,7 @@ function buildClinicalParagraph(firstName: string, subjects: SubjectProgress[], 
         ? `The assessment identifies ${weak2.join(' and ')} as priority intervention areas requiring structured and consistent support to close identified foundational gaps. `
         : '') +
       `${firstName}'s performance trajectory indicates a learner with real potential — with targeted intervention, meaningful improvement is achievable within one academic term. ` +
-      `Clinical recommendation: implement the 3-week holiday action plan with particular focus on identified priority areas to build a stronger foundation for the coming term.`
+      `Recommended focus: implement the 3-week holiday action plan with particular focus on identified priority areas to build a stronger foundation for the coming term.`
   }
   if (avg >= 2.0) {
     return `${firstName}'s current assessment reveals developing competency across the curriculum, with relative strengths observed in ${top2.join(' and ')}. ` +
@@ -308,18 +308,59 @@ function buildClinicalParagraph(firstName: string, subjects: SubjectProgress[], 
         ? `Priority intervention areas include ${weak2.join(' and ')}, where foundational gaps have been clearly identified and require immediate structured support. `
         : '') +
       `The trajectory indicates that consistent, structured support is essential at this stage to unlock ${firstName}'s academic potential. ` +
-      `Clinical recommendation: an intensive holiday study programme combined with regular EduNexus Learning Compass sessions will be critical in reversing this trajectory.`
+      `Recommended focus: an intensive holiday study programme combined with regular EduNexus Learning Compass sessions will be critical in reversing this trajectory.`
   }
   return `${firstName}'s current assessment reveals emerging competency across multiple curriculum areas, with ${weak2.join(' and ')} identified as critical priority intervention areas. ` +
     `Foundational gaps across several subjects indicate that intensive, structured support is urgently required. ` +
     `Early and consistent intervention at this developmental stage yields significantly positive outcomes — the holiday period represents a critical intervention window. ` +
-    `Clinical recommendation: implement the daily holiday study plan immediately, engage the EduNexus Learning Compass three times per week, and share this report with ${firstName}'s class teacher.`
+    `Recommended focus: implement the daily holiday study plan immediately, engage the EduNexus Learning Compass three times per week, and share this report with ${firstName}'s class teacher.`
+}
+
+// Phase 2.2 (canonical trajectory closure) — the direction-of-change
+// concept this label represents is canonically owned by Projection's
+// growth projector (lib/projection/growthProjector.ts), not by Clinic. This
+// mapping is presentation-only: it translates an already-computed canonical
+// `Trend` (+ already-computed `risk.overallRiskLevel` for severity banding)
+// into Clinic's pre-existing 4-value vocabulary — it never re-derives
+// direction from raw scores. `insufficient_data` (and the "no projection at
+// all" case) intentionally falls through to a CURRENT-STATE severity read
+// (the exact avg-threshold bands the old assessments-based fallback already
+// used below) rather than a fabricated trend claim — per Phase 2.2's
+// product principle: one point is current-state intelligence, not a trend.
+export type CanonicalGrowthInput = {
+  trend: import('@/lib/projection/types').Trend | null
+  riskLevel: import('@/lib/projection/types').RiskValue['overallRiskLevel'] | null
+}
+
+function mapCanonicalTrajectory(
+  canonicalGrowth: CanonicalGrowthInput,
+  avg: number,
+): 'IMPROVING' | 'STABLE' | 'NEEDS ATTENTION' | 'CRITICAL' {
+  const { trend, riskLevel } = canonicalGrowth
+  if (trend === 'improving') return 'IMPROVING'
+  if (trend === 'declining') return riskLevel === 'critical' ? 'CRITICAL' : 'NEEDS ATTENTION'
+  if (trend === 'stable' || trend === 'mixed') return 'STABLE'
+  // trend is 'insufficient_data' or null — no directional claim available;
+  // fall back to the same current-average severity bands the legacy
+  // no-history path already used (reused, not reinvented).
+  if (avg < 1.5) return 'CRITICAL'
+  if (avg < 2.0) return 'NEEDS ATTENTION'
+  return 'STABLE'
 }
 
 export function generateClinicalOverview(
   firstName: string,
   subjects: SubjectProgress[],
-  assessments: Array<Record<string, unknown>>
+  assessments: Array<Record<string, unknown>>,
+  // Optional — when supplied (every live server-side report path, per
+  // Phase 2.2), trajectory is sourced from canonical Projection via
+  // mapCanonicalTrajectory() above. When omitted, the legacy
+  // assessments-array-diffing fallback below runs unchanged — kept only for
+  // the one remaining orphaned, unreachable-from-nav client-only surface
+  // (app/academic-clinic/page.tsx) that has no straightforward path to
+  // fetch a canonical Projection before composing its client-side preview,
+  // same precedent as Phase 2.1's career cutover.
+  canonicalGrowth?: CanonicalGrowthInput | null
 ): ClinicalOverview {
   const avg        = subjects.reduce((s, x) => s + x.level, 0) / subjects.length
   const rounded    = Math.max(1, Math.min(4, Math.round(avg))) as 1 | 2 | 3 | 4
@@ -329,22 +370,33 @@ export function generateClinicalOverview(
   const clinicalStrengths = byDesc.filter(s => s.level >= 3).slice(0, 3)
   const priorityAreas     = byAsc.filter(s => s.level <= 2).slice(0, 3)
 
-  let trajectory: 'IMPROVING' | 'STABLE' | 'NEEDS ATTENTION' | 'CRITICAL' = 'STABLE'
-  if (avg < 1.5) {
-    trajectory = 'CRITICAL'
-  } else if (assessments.length >= 2) {
-    const prev     = (assessments[assessments.length - 2]?.subject_scores as Record<string, number>) || {}
-    const prevVals = Object.values(prev)
-    if (prevVals.length > 0) {
-      const prevAvg = prevVals.reduce((s, v) => s + (v || 0), 0) / prevVals.length
-      const diff    = avg - prevAvg
-      if (diff > 0.15)       trajectory = 'IMPROVING'
-      else if (diff < -0.15) trajectory = 'NEEDS ATTENTION'
-      else                   trajectory = 'STABLE'
-    }
+  let trajectory: 'IMPROVING' | 'STABLE' | 'NEEDS ATTENTION' | 'CRITICAL'
+  if (canonicalGrowth) {
+    trajectory = mapCanonicalTrajectory(canonicalGrowth, avg)
   } else {
-    if (avg < 2.0)      trajectory = 'NEEDS ATTENTION'
-    else if (avg < 1.5) trajectory = 'CRITICAL'
+    // Legacy fallback (pre-Phase-2.2 algorithm) — the exact pooled-average,
+    // raw-assessment-diffing approach Projection's own growthProjector.ts
+    // deliberately moved away from (Phase 4B.1, see that file's header) for
+    // producing false directional verdicts. Retained ONLY for the orphaned
+    // client-only preview page; every live server path now passes
+    // canonicalGrowth and never reaches this branch.
+    trajectory = 'STABLE'
+    if (avg < 1.5) {
+      trajectory = 'CRITICAL'
+    } else if (assessments.length >= 2) {
+      const prev     = (assessments[assessments.length - 2]?.subject_scores as Record<string, number>) || {}
+      const prevVals = Object.values(prev)
+      if (prevVals.length > 0) {
+        const prevAvg = prevVals.reduce((s, v) => s + (v || 0), 0) / prevVals.length
+        const diff    = avg - prevAvg
+        if (diff > 0.15)       trajectory = 'IMPROVING'
+        else if (diff < -0.15) trajectory = 'NEEDS ATTENTION'
+        else                   trajectory = 'STABLE'
+      }
+    } else {
+      if (avg < 2.0)      trajectory = 'NEEDS ATTENTION'
+      else if (avg < 1.5) trajectory = 'CRITICAL'
+    }
   }
 
   return {
@@ -378,6 +430,23 @@ const PATHWAY_MAP: Record<string, 'STEM' | 'Social Sciences' | 'Arts & Sports Sc
 // ─── Junior Guidance (web UI backward compat) ─────────────────────────────────
 
 export function generateJuniorGuidance(subjects: SubjectProgress[]): JuniorGuidance {
+  // Pilot Gate Fix (zero-evidence pathway fabrication, 2026-08-25): with zero
+  // subjects, `vitals.overallAverage` is `0/0 = NaN`, and every `avg >= N`
+  // comparison below is false — the ternary used to silently fall through to
+  // its final branch ('Arts & Sports Science'), producing a confident
+  // "recommended pathway" and reasoning sentence ("With an average of
+  // NaN/4.0...") from literally no evidence. Guard the zero-evidence case
+  // explicitly rather than relying on NaN comparisons to fail safe — they
+  // don't; they fail into whichever branch happens to be last.
+  if (subjects.length === 0) {
+    return {
+      recommendedPathway: 'Insufficient Evidence',
+      reasoning: 'Not enough evidence yet to recommend a pathway. Once at least one subject assessment is recorded for this learner, a pathway recommendation will appear here.',
+      strengths: [],
+      areasToImprove: [],
+      insufficientEvidence: true,
+    }
+  }
   const vitals  = calculateVitals(subjects)
   const avg     = vitals.overallAverage
   const rec     = avg >= 3.0 ? 'STEM' : avg >= 2.0 ? 'Social Sciences' : 'Arts & Sports Science'
@@ -386,12 +455,22 @@ export function generateJuniorGuidance(subjects: SubjectProgress[]): JuniorGuida
     reasoning: `With an average of ${avg}/4.0, the ${rec} pathway is recommended based on current performance.`,
     strengths:       subjects.filter(s => s.level >= 3).map(s => s.displayName).slice(0, 3),
     areasToImprove:  subjects.filter(s => s.level <= 2).map(s => s.displayName).slice(0, 3),
+    insufficientEvidence: false,
   }
 }
 
 // ─── Career Intelligence (Senior — Page 4B) ───────────────────────────────────
 
-export function generateSeniorGuidance(subjects: SubjectProgress[], firstName = 'This student', grade = 10, currentPathway?: string): SeniorGuidance {
+export function generateSeniorGuidance(
+  subjects: SubjectProgress[],
+  firstName = 'This student',
+  grade = 10,
+  currentPathway?: string,
+  // Phase 9.1.6 — canonical Postgres careers not already in CAREER_DATABASE,
+  // pre-fetched and adapted by the caller (assessmentPipeline.ts). Optional
+  // and additive: omitting it reproduces the exact pre-Phase-9.1.6 output.
+  additionalCareers: CareerData[] = []
+): SeniorGuidance {
   const engine = new CareerEngine()
   const scores = Object.fromEntries(subjects.map(s => [s.subject, s.level]))
   const subjectAvg = subjects.reduce((s, x) => s + x.level, 0) / subjects.length
@@ -400,7 +479,7 @@ export function generateSeniorGuidance(subjects: SubjectProgress[], firstName = 
   // Careers below this score read as discouraging ("21% match") rather than useful —
   // hide them here at the report layer so the shared engine's hidden-gems threshold (35) stays intact.
   const MIN_DISPLAY_SCORE = 45
-  const engineResults = engine.matchCareers(scores, tier, 'cbc', currentPathway)
+  const engineResults = engine.matchCareers(scores, tier, 'cbc', currentPathway, additionalCareers)
     .filter(match => match.matchScore >= MIN_DISPLAY_SCORE)
     .slice(0, 3)
 
@@ -429,6 +508,16 @@ export function generateSeniorGuidance(subjects: SubjectProgress[], firstName = 
         name: match.career.name,
         kenyanPathway: match.career.cbeReadiness.recommendedSeniorPath,
         requiredSubjects: match.career.matchRequirements.primarySubjects,
+        // Phase 2 — carry the already-computed AI-impact value through
+        // instead of letting it die here (it used to be dropped at this
+        // exact point, forcing buildCareerInsightCards to re-guess from the
+        // career name via keyword matching instead of using this real value,
+        // which is populated for every CareerData — both the legacy
+        // CAREER_DATABASE entries and canonical-adapter-sourced careers).
+        aiImpact: {
+          disruptionRisk: match.career.aiImpact.disruptionRisk,
+          growthOutlook: match.career.aiImpact.growthOutlook,
+        },
       },
       score, matchStrength, keyHits, gapSubjects,
     }
@@ -451,6 +540,7 @@ export function generateSeniorGuidance(subjects: SubjectProgress[], firstName = 
       keyGap,
       kenyanPathway: career.kenyanPathway,
       requiredSubjects: career.requiredSubjects,
+      aiImpact: career.aiImpact,
     }
   })
 
@@ -731,12 +821,28 @@ function getPathwayStatus(score: number): { label: PathwayStatusLabel; color: st
 
 type PathwayReq = { subjects: string[]; displayName: string; required: number }
 
+// Phase 2.1 (canonical pathway ownership) — STEM's Mathematics/Integrated
+// Science rows here already agreed with the canonical PATHWAY_RULES.STEM
+// thresholds, so they stay as their own rows. English and Kiswahili used to
+// be two separate rows gated at required=3/required=2 respectively — a
+// second, independently-invented threshold pair that disagreed with the
+// canonical calculateJuniorPathwayAffinity()'s own PATHWAY_RULES.STEM rule
+// (a single combined language_avg >= 2.5), proven in
+// lib/academicClinic/engineDivergenceCharacterization.test.ts to produce
+// contradictory gap status for the same learner. STEM's language
+// requirement is now built by buildStemLanguageGapRow() below, using
+// PATHWAY_RULES.STEM.language_avg directly — one canonical threshold,
+// not two invented ones. Social Sciences/Arts & Sports Science keep their
+// own PATHWAY_REQS rows unchanged: PATHWAY_RULES has no per-subject
+// requirements for either pathway (SOCIAL_SCIENCES only defines an overall
+// minimum_avg, ARTS defines none at all — lib/pathwayCalculator.ts:118-130),
+// so there is no canonical per-subject rule for these two rows to duplicate
+// or contradict — this is Clinic's own legitimate interpretation
+// (Category D — unowned intelligence), not a second copy of a canonical fact.
 const PATHWAY_REQS: Record<string, PathwayReq[]> = {
   'STEM': [
     { subjects: ['mathematics', 'core_mathematics'], displayName: 'Mathematics',        required: 3 },
     { subjects: ['integrated_science'],              displayName: 'Integrated Science',  required: 3 },
-    { subjects: ['english'],                          displayName: 'English',             required: 3 },
-    { subjects: ['kiswahili', 'kiswahili_ksl'],      displayName: 'Kiswahili',           required: 2 },
   ],
   'Social Sciences': [
     { subjects: ['english'],                                           displayName: 'English',                  required: 3 },
@@ -750,6 +856,42 @@ const PATHWAY_REQS: Record<string, PathwayReq[]> = {
     { subjects: ['kiswahili', 'kiswahili_ksl'],     displayName: 'Kiswahili',              required: 2 },
     { subjects: ['mathematics', 'core_mathematics'], displayName: 'Mathematics',            required: 2 },
   ],
+}
+
+// STEM's language requirement, canonical-sourced: PATHWAY_RULES.STEM.language_avg
+// (2.5) is a single COMBINED English+Kiswahili average, not two separate
+// per-subject gates — the same rule calculateJuniorPathwayAffinity() itself
+// uses to decide STEM eligibility. Missing subjects are skipped from the
+// average (not zero-filled), matching calculateWeightedScore()'s own
+// sparse-data behaviour in lib/pathwayCalculator.ts — a learner with only
+// one of the two languages assessed still gets an honest partial average,
+// not a fabricated pass/fail. Returns null (no row shown) only when NEITHER
+// language has any evidence at all, matching the existing PATHWAY_REQS-row
+// convention of omitting a requirement nothing can be said about yet.
+//
+// currentLevel/requiredLevel stay integers (1-4) because the PDF's GapTable
+// renders them as CBC level badges (lib/academicClinic/pdfGenerator.tsx's
+// levelColor/levelBg index a 4-entry array by level-1) — a decimal average
+// would break that badge. The met/gap decision below uses the true 2.5
+// threshold on the unrounded average; only the displayed badge is rounded.
+function buildStemLanguageGapRow(subjectMap: Record<string, number>): PathwayGapRow | null {
+  const englishLevel   = subjectMap['english'] ?? 0
+  const kiswahiliLevel = subjectMap['kiswahili'] ?? subjectMap['kiswahili_ksl'] ?? 0
+  if (englishLevel === 0 && kiswahiliLevel === 0) return null
+
+  const present = [englishLevel, kiswahiliLevel].filter(l => l > 0)
+  const langAvg = present.reduce((a, b) => a + b, 0) / present.length
+  const threshold = PATHWAY_RULES.STEM.language_avg
+  const met = langAvg >= threshold
+
+  return {
+    subjectKey:    'languages',
+    displayName:   'Languages (English & Kiswahili avg.)',
+    currentLevel:  Math.max(1, Math.min(4, Math.round(langAvg))),
+    requiredLevel: Math.ceil(threshold),
+    gap:           met ? 0 : 1,
+    status:        met ? 'met' : 'one_step',
+  }
 }
 
 function buildPathwayReadinessCards(
@@ -793,6 +935,10 @@ function buildPathwayReadinessCards(
         gap,
         status: rowStatus,
       })
+    }
+    if (key === 'STEM') {
+      const languageRow = buildStemLanguageGapRow(subjectMap)
+      if (languageRow) gapRows.push(languageRow)
     }
 
     const metNames = gapRows.filter(r => r.status === 'met').map(r => r.displayName)
@@ -999,6 +1145,32 @@ function getCareerMeta(name: string): {
   return { futureOutlook: 'Stable', aiImpact: 'Medium', selfEmployment: 'Medium', examples: ['Consulting', 'Private practice', 'Freelancing'] }
 }
 
+// Maps CareerMatch.aiImpact (real, already-computed disruption/growth data —
+// see generateSeniorGuidance) to the same label vocabulary getCareerMeta's
+// keyword-matching used to invent, so buildCareerInsightCards can use the
+// real value instead of guessing from the career's name.
+const GROWTH_OUTLOOK_LABEL: Record<'declining' | 'stable' | 'growing' | 'booming', string> = {
+  declining: 'Declining',
+  stable: 'Stable',
+  growing: 'Growing',
+  booming: 'Booming',
+}
+
+const DISRUPTION_RISK_LABEL: Record<'very_low' | 'low' | 'moderate' | 'high' | 'very_high', string> = {
+  very_low: 'Low',
+  low: 'Low–Medium',
+  moderate: 'Medium',
+  high: 'Medium–High',
+  very_high: 'High',
+}
+
+function mapCanonicalAiImpact(aiImpact: NonNullable<CareerMatch['aiImpact']>): { futureOutlook: string; aiImpact: string } {
+  return {
+    futureOutlook: GROWTH_OUTLOOK_LABEL[aiImpact.growthOutlook],
+    aiImpact:      DISRUPTION_RISK_LABEL[aiImpact.disruptionRisk],
+  }
+}
+
 // ─── Subject Improvement Impacts ─────────────────────────────────────────────
 
 const SUBJECT_IMPROVEMENT_IMPACTS: Record<string, string[]> = {
@@ -1137,10 +1309,30 @@ const PRIORITY_COMPASS_REASON: Record<string, string> = {
   creative_arts_sports: 'Creative Arts & Sports is the core subject confirming Arts & Sports Science pathway readiness.',
 }
 
-function getCompassReason(subjectKey: string, rank: number): string {
+// Pilot Artifact Acceptance phase fix — confirmed real contradiction: a
+// student whose recommended-pathway gap table showed every subject already
+// MET (e.g. Mathematics L3 with STEM requiring L3) still received the
+// static "This is currently the single subject preventing STEM
+// eligibility" reason, because this text was selected purely by rank/
+// subjectKey, with no check on whether the subject is an actual below-
+// requirement gap versus a `weakest`-sourced stretch/growth target. The
+// `isGap` flag (true only for items sourced from the recommended pathway's
+// own gapRows) keeps the "prevents/gates eligibility" language honest —
+// growth-target items (already meeting pathway requirements) get neutral
+// improvement language instead. Do not drop this flag / revert to
+// rank-only selection.
+function getCompassReason(subjectKey: string, rank: number, isGap: boolean): string {
   if (rank === 1) {
-    return PRIORITY_COMPASS_REASON[subjectKey]
-      ?? 'This is the highest-priority gap — addressing it first has the broadest impact on pathway readiness.'
+    if (isGap) {
+      return PRIORITY_COMPASS_REASON[subjectKey]
+        ?? 'This is the highest-priority gap — addressing it first has the broadest impact on pathway readiness.'
+    }
+    return 'This subject already meets pathway requirements — strengthening it further broadens options and improves competitiveness.'
+  }
+  if (!isGap) {
+    return rank === 2
+      ? 'A further improvement here builds on an already-strong foundation.'
+      : 'Continued growth here rounds out an already strong subject profile.'
   }
   return rank === 2
     ? 'This is the second priority gap — consistent support here strengthens overall pathway readiness.'
@@ -1159,17 +1351,17 @@ export function buildJuniorActionPriorities(
   }))
 
   const priorityKeys = new Set<string>()
-  const list: Array<{ subjectKey: string; displayName: string; currentLevel: number; targetLevel: number }> = []
+  const list: Array<{ subjectKey: string; displayName: string; currentLevel: number; targetLevel: number; isGap: boolean }> = []
 
   for (const gap of gapSubjects.slice(0, 2)) {
-    if (!priorityKeys.has(gap.subjectKey)) { priorityKeys.add(gap.subjectKey); list.push(gap) }
+    if (!priorityKeys.has(gap.subjectKey)) { priorityKeys.add(gap.subjectKey); list.push({ ...gap, isGap: true }) }
   }
 
   const weakest = [...subjects].sort((a, b) => a.level - b.level)
   for (const s of weakest) {
     if (!priorityKeys.has(s.subject)) {
       priorityKeys.add(s.subject)
-      list.push({ subjectKey: s.subject, displayName: s.displayName, currentLevel: s.level, targetLevel: Math.min(4, s.level + 1) })
+      list.push({ subjectKey: s.subject, displayName: s.displayName, currentLevel: s.level, targetLevel: Math.min(4, s.level + 1), isGap: false })
     }
     if (list.length >= 3) break
   }
@@ -1184,7 +1376,7 @@ export function buildJuniorActionPriorities(
       currentLevel:     item.currentLevel,
       targetLevel:      item.targetLevel,
       whyItMatters:     PRIORITY_WHY[item.subjectKey] ?? `Level ${item.targetLevel} in ${item.displayName} opens key pathway options.`,
-      compassReason:    getCompassReason(item.subjectKey, rank),
+      compassReason:    getCompassReason(item.subjectKey, rank, item.isGap),
       intervention:     `${sessions} Learning Compass sessions`,
       estimatedSessions: sessions,
       timeline,
@@ -1225,6 +1417,26 @@ export function buildSeniorReadinessIndicators(
   trajectory: 'IMPROVING' | 'STABLE' | 'NEEDS ATTENTION' | 'CRITICAL',
   firstName: string
 ): SeniorReadinessIndicators {
+  // Pilot Gate Fix (zero-evidence pathway fabrication, 2026-08-25 — Step 22
+  // cross-stage check): with zero subjects, `avg` is `0/0 = NaN`, `pct` is
+  // `NaN`, and every `pct >= N` comparison below is false — the same
+  // NaN-falls-through-to-the-last-branch pattern found in the Junior
+  // calculator, here producing a literal "NaN%" pathway readiness score and
+  // confident "Needs Work"/"Needs Attention" text that references "the
+  // chosen pathway" and "career access requires..." for a learner with no
+  // evidence at all. Guard explicitly rather than trusting NaN comparisons.
+  if (subjects.length === 0) {
+    return {
+      pathwayReadinessScore: 0,
+      universityReadiness: 'Needs Work',
+      universityReadinessDetail: 'Not enough evidence yet to assess university readiness. Once at least one subject assessment is recorded, this section will show a real readiness signal.',
+      careerReadiness: 'Needs Work',
+      careerReadinessDetail: 'Not enough evidence yet to assess career readiness. Once at least one subject assessment is recorded, this section will show a real readiness signal.',
+      pathwayProgress: 'Needs Attention',
+      pathwayProgressDetail: 'Not enough evidence yet to assess pathway progress. Once at least one subject assessment is recorded, this section will show a real progress signal.',
+      insufficientEvidence: true,
+    }
+  }
   const avg = subjects.reduce((s, x) => s + x.level, 0) / subjects.length
   const pct = (avg / 4) * 100
   const pathwayReadinessScore = Math.round(pct)
@@ -1245,7 +1457,11 @@ export function buildSeniorReadinessIndicators(
     'Strong':      `Subject performance aligns well with career entry requirements in the ${pw} sector.`,
     'Developing':  `Building strong foundations for ${pw} careers. One to two level improvements will confirm readiness.`,
     'Emerging':    `Career pathway is visible from current performance. Consistent support is needed to reach entry requirements.`,
-    'Needs Work':  `${pw} career access requires significant academic improvement. Prioritise the three subjects in the clinical action plan.`,
+    // Pilot Artifact Acceptance phase fix: this text cross-references the
+    // Senior page 3 section by name — that heading was renamed from
+    // "Clinical Action Plan" to "Priority Action Plan" (avoids medical/
+    // diagnostic-sounding language). Keep this in sync with that heading.
+    'Needs Work':  `${pw} career access requires significant academic improvement. Prioritise the three subjects in the priority action plan.`,
   }
 
   const progLabel = trajectory === 'IMPROVING' ? 'On Track' as const
@@ -1267,17 +1483,24 @@ export function buildSeniorReadinessIndicators(
     careerReadinessDetail:     carDetail[carLabel],
     pathwayProgress:           progLabel,
     pathwayProgressDetail:     progDetail[progLabel],
+    insufficientEvidence:      false,
   }
 }
 
 export function buildCareerInsightCards(seniorGuidance: SeniorGuidance): CareerInsightCard[] {
   return seniorGuidance.topCareers.slice(0, 3).map(c => {
     const meta = getCareerMeta(c.name)
+    // Phase 2 fix: prefer the real, already-computed aiImpact/growthOutlook
+    // carried on the match over getCareerMeta's name-keyword guess — only
+    // fall back to the guess when a match somehow has no aiImpact at all.
+    // selfEmployment/examples have no canonical equivalent, so they always
+    // come from getCareerMeta (Category D — unowned, Clinic-only intelligence).
+    const canonical = c.aiImpact ? mapCanonicalAiImpact(c.aiImpact) : null
     return {
       name:                   c.name,
       alignment:              c.matchPercentage,
-      futureOutlook:          meta.futureOutlook,
-      aiImpact:               meta.aiImpact,
+      futureOutlook:          canonical?.futureOutlook ?? meta.futureOutlook,
+      aiImpact:               canonical?.aiImpact ?? meta.aiImpact,
       selfEmploymentPotential: meta.selfEmployment,
       selfEmploymentExamples: meta.examples,
     }
@@ -1381,18 +1604,61 @@ export function generateReport(
   assessments:         Array<{ created_at?: string; dream_career?: string | null; [key: string]: unknown }>,
   juniorGuidance?:     JuniorGuidance,
   seniorGuidance?:     SeniorGuidance,
-  knowledgeRootCauses?: import('@/lib/knowledgeGraph/types').RootCauseResult[]
+  knowledgeRootCauses?: import('@/lib/knowledgeGraph/types').RootCauseResult[],
+  // Phase 9.1.7 — threaded into analyzeDreamCareer() only (generateSeniorGuidance
+  // takes its own copy directly from the caller, per Phase 9.1.6). Optional;
+  // omitting it reproduces the exact pre-Phase-9.1.7 behavior.
+  additionalCareers:   import('./careerEngine').CareerData[] = [],
+  // Phase 2.2 — the caller's canonical Projection growth/risk read (see
+  // CanonicalGrowthInput above generateClinicalOverview). Optional; omitting
+  // it reproduces the exact pre-Phase-2.2 legacy trajectory behavior.
+  canonicalGrowth?:    CanonicalGrowthInput | null
 ): AcademicClinicReport {
   const firstName = studentProfile.name.split(' ')[0]
   const isJunior  = studentProfile.grade >= 7 && studentProfile.grade <= 9
 
   const reportId         = `EC-${studentProfile.year}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
   const graphData        = generateGraphData(subjects)
-  const clinicalOverview = generateClinicalOverview(firstName, subjects, assessments)
+  const clinicalOverview = generateClinicalOverview(firstName, subjects, assessments, canonicalGrowth)
   let pathwayAnalysis: PathwayAnalysis | undefined = undefined
   if (isJunior) {
     const scores = Object.fromEntries(subjects.map(s => [s.subject, s.level]))
     const pr     = calculateJuniorPathwayAffinity(scores)
+
+    // Pilot Gate Fix (zero-evidence pathway fabrication, 2026-08-25): when the
+    // canonical calculator reports no usable evidence, do not build a
+    // confident recommendation, reasons, or "future pathway leads to
+    // Medicine/Law/Design..." narrative from it — every branch below this
+    // point assumed `pr.top_pathway` was always one of the three real
+    // pathway names and fell through to the Arts & Sports Science text for
+    // anything else, which is exactly how the sentinel would have leaked a
+    // second fabrication. `pathway_readiness` is intentionally left unset so
+    // the existing `if (pr)` truthiness checks further down (which gate
+    // pathwayReadinessCards/pathwayRoadmap/termActionPlan/juniorFutureOpportunities/
+    // juniorImprovementCascade/juniorActionPriorities/parentAction) skip
+    // building any of that confident content too, without needing their own
+    // separate guards.
+    if (pr.insufficientEvidence) {
+      // Honest placeholder: no pathwayScores (all zero would still read as
+      // "we measured and it's low"), no reasons/futureMessage narrative, and
+      // deliberately no `pathway_readiness` — every downstream field that
+      // depends on `if (pathwayAnalysis.pathway_readiness)` further down this
+      // function (pathwayReadinessCards, pathwayRoadmap, termActionPlan,
+      // juniorFutureOpportunities, juniorImprovementCascade,
+      // juniorActionPriorities, parentAction) already skips building
+      // anything when that's absent, so leaving it unset here is what makes
+      // all of those honestly empty too, without a second set of guards.
+      pathwayAnalysis = {
+        pathwayScores: [],
+        recommendedPathway: 'Insufficient Evidence',
+        confidenceLevel: 'DEVELOPING',
+        reasons: [],
+        subjectsToStrengthen: [],
+        futureMessage: '',
+        stem_viable: false,
+        insufficientEvidence: true,
+      }
+    } else {
     const recommended = pr.top_pathway as 'STEM' | 'Social Sciences' | 'Arts & Sports Science'
     const confMap = { high: 'HIGH', medium: 'MEDIUM', low: 'DEVELOPING' } as const
 
@@ -1442,6 +1708,7 @@ export function generateReport(
       to_unlock_social:        pr.to_unlock_social,
       to_maintain_recommended: pr.to_maintain_recommended,
       alternative_pathway:     pr.alternative_pathway,
+    }
     }
   }
   // ── Junior 3-page redesign v1 fields
@@ -1500,7 +1767,7 @@ export function generateReport(
 
   const cbcScores = Object.fromEntries(subjects.map(s => [s.subject, s.level]))
   const dreamCareerAnalysis = dreamCareerInput
-    ? analyzeDreamCareer(dreamCareerInput, cbcScores, studentProfile.pathway ?? undefined)
+    ? analyzeDreamCareer(dreamCareerInput, cbcScores, studentProfile.pathway ?? undefined, additionalCareers)
     : null
 
   return {
