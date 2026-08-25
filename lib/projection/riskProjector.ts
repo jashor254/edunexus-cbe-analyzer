@@ -7,7 +7,7 @@
 
 import type { EvidenceRow } from '@/lib/repositories/evidence.repository'
 import type { Projection, RiskValue, RiskFlag } from './types'
-import { computeCoverage, computeProjectionConfidence } from './coverage'
+import { computeCoverage, computeProjectionConfidence, sortEvidenceChronologically } from './coverage'
 
 export const RISK_PROJECTION_VERSION = 'risk-v1'
 
@@ -26,7 +26,7 @@ export function projectRisk(evidence: EvidenceRow[], now: Date = new Date()): Pr
 
   const flags: RiskFlag[] = []
   for (const [subject, rows] of bySubject) {
-    const sorted = [...rows].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    const sorted = sortEvidenceChronologically(rows)
     const latest = sorted[sorted.length - 1]
     const earliest = sorted[0]
     const declining = sorted.length >= 2 && latest.cbc_level! < earliest.cbc_level!

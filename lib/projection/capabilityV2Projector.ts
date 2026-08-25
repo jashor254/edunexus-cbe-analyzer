@@ -20,7 +20,7 @@
 
 import type { EvidenceRow } from '@/lib/repositories/evidence.repository'
 import type { Projection, CapabilityV2Value, CapabilityV2Dimension, CapabilityV2Score, CapabilityLevel, Trend } from './types'
-import { computeCoverage, computeProjectionConfidence, normalizeLevelToUnit, STABLE_THRESHOLD } from './coverage'
+import { computeCoverage, computeProjectionConfidence, normalizeLevelToUnit, STABLE_THRESHOLD, latestEvidencePerKey, sortEvidenceChronologically } from './coverage'
 
 export const CAPABILITY_V2_PROJECTION_VERSION = 'capability-v2'
 
@@ -80,11 +80,7 @@ export function projectCapabilityV2(evidence: EvidenceRow[], now: Date = new Dat
   if (scored.length === 0) return null
 
   // Latest evidence per subject only — same "current snapshot" contract as V1's capabilityProjector.
-  const latestBySubject = new Map<string, EvidenceRow>()
-  for (const e of scored) {
-    const existing = latestBySubject.get(e.subject)
-    if (!existing || new Date(e.created_at) > new Date(existing.created_at)) latestBySubject.set(e.subject, e)
-  }
+  const latestBySubject = latestEvidencePerKey(scored, e => e.subject)
 
   // Group ALL scored evidence (not just latest) per dimension, for trend + confidence.
   const evidenceByDimension = new Map<CapabilityV2Dimension, EvidenceRow[]>()
@@ -118,8 +114,7 @@ export function projectCapabilityV2(evidence: EvidenceRow[], now: Date = new Dat
     const totalWeight = contributors.reduce((s, c) => s + c.weight, 0)
     const weightedScore = contributors.reduce((s, c) => s + normalizeLevelToUnit(c.row.cbc_level!) * c.weight, 0) / totalWeight
 
-    const dimensionEvidence = (evidenceByDimension.get(dimension) ?? [])
-      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    const dimensionEvidence = sortEvidenceChronologically(evidenceByDimension.get(dimension) ?? [])
 
     const score: CapabilityV2Score = {
       dimension,

@@ -117,6 +117,40 @@ test('capability projector uses only the latest evidence per subject, not histor
   assert.deepEqual(p.capability!.supportingEvidenceIds, ['b'])
 })
 
+// Phase 3 audit (capability/risk authority) reproduced a real contradiction:
+// two rows sharing one `created_at` (routine — persistEvidenceBatch's
+// single-statement insert shares one Postgres statement-level NOW()) made
+// capabilityProjector.ts (a running `>` comparison, first-seen wins on a
+// tie) and academicProjector.ts (a plain `.sort()`, last-seen wins on a
+// tie under a stable sort) disagree about which row was "latest" —
+// opposite capability/trend verdicts from identical input. Both now go
+// through the shared sortEvidenceChronologically()/latestEvidencePerKey()
+// tie-break (lib/projection/coverage.ts), which this test locks in.
+test('same-timestamp evidence: every "latest wins" projector agrees on which row is latest', () => {
+  const tied = '2026-06-01T00:00:00Z'
+  const ev = [
+    evidence({ id: 'teacher-entry', subject: 'mathematics', cbc_level: 4, score: 92, created_at: tied }),
+    evidence({ id: 'quiz-entry', subject: 'mathematics', cbc_level: 1, score: 22, created_at: tied }),
+  ]
+  const p = computeLearnerProjection(LEARNER_ID, ev)
+
+  // Whichever row the shared tie-break picks, every projector that answers
+  // "what is the latest/current level for this subject" must pick the SAME
+  // one — never opposite conclusions for the same fixture.
+  const capabilityLatestId = p.capability!.supportingEvidenceIds[0]
+  const academicLatestId = p.academic!.value.bySubject.mathematics.history.at(-1)!.evidenceId
+
+  assert.equal(capabilityLatestId, academicLatestId, 'capabilityProjector and academicProjector must agree on which same-timestamp row is latest')
+
+  // The two agreeing projectors' capability/academic level must therefore
+  // also agree with each other about the resulting level, not contradict.
+  assert.equal(p.academic!.value.bySubject.mathematics.latestLevel === 4, p.capability!.value.bySubject.mathematics.level === 'exceptional')
+  assert.equal(p.academic!.value.bySubject.mathematics.latestLevel === 1, p.capability!.value.bySubject.mathematics.level === 'emerging')
+
+  // Knowledge Projector shares the same "latest per subject" contract.
+  assert.equal(p.knowledge!.value.bySubject.mathematics.currentLevel, p.academic!.value.bySubject.mathematics.latestLevel)
+})
+
 // ── Behaviour Projector ──────────────────────────────────────────────────────
 
 test('behaviour projector returns null when only academic-score evidence exists (no behavioural sources)', () => {

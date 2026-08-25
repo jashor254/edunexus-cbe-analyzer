@@ -15,6 +15,52 @@ const MS_PER_DAY = 1000 * 60 * 60 * 24
  */
 export const STABLE_THRESHOLD = 0.05
 
+/**
+ * The one chronological ordering every projector must share when deciding
+ * which evidence row is "latest" for a subject/sub-strand. Ties (identical
+ * `created_at` — routine, since a batched `persistEvidenceBatch()` insert
+ * shares one Postgres statement-level `now()`) are broken by `id`, which is
+ * arbitrary but deterministic and, critically, the SAME arbitrary choice
+ * every caller makes.
+ *
+ * Phase 3 audit (capability/risk authority) reproduced a real contradiction
+ * from this exact gap: capabilityProjector.ts kept the first-seen row on a
+ * tie (a running `>` comparison) while academicProjector.ts kept the
+ * last-seen row (a plain `.sort()` with no tie-break, relying on input
+ * order) — two projectors reading the identical evidence array could and
+ * did disagree about which row was "latest," producing opposite
+ * capability/trend verdicts from the same input. Every projector doing a
+ * "latest evidence" selection now sorts through this one function instead
+ * of re-deriving its own comparator.
+ */
+export function sortEvidenceChronologically(evidence: EvidenceRow[]): EvidenceRow[] {
+  return [...evidence].sort((a, b) => {
+    const byTime = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    if (byTime !== 0) return byTime
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+  })
+}
+
+/**
+ * The latest evidence row per key (subject, sub-strand, ...), using the
+ * shared chronological ordering above. `keyOf` returning `null` excludes a
+ * row from grouping (e.g. evidence with no resolved `sub_strand_id`) —
+ * the same "no fabricated entry" contract every projector already follows.
+ */
+export function latestEvidencePerKey<K extends string>(
+  evidence: EvidenceRow[],
+  keyOf: (e: EvidenceRow) => K | null
+): Map<K, EvidenceRow> {
+  const sorted = sortEvidenceChronologically(evidence)
+  const latest = new Map<K, EvidenceRow>()
+  for (const e of sorted) {
+    const key = keyOf(e)
+    if (key === null) continue
+    latest.set(key, e) // later rows (per sortEvidenceChronologically) overwrite earlier ones sharing a key
+  }
+  return latest
+}
+
 export function computeCoverage(evidence: EvidenceRow[], now: Date = new Date()): EvidenceCoverage {
   if (evidence.length === 0) {
     return { evidenceCount: 0, evidenceDiversity: 0, latestEvidenceAt: null, oldestEvidenceAt: null, freshnessDays: null }
