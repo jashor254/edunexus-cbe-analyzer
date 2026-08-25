@@ -170,6 +170,19 @@ async function getStudentAssignments(session: SyntheticSession): Promise<Respons
   return fetch(`${BASE_URL}/api/student/assignments`, { headers: { Cookie: session.cookieHeader } })
 }
 
+// Phase 7 — Learner Home Convergence split the flat pendingAssignments array
+// into a highlighted `nextAction` card plus a `continueAssignments` preview
+// (never both at once: the item chosen as nextAction is deliberately
+// excluded from continueAssignments so it isn't shown twice). This helper
+// reconstructs "every assignment id Home is showing anywhere" so this
+// file's pre-existing no-invented/no-hidden-eligibility invariant still
+// holds against the new, sectioned shape.
+function homeAssignmentIds(homeBody: { data: { nextAction: { kind: string; id: string } | null; continueAssignments: Array<{ id: string }> } }): Set<string> {
+  const ids = new Set(homeBody.data.continueAssignments.map(a => a.id))
+  if (homeBody.data.nextAction?.kind === 'assignment') ids.add(homeBody.data.nextAction.id)
+  return ids
+}
+
 async function mkClassResource(classId: string, title: string): Promise<string> {
   const { data: teacherClass, error: tcError } = await db
     .from('teacher_classes')
@@ -513,7 +526,7 @@ test('PART C: institutional learner\'s home pending-assignments widget matches /
   const homeResText = await homeRes.text()
   assert.equal(homeRes.status, 200, homeResText)
   const homeBody = JSON.parse(homeResText)
-  const homeIds = new Set((homeBody.data.pendingAssignments as Array<{ id: string }>).map(a => a.id))
+  const homeIds = homeAssignmentIds(homeBody)
   assert.ok(homeIds.has(assignment.id), 'home widget must show the institutional learner\'s real pending assignment')
 
   const assignmentsRes = await getStudentAssignments(session)
@@ -563,7 +576,7 @@ test('PART C: transferred learner\'s home widget reflects the SAME visibility as
   const homeResText = await homeRes.text()
   assert.equal(homeRes.status, 200, homeResText)
   const homeBody = JSON.parse(homeResText)
-  const homeIds = new Set((homeBody.data.pendingAssignments as Array<{ id: string }>).map(a => a.id))
+  const homeIds = homeAssignmentIds(homeBody)
 
   const assignmentsRes = await getStudentAssignments(session)
   const assignmentsBody = JSON.parse(await assignmentsRes.text())
