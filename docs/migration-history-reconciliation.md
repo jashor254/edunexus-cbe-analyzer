@@ -28,3 +28,69 @@ The fix for *this specific release* (manual, targeted SQL execution for the two 
 ## Scope note
 
 This is a dedicated project with its own review cycle — do not attempt it as part of, or a prerequisite to, deploying this release's 3 migrations. The two problems are independent: this release's migrations can be deployed safely today (see the deployment plan and this release's fix report) regardless of when the broader history gap gets closed.
+
+---
+
+## 2026-08-16 update (H1M → H1M-SNAPSHOT-3 arc)
+
+The "~22 migrations" figure above is **superseded and should not be used as a
+proxy for total schema loss.** It undercounted badly: one missing migration
+entry can produce 15+ tables (the Academy cluster); conversely a table can be
+missing from every tracked migration while its migration *entry* exists (or
+vice versa). The real picture, established by empirically reconstructing a
+fresh database twice from zero and proving it deterministic
+(`scripts/bootstrap-local-db/`, see its README for the full manifest), sorts
+into nine distinct categories:
+
+1. **Tracked repo migrations** — 107 files under `supabase/migrations/`, all
+   proven to replay cleanly on a fresh database (one, `20260629_core_foundation.sql`,
+   has a genuine internal bug in its final statement — a broken view — and
+   applies successfully minus that one statement).
+2. **Production migration entries with no repo file** — the `db_security_hardening_phase1-11`
+   sequence, the original `create_study_group_challenges`/`create_study_group_answers`,
+   `career_reality_engine_rebuild`, `eils_intelligence_learning_system`,
+   the devportal cluster (~8 entries), the Academy cluster (~15 entries),
+   `knowledge_graph_phase1_grade7_math` (a data-seed migration), and others —
+   all recovered verbatim from `supabase_migrations.schema_migrations.statements`
+   and now live in `scripts/bootstrap-local-db/00-baseline/`.
+3. **Pre-history/manual objects** — schema objects with no corresponding
+   migration *entry* at all in production's own history table, only
+   reconstructable from current live `information_schema`/`pg_get_functiondef`
+   introspection (e.g. several `careers` columns added after
+   `career_reality_engine_rebuild` by an unrecovered later change; several
+   functions targeted by security phases 8-11).
+4. **Version mismatches** — repo filename timestamp vs. production's recorded
+   version differ for the same-content migration (`eir_foundation`,
+   `baseline_sow_curriculum_schema`, `sow_tables`, `lms_quiz_extends_assignments`,
+   `growth_engine_sprint_c0`, and `sprint15_corrections`/`sprint14_security_hardening`,
+   the last pair notable because their filenames lexicographically *reverse*
+   true chronological order — see `01-security-hardening/phase11b-*.sql`'s
+   header for the concrete bug this caused and how it was corrected).
+5. **Fresh-bootstrap recovery artifacts** — everything under
+   `scripts/bootstrap-local-db/00-baseline/` and `01-security-hardening/`.
+   Deliberately kept out of `supabase/migrations/` so they stay invisible to
+   `supabase db push`/production migration discovery — they exist only to
+   reconstruct a *disposable local* database, never to be replayed against
+   production (which already has this state).
+6. **Historical data-only events excluded** — e.g.
+   `20260707_fix_strand_assessments_source_backfill.sql`, a pure data
+   backfill with no structural effect, deliberately skipped by the bootstrap.
+7. **Account-specific operations excluded** — none identified as schema-relevant;
+   none included in the bootstrap.
+8. **Security-hardening recovery** — the 11 `db_security_hardening_phase*`
+   operations plus the `sprint14`/`sprint15` policy rewrite, recovered and
+   proven to reach exact production parity (spot-checked: `auth_owns_student`,
+   `auth_is_guardian_of`, token/payment function grants, EILS deny-all RLS
+   posture, `v_api_*` `security_invoker`, and `study_group_challenges`
+   policy state — all confirmed matching live production as of 2026-08-16).
+9. **Known production-vs-bootstrap intentional differences** — none
+   outstanding. (A `study_group_challenges` policy divergence was open as of
+   H1M-SNAPSHOT-2; H1M-SNAPSHOT-3 determined it was a local reconstruction
+   ordering bug — not a real difference — and fixed it.)
+
+**Determinism proof**: two independent fresh runs of the unchanged bootstrap
+script produce an identical canonical schema fingerprint (structural MD5 over
+tables/columns/constraints/indexes/RLS/policies/functions/triggers/views,
+semantically normalized — see `scripts/bootstrap-local-db/fingerprint.sql`).
+See `scripts/bootstrap-local-db/README.md` for how to run it
+(`npm run db:bootstrap:test`).

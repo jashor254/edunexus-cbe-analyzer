@@ -70,3 +70,4 @@ generated-reports/*.pdf
 
 # growth outreach data — real school contact PII / campaign logs, not source
 scripts/growth/output/
+.aider*
