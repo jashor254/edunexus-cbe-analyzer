@@ -4,6 +4,7 @@
 // regular assignment: no waiting for the teacher to mark a stack of papers.
 
 import { z } from 'zod'
+import { after } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound, apiBadRequest } from '@/lib/api/response'
@@ -109,33 +110,45 @@ export async function POST(req: Request) {
       idempotency_key: `student.assignment.submitted:${submission.id}`,
     }).catch(err => console.error('[events] student.assignment.submitted:', err instanceof Error ? err.message : String(err)))
 
-    // Emit Evidence Domain observation — additive, fire and forget, never
-    // blocking the response. ADR-0024 Sprint C: closes the gap where quiz
-    // results generated zero learner Evidence, unlike manually-marked
-    // assignments (lib/assignments/evidence.ts, Sprint B).
-    // Stage 1 — resolve instructional provenance BEFORE emitting, from the
-    // served_variant_map this submission was bound to at first open. Read
-    // only; a failure here must never cost us the evidence row itself, so
-    // it degrades to null provenance rather than rejecting.
-    buildAdaptiveProvenance({ assignmentId, studentId })
-      .catch(err => {
+    // Emit Evidence Domain observation — additive, never blocking the
+    // response. ADR-0024 Sprint C: closes the gap where quiz results
+    // generated zero learner Evidence, unlike manually-marked assignments
+    // (lib/assignments/evidence.ts, Sprint B).
+    // Registered with after() rather than left as a detached promise — a
+    // route handler returning its response is not a guarantee that an
+    // un-awaited promise elsewhere in the function gets to keep running on
+    // a serverless platform (this codebase already uses after() for exactly
+    // this reason in app/api/sow/generate, app/api/holiday/generate, and
+    // app/api/teacher/classes/[classId]/generate-reports). Stage 1 —
+    // resolve instructional provenance first, from the served_variant_map
+    // this submission was bound to at first open. Read only; a failure here
+    // must never cost us the evidence row itself, so it degrades to null
+    // provenance rather than rejecting.
+    after(async () => {
+      let adaptiveDelivery = null
+      try {
+        adaptiveDelivery = await buildAdaptiveProvenance({ assignmentId, studentId })
+      } catch (err) {
         console.error('[submit-quiz] adaptive provenance failed:', err instanceof Error ? err.message : String(err))
-        return null
-      })
-      .then(adaptiveDelivery => recordQuizAutoGradeEvidence({
-        studentId,
-        initiatedBy:  userId,
-        assignmentId,
-        subject:      assignment.subject as string,
-        topic:        (assignment.topic as string | null) ?? null,
-        substrandId:  (assignment.substrand_id as string | null) ?? null,
-        score:        grade.score,
-        maxScore:     assignment.max_score ?? 100,
-        academicYear: new Date().getFullYear(),
-        term:         null,
-        adaptiveDelivery,
-      }))
-      .catch(err => console.error('[submit-quiz] evidence emission failed:', err instanceof Error ? err.message : String(err)))
+      }
+      try {
+        await recordQuizAutoGradeEvidence({
+          studentId,
+          initiatedBy:  userId,
+          assignmentId,
+          subject:      assignment.subject as string,
+          topic:        (assignment.topic as string | null) ?? null,
+          substrandId:  (assignment.substrand_id as string | null) ?? null,
+          score:        grade.score,
+          maxScore:     assignment.max_score ?? 100,
+          academicYear: new Date().getFullYear(),
+          term:         null,
+          adaptiveDelivery,
+        })
+      } catch (err) {
+        console.error('[submit-quiz] evidence emission failed:', err instanceof Error ? err.message : String(err))
+      }
+    })
 
     return apiSuccess({ submission, grade })
   } catch (e: unknown) {

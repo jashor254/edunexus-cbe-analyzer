@@ -127,6 +127,7 @@ export default function MarksheetPage({
   const [uploadResult, setUploadResult] = useState<{
     imported: number
     updated:  number
+    unlinked: number
     errors:   Array<{ row: number; field: string; message: string }>
     skipped:  number
   } | null>(null)
@@ -266,7 +267,13 @@ export default function MarksheetPage({
       setRows(marksToRows(saved, assessment.subjects))
       setAnalysis(analyzeSubjects(saved, assessment.subjects, assessment.max_score))
       setDirty(false)
-      showToast(`Saved ${data.data.saved} learners — positions calculated`)
+      const unlinked: number = data.data.unlinked ?? 0
+      showToast(
+        unlinked > 0
+          ? `Saved ${data.data.saved} learners — ${unlinked} name${unlinked !== 1 ? 's' : ''} could not be matched to a learner and will not count toward learner intelligence. Check spelling against the class roster.`
+          : `Saved ${data.data.saved} learners — positions calculated`,
+        unlinked === 0
+      )
     } catch {
       showToast('Network error — please try again', false)
     } finally {
@@ -548,6 +555,13 @@ export default function MarksheetPage({
                     </li>
                   )}
                 </ul>
+              </div>
+            )}
+            {uploadResult.unlinked > 0 && (
+              <div className="mt-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                <p className="text-sm font-bold text-amber-700">
+                  ⚠ {uploadResult.unlinked} name{uploadResult.unlinked !== 1 ? 's' : ''} could not be matched to a learner on this class's roster — saved to the gradebook, but will not count toward learner intelligence. Check spelling against the roster, or that the name isn't shared by two learners.
+                </p>
               </div>
             )}
           </div>

@@ -275,7 +275,7 @@ async function seedAssessment(teacherId: string, classId: string) {
     .select('id', { count: 'exact', head: true })
     .eq('assessment_id', assessment.id)
     .not('student_id', 'is', null)
-  console.log(`  assessment: ${saved.length} learners marked, ${linked} linked to a learner record`)
+  console.log(`  assessment: ${saved.marks.length} learners marked, ${linked} linked to a learner record`)
 
   const { data: teacher } = await db.from('teachers').select('user_id').eq('id', teacherId).maybeSingle()
   await recordAssessmentEvidence(assessment.id, teacherId, teacher!.user_id as string)

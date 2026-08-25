@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { after } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound, apiBadRequest } from '@/lib/api/response'
@@ -86,33 +87,42 @@ export async function POST(
     notifyAssignmentMarked(submission.id, assignmentId)
       .catch(err => console.error('[notify] mark:', err))
 
-    // Emit Evidence Domain observation — additive, fire and forget, never
-    // blocking the response. Only meaningful once a numeric score exists;
-    // a status-only update (e.g. "needs_revision") has nothing to convert.
+    // Emit Evidence Domain observation — additive, never blocking the
+    // response. Only meaningful once a numeric score exists; a status-only
+    // update (e.g. "needs_revision") has nothing to convert. Registered
+    // with after() rather than left as a detached promise — same rationale
+    // as app/api/student/submit-quiz/route.ts.
     if (score !== undefined && score !== null) {
-      // Stage 1 — instructional provenance, resolved from already-persisted
-      // delivery facts. Degrades to null rather than costing us the row.
-      buildAdaptiveProvenance({ assignmentId, studentId: submission.student_id as string })
-        .catch(err => {
+      const submissionStudentId = submission.student_id as string
+      after(async () => {
+        // Stage 1 — instructional provenance, resolved from already-persisted
+        // delivery facts. Degrades to null rather than costing us the row.
+        let adaptiveDelivery = null
+        try {
+          adaptiveDelivery = await buildAdaptiveProvenance({ assignmentId, studentId: submissionStudentId })
+        } catch (err) {
           console.error('[assignments/mark] adaptive provenance failed:', err instanceof Error ? err.message : String(err))
-          return null
-        })
-        .then(adaptiveDelivery => recordAssignmentMarkEvidence({
-          studentId:     submission.student_id as string,
-          teacherId:     teacher.id,
-          teacherUserId: userId,
-          assignmentId,
-          subject:       assignment.subject as string,
-          topic:         (assignment.topic as string | null) ?? null,
-          substrandId:   (assignment.substrand_id as string | null) ?? null,
-          score,
-          maxScore,
-          academicYear:  new Date().getFullYear(),
-          term:          null,
-          markedAt:      new Date().toISOString(),
-          adaptiveDelivery,
-        }))
-        .catch(err => console.error('[assignments/mark] evidence emission failed:', err instanceof Error ? err.message : String(err)))
+        }
+        try {
+          await recordAssignmentMarkEvidence({
+            studentId:     submissionStudentId,
+            teacherId:     teacher.id,
+            teacherUserId: userId,
+            assignmentId,
+            subject:       assignment.subject as string,
+            topic:         (assignment.topic as string | null) ?? null,
+            substrandId:   (assignment.substrand_id as string | null) ?? null,
+            score,
+            maxScore,
+            academicYear:  new Date().getFullYear(),
+            term:          null,
+            markedAt:      new Date().toISOString(),
+            adaptiveDelivery,
+          })
+        } catch (err) {
+          console.error('[assignments/mark] evidence emission failed:', err instanceof Error ? err.message : String(err))
+        }
+      })
     }
 
     return apiSuccess({ submission })

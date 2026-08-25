@@ -123,10 +123,10 @@ export async function bulkSaveMarks(
   marks: MarkInput[],
   curriculumType: CurriculumType = 'cbc',
   maxScore: number = 100
-): Promise<LearnerMark[]> {
+): Promise<{ marks: LearnerMark[]; unlinked: number }> {
   await repos.assessments.deleteMarksByAssessment(assessmentId, teacherId)
 
-  if (marks.length === 0) return []
+  if (marks.length === 0) return { marks: [], unlinked: 0 }
 
   // Link each mark to the learner it belongs to. `student_id` is what
   // recordAssessmentEvidence attributes Evidence by — a null here means the
@@ -148,6 +148,15 @@ export async function bulkSaveMarks(
       student_id:       linkLearner(m),
     }
   })
+
+  // A row here saves to the gradebook regardless of whether student_id
+  // resolved — but a null student_id means recordAssessmentEvidence and
+  // triggerLearnerModelUpdates will silently drop the row (both filter on
+  // `student_id != null`), so the mark never reaches Evidence/Projection.
+  // Counted here, at the one place the link outcome is already known, so a
+  // "successful" save can truthfully say whether every row actually entered
+  // learner intelligence.
+  const unlinked = rows.filter((r) => r.student_id == null).length
 
   const inserted = await repos.assessments.insertMarks(rows)
 
@@ -173,7 +182,7 @@ export async function bulkSaveMarks(
     },
   }).catch(err => console.error('[events] teacher.assessment.graded:', err instanceof Error ? err.message : String(err)))
 
-  return repos.assessments.findMarksByAssessment(assessmentId, teacherId)
+  return { marks: await repos.assessments.findMarksByAssessment(assessmentId, teacherId), unlinked }
 }
 
 export async function upsertMarksCSV(
@@ -183,7 +192,7 @@ export async function upsertMarksCSV(
   marks: MarkInput[],
   curriculumType: CurriculumType = 'cbc',
   maxScore: number = 100
-): Promise<{ inserted: number; updated: number; marks: LearnerMark[] }> {
+): Promise<{ inserted: number; updated: number; unlinked: number; marks: LearnerMark[] }> {
   const [existingMarkNames, roster] = await Promise.all([
     repos.assessments.findExistingMarkNames(assessmentId, teacherId),
     repos.assessments.findClassRosterForMarkLinking(classId),
@@ -214,6 +223,9 @@ export async function upsertMarksCSV(
 
   const inserted = rows.filter((r) => !existingNames.has(r.student_name)).length
   const updated  = rows.filter((r) => existingNames.has(r.student_name)).length
+  // Same rationale as bulkSaveMarks: a row saves regardless of link outcome,
+  // but only a resolved student_id can ever reach Evidence.
+  const unlinked = rows.filter((r) => r.student_id == null).length
 
   await repos.assessments.upsertMarks(rows)
 
@@ -243,7 +255,7 @@ export async function upsertMarksCSV(
     },
   }).catch(err => console.error('[events] teacher.assessment.graded:', err instanceof Error ? err.message : String(err)))
 
-  return { inserted, updated, marks: final }
+  return { inserted, updated, unlinked, marks: final }
 }
 
 export async function triggerLearnerModelUpdates(

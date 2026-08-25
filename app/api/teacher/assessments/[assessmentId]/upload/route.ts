@@ -1,3 +1,4 @@
+import { after } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import {
   apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest, apiNotFound,
@@ -123,12 +124,21 @@ export async function POST(
     triggerLearnerModelUpdates(assessmentId, teacher.id).catch((e: unknown) => console.error('[marks upload] triggerLearnerModelUpdates failed:', e instanceof Error ? e.message : String(e)))
 
     // Emit Evidence Domain records so Blueprint/Career/Adaptive Learning move
-    // from these marks too, not only from Compass sessions — fire and forget
-    recordAssessmentEvidence(assessmentId, teacher.id, userId).catch((e: unknown) => console.error('[marks upload] recordAssessmentEvidence failed:', e instanceof Error ? e.message : String(e)))
+    // from these marks too, not only from Compass sessions. Registered with
+    // after() rather than left as a detached promise — same rationale as
+    // app/api/student/submit-quiz/route.ts.
+    after(async () => {
+      try {
+        await recordAssessmentEvidence(assessmentId, teacher.id, userId)
+      } catch (e: unknown) {
+        console.error('[marks upload] recordAssessmentEvidence failed:', e instanceof Error ? e.message : String(e))
+      }
+    })
 
     return apiSuccess({
       imported: result.inserted,
       updated:  result.updated,
+      unlinked: result.unlinked,
       errors,
       skipped,
     })
