@@ -19,7 +19,12 @@
 
 import Link from 'next/link'
 import type { ReactNode } from 'react'
-import type { ParentAction } from '@/lib/parentExperience/actions'
+import {
+  type ParentAction,
+  type BlueprintViewer,
+  isActionDestinationValidForViewer,
+  isSafeInternalDestination,
+} from '@/lib/parentExperience/actions'
 import type { LearnerBlueprint, BlueprintSection, AttendanceData } from '@/lib/learnerBlueprint/types'
 import { readSection } from '@/lib/learnerBlueprint/readSection'
 import type { BlueprintValidationResult } from '@/lib/learnerBlueprint/validation'
@@ -63,7 +68,8 @@ const ATTENDANCE_RESPONSE_THRESHOLD_PERCENT = 90
  */
 const DOCUMENT_NAME = 'Learner Progress Report'
 
-type ActionItem = { title: string; detail: string }
+/** `href` is present only when the destination is already known AND valid for the current viewer (Phase 2 — see isActionDestinationValidForViewer) — a null `href` renders as plain informational text, never a broken/misleading CTA. */
+type ActionItem = { title: string; detail: string; href: string | null }
 
 // Level accent colours are shared across curricula — only the WORDS differ,
 // and those come from `resolveCurriculumVoice()` so an 8-4-4 learner is never
@@ -212,7 +218,14 @@ function OrderedActions({ items, empty }: { items: ActionItem[]; empty: string }
       {items.map((item, index) => (
         <li key={`${item.title}-${index}`} className="flex gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
           <span className="text-sm font-black text-amber-600">{index + 1}</span>
-          <p className="text-sm text-slate-700">{item.detail}</p>
+          <div className="space-y-1">
+            <p className="text-sm text-slate-700">{item.detail}</p>
+            {item.href && (
+              <Link href={item.href} className="text-sm font-semibold text-teal-700 hover:underline focus-visible:underline focus-visible:outline-none">
+                Take this action →
+              </Link>
+            )}
+          </div>
         </li>
       ))}
     </ol>
@@ -231,16 +244,20 @@ function attendanceNeedsResponse(section: BlueprintSection<AttendanceData>): boo
     && section.data.attendancePercentage < ATTENDANCE_RESPONSE_THRESHOLD_PERCENT
 }
 
-function pushUnique(bucket: ActionItem[], seen: Set<string>, item: ActionItem | null) {
+function pushUnique(bucket: ActionItem[], seen: Set<string>, item: Omit<ActionItem, 'href'> & { href?: string | null } | null) {
   if (!item) return
   const key = normalizeText(item.detail)
   if (!key || seen.has(key)) return
   seen.add(key)
-  bucket.push(item)
+  bucket.push({ href: null, ...item })
 }
 
-function actionFromParentAction(action: ParentAction): ActionItem {
-  return { title: action.title, detail: action.description }
+/** `href` is populated only when `action.destination` is both a safe internal path and valid for `viewer` — see isActionDestinationValidForViewer (lib/parentExperience/actions.ts). */
+function actionFromParentAction(action: ParentAction, viewer: BlueprintViewer): ActionItem {
+  const href = isActionDestinationValidForViewer(action.actionType, viewer) && isSafeInternalDestination(action.destination)
+    ? action.destination
+    : null
+  return { title: action.title, detail: action.description, href }
 }
 
 function futureEvidenceItems(blueprint: LearnerBlueprint): ActionItem[] {
@@ -254,9 +271,10 @@ function futureEvidenceItems(blueprint: LearnerBlueprint): ActionItem[] {
         detail: featuredItem
           ? `${publishedCount} published portfolio item${publishedCount === 1 ? '' : 's'}, with ${featuredItem.title} currently standing out.`
           : `${publishedCount} published portfolio item${publishedCount === 1 ? '' : 's'} already visible.`,
+        href: null,
       })
     } else if (latestItem) {
-      items.push({ title: 'Portfolio', detail: `${latestItem.title} is the latest portfolio signal so far.` })
+      items.push({ title: 'Portfolio', detail: `${latestItem.title} is the latest portfolio signal so far.`, href: null })
     }
   }
 
@@ -268,6 +286,7 @@ function futureEvidenceItems(blueprint: LearnerBlueprint): ActionItem[] {
         detail: highestLevelAchievement
           ? `${achievementCount} verified achievement${achievementCount === 1 ? '' : 's'}, including ${highestLevelAchievement.title}.`
           : `${achievementCount} verified achievement${achievementCount === 1 ? '' : 's'} so far.`,
+        href: null,
       })
     }
   }
@@ -291,12 +310,18 @@ export default function BlueprintView({
   learnerId,
   historicalMeta,
   exportMode = 'screen',
+  // Defaults to 'student' — the historical assumption every existing
+  // caller/test implicitly made before Phase 2 (Blueprint Actionability)
+  // introduced viewer-aware destinations. Callers that know their actual
+  // viewer (the page-level `primary` role) should pass it explicitly.
+  viewer = 'student',
 }: {
   blueprint: LearnerBlueprint
   validation: BlueprintValidationResult
   learnerId: string
   historicalMeta?: HistoricalMeta
   exportMode?: 'screen' | 'pdf'
+  viewer?: BlueprintViewer
 }) {
   const generatedAt = blueprint.metadata.generatedAt
   const generatedAtLabel = new Date(generatedAt).toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' })
@@ -366,16 +391,23 @@ export default function BlueprintView({
   if (!priorityAction && blueprint.recommendedNextSteps.status === 'available' && blueprint.recommendedNextSteps.data) {
     for (const action of blueprint.recommendedNextSteps.data.actions) {
       if (action.actionType === 'explore_career_journey') continue
-      pushUnique(followOns, seen, actionFromParentAction(action))
+      pushUnique(followOns, seen, actionFromParentAction(action, viewer))
     }
   }
 
   const risk = describeRiskForReader(blueprint.risk.status === 'available' ? blueprint.risk.data : null, tier)
 
   // Reuses the same already-real, context-correct destination Page 3's
-  // career follow-on is built from — never an invented URL.
-  const careerJourneyLink = blueprint.recommendedNextSteps.status === 'available' && blueprint.recommendedNextSteps.data
-    ? blueprint.recommendedNextSteps.data.actions.find((a) => a.actionType === 'explore_career_journey')?.destination ?? null
+  // career follow-on is built from — never an invented URL. Gated by
+  // viewer (Phase 2): a teacher/admin viewing this Blueprint holds neither
+  // the parent link nor the learner's own auth identity, so /career-
+  // intelligence would 403/empty for them — see
+  // isActionDestinationValidForViewer (lib/parentExperience/actions.ts).
+  const careerAction = blueprint.recommendedNextSteps.status === 'available' && blueprint.recommendedNextSteps.data
+    ? blueprint.recommendedNextSteps.data.actions.find((a) => a.actionType === 'explore_career_journey')
+    : null
+  const careerJourneyLink = careerAction && isActionDestinationValidForViewer(careerAction.actionType, viewer) && isSafeInternalDestination(careerAction.destination)
+    ? careerAction.destination
     : null
 
   const futureFraming = gradeBandFraming(gradeBand)

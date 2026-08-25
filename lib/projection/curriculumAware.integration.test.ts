@@ -11,7 +11,7 @@
 // Run: npx tsx --env-file=.env.local --test lib/projection/curriculumAware.integration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { recordAssignmentMarkEvidence } from '@/lib/assignments/evidence'
 import { recomputeLearnerProjection } from './recompute'
 

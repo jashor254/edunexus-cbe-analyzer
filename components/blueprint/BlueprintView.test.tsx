@@ -271,13 +271,14 @@ function createKevinBlueprint(overrides: Partial<LearnerBlueprint> = {}): Learne
   })
 }
 
-function render(blueprint: LearnerBlueprint, exportMode: 'screen' | 'pdf' = 'screen') {
+function render(blueprint: LearnerBlueprint, exportMode: 'screen' | 'pdf' = 'screen', viewer: 'student' | 'parent' | 'teacher' = 'student') {
   return renderToStaticMarkup(
     <BlueprintView
       blueprint={blueprint}
       validation={{ valid: true, errors: [] }}
       learnerId="learner-1"
       exportMode={exportMode}
+      viewer={viewer}
     />
   )
 }
@@ -584,6 +585,68 @@ test('BlueprintView dedupes repeated recommendations across the action list', ()
   }))
 
   assert.equal((html.match(/Keep Mathematics support short, regular, and closely monitored\./g) ?? []).length, 1)
+})
+
+// ── Phase 2 (Blueprint Actionability) ───────────────────────────────────────
+
+function blueprintWithFallbackAction(actionOverrides: Partial<LearnerBlueprint['recommendedNextSteps']['data']['actions'][number]> = {}) {
+  return createBlueprint({
+    // Falsy priorityAction is required for the fallback loop (the only path
+    // that renders a ParentAction as a Page-3 followOn item) to run at all.
+    learningCompass: unavailable('No current learning focus yet.'),
+    recommendedNextSteps: section({
+      actions: [{
+        title: 'Continue Holiday Learning',
+        description: 'A holiday learning programme is available — a good way to keep momentum between terms.',
+        actionType: 'continue_holiday_learning',
+        priority: 'important',
+        sourceDomain: 'Learning Compass',
+        destination: '/child/learner-1/full',
+        available: true,
+        reasonUnavailable: null,
+        generatedAt: '2026-07-23T10:00:00.000Z',
+        ...actionOverrides,
+      }],
+    }),
+  })
+}
+
+test('A. learner (student) viewer: a parent-only destination (continue_holiday_learning -> /child/{id}/full) renders as informational text, no CTA', () => {
+  const html = render(blueprintWithFallbackAction(), 'screen', 'student')
+  assert.match(html, /A holiday learning programme is available/)
+  assert.doesNotMatch(html, /href="\/child\/learner-1\/full"/)
+  assert.doesNotMatch(html, /Take this action/)
+})
+
+test('B. parent viewer: the SAME parent-only destination now renders as a real, clickable CTA', () => {
+  const html = render(blueprintWithFallbackAction(), 'screen', 'parent')
+  assert.match(html, /A holiday learning programme is available/)
+  assert.match(html, /href="\/child\/learner-1\/full"/)
+  assert.match(html, /Take this action/)
+})
+
+test('teacher viewer: never gets a Parent Action Centre CTA, including the career link every other viewer can reach', () => {
+  const html = render(createBlueprint(), 'screen', 'teacher')
+  assert.doesNotMatch(html, /href="\/child\/learner-1\/full"/)
+  assert.doesNotMatch(html, /href="\/career-intelligence"/)
+})
+
+test('C. missing/empty destination: an action with an empty destination renders text only, never an empty href', () => {
+  const html = render(blueprintWithFallbackAction({ destination: '' }), 'screen', 'parent')
+  assert.match(html, /A holiday learning programme is available/)
+  assert.doesNotMatch(html, /href=""/)
+})
+
+test('E. invalid/unsafe destination (protocol-relative) never becomes a link, for any viewer', () => {
+  const html = render(blueprintWithFallbackAction({ destination: '//evil.example.com/phish' }), 'screen', 'parent')
+  assert.match(html, /A holiday learning programme is available/)
+  assert.doesNotMatch(html, /evil\.example\.com/)
+})
+
+test('F. existing teaser destination (explore_career_journey) is unchanged for the default/student viewer', () => {
+  const html = render(createBlueprint())
+  assert.match(html, /href="\/career-intelligence"/)
+  assert.match(html, /Explore career pathways and next steps/)
 })
 
 test('BlueprintView changes future framing by grade band and stays honest when future evidence is thin', () => {

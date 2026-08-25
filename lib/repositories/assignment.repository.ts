@@ -256,6 +256,8 @@ export class AssignmentRepository extends BaseRepository {
       due_date: string
       status: string
       created_at: string
+      /** Set only when this row was created by delivering an approved Blueprint action (lib/learnerBlueprint/actionPlan/delivery/assignment.ts) — never inferred, only read. */
+      blueprint_action_item_id: string | null
       teacher_classes: { name: string | null; grade: number | null; subject: string | null } | null
       teachers: { full_name: string | null } | null
     }
@@ -267,7 +269,7 @@ export class AssignmentRepository extends BaseRepository {
         id, assignment_id, student_id, status, score, submitted_at, marked_at,
         assignments!inner (
           id, class_id, title, topic, instructions, type, is_compass_guided, is_quiz,
-          max_score, due_date, status, created_at,
+          max_score, due_date, status, created_at, blueprint_action_item_id,
           teacher_classes (name, grade, subject),
           teachers (full_name)
         )
@@ -297,6 +299,7 @@ export class AssignmentRepository extends BaseRepository {
         due_date: string
         status: string
         created_at: string
+        blueprint_action_item_id: string | null
         teacher_classes: { name: string | null; grade: number | null; subject: string | null } | null
         teachers: { full_name: string | null } | null
       }

@@ -54,7 +54,7 @@ export interface PathwayScore {
 
 export interface PathwayAnalysis {
   pathwayScores: PathwayScore[]
-  recommendedPathway: 'STEM' | 'Social Sciences' | 'Arts & Sports Science'
+  recommendedPathway: 'STEM' | 'Social Sciences' | 'Arts & Sports Science' | 'Insufficient Evidence'
   confidenceLevel: 'HIGH' | 'MEDIUM' | 'DEVELOPING'
   reasons: string[]
   subjectsToStrengthen: string[]
@@ -70,6 +70,12 @@ export interface PathwayAnalysis {
   to_unlock_social?:        string[]
   to_maintain_recommended?: string[]
   alternative_pathway?:     string
+  // Pilot Gate Fix (zero-evidence pathway fabrication, 2026-08-25): true only
+  // when the learner has no usable subject evidence at all. Presentation
+  // layers (pdfGenerator.tsx) must treat this as the authoritative signal to
+  // suppress "RECOMMENDED" badges and specific pathway/career claims — never
+  // infer "no evidence" from a low or zero-looking score alone.
+  insufficientEvidence?:    boolean
 }
 
 // ─── Career Match (Senior — Page 4B) ─────────────────────────────────────────
@@ -83,15 +89,31 @@ export interface CareerMatch {
   whyItFits?: string
   keyGap?: string
   kenyanPathway?: string
+  // Phase 2 (Learner Report Architecture reconciliation) — carries the
+  // already-computed AI-impact value through from CareerData (populated for
+  // every career, legacy CAREER_DATABASE and canonical-adapter-sourced
+  // alike), so buildCareerInsightCards can use it instead of re-guessing
+  // from the career name via keyword matching.
+  aiImpact?: {
+    disruptionRisk: 'very_low' | 'low' | 'moderate' | 'high' | 'very_high'
+    growthOutlook: 'declining' | 'stable' | 'growing' | 'booming'
+  }
 }
 
 // ─── Junior / Senior Guidance (kept for backward compat with web UI) ─────────
 
 export interface JuniorGuidance {
-  recommendedPathway: 'STEM' | 'Social Sciences' | 'Arts & Sports Science'
+  recommendedPathway: 'STEM' | 'Social Sciences' | 'Arts & Sports Science' | 'Insufficient Evidence'
   reasoning: string
   strengths: string[]
   areasToImprove: string[]
+  // Pilot Gate Fix (zero-evidence pathway fabrication, 2026-08-25): mirrors
+  // PathwayAnalysis.insufficientEvidence and CanonicalCareerMatches.insufficientEvidence
+  // (lib/learnerIntelligence/careerIntelligenceOrchestration.ts) — the same
+  // vocabulary already used for the honest zero-evidence Senior career state.
+  // Consumers (app/dashboard/clinic/reports/[studentId]/page.tsx) must check
+  // this before rendering `recommendedPathway` as a confident recommendation.
+  insufficientEvidence?: boolean
 }
 
 export interface SeniorGuidance {
@@ -228,6 +250,11 @@ export interface SeniorReadinessIndicators {
   careerReadinessDetail: string
   pathwayProgress: 'On Track' | 'Needs Attention' | 'Critical'
   pathwayProgressDetail: string
+  // Pilot Gate Fix (zero-evidence pathway fabrication, 2026-08-25): true only
+  // when the learner has no subject evidence at all. `pathwayReadinessScore`
+  // is a meaningless `0` in that case (not a real "0% ready") — presentation
+  // layers must check this flag before rendering the score as a percentage.
+  insufficientEvidence: boolean
 }
 
 export interface CareerInsightCard {

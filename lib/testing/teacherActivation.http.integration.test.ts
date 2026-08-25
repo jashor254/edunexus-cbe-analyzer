@@ -8,17 +8,17 @@
 // exercised through the real Zod-validated route, not by calling the lib
 // function directly.
 //
-// Run: LMS_TEST_BASE_URL=http://localhost:3000 npx tsx --env-file=.env.local --test lib/testing/teacherActivation.http.integration.test.ts
+// Run: TEST_BASE_URL=http://localhost:3100 npx tsx --test lib/testing/teacherActivation.http.integration.test.ts
 // (requires a real dev server already running)
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { inviteSchoolMember } from '@/lib/core/teacherOnboarding'
 import { signInForHttpTest, type SyntheticSession } from './httpAuthTestHelper'
 
-const BASE_URL = process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3000'
+const BASE_URL = process.env.TEST_BASE_URL ?? process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3100'
 const SYNTHETIC_MARKER = 'SYNTHETIC_PHASE2_ACTIVATION_HTTP_TEST'
 const db = createServiceClient()
 
@@ -66,9 +66,13 @@ after(async () => {
     await db.from('schools').delete().eq('id', id)
   }
   for (const id of createdAuthUserIds) {
+    // H1E-B: same notification_log FK leak class as schoolHandoff/
+    // teacherLifecycle/studentBlueprintSelfAccess.
+    await db.from('notification_log').delete().eq('user_id', id)
     await db.from('teachers').delete().eq('user_id', id)
     await db.from('profiles').delete().eq('id', id)
-    await db.auth.admin.deleteUser(id)
+    const { error } = await db.auth.admin.deleteUser(id)
+    if (error) console.error(`[cleanup] auth user ${id} not deleted: ${error.message}`)
   }
 })
 

@@ -169,6 +169,8 @@ export type LearnerAssignmentListItem = {
   due_date: string
   status: string
   created_at: string
+  /** Set only when this assignment was created by delivering an approved Blueprint action — read-only pass-through, never computed here. */
+  blueprint_action_item_id: string | null
   teacher_classes: { name: string | null; grade: number | null; subject: string | null } | null
   teachers: { full_name: string | null } | null
   submission: {
@@ -218,6 +220,7 @@ function projectSubmissionRow(row: {
     due_date: a.due_date,
     status: a.status,
     created_at: a.created_at,
+    blueprint_action_item_id: a.blueprint_action_item_id,
     teacher_classes: a.teacher_classes,
     teachers: a.teachers,
     submission,

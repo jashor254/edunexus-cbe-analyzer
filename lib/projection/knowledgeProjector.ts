@@ -14,7 +14,7 @@
 
 import type { EvidenceRow } from '@/lib/repositories/evidence.repository'
 import type { Projection, KnowledgeValue } from './types'
-import { computeCoverage, computeProjectionConfidence } from './coverage'
+import { computeCoverage, computeProjectionConfidence, latestEvidencePerKey } from './coverage'
 
 export const KNOWLEDGE_PROJECTION_VERSION = 'knowledge-v1'
 
@@ -22,23 +22,14 @@ export function projectKnowledge(evidence: EvidenceRow[], now: Date = new Date()
   const scored = evidence.filter(e => e.cbc_level !== null)
   if (scored.length === 0) return null
 
-  const latestBySubject = new Map<string, EvidenceRow>()
-  for (const e of scored) {
-    const existing = latestBySubject.get(e.subject)
-    if (!existing || new Date(e.created_at) > new Date(existing.created_at)) latestBySubject.set(e.subject, e)
-  }
+  const latestBySubject = latestEvidencePerKey(scored, e => e.subject)
 
   const bySubject: KnowledgeValue['bySubject'] = {}
   for (const [subject, e] of latestBySubject) {
     bySubject[subject] = { currentLevel: e.cbc_level as 1 | 2 | 3 | 4, asOf: e.created_at }
   }
 
-  const latestBySubStrand = new Map<string, EvidenceRow>()
-  for (const e of scored) {
-    if (!e.sub_strand_id) continue
-    const existing = latestBySubStrand.get(e.sub_strand_id)
-    if (!existing || new Date(e.created_at) > new Date(existing.created_at)) latestBySubStrand.set(e.sub_strand_id, e)
-  }
+  const latestBySubStrand = latestEvidencePerKey(scored, e => e.sub_strand_id)
 
   const bySubStrand: KnowledgeValue['bySubStrand'] = {}
   for (const [subStrandId, e] of latestBySubStrand) {

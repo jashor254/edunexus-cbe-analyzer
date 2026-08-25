@@ -2,7 +2,7 @@
 //
 // Career -> one canonical read only (ADR-0005 §2.5, ADR-0006 Decisions #3,
 // Sprint 12N). Reads via `getCareerBlueprintSummary()`
-// (lib/learnerIntelligence/careerIntelligence.ts) only — never
+// (lib/learnerIntelligence/careerIntelligenceOrchestration.ts) only — never
 // `computeCapabilityMatches`/`capabilityExtractor`/Projection directly,
 // never the deprecated `careerEngine.getMatchesForStudent()` persisted-table
 // path this composer used before Sprint 12N (see sprint-12n doc §1 for why
@@ -16,18 +16,29 @@
 // Only the single top cluster/direction is surfaced — never the full
 // families/matches list, never a specific career/job title (ADR-0006 §4,
 // this sprint's Architectural Goal: orientation, not job selection).
+//
+// Blueprint Section Access Boundary Fix — this composer no longer calls
+// getCareerBlueprintSummary() itself. composeBlueprint() (the only real
+// caller) resolves it once via careerAccess.ts's loadCareerAccess() and
+// passes the result in, so importing composeCareer.ts alone never boots
+// Career infrastructure. No caller currently relies on an internal
+// self-fetch fallback (confirmed: composeCareer's only callers are
+// composeBlueprint.ts and composeBlueprint.pure.test.ts's null-guard test),
+// so none is retained here — see careerAccess.ts if a future caller needs
+// one.
 
-import { getCareerBlueprintSummary } from '@/lib/learnerIntelligence/careerIntelligence'
 import type { BlueprintSection, CareerData } from './types'
 import type { StudentId } from '@/lib/core/identityTypes'
+import type { CareerAccessResult } from './careerAccess'
 
-const OWNER = 'lib/learnerIntelligence/careerIntelligence.getCareerBlueprintSummary'
+const OWNER = 'lib/learnerIntelligence/careerIntelligenceOrchestration.getCareerBlueprintSummary'
 
 const INSUFFICIENT_EVIDENCE_REASON =
   'More learning evidence is needed before Career Intelligence can provide reliable guidance.'
 
 export async function composeCareer(
-  legacyStudentId: StudentId | null
+  legacyStudentId: StudentId | null,
+  careerAccess: CareerAccessResult | null = null
 ): Promise<BlueprintSection<CareerData>> {
   if (!legacyStudentId) {
     return {
@@ -40,7 +51,8 @@ export async function composeCareer(
   }
 
   try {
-    const summary = await getCareerBlueprintSummary(legacyStudentId)
+    if (careerAccess?.error) throw careerAccess.error
+    const summary = careerAccess?.summary ?? null
 
     if (!summary) {
       return {

@@ -5,7 +5,7 @@
 
 import type { EvidenceRow } from '@/lib/repositories/evidence.repository'
 import type { Projection, AcademicValue, SubjectPerformance, SubStrandPerformance, Trend } from './types'
-import { computeCoverage, computeProjectionConfidence } from './coverage'
+import { computeCoverage, computeProjectionConfidence, sortEvidenceChronologically } from './coverage'
 
 export const ACADEMIC_PROJECTION_VERSION = 'academic-v1'
 
@@ -46,7 +46,7 @@ export function projectAcademic(evidence: EvidenceRow[], now: Date = new Date())
 
   const bySubject: Record<string, SubjectPerformance> = {}
   for (const [subject, rows] of bySubjectRaw) {
-    const sorted = [...rows].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    const sorted = sortEvidenceChronologically(rows)
     const levels = sorted.map(r => r.cbc_level!)
     bySubject[subject] = {
       subject,
@@ -74,7 +74,7 @@ export function projectAcademic(evidence: EvidenceRow[], now: Date = new Date())
 
   const bySubStrand: Record<string, SubStrandPerformance> = {}
   for (const [subStrandId, rows] of bySubStrandRaw) {
-    const sorted = [...rows].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    const sorted = sortEvidenceChronologically(rows)
     const levels = sorted.map(r => r.cbc_level!)
     const latest = sorted[sorted.length - 1]
     bySubStrand[subStrandId] = {

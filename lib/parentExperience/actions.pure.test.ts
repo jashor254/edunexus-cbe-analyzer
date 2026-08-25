@@ -9,7 +9,7 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { composeParentActions } from './actions'
+import { composeParentActions, isActionDestinationValidForViewer, isSafeInternalDestination, type ParentActionType } from './actions'
 import type { BlueprintSection, LearningCompassData, TeacherReflectionData, AttendanceData, CareerData } from '@/lib/learnerBlueprint/types'
 import type { BlueprintSnapshotRow, BlueprintSnapshotType } from '@/lib/repositories/blueprintSnapshot.repository'
 
@@ -201,4 +201,44 @@ test('every action has a real destination and a generatedAt timestamp — never 
     assert.ok(action.generatedAt)
     assert.ok(action.sourceDomain.length > 0)
   }
+})
+
+// ── Phase 2 (Blueprint Actionability): isActionDestinationValidForViewer ────
+
+const ALL_ACTION_TYPES: ParentActionType[] = [
+  'continue_holiday_learning',
+  'read_teacher_reflection',
+  'review_attendance',
+  'celebrate_achievement',
+  'view_report_card',
+  'explore_career_journey',
+  'no_action_needed',
+  'canonical_action_item',
+]
+
+test('a parent viewer may act on every action type — every destination this module emits is parent-space', () => {
+  for (const type of ALL_ACTION_TYPES) {
+    assert.equal(isActionDestinationValidForViewer(type, 'parent'), true, type)
+  }
+})
+
+test('a student (learner) viewer may only act on explore_career_journey — every other destination is parent-only (/child/{id}/... or guardian-scoped /report-card)', () => {
+  for (const type of ALL_ACTION_TYPES) {
+    assert.equal(isActionDestinationValidForViewer(type, 'student'), type === 'explore_career_journey', type)
+  }
+})
+
+test('a teacher/admin viewer may never act on any Parent Action Centre destination — they hold neither the parent link nor the learner\'s own auth identity', () => {
+  for (const type of ALL_ACTION_TYPES) {
+    assert.equal(isActionDestinationValidForViewer(type, 'teacher'), false, type)
+  }
+})
+
+test('isSafeInternalDestination accepts a real relative path and rejects protocol-relative/absolute/javascript: values', () => {
+  assert.equal(isSafeInternalDestination('/child/abc-123/full'), true)
+  assert.equal(isSafeInternalDestination('/career-intelligence'), true)
+  assert.equal(isSafeInternalDestination('//evil.example.com/phish'), false)
+  assert.equal(isSafeInternalDestination('https://evil.example.com'), false)
+  assert.equal(isSafeInternalDestination('javascript:alert(1)'), false)
+  assert.equal(isSafeInternalDestination(''), false)
 })
