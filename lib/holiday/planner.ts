@@ -16,7 +16,7 @@ import { repos } from '@/lib/repositories'
 import { callDeepSeek } from '@/lib/ai/deepseek'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { buildAdaptiveTask } from '@/lib/adaptiveLearning/recommend'
-import { buildCareerIntelligence } from '@/lib/learnerIntelligence/careerIntelligence'
+import { buildCareerIntelligence } from '@/lib/learnerIntelligence/careerIntelligenceOrchestration'
 import { publishEvent } from '@/lib/events'
 import type { HolidayPlanData, HolidayWeek } from './types'
 

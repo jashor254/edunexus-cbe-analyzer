@@ -19,6 +19,10 @@ export const DAILY_CALL_LIMITS: Record<TokenFeature, number> = {
   learning_compass:           30,
   career_intelligence_report: 2,
   adaptive_variant_generate:  40,
+  // Unknown-career AI generation only (lib/career/knowledgeRequests.ts) — never
+  // gates ordinary canonical DB search. Conservative like clinic_report: this
+  // is an ungrounded free-generation call (Phase 9 finding), not a cheap lookup.
+  career_knowledge_request:   5,
 }
 
 export type RateLimitResult =
