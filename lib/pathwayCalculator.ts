@@ -37,6 +37,13 @@ const SUBJECT_KEY_ALIASES: Record<string, string> = {
   pre_technical:      'pre_technical_studies',
   creative_arts:      'creative_arts_sports',
   agriculture:        'agriculture_nutrition',
+  // 8-4-4/KCSE subject variants — normalised to one canonical key each so
+  // punctuation/spacing entered by different schools doesn't fragment the
+  // capability evidence for the same subject.
+  'business studies':          'business_studies',
+  'history & government':      'history_and_government',
+  'history and government':    'history_and_government',
+  'history_&_government':      'history_and_government',
 }
 
 export function normalizeSubjectKey(key: string): string {
@@ -414,6 +421,16 @@ export type PathwayRecommendation = {
   kjsea_stem_threshold?:    number
   kjsea_qualifies_stem?:    boolean
   kjsea_qualifies_social?:  boolean
+  // Pilot Gate Fix (zero-evidence pathway fabrication, 2026-08-25): true only
+  // when this learner has NO usable subject evidence at all (no subject with
+  // a real CBC level > 0 was supplied). CBC levels are 1-4 — there is no
+  // legitimate "0" score, so `level > 0` is the correct usable-evidence test
+  // and never mistakes a real (if low) Level 1 for absence. When true,
+  // `top_pathway` is the sentinel 'Insufficient Evidence' (never one of the
+  // three real pathway names) and every score/guidance field is a neutral,
+  // non-committal default — callers must gate any "RECOMMENDED"/confident
+  // presentation on this flag rather than inferring it from a zero score.
+  insufficientEvidence:     boolean
 }
 
 // ─── KJSEA points and composites ──────────────────────────────────────────────
@@ -546,6 +563,46 @@ export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRe
   const allLevels = Object.values(scores).filter(v => v > 0)
   const cbcAvg    = allLevels.reduce((a, b) => a + b, 0) / allLevels.length
 
+  // ── Zero usable evidence ──────────────────────────────────────────────────────
+  // Pilot Gate Fix (2026-08-25): the three gates below were written assuming
+  // at least one subject with a real level is always present. With an empty
+  // `scores`, `allLevels` is `[]` and `majorityLevel1` (level1Count / 0) is
+  // `NaN`, which is falsy for `> 0.5` — so GATE 2 (Social Sciences) silently
+  // won, with confidence downgraded to 'low' but every downstream consumer
+  // (Junior PDF "RECOMMENDED" badge, the web dashboard's Pathway
+  // Recommendation card, the Blueprint pathway-gap-analysis adapter) still
+  // rendered it as a confident, specific recommendation. This is the root
+  // cause the Pilot Gate Fix phase closes: guard it here, at the one
+  // canonical calculator every one of those callers goes through, rather
+  // than patching each presentation layer separately.
+  if (allLevels.length === 0) {
+    return {
+      stem_score:            0,
+      social_sciences_score: 0,
+      arts_sports_score:     0,
+      top_pathway:           'Insufficient Evidence',
+      confidence:            'low',
+      strengths:              [],
+      development_areas:      [],
+      guidance_message:
+        'Not enough evidence yet to recommend a pathway. Once at least one subject ' +
+        'assessment is recorded for this learner, pathway readiness signals will appear here.',
+      calculated_at:         new Date().toISOString(),
+      performance_tier:      'low',
+      stem_viable:           false,
+      pathway_readiness: { stem: 0, social_sciences: 0, arts: 0 },
+      to_unlock_stem:          [],
+      to_unlock_social:        [],
+      to_maintain_recommended: [],
+      alternative_pathway:     'Insufficient Evidence',
+      kjsea_composite:        0,
+      kjsea_stem_threshold:   stemMinimum ?? undefined,
+      kjsea_qualifies_stem:   false,
+      kjsea_qualifies_social: false,
+      insufficientEvidence:   true,
+    }
+  }
+
   // ── Strengths and development areas ──────────────────────────────────────────
   const strengths = Object.entries(scores)
     .filter(([, s]) => s >= 3)
@@ -628,6 +685,7 @@ export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRe
       kjsea_stem_threshold:   stemMinimum ?? undefined,
       kjsea_qualifies_stem:   stemCompositeOk,
       kjsea_qualifies_social: socialCompositeOk,
+      insufficientEvidence:   false,
     }
   }
 
@@ -677,6 +735,7 @@ export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRe
       kjsea_stem_threshold:   stemMinimum ?? undefined,
       kjsea_qualifies_stem:   stemCompositeOk,
       kjsea_qualifies_social: socialCompositeOk,
+      insufficientEvidence:   false,
     }
   }
 
@@ -711,6 +770,7 @@ export function calculateJuniorPathwayAffinity(scores: SubjectScores): PathwayRe
     kjsea_stem_threshold:   stemMinimum ?? undefined,
     kjsea_qualifies_stem:   stemCompositeOk,
     kjsea_qualifies_social: socialCompositeOk,
+    insufficientEvidence:   false,
   }
 }
 

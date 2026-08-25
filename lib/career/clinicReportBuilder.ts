@@ -3,7 +3,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getCareerBySlug, getCurrentSkillsForAge, getNextSkillsForAge, getAgeRangeLabel } from './careerEngine'
-import { resolveCanonicalCareerMatches } from '@/lib/learnerIntelligence/careerIntelligence'
+import { resolveCanonicalCareerMatches } from '@/lib/learnerIntelligence/careerIntelligenceOrchestration'
 import { STANDARD_DISCLAIMER } from './types'
 import type {
   ClinicReport, SubjectScoreRow, Career, SkillTimelineItem,
@@ -11,6 +11,7 @@ import type {
   CareerMatchWithDetail,
 } from './types'
 import { calculateKJSEAComposite, calculateJuniorPathwayAffinity, calculatePathwayGapAnalysis, PATHWAY_DISCLAIMER, normalizeSubjectScores } from '@/lib/pathwayCalculator'
+import { resolveCurriculumFraming } from '@/lib/curriculum/gradeLabel'
 
 // ─── Subject display names (Fix 3) ────────────────────────────────────────────
 
@@ -38,10 +39,12 @@ const SUBJECT_DISPLAY_NAMES: Record<string, string> = {
   chemistry:                    'Chemistry',
   physics:                      'Physics',
   history:                      'History & Citizenship',
+  history_and_government:       'History & Government',
   geography:                    'Geography',
   geo:                          'Geography',
   business_studies:             'Business Studies',
   ire:                          'Islamic Religious Education',
+  hre:                          'Hindu Religious Education',
   home_science:                 'Home Science',
   hisc:                         'Home Science',
   community_service_learning:   'Community Service Learning',
@@ -643,13 +646,20 @@ export async function buildClinicReport(
   if (studentError || !student) throw new Error('Student not found')
 
   const grade = student.grade as number
-  const curriculum = (student.curriculum_type as string) ?? 'cbc'
+  const rawCurriculumType = student.curriculum_type as string | null
+  const curriculum = rawCurriculumType ?? 'cbc'
   const age = calcAge(student.date_of_birth as string | null, grade)
   const ageRange = getAgeRangeLabel(age)
 
   // Junior: Grade 7-9 CBC; Senior: Grade 10+, IGCSE, Form 1-4
   const section: 'junior' | 'senior' =
     curriculum === 'igcse' || grade >= 10 ? 'senior' : 'junior'
+
+  // Curriculum-aware display label + CBC-pathway-vocabulary admissibility —
+  // resolved from the RAW curriculum_type (not the `curriculum` default
+  // above, which exists only to preserve the pre-existing junior/senior
+  // section split). An unrecorded curriculum must never silently read as CBC.
+  const curriculumFraming = resolveCurriculumFraming(rawCurriculumType, grade)
 
   // 2. Latest assessment scores — stored as JSONB in subject_scores column
   const { data: assessments } = await db
@@ -701,11 +711,16 @@ export async function buildClinicReport(
     .eq('student_id', studentId)
     .maybeSingle()
 
-  // For senior students, prefer the student's actual chosen pathway over the learning-context recommendation
+  // For senior students, prefer the student's actual chosen pathway over the learning-context recommendation.
+  // recommended_pathway is CBC Senior School pathway vocabulary (STEM / Social
+  // Sciences / Arts & Sports Science / Business) — never surfaced for a
+  // curriculum where curriculumFraming says that vocabulary isn't admissible.
   const studentCurrentPathway = (student.current_pathway as string | null)
-  const recommended_pathway   = section === 'senior'
-    ? (studentCurrentPathway ?? ctx?.recommended_pathway as string | null)
-    : (ctx?.recommended_pathway as string | null)
+  const recommended_pathway   = !curriculumFraming.cbcPathwayAdmissible
+    ? null
+    : section === 'senior'
+      ? (studentCurrentPathway ?? ctx?.recommended_pathway as string | null)
+      : (ctx?.recommended_pathway as string | null)
   const kjsea_composite     = section === 'junior' ? calculateKJSEAComposite(subjectMap) : undefined
   const stem_viable         = section === 'junior'
     ? calculateJuniorPathwayAffinity(subjectMap).stem_viable
@@ -894,7 +909,10 @@ export async function buildClinicReport(
     ? buildCompassPrescription(seniorData!.currentConstraints.length > 0 ? seniorData!.currentConstraints : weakSubjects)
     : undefined
 
-  const seniorFutureOpportunities = section === 'senior'
+  // getFutureOpportunities() falls back to CBC's "Social Sciences" content
+  // when pathway is null/unrecognised — that fallback is exactly CBC pathway
+  // vocabulary, so it must never run when CBC pathway framing isn't admissible.
+  const seniorFutureOpportunities = section === 'senior' && curriculumFraming.cbcPathwayAdmissible
     ? getFutureOpportunities(recommended_pathway)
     : undefined
 
@@ -904,6 +922,8 @@ export async function buildClinicReport(
     grade,
     age,
     curriculum_type:   curriculum,
+    curriculumLabel:   curriculumFraming.label,
+    cbcPathwayAdmissible: curriculumFraming.cbcPathwayAdmissible,
     section,
     generated_at:      new Date().toISOString(),
     overall_score,
