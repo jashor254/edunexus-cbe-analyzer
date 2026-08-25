@@ -2,10 +2,11 @@
 
 import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, Sparkles, TrendingUp, MapPin, Clock, BookOpen,
   Star, CheckCircle2, AlertTriangle, Loader2, Users, Heart,
-  ChevronRight, Zap, Shield, Target, GraduationCap, Briefcase,
+  ChevronRight, ChevronDown, ChevronUp, Zap, Shield, Target, GraduationCap, Briefcase,
   Info, Rocket, User, ArrowRight, Brain, TrendingDown, Minus,
   ArrowUpRight, DollarSign, Timer, Flame, AlertCircle, CheckCircle,
 } from 'lucide-react'
@@ -17,6 +18,7 @@ import type {
 import { CAPABILITY_LABELS } from '@/lib/career/capabilityExtractor'
 import { alignmentToPercent, tierLabel } from '@/lib/career/capabilityMatchEngine'
 import { buildLifeSimulation } from '@/lib/career/lifeSimulator'
+import { getCareerSignalsForCareer, type CareerSignal } from '@/lib/career/careerSignals'
 
 // ── Door config ───────────────────────────────────────────────────────────────
 
@@ -172,6 +174,128 @@ function CapabilityAlignmentSection({ match }: { match: CapabilityCareerMatch })
           ))}
         </div>
       )}
+    </section>
+  )
+}
+
+// ── Career Signals section ("What's changing in this field?") ─────────────────
+// Phase 8.1 — a small, human-curated, source-backed set of world-of-work
+// developments (lib/career/careerSignals.ts). Reads nothing about the learner —
+// the same signals render for every learner viewing this career. See
+// docs/architecture/phase8-career-signals-audit.md for the architecture contract.
+
+const SIGNAL_GEOGRAPHY_LABEL: Record<CareerSignal['geography'], string> = {
+  KENYA: 'Kenya',
+  EAST_AFRICA: 'East Africa',
+  AFRICA: 'Africa',
+  GLOBAL: 'Global',
+}
+
+const SIGNAL_CONFIDENCE_LABEL: Record<CareerSignal['confidence'], string> = {
+  EARLY: 'Early signal',
+  EMERGING: 'Emerging change',
+  ESTABLISHED: 'Well established',
+}
+
+function CareerSignalCard({ signal }: { signal: CareerSignal }) {
+  const [showSources, setShowSources] = useState(false)
+
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-white/50">
+          {SIGNAL_GEOGRAPHY_LABEL[signal.geography]}
+        </span>
+        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-300">
+          {SIGNAL_CONFIDENCE_LABEL[signal.confidence]}
+        </span>
+      </div>
+
+      <div>
+        <p className="text-white font-semibold text-sm mb-1">{signal.title}</p>
+        <p className="text-white/70 text-sm leading-relaxed">{signal.summary}</p>
+      </div>
+
+      <div>
+        <p className="text-white/40 text-xs font-semibold uppercase tracking-wide mb-1">Why it matters</p>
+        <p className="text-white/60 text-sm leading-relaxed">{signal.learnerExplanation}</p>
+      </div>
+
+      {signal.exploreNext.length > 0 && (
+        <div>
+          <p className="text-white/40 text-xs font-semibold uppercase tracking-wide mb-1">What you could explore</p>
+          <ul className="space-y-1">
+            {signal.exploreNext.map(item => (
+              <li key={item} className="text-white/60 text-sm leading-relaxed flex items-start gap-1.5">
+                <span className="text-violet-400 mt-0.5">•</span>{item}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {signal.relatedCareerSlugs.length > 0 && (
+        <div className="flex flex-wrap gap-2 pt-1">
+          {signal.relatedCareerSlugs.map(slug => (
+            <Link
+              key={slug}
+              href={`/student/career/${slug}?source=signal`}
+              className="text-xs font-medium px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-white/60 capitalize hover:text-violet-300 hover:border-violet-500/30 transition-colors"
+            >
+              {slug.replace(/-/g, ' ')}
+            </Link>
+          ))}
+        </div>
+      )}
+
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowSources(s => !s)}
+          aria-expanded={showSources}
+          className="flex items-center gap-1 text-white/40 hover:text-white/60 text-xs font-medium transition-colors"
+        >
+          {showSources ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          Sources
+        </button>
+        {showSources && (
+          <ul className="mt-2 space-y-1.5">
+            {signal.sources.map(source => (
+              <li key={source.url} className="text-xs text-white/40">
+                <a
+                  href={source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-white/50 hover:text-violet-300 underline underline-offset-2"
+                >
+                  {source.publisher}
+                </a>
+                {' — '}
+                {new Date(source.publishedAt).toLocaleDateString('en-GB', { year: 'numeric', month: 'short' })}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function CareerSignalsSection({ careerSlug }: { careerSlug: string }) {
+  const signals = getCareerSignalsForCareer(careerSlug)
+  if (signals.length === 0) return null
+
+  return (
+    <section>
+      <h2 className="text-white font-bold text-xl mb-1 flex items-center gap-2">
+        <Zap className="w-5 h-5 text-violet-400" /> What&apos;s changing in this field?
+      </h2>
+      <p className="text-white/40 text-sm mb-4">Real, source-backed developments — not predictions.</p>
+      <div className="space-y-4">
+        {signals.map(signal => (
+          <CareerSignalCard key={signal.id} signal={signal} />
+        ))}
+      </div>
     </section>
   )
 }
@@ -731,6 +855,9 @@ function BarChart({ className }: { className?: string }) {
 
 export default function CareerDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params)
+  // Where the learner clicked from — analytics only (Phase 9.1 §8), forwarded
+  // to the API so it can attribute the resulting career_result_opened event.
+  const source = useSearchParams().get('source')
 
   const [career,          setCareer]          = useState<Career | null>(null)
   const [capabilityMatch, setCapabilityMatch] = useState<CapabilityCareerMatch | null>(null)
@@ -762,7 +889,10 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
   }, [])
 
   useEffect(() => {
-    const qs = studentId ? `?studentId=${studentId}` : ''
+    const params = new URLSearchParams()
+    if (studentId) params.set('studentId', studentId)
+    if (source)    params.set('source', source)
+    const qs = params.toString() ? `?${params.toString()}` : ''
     fetch(`/api/career/${slug}${qs}`)
       .then(r => r.json())
       .then(d => {
@@ -771,7 +901,7 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
       })
       .catch(() => null)
       .finally(() => setLoading(false))
-  }, [slug, studentId])
+  }, [slug, studentId, source])
 
   useEffect(() => {
     if (!career) return
@@ -1027,6 +1157,9 @@ export default function CareerDetailPage({ params }: { params: Promise<{ slug: s
             </div>
           </section>
         )}
+
+        {/* ── CAREER SIGNALS ("What's changing in this field?") ─────────────── */}
+        <CareerSignalsSection careerSlug={career.slug} />
 
         {/* ── SKILL TIMELINE ───────────────────────────────────────────────── */}
         <section>
