@@ -16,7 +16,9 @@ import {
   recomputeAndSaveCapabilityProfile,
 } from '@/lib/career/careerEngine'
 import { computeCapabilityMatches } from '@/lib/career/capabilityMatchEngine'
-import { familiesFromMatches, careerModeForGrade, resolveFreshCapabilityProfile } from '@/lib/learnerIntelligence/careerIntelligence'
+import { familiesFromMatches, careerModeForGrade } from '@/lib/learnerIntelligence/careerIntelligence'
+import { resolveFreshCapabilityProfile } from '@/lib/learnerIntelligence/careerIntelligenceOrchestration'
+import { canAccessLegacyStudent } from '@/lib/core/permissions'
 import type { CapabilityMatchReport } from '@/lib/career/types'
 
 export const dynamic = 'force-dynamic'
@@ -32,14 +34,16 @@ const PostSchema = z.object({
 // ── Shared: verify student ownership ─────────────────────────────────────────
 
 async function verifyStudent(userId: string, studentId: string) {
+  const allowed = await canAccessLegacyStudent(userId, studentId)
+  if (!allowed) return null
+
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('students')
-    .select('id, user_id, grade')
+    .select('id, grade')
     .eq('id', studentId)
     .single()
   if (error || !data) return null
-  if (data.user_id !== userId) return null
   return data
 }
 

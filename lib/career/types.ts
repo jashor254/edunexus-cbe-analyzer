@@ -356,6 +356,10 @@ export type ClinicReport = {
   grade: number
   age: number
   curriculum_type: string
+  /** Resolved by resolveCurriculumFraming() (lib/curriculum/gradeLabel.ts) — the one curriculum-aware label every renderer must display instead of deriving its own. */
+  curriculumLabel: string
+  /** Whether CBC Senior School pathway vocabulary (STEM/Social Sciences/Arts & Sports Science/Business) may be shown for this learner. False for 8-4-4 and any unrecognised curriculum. */
+  cbcPathwayAdmissible: boolean
   section: ClinicReportSection
   generated_at: string
 

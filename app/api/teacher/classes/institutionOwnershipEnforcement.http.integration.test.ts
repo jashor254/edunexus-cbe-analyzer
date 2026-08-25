@@ -20,13 +20,13 @@
 // Requires a server already running at LMS_TEST_BASE_URL (default
 // http://localhost:3939).
 //
-// Run: LMS_TEST_BASE_URL=http://localhost:3939 npx tsx --env-file=.env.local --test app/api/teacher/classes/institutionOwnershipEnforcement.http.integration.test.ts
+// Run: TEST_BASE_URL=http://localhost:3100 npx tsx --test app/api/teacher/classes/institutionOwnershipEnforcement.http.integration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { signInForHttpTest, type SyntheticSession } from '@/lib/testing/httpAuthTestHelper'
 
-const BASE_URL = process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3939'
+const BASE_URL = process.env.TEST_BASE_URL ?? process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3100'
 const SYNTHETIC_MARKER = 'SYNTHETIC_INSTOWNERSHIP_ROUTE_TEST'
 const db = createServiceClient()
 

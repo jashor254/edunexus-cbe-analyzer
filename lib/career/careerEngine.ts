@@ -2,6 +2,7 @@
 
 import { repos } from '@/lib/repositories'
 import { callDeepSeek } from '@/lib/ai/deepseek'
+import { publishEvent } from '@/lib/events/publish'
 import { extractCapabilityProfile } from './capabilityExtractor'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { projectionToTimestampedScoreHistory, type TimestampedScoreSnapshot } from '@/lib/learnerIntelligence/projectionAdapters'
@@ -231,7 +232,7 @@ export async function saveCareerInterest(
 ): Promise<StudentCareerInterest> {
   const career = await repos.careers.findCareerIdBySlug(careerSlug)
 
-  return repos.careers.insertCareerInterest({
+  const saved = await repos.careers.insertCareerInterest({
     student_id:     studentId,
     career_id:      career?.id ?? null,
     career_slug:    careerSlug,
@@ -239,6 +240,20 @@ export async function saveCareerInterest(
     notes:          notes ?? null,
     explored_at:    new Date().toISOString(),
   })
+
+  // Fired only after the insert above succeeds — analytics observing an
+  // explicit learner action, never a trigger for one. Does not (and must
+  // not) touch capability/Projection/pathway affinity; saving an interest
+  // stays a pure insert (Phase 9 §14/§15's proven boundary).
+  void publishEvent({
+    event_type:    'student.career_interest.saved',
+    resource_type: 'career_interest',
+    resource_id:   saved.id,
+    actor_id:      studentId,
+    payload:       { careerSlug, careerId: career?.id ?? null, interestLevel },
+  }).catch(err => console.error('[events] student.career_interest.saved:', err instanceof Error ? err.message : String(err)))
+
+  return saved
 }
 
 // ── SUBJECT STRENGTH SUGGESTIONS ─────────────────────────────────────────────

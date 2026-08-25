@@ -38,7 +38,7 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { persistEvidenceBatch, confirmReview } from '@/lib/intelligence/evidenceLifecycle'
 import { EVIDENCE_SOURCE_TRUST_TIER, type LearnerEvidence } from '@/lib/intelligence/evidence'
@@ -313,7 +313,13 @@ after(async () => {
     await safely(() => db.from('school_users').delete().eq('school_id', schoolId))
     await safely(() => db.from('schools').delete().eq('id', schoolId))
   }
-  if (isUuid(teacherUserId)) await safely(() => db.auth.admin.deleteUser(teacherUserId))
+  if (isUuid(teacherUserId)) {
+    // H1E-B: notification_log FK blocks deleteUser silently (swallowed by
+    // safely() above) unless cleared first — same class of leak found and
+    // fixed elsewhere in H1E-A/H1E-B.
+    await safely(() => db.from('notification_log').delete().eq('user_id', teacherUserId))
+    await safely(() => db.auth.admin.deleteUser(teacherUserId))
+  }
 })
 
 // ── 1. Confirmed evidence -> Projection identifies the weakness ─────────────
@@ -678,7 +684,7 @@ test('P2-3 (was TRIPWIRE 3). Blueprint can now answer "did THIS weakness change?
 test('P2-4. Career Intelligence still composes over the anchored record (no regression)', async () => {
   // Phase 2 must not disturb Career Intelligence's canonical inputs. It reads
   // academic.bySubject, which anchoring does not change.
-  const { buildCareerIntelligence } = await import('@/lib/learnerIntelligence/careerIntelligence')
+  const { buildCareerIntelligence } = await import('@/lib/learnerIntelligence/careerIntelligenceOrchestration')
   const career = await buildCareerIntelligence(legacyStudentId)
   assert.equal(career.studentId, legacyStudentId)
   assert.ok(career.mode === 'exploration', 'Grade 8 stays in broad-exploration mode — the grade gate is untouched')

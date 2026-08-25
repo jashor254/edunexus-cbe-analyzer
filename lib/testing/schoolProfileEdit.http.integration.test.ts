@@ -7,16 +7,16 @@
 // correctly on a fresh GET (proving the write actually landed, not just
 // that the response echoed back what was sent).
 //
-// Run: LMS_TEST_BASE_URL=http://localhost:3939 npx tsx --env-file=.env.local --test lib/testing/schoolProfileEdit.http.integration.test.ts
+// Run: TEST_BASE_URL=http://localhost:3100 npx tsx --test lib/testing/schoolProfileEdit.http.integration.test.ts
 // (requires `next dev -p 3939 &` already running)
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { signInForHttpTest, type SyntheticSession } from './httpAuthTestHelper'
 
-const BASE_URL = process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3939'
+const BASE_URL = process.env.TEST_BASE_URL ?? process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3100'
 const SYNTHETIC_MARKER = 'SYNTHETIC_PHASE1_PROFILE_EDIT_TEST'
 const db = createServiceClient()
 

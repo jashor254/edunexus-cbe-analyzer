@@ -153,7 +153,7 @@ export default async function StudentBlueprintPage({
           <BlueprintActionPlanSection learnerId={learnerId} items={actionPlanItems} />
         </div>
       )}
-      <BlueprintView blueprint={blueprint} validation={validation} learnerId={learnerId} exportMode={exportMode} />
+      <BlueprintView blueprint={blueprint} validation={validation} learnerId={learnerId} exportMode={exportMode} viewer={primary} />
       {primary === 'student' && exportMode !== 'pdf' && <JourneyLinks current="blueprint" />}
     </>
   )

@@ -49,7 +49,7 @@
 
 import { getPersistedProjections } from '@/lib/projection/recompute'
 import { normalizeSubjectKey } from '@/lib/pathwayCalculator'
-import type { AcademicValue, Trend } from '@/lib/projection/types'
+import type { AcademicValue, CapabilityLevel, CapabilityValue, GrowthValue, RiskValue, Trend } from '@/lib/projection/types'
 
 // ── Canonical tier -> level mapping ────────────────────────────────────────
 //
@@ -276,6 +276,25 @@ export type CompassAcademicProjection = {
 
 const EMPTY_PROJECTION: CompassAcademicProjection = { academic: null, confidence: null, freshnessDays: null }
 
+type PersistedProjectionRows = Awaited<ReturnType<typeof getPersistedProjections>>
+
+/**
+ * The one place Compass fetches `learner_projections` — READ ONLY, one row
+ * set covering every persisted dimension (academic, capability, knowledge,
+ * behaviour, growth, risk, completeness), never `recomputeLearnerProjection()`
+ * (write side effect — a learner sending a chat message must never trigger
+ * one). Returns `[]` rather than throwing on a read failure, so every
+ * caller degrades to its legacy fallback instead of breaking a session.
+ */
+async function readCompassProjectionRows(learnerId: string): Promise<PersistedProjectionRows> {
+  try {
+    return await getPersistedProjections(learnerId)
+  } catch (err) {
+    console.error('[compass/learnerContext] projection read failed, falling back to legacy context:', err instanceof Error ? err.message : String(err))
+    return []
+  }
+}
+
 /**
  * Reads the learner's persisted academic projection — READ ONLY.
  *
@@ -290,16 +309,7 @@ const EMPTY_PROJECTION: CompassAcademicProjection = { academic: null, confidence
  * caller has a legacy fallback for exactly that case.
  */
 export async function readCompassAcademicProjection(learnerId: string): Promise<CompassAcademicProjection> {
-  let rows
-  try {
-    rows = await getPersistedProjections(learnerId)
-  } catch (err) {
-    // A projection read failing must degrade Compass to its legacy
-    // fallback, never break a learner's session.
-    console.error('[compass/learnerContext] projection read failed, falling back to legacy context:', err instanceof Error ? err.message : String(err))
-    return EMPTY_PROJECTION
-  }
-
+  const rows = await readCompassProjectionRows(learnerId)
   const academicRow = rows.find(r => r.projector_type === 'academic')
   if (!academicRow) return EMPTY_PROJECTION
 
@@ -311,6 +321,125 @@ export async function readCompassAcademicProjection(learnerId: string): Promise<
     confidence: academicRow.confidence ?? null,
     freshnessDays: academicRow.freshness_days ?? null,
   }
+}
+
+// ── Phase 4 — Blueprint/Compass Intelligence Convergence ────────────────────
+//
+// Persistent learner intelligence Compass may consume as CONTEXT, never as
+// a hard constraint (see resolveCompassLearnerIntelligence's own doc
+// comment and lib/compass/prompt.ts's PERSISTENT CONTEXT section for the
+// "informs, does not lock" instruction actually given to the model).
+//
+// Deliberately excludes:
+//   - Career Intelligence's 6-dimension capability blend
+//     (lib/career/capabilityExtractor.ts et al) — a distinct, separately
+//     fragmented domain (Phase 3 audit) not yet safe to converge.
+//   - Blueprint's own composed output — traced (Phase 4 audit) and found to
+//     add no field here that isn't either (a) a pure reformatting of this
+//     same Projection data, already read here directly, or (b) parent-
+//     audience-shaped prose (lib/parentExperience/actions.ts) with no
+//     tutoring-relevant content Projection doesn't already carry more
+//     precisely. Nothing was found worth importing beyond Projection
+//     itself — see the Phase 4 closeout for the full trace.
+//   - The raw categorical risk label (`overallRiskLevel`) — only the
+//     underlying per-subject flag `reason` sentences are exposed, per
+//     Phase 4 §21 ("prefer underlying learning factors over categorical
+//     risk labels").
+
+export type CompassEvidenceSufficiency = 'none' | 'limited' | 'established'
+
+export type CompassSubjectIntelligence = {
+  /** Plain per-subject capability level from Projection's capability projector — NOT Career Intelligence's 6-dimension career-framed blend. */
+  capabilityLevel: CapabilityLevel | null
+  /** This subject's own trend, from Growth's per-subject (comparable-context) breakdown — never a cross-subject-pooled figure. */
+  trajectory: Trend | null
+  /** Underlying factor sentences for THIS subject only (risk projector's own `reason` text) — never a bare severity label. */
+  riskFactors: string[]
+  /** Derived from Projection's own confidence number — never a fabricated percentage exposed to the model. */
+  evidenceSufficiency: CompassEvidenceSufficiency
+}
+
+const EMPTY_SUBJECT_INTELLIGENCE: CompassSubjectIntelligence = {
+  capabilityLevel: null, trajectory: null, riskFactors: [], evidenceSufficiency: 'none',
+}
+
+/** Below this confidence, evidence exists but is not yet enough to call the learner's state "established" — same 3-tier "sufficient evidence" judgment ARDS/Blueprint already apply elsewhere, not a new threshold invented for Compass. */
+const ESTABLISHED_CONFIDENCE_THRESHOLD = 70
+
+/**
+ * Pure extraction of subject-scoped persistent intelligence from an
+ * already-fetched Projection bundle — kept separate from the I/O wrapper
+ * below so it is directly testable without a database.
+ */
+export function extractCompassSubjectIntelligence(input: {
+  capability: CapabilityValue | null
+  capabilityConfidence: number | null
+  growth: GrowthValue | null
+  risk: RiskValue | null
+  subject: string
+}): CompassSubjectIntelligence {
+  const normalized = normalizeSubjectKey(input.subject)
+
+  const capabilityKey = input.capability
+    ? Object.keys(input.capability.bySubject).find(k => normalizeSubjectKey(k) === normalized) ?? null
+    : null
+  if (capabilityKey === null) return EMPTY_SUBJECT_INTELLIGENCE
+
+  const growthKey = input.growth
+    ? Object.keys(input.growth.bySubject).find(k => normalizeSubjectKey(k) === normalized) ?? null
+    : null
+
+  const riskFactors = (input.risk?.flags ?? [])
+    .filter(f => f.subject !== null && normalizeSubjectKey(f.subject) === normalized)
+    .map(f => f.reason)
+
+  return {
+    capabilityLevel: input.capability!.bySubject[capabilityKey].level,
+    trajectory: growthKey ? input.growth!.bySubject[growthKey].trend : null,
+    riskFactors,
+    evidenceSufficiency: (input.capabilityConfidence ?? 0) >= ESTABLISHED_CONFIDENCE_THRESHOLD ? 'established' : 'limited',
+  }
+}
+
+/**
+ * The one call a Compass tutoring route makes: reads the learner's full
+ * Projection bundle ONCE (never a second `learner_projections` read for the
+ * same request) and resolves both the tutoring-level state
+ * ({@link resolveCompassAcademicLevel}'s existing precedence chain,
+ * unchanged) and subject-scoped persistent intelligence from it.
+ */
+export async function resolveCompassLearnerIntelligence(input: {
+  learnerId: string
+  subject: string
+  legacy: LegacyAcademicFallback
+}): Promise<{ academic: CompassAcademicState; persistent: CompassSubjectIntelligence }> {
+  const rows = await readCompassProjectionRows(input.learnerId)
+
+  const academicRow = rows.find(r => r.projector_type === 'academic')
+  const academicRawValue = academicRow?.value as AcademicValue | null
+  const academicValue = academicRawValue && typeof academicRawValue === 'object' && academicRawValue.bySubject ? academicRawValue : null
+
+  const academic = resolveCompassAcademicLevel({
+    academic: academicValue,
+    academicConfidence: academicRow?.confidence ?? null,
+    academicFreshnessDays: academicRow?.freshness_days ?? null,
+    subject: input.subject,
+    legacy: input.legacy,
+  })
+
+  const capabilityRow = rows.find(r => r.projector_type === 'capability')
+  const growthRow = rows.find(r => r.projector_type === 'growth')
+  const riskRow = rows.find(r => r.projector_type === 'risk')
+
+  const persistent = extractCompassSubjectIntelligence({
+    capability: (capabilityRow?.value as CapabilityValue | null) ?? null,
+    capabilityConfidence: capabilityRow?.confidence ?? null,
+    growth: (growthRow?.value as GrowthValue | null) ?? null,
+    risk: (riskRow?.value as RiskValue | null) ?? null,
+    subject: input.subject,
+  })
+
+  return { academic, persistent }
 }
 
 /**

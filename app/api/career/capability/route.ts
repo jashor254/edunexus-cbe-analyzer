@@ -7,10 +7,11 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized, apiBadRequest, apiForbidden } from '@/lib/api/response'
 import {
-  getCapabilityProfile,
   getCapabilityHistory,
   recomputeAndSaveCapabilityProfile,
 } from '@/lib/career/careerEngine'
+import { resolveCurrentCapabilityProfile } from '@/lib/learnerIntelligence/careerIntelligenceOrchestration'
+import { canAccessLegacyStudent } from '@/lib/core/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,17 +41,20 @@ export async function GET(req: NextRequest) {
 
     const { studentId, history } = parsed.data
 
-    // Verify student belongs to this user (self-created OR teacher-linked)
-    const { data: student, error: studentErr } = await supabase
-      .from('students')
-      .select('id, user_id, parent_user_id')
-      .eq('id', studentId)
-      .single()
+    // Verify student belongs to this user — legacy self/parent link, or the
+    // institutional Phase 1C compatibility bridge (canAccessLegacyStudent,
+    // lib/core/permissions.ts). includeParent: true preserves this route's
+    // existing, broader-than-its-siblings self-OR-parent semantics.
+    const allowed = await canAccessLegacyStudent(user.id, studentId, { includeParent: true })
+    if (!allowed) return apiForbidden()
 
-    if (studentErr || !student) return apiBadRequest('Student not found')
-    if (student.user_id !== user.id && student.parent_user_id !== user.id) return apiForbidden()
-
-    const profile = await getCapabilityProfile(studentId)
+    // Phase 5 (Career Intelligence Convergence): canonical Projection first,
+    // the persisted (Evidence + legacy) snapshot only when Projection has no
+    // evidence at all for this student — see
+    // resolveCurrentCapabilityProfile's own doc comment. This is what
+    // previously let this route disagree with /api/career/capability-matches
+    // (Projection-only, live) for the same learner.
+    const profile = await resolveCurrentCapabilityProfile(studentId)
 
     if (history) {
       const historyItems = await getCapabilityHistory(studentId, 10)
@@ -78,15 +82,10 @@ export async function POST(req: NextRequest) {
 
     const { studentId } = parsed.data
 
-    // Verify student belongs to this user (self-created OR teacher-linked)
-    const { data: student, error: studentErr } = await supabase
-      .from('students')
-      .select('id, user_id, parent_user_id')
-      .eq('id', studentId)
-      .single()
-
-    if (studentErr || !student) return apiBadRequest('Student not found')
-    if (student.user_id !== user.id && student.parent_user_id !== user.id) return apiForbidden()
+    // Verify student belongs to this user — legacy self/parent link, or the
+    // institutional Phase 1C compatibility bridge (see GET handler above).
+    const allowed = await canAccessLegacyStudent(user.id, studentId, { includeParent: true })
+    if (!allowed) return apiForbidden()
 
     const profile = await recomputeAndSaveCapabilityProfile(studentId)
 

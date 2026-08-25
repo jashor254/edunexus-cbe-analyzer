@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized, apiBadRequest, apiForbidden } from '@/lib/api/response'
 import { saveCareerInterest, getInterestsForStudent } from '@/lib/career/careerEngine'
+import { canAccessLegacyStudent } from '@/lib/core/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,15 +27,10 @@ export async function POST(req: NextRequest) {
 
     const { studentId, careerSlug, interestLevel, notes } = parsed.data
 
-    // Verify student belongs to this user
-    const { data: student } = await supabase
-      .from('students')
-      .select('id')
-      .eq('id', studentId)
-      .eq('user_id', user.id)
-      .maybeSingle()
-
-    if (!student) return apiForbidden()
+    // Verify student belongs to this user — legacy self link, or the
+    // institutional Phase 1C compatibility bridge.
+    const allowed = await canAccessLegacyStudent(user.id, studentId)
+    if (!allowed) return apiForbidden()
 
     const interest = await saveCareerInterest(studentId, careerSlug, interestLevel, notes)
     return apiSuccess({ interest })
@@ -54,14 +50,8 @@ export async function GET(req: NextRequest) {
     const studentId = searchParams.get('studentId')
     if (!studentId) return apiBadRequest('studentId is required')
 
-    const { data: student } = await supabase
-      .from('students')
-      .select('id')
-      .eq('id', studentId)
-      .eq('user_id', user.id)
-      .maybeSingle()
-
-    if (!student) return apiForbidden()
+    const allowed = await canAccessLegacyStudent(user.id, studentId)
+    if (!allowed) return apiForbidden()
 
     const interests = await getInterestsForStudent(studentId)
     return apiSuccess({ interests })

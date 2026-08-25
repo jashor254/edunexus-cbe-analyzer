@@ -10,7 +10,8 @@ import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiBadRequest, apiForbidden, apiUnauthorized } from '@/lib/api/response'
-import { resolveCanonicalCareerMatches } from '@/lib/learnerIntelligence/careerIntelligence'
+import { resolveCanonicalCareerMatches } from '@/lib/learnerIntelligence/careerIntelligenceOrchestration'
+import { canAccessLegacyStudent } from '@/lib/core/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,14 +28,8 @@ async function authorizeStudent(studentId: string) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: apiUnauthorized() } as const
 
-  const { data: student, error: studentError } = await supabase
-    .from('students')
-    .select('id')
-    .eq('id', studentId)
-    .eq('user_id', user.id)
-    .maybeSingle()
-
-  if (studentError || !student) return { error: apiForbidden() } as const
+  const allowed = await canAccessLegacyStudent(user.id, studentId)
+  if (!allowed) return { error: apiForbidden() } as const
   return { error: null } as const
 }
 

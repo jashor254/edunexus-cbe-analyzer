@@ -20,9 +20,10 @@ import {
   resolveCompassAcademicLevel,
   resolveCompassSubjectRanking,
   tierToLevel,
+  extractCompassSubjectIntelligence,
   type LegacyAcademicFallback,
 } from './learnerContext'
-import type { AcademicValue, Trend } from '@/lib/projection/types'
+import type { AcademicValue, CapabilityValue, GrowthValue, RiskValue, Trend } from '@/lib/projection/types'
 
 const SOURCE = readFileSync(join(__dirname, 'learnerContext.ts'), 'utf8')
 
@@ -325,4 +326,101 @@ test('14c. the comment-stripping guardrail helper actually works (it must not si
   assert.ok(CODE.includes('export function resolveCompassAcademicLevel'), 'CODE must retain executable declarations')
   assert.ok(SOURCE.includes('recomputeLearnerProjection'), 'the doc comment does mention it — that is the case being handled')
   assert.ok(!CODE.includes('not a synchronizer'), 'prose should have been stripped')
+})
+
+// ── Phase 4 (Blueprint/Compass Intelligence Convergence): extractCompassSubjectIntelligence ──
+
+function capability(bySubject: Record<string, { level: CapabilityValue['bySubject'][string]['level']; score?: number }>): CapabilityValue {
+  const entries = Object.entries(bySubject).map(([k, v]) => [k, { level: v.level, score: v.score ?? 0.5 }] as const)
+  return { overallLevel: 'capable', overallScore: 0.5, bySubject: Object.fromEntries(entries) }
+}
+
+function growth(bySubject: Record<string, { trend: Trend }>): GrowthValue {
+  return {
+    trend: 'insufficient_data', sourceSubject: null, earliestScore: null, latestScore: null, delta: null, windowStart: null, windowEnd: null,
+    bySubject: Object.fromEntries(Object.entries(bySubject).map(([k, v]) => [k, {
+      trend: v.trend, earliestScore: null, latestScore: null, delta: null, windowStart: null, windowEnd: null,
+    }])),
+  }
+}
+
+function risk(flags: RiskValue['flags']): RiskValue {
+  const worst = flags.some(f => f.severity === 'critical') ? 'critical' : flags.some(f => f.severity === 'at_risk') ? 'at_risk' : flags.length ? 'watch' : 'normal'
+  return { flags, overallRiskLevel: worst }
+}
+
+test('P4-1. no capability projection for this subject: returns the empty/none result, not a fabricated one', () => {
+  const result = extractCompassSubjectIntelligence({
+    capability: capability({ english: { level: 'strong' } }),
+    capabilityConfidence: 90,
+    growth: null,
+    risk: null,
+    subject: 'mathematics',
+  })
+  assert.equal(result.capabilityLevel, null)
+  assert.equal(result.evidenceSufficiency, 'none')
+  assert.deepEqual(result.riskFactors, [])
+})
+
+test('P4-2. capability present, high confidence: evidenceSufficiency is "established"', () => {
+  const result = extractCompassSubjectIntelligence({
+    capability: capability({ mathematics: { level: 'developing' } }),
+    capabilityConfidence: 85,
+    growth: null,
+    risk: null,
+    subject: 'mathematics',
+  })
+  assert.equal(result.capabilityLevel, 'developing')
+  assert.equal(result.evidenceSufficiency, 'established')
+})
+
+test('P4-3. capability present, low confidence: evidenceSufficiency is "limited", never fabricated as "established"', () => {
+  const result = extractCompassSubjectIntelligence({
+    capability: capability({ mathematics: { level: 'developing' } }),
+    capabilityConfidence: 20,
+    growth: null,
+    risk: null,
+    subject: 'mathematics',
+  })
+  assert.equal(result.evidenceSufficiency, 'limited')
+})
+
+test('P4-4. trajectory is read from this subject\'s OWN growth entry — never a cross-subject-pooled figure', () => {
+  const result = extractCompassSubjectIntelligence({
+    capability: capability({ mathematics: { level: 'capable' } }),
+    capabilityConfidence: 80,
+    growth: growth({ mathematics: { trend: 'declining' }, english: { trend: 'improving' } }),
+    risk: null,
+    subject: 'mathematics',
+  })
+  assert.equal(result.trajectory, 'declining')
+})
+
+test('P4-5. risk factors are subject-scoped underlying-reason sentences, never a bare severity label, never another subject\'s flags', () => {
+  const result = extractCompassSubjectIntelligence({
+    capability: capability({ mathematics: { level: 'developing' } }),
+    capabilityConfidence: 80,
+    growth: null,
+    risk: risk([
+      { subject: 'mathematics', reason: 'Below Expectation in mathematics and declining from prior evidence', severity: 'critical', evidenceIds: ['e1'] },
+      { subject: 'english', reason: 'Approaching Expectation in english but declining from prior evidence', severity: 'watch', evidenceIds: ['e2'] },
+    ]),
+    subject: 'mathematics',
+  })
+  assert.deepEqual(result.riskFactors, ['Below Expectation in mathematics and declining from prior evidence'])
+  // CompassSubjectIntelligence has no severity/label field at all (proven
+  // by the type itself, not just this assertion) — only prose reason
+  // sentences ever reach the prompt.
+  assert.ok(result.riskFactors.every(f => f !== 'critical' && f !== 'watch' && f !== 'at_risk'))
+})
+
+test('P4-6. subject-key normalization matches the same rule resolveCompassAcademicLevel already uses (e.g. differently-cased/spelled keys still match)', () => {
+  const result = extractCompassSubjectIntelligence({
+    capability: capability({ Mathematics: { level: 'strong' } }),
+    capabilityConfidence: 90,
+    growth: null,
+    risk: null,
+    subject: 'mathematics',
+  })
+  assert.equal(result.capabilityLevel, 'strong')
 })

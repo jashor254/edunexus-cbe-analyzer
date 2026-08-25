@@ -13,16 +13,28 @@
 // surface already obeys.
 import { NextRequest } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiNotFound } from '@/lib/api/response'
 import { getCareerBySlugWithCOS } from '@/lib/career/careerEngine'
 import { requestCareerKnowledge } from '@/lib/career/knowledgeRequests'
 import { computeCapabilityMatches } from '@/lib/career/capabilityMatchEngine'
-import { resolveFreshCapabilityProfile, careerModeForGrade } from '@/lib/learnerIntelligence/careerIntelligence'
+import { careerModeForGrade } from '@/lib/learnerIntelligence/careerIntelligence'
+import { resolveFreshCapabilityProfile } from '@/lib/learnerIntelligence/careerIntelligenceOrchestration'
+import { canAccessLegacyStudent } from '@/lib/core/permissions'
 import type { CapabilityCareerMatch } from '@/lib/career/types'
 import { buildCareerReadinessChains, buildCapabilityReadinessChains } from '@/lib/knowledgeGraph/careerReadiness'
 import type { CareerReadinessReport } from '@/lib/knowledgeGraph/careerReadiness'
+import { publishEvent } from '@/lib/events/publish'
 
 export const dynamic = 'force-dynamic'
+
+// What the learner clicked to get here — analytics only (Phase 9.1 §8), never
+// used for any access-control or intelligence decision. Falls back to 'other'
+// rather than rejecting the request when an entry point doesn't pass one.
+const KNOWN_SOURCES = new Set(['search', 'explorer', 'career_match', 'signal', 'other'])
+function resolveSource(raw: string | null): string {
+  return raw && KNOWN_SOURCES.has(raw) ? raw : 'other'
+}
 
 export async function GET(
   req: NextRequest,
@@ -34,6 +46,8 @@ export async function GET(
     if (authError || !user) return apiUnauthorized()
 
     const { slug } = await params
+    const { searchParams } = new URL(req.url)
+    const source = resolveSource(searchParams.get('source'))
     const career = await getCareerBySlugWithCOS(slug)
 
     // No exact slug match. This used to generate a career inline and persist it,
@@ -53,6 +67,9 @@ export async function GET(
             readiness_report: null,
           })
         }
+        if (result.status === 'rate_limited') {
+          return apiNotFound(`Career '${slug}' not found`)
+        }
         return apiSuccess({ career: result.career, provisional: false, capability_match: null, readiness_report: null })
       } catch (genErr) {
         console.error('[career/slug] knowledge request failed', genErr)
@@ -60,19 +77,34 @@ export async function GET(
       }
     }
 
-    const { searchParams } = new URL(req.url)
+    // Analytics only — a canonical career the learner actually opened.
+    // Never mutates learner_evidence/Projection/capability/interest state
+    // (Phase 9.1 §12/§35 Guard A).
+    void publishEvent({
+      event_type:    'student.career_result.opened',
+      resource_type: 'career',
+      resource_id:   career.slug,
+      actor_id:      user.id,
+      payload:       { careerSlug: career.slug, careerId: career.id, source },
+    }).catch(err => console.error('[events] student.career_result.opened:', err instanceof Error ? err.message : String(err)))
+
     const studentId = searchParams.get('studentId')
 
     let capabilityMatch:   CapabilityCareerMatch | null = null
     let readinessReport:   CareerReadinessReport | null = null
 
     if (studentId) {
-      const { data: student } = await supabase
-        .from('students')
-        .select('id, grade')
-        .eq('id', studentId)
-        .eq('user_id', user.id)
-        .maybeSingle()
+      const allowed = await canAccessLegacyStudent(user.id, studentId)
+      // Service client, not the request-scoped `supabase` above: RLS on
+      // `students`/`student_learning_context` only recognizes
+      // `auth.uid() = user_id`, which an institutional learner's Phase 1C
+      // compatibility row never has set (see canAccessLegacyStudent) — the
+      // same reason /api/student/home/route.ts and assignmentDiscovery.ts
+      // already read through the service client post-authorization.
+      const db = createServiceClient()
+      const student = allowed
+        ? (await db.from('students').select('id, grade').eq('id', studentId).maybeSingle()).data
+        : null
 
       if (student) {
         // Capability match — fast, deterministic, no tokens. Sourced live
@@ -105,7 +137,7 @@ export async function GET(
 
         // Knowledge graph readiness chains — surface which prerequisite topics block this career
         try {
-          const { data: ctx } = await supabase
+          const { data: ctx } = await db
             .from('student_learning_context')
             .select('knowledge_root_causes')
             .eq('student_id', studentId)

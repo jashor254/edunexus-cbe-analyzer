@@ -38,6 +38,7 @@ import {
   readCompassAcademicProjection,
   resolveCompassAcademicLevelFor,
   resolveCompassLearnerContext,
+  resolveCompassLearnerIntelligence,
 } from './learnerContext'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_P0A_COMPASS_CONTEXT_TEST'
@@ -369,4 +370,73 @@ test('R2. a learner with no persisted projection degrades to legacy rather than 
   )
   assert.equal(state.source, 'legacy_tier')
   assert.equal(state.level, 3)
+})
+
+// ── Phase 4 (Blueprint/Compass Intelligence Convergence): resolveCompassLearnerIntelligence ──
+//
+// Uses a fresh subject (integrated_science) rather than 'mathematics' —
+// by this point in the file, mathematics's evidence history has been
+// mutated by tests 1/2/2b (added, then retracted) in ways this section
+// does not depend on and should not be coupled to.
+
+test('P4-1. a real declining, below-expectation subject: capabilityLevel/trajectory/riskFactors all reflect the SAME real Projection data', async () => {
+  await addConfirmedEvidence('integrated_science', 4, 1)
+  await addConfirmedEvidence('integrated_science', 1, 2)
+
+  const { persistent } = await resolveCompassLearnerIntelligence({
+    learnerId: studentId,
+    subject: 'integrated_science',
+    legacy: await legacyFromContext(),
+  })
+
+  assert.equal(persistent.capabilityLevel, 'emerging', 'Level 1 latest evidence must map to the emerging capability band')
+  assert.equal(persistent.trajectory, 'declining', 'earliest Level 4 -> latest Level 1 is a real decline, from the Growth projector')
+  assert.equal(persistent.evidenceSufficiency, 'limited', 'two low-diversity rows must not read as "established"')
+  assert.equal(persistent.riskFactors.length, 1, 'riskProjector must flag Below-Expectation-and-declining for this subject')
+  assert.match(persistent.riskFactors[0], /Below Expectation in integrated_science and declining from prior evidence/)
+})
+
+test('P4-2. a DIFFERENT subject with no evidence at all: evidenceSufficiency "none", no cross-subject leakage of integrated_science\'s risk factor', async () => {
+  const { persistent } = await resolveCompassLearnerIntelligence({
+    learnerId: studentId,
+    subject: 'kiswahili',
+    legacy: await legacyFromContext(),
+  })
+  assert.equal(persistent.capabilityLevel, null)
+  assert.equal(persistent.evidenceSufficiency, 'none')
+  assert.deepEqual(persistent.riskFactors, [], 'kiswahili must never inherit integrated_science\'s risk flag')
+})
+
+test('P4-3. the academic level and persistent intelligence resolve from ONE projection read, not two', async () => {
+  const before = await db.from('learner_projections').select('id, last_computed').eq('learner_id', studentId)
+  const beforeStamps = (before.data ?? []).map(r => r.last_computed).sort()
+
+  const { academic, persistent } = await resolveCompassLearnerIntelligence({
+    learnerId: studentId,
+    subject: 'integrated_science',
+    legacy: await legacyFromContext(),
+  })
+  assert.equal(academic.source, 'projection')
+  assert.equal(persistent.capabilityLevel, 'emerging')
+
+  const afterRead = await db.from('learner_projections').select('id, last_computed').eq('learner_id', studentId)
+  const afterStamps = (afterRead.data ?? []).map(r => r.last_computed).sort()
+  assert.deepEqual(afterStamps, beforeStamps, 'resolveCompassLearnerIntelligence must not write any projection row (read-only, same contract as the rest of this module)')
+})
+
+test('P4-4. real risk-factor text flows unmodified into the actual Compass system prompt', async () => {
+  const { persistent } = await resolveCompassLearnerIntelligence({
+    learnerId: studentId,
+    subject: 'integrated_science',
+    legacy: await legacyFromContext(),
+  })
+  const prompt = buildCompassPrompt({
+    firstName: 'Mary', grade: 8, level: 1, isJunior: true,
+    persistentIntelligence: persistent,
+    subject: 'integrated_science', subtopic: 'integrated_science',
+    gradeTopics: [], sessionsWithoutImprovement: 0,
+    mode: 'school', languageMode: 'mixed', questionMode: 'mcq-and-structured',
+  })
+  assert.match(prompt, /Below Expectation in integrated_science and declining from prior evidence/)
+  assert.match(prompt, /trust what they show you now and adjust immediately/)
 })

@@ -22,7 +22,7 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { canManageLearnerRecordCore, canViewLearnerRecord } from '@/lib/core/permissions'
 import { asLearnerId } from '@/lib/core/identityTypes'
