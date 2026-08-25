@@ -115,7 +115,7 @@ export default function ParentBlueprintView({
       </ParentSectionCard>
 
       <ParentSectionCard title="Recommended Next Steps" section={blueprint.recommendedNextSteps} defaultOpen>
-        {data => <RecommendedNextStepsSection data={data} />}
+        {data => <RecommendedNextStepsSection data={data} viewer="parent" />}
       </ParentSectionCard>
     </div>
   )

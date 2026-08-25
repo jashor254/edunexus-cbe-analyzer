@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { Loader2, AlertCircle, FileText, ArrowLeft } from 'lucide-react'
 import type { ReportCardWithSubjects } from '@/types/core'
+import { SchoolLetterhead, type SchoolLetterheadIdentity } from '@/components/core/SchoolLetterhead'
 
 type GuardianLearner = {
   learner_id:    string
@@ -17,6 +18,7 @@ export default function ParentReportCardPage() {
   const [learners, setLearners] = useState<GuardianLearner[] | null>(null)
   const [selected, setSelected] = useState<GuardianLearner | null>(null)
   const [report, setReport]     = useState<ReportCardWithSubjects | null>(null)
+  const [school, setSchool]     = useState<SchoolLetterheadIdentity | null>(null)
   const [error, setError]       = useState('')
   const [loadingReport, setLoadingReport] = useState(false)
 
@@ -33,6 +35,7 @@ export default function ParentReportCardPage() {
   const loadReport = useCallback(async (learner: GuardianLearner) => {
     setSelected(learner)
     setReport(null)
+    setSchool(null)
     setError('')
     if (!learner.currentTermId) {
       setError('No current term is set for this school yet.')
@@ -47,6 +50,7 @@ export default function ParentReportCardPage() {
       const json = await res.json()
       if (!res.ok || !json.success) throw new Error(json.error ?? 'Report card not available')
       setReport(json.data.report)
+      setSchool(json.data.school ?? null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Report card not available')
     } finally {
@@ -118,6 +122,8 @@ export default function ParentReportCardPage() {
 
           {!loadingReport && report && (
             <div className="border border-white/10 rounded-2xl bg-white/5 p-6 space-y-4">
+              {school && <SchoolLetterhead school={school} />}
+
               <div>
                 <h2 className="text-lg font-semibold text-white">
                   {report.learners.first_name} {report.learners.last_name}

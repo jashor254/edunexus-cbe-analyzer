@@ -37,9 +37,8 @@ export async function sendReportWhatsApp(params: ReportWhatsAppParams): Promise<
     // in parallel, and either can be disabled/fail on its own), so this
     // message must never assert something about a channel it can't confirm.
     const messageSnip =
-      `${params.studentName}'s Grade ${params.grade} Learner Blueprint is ready. ` +
-      `Your child's personalised report covers who they are becoming, how they learn, ` +
-      `and which future opportunities are opening up. ` +
+      `${params.studentName}'s Grade ${params.grade} Learner Intelligence Report is ready. ` +
+      `It covers current strengths, focus areas, and pathway/career signals based on recorded evidence. ` +
       `${params.signupToken ? 'Create your EduNexus parent account to access the Learning Compass for your child.' : 'View on your dashboard.'}`
 
     const result = await sendWhatsAppTemplate({
@@ -52,7 +51,7 @@ export async function sendReportWhatsApp(params: ReportWhatsAppParams): Promise<
             { type: 'text', text: params.parentName },
             { type: 'text', text: params.studentName },
             { type: 'text', text: params.teacherName },
-            { type: 'text', text: 'Learner Blueprint Ready' },
+            { type: 'text', text: 'Learner Intelligence Report Ready' },
             { type: 'text', text: messageSnip.substring(0, 200) },
             { type: 'text', text: link },
           ],

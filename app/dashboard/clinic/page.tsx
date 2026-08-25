@@ -465,7 +465,7 @@ function ClinicReportView({ studentId, studentName, onClose }: {
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-violet-400 text-xs font-bold uppercase tracking-wider mb-1">
-              Academic Clinic Report
+              Learner Intelligence Report
             </div>
             <h2 className="text-white font-black text-2xl">{report.student_name}</h2>
             <div className="flex flex-wrap gap-3 mt-1.5 text-sm text-white/50">
@@ -896,7 +896,7 @@ function ClinicReportView({ studentId, studentName, onClose }: {
 
         <p className="text-white/20 text-xs text-center">
           Last generated: {new Date(report.generated_at).toLocaleString('en-KE')} ·
-          EduNexus Academic Clinic © 2026 | Jashor Technologies
+          EduNexus Learner Intelligence Report © 2026 | Jashor Technologies
         </p>
 
       </div>
@@ -1236,7 +1236,7 @@ export default function ClinicPage() {
               </div>
             </div>
             <div>
-              <h1 className="text-3xl font-black text-slate-900">Academic Clinic</h1>
+              <h1 className="text-3xl font-black text-slate-900">Learner Intelligence Reports</h1>
               <p className="text-sm text-slate-500">
                 Deep insights for your child's CBC & IGCSE journey
               </p>
@@ -1342,7 +1342,7 @@ export default function ClinicPage() {
         <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-8 text-white shadow-2xl">
           <h3 className="text-2xl font-black mb-2 flex items-center gap-2">
             <Sparkles className="w-6 h-6" />
-            What's in the Academic Clinic?
+            What's in the Learner Intelligence Report?
           </h3>
           <p className="text-indigo-200 mb-6 text-sm">
             Everything you need to understand and support your child's CBC & IGCSE journey.

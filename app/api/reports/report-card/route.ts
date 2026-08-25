@@ -16,6 +16,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
 import { getReportCard } from '@/lib/core/report-cards'
+import { getSchool } from '@/lib/core/school'
 import { requireParent } from '@/lib/core/permissions'
 import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
 import { asLearnerId } from '@/lib/core/identityTypes'
@@ -47,7 +48,16 @@ export async function GET(req: NextRequest) {
     const report = await getReportCard(learnerId, termId)
     if (!report || !report.is_published) return apiError('Report card not available', 404)
 
-    return apiSuccess({ report })
+    // Phase 3 (document identity/letterhead) — school identity for the
+    // official Report Card's letterhead. report.school_id comes from the
+    // already ownership-verified report row itself (requireParent above),
+    // never from client input, so there is no cross-school lookup vector
+    // here: a caller cannot request another school's branding by supplying
+    // a different schoolId, because no schoolId parameter exists on this
+    // route at all.
+    const school = await getSchool(report.school_id)
+
+    return apiSuccess({ report, school })
   } catch (err) {
     console.error('[reports/report-card GET]', err instanceof Error ? err.message : err)
     return apiError('Server error', 500)

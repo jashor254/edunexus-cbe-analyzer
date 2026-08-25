@@ -333,7 +333,7 @@ export default function ReportsPage() {
             activeTab === 'clinic' ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          <FlaskConical className="w-4 h-4" /> Academic Clinic
+          <FlaskConical className="w-4 h-4" /> Learner Intelligence Reports
         </button>
         <button
           onClick={() => setActiveTab('other')}
@@ -345,7 +345,7 @@ export default function ReportsPage() {
         </button>
       </div>
 
-      {/* Academic Clinic Reports */}
+      {/* Learner Intelligence Reports */}
       {activeTab === 'clinic' && (
         classes.length === 0 ? (
           <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-12 text-center">
