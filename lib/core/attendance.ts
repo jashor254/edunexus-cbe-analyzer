@@ -56,6 +56,7 @@ import { getSchoolUser, isSchoolAdmin } from '@/lib/core/school-users'
 import { getClass } from '@/lib/core/classes'
 import { listAcademicYears, listTerms } from '@/lib/core/school'
 import { getClassRoster } from '@/lib/core/learners'
+import { resolveParent } from '@/lib/core/identity'
 import { MembershipRequiredError, PermissionDeniedError, ResourceOwnershipError } from '@/lib/core/errors'
 
 const ATTENDANCE_STATUSES: readonly AttendanceStatus[] = ['present', 'absent', 'late', 'excused']
@@ -517,17 +518,41 @@ export async function listAttendanceForSession(
 }
 
 // A learner's full attendance history can span many classes and teachers
-// across terms — no Attendance-specific class-teacher-of-record or
-// parent/student visibility rule exists yet (that is Sprint 11G's own,
-// separately-approved scope). Admin-tier only for now, rather than
-// inferring a broader rule this sprint isn't asked to design.
+// across terms — no Attendance-specific class-teacher-of-record visibility
+// rule exists yet (that remains Sprint 11G's own, separately-approved
+// scope: a class-teacher who is NOT this learner's guardian still cannot
+// read the learner's full cross-class history through this function).
+// Admin-tier stays unconditionally allowed, exactly as before.
+//
+// Parent Portal Phase P4.5: widened to also allow a learner's own
+// authenticated guardian, per the canonical guardian relationship
+// `resolveParent()` already defines (`learner_guardians`) — the SAME
+// resolver `lib/core/permissions.ts`'s `requireParent` uses, reused here
+// rather than re-implemented. This was the confirmed root cause of P4's
+// named finding: `composeAttendance()` (the only caller of this function)
+// always received a `PermissionDeniedError` for a real parent actor, which
+// silently neutered the pre-existing "Learning Time" Home card and
+// `review_attendance` ParentAction, not just P4's own new Attendance
+// Attention source. `learnerId` here is already Core `learners.id` space
+// (composeAttendance passes `coreLearnerId` — see composeAttendance.ts),
+// which is exactly the space `resolveParent().coreLearnerIds` is keyed on,
+// so no new identity bridge is introduced. A caller who is neither
+// admin-tier nor a registered guardian of THIS specific learner is denied
+// exactly as before (an unrelated parent, a plain non-admin class teacher,
+// or a bogus learnerId all still throw).
 export async function getLearnerAttendanceHistory(
   actorUserId: string,
   schoolId: string,
   learnerId: string,
 ): Promise<AttendanceHistoryRow[]> {
   const admin = await isSchoolAdmin(actorUserId, schoolId)
-  if (!admin) throw new PermissionDeniedError('Only school admins may read a learner\'s full attendance history in this sprint.')
+  if (!admin) {
+    const { coreLearnerIds } = await resolveParent(actorUserId)
+    const isGuardianOfThisLearner = (coreLearnerIds as readonly string[]).includes(learnerId)
+    if (!isGuardianOfThisLearner) {
+      throw new PermissionDeniedError('Only school admins or this learner\'s own registered guardian may read a learner\'s full attendance history.')
+    }
+  }
 
   const history = await repos.attendance.listLearnerAttendanceHistory(learnerId)
   return history.filter(row => row.attendance_sessions.school_id === schoolId)

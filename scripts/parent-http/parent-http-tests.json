@@ -6,6 +6,7 @@
     "lib/testing/parentCompassActorBoundary.http.integration.test.ts",
     "lib/testing/parentChildContextConvergence.http.integration.test.ts",
     "lib/testing/parentLearnViewerRole.http.integration.test.ts",
-    "lib/testing/parentAttentionAction.http.integration.test.ts"
+    "lib/testing/parentAttentionAction.http.integration.test.ts",
+    "lib/testing/parentAttendanceVisibility.http.integration.test.ts"
   ]
 }
