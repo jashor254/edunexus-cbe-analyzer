@@ -10,7 +10,7 @@
 // Run: npx tsx --env-file=.env.local --test lib/assignments/evidence.substrand.integration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { recordAssignmentMarkEvidence } from './evidence'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_ADR0024_SPRINTB_TEST'

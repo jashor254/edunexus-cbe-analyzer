@@ -18,8 +18,14 @@ import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest, api
 import { UnauthorizedError, ForbiddenError, NotFoundError, ValidationError, ConflictError } from '@/lib/core/errors'
 import { deliverBlueprintActionAsAssignment } from '@/lib/learnerBlueprint/actionPlan/delivery/assignment'
 
+// Phase 7.5 — exactly one of classId (legacy teacher_classes.id) /
+// classSubjectId (institutional, a current class_subjects.id tenure) must
+// be supplied; the delivery adapter itself is the sole authority on
+// enforcing "exactly one" (mirrors createAssignment's own dispatch) — this
+// schema only requires each field, if present, to be a real UUID.
 const DeliverAssignmentSchema = z.object({
-  classId:                  z.string().uuid(),
+  classId:                  z.string().uuid().optional(),
+  classSubjectId:            z.string().uuid().optional(),
   confirmClassWideDelivery: z.boolean(),
   subject:                  z.string().min(1),
   topic:                    z.string().min(1),
@@ -41,6 +47,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ actionI
 
     const { assignment, alreadyDelivered } = await deliverBlueprintActionAsAssignment(supabase, actionItemId, {
       classId: parsed.data.classId,
+      classSubjectId: parsed.data.classSubjectId,
       confirmClassWideDelivery: parsed.data.confirmClassWideDelivery,
       subject: parsed.data.subject,
       topic: parsed.data.topic,

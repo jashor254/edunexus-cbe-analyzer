@@ -20,9 +20,23 @@
 // assignment-targeting model exists in this codebase to build on safely
 // without redesigning submission fan-out/grading/listing, so that
 // alternative was not attempted here.
+//
+// Phase 7.5 — INSTITUTIONAL ADAPTIVE DELIVERY CONVERGENCE. Until this phase,
+// `DeliverBlueprintActionAsAssignmentCommand` only ever accepted `classId`
+// (a legacy `teacher_classes.id`), so every delivery — even for a purely
+// institutional Core learner/class/subject — was forced through
+// `createAssignment`'s Solo-mode `requireClassTeacher` authority path,
+// which an institutional teacher's `class_subjects` tenure alone can never
+// satisfy (Phase 1D's own header comment named this exact gap). This module
+// now accepts EITHER `classId` (legacy) OR `classSubjectId` (institutional
+// — a current `class_subjects.id` tenure, `ended_at IS NULL`), mirroring
+// `createAssignment`'s own "exactly one, never both" dispatch, and delegates
+// to the SAME canonical service either way — no parallel delivery system,
+// no new assignment writer, no duplicated insert logic. Legacy behavior is
+// byte-for-byte unchanged when `classId` is supplied.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { requireAuthentication, canManageLearnerRecordCore } from '@/lib/core/permissions'
+import { requireAuthentication, canManageLearnerRecordCore, requireInstitutionalAssignmentAuthority } from '@/lib/core/permissions'
 import { ResourceOwnershipError, NotFoundError, ValidationError, ConflictError } from '@/lib/core/errors'
 import { getSchoolUser } from '@/lib/core/school-users'
 import { repos } from '@/lib/repositories'
@@ -32,10 +46,33 @@ import { createAssignment } from '@/lib/assignments/create'
 import type { LearnerId } from '@/lib/core/identityTypes'
 
 export type DeliverBlueprintActionAsAssignmentCommand = {
-  classId: string
+  /**
+   * Legacy/Solo mode — a `teacher_classes.id`. Exactly one of `classId` /
+   * `classSubjectId` must be set (Phase 7.5 — mirrors
+   * `CreateAssignmentCommand`'s own "never both, never neither" rule,
+   * lib/assignments/create.ts). Preserved unchanged from Phase 2B.
+   */
+  classId?: string
+  /**
+   * Institutional mode — a `class_subjects.id` (a CURRENT teaching tenure,
+   * `ended_at IS NULL`). Exactly one of `classId` / `classSubjectId` must be
+   * set. Phase 7.5 — before this, institutional delivery had no path at all
+   * (`deliverBlueprintActionAsAssignment` only ever accepted `classId`,
+   * routing every call through `createAssignment`'s Solo-mode
+   * `requireClassTeacher` authority, which a `teacher_classes.id` alone can
+   * satisfy but a Core institutional class never can).
+   */
+  classSubjectId?: string
   /** Must be literally `true`. Anything else (including omission) is a validation failure — delivery never happens implicitly. */
   confirmClassWideDelivery: boolean
-  /** Required — the Blueprint domain has no reliable subject/topic data to derive these from; inventing them from free-text `target_capability` would violate the "deterministic mapping only" rule. */
+  /**
+   * Required for legacy/Solo mode — the Blueprint domain has no reliable
+   * subject/topic data to derive these from; inventing them from free-text
+   * `target_capability` would violate the "deterministic mapping only"
+   * rule. IGNORED for institutional mode, exactly as `createAssignment`
+   * itself ignores it for `classSubjectId` — the Core subject name resolved
+   * from the tenure is the only authoritative subject there (Phase 1D).
+   */
   subject: string
   topic: string
   /** Optional overrides. Omitted fields fall back to {@link mapActionToAssignmentDraft}'s deterministic, private-content-free mapping. */
@@ -133,9 +170,30 @@ export async function deliverBlueprintActionAsAssignment(
   if (command.confirmClassWideDelivery !== true) {
     throw new ValidationError('You must explicitly confirm this assignment will be issued to the entire selected class (confirmClassWideDelivery: true).')
   }
-  if (!command.classId) throw new ValidationError('A class must be selected for delivery.')
+  const hasClassId = !!command.classId
+  const hasClassSubjectId = !!command.classSubjectId
+  if (hasClassId === hasClassSubjectId) {
+    throw new ValidationError('A class must be selected for delivery (exactly one of classId or classSubjectId).')
+  }
   if (!command.subject?.trim()) throw new ValidationError('Blueprint delivery: "subject" is required.')
   if (!command.topic?.trim()) throw new ValidationError('Blueprint delivery: "topic" is required.')
+
+  // Institutional mode's tenure IS the class-authorization check
+  // (requireInstitutionalAssignmentAuthority, re-verified again inside
+  // createAssignment below — cheap and safe to check twice), but tenure
+  // alone does not prove the tenure's OWN school matches the school this
+  // action item belongs to. A teacher legitimately holding tenure in a
+  // DIFFERENT school than `action.school_id` (a real, if narrow,
+  // multi-school-teacher scenario) must never be able to deliver this
+  // learner's action into that other school's class. canManageLearnerRecordCore
+  // above already anchors the actor to action.school_id; this closes the
+  // second half — the DELIVERY TARGET must be in that same school too.
+  if (hasClassSubjectId) {
+    const authority = await requireInstitutionalAssignmentAuthority(client, command.classSubjectId!)
+    if (authority.schoolId !== action.school_id) {
+      throw new ResourceOwnershipError('This teaching assignment belongs to a different school than the learner\'s Blueprint action.')
+    }
+  }
 
   const draft = mapActionToAssignmentDraft(action)
   const title = command.title?.trim() || draft.title
@@ -149,6 +207,7 @@ export async function deliverBlueprintActionAsAssignment(
   try {
     const result = await createAssignment(client, {
       classId: command.classId,
+      classSubjectId: command.classSubjectId,
       title,
       subject: command.subject,
       topic: command.topic,
@@ -187,7 +246,7 @@ export async function deliverBlueprintActionAsAssignment(
     throw err
   }
 
-  await recordDeliveryHistory(action, created, user.id, command.classId)
+  await recordDeliveryHistory(action, created, user.id)
 
   return { assignment: created, alreadyDelivered: false }
 }
@@ -205,7 +264,6 @@ async function recordDeliveryHistory(
   action: BlueprintActionItemRow,
   assignment: AssignmentRow,
   userId: string,
-  classId: string,
 ): Promise<void> {
   try {
     const actorId = await resolveActorSchoolUserId(userId, action.school_id)
@@ -216,7 +274,12 @@ async function recordDeliveryHistory(
       resulting_status: action.status, // Unchanged — "assignment created" is not "action completed."
       snapshot: action,
       actor_id: actorId,
-      reason: `Delivered as assignment ${assignment.id} to class ${classId} (class-wide delivery).`,
+      // `assignment.class_id` is always the resolved STORAGE class id —
+      // the real teacher_classes.id either mode ultimately writes to
+      // (institutional mode's Phase 1B compatibility class, for legacy
+      // mode the class itself) — never `command.classId`, which is unset
+      // for institutional deliveries.
+      reason: `Delivered as assignment ${assignment.id} to class ${assignment.class_id} (class-wide delivery).`,
     })
   } catch (err) {
     console.error('[blueprint/delivery] failed to record delivery history:', err instanceof Error ? err.message : String(err))

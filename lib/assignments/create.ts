@@ -13,11 +13,12 @@
 // lib/learnerBlueprint/actionPlan/delivery/assignment.ts) is this service's
 // second production caller — never a second writer. It supplies a
 // session-bound Supabase client for an authorized teacher actor and passes
-// through the same `requireClassTeacher` gate below; this service does not
-// accept a caller-provided teacher id as proof of identity. (Phase 1D: the
-// Blueprint adapter still only ever uses the legacy/Solo path — see its own
-// module header and the Phase 1D closeout report §14 for why institutional
-// Blueprint delivery is a named limitation, not migrated in this phase.)
+// through the same `requireClassTeacher`/`requireInstitutionalAssignmentAuthority`
+// gates below; this service does not accept a caller-provided teacher id as
+// proof of identity. (Phase 1D named institutional Blueprint delivery as a
+// gap — the adapter only ever supplied `classId`. Phase 7.5 closed it: the
+// adapter now supplies either `classId` or `classSubjectId`, reusing this
+// same dispatch unchanged.)
 //
 // `blueprintActionItemId` (Phase 2B) is trusted server-derived provenance,
 // never a client-controlled field: the ordinary HTTP route
