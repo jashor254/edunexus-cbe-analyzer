@@ -1,5 +1,5 @@
 import { BaseRepository } from './base'
-import type { School, SchoolUser, SchoolUserRole, SchoolSettings, AcademicYear, Term, SchoolReportCard, ReportCardWithSubjects, CbcLevel, SchoolEntitlementStatus, SchoolPayment, SchoolPaymentMethod } from '@/types/core'
+import type { School, SchoolUser, SchoolUserRole, SchoolSettings, AcademicYear, Term, SchoolReportCard, ReportCardWithSubjects, ReportCardSubjectSnapshotEntry, CbcLevel, SchoolEntitlementStatus, SchoolPayment, SchoolPaymentMethod } from '@/types/core'
 import type {
   SchoolIntelligenceSummary,
   StrandHealthRecord,
@@ -27,7 +27,7 @@ const SCHOOL_PAYMENT_COLS =
   'id, school_id, amount, payment_method, payment_reference, payment_date, coverage_start, coverage_end, confirmed_by, status, notes, created_at, updated_at'
 
 const REPORT_COLS =
-  'id, school_id, learner_id, term_id, class_id, overall_score, overall_cbc_level, position_in_class, total_learners, days_present, days_absent, class_teacher_comment, headteacher_comment, pdf_url, is_published, published_at, generated_at, created_at, updated_at'
+  'id, school_id, learner_id, term_id, class_id, overall_score, overall_cbc_level, position_in_class, total_learners, days_present, days_absent, class_teacher_comment, headteacher_comment, pdf_url, is_published, published_at, generated_at, subject_snapshot, created_at, updated_at'
 
 /** One active teacher membership, with the entitlement state of the school it points at. */
 export type SchoolEntitlementMembership = {
@@ -582,24 +582,90 @@ export class SchoolRepository extends BaseRepository {
     return data
   }
 
+  // Phase P5.5 (docs/architecture/parent-portal-p5-5-report-card-snapshot-integrity.md):
+  // publish now does two things per card, not one — flip is_published/
+  // published_at (unchanged) AND freeze that learner's current
+  // term_subject_summaries state into subject_snapshot, in the SAME row
+  // UPDATE, so a card is never observably "published" with a still-null
+  // snapshot from a half-finished write. This trades the previous single
+  // bulk UPDATE's whole-class atomicity for per-row atomicity: before this
+  // phase, one SQL statement published the entire class/term in a single
+  // all-or-nothing operation; now each row is published via its own
+  // statement (matching the existing per-row-write precedent already used
+  // by computeTermSummaries's own updateClassPositions loop, lib/core/
+  // assessments.ts), so a crash mid-loop can leave some cards published and
+  // others not — but never a card that is published with a stale or missing
+  // snapshot. Named explicitly, not hidden — see the P5.5 doc's Atomicity
+  // section; the mission's own instruction was not to build broad
+  // transaction infrastructure unless genuinely required, and a narrow
+  // reusable RPC/transaction mechanism does not already exist here.
   async publishReportCards(
     schoolId: string,
     termId: string,
     classId?: string
   ): Promise<{ published: number; publishedCards: Array<{ id: string; learner_id: string }> }> {
-    let query = this.db
+    let candidateQuery = this.db
       .from('school_report_cards')
-      .update({ is_published: true, published_at: new Date().toISOString() })
+      .select('id, learner_id')
       .eq('school_id', schoolId)
       .eq('term_id', termId)
       .eq('is_published', false)
-    if (classId) query = query.eq('class_id', classId)
-    // `learner_id` added Sprint 12K — lets the caller trigger one Blueprint
-    // Snapshot per published learner (ADR-0008 Part 3) without a second
-    // query; purely additive to the existing select.
-    const { data, error } = await query.select('id, learner_id')
-    if (error) throw new Error(`publishReportCards: ${error.message}`)
-    return { published: data?.length ?? 0, publishedCards: (data ?? []) as Array<{ id: string; learner_id: string }> }
+    if (classId) candidateQuery = candidateQuery.eq('class_id', classId)
+    const { data: candidates, error: candidateError } = await candidateQuery
+    if (candidateError) throw new Error(`publishReportCards: ${candidateError.message}`)
+    if (!candidates || candidates.length === 0) return { published: 0, publishedCards: [] }
+
+    const learnerIds = candidates.map((c) => c.learner_id)
+
+    // One batched read for the whole class/term (never per-learner —
+    // CLAUDE.md's "never query inside a loop"), joined to subjects for the
+    // canonical name/code this snapshot freezes (same join
+    // findReportCardWithSubjects already performs for the live path).
+    const { data: summaries, error: summariesError } = await this.db
+      .from('term_subject_summaries')
+      .select('learner_id, subject_id, weighted_score, cbc_level, position_in_class, teacher_comment, subjects (id, name, code)')
+      .eq('term_id', termId)
+      .in('learner_id', learnerIds)
+    if (summariesError) throw new Error(`publishReportCards: ${summariesError.message}`)
+
+    const snapshotByLearner = new Map<string, ReportCardSubjectSnapshotEntry[]>()
+    for (const row of summaries ?? []) {
+      const subject = row.subjects as unknown as { id: string; name: string; code: string } | null
+      if (!subject) continue
+      const entry: ReportCardSubjectSnapshotEntry = {
+        subject_id: subject.id,
+        subject_name: subject.name,
+        subject_code: subject.code,
+        weighted_score: row.weighted_score,
+        cbc_level: row.cbc_level as CbcLevel | null,
+        position_in_class: row.position_in_class,
+        teacher_comment: row.teacher_comment,
+      }
+      const list = snapshotByLearner.get(row.learner_id) ?? []
+      list.push(entry)
+      snapshotByLearner.set(row.learner_id, list)
+    }
+
+    const publishedAt = new Date().toISOString()
+    const publishedCards: Array<{ id: string; learner_id: string }> = []
+
+    for (const card of candidates) {
+      const { data, error } = await this.db
+        .from('school_report_cards')
+        .update({
+          is_published: true,
+          published_at: publishedAt,
+          subject_snapshot: snapshotByLearner.get(card.learner_id) ?? [],
+        })
+        .eq('id', card.id)
+        .eq('is_published', false)
+        .select('id, learner_id')
+        .maybeSingle()
+      if (error) throw new Error(`publishReportCards: ${error.message}`)
+      if (data) publishedCards.push(data as { id: string; learner_id: string })
+    }
+
+    return { published: publishedCards.length, publishedCards }
   }
 
   // TD-014 (docs/engineering/implementation-log.md): term_subject_summaries
@@ -610,6 +676,18 @@ export class SchoolRepository extends BaseRepository {
   // every call return null as if the report simply didn't exist. Fixed by
   // querying the two tables separately (each embed below — learners and
   // subjects — has a real FK) and joining in application code.
+  // Phase P5.5 (docs/architecture/parent-portal-p5-5-report-card-snapshot-integrity.md):
+  // once a card is published AND carries a subject_snapshot (every card
+  // published from this phase onward), the per-subject breakdown is served
+  // from that frozen snapshot — never a live join onto term_subject_summaries,
+  // which a later teacher assessment publish can still mutate for this same
+  // (learner_id, term_id). A draft card (is_published=false) intentionally
+  // stays live — that is existing, unchanged product behaviour, not a gap.
+  // A published card with subject_snapshot still null (published before
+  // this phase shipped) falls back to the live join — the pre-existing,
+  // honestly-named drift behaviour for historical cards this migration
+  // cannot retroactively repair (no prior snapshot was ever captured for
+  // them to freeze).
   async findReportCardWithSubjects(
     learnerId: string,
     termId: string
@@ -626,6 +704,26 @@ export class SchoolRepository extends BaseRepository {
     if (reportError) throw new Error(`findReportCardWithSubjects: ${reportError.message}`)
     if (!report) return null
 
+    const typedReport = report as unknown as SchoolReportCard & {
+      learners: { id: string; first_name: string; middle_name: string | null; last_name: string; admission_number: string }
+    }
+
+    if (typedReport.is_published && typedReport.subject_snapshot && typedReport.subject_snapshot.length > 0) {
+      const frozenSummaries = typedReport.subject_snapshot.map((s) => ({
+        id: s.subject_id,
+        subject_id: s.subject_id,
+        weighted_score: s.weighted_score,
+        cbc_level: s.cbc_level,
+        position_in_class: s.position_in_class,
+        teacher_comment: s.teacher_comment,
+        subjects: { id: s.subject_id, name: s.subject_name, code: s.subject_code },
+      }))
+      return {
+        ...typedReport,
+        term_subject_summaries: frozenSummaries,
+      } as unknown as ReportCardWithSubjects
+    }
+
     const { data: summaries, error: summariesError } = await this.db
       .from('term_subject_summaries')
       .select(`
@@ -637,7 +735,7 @@ export class SchoolRepository extends BaseRepository {
     if (summariesError) throw new Error(`findReportCardWithSubjects: ${summariesError.message}`)
 
     return {
-      ...report,
+      ...typedReport,
       term_subject_summaries: summaries ?? [],
     } as unknown as ReportCardWithSubjects
   }

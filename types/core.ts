@@ -350,6 +350,23 @@ export type TermSubjectSummary = {
   updated_at: string
 }
 
+// Phase P5.5 (docs/architecture/parent-portal-p5-5-report-card-snapshot-integrity.md):
+// the per-subject breakdown a published report card shows a parent, frozen
+// at the exact moment of publish — the same "computed once, stored,
+// never recomputed on view" precedent overall_score/overall_cbc_level
+// already use, extended to the subject list. Deliberately narrow: subject
+// identity is whatever term_subject_summaries already resolved (subject_id
+// + the canonical subjects.name/code join), not a new taxonomy.
+export type ReportCardSubjectSnapshotEntry = {
+  subject_id: string
+  subject_name: string
+  subject_code: string
+  weighted_score: number | null
+  cbc_level: CbcLevel | null
+  position_in_class: number | null
+  teacher_comment: string | null
+}
+
 export type SchoolReportCard = {
   id: string
   school_id: string
@@ -368,6 +385,12 @@ export type SchoolReportCard = {
   is_published: boolean
   published_at: string | null
   generated_at: string | null
+  // NULL for a still-draft card (intentionally live, see getReportCard/
+  // findReportCardWithSubjects) and for a card published before Phase P5.5
+  // (historical drift for those rows is a named, accepted limitation — see
+  // the P5.5 doc). Populated once, at publish time, for every card
+  // published from P5.5 onward; never rewritten after that.
+  subject_snapshot: ReportCardSubjectSnapshotEntry[] | null
   created_at: string
   updated_at: string
 }
