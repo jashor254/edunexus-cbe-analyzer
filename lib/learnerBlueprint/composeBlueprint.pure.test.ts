@@ -4,6 +4,17 @@
 // validation, metadata freshness, parent summary templating, and the
 // three static placeholders. No env vars, no network.
 //
+// Blueprint Section Access Boundary Fix — composeCareer.ts and
+// composeLearningCompass.ts no longer import Career/Compass infrastructure
+// themselves (careerAccess.ts/compassAccess.ts own those calls now, invoked
+// once by composeBlueprint.ts), so their null-guard tests live here again,
+// genuinely zero-env. composeAcademicRecord's and composeGrowthTimeline's
+// equivalent tests moved to blueprintSectionNullGuards.pure.test.ts — those
+// two composers retain a real, load-bearing internal Projection-fetch
+// fallback for other direct callers, so importing them still boots
+// infrastructure; see the Learner Blueprint Pure Composition Boundary Audit
+// for why that fallback wasn't removed.
+//
 // Run: npx tsx --test lib/learnerBlueprint/composeBlueprint.pure.test.ts
 
 import { test } from 'node:test'
@@ -11,32 +22,11 @@ import assert from 'node:assert/strict'
 import { composeMetadata } from './composeMetadata'
 import { validateBlueprint } from './validation'
 import { composeParentSummary } from './composeParentSummary'
-import { composeGrowthTimeline } from './composeGrowthTimeline'
-import { composeAcademicRecord } from './composeAcademicRecord'
 import { composeLearningCompass } from './composeLearningCompass'
 import { composeCareer } from './composeCareer'
 import type { LearnerBlueprint, BlueprintSection, AcademicRecordData, AttendanceData } from './types'
 
-// ── Placeholders (Growth Timeline) ────────────────────────────────────────────
-// Teacher Reflection moved to composeBlueprint.integration.test.ts (Sprint
-// 12O) — it now reads the real `teacher_reflections` table via
-// `lib/teacherReflection/reflection.ts`, no longer a pure static placeholder.
-
-test('composeGrowthTimeline is unavailable when no legacy student is bridged (no DB call attempted)', async () => {
-  const section = await composeGrowthTimeline(null)
-  assert.equal(section.status, 'unavailable')
-  assert.equal(section.data, null)
-  assert.match(section.unavailableReason ?? '', /bridged/)
-})
-
 // ── Missing legacy-student-identity short-circuits (no DB call attempted) ────
-
-test('composeAcademicRecord is unavailable when no legacy student is bridged ("missing assessments")', async () => {
-  const section = await composeAcademicRecord(null)
-  assert.equal(section.status, 'unavailable')
-  assert.equal(section.data, null)
-  assert.match(section.unavailableReason ?? '', /bridged/)
-})
 
 test('composeLearningCompass is unavailable when no legacy student is bridged ("missing compass")', async () => {
   const section = await composeLearningCompass(null)

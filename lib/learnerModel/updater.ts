@@ -9,7 +9,7 @@
 
 import { repos } from '@/lib/repositories'
 import { marksToLevel } from '@/lib/intelligence/cbcScale'
-import { computeCapabilityProfile } from '@/lib/career/capabilityExtractor'
+import { computeCapabilityProfile } from '@/lib/career/recomputeCapabilityProfile'
 import {
   getOrCreateLearnerProfile,
   patchKnowledgeState,

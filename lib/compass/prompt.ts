@@ -12,6 +12,23 @@ export type KnowledgeContextBlock = {
   failingTopic:       string | null
 }
 
+/**
+ * Phase 4 — Blueprint/Compass Intelligence Convergence. Subject-scoped
+ * persistent state from the canonical Projection Engine, resolved by
+ * `resolveCompassLearnerIntelligence` (lib/compass/learnerContext.ts).
+ * Background context only — see buildPersistentContextBlock's own
+ * comment for the explicit "informs, does not lock" instruction given to
+ * the model. Deliberately excludes Career Intelligence's capability blend
+ * and any raw categorical risk label — see learnerContext.ts's module
+ * header for what was traced and excluded, and why.
+ */
+export type CompassPersistentContext = {
+  capabilityLevel: 'emerging' | 'developing' | 'capable' | 'strong' | 'exceptional' | null
+  trajectory: 'improving' | 'declining' | 'stable' | 'insufficient_data' | 'mixed' | null
+  riskFactors: string[]
+  evidenceSufficiency: 'none' | 'limited' | 'established'
+}
+
 export interface CompassPromptParams {
   // Student
   firstName: string
@@ -30,6 +47,8 @@ export interface CompassPromptParams {
    * real evidence-derived one.
    */
   levelSource?: 'projection' | 'client_hint' | 'legacy_tier' | 'legacy_overall' | 'session' | 'default'
+  /** Phase 4 — subject-scoped persistent intelligence; undefined/all-null degrades silently (curriculum-aware Compass, unaffected). */
+  persistentIntelligence?: CompassPersistentContext
 
   // Session
   subject: string
@@ -177,7 +196,7 @@ NEEDS_REMEDIATION → move to prerequisite support.
 
 ${p.firstName} | Grade ${p.grade} | Level ${p.level}/4 (${['BE','AE','ME','EE'][p.level - 1]})${!p.isJunior && p.pathway ? ` | Pathway: ${p.pathway}` : ''}${p.levelSource && p.levelSource !== 'projection' ? ` (provisional — no confirmed evidence yet, treat as a starting point only)` : ''}
 ${p.lastSessionSummary ? `Last session: ${p.lastSessionSummary}` : 'First session.'}${p.sessionsWithoutImprovement >= 2 ? `\nNote: ${p.sessionsWithoutImprovement} sessions without improvement — try a different approach.` : ''}
-
+${buildPersistentContextBlock(p.persistentIntelligence)}
 ---
 
 ## SESSION
@@ -207,6 +226,44 @@ COMPASS_EVAL_END`.trim()
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Phase 4 — Blueprint/Compass Intelligence Convergence.
+ *
+ * This block is BACKGROUND ONLY (Phase 4 §11-13's "informs, does not
+ * lock" requirement) — it describes where EduNexus's records say the
+ * learner started, never a verdict the model must defend. The explicit
+ * override rule at the end is what makes immediate, in-session adaptation
+ * possible: a learner who performs above or below this record must be
+ * taught to what they demonstrate right now, not to this note.
+ *
+ * Risk is deliberately rendered as underlying learning factors (the
+ * projector's own `reason` sentences), never a bare categorical label
+ * ("HIGH RISK") — Phase 4 §21. Server-constructed only, from typed
+ * Projection fields — never learner-authored or teacher-authored free
+ * text, so this can never be used to smuggle untrusted instructions into
+ * the system prompt (Phase 4 §10).
+ *
+ * Returns '' (no block at all) when there is no persistent intelligence —
+ * "no learner intelligence" degrades silently to the existing curriculum-
+ * aware prompt, never a broken or empty section header.
+ */
+function buildPersistentContextBlock(ctx: CompassPersistentContext | undefined): string {
+  if (!ctx || ctx.evidenceSufficiency === 'none') return ''
+
+  const lines: string[] = ['PERSISTENT CONTEXT (background only, not a verdict)']
+
+  if (ctx.evidenceSufficiency === 'limited') {
+    lines.push('Based on limited evidence so far — treat as a loose hint, not a fact.')
+  }
+  if (ctx.capabilityLevel) lines.push(`Prior capability record for this subject: ${ctx.capabilityLevel}.`)
+  if (ctx.trajectory && ctx.trajectory !== 'insufficient_data') lines.push(`Recent trajectory: ${ctx.trajectory}.`)
+  if (ctx.riskFactors.length > 0) lines.push(`Learning factors to be aware of: ${ctx.riskFactors.join(' ')}`)
+
+  lines.push('RULE: this is a starting point, not a constraint. If the learner performs above or below this record during the session, trust what they show you now and adjust immediately — do not hold them to this background note.')
+
+  return lines.join('\n') + '\n'
+}
 
 function buildModeNote(p: CompassPromptParams): string {
   if (p.mode === 'holiday') {

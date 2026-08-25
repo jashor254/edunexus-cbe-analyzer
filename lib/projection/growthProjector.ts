@@ -19,7 +19,7 @@
 
 import type { EvidenceRow } from '@/lib/repositories/evidence.repository'
 import type { Projection, GrowthValue, GrowthContextTrend, Trend } from './types'
-import { computeCoverage, computeProjectionConfidence, normalizeLevelToUnit, STABLE_THRESHOLD } from './coverage'
+import { computeCoverage, computeProjectionConfidence, normalizeLevelToUnit, STABLE_THRESHOLD, sortEvidenceChronologically } from './coverage'
 
 export const GROWTH_PROJECTION_VERSION = 'growth-v2-comparable-context'
 
@@ -47,7 +47,7 @@ function computeContextTrend(rows: EvidenceRow[]): GrowthContextTrend {
 
   const periods = [...byPeriod.values()]
     .map(group => {
-      const sortedGroup = [...group].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      const sortedGroup = sortEvidenceChronologically(group)
       const avgScore = group.reduce((sum, r) => sum + normalizeLevelToUnit(r.cbc_level!), 0) / group.length
       return { at: sortedGroup[0].created_at, avgScore }
     })

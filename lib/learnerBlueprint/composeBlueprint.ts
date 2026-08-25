@@ -43,6 +43,8 @@ import { composeLearningStory } from './composeLearningStory'
 import { composeRecommendedNextSteps } from './composeRecommendedNextSteps'
 import { composeMetadata } from './composeMetadata'
 import { loadProjectionAccess } from './projectionAccess'
+import { loadCareerAccess } from './careerAccess'
+import { loadCompassAccess } from './compassAccess'
 import { getGradeBand } from './gradeBand'
 import { validateBlueprint, type BlueprintValidationResult } from './validation'
 import { composeBlueprintCoherence } from './coherence'
@@ -84,21 +86,28 @@ export async function composeBlueprint(ids: BlueprintIdentifiers): Promise<Compo
   // exactly as before. No composer re-implements this lookup.
   const legacyStudentId = await resolveLegacyStudentId(ids.coreLearnerId)
 
-  const [identity, attendance, learningCompass, career, portfolio, achievement, teacherReflection, projectionAccess] = await Promise.all([
+  // Blueprint Section Access Boundary Fix — Career and Compass are now
+  // acquired here (one canonical read each, same as Projection already was)
+  // rather than composeCareer()/composeLearningCompass() fetching them
+  // internally. This keeps those two composers importable from
+  // already-resolved data only — see careerAccess.ts/compassAccess.ts.
+  const [identity, attendance, portfolio, achievement, teacherReflection, projectionAccess, careerAccess, compassAccess] = await Promise.all([
     composeIdentity(ids),
     composeAttendance(ids.actorUserId, ids.schoolId, ids.coreLearnerId),
-    composeLearningCompass(legacyStudentId),
-    composeCareer(legacyStudentId),
     composePortfolio(ids.coreLearnerId, ids.schoolId),
     composeAchievement(ids.coreLearnerId, ids.schoolId),
     composeTeacherReflection(ids.coreLearnerId, ids.schoolId),
     loadProjectionAccess(legacyStudentId),
+    loadCareerAccess(legacyStudentId),
+    loadCompassAccess(legacyStudentId),
   ])
 
-  const [academicRecord, growthTimeline, risk] = await Promise.all([
+  const [academicRecord, growthTimeline, risk, learningCompass, career] = await Promise.all([
     composeAcademicRecord(legacyStudentId, projectionAccess),
     composeGrowthTimeline(legacyStudentId, projectionAccess),
     composeRisk(legacyStudentId, projectionAccess),
+    composeLearningCompass(legacyStudentId, compassAccess),
+    composeCareer(legacyStudentId, careerAccess),
   ])
 
   // Pure — no I/O of its own. Runs after academicRecord because the pathway
