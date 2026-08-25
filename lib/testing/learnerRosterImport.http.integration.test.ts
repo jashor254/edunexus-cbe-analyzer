@@ -6,17 +6,17 @@
 // next/headers cookies(), which only resolves inside a real Next.js request.
 // Run with:
 //   npm run dev          (in another shell)
-//   npx tsx --env-file=.env.local --test lib/testing/learnerRosterImport.http.integration.test.ts
+//   npx tsx --test lib/testing/learnerRosterImport.http.integration.test.ts
 //
 // Every fixture is synthetic. No real learner data is created, read or
 // modified, and no learner PII appears in assertions or output.
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { signInForHttpTest } from '@/lib/testing/httpAuthTestHelper'
 
-const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:3000'
+const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:3100'
 const MARKER = 'SYNTHETIC_ROSTER'
 const db = createServiceClient()
 const ENDPOINT = `${BASE}/api/core/learners/import`

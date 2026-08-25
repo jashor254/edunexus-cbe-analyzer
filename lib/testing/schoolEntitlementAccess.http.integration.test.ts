@@ -7,7 +7,7 @@
 //
 // Run with:
 //   npm run dev          (in another shell)
-//   npx tsx --env-file=.env.local --test lib/testing/schoolEntitlementAccess.http.integration.test.ts
+//   npx tsx --test lib/testing/schoolEntitlementAccess.http.integration.test.ts
 //
 // What this proves that a unit test cannot: a real non-admin teacher, hitting
 // the real gated route with a real session, no longer receives HTTP 500 from
@@ -16,11 +16,11 @@
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { signInForHttpTest } from '@/lib/testing/httpAuthTestHelper'
 import { setSchoolEntitlement } from '@/lib/core/schoolEntitlement'
 
-const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:3000'
+const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:3100'
 const MARKER = 'SYNTHETIC_ENTITLEMENT_HTTP'
 const db = createServiceClient()
 

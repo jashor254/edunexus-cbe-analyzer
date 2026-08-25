@@ -6,12 +6,12 @@
 // THEN removeStaleLegacyRosterMembership() in sequence, through a real
 // authenticated HTTP request.
 //
-// Run: LMS_TEST_BASE_URL=http://localhost:3000 npx tsx --env-file=.env.local --test lib/testing/legacyRosterConvergence.http.integration.test.ts
+// Run: TEST_BASE_URL=http://localhost:3100 npx tsx --test lib/testing/legacyRosterConvergence.http.integration.test.ts
 // (requires a real dev server already running)
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { activateSchool } from '@/lib/core/schoolActivation'
 import { inviteTeacher, acceptTeacherInvitation } from '@/lib/core/teacherOnboarding'
@@ -20,7 +20,7 @@ import { ensureBridgedClass, ensureBridgedLearner } from '@/lib/core/academicBri
 import { asLearnerId } from '@/lib/core/identityTypes'
 import { signInForHttpTest, type SyntheticSession } from './httpAuthTestHelper'
 
-const BASE_URL = process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3000'
+const BASE_URL = process.env.TEST_BASE_URL ?? process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3100'
 const SYNTHETIC_MARKER = 'SYNTHETIC_PHASE5_CONVERGENCE_HTTP_TEST'
 const db = createServiceClient()
 

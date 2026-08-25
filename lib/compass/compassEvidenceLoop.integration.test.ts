@@ -19,7 +19,7 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { recordCompassSessionEvidence } from './evidence'
 import { confirmReview, rejectReview, getPendingReview } from '@/lib/intelligence/evidenceLifecycle'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'

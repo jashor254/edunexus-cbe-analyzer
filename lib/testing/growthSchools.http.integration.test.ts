@@ -10,15 +10,15 @@
 // hits a real running Next.js server since utils/supabase/server.ts's
 // createClient() reads the session via next/headers cookies().
 //
-// Run: LMS_TEST_BASE_URL=http://localhost:3939 NODE_OPTIONS=--dns-result-order=ipv4first npx tsx --env-file=.env.local --test lib/testing/growthSchools.http.integration.test.ts
+// Run: TEST_BASE_URL=http://localhost:3100 NODE_OPTIONS=--dns-result-order=ipv4first npx tsx --test lib/testing/growthSchools.http.integration.test.ts
 // (requires `next dev -p 3939 &` already running)
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { signInForHttpTest, type SyntheticSession } from './httpAuthTestHelper'
 
-const BASE_URL = process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3939'
+const BASE_URL = process.env.TEST_BASE_URL ?? process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3100'
 const MARKER = 'SYNTHETIC_GROWTH_C0_HTTP_TEST'
 const db = createServiceClient()
 

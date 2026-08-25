@@ -20,7 +20,7 @@
 // Run: npx tsx --env-file=.env.local --test lib/curriculum/curriculumContext.integration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { resolveCurriculumContext, UNAVAILABLE_CURRICULUM_FIELDS } from './curriculumContext'
 
 const SYNTHETIC_MARKER = 'SYNTHETIC_CURRICULUM_CONTEXT_TEST'

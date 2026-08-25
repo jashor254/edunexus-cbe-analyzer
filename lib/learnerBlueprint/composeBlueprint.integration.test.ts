@@ -20,7 +20,7 @@
 
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { activateSchool } from '@/lib/core/schoolActivation'
 import { onboardLearner } from '@/lib/core/learnerOnboarding'

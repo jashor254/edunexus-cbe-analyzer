@@ -12,7 +12,7 @@
 // Run: npx tsx --env-file=.env.local --test lib/intelligence/evidenceDomain.integration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { runCsvIngestion } from './runCsvIngestion'
 import { persistEvidenceBatch, confirmReview, rejectReview, retractEvidence, eraseEvidence, getPendingReview, getEvidenceAuditTrail, getEvidenceHistoryForLearner } from './evidenceLifecycle'
 import { startIngestionRun, getIngestionRun, getIngestionRunLiveStats } from './ingestionRun'
@@ -73,6 +73,12 @@ after(async () => {
     }
     await db.from('ingestion_runs').delete().in('id', runIds)
   }
+  // Confirmed-evidence recomputation can indirectly persist a
+  // learner_projections row for these fixture students (H1D-3 finding —
+  // learner_projections.learner_id -> students.id has no ON DELETE CASCADE,
+  // so leaving this out silently fails the students delete for exactly the
+  // rows that got a projection, without the client code surfacing an error).
+  await db.from('learner_projections').delete().in('learner_id', studentIds)
   await db.from('students').delete().in('id', studentIds)
   await db.from('teachers').delete().eq('id', teacherId)
   await db.auth.admin.deleteUser(authUserId)

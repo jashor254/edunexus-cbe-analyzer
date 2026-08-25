@@ -20,16 +20,16 @@
 //
 // Requires a server at LMS_TEST_BASE_URL (default http://localhost:3000).
 //
-// Run: LMS_TEST_BASE_URL=http://localhost:3000 npx tsx --env-file=.env.local --test lib/testing/teacherSelfJoin.http.integration.test.ts
+// Run: TEST_BASE_URL=http://localhost:3100 npx tsx --test lib/testing/teacherSelfJoin.http.integration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { signInForHttpTest, type SyntheticSession } from '@/lib/testing/httpAuthTestHelper'
 import { resolveSchoolCoverage } from '@/lib/core/schoolEntitlement'
 import { inviteTeacher, acceptTeacherInvitation } from '@/lib/core/teacherOnboarding'
 import { deactivateSchoolMembership } from '@/lib/core/school-users'
 
-const BASE_URL = process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3000'
+const BASE_URL = process.env.TEST_BASE_URL ?? process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3100'
 const SYNTHETIC_MARKER = 'SYNTHETIC_SELFJOIN_TEST'
 const db = createServiceClient()
 const PASSWORD = `Test!${Math.random().toString(36).slice(2, 12)}`

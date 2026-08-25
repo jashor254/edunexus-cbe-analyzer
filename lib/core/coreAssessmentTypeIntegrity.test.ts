@@ -31,7 +31,7 @@
 // Run: npx tsx --env-file=.env.local --test lib/core/coreAssessmentTypeIntegrity.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { createAssessment as createCoreAssessment, listAssessments } from '@/lib/core/assessments'
 import { createAssessment as createTeacherAssessment, updateAssessment } from '@/lib/assessments/mutations'
 

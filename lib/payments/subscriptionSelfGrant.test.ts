@@ -14,7 +14,7 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { fulfillPayment, creditSubscription } from '@/lib/payments/fulfillment'
 
 const MARKER = 'SYNTHETIC_SUBS_SELFGRANT'

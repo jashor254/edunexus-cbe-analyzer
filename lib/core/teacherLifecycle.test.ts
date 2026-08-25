@@ -14,7 +14,7 @@
 // Run: npx tsx --env-file=.env.local --test lib/core/teacherLifecycle.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { activateSchool } from '@/lib/core/schoolActivation'
 import { inviteTeacher, acceptTeacherInvitation } from '@/lib/core/teacherOnboarding'
@@ -139,9 +139,16 @@ after(async () => {
     if (error) console.error(`[cleanup] school ${id} not deleted: ${error.message}`)
   }
   for (const id of createdAuthUserIds) {
+    // H1E-A: inviteTeacher's notification side effect leaves a
+    // notification_log row referencing this user; deleteUser silently
+    // fails against that FK (its error return isn't surfaced here) unless
+    // cleared first — confirmed as a real, reproducible leak, not an
+    // environment fluke, by the DEEP_PR cleanup gate.
+    await db.from('notification_log').delete().eq('user_id', id)
     await db.from('teachers').delete().eq('user_id', id)
     await db.from('profiles').delete().eq('id', id)
-    await db.auth.admin.deleteUser(id)
+    const { error } = await db.auth.admin.deleteUser(id)
+    if (error) console.error(`[cleanup] auth user ${id} not deleted: ${error.message}`)
   }
 })
 

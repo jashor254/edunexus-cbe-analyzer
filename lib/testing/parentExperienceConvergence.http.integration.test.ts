@@ -13,19 +13,19 @@
 // APIs) exactly the way real enrolled learners are bridged (students.external_id
 // -> learners.id, Sprint 9F) — not a shortcut fixture.
 //
-// Run: LMS_TEST_BASE_URL=http://localhost:3939 npx tsx --env-file=.env.local --test lib/testing/parentExperienceConvergence.http.integration.test.ts
+// Run: TEST_BASE_URL=http://localhost:3100 npx tsx --test lib/testing/parentExperienceConvergence.http.integration.test.ts
 // (requires `next dev -p 3939 &` already running)
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createClient } from '@supabase/supabase-js'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { requireParent } from '@/lib/core/permissions'
 import { ResourceOwnershipError } from '@/lib/core/errors'
 import { signInForHttpTest, type SyntheticSession } from './httpAuthTestHelper'
 import { asStudentId } from '@/lib/core/identityTypes'
 
-const BASE_URL = process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3939'
+const BASE_URL = process.env.TEST_BASE_URL ?? process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3100'
 const SYNTHETIC_MARKER = 'SYNTHETIC_SPRINT5_PARENT_CONVERGENCE_TEST'
 const db = createServiceClient()
 

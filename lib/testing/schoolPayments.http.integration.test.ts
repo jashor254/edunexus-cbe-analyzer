@@ -6,7 +6,7 @@
 // next/headers cookies(), which only resolves inside a real Next.js request.
 // Run with:
 //   npm run dev          (in another shell)
-//   npx tsx --env-file=.env.local --test lib/testing/schoolPayments.http.integration.test.ts
+//   npx tsx --test lib/testing/schoolPayments.http.integration.test.ts
 //
 // All fixtures are synthetic. No real school, payment, learner, or entitlement
 // row is created, read, or modified, and no financial or learner PII appears in
@@ -15,11 +15,11 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { signInForHttpTest } from '@/lib/testing/httpAuthTestHelper'
 import { resolveSchoolCoverage } from '@/lib/core/schoolEntitlement'
 
-const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:3000'
+const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:3100'
 const MARKER = 'SYNTHETIC_SCHOOL_PAYMENT'
 const db = createServiceClient()
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!

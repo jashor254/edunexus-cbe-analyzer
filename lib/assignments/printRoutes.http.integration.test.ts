@@ -10,14 +10,14 @@
 // Requires a server already running at LMS_TEST_BASE_URL (default
 // http://localhost:3939) and a reachable Supabase project.
 //
-// Run: LMS_TEST_BASE_URL=http://localhost:3939 npx tsx --env-file=.env.local --test lib/assignments/printRoutes.http.integration.test.ts
+// Run: TEST_BASE_URL=http://localhost:3100 npx tsx --test lib/assignments/printRoutes.http.integration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { signInForHttpTest, type SyntheticSession } from '@/lib/testing/httpAuthTestHelper'
 import { runCsvIngestion } from '@/lib/intelligence/runCsvIngestion'
 
-const BASE_URL = process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3939'
+const BASE_URL = process.env.TEST_BASE_URL ?? process.env.LMS_TEST_BASE_URL ?? 'http://localhost:3100'
 const SYNTHETIC_MARKER = 'SYNTHETIC_PRINT_ROUTES_HTTP_TEST'
 const SUBJECT = 'mathematics'
 const YEAR = 2026

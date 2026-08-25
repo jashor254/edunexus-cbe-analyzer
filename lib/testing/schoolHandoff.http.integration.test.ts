@@ -12,7 +12,7 @@
 // through next/headers cookies(), which only resolves inside a real request.
 // Run with:
 //   npm run dev          (in another shell)
-//   npx tsx --env-file=.env.local --test lib/testing/schoolHandoff.http.integration.test.ts
+//   npx tsx --test lib/testing/schoolHandoff.http.integration.test.ts
 //
 // The security question this phase must answer honestly: does adding a `role`
 // parameter to an invitation reintroduce the "user-controlled role →
@@ -21,10 +21,10 @@
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { signInForHttpTest } from '@/lib/testing/httpAuthTestHelper'
 
-const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:3000'
+const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:3100'
 const MARKER = 'SYNTHETIC_HANDOFF'
 const db = createServiceClient()
 
@@ -140,8 +140,14 @@ after(async () => {
   }
   await db.from('growth_users').delete().eq('id', founderId)
   for (const id of createdUsers) {
+    // H1E-B: notification_log rows (from invite/accept flows) block
+    // deleteUser silently unless cleared first — same class of leak found
+    // and fixed in teacherLifecycle.test.ts / studentBlueprintSelfAccess
+    // during H1E-A.
+    await db.from('notification_log').delete().eq('user_id', id)
     await db.from('teachers').delete().eq('user_id', id)
-    await db.auth.admin.deleteUser(id)
+    const { error } = await db.auth.admin.deleteUser(id)
+    if (error) console.error(`[cleanup] auth user ${id} not deleted: ${error.message}`)
   }
 })
 

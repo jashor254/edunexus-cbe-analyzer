@@ -10,17 +10,17 @@
 //
 // Run with:
 //   npm run dev          (in another shell)
-//   npx tsx --env-file=.env.local --test lib/testing/pilotAvailableStudents.http.integration.test.ts
+//   npx tsx --test lib/testing/pilotAvailableStudents.http.integration.test.ts
 //
 // No real learner PII appears in assertions or output — fixtures are synthetic
 // and only counts/field names are asserted.
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServiceClient } from '@/utils/supabase/service'
+import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { signInForHttpTest } from '@/lib/testing/httpAuthTestHelper'
 
-const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:3000'
+const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:3100'
 const MARKER = 'SYNTHETIC_PILOT_PICKER'
 const db = createServiceClient()
 const ENDPOINT = `${BASE}/api/admin/pilot/available-students`
