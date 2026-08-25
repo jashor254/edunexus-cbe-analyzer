@@ -76,6 +76,46 @@ export type ParentActionCentre = {
   actions: ParentAction[]
 }
 
+// ── Phase 2 (Blueprint Actionability): viewer-aware destination validity ───
+//
+// Every `ParentAction.destination` above is parent-space by construction —
+// six of the seven types resolve to `/child/{learnerId}/...` (requireParent
+// -gated, app/(parent)/child/[learnerId]/*) or `/report-card`
+// (app/(parent)/report-card — no role gate on the page itself, but its data
+// source, GET /api/reports/report-card/mine, reads `listGuardianLearners`
+// only, so a learner opening it sees an empty "no children" screen, not
+// their own report). The one exception is `explore_career_journey`
+// (`/career-intelligence`), whose API (`/api/parent/career-intelligence`)
+// authorizes on `student.user_id === caller OR student.parent_user_id ===
+// caller` — reachable by a self-viewing student, not just a parent.
+//
+// `BlueprintView` (components/blueprint/BlueprintView.tsx) is shared across
+// every viewer who passes `requireLearnerAccess` — the learner themselves,
+// their parent, or the learner's teacher/school-admin — so a destination
+// that is safe to link for one viewer is not automatically safe for
+// another. This function is the one place that decision is made; both
+// `BlueprintView` and the parent-only `RecommendedNextStepsSection`
+// (components/blueprint/sections.tsx) call it rather than each re-deriving
+// it (Engineering Rule 4 — never duplicate authorization/access decisions).
+export type BlueprintViewer = 'student' | 'parent' | 'teacher'
+
+export function isActionDestinationValidForViewer(actionType: ParentActionType, viewer: BlueprintViewer): boolean {
+  if (viewer === 'parent') return true
+  if (viewer === 'student') return actionType === 'explore_career_journey'
+  return false // 'teacher' — holds neither the parent link nor the learner's own auth identity
+}
+
+/**
+ * Smallest safe navigation guard (Phase 2 §10) — every canonical
+ * destination emitted above is already a hardcoded internal relative path,
+ * never user-authored, but this is the one place a `<Link href>` is built
+ * from it, so it is worth refusing anything that is not a same-origin
+ * relative path rather than trusting the string blindly.
+ */
+export function isSafeInternalDestination(destination: string): boolean {
+  return destination.startsWith('/') && !destination.startsWith('//')
+}
+
 // ── Phase 2: Canonical Domain Ownership (frozen) ────────────────────────────
 //
 // Action                     | Owner

@@ -25,6 +25,12 @@ import type {
   RiskData,
   LearningStoryData,
 } from '@/lib/learnerBlueprint/types'
+import Link from 'next/link'
+import {
+  type BlueprintViewer,
+  isActionDestinationValidForViewer,
+  isSafeInternalDestination,
+} from '@/lib/parentExperience/actions'
 
 const TREND_ARROW: Record<string, string> = {
   improving: '↑',
@@ -351,21 +357,41 @@ const PRIORITY_STYLE: Record<string, string> = {
   completed: 'bg-gray-100 text-gray-500 border-gray-200',
 }
 
-export function RecommendedNextStepsSection({ data }: { data: RecommendedNextStepsData }) {
+/**
+ * `viewer` defaults to 'parent' — this section's only current caller,
+ * ParentBlueprintView.tsx, is reached exclusively through
+ * app/(parent)/child/[learnerId]/full, which is requireParent-gated (never
+ * a student or teacher viewer). The prop is still explicit, not hardcoded,
+ * so a future non-parent caller cannot silently inherit parent-only links
+ * — see isActionDestinationValidForViewer (lib/parentExperience/actions.ts),
+ * the same function BlueprintView.tsx uses for the shared learner/parent/
+ * teacher Blueprint render.
+ */
+export function RecommendedNextStepsSection({ data, viewer = 'parent' }: { data: RecommendedNextStepsData; viewer?: BlueprintViewer }) {
   return (
     <div className="space-y-2">
-      {data.actions.map((action, i) => (
-        <div key={i} className="rounded-xl border border-gray-100 p-3 space-y-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-bold text-gray-900">{action.title}</span>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded border font-bold ${PRIORITY_STYLE[action.priority]}`}>
-              {action.priority}
-            </span>
+      {data.actions.map((action, i) => {
+        const href = isActionDestinationValidForViewer(action.actionType, viewer) && isSafeInternalDestination(action.destination)
+          ? action.destination
+          : null
+        return (
+          <div key={i} className="rounded-xl border border-gray-100 p-3 space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-bold text-gray-900">{action.title}</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded border font-bold ${PRIORITY_STYLE[action.priority]}`}>
+                {action.priority}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500">{action.description}</p>
+            <p className="text-[10px] text-gray-300">Source: {action.sourceDomain}</p>
+            {href && (
+              <Link href={href} className="inline-block text-xs font-semibold text-teal-700 hover:underline focus-visible:underline focus-visible:outline-none">
+                Take this action →
+              </Link>
+            )}
           </div>
-          <p className="text-xs text-gray-500">{action.description}</p>
-          <p className="text-[10px] text-gray-300">Source: {action.sourceDomain}</p>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
