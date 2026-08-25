@@ -4,7 +4,7 @@
 // Exits with code 1 if any required variable is missing or malformed.
 // Used by CI (env-check job) and can be run locally: npx tsx scripts/check-env.ts
 
-type EnvRule = {
+export type EnvRule = {
   key:         string
   required:    boolean
   description: string
@@ -13,7 +13,7 @@ type EnvRule = {
 
 const URL_REGEX = /^https?:\/\/.+/
 
-const RULES: EnvRule[] = [
+export const RULES: EnvRule[] = [
   // ── Supabase ────────────────────────────────────────────────────────────────
   {
     key:         'NEXT_PUBLIC_SUPABASE_URL',
@@ -25,13 +25,21 @@ const RULES: EnvRule[] = [
     key:         'NEXT_PUBLIC_SUPABASE_ANON_KEY',
     required:    true,
     description: 'Supabase anonymous (public) key',
-    validate:    v => v.startsWith('eyJ') ? null : 'Expected a JWT starting with eyJ',
+    // Opaque credential, not decoded anywhere in this codebase — every real
+    // client factory (utils/supabase/client.ts, server.ts, middleware.ts,
+    // authAnon.ts) and lib/config/env.ts's own zod schema only require
+    // presence/non-empty. A prior `startsWith('eyJ')` check assumed the old
+    // JWT-shaped Supabase key format and rejected the current, valid
+    // sb_publishable_.../sb_secret_... format — see Supabase Key Contract
+    // Audit. Presence is already enforced above; this only guards against
+    // whitespace-only values slipping past that check.
+    validate:    v => v.trim().length > 0 ? null : 'Must not be blank',
   },
   {
     key:         'SUPABASE_SERVICE_ROLE_KEY',
     required:    true,
     description: 'Supabase service role key — bypasses RLS (server-only)',
-    validate:    v => v.startsWith('eyJ') ? null : 'Expected a JWT starting with eyJ',
+    validate:    v => v.trim().length > 0 ? null : 'Must not be blank',
   },
 
   // ── AI providers ────────────────────────────────────────────────────────────
@@ -158,6 +166,11 @@ function printResults(results: Result[], passed: boolean): void {
   }
 }
 
-const { results, passed } = checkEnv()
-printResults(results, passed)
-process.exit(passed ? 0 : 1)
+// Guarded so a test can import RULES (see
+// scripts/check-env.supabaseKeyShape.test.ts) without also running the CLI
+// checker and calling process.exit() on import.
+if (require.main === module) {
+  const { results, passed } = checkEnv()
+  printResults(results, passed)
+  process.exit(passed ? 0 : 1)
+}

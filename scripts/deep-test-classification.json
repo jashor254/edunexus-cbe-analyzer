@@ -2046,6 +2046,20 @@
       "parallel": "SAFE"
     },
     {
+      "file": "lib/testing/academicClinicPdf.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "parent",
+        "billing"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
       "file": "lib/testing/clinicDownload.http.integration.test.ts",
       "tier": "D2",
       "domain": [

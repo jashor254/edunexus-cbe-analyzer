@@ -78,6 +78,7 @@
     "lib/intelligence/evidenceAndBalanceRls.integration.test.ts",
     "lib/learnerAchievement/achievement.integration.test.ts",
     "lib/learnerBlueprint/actionPlan/delivery/assignment.integration.test.ts",
+    "lib/learnerBlueprint/actionPlan/delivery/institutionalAssignmentDelivery.integration.test.ts",
     "lib/learnerBlueprint/actionPlan/delivery/compass.integration.test.ts",
     "lib/learnerBlueprint/actionPlan/lifecycle.integration.test.ts",
     "lib/learnerBlueprint/actionPlan/review.integration.test.ts",

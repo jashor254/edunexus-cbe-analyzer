@@ -36,6 +36,7 @@ const APPROVED_CLIENT_FILES = [
   'utils/supabase/client.ts',
   'utils/supabase/server.ts',
   'utils/supabase/service.ts',
+  'utils/supabase/test-service.ts',
   'utils/supabase/middleware.ts',
   'proxy.ts',
 ]

@@ -1,7 +1,7 @@
 {
-  "directClientImports": 0,
-  "serviceClientOutsideRepos": 381,
+  "directClientImports": 43,
+  "serviceClientOutsideRepos": 409,
   "postgrestCatch": 0,
-  "consoleLog": 17,
-  "selectStar": 9
+  "consoleLog": 38,
+  "selectStar": 5
 }

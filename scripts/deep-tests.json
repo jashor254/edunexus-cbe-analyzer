@@ -149,6 +149,7 @@
     "lib/row/recordOfWorkIntegrity.integration.test.ts",
     "lib/storage/lmsBuckets.integration.test.ts",
     "lib/teacherReflection/reflection.integration.test.ts",
+    "lib/testing/academicClinicPdf.http.integration.test.ts",
     "lib/testing/assessmentReviewDashboard.http.integration.test.ts",
     "lib/testing/clinicDownload.http.integration.test.ts",
     "lib/testing/deleteAuthUserOrThrow.integration.test.ts",
