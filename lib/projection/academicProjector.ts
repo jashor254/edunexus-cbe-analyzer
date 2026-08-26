@@ -24,7 +24,7 @@ export const ACADEMIC_PROJECTION_VERSION = 'academic-v1'
  * unify these two functions — see the ADR addendum for why keeping them
  * distinct, and clearly named, is the chosen architecture.
  */
-function computeTrend(levels: number[]): Trend {
+export function computeTrend(levels: number[]): Trend {
   if (levels.length < 2) return 'insufficient_data'
   const earliest = levels[0]
   const latest = levels[levels.length - 1]

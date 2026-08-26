@@ -165,3 +165,22 @@ test('score correctly scales to a partial-credit CBC level, same converter every
   assert.equal(row!.score, 25)
   assert.ok(row!.cbc_level === 1 || row!.cbc_level === 2, `expected a low CBC level for 25%, got ${row!.cbc_level}`)
 })
+
+test('Phase 2B: subject identity is now canonicalized through mapSubject, not stored verbatim — confirmed live regression (this producer previously bypassed the boundary and wrote subject="Mathematics" capitalized, fragmenting it from the gradebook pipeline\'s "mathematics")', async () => {
+  await recordQuizAutoGradeEvidence({
+    studentId, initiatedBy: authUserId,
+    assignmentId: 'SYNTHETIC_ADR0024_SPRINTC_TEST-subjectcase',
+    subject: 'Mathematics', topic: 'Algebra', substrandId: null,
+    score: 15, maxScore: 20, academicYear: 2026, term: 1,
+  })
+
+  const { data: row } = await db
+    .from('learner_evidence')
+    .select('subject, raw_subject')
+    .eq('learner_id', studentId)
+    .like('raw_input_ref', 'assignment:SYNTHETIC_ADR0024_SPRINTC_TEST-subjectcase%')
+    .single()
+
+  assert.equal(row!.subject, 'mathematics', 'canonical subject must be lowercased/normalized, matching every other Evidence producer')
+  assert.equal(row!.raw_subject, 'Mathematics', 'raw_subject must still preserve exactly what the source said')
+})

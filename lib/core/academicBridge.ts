@@ -56,20 +56,27 @@
 
 import { repos } from '@/lib/repositories'
 import { resolveTeacher, resolveMembership, resolveLegacyStudentId } from '@/lib/core/identity'
-import { asStudentId, type LearnerId, type StudentId } from '@/lib/core/identityTypes'
+import { asStudentId, asLearnerId, type LearnerId, type StudentId } from '@/lib/core/identityTypes'
 import { BridgeAlreadyClaimedError } from '@/lib/core/errors'
 import { logger } from '@/lib/observability/logger'
 import { isSchoolAdmin, getSchoolUser } from '@/lib/core/school-users'
 import { getClass } from '@/lib/core/classes'
 import { getLearner } from '@/lib/core/learners'
 import { listAcademicYears } from '@/lib/core/school'
-import { createAssessment, saveScores } from '@/lib/core/assessments'
+import { createAssessment, saveScores, getCanonicalAssessmentContext, getAssessmentScores, type CanonicalAssessmentContext } from '@/lib/core/assessments'
+import { resolveInstitutionalAssignmentAuthority, resolveCurrentSubjectTeachingAuthority } from '@/lib/core/permissions'
 import { recordAssessmentEvidence } from '@/lib/assessments/evidence'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
+import { getClassRoster } from '@/lib/core/learners'
+import { getCurrentTerm } from '@/lib/core/school'
+import { getCurrentSeniorProgrammesForLearners, type CurrentSeniorProgrammeResult } from '@/lib/curriculum/seniorProgramme'
+import { getDeterministicAliasesForCode } from '@/lib/curriculum/evidenceSubjectResolution'
+import { mapSubject } from '@/lib/intelligence/subjectMapping'
+import { getGradeBand, isSeniorBand } from '@/lib/learnerBlueprint/gradeBand'
 import { getLearnerTimeline, type TimelineEntry } from '@/lib/learnerRecord/timeline'
 import { buildCareerIntelligence, type CareerIntelligence } from '@/lib/learnerIntelligence/careerIntelligenceOrchestration'
 import { resolveCompassStudentAccess, type OwnershipResult } from '@/lib/compass/ownership'
-import { MembershipRequiredError, PermissionDeniedError, IdentityResolutionError } from '@/lib/core/errors'
+import { MembershipRequiredError, PermissionDeniedError, IdentityResolutionError, ResourceOwnershipError } from '@/lib/core/errors'
 import type { AcademicYear } from '@/types/core'
 
 // ── Class bridge ─────────────────────────────────────────────────────────────
@@ -342,15 +349,57 @@ export type BridgedAssessmentInput = {
  * Creates an assessment against a Core class, using the existing,
  * unmodified `lib/core/assessments.ts::createAssessment` — the only new
  * work is resolving `coreClassId` to its bridged legacy id first.
+ *
+ * Phase 3A — an optional `classSubjectId` gives the assessment canonical
+ * subject identity. When supplied, it is authorized via
+ * {@link resolveInstitutionalAssignmentAuthority} — the same tenure/
+ * `ended_at`/active-membership/role check the assignment/quiz domain
+ * already uses — never trusted as-is:
+ *  - the resolved tenure's `schoolId`/`coreClassId` must match this call's
+ *    own `schoolId`/`coreClassId` exactly, or the request is rejected
+ *    (cross-school and class-mismatch tampering, Phase 3A Steps 9-10) —
+ *    both are derived from `classSubjectId` alone, never taken from the
+ *    caller's own `schoolId`/`coreClassId` arguments as truth.
+ *  - the caller's `input.subjects` free text is IGNORED and replaced with
+ *    the canonical subject name (Phase 3A Step 8, Option A — the browser
+ *    cannot make its own subject text stick once a verified `classSubjectId`
+ *    is present).
+ *
+ * `classSubjectId` omitted entirely reproduces the exact pre-Phase-3A
+ * behaviour (free-text `input.subjects`, no canonical columns set) — every
+ * existing caller of this function is unaffected.
  */
 export async function createBridgedAssessment(
   schoolId: string,
   coreClassId: string,
   actingUserId: string,
-  input: BridgedAssessmentInput
+  input: BridgedAssessmentInput,
+  classSubjectId?: string,
 ): Promise<{ assessmentId: string; legacyClassId: string }> {
   const bridged = await ensureBridgedClass(schoolId, coreClassId, actingUserId)
-  const assessment = await createAssessment({ ...input, class_id: bridged.legacyClassId, userId: actingUserId })
+
+  let canonicalSubjectId: string | undefined
+  let canonicalSubjects: string[] | undefined
+  if (classSubjectId) {
+    const authority = await resolveInstitutionalAssignmentAuthority(actingUserId, classSubjectId)
+    if (authority.schoolId !== schoolId) {
+      throw new ResourceOwnershipError('This teaching assignment does not belong to the requested school.')
+    }
+    if (authority.coreClassId !== coreClassId) {
+      throw new ResourceOwnershipError('This teaching assignment does not belong to the requested class.')
+    }
+    canonicalSubjectId = authority.subjectId
+    canonicalSubjects = [authority.subjectName]
+  }
+
+  const assessment = await createAssessment({
+    ...input,
+    subjects: canonicalSubjects ?? input.subjects,
+    class_id: bridged.legacyClassId,
+    userId: actingUserId,
+    class_subject_id: classSubjectId ?? null,
+    subject_id: canonicalSubjectId ?? null,
+  })
   return { assessmentId: assessment.id, legacyClassId: bridged.legacyClassId }
 }
 
@@ -404,6 +453,223 @@ export async function recordBridgedMarks(
   await Promise.all(legacyStudentIds.map(id => recomputeLearnerProjection(id)))
 
   return { legacyStudentIds }
+}
+
+// ── Phase 3C: canonical marks entry ─────────────────────────────────────────
+
+export type CanonicalScoreInput = { coreLearnerId: LearnerId; score: number }
+
+export type CanonicalMarkRejectionReason = 'not_on_roster' | 'programme_mismatch' | 'score_out_of_range'
+export type CanonicalMarkRejection = { coreLearnerId: LearnerId; reason: CanonicalMarkRejectionReason }
+
+export type RecordCanonicalMarksResult = {
+  saved: LearnerId[]
+  rejected: CanonicalMarkRejection[]
+}
+
+/**
+ * Phase 3C — the ONE teacher-facing marks-entry path for a canonical
+ * (`class_subject_id`-bearing) assessment. Composes entirely of existing,
+ * unmodified pieces (`getClassRoster`, `resolveCurrentSubjectTeachingAuthority`,
+ * `getCurrentSeniorProgrammesForLearners`, `recordBridgedMarks`) — no new
+ * Evidence/Projection/Blueprint logic, per Phase 3C's scope lock.
+ *
+ * Authorization: re-verifies the CURRENT class+subject teaching tenure on
+ * every call (Step 26/27) — never the assessment's own, possibly long-ended
+ * `class_subject_id` snapshot. A departed teacher is rejected even for an
+ * assessment they created; the current subject teacher (including a
+ * replacement) may manage it.
+ *
+ * Roster authority: `getClassRoster` (Core `learner_enrollments`, current
+ * term), never a client-supplied learner list and never legacy
+ * `class_students` — a `coreLearnerId` not on the roster is rejected
+ * (`not_on_roster`), closing the gap the existing free-text `save-scores`
+ * action leaves open (it trusts whatever the caller posts).
+ *
+ * Programme matching (Senior bands only, Step 10-12/25): a learner whose
+ * CURRENT senior programme is resolved and does NOT include this
+ * assessment's subject is rejected (`programme_mismatch`) rather than
+ * silently scored — but a learner with NO resolved programme yet
+ * (transitional/incomplete rollout) is allowed, never blocked and never
+ * given a fabricated programme. Junior classes never run this check at all
+ * (`isSeniorBand` gates it) — Grade 9 roster members are always eligible.
+ *
+ * Score range (0..maxScore) is validated per learner; an out-of-range score
+ * is rejected for that learner only (`score_out_of_range`) — the rest of
+ * the batch still saves (Step 16 partial-entry support). A malformed
+ * request (duplicate `coreLearnerId`) throws rather than guessing which
+ * entry to keep.
+ */
+export async function recordCanonicalAssessmentMarks(
+  schoolId: string,
+  assessmentId: string,
+  actingUserId: string,
+  scores: CanonicalScoreInput[],
+): Promise<RecordCanonicalMarksResult> {
+  const seen = new Set<string>()
+  for (const s of scores) {
+    if (seen.has(s.coreLearnerId)) {
+      throw new Error(`recordCanonicalAssessmentMarks: duplicate coreLearnerId ${s.coreLearnerId} in scores payload`)
+    }
+    seen.add(s.coreLearnerId)
+  }
+
+  const context = await getCanonicalAssessmentContext(schoolId, assessmentId)
+  if (context.kind !== 'canonical') {
+    throw new ResourceOwnershipError('This assessment is not available for canonical marks entry.')
+  }
+
+  await resolveCurrentSubjectTeachingAuthority(actingUserId, schoolId, context.coreClassId, context.subjectId)
+
+  const currentTerm = await getCurrentTerm(schoolId)
+  if (!currentTerm) throw new Error('recordCanonicalAssessmentMarks: no current term configured for this school')
+
+  const roster = await getClassRoster(context.coreClassId, currentTerm.id)
+  const rosterById = new Map(roster.map(l => [l.id, l]))
+
+  const rejected: CanonicalMarkRejection[] = []
+  const inRange: CanonicalScoreInput[] = []
+  for (const entry of scores) {
+    if (!rosterById.has(entry.coreLearnerId)) {
+      rejected.push({ coreLearnerId: entry.coreLearnerId, reason: 'not_on_roster' })
+      continue
+    }
+    if (!Number.isFinite(entry.score) || entry.score < 0 || entry.score > context.maxScore) {
+      rejected.push({ coreLearnerId: entry.coreLearnerId, reason: 'score_out_of_range' })
+      continue
+    }
+    inRange.push(entry)
+  }
+
+  let eligible = inRange
+  if (isSeniorBand(getGradeBand(context.className)) && inRange.length > 0) {
+    const programmesByLearnerId = await getCurrentSeniorProgrammesForLearners(inRange.map(e => e.coreLearnerId))
+    eligible = []
+    for (const entry of inRange) {
+      const programme = programmesByLearnerId.get(entry.coreLearnerId)
+      const isExplicitMismatch =
+        programme?.status === 'resolved' && !programme.subjects.some(s => s.subjectId === context.subjectId)
+      if (isExplicitMismatch) {
+        rejected.push({ coreLearnerId: entry.coreLearnerId, reason: 'programme_mismatch' })
+        continue
+      }
+      // status === 'unresolved' is deliberately NOT a rejection (Step 10) —
+      // transitional, never fabricated, never treated as exclusion.
+      eligible.push(entry)
+    }
+  }
+
+  if (eligible.length === 0) return { saved: [], rejected }
+
+  // Canonical raw Evidence key — the audited alias table when this subject
+  // has one (guarantees Blueprint attribution matches Phase 2A's identity),
+  // else the same identity-safe normalizer every other producer uses. Never
+  // the Title-Case `subjects.name` verbatim — mapSubject('Core Mathematics')
+  // would collapse to 'core mathematics' (a space, not the underscore form
+  // every existing consumer of this identity expects), silently breaking
+  // the exact attribution chain Phase 3A proved.
+  const rawSubjectKey =
+    getDeterministicAliasesForCode(context.subjectCode)[0] ?? mapSubject(context.subjectName).canonicalSubject
+
+  const bridged = await ensureBridgedClass(schoolId, context.coreClassId, actingUserId)
+  const bridgedScores: BridgedScoreInput[] = eligible.map(entry => {
+    const learner = rosterById.get(entry.coreLearnerId)!
+    return {
+      coreLearnerId: entry.coreLearnerId,
+      admission_number: learner.admission_number,
+      student_name: `${learner.first_name} ${learner.last_name}`.trim(),
+      subject_scores: { [rawSubjectKey]: entry.score },
+      total_marks: entry.score,
+      mean_score: entry.score,
+    }
+  })
+
+  await recordBridgedMarks(schoolId, assessmentId, bridged, actingUserId, bridgedScores)
+
+  return { saved: eligible.map(e => e.coreLearnerId), rejected }
+}
+
+export type CanonicalRosterProgrammeStatus = 'not_applicable' | 'matched' | 'unresolved' | 'mismatch'
+
+export type CanonicalRosterEntry = {
+  coreLearnerId: LearnerId
+  admissionNumber: string
+  name: string
+  existingScore: number | null
+  programmeStatus: CanonicalRosterProgrammeStatus
+}
+
+export type CanonicalAssessmentMarksView =
+  | { kind: 'not_found' }
+  | { kind: 'legacy' }
+  | { kind: 'canonical'; context: Extract<CanonicalAssessmentContext, { kind: 'canonical' }>; roster: CanonicalRosterEntry[] }
+
+/**
+ * Phase 3C — the read side of the marks page: canonical assessment context
+ * plus the current roster, each learner's already-saved score (if any, so
+ * the teacher never re-enters what was already saved — Step 17) and, for
+ * Senior classes only, their programme-match status for this subject. Never
+ * writes anything (including no bridging) — a page load must not create
+ * legacy shadow rows a teacher never asked to create.
+ */
+export async function getCanonicalAssessmentMarksView(
+  schoolId: string,
+  assessmentId: string,
+): Promise<CanonicalAssessmentMarksView> {
+  const context = await getCanonicalAssessmentContext(schoolId, assessmentId)
+  if (context.kind !== 'canonical') return context
+
+  const currentTerm = await getCurrentTerm(schoolId)
+  if (!currentTerm) return { kind: 'canonical', context, roster: [] }
+
+  const roster = await getClassRoster(context.coreClassId, currentTerm.id)
+  if (roster.length === 0) return { kind: 'canonical', context, roster: [] }
+
+  const rawSubjectKey =
+    getDeterministicAliasesForCode(context.subjectCode)[0] ?? mapSubject(context.subjectName).canonicalSubject
+
+  // Existing scores are keyed by the LEGACY student id (learner_marks.student_id);
+  // resolve the reverse bridge (students.external_id -> learners.id) to
+  // align them back onto the Core roster. No bridge yet for a learner
+  // simply means "never scored on this assessment" — a legitimate, common
+  // state, not an error.
+  const existingScores = await getAssessmentScores(assessmentId)
+  const legacyStudentIds = existingScores.map(s => s.learner_id).filter((id): id is string => !!id)
+  const bridgeRows = legacyStudentIds.length ? await repos.teachers.findExternalIdsByStudentIds(legacyStudentIds) : []
+  const coreLearnerIdByLegacyId = new Map(bridgeRows.filter(r => r.external_id).map(r => [r.id, r.external_id as string]))
+  const scoreByCoreLearnerId = new Map<string, number>()
+  for (const s of existingScores) {
+    const coreId = coreLearnerIdByLegacyId.get(s.learner_id)
+    const value = s.subject_scores[rawSubjectKey]
+    if (coreId && typeof value === 'number') scoreByCoreLearnerId.set(coreId, value)
+  }
+
+  let programmesByLearnerId: Map<LearnerId, CurrentSeniorProgrammeResult> | null = null
+  const senior = isSeniorBand(getGradeBand(context.className))
+  if (senior) {
+    programmesByLearnerId = await getCurrentSeniorProgrammesForLearners(roster.map(l => asLearnerId(l.id)))
+  }
+
+  const rosterEntries: CanonicalRosterEntry[] = roster.map(learner => {
+    let programmeStatus: CanonicalRosterProgrammeStatus = 'not_applicable'
+    if (senior && programmesByLearnerId) {
+      const programme = programmesByLearnerId.get(asLearnerId(learner.id))
+      if (programme?.status === 'resolved') {
+        programmeStatus = programme.subjects.some(s => s.subjectId === context.subjectId) ? 'matched' : 'mismatch'
+      } else {
+        programmeStatus = 'unresolved'
+      }
+    }
+    return {
+      coreLearnerId: asLearnerId(learner.id),
+      admissionNumber: learner.admission_number,
+      name: `${learner.first_name} ${learner.last_name}`.trim(),
+      existingScore: scoreByCoreLearnerId.get(learner.id) ?? null,
+      programmeStatus,
+    }
+  })
+
+  return { kind: 'canonical', context, roster: rosterEntries }
 }
 
 // ============================================================================

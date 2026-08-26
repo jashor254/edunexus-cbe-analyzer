@@ -182,6 +182,38 @@ export function claimKey(e: Pick<LearnerEvidence, 'learnerId' | 'subject' | 'ass
   return `${e.learnerId}:${e.subject}:${e.subStrandId ?? 'null'}:${e.assessmentType}:${e.academicYear}:${e.term ?? 'null'}`
 }
 
+/**
+ * Phase 3-closeout — the narrow idempotency gate `persistEvidenceBatch`
+ * needs before deciding to supersede. `correctionGroupKey` already pins
+ * identity (same learner, same producer, same artifact — Phase E4); this
+ * asks the one remaining question: is the INCOMING observation's content
+ * actually different from what's already the current row for that artifact,
+ * or is this a retry (double-click, network retry, an idempotent re-POST)
+ * of the exact same one?
+ *
+ * Deliberately compares only the fields that constitute the observation
+ * itself — `score`, `cbcLevel`, `subject`, `rawSubject`, `assessmentType`,
+ * `academicYear`, `term` — never metadata that can legitimately vary
+ * between two writes of an unchanged observation (confidence formula
+ * version, extraction method, timestamps, issues, trust tier, purpose).
+ * Any one of those meaningful fields differing means this is a real
+ * correction, not a retry, and must supersede exactly as before — this
+ * function only ever narrows toward "definitely the same," never toward
+ * "definitely different," so it can only produce a no-op where the
+ * observation is genuinely unchanged.
+ */
+function isIdenticalObservation(prior: EvidenceRow, next: LearnerEvidence): boolean {
+  return (
+    prior.score === next.score &&
+    prior.cbc_level === next.cbcLevel &&
+    prior.subject === next.subject &&
+    prior.raw_subject === next.rawSubject &&
+    prior.assessment_type === next.assessmentType &&
+    prior.academic_year === next.academicYear &&
+    prior.term === next.term
+  )
+}
+
 async function mapWithConcurrency<T, R>(items: T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = new Array(items.length)
   let index = 0
@@ -238,6 +270,8 @@ export type PersistEvidenceResult = {
   inserted: EvidenceRow[]
   confirmedCount: number
   pendingReviewCount: number
+  /** Phase 3-closeout — items skipped because they were an identical retry of the current row for their artifact (see {@link isIdenticalObservation}). Not an error; the prior row remains active untouched. */
+  noOpCount: number
 }
 
 /**
@@ -274,28 +308,41 @@ export async function persistEvidenceBatch(evidence: LearnerEvidence[], runId: s
   })
 
   const inserted: EvidenceRow[] = []
+  let noOpCount = 0
 
   // Fast path: unkeyed evidence and single-item groups go through one bulk insert.
   const bulkRows: NewEvidenceRow[] = unkeyed.map(e => toNewEvidenceRow(e, runId, null))
-  const singletonKeys: string[] = []
   for (const [key, group] of groups) {
-    if (group.length === 1) {
-      bulkRows.push(toNewEvidenceRow(group[0], runId, priorByKey.get(key)?.id ?? null))
-      singletonKeys.push(key)
+    if (group.length !== 1) continue
+    const prior = priorByKey.get(key) ?? null
+    if (prior && isIdenticalObservation(prior, group[0])) {
+      // Idempotent retry of the current row for this artifact — the prior
+      // row is already correct and active; inserting another one would
+      // only produce a redundant supersession pair with no semantic change.
+      noOpCount++
+      continue
     }
+    bulkRows.push(toNewEvidenceRow(group[0], runId, prior?.id ?? null))
   }
   if (bulkRows.length > 0) inserted.push(...await repos.evidence.insertEvidenceBatch(bulkRows))
 
   // Slow path: multi-item groups (duplicate claim keys within this batch) —
   // inserted sequentially so each item's `supersedes` can reference the
-  // real id of the item immediately before it in the chain.
+  // real id of the item immediately before it in the chain. The same
+  // idempotency gate applies at each step, compared against whichever row
+  // (prior DB row, or the previous item just inserted in this same chain)
+  // is currently the head of the artifact's history.
   for (const [key, group] of groups) {
     if (group.length <= 1) continue
-    let priorId = priorByKey.get(key)?.id ?? null
+    let priorRow = priorByKey.get(key) ?? null
     for (const item of group) {
-      const [row] = await repos.evidence.insertEvidenceBatch([toNewEvidenceRow(item, runId, priorId)])
+      if (priorRow && isIdenticalObservation(priorRow, item)) {
+        noOpCount++
+        continue
+      }
+      const [row] = await repos.evidence.insertEvidenceBatch([toNewEvidenceRow(item, runId, priorRow?.id ?? null)])
       inserted.push(row)
-      priorId = row.id
+      priorRow = row
     }
   }
 
@@ -324,7 +371,7 @@ export async function persistEvidenceBatch(evidence: LearnerEvidence[], runId: s
   if (projectionEvents.length > 0) await repos.evidence.insertProjectionEvents(projectionEvents)
 
   const confirmedCount = inserted.filter(r => r.lifecycle_state === 'auto_confirmed').length
-  return { inserted, confirmedCount, pendingReviewCount: inserted.length - confirmedCount }
+  return { inserted, confirmedCount, pendingReviewCount: inserted.length - confirmedCount, noOpCount }
 }
 
 // ── Review lifecycle ─────────────────────────────────────────────────────────

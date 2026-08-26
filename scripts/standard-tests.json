@@ -82,6 +82,7 @@
     "lib/intelligence/phaseGMigration.safety.test.ts",
     "lib/intelligence/phaseMinus1Migration.safety.test.ts",
     "lib/intelligence/shadowSupersession.test.ts",
+    "lib/intelligence/subjectMapping.test.ts",
     "lib/kiswahili/inshaEvaluator.test.ts",
     "lib/learnerBlueprint/blueprintSectionNullGuards.pure.test.ts",
     "lib/learnerBlueprint/blueprintSectionPurity.architecture.test.ts",

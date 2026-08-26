@@ -29,6 +29,7 @@
 import { resolveLegacyStudentId } from '@/lib/core/identity'
 import { composeIdentity } from './composeIdentity'
 import { composeAcademicRecord } from './composeAcademicRecord'
+import { composeProgrammeAcademicRecord } from './composeProgrammeAcademicRecord'
 import { composeAttendance } from './composeAttendance'
 import { composeLearningCompass } from './composeLearningCompass'
 import { composeCareer } from './composeCareer'
@@ -45,7 +46,7 @@ import { composeMetadata } from './composeMetadata'
 import { loadProjectionAccess } from './projectionAccess'
 import { loadCareerAccess } from './careerAccess'
 import { loadCompassAccess } from './compassAccess'
-import { getGradeBand } from './gradeBand'
+import { getGradeBand, isSeniorBand } from './gradeBand'
 import { validateBlueprint, type BlueprintValidationResult } from './validation'
 import { composeBlueprintCoherence } from './coherence'
 import type { CoherenceReport } from './coherence'
@@ -102,18 +103,24 @@ export async function composeBlueprint(ids: BlueprintIdentifiers): Promise<Compo
     loadCompassAccess(legacyStudentId),
   ])
 
+  // Resolved here (from Identity, already available) rather than after
+  // Academic Record — Senior-band Blueprints need to know their grade band
+  // BEFORE composing the Academic Record, so it can select the
+  // programme-aware composer instead of the Junior evidence-grouping one
+  // (Phase 2 — Senior School Programme Truth). Junior/unknown bands are
+  // unaffected: composeAcademicRecord (legacy path) is unchanged and is
+  // still exactly what runs for them.
+  const gradeBand = getGradeBand(identity.data?.currentClassName ?? null)
+
   const [academicRecord, growthTimeline, risk, learningCompass, career] = await Promise.all([
-    composeAcademicRecord(legacyStudentId, projectionAccess),
+    isSeniorBand(gradeBand)
+      ? composeProgrammeAcademicRecord(ids.coreLearnerId, legacyStudentId, projectionAccess)
+      : composeAcademicRecord(legacyStudentId, projectionAccess),
     composeGrowthTimeline(legacyStudentId, projectionAccess),
     composeRisk(legacyStudentId, projectionAccess),
     composeLearningCompass(legacyStudentId, compassAccess),
     composeCareer(legacyStudentId, careerAccess),
   ])
-
-  // Pure — no I/O of its own. Runs after academicRecord because the pathway
-  // composite is computed from the same Projection-sourced subject levels the
-  // Academic Record already resolved, never from a second read.
-  const gradeBand = getGradeBand(identity.data?.currentClassName ?? null)
   const pathwayReadiness = composePathwayReadiness(
     gradeBand,
     academicRecord.data?.bySubject ?? [],

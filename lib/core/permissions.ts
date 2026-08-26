@@ -22,6 +22,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createServiceClient } from '@/utils/supabase/service'
+import { repos } from '@/lib/repositories'
 import type { SchoolUserRole } from '@/types/core'
 import {
   resolveCurrentUser,
@@ -184,9 +185,30 @@ export async function requireInstitutionalAssignmentAuthority(
   classSubjectId: string,
 ): Promise<InstitutionalAssignmentAuthority> {
   const user = await requireAuthentication(client)
+  return resolveInstitutionalAssignmentAuthority(user.id, classSubjectId)
+}
 
+/**
+ * Phase 3A — the same tenure/membership/role checks
+ * {@link requireInstitutionalAssignmentAuthority} performs, factored out to
+ * take an already-authenticated `userId` directly rather than a
+ * `SupabaseClient` to re-authenticate from. Extracted for
+ * `lib/core/academicBridge.ts::createBridgedAssessment`, which already holds
+ * a server-verified `actingUserId` by the time it needs this check and has
+ * no client of its own to pass — re-deriving the same tenure/ended_at/role
+ * logic there instead of calling this would be exactly the copy-pasted
+ * authorization this module's header warns against.
+ *
+ * `requireInstitutionalAssignmentAuthority` is the one and only public
+ * entry point for a route holding a `SupabaseClient`; this is the shared
+ * primitive both it and `academicBridge.ts` build on.
+ */
+export async function resolveInstitutionalAssignmentAuthority(
+  userId: string,
+  classSubjectId: string,
+): Promise<InstitutionalAssignmentAuthority> {
   const tenure = await resolveTeachingTenure(classSubjectId)
-  if (!tenure || tenure.membershipUserId !== user.id) {
+  if (!tenure || tenure.membershipUserId !== userId) {
     // Deliberately indistinguishable from "no such tenure" (matches
     // `requireClassTeacher`'s existing not-found/not-yours conflation) —
     // never confirms to a caller that a `classSubjectId` they don't hold
@@ -200,7 +222,7 @@ export async function requireInstitutionalAssignmentAuthority(
     throw new MembershipRequiredError('Your school membership is not active.')
   }
 
-  const membership = await resolveMembership(user.id, tenure.schoolId)
+  const membership = await resolveMembership(userId, tenure.schoolId)
   if (!membership || !membership.isActive) {
     throw new MembershipRequiredError()
   }
@@ -215,7 +237,7 @@ export async function requireInstitutionalAssignmentAuthority(
     coreClassId: tenure.coreClassId,
     subjectId: tenure.subjectId,
     subjectName: tenure.subjectName,
-    teacherUserId: user.id,
+    teacherUserId: userId,
   }
 }
 
@@ -373,6 +395,62 @@ export async function canManageAssessment(client: SupabaseClient, schoolId: stri
     if (isEduNexusError(err)) return false
     throw err
   }
+}
+
+/**
+ * Phase 3C — marks-entry authority for a CANONICAL (`class_subject_id`-
+ * bearing) assessment. Deliberately answers a different question from
+ * {@link canManageAssessment} ("do you currently manage this class at
+ * all"): "does the CURRENT teaching tenure for this exact class+subject
+ * belong to you" — the assessment's own, possibly long-ended
+ * `class_subject_id` is never itself the check (Phase 3A Step 33's teacher-
+ * replacement history preservation means an assessment's stored tenure id
+ * can outlive the person who created it). Authority instead follows
+ * whoever CURRENTLY teaches this class+subject, mirroring how
+ * `class_subjects` itself models continuity — a departed teacher's replacement
+ * inherits write access to existing assessments for that subject, exactly
+ * as `class_subjects_current_assignment_uniq` intends for teaching itself.
+ *
+ * Admin-tier school membership bypasses the tenure check entirely (same
+ * shape as `canManageAssessment`). A non-admin caller is authorized only if
+ * {@link resolveInstitutionalAssignmentAuthority} succeeds against the
+ * class+subject's CURRENT `class_subjects` row — throws `ResourceOwnershipError`
+ * if no current tenure exists at all for this class+subject (the subject
+ * assignment was fully removed, not merely reassigned), and otherwise
+ * propagates that function's own ended_at/membership/role errors unchanged.
+ */
+export async function requireCurrentSubjectTeachingAuthority(
+  client: SupabaseClient,
+  schoolId: string,
+  coreClassId: string,
+  subjectId: string,
+): Promise<void> {
+  const user = await requireAuthentication(client)
+  return resolveCurrentSubjectTeachingAuthority(user.id, schoolId, coreClassId, subjectId)
+}
+
+/**
+ * {@link requireCurrentSubjectTeachingAuthority} variant taking an
+ * already-authenticated `userId` directly — for
+ * `lib/core/academicBridge.ts::recordCanonicalAssessmentMarks`, which holds
+ * a server-verified `actingUserId` and no `SupabaseClient` of its own, same
+ * shape as {@link resolveInstitutionalAssignmentAuthority}.
+ */
+export async function resolveCurrentSubjectTeachingAuthority(
+  userId: string,
+  schoolId: string,
+  coreClassId: string,
+  subjectId: string,
+): Promise<void> {
+  const membership = await resolveMembership(userId, schoolId)
+  if (membership && SCHOOL_ADMIN_ROLES.includes(membership.role)) return
+
+  const currentClassSubjectId = await repos.teachers.findCurrentTenureIdForClassSubject(coreClassId, subjectId)
+  if (!currentClassSubjectId) {
+    throw new ResourceOwnershipError('No teacher currently holds this class and subject — an administrator must reassign it before marks can be entered.')
+  }
+
+  await resolveInstitutionalAssignmentAuthority(userId, currentClassSubjectId)
 }
 
 /**

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { GraduationCap, Users, ArrowRight, Building2 } from 'lucide-react'
+import { GraduationCap, Users, ArrowRight, Building2, ClipboardPlus } from 'lucide-react'
 import type { TeachingContext } from '@/lib/core/teachingAssignments'
 
 // The institutional teaching surface: the subjects and classes THE SCHOOL has
@@ -70,7 +70,7 @@ export default function MyTeaching({ context }: Props) {
 
             <ul className="divide-y divide-slate-100">
               {group.classes.map(cls => (
-                <li key={cls.assignmentId}>
+                <li key={cls.assignmentId} className="flex items-center">
                   {/* The Class Blueprint is the one existing screen keyed on a
                       Core `classes.id` (the legacy `/teacher/classes/[id]`
                       screen expects a `teacher_classes.id` — a different id
@@ -80,7 +80,7 @@ export default function MyTeaching({ context }: Props) {
                       link. */}
                   <Link
                     href={`/teacher/core-classes/${cls.classId}/blueprint`}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors group"
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors group flex-1 min-w-0"
                   >
                     <Users className="w-4 h-4 text-slate-300 shrink-0" />
                     <div className="min-w-0 flex-1">
@@ -93,6 +93,17 @@ export default function MyTeaching({ context }: Props) {
                       )}
                     </div>
                     <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors shrink-0" />
+                  </Link>
+                  {/* Phase 3B — the one new discoverable action this phase
+                      adds. `cls.assignmentId` is `class_subjects.id`, the
+                      exact tenure /teacher/assessments/new needs to lock its
+                      canonical subject context to (Step 22). */}
+                  <Link
+                    href={`/teacher/assessments/new?classSubjectId=${cls.assignmentId}`}
+                    title="Add Assessment"
+                    className="shrink-0 flex items-center justify-center w-10 h-10 mr-2 rounded-xl text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+                  >
+                    <ClipboardPlus className="w-4 h-4" />
                   </Link>
                 </li>
               ))}

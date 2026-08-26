@@ -33,6 +33,7 @@ import { persistEvidenceBatch } from '@/lib/intelligence/evidenceLifecycle'
 import { quizAttemptKey } from '@/lib/intelligence/correctionKey'
 import { normaliseScore, marksToLevelForSchool } from '@/lib/assessments/gradeCalculator'
 import { resolveCurriculumContext } from '@/lib/curriculum/curriculumContext'
+import { mapSubject } from '@/lib/intelligence/subjectMapping'
 
 const SOURCE = 'quiz_auto_grade' as const
 
@@ -87,11 +88,22 @@ export async function recordQuizAutoGradeEvidence(input: QuizEvidenceInput): Pro
     institution: null,
   })
 
+  // Phase 2B — this producer previously stored `input.subject` verbatim as
+  // BOTH `subject` and `rawSubject`, bypassing the identity-safe mapper
+  // every other Evidence writer already used. Confirmed live in production:
+  // 152 rows with `subject='Mathematics'` (capital M, never normalized),
+  // distinct from the 105 correctly-normalized `subject='mathematics'`
+  // rows written by the gradebook pipeline — the same real subject
+  // fragmented into two Evidence identities purely because this one writer
+  // skipped the boundary. `rawSubject` still preserves exactly what
+  // `assignments.subject` said, unchanged.
+  const { canonicalSubject } = mapSubject(input.subject)
+
   const evidence: LearnerEvidence = {
     learnerId: input.studentId,
     extractedName: '',
     extractedExternalId: null,
-    subject: input.subject,
+    subject: canonicalSubject,
     rawSubject: input.subject,
     score: percentage,
     cbcLevel,

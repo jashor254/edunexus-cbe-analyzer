@@ -2190,6 +2190,7 @@ export type Database = {
           assessment_type: string | null
           assessment_type_id: string | null
           class_id: string | null
+          class_subject_id: string | null
           created_at: string | null
           curriculum_type: string | null
           external_id: string | null
@@ -2200,6 +2201,7 @@ export type Database = {
           integration_connection_id: string | null
           is_published: boolean
           max_score: number | null
+          subject_id: string | null
           subjects: string[]
           teacher_id: string
           term: string
@@ -2212,6 +2214,7 @@ export type Database = {
           assessment_type?: string | null
           assessment_type_id?: string | null
           class_id?: string | null
+          class_subject_id?: string | null
           created_at?: string | null
           curriculum_type?: string | null
           external_id?: string | null
@@ -2222,6 +2225,7 @@ export type Database = {
           integration_connection_id?: string | null
           is_published?: boolean
           max_score?: number | null
+          subject_id?: string | null
           subjects?: string[]
           teacher_id: string
           term: string
@@ -2234,6 +2238,7 @@ export type Database = {
           assessment_type?: string | null
           assessment_type_id?: string | null
           class_id?: string | null
+          class_subject_id?: string | null
           created_at?: string | null
           curriculum_type?: string | null
           external_id?: string | null
@@ -2244,6 +2249,7 @@ export type Database = {
           integration_connection_id?: string | null
           is_published?: boolean
           max_score?: number | null
+          subject_id?: string | null
           subjects?: string[]
           teacher_id?: string
           term?: string
@@ -2268,6 +2274,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "class_assessments_class_subject_id_fkey"
+            columns: ["class_subject_id"]
+            isOneToOne: false
+            referencedRelation: "class_subjects"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "class_assessments_grade_id_fkey"
             columns: ["grade_id"]
             isOneToOne: false
@@ -2286,6 +2299,13 @@ export type Database = {
             columns: ["integration_connection_id"]
             isOneToOne: false
             referencedRelation: "integration_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_assessments_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
             referencedColumns: ["id"]
           },
           {

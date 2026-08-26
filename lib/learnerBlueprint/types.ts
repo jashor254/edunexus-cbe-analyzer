@@ -117,6 +117,41 @@ export type AcademicRecordData = {
   /** Projection's own confidence (0-100) — carried through, never re-derived. */
   confidence: number | null
   lastComputed: string | null
+
+  // ── Phase 2 (Senior School Programme Truth) — all optional, additive,
+  // populated only by composeProgrammeAcademicRecord.ts for Senior-band
+  // learners. Absent/undefined for every existing Junior-path caller —
+  // nothing above this line changes shape or meaning.
+
+  /**
+   * 'canonical': bySubject was built from the learner's current
+   * learner_programme_subjects, not from evidence-string grouping.
+   * 'unresolved': this is a Senior learner with no canonical programme row
+   * yet — bySubject (if present) is the legacy evidence-derived view, never
+   * to be read as the learner's actual current subjects.
+   * 'not_applicable': Junior/no-programme-concept path (existing behavior).
+   */
+  programmeStatus?: 'canonical' | 'unresolved' | 'not_applicable'
+  /** Explicit truth-source tag a downstream consumer must check before treating bySubject as "the learner's current subjects." */
+  source?: 'canonical_programme' | 'legacy_evidence_view'
+  /**
+   * Programme subjects with zero admissible, canonically-attributed
+   * evidence (e.g. CSL with no assessments yet). Deliberately NOT merged
+   * into bySubject, which requires a real 1-4 level for every entry — a
+   * fabricated level would misrepresent "no evidence" as "evidence of
+   * level 1." A programme-aware consumer must render these as present in
+   * the programme with an honest insufficient-evidence state, never as
+   * absent from the learner's subjects.
+   */
+  evidenceInsufficientSubjects?: Array<{ subject: string; subjectId: string }>
+  /**
+   * Raw evidence subject strings for this learner that exist but could not
+   * be deterministically attributed to any current programme subject (e.g.
+   * generic "mathematics" when the programme specifies Core Mathematics —
+   * see lib/curriculum/evidenceSubjectResolution.ts). Preserved for
+   * provenance/audit, never silently discarded and never auto-attributed.
+   */
+  unattributedEvidenceSubjects?: string[]
 }
 
 // ── Attendance (Attendance service) ──────────────────────────────────────────

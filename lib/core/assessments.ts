@@ -4,8 +4,9 @@ import { computeRankings } from '@/lib/ranking'
 import { gradeScore } from '@/lib/grading'
 import type { GradeScale } from '@/lib/grading'
 import type { TermSubjectSummary, CbcLevel } from '@/types/core'
-import { resolveTeacher } from '@/lib/core/identity'
+import { resolveTeacher, resolveTeachingTenure } from '@/lib/core/identity'
 import { resolveOrCreateAssessmentType } from '@/lib/assessments/mutations'
+import { getSubject } from '@/lib/core/subjects'
 
 // class_assessments is the shared table (extended by Core) — we read/write it here
 // learner_marks stores per-student scores as jsonb subject_scores
@@ -26,6 +27,11 @@ type AssessmentConfig = {
   grading_type: string
   is_published: boolean
   grade_id: string | null
+  // Phase 3A — canonical subject identity. Null for legacy/free-text
+  // assessments; set only when created through a verified class_subjects
+  // teaching assignment (lib/core/academicBridge.ts::createBridgedAssessment).
+  class_subject_id: string | null
+  subject_id: string | null
   created_at: string
   updated_at: string
 }
@@ -91,6 +97,12 @@ export async function createAssessment(input: {
   weight_percent?: number
   grading_type?: string
   grade_id?: string
+  // Phase 3A — canonical subject identity, already resolved and verified
+  // by the caller (lib/core/academicBridge.ts::createBridgedAssessment)
+  // against a real class_subjects tenure. Never derived here — this
+  // function stores exactly what it is given.
+  class_subject_id?: string | null
+  subject_id?: string | null
 }): Promise<AssessmentConfig> {
   const { userId, ...rest } = input
   const teacher = await resolveTeacher(userId)
@@ -108,6 +120,76 @@ export async function createAssessment(input: {
     assessment_type_id: assessmentTypeId,
   })
   return data as unknown as AssessmentConfig
+}
+
+export type CanonicalAssessmentContext =
+  | { kind: 'not_found' }
+  | { kind: 'legacy' } // subject_id/class_subject_id absent — Phase 3 Step 33, owned by the legacy gradebook, not this canonical marks path
+  | {
+      kind: 'canonical'
+      assessmentId: string
+      title: string
+      assessmentType: string
+      term: string
+      year: number
+      maxScore: number
+      subjectId: string
+      subjectName: string
+      subjectCode: string
+      coreClassId: string
+      className: string
+      schoolId: string
+    }
+
+/**
+ * Phase 3C — resolves the context a canonical marks-entry page needs for
+ * ONE assessment, re-deriving subject/class identity from the CURRENT
+ * `class_subjects` row the assessment's `class_subject_id` points at
+ * (via {@link resolveTeachingTenure}) rather than trusting any snapshot on
+ * the assessment row itself. `schoolId` is the caller's own — a mismatch
+ * against the resolved tenure's school is reported as `not_found`,
+ * identical to a genuinely missing assessment, so this function reveals
+ * nothing about an assessment's existence to a caller from the wrong
+ * school (Phase 3 Step 10/31's cross-school tampering posture, applied to
+ * reads too).
+ */
+export async function getCanonicalAssessmentContext(
+  schoolId: string,
+  assessmentId: string,
+): Promise<CanonicalAssessmentContext> {
+  const row = await repos.assessments.findCoreAssessmentById(assessmentId) as {
+    id: string
+    title: string
+    assessment_type: string
+    term: string
+    year: number
+    max_score: number
+    class_subject_id: string | null
+    subject_id: string | null
+  } | null
+  if (!row) return { kind: 'not_found' }
+  if (!row.class_subject_id || !row.subject_id) return { kind: 'legacy' }
+
+  const tenure = await resolveTeachingTenure(row.class_subject_id)
+  if (!tenure || tenure.schoolId !== schoolId) return { kind: 'not_found' }
+
+  const subject = await getSubject(row.subject_id)
+
+  return {
+    kind: 'canonical',
+    assessmentId: row.id,
+    title: row.title,
+    assessmentType: row.assessment_type,
+    term: row.term,
+    year: row.year,
+    maxScore: row.max_score,
+    subjectId: row.subject_id,
+    subjectName: subject.name,
+    subjectCode: subject.code,
+    coreClassId: tenure.coreClassId,
+    className: tenure.className,
+    schoolId: tenure.schoolId,
+  }
 }
 
 export async function publishAssessment(assessmentId: string): Promise<void> {

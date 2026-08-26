@@ -1009,7 +1009,7 @@ export class AssessmentRepository extends BaseRepository {
   // ── Core assessments (extended columns) ──────────────────────────────────────
 
   private readonly CORE_ASSESSMENT_COLS =
-    'id, class_id, teacher_id, title, assessment_type, term, year, max_score, subjects, curriculum_type, grade_scale_id, weight_percent, grading_type, is_published, grade_id, created_at, updated_at'
+    'id, class_id, teacher_id, title, assessment_type, term, year, max_score, subjects, curriculum_type, grade_scale_id, weight_percent, grading_type, is_published, grade_id, class_subject_id, subject_id, created_at, updated_at'
 
   async listAssessmentsByClass(
     classId: string,
@@ -1062,6 +1062,11 @@ export class AssessmentRepository extends BaseRepository {
     weight_percent?: number
     grading_type?: string
     grade_id?: string
+    // Phase 3A — canonical subject identity, resolved server-side from a
+    // verified class_subjects tenure. Both null for legacy/free-text
+    // callers (unchanged behaviour); never derived here, only stored.
+    class_subject_id?: string | null
+    subject_id?: string | null
   }): Promise<Record<string, unknown>> {
     const { data, error } = await this.db
       .from('class_assessments')
@@ -1074,6 +1079,23 @@ export class AssessmentRepository extends BaseRepository {
       .select(this.CORE_ASSESSMENT_COLS)
       .single()
     if (error) throw new Error(`createAssessment: ${error.message}`)
+    return data
+  }
+
+  // Phase 3C — the marks-entry page needs to read ONE assessment by id,
+  // scoped to a school rather than a teacher (`findAssessmentById` requires
+  // a teacher_id and lacks class_subject_id/subject_id — see that method's
+  // own comment). School scoping is enforced by the caller
+  // (lib/core/assessments.ts::getCanonicalAssessmentContext), which
+  // resolves the assessment's tenure via class_subject_id and rejects a
+  // school mismatch — this read alone is not an authorization boundary.
+  async findCoreAssessmentById(id: string): Promise<Record<string, unknown> | null> {
+    const { data, error } = await this.db
+      .from('class_assessments')
+      .select(this.CORE_ASSESSMENT_COLS)
+      .eq('id', id)
+      .maybeSingle()
+    if (error) throw new Error(`findCoreAssessmentById: ${error.message}`)
     return data
   }
 

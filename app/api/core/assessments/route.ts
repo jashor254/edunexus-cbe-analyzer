@@ -11,6 +11,12 @@ import { asLearnerId } from '@/lib/core/identityTypes'
 const CreateSchema = z.object({
   schoolId: z.string().uuid(),
   class_id: z.string().uuid(),
+  // Phase 3A — optional canonical teaching-assignment reference. When
+  // present, the server derives canonical subject identity from it and
+  // ignores/overrides `subjects` text (see createBridgedAssessment) —
+  // never the reverse. Omitted entirely, behaviour is unchanged from
+  // before Phase 3A (free-text `subjects` only).
+  classSubjectId: z.string().uuid().optional(),
   title: z.string().min(1),
   assessment_type: z.string(),
   term: z.string(),
@@ -174,7 +180,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const parsed = CreateSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
-  const { schoolId, class_id: coreClassId, ...input } = parsed.data
+  const { schoolId, class_id: coreClassId, classSubjectId, ...input } = parsed.data
   let userId: string
   try {
     userId = (await requireAuthentication(supabase)).id
@@ -187,10 +193,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     // ensureBridgedClass runs inside createBridgedAssessment; the existing
     // requireCanManageAssessment check still runs, against the resolved
-    // legacy class id, as an unchanged second gate.
+    // legacy class id, as an unchanged second gate. Phase 3A's
+    // classSubjectId authorization (tenure ownership, ended_at, active
+    // membership, school/class match) runs inside createBridgedAssessment
+    // too, as an additional gate specific to canonical subject identity —
+    // never a replacement for requireCanManageAssessment.
     const bridged = await ensureBridgedClass(schoolId, coreClassId, userId)
     await requireCanManageAssessment(supabase, schoolId, bridged.legacyClassId)
-    result = await createBridgedAssessment(schoolId, coreClassId, userId, input)
+    result = await createBridgedAssessment(schoolId, coreClassId, userId, input, classSubjectId)
   } catch (err) {
     return errorResponse(err)
   }
