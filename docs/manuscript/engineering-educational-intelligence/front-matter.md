@@ -32,13 +32,23 @@ This book is a work of engineering nonfiction. The systems, architectures, and c
 
 Every effort has been made to ensure the accuracy of the information in this book at the time of publication. The author assumes no responsibility for errors, omissions, or for any outcomes resulting from the use of the information contained herein.
 
-First Edition
+First Edition, 2026
 
-ISBN: *[pending — ISBN not yet assigned]*
+<!-- ISBN_LINE: inserted at build time from publication config; omitted entirely when no ISBN is set. Do not hardcode an ISBN value here. -->
 
-Library of Congress / national library cataloging data: *[pending registration]*
+Published by EduNexus Kenya
 
-Published by: *[pending — independently published unless a publisher is confirmed]*
+edunexus.co.ke
+
+---
+
+## About the Author
+
+Dennis Kariuki is a Kenyan educator, software engineer, and founder of EduNexus, where he works on educational intelligence systems designed around evidence, learner progression, and human-guided decision-making. His work sits at the intersection of classroom practice, educational systems design, and software architecture. Engineering Educational Intelligence grew from the practical challenge of building systems that do more than record learning — systems capable of reasoning carefully about what available evidence actually says about a learner.
+
+Contact:
+hello@edunexus.co.ke
+edunexus.co.ke
 
 ---
 

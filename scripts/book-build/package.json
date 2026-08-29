@@ -1,0 +1,14 @@
+{
+  "name": "eei-book-build",
+  "private": true,
+  "type": "module",
+  "description": "Self-contained build pipeline for the Engineering Educational Intelligence book PDF. Isolated from the main app's dependencies on purpose.",
+  "scripts": {
+    "book:pdf": "node build.mjs"
+  },
+  "dependencies": {
+    "marked": "^15.0.0",
+    "pagedjs-cli": "^0.4.3",
+    "pdf-lib": "^1.17.1"
+  }
+}

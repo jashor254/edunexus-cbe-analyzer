@@ -71,3 +71,7 @@ generated-reports/*.pdf
 # growth outreach data — real school contact PII / campaign logs, not source
 scripts/growth/output/
 .aider*
+
+# book build pipeline — isolated node project + generated PDF, not source
+scripts/book-build/node_modules/
+docs/manuscript/engineering-educational-intelligence/dist/
