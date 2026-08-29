@@ -286,6 +286,11 @@ blockquote + p { text-indent: 0; }
   font-family: "Noto Sans", sans-serif;
   font-size: 10.3pt;
   margin-bottom: 0.09in;
+  /* Without this, an entry sitting right at a page boundary (two-line
+     chapter titles wrapping in their table-cell, in practice) gets its <a>
+     fragmented and cloned across both pages by Paged.js — which produced a
+     harmless-looking visual duplicate but a real duplicate link annotation. */
+  break-inside: avoid;
 }
 
 /* A two-cell table row per entry (title, page number) rather than dotted
@@ -299,6 +304,8 @@ blockquote + p { text-indent: 0; }
   table-layout: fixed;
   color: var(--ink);
   text-decoration: none;
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
 .toc li a .toc-title {

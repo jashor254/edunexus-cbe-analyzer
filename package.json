@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "book:pdf": "cd scripts/book-build && npm install --no-audit --no-fund --silent && node build.mjs",
+    "book:pdf": "cd scripts/book-build && npm install --no-audit --no-fund --silent && PUPPETEER_EXECUTABLE_PATH=\"${PUPPETEER_EXECUTABLE_PATH:-/usr/bin/google-chrome}\" node build.mjs",
     "db:types": "supabase gen types typescript --linked > lib/database.types.ts",
     "db:bootstrap:test": "bash scripts/bootstrap-local-db/run.sh",
     "db:reap:synthetic": "bash scripts/bootstrap-local-db/reap-synthetic-fixtures.sh",

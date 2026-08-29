@@ -1,26 +1,25 @@
 // Build pipeline: frozen Markdown manuscript -> assembled HTML -> print-quality PDF.
 //
 // Pipeline choice (see publication-artifact report for the full rationale):
-// marked (Markdown -> HTML) -> Paged.js via pagedjs-cli (CSS Paged Media polyfill:
-// running headers, page-box footnotes/page numbers, generated TOC leaders, PDF
-// outline) -> Chromium print-to-pdf, then a small pdf-lib pass to set PDF Info
-// metadata (Title/Author/Subject), which Chromium's print-to-pdf does not expose.
+// marked (Markdown -> HTML) -> Paged.js (via pagedjs-cli's Printer, used as a
+// library — see render.mjs) for CSS Paged Media pagination (running headers,
+// page counters, generated TOC page numbers) -> Chromium print-to-pdf ->
+// pdf-lib passes for PDF Info metadata, real link annotations, and a bookmark
+// outline (render.mjs reconstructs the latter two directly from the rendered
+// DOM, because Chromium's print-to-pdf silently drops link annotations for
+// anything laid out inside Paged.js's paginated page fragments).
 //
 // No LaTeX/TeX Live install was introduced: this repo already has Google Chrome
 // and Node, so the HTML/CSS route reuses what's present instead of installing a
 // multi-hundred-MB TeX toolchain for a single 33k-word manuscript.
 
 import { readFile, writeFile, mkdir, rm } from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { Marked } from "marked";
-import { PDFDocument } from "pdf-lib";
 import { metadata } from "./metadata.mjs";
+import { renderWithLinks } from "./render.mjs";
 
-const run = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "../..");
 const MANUSCRIPT_DIR = path.join(
@@ -131,6 +130,8 @@ function renderCopyrightPage() {
 </section>`;
 }
 
+const ABOUT_AUTHOR_ID = "sec-about-the-author";
+
 function renderAboutAuthorPage(marked, aboutMarkdown) {
   // aboutMarkdown is the manuscript's own "About the Author" body (minus the
   // "Contact:" line, which we render separately using the approved config so the
@@ -139,7 +140,7 @@ function renderAboutAuthorPage(marked, aboutMarkdown) {
   const html = marked.parse(bodyOnly);
   return `
 <section class="frontmatter-page about-author-page">
-  <h1>About the Author</h1>
+  <h1 id="${ABOUT_AUTHOR_ID}">About the Author</h1>
   ${html}
   <div class="contact-block">
     <a href="mailto:${metadata.contactEmail}">${metadata.contactEmail}</a><br>
@@ -250,32 +251,24 @@ ${renderAboutAuthorPage(marked, fmSections["About the Author"])}
     "engineering-educational-intelligence.pdf"
   );
 
-  const pagedCli = path.join(__dirname, "node_modules/.bin/pagedjs-cli");
-  const chromePath =
-    process.env.PUPPETEER_EXECUTABLE_PATH || "/usr/bin/google-chrome";
+  // PUPPETEER_EXECUTABLE_PATH must be set in the environment *before* this
+  // process starts (see package.json's book:pdf script) — puppeteer reads it
+  // when the "pagedjs-cli" -> "puppeteer" module is first imported, which
+  // happens at this file's top-level `import`, before any code here runs.
 
-  console.log("- Rendering PDF with pagedjs-cli (this takes a few seconds)...");
-  await run(
-    pagedCli,
-    [
-      htmlPath,
-      "-o",
-      pdfPath,
-      "--outline-tags",
-      "h1,h2",
-      "--allowedPath",
-      DIST_DIR,
-    ],
-    {
-      env: { ...process.env, PUPPETEER_EXECUTABLE_PATH: chromePath },
-      maxBuffer: 1024 * 1024 * 32,
-    }
-  );
+  // The outline includes About the Author (end matter) even though it is
+  // deliberately absent from the printed Table of Contents — this only adds
+  // an invisible PDF bookmark entry, it does not touch the visible page.
+  const outlineHeadings = [
+    ...headingIndex,
+    { depth: 1, id: ABOUT_AUTHOR_ID, text: "About the Author" },
+  ];
+
+  console.log("- Rendering PDF (Paged.js) and reconstructing link annotations...");
+  const { pdfDoc, stats } = await renderWithLinks(htmlPath, outlineHeadings);
 
   // Chromium's print-to-pdf does not expose PDF Info metadata (Title/Author/
   // Subject) through CSS/HTML, so set it directly on the generated file.
-  const pdfBytes = await readFile(pdfPath);
-  const pdfDoc = await PDFDocument.load(pdfBytes);
   pdfDoc.setTitle(metadata.title);
   pdfDoc.setAuthor(metadata.author);
   pdfDoc.setSubject(
@@ -287,8 +280,11 @@ ${renderAboutAuthorPage(marked, fmSections["About the Author"])}
   await writeFile(pdfPath, finalBytes);
 
   console.log(`\nBuilt: ${pdfPath}`);
-  console.log(`Pages: ${pdfDoc.getPageCount()}`);
+  console.log(`Pages: ${stats.totalPages}`);
   console.log(`Size: ${(finalBytes.length / 1024).toFixed(0)} KB`);
+  console.log(`Internal (TOC) links: ${stats.internalLinks}`);
+  console.log(`External links: ${stats.externalLinks}`);
+  console.log(`Bookmarks: ${stats.bookmarks}`);
   console.log(`ISBN in artifact: ${metadata.isbn ?? "(omitted — none supplied)"}`);
 }
 
