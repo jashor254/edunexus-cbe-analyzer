@@ -265,18 +265,30 @@ export class TeacherRepository extends BaseRepository {
   }
 
   /**
-   * The school ids where this user currently holds an ACTIVE teacher
-   * membership. Exists to answer "is this person a school teacher at all",
-   * separately from "what are they assigned to teach" — a teacher with a
-   * membership and no assignments must be distinguishable from a Solo
-   * Teacher, and `listTeachingAssignmentsByUser` collapses both to [].
+   * The school ids where this user currently holds an ACTIVE teacher-
+   * capable membership. Exists to answer "is this person a school teacher
+   * at all", separately from "what are they assigned to teach" — a teacher
+   * with a membership and no assignments must be distinguishable from a
+   * Solo Teacher, and `listTeachingAssignmentsByUser` collapses both to [].
+   *
+   * Role filter matches `lib/core/permissions.ts`'s `SCHOOL_STAFF_ROLES`
+   * (not importable here — that module imports `repos`, so importing it
+   * back from a repository would cycle) — 'teacher' plus the admin-tier
+   * roles, because `assignSubjectTeacher`'s own `canTeach` check already
+   * allows `school_admin`/`headteacher`/`deputy_headteacher` to hold a
+   * `class_subjects` assignment (a head who also teaches a subject is a
+   * real, common case, not an edge case). Before this fix, an admin's own
+   * real teaching assignments existed correctly in `class_subjects` but
+   * were invisible to every reader gated through this function — found via
+   * a real pilot school's admin (who also teaches) seeing their own
+   * dashboard silently report zero classes.
    */
   async listActiveTeacherMembershipSchoolIds(userId: string): Promise<string[]> {
     const { data, error } = await this.db
       .from('school_users')
       .select('school_id')
       .eq('user_id', userId)
-      .eq('role', 'teacher')
+      .in('role', ['teacher', 'school_admin', 'headteacher', 'deputy_headteacher'])
       .eq('is_active', true)
     if (error) throw new Error(`listActiveTeacherMembershipSchoolIds: ${error.message}`)
     return (data ?? []).map(r => r.school_id as string)
@@ -309,7 +321,10 @@ export class TeacherRepository extends BaseRepository {
       .from('school_users')
       .select('id, school_id')
       .eq('user_id', userId)
-      .eq('role', 'teacher')
+      // Same role set as listActiveTeacherMembershipSchoolIds above (see its
+      // comment) — admin-tier roles can hold real class_subjects
+      // assignments too, and this must not hide them.
+      .in('role', ['teacher', 'school_admin', 'headteacher', 'deputy_headteacher'])
       .eq('is_active', true)
     if (membershipError) throw new Error(`listTeachingAssignmentsByUser (memberships): ${membershipError.message}`)
     if (!memberships || memberships.length === 0) return []
