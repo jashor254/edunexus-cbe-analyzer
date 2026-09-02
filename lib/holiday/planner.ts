@@ -48,6 +48,9 @@ export async function generateHolidayPlan(input: PlanInput): Promise<HolidayPlan
   ])
 
   const studentName = student?.name?.trim() || 'Student'
+  if (student && student.grade == null) {
+    console.error('[holiday/planner] student has no grade on record — defaulting to 8, plan content may be wrong for this learner', { studentId: input.studentId })
+  }
   const grade = (student?.grade as number) ?? 8
 
   // 2. Priority subjects, weakest first (subject-level — see module header).
@@ -165,14 +168,21 @@ export async function generateHolidayPlan(input: PlanInput): Promise<HolidayPlan
 
   const whatsappMessage = buildWhatsAppMessage({
     firstName, grade, topGap, careerNote,
-    weeks, compassCount, holidayPeriod: input.holidayPeriod,
+    weeks, compassCount, holidayPeriod: input.holidayPeriod, term: input.term,
   })
 
   const topGapConfidence = topTasks[0]?.confidence
+  // topGap only ever exists when priorityGaps found a real gap (latestLevel
+  // <= 2, filtered above) — so "had a strong term" was never actually
+  // gated on the learner's level, only on how confident the evidence for
+  // the gap was. A learner with several established observations all
+  // showing Level 1 is not having a strong term; they have a
+  // well-confirmed gap. Confidence should change how firmly this is
+  // stated, never flip "genuine gap" into "strong term."
   const parentSummary = topGap
     ? topGapConfidence === 'Low'
       ? `Current evidence suggests ${firstName} may benefit from more practice in ${topGap}, though this is based on limited evidence so far. ${careerNote ? careerNote + ' ' : ''}The holiday plan is light and exploratory — ${compassCount} short Compass session${compassCount !== 1 ? 's' : ''} spread across the break.`
-      : `${firstName} had a strong term but has room to grow in ${topGap}. ${careerNote ? careerNote + ' ' : ''}The holiday plan is light and focused — ${compassCount} short Compass session${compassCount !== 1 ? 's' : ''} spread across the break.`
+      : `${firstName} has room to grow in ${topGap} this holiday. ${careerNote ? careerNote + ' ' : ''}The holiday plan is light and focused — ${compassCount} short Compass session${compassCount !== 1 ? 's' : ''} spread across the break.`
     : `${firstName} had a solid term. The holiday plan keeps momentum light — rest, explore, and stay curious.`
 
   const planData: HolidayPlanData = {
@@ -351,6 +361,7 @@ function buildWhatsAppMessage(p: {
   weeks:         HolidayWeek[]
   compassCount:  number
   holidayPeriod: string
+  term:          number
 }): string {
   const workWeeks = p.weeks.filter(w => !w.is_rest_week)
   const restWeeks = p.weeks.filter(w => w.is_rest_week)
@@ -361,7 +372,7 @@ function buildWhatsAppMessage(p: {
 
   return `EduNexus — ${p.firstName}'s ${p.holidayPeriod} Plan 🎓
 
-Good news: ${p.firstName} completed Term ${p.weeks.length > 0 ? '2' : '1'} and is ready for a break.
+Good news: ${p.firstName} completed Term ${p.term} and is ready for a break.
 ${p.topGap ? `\nOne focus this holiday: *${p.topGap}*` : ''}
 ${p.careerNote ? `\n🔭 ${p.careerNote}` : ''}
 
