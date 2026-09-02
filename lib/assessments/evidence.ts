@@ -53,6 +53,17 @@ export async function recordAssessmentEvidence(
   assessmentId: string,
   teacherId: string,
   initiatedByUserId: string,
+  // Real signal of doubt about the SCORES THEMSELVES (not identity —
+  // student_id is already a verified FK), for sources where the person
+  // recording marks already knows they're uncertain (e.g. a bulk import
+  // from a photographed marksheet that was hard to read). Defaults to 0
+  // (identical to every caller before this parameter existed) — never
+  // silently changes existing behaviour. computeConfidence() already
+  // treats fieldIssueCount as "a real reason for doubt, not a hard
+  // block" (-20 confidence per issue); this just lets a caller who
+  // genuinely knows the data is shaky say so, instead of every import
+  // landing at the same auto_confirmed trust as a cleanly-read sheet.
+  knownFieldIssueCount = 0,
 ): Promise<void> {
   const startedAt = new Date()
 
@@ -96,7 +107,7 @@ export async function recordAssessmentEvidence(
   const confidence = computeConfidence({
     identityConfidence: 100, // student_id is a real FK, not name/fuzzy-matched
     identityMatchType: 'external_id',
-    fieldIssueCount: 0,
+    fieldIssueCount: knownFieldIssueCount,
     source: SOURCE,
   })
   const reviewStatus = resolveReviewStatus(confidence)

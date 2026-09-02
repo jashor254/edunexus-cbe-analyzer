@@ -430,7 +430,11 @@ export async function recordBridgedMarks(
   assessmentId: string,
   bridgedClass: BridgedClass,
   actingUserId: string,
-  scores: BridgedScoreInput[]
+  scores: BridgedScoreInput[],
+  // Threaded straight to recordAssessmentEvidence's own knownFieldIssueCount
+  // — see that function's doc comment. Defaults to 0, unchanged behaviour
+  // for every existing caller.
+  knownFieldIssueCount = 0,
 ): Promise<{ legacyStudentIds: StudentId[] }> {
   const legacyScores = []
   const legacyStudentIds: StudentId[] = []
@@ -449,7 +453,7 @@ export async function recordBridgedMarks(
   }
 
   await saveScores(assessmentId, bridgedClass.legacyClassId, bridgedClass.legacyTeacherId, legacyScores)
-  await recordAssessmentEvidence(assessmentId, bridgedClass.legacyTeacherId, actingUserId)
+  await recordAssessmentEvidence(assessmentId, bridgedClass.legacyTeacherId, actingUserId, knownFieldIssueCount)
   await Promise.all(legacyStudentIds.map(id => recomputeLearnerProjection(id)))
 
   return { legacyStudentIds }
