@@ -27,6 +27,7 @@
 import { insufficientEvidenceInsight, type Insight, type ConfidenceLevel } from '@/lib/learnerIntelligence/insight'
 import { mapSubject } from '@/lib/intelligence/subjectMapping'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
+import { computeLearnerProjection } from '@/lib/projection/engine'
 import type { LearnerIntelligenceProjection, Trend } from '@/lib/projection/types'
 import type { RemedialGroupType } from '@/lib/remedial/types'
 import { CurriculumService, type CurriculumContext } from '@/lib/curriculum/service'
@@ -561,10 +562,29 @@ export async function recommendForClass(
 ): Promise<ClassGroups> {
   const concurrency = options?.concurrency ?? 20
   const [withProjections, curriculumContext] = await Promise.all([
-    mapWithConcurrency(learners, concurrency, async l => ({
-      ...l,
-      projection: await recomputeLearnerProjection(l.learnerId),
-    })),
+    mapWithConcurrency(learners, concurrency, async l => {
+      try {
+        return { ...l, projection: await recomputeLearnerProjection(l.learnerId) }
+      } catch (err) {
+        // Per-learner error isolation — one failed recomputeLearnerProjection
+        // (a real, observed failure mode: transient Supabase fetch errors
+        // during this exact call, hit repeatedly seeding Kangai Junior
+        // School's real data) must never abort the WHOLE class's
+        // recommendations. Falls back to computeLearnerProjection(id, [])
+        // — the same pure engine, given no evidence — which naturally
+        // yields the existing, already-correct `insufficient_data` path
+        // through buildAdaptiveTask, rather than inventing a second
+        // failure representation. Same "isolate, never crash the batch"
+        // rule lib/assignments/printRoutes.ts already established for its
+        // own per-learner loop (that module works around this exact gap
+        // by not calling recommendForClass at all — see its header
+        // comment); this closes the gap for every OTHER real consumer
+        // (variantGeneration.ts, Classroom Differentiation) that calls
+        // recommendForClass directly.
+        console.error('[adaptiveLearning/recommend] projection lookup failed for learner', l.learnerId, err instanceof Error ? err.message : String(err))
+        return { ...l, projection: computeLearnerProjection(l.learnerId, []) }
+      }
+    }),
     options?.subStrandId ? CurriculumService.resolveSubstrandContext(options.subStrandId) : Promise.resolve(null),
   ])
   return buildClassRecommendations(withProjections, subject, curriculumContext)
