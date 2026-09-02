@@ -324,31 +324,40 @@ export async function generateClassHolidayPlans(
   const emit = (phase: HolidayBatchProgress['phase'], currentStudentName: string) =>
     onProgress?.({ total: enrollment.length, completed, generated, failed, currentStudentName, failedStudents: [...failedStudents], phase })
 
-  const results = await Promise.allSettled(
-    enrollment.map(async (studentId) => {
+  // Was Promise.allSettled(enrollment.map(...)) — every student's
+  // generateHolidayPlan() (a projection recompute + career intelligence +
+  // a real AI call) fired at once, unbounded. lib/adaptiveLearning/
+  // recommend.ts's own class-wide fan-out caps at 20 concurrent for the
+  // same reason; this had no cap at all. A worker pool over the same
+  // enrollment, same progress-emit shape, same per-student error
+  // isolation (a failed student never aborts the batch — that was already
+  // true here via allSettled, preserved here via try/catch per worker).
+  const CONCURRENCY = 5
+  const results: BatchResult[] = new Array(enrollment.length)
+  let index = 0
+  async function worker() {
+    while (index < enrollment.length) {
+      const i = index++
+      const studentId = enrollment[i]
       const studentName = nameById.get(studentId) ?? studentId
       await emit('started', studentName)
       try {
         const plan = await generateHolidayPlan({ studentId, ...input })
         completed++; generated++
         await emit('done', studentName)
-        return { studentId, studentName, plan }
+        results[i] = { studentId, studentName, plan }
       } catch (err) {
         completed++; failed++
         const reason = err instanceof Error ? err.message : String(err)
         failedStudents.push({ studentId, studentName, reason })
         await emit('done', studentName)
-        throw err
+        results[i] = { studentId, studentName, plan: null, error: reason }
       }
-    })
-  )
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, enrollment.length) }, worker))
 
-  return results.map((r, i) => {
-    const id = enrollment[i]
-    if (r.status === 'fulfilled') return r.value as BatchResult
-    const failedEntry = failedStudents.find(f => f.studentId === id)
-    return { studentId: id, studentName: nameById.get(id) ?? id, plan: null, error: failedEntry?.reason ?? String((r as PromiseRejectedResult).reason) }
-  })
+  return results
 }
 
 // ── WhatsApp message builder ──────────────────────────────────────────────────
