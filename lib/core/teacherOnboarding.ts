@@ -70,8 +70,19 @@ export function isInvitableSchoolRole(value: string): value is InvitableSchoolRo
 }
 
 export type InviteTeacherResult =
-  | { status: 'invited'; schoolUser: SchoolUser }
-  | { status: 'already_pending'; schoolUser: SchoolUser }
+  // `emailSent: false` means the school_users row (and, for a brand-new
+  // teacher, the auth account) was created successfully but the activation
+  // email itself failed to send (Resend error, wrong sandbox `from` address,
+  // etc.) — a real, distinct outcome from `status`, which only reports
+  // whether the invite record exists. Before this field existed,
+  // inviteSchoolMember reported `status:'invited'` whenever the account/row
+  // was created, whether or not the email actually went out — the account
+  // could be real while the admin's only way to reach the teacher (email)
+  // silently failed. `emailError` carries the reason so the Team screen can
+  // tell an admin to send the activation link manually instead of claiming
+  // a clean success.
+  | { status: 'invited'; schoolUser: SchoolUser; emailSent: boolean; emailError?: string }
+  | { status: 'already_pending'; schoolUser: SchoolUser; emailSent: boolean; emailError?: string }
   | { status: 'already_member'; schoolUser: SchoolUser }
   /** An existing membership had its role changed in place (e.g. teacher → school_admin). */
   | { status: 'role_changed'; schoolUser: SchoolUser; previousRole: SchoolUser['role'] }
@@ -151,11 +162,11 @@ export async function inviteSchoolMember(
 
     const rows = await repos.teachers.listSchoolUserRowsForUser(schoolId, authUser.id)
     const schoolUser = rows[0] ?? await repos.teachers.insertPendingSchoolUser(schoolId, authUser.id, role, invitedBy)
-    await sendTeacherInviteEmail({
+    const sendResult = await sendTeacherInviteEmail({
       schoolUserId: schoolUser.id, toEmail: email, schoolName: school.school_name,
       invitedByName, actionUrl: created.actionLink, isNewAccount: true, userId: invitedBy,
     })
-    return { status: 'invited', schoolUser }
+    return { status: 'invited', schoolUser, emailSent: sendResult.success, emailError: sendResult.error }
   }
 
   // Any membership at this school, under any role, in any state.
@@ -169,13 +180,14 @@ export async function inviteSchoolMember(
     if (existing.role === role) {
       if (!existing.is_active) {
         // Resend: still pending, admin clicked invite again.
-        await sendTeacherInviteEmail({
+        const sendResult = await sendTeacherInviteEmail({
           schoolUserId: existing.id, toEmail: email, schoolName: school.school_name,
           invitedByName, actionUrl: `${APP_URL}/login?returnTo=${encodeURIComponent(ACTIVATION_PATH)}`,
           isNewAccount: false, userId: invitedBy,
         })
+        return { status: 'already_pending', schoolUser: existing, emailSent: sendResult.success, emailError: sendResult.error }
       }
-      return { status: existing.is_active ? 'already_member' : 'already_pending', schoolUser: existing }
+      return { status: 'already_member', schoolUser: existing }
     }
     const previousRole = existing.role
     const schoolUser = await updateSchoolUserRole(existing.id, role)
@@ -183,12 +195,12 @@ export async function inviteSchoolMember(
   }
 
   const schoolUser = await repos.teachers.insertPendingSchoolUser(schoolId, authUser.id, role, invitedBy)
-  await sendTeacherInviteEmail({
+  const sendResult = await sendTeacherInviteEmail({
     schoolUserId: schoolUser.id, toEmail: email, schoolName: school.school_name,
     invitedByName, actionUrl: `${APP_URL}/login?returnTo=${encodeURIComponent(ACTIVATION_PATH)}`,
     isNewAccount: false, userId: invitedBy,
   })
-  return { status: 'invited', schoolUser }
+  return { status: 'invited', schoolUser, emailSent: sendResult.success, emailError: sendResult.error }
 }
 
 // ── Accept ───────────────────────────────────────────────────────────────────

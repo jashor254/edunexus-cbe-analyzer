@@ -44,6 +44,9 @@ type InviteResult = {
   status: 'invited' | 'already_pending' | 'already_member' | 'role_changed' | 'no_account'
   email?: string
   previousRole?: string
+  /** Only meaningful for 'invited'/'already_pending' — whether the activation email actually sent. */
+  emailSent?: boolean
+  emailError?: string
 }
 
 // Human-facing labels for the two roles a school admin may hand out. The
@@ -69,6 +72,17 @@ const INVITE_RESULT_LABEL: Record<InviteResult['status'], { text: string; tone: 
   already_member:  { text: 'This person already holds that role at this school.',          tone: 'info' },
   role_changed:    { text: 'Role updated for this member.',                                tone: 'success' },
   no_account:      { text: 'No EduNexus account exists for that email yet — ask them to sign up at edunexus.co.ke first, then invite this same address.', tone: 'error' },
+}
+
+/** The invite/school_users row can succeed while the activation email itself fails — this is that distinct, honest message. */
+function inviteResultLabel(result: InviteResult): { text: string; tone: 'success' | 'info' | 'error' } {
+  if ((result.status === 'invited' || result.status === 'already_pending') && result.emailSent === false) {
+    return {
+      text: `Account created, but the activation email failed to send${result.emailError ? ` (${result.emailError})` : ''}. Send the activation link to them manually.`,
+      tone: 'error',
+    }
+  }
+  return INVITE_RESULT_LABEL[result.status]
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -233,10 +247,10 @@ export default function CoreTeamPage() {
             </div>
             {inviteResult && (
               <p className={`text-xs ${
-                INVITE_RESULT_LABEL[inviteResult.status].tone === 'success' ? 'text-emerald-600' :
-                INVITE_RESULT_LABEL[inviteResult.status].tone === 'error' ? 'text-red-600' : 'text-slate-500'
+                inviteResultLabel(inviteResult).tone === 'success' ? 'text-emerald-600' :
+                inviteResultLabel(inviteResult).tone === 'error' ? 'text-red-600' : 'text-slate-500'
               }`}>
-                {INVITE_RESULT_LABEL[inviteResult.status].text}
+                {inviteResultLabel(inviteResult).text}
               </p>
             )}
           </div>

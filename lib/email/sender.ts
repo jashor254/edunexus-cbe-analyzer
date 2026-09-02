@@ -23,6 +23,21 @@ async function isDuplicate(type: string, referenceId: string): Promise<boolean> 
   return repos.notifications.isDuplicate(type, referenceId, 'email')
 }
 
+/**
+ * Never throws. This is an observability side-effect of a send that has
+ * already happened — a resend (e.g. teacher_invite, deliberately not
+ * deduplicated so every admin click really does send) can legitimately hit
+ * `notification_log`'s own unique constraint on a second attempt for the
+ * same (type, reference_id, channel). Before this, that constraint
+ * violation propagated up through the caller's un-guarded `await
+ * logAttempt(...)`, was caught by the SAME try/catch that wraps the actual
+ * Resend call, and came back as `{success:false, error:'Failed to insert
+ * notification log: duplicate key...'}` — a real, successfully-sent email
+ * (Resend had already returned no error) reported to the caller as a send
+ * failure, contradicting this file's header comment ("Never throws —
+ * always returns {success, error?}"). Logging failing must never overturn
+ * a send that already succeeded.
+ */
 async function logAttempt(params: {
   userId: string | null
   type: string
@@ -31,15 +46,21 @@ async function logAttempt(params: {
   success: boolean
   errorMessage?: string
 }): Promise<void> {
-  await repos.notifications.insertNotificationLog({
-    user_id:       params.userId,
-    type:          params.type,
-    reference_id:  params.referenceId,
-    channel:       'email',
-    email_address: params.emailAddress,
-    success:       params.success,
-    error_message: params.errorMessage ?? null,
-  })
+  try {
+    await repos.notifications.insertNotificationLog({
+      user_id:       params.userId,
+      type:          params.type,
+      reference_id:  params.referenceId,
+      channel:       'email',
+      email_address: params.emailAddress,
+      success:       params.success,
+      error_message: params.errorMessage ?? null,
+    })
+  } catch (err) {
+    console.error('[logAttempt] failed to write notification_log (send outcome unaffected)', {
+      type: params.type, referenceId: params.referenceId, err: err instanceof Error ? err.message : String(err),
+    })
+  }
 }
 
 // ---------------------------------------------------------------------------
