@@ -73,6 +73,9 @@ export async function buildAttentionFeed(teacherId: string): Promise<AttentionIt
     .from('teacher_classes')
     .select('id')
     .eq('teacher_id', teacherId)
+    // Archived classes must not keep generating attention-feed alerts —
+    // same gap as classListProjection.ts (status had no reader anywhere).
+    .eq('status', 'active')
 
   if (error) throw new Error(`Failed to fetch teacher classes: ${error.message}`)
   const classIds = (classes ?? []).map((c) => c.id as string)

@@ -99,6 +99,7 @@ export async function GET() {
         .from('teacher_classes')
         .select('id')
         .eq('teacher_id', teacherId)
+        .eq('status', 'active')
 
       if (teacherClasses && teacherClasses.length > 0) {
         const classIds = teacherClasses.map((c: { id: string }) => c.id)

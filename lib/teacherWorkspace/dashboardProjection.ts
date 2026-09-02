@@ -93,7 +93,8 @@ export async function getTeacherDashboardProjection(userId: string): Promise<Tea
   const [{ data: classes }, { count: schemeCount }] = await Promise.all([
     db.from('teacher_classes')
       .select('id')
-      .eq('teacher_id', teacher.id),
+      .eq('teacher_id', teacher.id)
+      .eq('status', 'active'),
     db.from('schemes_of_work')
       .select('id', { count: 'exact', head: true })
       .eq('teacher_id', teacher.id),

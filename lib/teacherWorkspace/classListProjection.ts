@@ -21,6 +21,15 @@ export async function getTeacherClassListProjection(teacherId: string): Promise<
       class_students(count)
     `)
     .eq('teacher_id', teacherId)
+    // `status` ('active'/'archived') was a column with no reader — every
+    // caller of this projection saw archived classes exactly like active
+    // ones. Found via a real pilot rollout: Core's academicBridge.ts bridges
+    // a Core class into a NEW teacher_classes row on first assessment
+    // creation, which can leave an old, superseded legacy class (e.g. one
+    // the teacher used before their school adopted Core, now holding stale
+    // duplicate data) sitting in the same list as its replacement with no
+    // way to hide it.
+    .eq('status', 'active')
     .order('created_at', { ascending: false })
 
   if (error) throw new Error(`getTeacherClassListProjection: ${error.message}`)
