@@ -24,7 +24,7 @@
 // independently computed from Projection. See the architecture doc §2
 // for the full rationale (a contradiction found and fixed before freeze).
 
-import { confidenceFromScore, insufficientEvidenceInsight, type Insight } from '@/lib/learnerIntelligence/insight'
+import { insufficientEvidenceInsight, type Insight, type ConfidenceLevel } from '@/lib/learnerIntelligence/insight'
 import { mapSubject } from '@/lib/intelligence/subjectMapping'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import type { LearnerIntelligenceProjection, Trend } from '@/lib/projection/types'
@@ -157,7 +157,7 @@ type AcademicSignal = {
    * decision must be corroborated by sub-strand observations, never by
    * subject-wide ones that may be about an entirely different topic.
    */
-  history: ReadonlyArray<{ level: 1 | 2 | 3 | 4 }>
+  history: ReadonlyArray<{ level: 1 | 2 | 3 | 4; evidenceId: string }>
 }
 
 /**
@@ -194,6 +194,34 @@ function evidenceStateFor(observationCount: number): AdaptiveEvidenceState {
   if (observationCount === 1) return 'initial'
   if (observationCount === 2) return 'developing'
   return 'established'
+}
+
+/**
+ * Confidence for the SUBJECT/GRAIN this decision is actually about — never
+ * projection.academic!.confidence, which is a whole-learner aggregate over
+ * every subject's evidence combined (lib/projection/coverage.ts's
+ * countFactor). Deliberately mirrors evidenceStateFor's own thresholds:
+ * confidence and evidenceState are two labels for the same underlying fact
+ * (how many real observations this exact decision rests on), so they must
+ * never be able to disagree the way the aggregate score could.
+ */
+function confidenceFromEvidenceState(state: AdaptiveEvidenceState): ConfidenceLevel {
+  if (state === 'established') return 'High'
+  if (state === 'developing') return 'Medium'
+  return 'Low' // 'initial' or 'no_evidence' (the latter never reaches here — insufficient_data returns earlier)
+}
+
+// Human-readable rendering of Trend for a teacher-facing sentence only.
+// decision.trend / signal.trend stay the raw enum everywhere else (API
+// responses, the returned AdaptiveTask) — this map exists solely so
+// buildAdaptiveTask's observation string never interpolates an internal
+// enum member like 'insufficient_data' or 'mixed' as if it were English.
+const TREND_LABEL: Record<Trend, string> = {
+  improving:          'improving',
+  declining:          'declining',
+  stable:             'holding steady',
+  mixed:              'showing a mixed pattern',
+  insufficient_data:  'too early to call a trend',
 }
 
 /**
@@ -428,16 +456,32 @@ export function buildAdaptiveTask(
 
   const signal = resolveAcademicSignal(projection, subject, curriculum?.subStrandId)!
   const level = signal.level
-  const confidence = confidenceFromScore(projection.academic!.confidence / 100)
+  // Was confidenceFromScore(projection.academic!.confidence / 100) — that
+  // score is computed across EVERY subject's evidence combined (coverage.ts's
+  // countFactor over the whole learner), so a learner with one CAT across 8
+  // subjects showed "High confidence" on a decision resting on exactly one
+  // real observation IN THIS SUBJECT. decision.evidenceState is already the
+  // correctly-scoped signal (computed from signal.history — this subject/
+  // grain's own observation count) — use that instead.
+  const confidence = confidenceFromEvidenceState(decision.evidenceState)
 
   const { action: groundedAction, curriculumNotice } = buildGroundedAction(groupType, subject, curriculum)
   const action = context?.careerNote ? `${groundedAction} ${context.careerNote}` : groundedAction
 
+  // TREND_LABEL, not the raw Trend value — 'insufficient_data' and 'mixed'
+  // are internal enum members, not English. With 1-2 real observations
+  // (the common pilot case), 'insufficient_data' was the DEFAULT string
+  // rendered into a teacher-facing sentence: "...Mathematics
+  // (insufficient_data)." decision.trend (used everywhere else — API
+  // responses, the returned AdaptiveTask) stays the raw enum; only this
+  // rendered sentence is affected.
+  const trendLabel = TREND_LABEL[signal.trend]
+
   const baseObservation = curriculum
     ? (signal.grain === 'subStrand'
-        ? `${learnerName} is currently at Level ${level} in ${curriculum.strandTitle} — ${curriculum.subStrandTitle} (${signal.trend}), based on evidence specific to this sub-strand.`
-        : `${learnerName} is currently at Level ${level} in ${subject} (${signal.trend}), working within ${curriculum.strandTitle} — ${curriculum.subStrandTitle}.`)
-    : `${learnerName} is currently at Level ${level} in ${subject} (${signal.trend}).`
+        ? `${learnerName} is currently at Level ${level} in ${curriculum.strandTitle} — ${curriculum.subStrandTitle} (${trendLabel}), based on evidence specific to this sub-strand.`
+        : `${learnerName} is currently at Level ${level} in ${subject} (${trendLabel}), working within ${curriculum.strandTitle} — ${curriculum.subStrandTitle}.`)
+    : `${learnerName} is currently at Level ${level} in ${subject} (${trendLabel}).`
 
   // A provisional decision must SAY it is provisional. The mandate is that
   // thin evidence changes how confidently we speak, not whether we help —
@@ -449,7 +493,11 @@ export function buildAdaptiveTask(
 
   return {
     observation,
-    evidence:    projection.academic!.supportingEvidenceIds,
+    // Was projection.academic!.supportingEvidenceIds — every subject's
+    // evidence ids, not this subject's. A Mathematics task would cite the
+    // learner's Kiswahili evidence as its support. signal.history is
+    // already scoped to the grain that produced this decision.
+    evidence:    signal.history.map(h => h.evidenceId),
     confidence,
     action,
     learnerId,
