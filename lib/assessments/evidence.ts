@@ -25,8 +25,9 @@ import { computeConfidence, resolveReviewStatus } from '@/lib/intelligence/confi
 import { persistEvidenceBatch } from '@/lib/intelligence/evidenceLifecycle'
 import { classAssessmentResultKey } from '@/lib/intelligence/correctionKey'
 import { mapSubject } from '@/lib/intelligence/subjectMapping'
-import { marksToLevel } from '@/lib/assessments/gradeCalculator'
+import { marksToLevel, type MarksThresholds } from '@/lib/assessments/gradeCalculator'
 import type { AssessmentType } from '@/lib/assessments/types'
+import { resolveTeacherGradeBoundaries } from '@/lib/core/school'
 
 const SOURCE = 'teacher_upload' as const
 const EXTRACTION_METHOD = 'teacher_gradebook_v1'
@@ -112,6 +113,29 @@ export async function recordAssessmentEvidence(
   })
   const reviewStatus = resolveReviewStatus(confidence)
 
+  // Was marksToLevel(...) with NO thresholds argument — always the hardcoded
+  // DEFAULT_MARKS_THRESHOLDS (75/50/30), completely ignoring
+  // school_settings.grade_boundaries. lib/core/assessments.ts's
+  // computeTermSummaries() (the report-card path) already honours the
+  // school's configured boundaries (75/50/25 fallback) via the same
+  // resolveTeacherGradeBoundaries() this reuses — so the exact same raw
+  // score could land on a different CBC level in evidence than it does on
+  // the report card it supposedly backs. A school with AE set to 25 (e.g.
+  // Kangai Junior School) had every 25-29% score in evidence silently
+  // treated as Level 1 (Below) while term summaries correctly called it
+  // Level 2 (Approaching). resolveTeacherGradeBoundaries() already falls
+  // back to {} defensively (a teacher with no resolvable school, or no
+  // settings row yet), which marksToLevel's own default parameter then
+  // covers with 75/50/30 — never a thrown error.
+  const gradeBoundaries = await resolveTeacherGradeBoundaries(teacherId)
+  const thresholds: MarksThresholds | undefined = Object.keys(gradeBoundaries).length
+    ? {
+        level4: gradeBoundaries.EE?.min ?? 75,
+        level3: gradeBoundaries.ME?.min ?? 50,
+        level2: gradeBoundaries.AE?.min ?? 25,
+      }
+    : undefined
+
   const evidenceBatch: LearnerEvidence[] = []
   for (const mark of gradedMarks) {
     const subjectScores = mark.subject_scores as Record<string, number>
@@ -128,7 +152,7 @@ export async function recordAssessmentEvidence(
         subject: canonicalSubject,
         rawSubject,
         score,
-        cbcLevel: marksToLevel(Math.round(percentScore)),
+        cbcLevel: marksToLevel(Math.round(percentScore), thresholds),
         assessmentType,
         academicYear,
         term,
