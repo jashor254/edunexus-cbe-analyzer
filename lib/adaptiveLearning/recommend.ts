@@ -25,6 +25,7 @@
 // for the full rationale (a contradiction found and fixed before freeze).
 
 import { confidenceFromScore, insufficientEvidenceInsight, type Insight } from '@/lib/learnerIntelligence/insight'
+import { mapSubject } from '@/lib/intelligence/subjectMapping'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import type { LearnerIntelligenceProjection, Trend } from '@/lib/projection/types'
 import type { RemedialGroupType } from '@/lib/remedial/types'
@@ -270,14 +271,27 @@ function resolveAcademicSignal(
   const academic = projection.academic?.value
   if (!academic) return null
 
+  // Every academic/risk projector writes bySubject/flags keyed by
+  // mapSubject(rawSubject).canonicalSubject (lib/assessments/evidence.ts,
+  // lib/compass/evidence.ts) — lowercase, not the human-readable subject
+  // name (e.g. "Mathematics") every real caller actually has (assignment.subject
+  // is free-text from app/api/teacher/assignments; class_subjects/subjects.name
+  // is "Mathematics", never "mathematics"). Before this normalization, an
+  // exact-match `bySubject[subject]` lookup here silently missed on the
+  // capitalization mismatch and returned `insufficient_data` for 100% of a
+  // real class regardless of how much confirmed evidence existed — found
+  // live against Kangai Junior School's real Grade 7 Yellow: 29/29 learners
+  // with real Mathematics evidence all reported "no evidence" until this fix.
+  const canonicalSubject = mapSubject(subject).canonicalSubject
+
   if (subStrandId) {
     const subStrand = academic.bySubStrand[subStrandId]
-    if (subStrand && subStrand.subject === subject) {
+    if (subStrand && subStrand.subject === canonicalSubject) {
       return { level: subStrand.latestLevel, trend: subStrand.trend, grain: 'subStrand', history: subStrand.history }
     }
   }
 
-  const bySubject = academic.bySubject[subject]
+  const bySubject = academic.bySubject[canonicalSubject]
   if (!bySubject) return null
   return { level: bySubject.latestLevel, trend: bySubject.trend, grain: 'subject', history: bySubject.history }
 }
@@ -319,7 +333,11 @@ export function decideAdaptive(
 
   const observationCount = signal.history.length
   const evidenceState = evidenceStateFor(observationCount)
-  const subjectFlag = projection.risk?.value.flags.find(f => f.subject === subject) ?? null
+  // Same canonical-subject requirement as resolveAcademicSignal above — risk
+  // flags are also keyed by mapSubject(...).canonicalSubject, not the
+  // human-readable subject name.
+  const canonicalSubject = mapSubject(subject).canonicalSubject
+  const subjectFlag = projection.risk?.value.flags.find(f => f.subject === canonicalSubject) ?? null
   const undamped = rawBand(signal.level, subjectFlag?.severity ?? null)
 
   const grainLabel = signal.grain === 'subStrand' ? 'this sub-strand' : subject
