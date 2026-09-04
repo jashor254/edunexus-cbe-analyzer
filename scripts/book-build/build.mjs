@@ -114,7 +114,7 @@ function renderTitlePage() {
 
 function renderCopyrightPage() {
   const isbnLine = metadata.isbn
-    ? `<p>ISBN: ${metadata.isbn}</p>`
+    ? `<p>ISBN: ${metadata.isbn}${metadata.isbnFormat ? ` (${metadata.isbnFormat})` : ""}</p>`
     : ""; // Rule: never print "[pending]" or any placeholder in the artifact.
 
   return `

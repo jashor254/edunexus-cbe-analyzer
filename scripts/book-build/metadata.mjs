@@ -7,6 +7,11 @@
 // To insert a real ISBN later: set the BOOK_ISBN environment variable when running
 // the build (e.g. `BOOK_ISBN=978-...  npm run book:pdf`). Leave it unset to omit the
 // ISBN line entirely — never hardcode a placeholder value here.
+//
+// BOOK_ISBN_FORMAT is an optional qualifier appended in parentheses, e.g.
+// `BOOK_ISBN_FORMAT="E-book"` renders "ISBN: 978-... (E-book)" — used to match
+// a specific binding/format when an ISBN is registered per-format (KNLS requires
+// this for the e-book-only release).
 
 export const metadata = {
   title: "Engineering Educational Intelligence",
@@ -18,4 +23,5 @@ export const metadata = {
   website: "edunexus.co.ke",
   contactEmail: "hello@edunexus.co.ke",
   isbn: process.env.BOOK_ISBN?.trim() || null,
+  isbnFormat: process.env.BOOK_ISBN_FORMAT?.trim() || null,
 };
