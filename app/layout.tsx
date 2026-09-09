@@ -10,17 +10,18 @@ import './globals.css'
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://edunexus.co.ke'),
   title: {
-    default: 'EduNexus | Mwongozo wa CBC na Mustakabali wa Taaluma',
+    default: 'EduNexus | Jukwaa la Akili ya Elimu na Mustakabali wa Taaluma',
     template: '%s | EduNexus Kenya'
   },
-  description: 'Gundua uwezo wa mtoto wako kwa CBC. Tunakusaidia kuchagua njia sahihi ya masomo, kuona mustakabali wa taaluma, na kufanya maamuzi ya kitaalamu kwa ujasiri.',
+  description: 'Gundua uwezo wa mtoto wako kwa CBC, 8-4-4 au IGCSE. Tunakusaidia kuchagua njia sahihi ya masomo, kuona mustakabali wa taaluma, na kufanya maamuzi ya kitaalamu kwa ujasiri.',
   keywords: [
     'CBC Kenya',
-    'mwongozo wa CBC',
+    'jukwaa la elimu Kenya',
     'uchambuzi wa masomo',
     'pathway analysis',
     'STEM Kenya',
     'elimu ya CBC',
+    '8-4-4 na IGCSE',
     'mbinu za kusoma',
     'maamuzi ya taaluma',
     'EduNexus',
@@ -37,8 +38,8 @@ export const metadata: Metadata = {
   
   // ✅ Open Graph - Inaonekana kwenye WhatsApp, Facebook
   openGraph: {
-    title: 'EduNexus | Mwongozo wa CBC na Mustakabali wa Taaluma',
-    description: 'Tunaonyesha wazazi na wanafunzi njia sahihi ya CBC - kutoka chaguo la masomo hadi mustakabali wa kazi.',
+    title: 'EduNexus | Jukwaa la Akili ya Elimu na Mustakabali wa Taaluma',
+    description: 'Tunaonyesha wazazi na wanafunzi njia sahihi ya masomo - kutoka CBC, 8-4-4 hadi IGCSE - hadi mustakabali wa kazi.',
     url: 'https://edunexus.co.ke',
     siteName: 'EduNexus Kenya',
     images: [
@@ -46,18 +47,18 @@ export const metadata: Metadata = {
         url: 'https://edunexus.co.ke/og-image.jpg',
         width: 1200,
         height: 630,
-        alt: 'EduNexus - Mwongozo wa CBC Kenya',
+        alt: 'EduNexus - Jukwaa la Elimu Kenya',
       },
     ],
     locale: 'en_KE',
     type: 'website',
   },
 
-  // ✅ Twitter Card
+  // ✅ Twitter Card (English — international audience)
   twitter: {
     card: 'summary_large_image',
-    title: 'EduNexus | Mwongozo wa CBC',
-    description: 'Gundua uwezo wa mtoto wako na uchague njia sahihi ya masomo.',
+    title: 'EduNexus | Education Intelligence Platform',
+    description: "Beyond the classroom: engaging schools, teachers, parents, and learners around one shared, evidence-based picture of a child's growth — from Kenya's CBC, 8-4-4, and IGCSE curricula to real career pathways.",
     images: ['https://edunexus.co.ke/og-image.jpg'],
     creator: '@edunexus',
   },
