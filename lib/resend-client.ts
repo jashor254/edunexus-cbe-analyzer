@@ -17,3 +17,10 @@ export const EMAIL_FROM_DEV = 'EduNexus <onboarding@resend.dev>';
 export const getEmailFrom = () => {
   return process.env.NODE_ENV === 'production' ? EMAIL_FROM : EMAIL_FROM_DEV;
 };
+
+// hello@edunexus.co.ke has no inbox behind it (Resend only sends — the
+// domain's MX records don't point at a real mailbox), so replies to any
+// outbound email would otherwise vanish. Route them to a monitored inbox
+// until a real hello@ mailbox exists (e.g. Google Workspace/Zoho on the
+// domain).
+export const EMAIL_REPLY_TO = 'kariukidennis092@gmail.com';
