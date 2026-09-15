@@ -124,7 +124,9 @@ function buildLessonPlanPrompt(ctx: LessonPlanContext): string {
     ? pickTopicCounties(ctx.strand, ctx.learningArea)
     : ['', '', '']
 
-  const languageInstruction = isKiswahiliSubject(ctx.learningArea)
+  const isKiswahili = isKiswahiliSubject(ctx.learningArea)
+
+  const languageInstruction = isKiswahili
     ? `
 LUGHA YA MAUDHUI:
 Andika maudhui YOTE ya mpango huu wa somo kwa KISWAHILI SANIFU.
@@ -134,6 +136,120 @@ Tumia Kiswahili fasaha na sahihi kinachofaa kwa wanafunzi wa CBC Kenya.
 Hata maneno ya kitaalamu yaandikwe kwa Kiswahili katika somo hili.
 `
     : `Write all lesson plan content in English.`
+
+  // Same content-shaping bug class the SOW generator had: a top-level
+  // language instruction was previously followed by an unconditionally
+  // English learner-centered rule block, JSON template (the actual
+  // instruction the model follows to fill each field), extended-activities
+  // verb list, and a reflection field the model was told to output
+  // VERBATIM in English regardless of language. Kiswahili lesson plans
+  // therefore got correct Kiswahili headers around English-generated body
+  // content. Each block below now has a real Kiswahili counterpart, not a
+  // translated label — the model is shown Kiswahili examples/instructions
+  // to actually generate from, matching the SOW generator's fix.
+  const learnerCenteredRule = isKiswahili
+    ? `
+KANUNI YA MWANAFUNZI KATIKA KITOVU — SOMA HII KWANZA, INATUMIKA KWA KILA SEHEMU:
+CBC ni MWANAFUNZI KATIKA KITOVU. Wanafunzi DAIMA ndio kiini cha kila sentensi.
+Mwalimu ANAONGOZA, ANAELEKEZA, au ANAWEZESHA tu — kamwe si mtendaji mkuu.
+
+Maneno YALIYOKATAZWA (usiyatumie kama kiini cha sentensi):
+  ✗ "Mwalimu anasoma..."
+  ✗ "Mwalimu anaonyesha..."
+  ✗ "Mwalimu anagawanya..."
+  ✗ "Mwalimu anaeleza..."
+  ✗ "Mwalimu anaandika..."
+  ✗ "Mwalimu anauliza..."
+
+Mfumo SAHIHI — wanafunzi wanatenda, mwalimu anasaidia:
+  ✓ "Wanafunzi wanasoma uchunguzi kifani uliochapishwa kwa jozi na kutambua vichocheo vikuu."
+  ✓ "Wanafunzi wanashiriki matokeo yao huku mwalimu akiandika mambo muhimu ubaoni."
+  ✓ "Wanafunzi wanafanya kazi kupitia tatizo la mfano na kueleza kila hatua kwa sauti."
+  ✓ "Wanafunzi wanajadili kwa vikundi kisha wanawasilisha kichocheo kimoja kwa darasa."
+  ✓ "Wanafunzi wanajibu swali: 'Umewahi kuona mgogoro wa ardhi?'"
+`
+    : `
+LEARNER-CENTERED RULE — READ THIS FIRST, APPLIES TO EVERY FIELD:
+CBC is LEARNER-CENTERED. Learners are ALWAYS the subject of every sentence.
+The teacher ONLY guides, prompts, or facilitates — never the main actor.
+
+BANNED phrases (never use these as a sentence subject):
+  ✗ "The teacher reads..."
+  ✗ "The teacher demonstrates..."
+  ✗ "The teacher distributes..."
+  ✗ "The teacher explains..."
+  ✗ "The teacher writes..."
+  ✗ "The teacher asks..."
+
+CORRECT pattern — learners act, teacher supports:
+  ✓ "Learners read a printed case study in pairs and identify key triggers."
+  ✓ "Learners share their findings as the teacher records key points on the board."
+  ✓ "Learners work through a sample problem and explain each step aloud."
+  ✓ "Learners discuss in groups then present one trigger to the class."
+  ✓ "Learners respond to the prompt: 'Have you ever seen a land dispute?'"
+`
+
+  const jsonTemplate = isKiswahili
+    ? `Tengeneza SEHEMU HIZI PEKEE kama JSON:
+{
+  "organisationOfLearning": "${location} — [kidokezo kifupi cha upangaji: jozi, vikundi vya 4, darasa zima]",
+  "introduction": "Dakika 5 za utangulizi. Wanafunzi wanajibu swali la ufunguzi linalohusiana na maarifa ya awali, kisha wanatabiri au kushiriki mawazo kuhusu mada mpya. Mwalimu anauliza swali na kuongoza tu — wanafunzi wanazungumza na kutenda.",
+  "step1": "Dakika 10. Wanafunzi wanafanya shughuli ya SOW: '${experiences[0] || ''}'. Andika TU kile WANAFUNZI wanachofanya. Dumisha aina ile ile ya shughuli na muktadha wa Kikenya. Nafasi ya mwalimu: kuuliza maswali tu.",
+  "step2": "Dakika 10. Wanafunzi wanafanya shughuli ya SOW: '${experiences[1] || ''}'. Andika TU kile WANAFUNZI wanachofanya. Dumisha aina ile ile ya shughuli na muktadha wa Kikenya. Nafasi ya mwalimu: kuzunguka na kuongoza tu.",
+  "step3": "Dakika 10. Wanafunzi wanafanya shughuli ya SOW: '${experiences[2] || ''}'. Andika TU kile WANAFUNZI wanachofanya. Dumisha aina ile ile ya shughuli na muktadha wa Kikenya. Nafasi ya mwalimu: kuwezesha mgawanyo wa mawazo tu.",
+  "conclusion": "Dakika 5. Wanafunzi wanafupisha mambo muhimu ya somo. Wanafunzi wanajibu maswali 1-2 ya haraka ya mdomo kupima uelewa. Mwalimu anatoa muhtasari wa somo lijalo.",
+  "extendedActivities": "Vipengele VITATU HASA. Kila kipengele ni shughuli moja huru ambayo mwanafunzi anaweza kufanya nyumbani peke yake. Anza kila kimoja na kitenzi: Chora, Andika, Hoji, Tafiti, Angalia, Buni, Uliza, Tafuta. Kamwe usitumie orodha za nambari. Kamwe usiandike kama aya. Umbo: '- [kitenzi] [shughuli]\\n- [kitenzi] [shughuli]\\n- [kitenzi] [shughuli]'",
+  "reflection": "Je, wanafunzi waliweza ${outcomes[0] || '[matokeo a]'}? Je, wanafunzi waliweza ${outcomes[1] || '[matokeo b]'}? Je, wanafunzi waliweza ${outcomes[2] || '[matokeo c]'}? Kama sivyo, utawasaidiaje katika somo lijalo?"
+}
+
+KANUNI ZA ZIADA:
+- Hatua 1, 2, 3 LAZIMA zitumie aina ile ile ya shughuli kutoka kwenye uzoefu wa SOW hapo juu — usibadilishe wala kubuni mpya
+- Sehemu ya tafakuri lazima itolewe kama ilivyo maswali elekezi yaliyoonyeshwa hapo juu — usiiandike upya
+- Rudisha JSON sahihi pekee, hakuna markdown`
+    : `Generate ONLY these sections as JSON:
+{
+  "organisationOfLearning": "${location} — [brief note on grouping: pairs, groups of 4, whole class]",
+  "introduction": "5-minute set induction. Learners respond to an opening question linked to prior learning, then predict or share ideas about the new topic. The teacher only poses the question and guides — learners speak and act.",
+  "step1": "10 minutes. Learners carry out the SOW activity: '${experiences[0] || ''}'. Write ONLY what LEARNERS do. Keep the same activity type and Kenyan context. Teacher role: prompt questions only.",
+  "step2": "10 minutes. Learners carry out the SOW activity: '${experiences[1] || ''}'. Write ONLY what LEARNERS do. Keep the same activity type and Kenyan context. Teacher role: circulate and guide only.",
+  "step3": "10 minutes. Learners carry out the SOW activity: '${experiences[2] || ''}'. Write ONLY what LEARNERS do. Keep the same activity type and Kenyan context. Teacher role: facilitate sharing only.",
+  "conclusion": "5 minutes. Learners summarize the key lesson points. Learners answer 1-2 quick oral questions to check understanding. Teacher previews the next lesson.",
+  "extendedActivities": "EXACTLY 3 bullet points. Each bullet is one standalone activity a learner can do at home independently. Start each with a verb: Draw, Write, Interview, Research, Observe, Create, Ask, Find. Never use numbered lists. Never write as a paragraph. Format as: '- [verb] [activity]\\n- [verb] [activity]\\n- [verb] [activity]'",
+  "reflection": "Were learners able to ${outcomes[0] || '[outcome a]'}? Were learners able to ${outcomes[1] || '[outcome b]'}? Were learners able to ${outcomes[2] || '[outcome c]'}? If not, how will you assist them in the next lesson?"
+}
+
+ADDITIONAL RULES:
+- Steps 1, 2, 3 MUST use the same activity type from the SOW experiences above — do not substitute or invent new ones
+- The reflection field must be output exactly as the guiding questions shown above — do not rewrite it
+- Return ONLY valid JSON, no markdown`
+
+  const contextSection = placeBased
+    ? (isKiswahili
+      ? `MUKTADHA WA KIKENYA — LAZIMA:
+Kila hatua imepangiwa mahali MAHUSUSI TOFAUTI nchini Kenya. Tumia HIZI PEKEE — hakuna kubadilisha, hakuna nyongeza, hakuna kurudia:
+- step1: "${county1}"
+- step2: "${county2}"
+- step3: "${county3}"
+Taja kaunti, miji, mito, misitu, au alama ambazo mwanafunzi wa Kenya angezitambua.
+Linganisha mahali na mada — mada za ukame zitumie kaunti za ASAL (Kitui, Marsabit, Garissa), mada za mafuriko zitumie Kenya ya magharibi (Budalang'i, Kisumu, Homa Bay), mada za kilimo zitumie nyanda za juu (Nyeri, Uasin Gishu, Trans Nzoia).
+Kamwe usitaje "jamii" au "kaunti ya Kenya" kwa ujumla — tumia jina lililopangiwa hapo juu daima.
+USITAJE mahali pengine popote pa Kenya katika hatua yoyote. Kila hatua inatumia mahali pamoja pekee: lililopangiwa hapo juu.`
+      : `KENYAN CONTEXT — MANDATORY:
+Each step is pre-assigned a DIFFERENT specific Kenyan location. Use ONLY these — no swaps, no extras, no repeats:
+- step1: "${county1}"
+- step2: "${county2}"
+- step3: "${county3}"
+Reference counties, towns, rivers, forests, or landmarks a Kenyan learner would recognize.
+Match the place to the topic — drought topics use ASAL counties (Kitui, Marsabit, Garissa), flood topics use western Kenya (Budalang'i, Kisumu, Homa Bay), farming topics use highlands (Nyeri, Uasin Gishu, Trans Nzoia).
+Never use generic "a community" or "a county in Kenya" — always use the assigned name above.
+Do NOT mention any other Kenyan location in any step. Each step uses exactly one location: the one assigned above.`)
+    : (isKiswahili
+      ? `MWONGOZO WA MUKTADHA:
+${getSubjectContextHint(ctx.learningArea)}
+Usilazimishe majina ya mahali au marejeleo ya kaunti katika somo hili — tumia mifano ya ulimwengu halisi inayohusiana na somo badala yake.`
+      : `CONTEXT GUIDANCE:
+${getSubjectContextHint(ctx.learningArea)}
+Do NOT force place names or county references into this subject — use subject-relevant real-world examples instead.`)
 
   return `
 You are an experienced Kenyan CBC teacher writing a lesson plan for a TSC inspection.
@@ -165,53 +281,11 @@ Step 3 activity: ${experiences[2] || ''}
 
 LEARNING RESOURCES: ${resources.join(', ')}
 
-LEARNER-CENTERED RULE — READ THIS FIRST, APPLIES TO EVERY FIELD:
-CBC is LEARNER-CENTERED. Learners are ALWAYS the subject of every sentence.
-The teacher ONLY guides, prompts, or facilitates — never the main actor.
+${learnerCenteredRule}
 
-BANNED phrases (never use these as a sentence subject):
-  ✗ "The teacher reads..."
-  ✗ "The teacher demonstrates..."
-  ✗ "The teacher distributes..."
-  ✗ "The teacher explains..."
-  ✗ "The teacher writes..."
-  ✗ "The teacher asks..."
+${jsonTemplate}
 
-CORRECT pattern — learners act, teacher supports:
-  ✓ "Learners read a printed case study in pairs and identify key triggers."
-  ✓ "Learners share their findings as the teacher records key points on the board."
-  ✓ "Learners work through a sample problem and explain each step aloud."
-  ✓ "Learners discuss in groups then present one trigger to the class."
-  ✓ "Learners respond to the prompt: 'Have you ever seen a land dispute?'"
-
-Generate ONLY these sections as JSON:
-{
-  "organisationOfLearning": "${location} — [brief note on grouping: pairs, groups of 4, whole class]",
-  "introduction": "5-minute set induction. Learners respond to an opening question linked to prior learning, then predict or share ideas about the new topic. The teacher only poses the question and guides — learners speak and act.",
-  "step1": "10 minutes. Learners carry out the SOW activity: '${experiences[0] || ''}'. Write ONLY what LEARNERS do. Keep the same activity type and Kenyan context. Teacher role: prompt questions only.",
-  "step2": "10 minutes. Learners carry out the SOW activity: '${experiences[1] || ''}'. Write ONLY what LEARNERS do. Keep the same activity type and Kenyan context. Teacher role: circulate and guide only.",
-  "step3": "10 minutes. Learners carry out the SOW activity: '${experiences[2] || ''}'. Write ONLY what LEARNERS do. Keep the same activity type and Kenyan context. Teacher role: facilitate sharing only.",
-  "conclusion": "5 minutes. Learners summarize the key lesson points. Learners answer 1-2 quick oral questions to check understanding. Teacher previews the next lesson.",
-  "extendedActivities": "EXACTLY 3 bullet points. Each bullet is one standalone activity a learner can do at home independently. Start each with a verb: Draw, Write, Interview, Research, Observe, Create, Ask, Find. Never use numbered lists. Never write as a paragraph. Format as: '- [verb] [activity]\\n- [verb] [activity]\\n- [verb] [activity]'",
-  "reflection": "Were learners able to ${outcomes[0] || '[outcome a]'}? Were learners able to ${outcomes[1] || '[outcome b]'}? Were learners able to ${outcomes[2] || '[outcome c]'}? If not, how will you assist them in the next lesson?"
-}
-
-ADDITIONAL RULES:
-- Steps 1, 2, 3 MUST use the same activity type from the SOW experiences above — do not substitute or invent new ones
-- The reflection field must be output exactly as the guiding questions shown above — do not rewrite it
-- Return ONLY valid JSON, no markdown
-
-${placeBased ? `KENYAN CONTEXT — MANDATORY:
-Each step is pre-assigned a DIFFERENT specific Kenyan location. Use ONLY these — no swaps, no extras, no repeats:
-- step1: "${county1}"
-- step2: "${county2}"
-- step3: "${county3}"
-Reference counties, towns, rivers, forests, or landmarks a Kenyan learner would recognize.
-Match the place to the topic — drought topics use ASAL counties (Kitui, Marsabit, Garissa), flood topics use western Kenya (Budalang'i, Kisumu, Homa Bay), farming topics use highlands (Nyeri, Uasin Gishu, Trans Nzoia).
-Never use generic "a community" or "a county in Kenya" — always use the assigned name above.
-Do NOT mention any other Kenyan location in any step. Each step uses exactly one location: the one assigned above.` : `CONTEXT GUIDANCE:
-${getSubjectContextHint(ctx.learningArea)}
-Do NOT force place names or county references into this subject — use subject-relevant real-world examples instead.`}
+${contextSection}
 `
 }
 
@@ -247,7 +321,9 @@ export async function generateLessonPlan(
       parsed.conclusion &&
       parsed.extendedActivities
     ) {
-      const reflectionFallback = `Were learners able to ${ctx.learningOutcomes[0] || '[outcome a]'}? Were learners able to ${ctx.learningOutcomes[1] || '[outcome b]'}? Were learners able to ${ctx.learningOutcomes[2] || '[outcome c]'}? If not, how will you assist them in the next lesson?`
+      const reflectionFallback = isKiswahiliSubject(ctx.learningArea)
+        ? `Je, wanafunzi waliweza ${ctx.learningOutcomes[0] || '[matokeo a]'}? Je, wanafunzi waliweza ${ctx.learningOutcomes[1] || '[matokeo b]'}? Je, wanafunzi waliweza ${ctx.learningOutcomes[2] || '[matokeo c]'}? Kama sivyo, utawasaidiaje katika somo lijalo?`
+        : `Were learners able to ${ctx.learningOutcomes[0] || '[outcome a]'}? Were learners able to ${ctx.learningOutcomes[1] || '[outcome b]'}? Were learners able to ${ctx.learningOutcomes[2] || '[outcome c]'}? If not, how will you assist them in the next lesson?`
       const reflection = typeof parsed.reflection === 'string' && parsed.reflection.trim()
         ? parsed.reflection
         : reflectionFallback

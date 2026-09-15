@@ -5,6 +5,7 @@ import { esc } from '@/lib/pdf/utils'
 
 import { toTitleCase } from '@/lib/utils/formatters'
 import type { CurriculumMode } from '@/lib/sow/types'
+import { isKiswahiliSubject } from '@/lib/curriculum/subjectUtils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,21 +40,47 @@ function fmtDate(raw: string | null | undefined): string {
   return d.toLocaleDateString('en-KE', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-function fmtTerm(term: number | string): string {
+function fmtTerm(term: number | string, isKiswahili: boolean): string {
   const s = String(term)
+  if (isKiswahili) {
+    const n = s.replace(/\D/g, '')
+    return n ? `Muhula wa ${n}` : s
+  }
   return s.toLowerCase().startsWith('term') ? s : `Term ${s}`
 }
 
 // ─── HTML builder ─────────────────────────────────────────────────────────────
 
 function buildPage(row: RecordOfWork): string {
+  const sw          = isKiswahiliSubject(row.learning_area)
   const school      = toTitleCase(row.school)
   const teacherName = toTitleCase(row.teacher_name)
-  const term        = fmtTerm(row.term)
+  const term        = fmtTerm(row.term, sw)
   const is844       = row.curriculumMode === '844_form3' || row.curriculumMode === '844_form4'
 
   const done  = row.entries.filter(e => e.work_done?.trim()).length
   const total = row.entries.length
+
+  // TSC-standard Kiswahili terms, not literal translations — same
+  // convention as getColumnConfig (lib/sow/pdfRenderer.ts) and the lesson
+  // plan renderer (lib/lessonPlan/pdfRenderer.ts).
+  const labels = sw
+    ? {
+        title: 'REKODI YA KAZI ILIYOFUNZWA',
+        school: 'Shule:', subject: 'Somo:', gradeForm: is844 ? 'Kidato:' : 'Gredi:',
+        teacher: 'Mwalimu:', term: 'Muhula:', year: 'Mwaka:',
+        date: 'Tarehe', strand: is844 ? 'Mada' : 'Mada Kuu', subStrand: is844 ? 'Mada Ndogo' : 'Mada Ndogo',
+        workDone: 'Kazi Iliyofanywa', reflection: 'Maoni', signature: 'Sahihi',
+        status: (d: number, t: number) => `Rekodi inaendelea masomo yanapofunzwa — masomo ${d} kati ya ${t} yameandikwa`,
+      }
+    : {
+        title: 'RECORD OF WORK COVERED',
+        school: 'School:', subject: 'Subject:', gradeForm: is844 ? 'Form:' : 'Grade:',
+        teacher: 'Teacher:', term: 'Term:', year: 'Year:',
+        date: 'Date', strand: is844 ? 'Topic' : 'Strand', subStrand: is844 ? 'Sub-Topic' : 'Sub-Strand',
+        workDone: 'Work Done', reflection: 'Reflection', signature: 'Signature',
+        status: (d: number, t: number) => `Record continues as lessons are completed — ${d} of ${t} lessons recorded`,
+      }
 
   const bodyRows = row.entries.map((e, i) => `
     <tr class="${i % 2 === 1 ? 'alt' : ''}">
@@ -68,19 +95,19 @@ function buildPage(row: RecordOfWork): string {
 
   return `
   <div class="header-block">
-    <div class="doc-title">RECORD OF WORK COVERED</div>
+    <div class="doc-title">${labels.title}</div>
     <table class="meta-table">
       <tr>
-        <td class="ml">School:</td>   <td class="mv">${esc(school)}</td>
-        <td class="ml">Subject:</td>  <td class="mv">${esc(row.learning_area)}</td>
+        <td class="ml">${labels.school}</td>   <td class="mv">${esc(school)}</td>
+        <td class="ml">${labels.subject}</td>  <td class="mv">${esc(row.learning_area)}</td>
       </tr>
       <tr>
-        <td class="ml">${is844 ? 'Form:' : 'Grade:'}</td> <td class="mv">${esc(row.grade)}</td>
-        <td class="ml">Teacher:</td>  <td class="mv">${esc(teacherName)}</td>
+        <td class="ml">${labels.gradeForm}</td> <td class="mv">${esc(row.grade)}</td>
+        <td class="ml">${labels.teacher}</td>  <td class="mv">${esc(teacherName)}</td>
       </tr>
       <tr>
-        <td class="ml">Term:</td>     <td class="mv">${esc(term)}</td>
-        <td class="ml">Year:</td>     <td class="mv">${esc(row.year)}</td>
+        <td class="ml">${labels.term}</td>     <td class="mv">${esc(term)}</td>
+        <td class="ml">${labels.year}</td>     <td class="mv">${esc(row.year)}</td>
       </tr>
     </table>
   </div>
@@ -88,19 +115,19 @@ function buildPage(row: RecordOfWork): string {
   <table class="row-table">
     <thead>
       <tr>
-        <th class="col-date">Date</th>
-        <th class="col-strand">${is844 ? 'Topic' : 'Strand'}</th>
-        <th class="col-sub">${is844 ? 'Sub-Topic' : 'Sub-Strand'}</th>
-        <th class="col-work">Work Done</th>
-        <th class="col-ref">Reflection</th>
-        <th class="col-sig">Signature</th>
+        <th class="col-date">${labels.date}</th>
+        <th class="col-strand">${labels.strand}</th>
+        <th class="col-sub">${labels.subStrand}</th>
+        <th class="col-work">${labels.workDone}</th>
+        <th class="col-ref">${labels.reflection}</th>
+        <th class="col-sig">${labels.signature}</th>
       </tr>
     </thead>
     <tbody>${bodyRows}</tbody>
   </table>
 
   <div class="row-status">
-    Record continues as lessons are completed — ${done} of ${total} lessons recorded
+    ${labels.status(done, total)}
   </div>
 
   <div class="footer">EduNexus · For Kenyan Teachers</div>`

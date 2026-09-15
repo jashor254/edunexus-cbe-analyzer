@@ -39,14 +39,26 @@ function validateLearningOutcomes(
   return { valid: true }
 }
 
-function validateLearningExperiences(experiences: string[] = []): { valid: boolean; reason?: string } {
+// English content is the default; a Kiswahili learning area (subjectType
+// starting 'kiswahili', or the senior/KCSE variants) switches to a parallel
+// Swahili keyword set instead of stacking languages — correctly-written
+// Swahili content contains none of the English words and was always failing
+// this check.
+function isKiswahiliSubjectType(subjectType: string): boolean {
+  return subjectType.startsWith('kiswahili')
+}
+
+function validateLearningExperiences(
+  experiences: string[] = [],
+  subjectType = 'default',
+): { valid: boolean; reason?: string } {
   if (!Array.isArray(experiences) || experiences.length === 0) {
     return { valid: false, reason: 'Learning experiences missing' }
   }
 
-  const learnerKeywords = [
-    'learner', 'student', 'group', 'discuss', 'perform', 'participate', 'work',
-  ]
+  const learnerKeywords = isKiswahiliSubjectType(subjectType)
+    ? ['mwanafunzi', 'wanafunzi', 'kundi', 'jadili', 'jadiliana', 'fanya', 'shirikiana', 'onyesha', 'soma', 'andika', 'sikiliza', 'imba', 'cheza']
+    : ['learner', 'student', 'group', 'discuss', 'perform', 'participate', 'work']
 
   const combined = experiences.join(' ').toLowerCase()
 
@@ -57,18 +69,25 @@ function validateLearningExperiences(experiences: string[] = []): { valid: boole
   return { valid: true }
 }
 
-function validateInquiryQuestions(questions: string[] = []): { valid: boolean; reason?: string } {
+function validateInquiryQuestions(
+  questions: string[] = [],
+  subjectType = 'default',
+): { valid: boolean; reason?: string } {
   if (!Array.isArray(questions) || questions.length === 0) {
     return { valid: false, reason: 'Inquiry questions missing' }
   }
 
   const combined = questions.join(' ').toLowerCase()
 
+  // Universal across languages: a question is a question if it's punctuated
+  // as one.
   if (!combined.includes('?')) {
     return { valid: false, reason: 'Inquiry questions must be in question form' }
   }
 
-  const higherOrderStarters = ['how', 'why', 'in what ways', 'to what extent']
+  const higherOrderStarters = isKiswahiliSubjectType(subjectType)
+    ? ['vipi', 'kwa nini', 'kwa njia gani', 'kwa kiwango gani', 'ni nini', 'ni kwa nini', 'eleza', 'je']
+    : ['how', 'why', 'in what ways', 'to what extent']
 
   if (!higherOrderStarters.some(q => combined.includes(q))) {
     return { valid: false, reason: 'Inquiry questions lack higher-order thinking' }
@@ -182,8 +201,8 @@ export function validateLesson(
   const verbOrder = VERB_ORDERS[subjectType] ?? VERB_ORDERS.default
   const checks = [
     validateLearningOutcomes(lesson.learning_outcomes as string[], verbOrder, subjectType),
-    validateLearningExperiences(lesson.learning_experiences as string[]),
-    validateInquiryQuestions(lesson.key_inquiry_questions as string[]),
+    validateLearningExperiences(lesson.learning_experiences as string[], subjectType),
+    validateInquiryQuestions(lesson.key_inquiry_questions as string[], subjectType),
     validateAssessmentMethods(lesson.assessment_methods as string[]),
     validateLearningResources(lesson.learning_resources as string[]),
     validateSubstrandAlignment(lesson, substrandTitle),

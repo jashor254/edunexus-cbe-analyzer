@@ -6,6 +6,7 @@ import {
   ChevronLeft, Loader2, Download, CheckCircle2,
   ClipboardList, Sparkles, AlertTriangle, Check,
 } from 'lucide-react'
+import { isKiswahiliSubject } from '@/lib/curriculum/subjectUtils'
 
 interface ROWEntry {
   id:                  string
@@ -97,6 +98,7 @@ export default function RecordOfWorkEditorPage({ params }: { params: Promise<{ i
   const done  = entries.filter(e => e.reflection?.trim()).length
   const total = entries.length
   const pct   = total > 0 ? Math.round((done / total) * 100) : 0
+  const sw    = isKiswahiliSubject(row.learning_area)
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -177,12 +179,12 @@ export default function RecordOfWorkEditorPage({ params }: { params: Promise<{ i
             {/* Meta header */}
             <div className="px-5 py-4 border-b border-slate-100 bg-slate-50">
               <div className="grid grid-cols-3 gap-x-8 gap-y-1 text-sm">
-                <div><span className="font-semibold text-slate-500">School:</span> <span className="text-slate-800">{row.school}</span></div>
-                <div><span className="font-semibold text-slate-500">Subject:</span> <span className="text-slate-800">{row.learning_area}</span></div>
-                <div><span className="font-semibold text-slate-500">Grade:</span> <span className="text-slate-800">{row.grade}</span></div>
-                <div><span className="font-semibold text-slate-500">Teacher:</span> <span className="text-slate-800">{row.teacher_name || '—'}</span></div>
-                <div><span className="font-semibold text-slate-500">Term:</span> <span className="text-slate-800">{row.term}</span></div>
-                <div><span className="font-semibold text-slate-500">Year:</span> <span className="text-slate-800">{row.year}</span></div>
+                <div><span className="font-semibold text-slate-500">{sw ? 'Shule:' : 'School:'}</span> <span className="text-slate-800">{row.school}</span></div>
+                <div><span className="font-semibold text-slate-500">{sw ? 'Somo:' : 'Subject:'}</span> <span className="text-slate-800">{row.learning_area}</span></div>
+                <div><span className="font-semibold text-slate-500">{sw ? 'Gredi:' : 'Grade:'}</span> <span className="text-slate-800">{row.grade}</span></div>
+                <div><span className="font-semibold text-slate-500">{sw ? 'Mwalimu:' : 'Teacher:'}</span> <span className="text-slate-800">{row.teacher_name || '—'}</span></div>
+                <div><span className="font-semibold text-slate-500">{sw ? 'Muhula:' : 'Term:'}</span> <span className="text-slate-800">{row.term}</span></div>
+                <div><span className="font-semibold text-slate-500">{sw ? 'Mwaka:' : 'Year:'}</span> <span className="text-slate-800">{row.year}</span></div>
               </div>
             </div>
 
@@ -191,11 +193,11 @@ export default function RecordOfWorkEditorPage({ params }: { params: Promise<{ i
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="bg-[#1e293b] text-white">
-                    <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wide border-r border-slate-600 w-27.5">Date</th>
-                    <th className="px-3 py-3 text-center text-xs font-bold uppercase tracking-wide border-r border-slate-600 w-20">Wk / Lesson</th>
-                    <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wide border-r border-slate-600">Work Done</th>
-                    <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wide border-r border-slate-600 w-50">Reflection</th>
-                    <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wide w-22.5">Signature</th>
+                    <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wide border-r border-slate-600 w-27.5">{sw ? 'Tarehe' : 'Date'}</th>
+                    <th className="px-3 py-3 text-center text-xs font-bold uppercase tracking-wide border-r border-slate-600 w-20">{sw ? 'Wiki / Somo' : 'Wk / Lesson'}</th>
+                    <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wide border-r border-slate-600">{sw ? 'Kazi Iliyofanywa' : 'Work Done'}</th>
+                    <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wide border-r border-slate-600 w-50">{sw ? 'Maoni' : 'Reflection'}</th>
+                    <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wide w-22.5">{sw ? 'Sahihi' : 'Signature'}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -229,7 +231,7 @@ export default function RecordOfWorkEditorPage({ params }: { params: Promise<{ i
                         <td className="px-3 py-3 border-r border-slate-100 align-top">
                           <div className="text-xs space-y-1.5">
                             <div>
-                              <div className="font-semibold text-slate-400 text-[10px] uppercase mb-0.5">Strand</div>
+                              <div className="font-semibold text-slate-400 text-[10px] uppercase mb-0.5">{sw ? 'Mada Kuu' : 'Strand'}</div>
                               <div
                                 contentEditable
                                 suppressContentEditableWarning
@@ -244,7 +246,7 @@ export default function RecordOfWorkEditorPage({ params }: { params: Promise<{ i
                               >{entry.strand || ''}</div>
                             </div>
                             <div>
-                              <div className="font-semibold text-slate-400 text-[10px] uppercase mb-0.5">Sub-Strand</div>
+                              <div className="font-semibold text-slate-400 text-[10px] uppercase mb-0.5">{sw ? 'Mada Ndogo' : 'Sub-Strand'}</div>
                               <div
                                 contentEditable
                                 suppressContentEditableWarning
@@ -268,7 +270,7 @@ export default function RecordOfWorkEditorPage({ params }: { params: Promise<{ i
                               rows={3}
                               defaultValue={entry.reflection}
                               onBlur={e => updateReflection(entry.id, e.target.value)}
-                              placeholder="Add reflection…"
+                              placeholder={sw ? 'Ongeza maoni…' : 'Add reflection…'}
                               className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-2 resize-none focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-100 bg-white transition leading-relaxed"
                             />
                             <div className="absolute top-2 right-2">
@@ -293,14 +295,14 @@ export default function RecordOfWorkEditorPage({ params }: { params: Promise<{ i
             {/* Footer */}
             <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
               <span className="text-xs text-gray-400">
-                Auto-saved · {total} lessons total · Only Reflection is editable
+                {sw ? `Imehifadhiwa kiotomatiki · masomo ${total} kwa jumla · Maoni pekee ndiyo yanayoweza kuhaririwa` : `Auto-saved · ${total} lessons total · Only Reflection is editable`}
               </span>
               <div className="flex items-center gap-4 text-xs">
                 <span className="flex items-center gap-1.5 text-teal-600 font-bold">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> {done} with reflection
+                  <CheckCircle2 className="w-3.5 h-3.5" /> {done} {sw ? 'yenye maoni' : 'with reflection'}
                 </span>
                 <span className="flex items-center gap-1.5 text-slate-400 font-medium">
-                  <div className="w-3 h-3 rounded-full border-2 border-slate-300" /> {total - done} pending
+                  <div className="w-3 h-3 rounded-full border-2 border-slate-300" /> {total - done} {sw ? 'bado' : 'pending'}
                 </span>
               </div>
             </div>
@@ -318,18 +320,40 @@ function toTitleCase(s: string): string {
   return s.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
 }
 
-function fmtTerm(term: string): string {
+function fmtTerm(term: string, isKiswahili: boolean): string {
+  if (isKiswahili) {
+    const n = term.replace(/\D/g, '')
+    return n ? `Muhula wa ${n}` : term
+  }
   return term.toLowerCase().startsWith('term') ? term : `Term ${term}`
 }
 
 // ─── Print HTML ───────────────────────────────────────────────────────────────
 
 function buildPrintHtml(row: ROWRecord, entries: ROWEntry[]): string {
+  const sw          = isKiswahiliSubject(row.learning_area)
   const school      = toTitleCase(row.school || '')
   const teacherName = toTitleCase(row.teacher_name || '')
-  const term        = fmtTerm(row.term)
+  const term        = fmtTerm(row.term, sw)
   const done        = entries.filter(e => e.reflection?.trim()).length
   const total       = entries.length
+
+  // TSC-standard Kiswahili terms — same convention as lib/row/pdfRenderer.ts.
+  const labels = sw
+    ? {
+        title: 'Rekodi ya Kazi Iliyofunzwa', school: 'Shule:', subject: 'Somo:', grade: 'Gredi:',
+        teacher: 'Mwalimu:', term: 'Muhula:', year: 'Mwaka:',
+        date: 'Tarehe', wkLesson: 'Wiki / Somo', workDone: 'Kazi Iliyofanywa', reflection: 'Maoni', signature: 'Sahihi',
+        status: `Rekodi inaendelea masomo yanapofunzwa — masomo ${done} kati ya ${total} yameandikwa`,
+        printBtn: 'Chapisha / Hifadhi kama PDF',
+      }
+    : {
+        title: 'Record of Work Covered', school: 'School:', subject: 'Subject:', grade: 'Grade:',
+        teacher: 'Teacher:', term: 'Term:', year: 'Year:',
+        date: 'Date', wkLesson: 'Wk / Lesson', workDone: 'Work Done', reflection: 'Reflection', signature: 'Signature',
+        status: `Record continues as lessons are completed — ${done} of ${total} lessons recorded`,
+        printBtn: 'Print / Save as PDF',
+      }
 
   const tableRows = entries.map((e, i) => {
     const date = e.date_taught
@@ -339,7 +363,7 @@ function buildPrintHtml(row: ROWRecord, entries: ROWEntry[]): string {
     return `
     <tr class="${i % 2 === 1 ? 'alt' : ''}">
       <td class="col-date">${date}</td>
-      <td class="col-wk center">Wk ${e.week}<br/><span class="sub">L${e.lesson}</span></td>
+      <td class="col-wk center">${sw ? 'Wiki' : 'Wk'} ${e.week}<br/><span class="sub">${sw ? 'S' : 'L'}${e.lesson}</span></td>
       <td class="col-work">${workDone}</td>
       <td class="col-ref">${e.reflection || ''}</td>
       <td class="col-sig"></td>
@@ -347,10 +371,10 @@ function buildPrintHtml(row: ROWRecord, entries: ROWEntry[]): string {
   }).join('')
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${sw ? 'sw' : 'en'}">
 <head>
 <meta charset="utf-8"/>
-<title>Record of Work — ${row.learning_area}</title>
+<title>${labels.title} — ${row.learning_area}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: Arial, sans-serif; font-size: 10pt; color: #000; background: #fff; }
@@ -411,41 +435,41 @@ function buildPrintHtml(row: ROWRecord, entries: ROWEntry[]): string {
     <button onclick="window.print()"
       style="background:#1e293b;color:#fff;border:none;padding:9px 20px;border-radius:6px;
              font-size:10pt;cursor:pointer;font-weight:700;">
-      Print / Save as PDF
+      ${labels.printBtn}
     </button>
   </div>
   <div style="padding:15mm;">
-    <div class="doc-title">Record of Work Covered</div>
+    <div class="doc-title">${labels.title}</div>
     <table class="meta-table">
       <tr>
-        <td class="ml">School:</td>   <td class="mv">${school || '—'}</td>
-        <td class="ml">Subject:</td>  <td class="mv">${row.learning_area}</td>
+        <td class="ml">${labels.school}</td>   <td class="mv">${school || '—'}</td>
+        <td class="ml">${labels.subject}</td>  <td class="mv">${row.learning_area}</td>
       </tr>
       <tr>
-        <td class="ml">Grade:</td>    <td class="mv">${row.grade}</td>
-        <td class="ml">Teacher:</td>  <td class="mv">${teacherName || '—'}</td>
+        <td class="ml">${labels.grade}</td>    <td class="mv">${row.grade}</td>
+        <td class="ml">${labels.teacher}</td>  <td class="mv">${teacherName || '—'}</td>
       </tr>
       <tr>
-        <td class="ml">Term:</td>     <td class="mv">${term}</td>
-        <td class="ml">Year:</td>     <td class="mv">${row.year}</td>
+        <td class="ml">${labels.term}</td>     <td class="mv">${term}</td>
+        <td class="ml">${labels.year}</td>     <td class="mv">${row.year}</td>
       </tr>
     </table>
 
     <table class="row-table">
       <thead>
         <tr>
-          <th class="col-date">Date</th>
-          <th class="col-wk">Wk / Lesson</th>
-          <th class="col-work">Work Done</th>
-          <th class="col-ref">Reflection</th>
-          <th class="col-sig">Signature</th>
+          <th class="col-date">${labels.date}</th>
+          <th class="col-wk">${labels.wkLesson}</th>
+          <th class="col-work">${labels.workDone}</th>
+          <th class="col-ref">${labels.reflection}</th>
+          <th class="col-sig">${labels.signature}</th>
         </tr>
       </thead>
       <tbody>${tableRows}</tbody>
     </table>
 
     <div class="row-status">
-      Record continues as lessons are completed — ${done} of ${total} lessons recorded
+      ${labels.status}
     </div>
     <div class="footer">EduNexus · edunexus.co.ke</div>
   </div>

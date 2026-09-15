@@ -33,6 +33,13 @@ async function callOnce(
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
 
+  // The timer used to be cleared in a `finally` scoped only around `fetch()`
+  // itself — so it stopped protecting the call the instant HTTP headers came
+  // back, before `response.json()` ever ran. A response that stalls mid-body
+  // (slow/large completion, flaky connection) then hung with zero timeout,
+  // since the same AbortSignal was still attached to the stream but nothing
+  // was left to fire it. Wrapping the whole fetch+parse sequence in one
+  // try/finally keeps the abort armed until the call is genuinely done.
   let response: Response
   try {
     response = await fetch(`${DEEPSEEK_CONFIG.baseURL}/v1/chat/completions`, {
@@ -53,6 +60,21 @@ async function callOnce(
       }),
       signal: controller.signal,
     })
+
+    if (!response.ok) {
+      const text = await response.text()
+      throw new Error(`DeepSeek API error ${response.status}: ${text}`)
+    }
+
+    const data = await response.json() as {
+      choices: { message: { content: string } }[]
+      usage?: { total_tokens?: number }
+    }
+    return {
+      content:     data.choices[0].message.content,
+      // Previously discarded entirely — the response already carries this.
+      usageTokens: data.usage?.total_tokens ?? null,
+    }
   } catch (err) {
     if ((err as Error).name === 'AbortError') {
       throw new Error('DeepSeek timeout after 25s')
@@ -60,21 +82,6 @@ async function callOnce(
     throw err
   } finally {
     clearTimeout(timer)
-  }
-
-  if (!response.ok) {
-    const text = await response.text()
-    throw new Error(`DeepSeek API error ${response.status}: ${text}`)
-  }
-
-  const data = await response.json() as {
-    choices: { message: { content: string } }[]
-    usage?: { total_tokens?: number }
-  }
-  return {
-    content:     data.choices[0].message.content,
-    // Previously discarded entirely — the response already carries this.
-    usageTokens: data.usage?.total_tokens ?? null,
   }
 }
 

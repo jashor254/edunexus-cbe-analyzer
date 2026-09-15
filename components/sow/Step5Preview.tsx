@@ -14,6 +14,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { downloadSOWAsPDF, getColumnConfig } from '@/lib/sow/pdfRenderer'
+import { isKiswahiliSubject } from '@/lib/curriculum/subjectUtils'
 import type {
   SOWContext,
   SelectedSubstrand,
@@ -75,7 +76,7 @@ export default function Step5Preview({
   const [week1Generated, setWeek1Generated] = useState(false)
 
   const teachingSlots = timeline.filter(s => !s.isBreak).length
-  const colConfig = getColumnConfig(context.curriculumMode)
+  const colConfig = getColumnConfig(context.curriculumMode, isKiswahiliSubject(context.learningAreaName))
 
   const handleGenerate = useCallback(async () => {
     setGenerating(true)
@@ -91,7 +92,7 @@ export default function Step5Preview({
     let kicdStrands: Array<{ title: string; kicd_data?: unknown }> = []
 
     try {
-      const kicdRes = await fetch(`/api/sow/kicd-context?subject=${encodeURIComponent(subjectName)}`)
+      const kicdRes = await fetch(`/api/sow/kicd-context?subject=${encodeURIComponent(subjectName)}&grade=${encodeURIComponent(context.gradeName)}`)
       if (kicdRes.ok) {
         const kicdJson = await kicdRes.json() as { data?: { kicdArea?: { kicd_subject_data?: unknown }; kicdStrands?: Array<{ title: string; kicd_data?: unknown }> } }
         kicdArea = kicdJson.data?.kicdArea ?? null
@@ -519,7 +520,7 @@ export default function Step5Preview({
           <table className="w-full text-sm min-w-225">
             <thead>
               <tr className="bg-slate-700">
-                {['WK', 'LSN', colConfig.col3, colConfig.col4, colConfig.col5,
+                {[colConfig.col1, colConfig.col2, colConfig.col3, colConfig.col4, colConfig.col5,
                   colConfig.col6,
                   ...(colConfig.hasInquiryQuestions ? [colConfig.col7!] : []),
                   colConfig.col8, colConfig.col9, colConfig.col10 || 'REFLECTION'

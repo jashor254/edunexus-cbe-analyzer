@@ -4,6 +4,7 @@ import { esc } from '@/lib/pdf/utils'
 // Follows KNEC SOW template format.
 
 import type { SOWPreviewData, GeneratedLesson, BreakItem } from './types'
+import { isKiswahiliSubject } from '@/lib/curriculum/subjectUtils'
 
 const NAMED_BREAK_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   'August Holiday':    { bg: '#FEF3C7', text: '#92400E', border: '#F59E0B' },
@@ -46,12 +47,39 @@ const BTEOTLE_RE = /^(by the end of (the|this) lesson[,:]?\s*)?(the\s+)?learner[
 export function generateSOWHtml(data: SOWPreviewData): string {
   const { meta, lessons } = data
   const isKcse = meta.curriculumMode.startsWith('844')
+  const isKiswahili = isKiswahiliSubject(meta.learningArea)
 
-  const termLabels = {
-    strand:    isKcse ? 'TOPIC'     : 'STRAND',
-    substrand: isKcse ? 'SUBTOPIC'  : 'SUBSTRAND',
-    outcomes:  isKcse ? 'SPECIFIC OBJECTIVES' : 'SPECIFIC LEARNING OUTCOMES',
-  }
+  // TSC-standard Kiswahili scheme terms — same set used by getColumnConfig
+  // in pdfRenderer.ts and the saved-scheme view page. This file is a
+  // separate renderer (the live "Download PDF" button calls generateSOWHtml
+  // here, not pdfRenderer.ts's table), so it needs its own copy of the same
+  // terms rather than inheriting the fix made there — not literal
+  // translations (e.g. "Shabaha" not "Matokeo ya Ujifunzaji").
+  const termLabels = isKiswahili
+    ? {
+        week:      'WK.',
+        lesson:    'KIPINDI',
+        strand:    'MADA KUU',
+        substrand: 'MADA NDOGO',
+        outcomes:  'SHABAHA',
+        experiences: 'SHUGHULI ZA UFUNZAJI',
+        inquiry:     'MASWALI DADISI',
+        resources:   'NYENZO',
+        assessment:  'TATHMINI',
+        reflection:  'MAONI',
+      }
+    : {
+        week:      'WEEK',
+        lesson:    'LESSON',
+        strand:    isKcse ? 'TOPIC'     : 'STRAND',
+        substrand: isKcse ? 'SUBTOPIC'  : 'SUBSTRAND',
+        outcomes:  isKcse ? 'SPECIFIC OBJECTIVES' : 'SPECIFIC LEARNING OUTCOMES',
+        experiences: 'LEARNING EXPERIENCES',
+        inquiry:     'KEY INQUIRY QUESTIONS',
+        resources:   'LEARNING RESOURCES',
+        assessment:  'ASSESSMENT METHODS',
+        reflection:  'REFLECTION',
+      }
 
   const sortedBreaks: BreakItem[] = [...(data.breaks ?? [])].sort((a, b) =>
     a.startWeek !== b.startWeek ? a.startWeek - b.startWeek : a.startLesson - b.startLesson
@@ -355,16 +383,16 @@ export function generateSOWHtml(data: SOWPreviewData): string {
     <table>
       <thead>
         <tr>
-          <th style="width:28px">WEEK</th>
-          <th style="width:28px">LESSON</th>
+          <th style="width:28px">${termLabels.week}</th>
+          <th style="width:28px">${termLabels.lesson}</th>
           <th style="width:85px">${termLabels.strand}</th>
           <th style="width:85px">${termLabels.substrand}</th>
-          <th style="width:130px">LESSON LEARNING OUTCOMES</th>
-          <th style="width:130px">LEARNING EXPERIENCES</th>
-          <th style="width:110px">KEY INQUIRY QUESTIONS</th>
-          <th style="width:100px">LEARNING RESOURCES</th>
-          <th style="width:90px">ASSESSMENT METHODS</th>
-          <th style="width:75px">REFLECTION</th>
+          <th style="width:130px">${termLabels.outcomes}</th>
+          <th style="width:130px">${termLabels.experiences}</th>
+          <th style="width:110px">${termLabels.inquiry}</th>
+          <th style="width:100px">${termLabels.resources}</th>
+          <th style="width:90px">${termLabels.assessment}</th>
+          <th style="width:75px">${termLabels.reflection}</th>
         </tr>
       </thead>
       <tbody>

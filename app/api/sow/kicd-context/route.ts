@@ -1,6 +1,6 @@
 // app/api/sow/kicd-context/route.ts
 // GET: Return KICD enrichment data for AI generation context
-// Query params: subject (learning area name, partial match)
+// Query params: subject (learning area name, partial match), grade (exact grade name, optional but required for accurate results — see repository comment)
 
 import { createClient } from '@/utils/supabase/server'
 import { repos } from '@/lib/repositories'
@@ -16,12 +16,13 @@ export async function GET(req: Request) {
     const url = new URL(req.url)
     const subject = url.searchParams.get('subject')?.trim()
     if (!subject) return apiBadRequest('Missing subject')
+    const grade = url.searchParams.get('grade')?.trim() || undefined
 
     // Curriculum data is teacher-only — students and parents have no access
     const teacher = await repos.teachers.findTeacherByUserId(user.id)
     if (!teacher) return apiForbidden()
 
-    const context = await CurriculumService.resolveKicdContext(subject)
+    const context = await CurriculumService.resolveKicdContext(subject, grade)
 
     return apiSuccess(context)
   } catch (err: unknown) {

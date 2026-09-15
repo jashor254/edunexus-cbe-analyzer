@@ -17,6 +17,8 @@ function localizeGrade(grade: string, isKiswahili: boolean): string {
 }
 
 export interface ColConfig {
+  col1: string
+  col2: string
   col3: string
   col4: string
   col5: string
@@ -28,30 +30,67 @@ export interface ColConfig {
   hasInquiryQuestions: boolean
 }
 
-export function getColumnConfig(mode: CurriculumMode): ColConfig {
+// `isKiswahili` is separate from `mode` (CBC vs 8-4-4) — headers must localize
+// to the subject's language independently of which curriculum table shape is
+// used. Defaults to English so every existing call site keeps working.
+export function getColumnConfig(mode: CurriculumMode, isKiswahili = false): ColConfig {
   if (mode === '844_form3' || mode === '844_form4') {
-    return {
-      col3: 'TOPIC',
-      col4: 'SUB-TOPIC',
-      col5: 'OBJECTIVES',
-      col6: 'T/L ACTIVITIES',
-      col8: 'T/L AIDS',
-      col9: 'REFERENCE',
-      col10: 'REMARKS',
-      hasInquiryQuestions: false,
-    }
+    return isKiswahili
+      ? {
+          col1: 'WIKI',
+          col2: 'SOMO',
+          col3: 'MADA',
+          col4: 'MADA NDOGO',
+          col5: 'MALENGO',
+          col6: 'SHUGHULI ZA UFUNDISHAJI/UJIFUNZAJI',
+          col8: 'VIFAA VYA UFUNDISHAJI',
+          col9: 'MAREJEO',
+          col10: 'MAONI',
+          hasInquiryQuestions: false,
+        }
+      : {
+          col1: 'WK',
+          col2: 'LSN',
+          col3: 'TOPIC',
+          col4: 'SUB-TOPIC',
+          col5: 'OBJECTIVES',
+          col6: 'T/L ACTIVITIES',
+          col8: 'T/L AIDS',
+          col9: 'REFERENCE',
+          col10: 'REMARKS',
+          hasInquiryQuestions: false,
+        }
   }
-  return {
-    col3: 'STRAND',
-    col4: 'SUB-STRAND',
-    col5: 'LESSON LEARNING OUTCOMES',
-    col6: 'LEARNING EXPERIENCES',
-    col7: 'KEY INQUIRY QUESTIONS',
-    col8: 'LEARNING RESOURCES',
-    col9: 'ASSESSMENT METHODS',
-    col10: 'REFLECTION',
-    hasInquiryQuestions: true,
-  }
+  // TSC-standard Kiswahili scheme terms — the actual column names used on
+  // real TSC templates and schemesofwork.com, not literal translations of
+  // the English headers (e.g. "Shabaha" not "Matokeo ya Ujifunzaji").
+  return isKiswahili
+    ? {
+        col1: 'WK.',
+        col2: 'KIPINDI',
+        col3: 'MADA KUU',
+        col4: 'MADA NDOGO',
+        col5: 'SHABAHA',
+        col6: 'SHUGHULI ZA UFUNZAJI',
+        col7: 'MASWALI DADISI',
+        col8: 'NYENZO',
+        col9: 'TATHMINI',
+        col10: 'MAONI',
+        hasInquiryQuestions: true,
+      }
+    : {
+        col1: 'WK',
+        col2: 'LSN',
+        col3: 'STRAND',
+        col4: 'SUB-STRAND',
+        col5: 'LESSON LEARNING OUTCOMES',
+        col6: 'LEARNING EXPERIENCES',
+        col7: 'KEY INQUIRY QUESTIONS',
+        col8: 'LEARNING RESOURCES',
+        col9: 'ASSESSMENT METHODS',
+        col10: 'REFLECTION',
+        hasInquiryQuestions: true,
+      }
 }
 
 
@@ -210,8 +249,8 @@ function buildTablePage(
   }
 
   const headerCols = isCBC
-    ? `<th style="width:4%">WK</th>
-       <th style="width:4%">LSN</th>
+    ? `<th style="width:4%">${colConfig.col1}</th>
+       <th style="width:4%">${colConfig.col2}</th>
        <th style="width:9%">${colConfig.col3}</th>
        <th style="width:11%">${colConfig.col4}</th>
        <th style="width:16%">${colConfig.col5}</th>
@@ -220,8 +259,8 @@ function buildTablePage(
        <th style="width:10%">${colConfig.col8}</th>
        <th style="width:10%">${colConfig.col9}</th>
        <th style="width:8%">${colConfig.col10 || 'REFLECTION'}</th>`
-    : `<th style="width:4%">WK</th>
-       <th style="width:4%">LSN</th>
+    : `<th style="width:4%">${colConfig.col1}</th>
+       <th style="width:4%">${colConfig.col2}</th>
        <th style="width:10%">${colConfig.col3}</th>
        <th style="width:12%">${colConfig.col4}</th>
        <th style="width:18%">${colConfig.col5}</th>

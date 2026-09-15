@@ -7,6 +7,7 @@ import { allocateLessons } from './lessonAllocator'
 import { generateValidatedLesson } from './aiLessonGenerator'
 import { VerbRotationEngine } from './verbRotationEngine'
 import { DiversityEngine, auditDiversity } from './diversityEngine'
+import { isKiswahiliSubject } from '@/lib/curriculum/subjectUtils'
 import type {
   SOWContext,
   SelectedSubstrand,
@@ -152,6 +153,7 @@ export async function generateSchemePipeline(
   const verbEngine      = new VerbRotationEngine(15)
   const diversityEngine = new DiversityEngine()
   const isCBC           = context.curriculumMode.startsWith('cbc')
+  const isKiswahili     = isKiswahiliSubject(context.learningAreaName)
 
   const BATCH_SIZE = 5  // smaller batches so diversity seeds differ within each batch
 
@@ -169,7 +171,7 @@ export async function generateSchemePipeline(
 
         // Each lesson in the batch gets a UNIQUE diversity seed
         // so parallel lessons don't all produce the same structure
-        const diversitySeed = diversityEngine.next(isCBC)
+        const diversitySeed = diversityEngine.next(isCBC, isKiswahili)
 
         return generateValidatedLesson({
           learningArea:   context.learningAreaName,

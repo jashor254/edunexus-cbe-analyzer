@@ -18,9 +18,15 @@ const SaveSOWSchema = z.object({
   schemeData: z.object({
     meta: z.object({
       school:          z.string().min(1),
-      grade:           z.number().int().min(1).max(12),
+      // "Grade 9", "Form 3" — matches schemes_of_work.grade (text), not a
+      // bare 1-12 number. Neither real caller (Step5Preview.tsx, the live
+      // wizard page) has ever sent a number here.
+      grade:           z.string().min(1),
       learningArea:    z.string().min(1),
-      term:            z.number().int().min(1).max(3),
+      // Both callers send `String(term)` — coerce rather than requiring the
+      // frontend shape to change, since schemes_of_work.term is genuinely
+      // an integer column and this still validates range/int-ness.
+      term:            z.coerce.number().int().min(1).max(3),
       year:            z.number().int().min(2020).max(2100),
       totalLessons:    z.number().int().min(1),
       totalWeeks:      z.number().int().min(1),

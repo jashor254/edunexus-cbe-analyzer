@@ -12,6 +12,9 @@ import type {
   SelectedSubstrand, BreakItem, GeneratedLesson, SOWGenerationResult, TimelineSlot,
 } from '@/lib/sow/types'
 import { generateSOWHtml, downloadSOWAsText } from '@/lib/sow/pdfGenerator'
+import { getColumnConfig } from '@/lib/sow/pdfRenderer'
+import { isKiswahiliSubject } from '@/lib/curriculum/subjectUtils'
+import { getSetBooksForSubject, insertSetBooksAsSixthSubstrand } from '@/lib/sow/setBooks'
 import { toast } from 'sonner'
 import Step4Breaks from '@/components/sow/Step4Breaks'
 import { buildTermSchedule } from '@/lib/sow/termSchedule'
@@ -126,6 +129,7 @@ export default function SchemeOfWorkPage() {
   const [school, setSchool]           = useState('')
   const [textbook, setTextbook]       = useState('')
   const [learningAreas, setLearningAreas] = useState<Array<{ id: string; name: string }>>([])
+  const [selectedSetBooks, setSelectedSetBooks] = useState<string[]>([])
 
   // Step 2
   const [strands, setStrands]           = useState<Strand[]>([])
@@ -196,6 +200,9 @@ export default function SchemeOfWorkPage() {
   const lpw           = lessonStructure.lessonsPerWeek
   const teachingWeeks = lessonStructure.lastWeek - lessonStructure.firstWeek + 1
   const is844  = curriculumMode?.startsWith('844') ?? false
+  const availableSetBooks = curriculumMode && grade
+    ? getSetBooksForSubject(learningAreaName, curriculumMode, grade)
+    : []
   const labels = is844
     ? { strand: 'Topic', substrand: 'Subtopic', strands: 'Topics', substrands: 'Subtopics' }
     : { strand: 'Strand', substrand: 'Substrand', strands: 'Strands', substrands: 'Substrands' }
@@ -284,7 +291,7 @@ export default function SchemeOfWorkPage() {
     // official CBC-aligned material.
     let kicdContext: SOWContext['kicdContext']
     try {
-      const kicdRes = await fetch(`/api/sow/kicd-context?subject=${encodeURIComponent(learningAreaName || learningArea)}`)
+      const kicdRes = await fetch(`/api/sow/kicd-context?subject=${encodeURIComponent(learningAreaName || learningArea)}&grade=${encodeURIComponent(grade)}`)
       if (kicdRes.ok) {
         const kicdJson = await kicdRes.json() as { data?: { kicdArea?: { kicd_subject_data?: unknown }; kicdStrands?: Array<{ title: string; kicd_data?: unknown }> } }
         kicdContext = {
@@ -297,10 +304,11 @@ export default function SchemeOfWorkPage() {
     }
 
     const context: SOWContext = { school, grade, gradeName: grade, learningArea, learningAreaName, term, year, curriculumMode, textbook, kicdContext }
-    const selectedSubstrands: SelectedSubstrand[] = selections.map((s, i) => ({
+    const rawSubstrands: SelectedSubstrand[] = selections.map((s, i) => ({
       strandId: s.strandId, strandTitle: s.strandTitle, substrandId: s.substrandId,
       substrandTitle: s.substrandTitle, lessonsRequired: s.lessonsRequired, orderIndex: i,
     }))
+    const selectedSubstrands = insertSetBooksAsSixthSubstrand(rawSubstrands, selectedSetBooks)
     try {
       setProgress('Preparing your scheme of work…')
       const res = await fetch('/api/sow/generate', {
@@ -325,7 +333,7 @@ export default function SchemeOfWorkPage() {
       setProgress('Something went wrong. Please check your connection and try again.')
       setGenerating(false)
     }
-  }, [curriculumMode, grade, learningArea, learningAreaName, school, term, year, textbook, selections, lessonStructure, breaks])
+  }, [curriculumMode, grade, learningArea, learningAreaName, school, term, year, textbook, selections, selectedSetBooks, lessonStructure, breaks])
 
   // Poll while a scheme generates in the background — mirrors the Holiday
   // Planner / class report generation pattern. Safe to leave this step;
@@ -489,6 +497,11 @@ export default function SchemeOfWorkPage() {
   // ─── Shared input class ───────────────────────────────────────────────────
   const inputCls = `w-full px-4 py-3 rounded-xl border border-slate-200 bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none text-gray-900 transition`
 
+  // Preview table headers must match the subject's language, not just CBC/8-4-4 —
+  // same getColumnConfig used by Step5Preview/pdfRenderer so all three SOW
+  // rendering surfaces stay in sync.
+  const previewColConfig = getColumnConfig(curriculumMode ?? 'cbc_junior', isKiswahiliSubject(learningAreaName))
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -628,12 +641,13 @@ export default function SchemeOfWorkPage() {
                         setLearningArea(e.target.value)
                         setLearningAreaName(learningAreas.find(a => a.id === e.target.value)?.name || e.target.value)
                         setSelections([])
+                        setSelectedSetBooks([])
                       }} className={inputCls}>
                         <option value="">Select subject...</option>
                         {learningAreas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                       </select>
                     ) : (
-                      <input value={learningAreaName} onChange={e => { setLearningAreaName(e.target.value); setLearningArea(e.target.value) }}
+                      <input value={learningAreaName} onChange={e => { setLearningAreaName(e.target.value); setLearningArea(e.target.value); setSelectedSetBooks([]) }}
                         placeholder="e.g. Mathematics" className={inputCls} />
                     )}
                     {learningAreas.length === 0 && grade && (
@@ -669,6 +683,31 @@ export default function SchemeOfWorkPage() {
                     </label>
                     <input value={textbook} onChange={e => setTextbook(e.target.value)} placeholder="e.g. KLB Mathematics Grade 8" className={inputCls} />
                   </div>
+                  {availableSetBooks.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                        Set Book / Kitabu Teule <span className="text-gray-400 font-normal">(optional)</span>
+                      </label>
+                      <div className="space-y-2">
+                        {availableSetBooks.map(book => (
+                          <label key={book.id} className="flex items-center gap-2 text-sm text-gray-700">
+                            <input
+                              type="checkbox"
+                              checked={selectedSetBooks.includes(book.title)}
+                              onChange={() => setSelectedSetBooks(prev =>
+                                prev.includes(book.title) ? prev.filter(t => t !== book.title) : [...prev, book.title]
+                              )}
+                              className="rounded border-slate-300"
+                            />
+                            {book.title}
+                          </label>
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1.5">
+                        Selected set books are scheduled as the 6th topic in the sequence, after the first 5 chapters — the standard KCSE placement.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1035,9 +1074,7 @@ export default function SchemeOfWorkPage() {
               : <AlertTriangle className="w-10 h-10 text-red-500 mx-auto mb-4" />
             }
             <p className={`font-bold ${generating ? 'text-gray-700' : 'text-red-700'}`}>
-              {generating && genCounts && genCounts.total > 0
-                ? `Lesson ${Math.min(genCounts.completed + 1, genCounts.total)} of ${genCounts.total}`
-                : (progress || 'Generating your scheme…')}
+              {generating ? 'Generating your scheme…' : (progress || 'Generating your scheme…')}
             </p>
             {generating && genCounts && genCounts.total > 0 && (
               <div className="max-w-sm mx-auto mt-4 space-y-2">
@@ -1065,20 +1102,6 @@ export default function SchemeOfWorkPage() {
         {/* ── STEP 5: Preview & Download ────────────────────────────────── */}
         {step === 5 && result && (
           <div className="space-y-6">
-
-            {/* Result stats */}
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-500 p-5 shadow-lg shadow-teal-900/20">
-                <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -translate-y-4 translate-x-4" />
-                <div className="text-4xl font-black text-white mb-1">{result.summary.generated}</div>
-                <div className="text-sm text-white/80 font-bold">Lessons Generated</div>
-              </div>
-              <div className={`relative overflow-hidden rounded-2xl p-5 shadow-lg ${result.summary.failed > 0 ? 'bg-gradient-to-br from-amber-500 to-orange-500 shadow-amber-900/20' : 'bg-gradient-to-br from-indigo-500 to-violet-500 shadow-indigo-900/20'}`}>
-                <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -translate-y-4 translate-x-4" />
-                <div className="text-4xl font-black text-white mb-1">{result.summary.failed}</div>
-                <div className="text-sm text-white/80 font-bold">{result.summary.failed > 0 ? 'Issues found' : 'All Successful ✓'}</div>
-              </div>
-            </div>
 
             {/* Attribution badge — only claims KICD alignment when real KICD
                 strand data was actually attached to the generation prompt.
@@ -1161,7 +1184,11 @@ export default function SchemeOfWorkPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gradient-to-r from-slate-800 to-[#0c1929]">
-                      {['WK', 'LSN', 'Strand', 'Substrand', 'Lesson Learning Outcomes', 'Experiences', 'Inquiry Questions', 'Resources', 'Assessment', 'Reflection'].map(h => (
+                      {[previewColConfig.col1, previewColConfig.col2, previewColConfig.col3, previewColConfig.col4, previewColConfig.col5,
+                        previewColConfig.col6,
+                        ...(previewColConfig.hasInquiryQuestions ? [previewColConfig.col7!] : []),
+                        previewColConfig.col8, previewColConfig.col9, previewColConfig.col10 || 'REFLECTION',
+                      ].map(h => (
                         <th key={h} className="text-left px-3 py-3.5 text-xs font-black text-slate-300 whitespace-nowrap">
                           {h}
                         </th>
@@ -1212,12 +1239,15 @@ export default function SchemeOfWorkPage() {
               <div className="bg-red-50 border border-red-200 rounded-2xl p-5">
                 <h3 className="font-black text-red-800 mb-3 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4" />
-                  {result.failures.length} lessons failed to generate
+                  {result.failures.length} lesson{result.failures.length !== 1 ? 's' : ''} could not be generated
                 </h3>
+                <p className="text-sm text-red-700 mb-3">
+                  Add these manually below, or start a new scheme to try again.
+                </p>
                 <div className="space-y-2">
                   {result.failures.map((f, i) => (
                     <div key={i} className="text-sm text-red-700 bg-red-100/60 rounded-lg px-3 py-2">
-                      Week {f.week} Lesson {f.lesson} · {f.substrand}: {f.error}
+                      Week {f.week} Lesson {f.lesson} · {f.substrand}
                     </div>
                   ))}
                 </div>

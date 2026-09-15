@@ -166,6 +166,31 @@ export const VERB_ORDERS: Record<string, string[][]> = {
     ],
   ],
 
+  // ── CBC JUNIOR: KISWAHILI (Grade 7-9) ────────────────────────────────────
+  // detectSubjectType() returns plain 'kiswahili' for CBC Junior. Without this
+  // key the lookup fell through to VERB_ORDERS.default (English), so every
+  // correctly-written Swahili learning outcome failed verb validation.
+  // Trimmed from cbc_senior_kiswahili to Bloom's lower/mid tiers
+  // (remember → understand/apply → analyze-evaluate-create) for Junior grades.
+  kiswahili: [
+    [
+      'taja', 'orodhesha', 'tambua', 'andika',
+      'soma', 'onyesha', 'angalia', 'tazama',
+      'toa', 'weka', 'fahamia', 'jaza',
+      'kamilisha', 'panga', 'zungumza',
+    ],
+    [
+      'eleza', 'elezea', 'fupisha', 'linganisha',
+      'tofautisha', 'tumia', 'fafanua', 'husisha',
+      'changanya', 'iga', 'panga upya', 'rekebisha',
+    ],
+    [
+      'changanua', 'tathmini', 'tunga', 'buni',
+      'chambua', 'hakiki', 'fuatilia', 'tafsiri',
+      'pendekeza', 'thamini', 'tetea', 'thibitisha',
+    ],
+  ],
+
   // ── CBC SENIOR: KISWAHILI (Grade 10-12) ──────────────────────────────────
   cbc_senior_kiswahili: [
     [

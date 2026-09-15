@@ -33,6 +33,9 @@ export function isPlaceBasedSubject(subject: string): boolean {
 // Per-subject context hint for subjects where county examples don't apply
 export function getSubjectContextHint(subject: string): string {
   const s = subject.toLowerCase().trim()
+  if (s.startsWith('kiswahili')) {
+    return 'Tumia mifano na hali za kila siku ambazo mwanafunzi wa Kenya angezitambua shuleni au nyumbani.'
+  }
   if (s.includes('science') || s.includes('biology') || s.includes('chemistry') || s.includes('physics')) {
     return 'Use real scientific phenomena, lab observations, or everyday science examples a Kenyan learner encounters at school or home.'
   }

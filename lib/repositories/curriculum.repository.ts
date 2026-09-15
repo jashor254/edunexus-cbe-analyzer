@@ -565,25 +565,81 @@ export class CurriculumRepository extends BaseRepository {
     return all
   }
 
-  async findKicdContextBySubjectName(subject: string): Promise<{
+  async findKicdContextBySubjectName(subject: string, grade?: string): Promise<{
     area: { kicd_subject_data: Record<string, unknown> | null } | null
     strands: Array<{ title: string; kicd_data: Record<string, unknown> | null }>
   }> {
-    const [{ data: area }, { data: strands }] = await Promise.all([
-      this.db
+    // Strand titles ("Listening and Speaking", "Numbers") never contain the
+    // subject name — filtering sow_strands by `.ilike('title', %subject%)`
+    // could never match. Resolve the learning area first, then fetch its
+    // strands by the FK.
+    //
+    // Subject name alone is not unique: "Kiswahili" matches 11+ different
+    // sow_learning_areas rows, one per grade (plus exact-duplicate seed rows
+    // per grade, e.g. "Grade 9" and "Grade 9 (JSS)"), each with its own
+    // grade-specific kicd_data. Without a grade filter, `.limit(1)` returns
+    // whichever row Postgres happens to return first — frequently one with
+    // no KICD content loaded, even when the teacher's actual grade has real
+    // content sitting in a sibling row. When `grade` is supplied, restrict
+    // to sow_learning_areas under that exact grade name (there may be more
+    // than one matching grade_id from duplicate seed rows — search all of
+    // them, since content is loaded identically into each duplicate).
+    let learningAreaIds: string[] | null = null
+    if (grade) {
+      const { data: grades } = await this.db
+        .from('sow_grades')
+        .select('id')
+        .eq('name', grade)
+      const gradeIds = (grades ?? []).map(g => g.id)
+      if (gradeIds.length) {
+        const { data: areasInGrade } = await this.db
+          .from('sow_learning_areas')
+          .select('id')
+          .in('grade_id', gradeIds)
+          .ilike('name', `%${subject}%`)
+        learningAreaIds = (areasInGrade ?? []).map(a => a.id)
+      }
+    }
+
+    let area: { id: string; kicd_subject_data: Record<string, unknown> | null } | null = null
+    if (learningAreaIds && learningAreaIds.length) {
+      // Prefer whichever duplicate actually has kicd_subject_data populated.
+      const { data: areas } = await this.db
         .from('sow_learning_areas')
-        .select('kicd_subject_data')
+        .select('id, kicd_subject_data')
+        .in('id', learningAreaIds)
+      area = (areas ?? []).find(a => a.kicd_subject_data && Object.keys(a.kicd_subject_data).length > 0)
+        ?? (areas ?? [])[0]
+        ?? null
+    }
+    if (!area) {
+      // No grade given, or no grade-scoped match — fall back to the old
+      // ungrounded subject-only lookup rather than returning nothing.
+      const { data: fallbackArea } = await this.db
+        .from('sow_learning_areas')
+        .select('id, kicd_subject_data')
         .ilike('name', `%${subject}%`)
         .limit(1)
-        .maybeSingle(),
-      this.db
-        .from('sow_strands')
-        .select('title, kicd_data')
-        .ilike('title', `%${subject}%`),
-    ])
+        .maybeSingle()
+      area = fallbackArea
+    }
+
+    if (!area) {
+      console.warn(`[findKicdContextBySubjectName] No sow_learning_areas match for subject "${subject}"${grade ? ` grade "${grade}"` : ''}`)
+      return { area: null, strands: [] }
+    }
+
+    // Merge strands across every duplicate learning-area row for this
+    // grade+subject (not just the one `area` resolved to for subject-level
+    // data) so content loaded into a sibling duplicate row is still found.
+    const strandSourceIds = learningAreaIds && learningAreaIds.length ? learningAreaIds : [area.id]
+    const { data: strands } = await this.db
+      .from('sow_strands')
+      .select('title, kicd_data')
+      .in('learning_area_id', strandSourceIds)
 
     return {
-      area: (area ?? null) as { kicd_subject_data: Record<string, unknown> | null } | null,
+      area: { kicd_subject_data: area.kicd_subject_data } as { kicd_subject_data: Record<string, unknown> | null },
       strands: (strands ?? []) as Array<{ title: string; kicd_data: Record<string, unknown> | null }>,
     }
   }

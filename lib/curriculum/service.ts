@@ -83,9 +83,9 @@ export const CurriculumService = {
     }))
   },
 
-  /** KICD JSON enrichment for a subject — used by app/api/sow/kicd-context. */
-  async resolveKicdContext(subject: string): Promise<CurriculumKicdContext> {
-    const { area, strands } = await repos.curriculum.findKicdContextBySubjectName(subject)
+  /** KICD JSON enrichment for a subject+grade — used by app/api/sow/kicd-context. */
+  async resolveKicdContext(subject: string, grade?: string): Promise<CurriculumKicdContext> {
+    const { area, strands } = await repos.curriculum.findKicdContextBySubjectName(subject, grade)
     return { kicdArea: area, kicdStrands: strands }
   },
 

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import {
   ChevronLeft, Loader2, Download, Check, BookOpen, AlertCircle, FolderOpen, NotebookPen, ClipboardList, ArrowRight,
 } from 'lucide-react'
+import { isKiswahiliSubject } from '@/lib/curriculum/subjectUtils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -359,7 +360,12 @@ export default function SOWDetailPage({ params }: { params: Promise<{ id: string
           <table className="w-full text-xs border-collapse" style={{ minWidth: '900px' }}>
             <thead>
               <tr style={{ background: '#1e293b' }}>
-                {['Wk', 'Ls', 'Strand', 'Sub-Strand', 'Lesson Learning Outcomes', 'Learning Experiences', 'Key Inquiry Qs', 'Resources', 'Assessment'].map((h, i) => (
+                {(isKiswahiliSubject(scheme?.learning_area ?? '')
+                  // TSC-standard Kiswahili scheme terms, not literal
+                  // translations (e.g. "Shabaha" not "Matokeo ya Ujifunzaji").
+                  ? ['Wk.', 'Kipindi', 'Mada Kuu', 'Mada Ndogo', 'Shabaha', 'Shughuli za Ufunzaji', 'Maswali Dadisi', 'Nyenzo', 'Tathmini']
+                  : ['Wk', 'Ls', 'Strand', 'Sub-Strand', 'Lesson Learning Outcomes', 'Learning Experiences', 'Key Inquiry Qs', 'Resources', 'Assessment']
+                ).map((h, i) => (
                   <th
                     key={i}
                     className="px-3 py-3 text-left font-black uppercase tracking-wide text-slate-300"
@@ -375,7 +381,8 @@ export default function SOWDetailPage({ params }: { params: Promise<{ id: string
                 if (row.type === 'break') {
                   const b = row.data
                   const c = breakColorMap[b.title] ?? FALLBACK_PALETTE[0]
-                  const wkRange = b.startWeek === b.endWeek ? `Wk ${b.startWeek}` : `Wk ${b.startWeek}–${b.endWeek}`
+                  const wkLabel = isKiswahiliSubject(scheme?.learning_area ?? '') ? 'Wk.' : 'Wk'
+                  const wkRange = b.startWeek === b.endWeek ? `${wkLabel} ${b.startWeek}` : `${wkLabel} ${b.startWeek}–${b.endWeek}`
                   return (
                     <tr key={`break-${b.id}`} style={{ backgroundColor: c.bg, borderLeft: `4px solid ${c.border}` }}>
                       <td
