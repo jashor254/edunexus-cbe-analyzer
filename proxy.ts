@@ -31,6 +31,10 @@ const PUBLIC_PREFIXES = [
   '/legal',
   '/about',
   '/insights',
+  // The book's marketing/download page and its PDF (served from
+  // public/book/) — same public-marketing-content case as /insights, not a
+  // logged-in area.
+  '/book',
   '/auth',
   '/join',
   '/shared',

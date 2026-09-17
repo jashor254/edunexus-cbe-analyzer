@@ -162,6 +162,9 @@ function MarketingFooter() {
             <Link href="/insights" className={`text-sm text-white/50 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
               Insights
             </Link>
+            <Link href="/book" className={`text-sm text-white/50 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
+              Book
+            </Link>
             <Link href="/legal/privacy" className={`text-sm text-white/50 hover:text-white transition-colors rounded ${FOCUS_RING}`}>
               Privacy Policy
             </Link>
