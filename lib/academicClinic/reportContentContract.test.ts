@@ -45,7 +45,6 @@ const REPORT_DELIVERY_SURFACES = [
   'components/ui/empty-states.tsx',
   'app/teacher/classes/[classId]/page.tsx',
   'app/dashboard/page.tsx',
-  'components/onboarding-tutorial.tsx',
 ]
 
 const PROHIBITED_OVERCLAIMS: Array<{ phrase: RegExp; reason: string }> = [
