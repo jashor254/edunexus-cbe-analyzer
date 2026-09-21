@@ -125,6 +125,7 @@ export type LearnerEvidence = {
 export type EvidencePayload =
   | { kind: 'remark'; payloadVersion: 1; body: string }
   | AdaptiveDeliveryPayload
+  | PaperIntelligenceMarkPayload
 
 /**
  * Adaptive Remediation Phase 1, Stage 1 — the instructional condition under
@@ -174,6 +175,31 @@ export type AdaptiveDeliveryPayload = {
   isAdaptiveAssignment: boolean
   /** Set when the assignment was delivered from an approved Blueprint action, linking outcome back to intent. */
   blueprintActionItemId: string | null
+}
+
+/**
+ * Paper Intelligence Prototype 01 — additive payload variant, same pattern
+ * as AdaptiveDeliveryPayload above (Phase C precedent: one shared jsonb
+ * column, discriminated by kind, never a new scalar column per source).
+ * This is the AI's full, auditable proposal — never the trusted claim
+ * itself. `score`/`cbcLevel` on the evidence row remain the only thing any
+ * projector reads; this payload exists purely so a teacher (or a future
+ * audit) can see exactly what the model saw and proposed, and so a
+ * rejected/corrected mark's original AI reasoning is never lost.
+ */
+export type PaperIntelligenceMarkPayload = {
+  kind: 'paper_intelligence_mark'
+  payloadVersion: 1
+  rubricId: string
+  questionNumber: number
+  recognizedAnswer: string
+  recognitionConfidence: number
+  gradingConfidence: number
+  rationale: string
+  provider: 'gemini'
+  model: string
+  /** Storage path, never the image bytes. */
+  imageRef: string
 }
 
 /** LI-6: each source has a declared trust tier. Confidence scoring (confidence.ts) is capped by this. */
