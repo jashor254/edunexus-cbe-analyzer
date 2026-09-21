@@ -25,6 +25,14 @@ import { growthRepos } from '@/lib/growth/repositories'
 // immediately, with no write — this is what "existing founder data
 // remains untouched" means in practice: this function never mutates a
 // row that's already there, whether or not GROWTH_FOUNDER_EMAIL is set.
+// Takes a session-bound client (from utils/supabase/server), not
+// createServiceClient() — deliberate exception to the "server-side DB always
+// uses the service client" rule: requireAuthentication() below needs
+// auth.getUser() resolved against the caller's own session, which the
+// service-role client has no session to provide. app/api/growth/* routes
+// reuse this same session client for their subsequent growth_schools/
+// growth_users queries too, so RLS (not just this founder-email gate) is
+// the second layer of defense on that data — not a silent divergence.
 export async function requireGrowthUser(client: SupabaseClient): Promise<{ id: string }> {
   const user = await requireAuthentication(client)
 

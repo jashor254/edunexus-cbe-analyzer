@@ -5,6 +5,7 @@ import { gradeScore } from '@/lib/grading'
 import type { GradeScale } from '@/lib/grading'
 import type { SchoolReportCard, ReportCardWithSubjects, CbcLevel } from '@/types/core'
 import { getAttendanceStatusCountsForClass } from '@/lib/core/attendance'
+import { getClass } from '@/lib/core/classes'
 import { createBlueprintSnapshot } from '@/lib/learnerBlueprint/snapshot'
 import { asLearnerId } from '@/lib/core/identityTypes'
 
@@ -46,6 +47,22 @@ export async function generateReportCards(
   termId: string,
   gradeBoundaries: Record<string, { min: number }>
 ): Promise<{ generated: number; skipped: number }> {
+  // Tenant-isolation forensic audit (2026-09-03): classId was never proven
+  // to belong to schoolId before the reads below ran — a School A admin
+  // could supply their own valid schoolId alongside another school's real
+  // classId, and listClassReportCards/findActiveEnrollmentsByClass/
+  // findTermSubjectSummaries (none of which filter by school_id) would read
+  // that other school's real report-card/enrollment/subject data before
+  // this function's own logic ever ran. The only reason that path didn't
+  // already leak in production was an unrelated Attendance ownership check
+  // three reads later (getAttendanceStatusCountsForClass -> getClass,
+  // below) accidentally throwing first — fragile, not a designed gate.
+  // getClass() is the exact, already-battle-tested ownership check
+  // (repos.teachers.findClassById: `.eq('id', classId).eq('school_id',
+  // schoolId).single()`) — reused here at the correct boundary, before any
+  // class-scoped read, instead of relying on it firing by accident later.
+  await getClass(classId, schoolId)
+
   // Sprint 5B integrity guard (docs/engineering/sprint-5a-report-card-lifecycle-audit.md
   // Part 4/7, docs/engineering/implementation-log.md): refuses to generate
   // if ANY report card for this class/term is already published.

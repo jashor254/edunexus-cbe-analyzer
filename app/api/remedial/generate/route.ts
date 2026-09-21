@@ -3,6 +3,8 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
 import { generateRemedialPlan } from '@/lib/remedial/planner'
+import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
+import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
 
 const Schema = z.object({
   sowId:          z.string().uuid(),
@@ -18,6 +20,19 @@ const Schema = z.object({
 
 export async function POST(req: Request): Promise<Response> {
   try {
+    const access = await checkFeatureAccess('remedial_planner')
+    if (access.allowed === false) {
+      return apiError(
+        access.reason === 'insufficient_tokens' ? 'Insufficient tokens. Please top up to generate a remedial plan.' : 'Access denied',
+        access.reason === 'unauthenticated' ? 401 : 403,
+      )
+    }
+
+    const rateLimit = await checkDailyCallLimit(access.userId, 'remedial_planner')
+    if (rateLimit.allowed === false) {
+      return apiError(`Daily limit of ${rateLimit.limit} remedial plan generations reached. Resets at ${rateLimit.resetAt}`, 429)
+    }
+
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return apiUnauthorized()
@@ -42,6 +57,18 @@ export async function POST(req: Request): Promise<Response> {
       .maybeSingle()
     if (!sow) return apiForbidden()
 
+    // Verify teacher owns classId too — sowId ownership alone does not imply
+    // classId ownership, since the two are independent, client-supplied
+    // fields. Without this check a teacher could supply any real classId and
+    // pull that class's roster/learner profiles into their own plan.
+    const { data: cls } = await db
+      .from('teacher_classes')
+      .select('id')
+      .eq('id', parsed.data.classId)
+      .eq('teacher_id', teacher.id)
+      .maybeSingle()
+    if (!cls) return apiForbidden()
+
     const plan = await generateRemedialPlan({
       sowId:          parsed.data.sowId,
       teacherId:      teacher.id,
@@ -54,6 +81,11 @@ export async function POST(req: Request): Promise<Response> {
       currentWeek:    parsed.data.currentWeek,
       weeksRemaining: parsed.data.weeksRemaining,
     })
+
+    // Charged only after a successful plan (never before, per lib/payments/access.ts).
+    if (access.deductTokens) {
+      await deductFeatureTokens(access.userId, 'remedial_planner', access.cost)
+    }
 
     return apiSuccess({ plan })
   } catch (e: unknown) {

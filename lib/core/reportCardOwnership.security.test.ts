@@ -274,3 +274,44 @@ test('NO REGRESSION: generateReportCards still succeeds normally for an all-draf
   await db.from('terms').delete().eq('id', term.id)
   await db.from('academic_years').delete().eq('id', year.id)
 })
+
+// ── generateReportCards: classId-belongs-to-schoolId boundary ──────────────
+//
+// Tenant-isolation forensic audit (2026-09-03): generateReportCards never
+// proved classId belonged to schoolId before reading class-scoped data
+// (listClassReportCards / findActiveEnrollmentsByClass /
+// findTermSubjectSummaries — none filter by school_id). A School A admin
+// supplying their own valid schoolId alongside School B's real classId
+// would have those three reads succeed against School B's real data before
+// an unrelated Attendance ownership check happened to throw three reads
+// later. Fixed with one explicit getClass(classId, schoolId) call — the
+// same helper Attendance already relied on — moved to the actual boundary,
+// before any class-scoped read.
+
+test('EXPLOIT BLOCKED: generateReportCards refuses School B\'s classId even with School A\'s own valid schoolId, and writes nothing', async () => {
+  const { count: before } = await db.from('school_report_cards').select('id', { count: 'exact', head: true }).eq('school_id', schoolA.schoolId)
+
+  await assert.rejects(
+    generateReportCards(schoolA.authUserId, schoolA.schoolId, schoolB.classId, schoolB.termId, {})
+  )
+
+  const { count: after } = await db.from('school_report_cards').select('id', { count: 'exact', head: true }).eq('school_id', schoolA.schoolId)
+  assert.equal(after, before, 'a rejected cross-school generate call must write zero report-card rows')
+
+  // Confirm School B's own data was untouched too — the rejection must
+  // happen before any read/write, not merely before a School-A-scoped write.
+  const { count: bCount } = await db.from('school_report_cards').select('id', { count: 'exact', head: true }).eq('school_id', schoolB.schoolId).eq('class_id', schoolB.classId)
+  assert.equal(bCount, 2, 'School B\'s existing 2 seeded report cards for this class must be untouched')
+})
+
+test('EXPLOIT BLOCKED: generateReportCards refuses the reverse mismatch too (School B\'s schoolId, School A\'s classId)', async () => {
+  await assert.rejects(
+    generateReportCards(schoolB.authUserId, schoolB.schoolId, schoolA.classId, schoolA.termId, {})
+  )
+})
+
+test('NONEXISTENT: generateReportCards refuses a well-formed but nonexistent classId, same as cross-school', async () => {
+  await assert.rejects(
+    generateReportCards(schoolA.authUserId, schoolA.schoolId, '00000000-0000-0000-0000-000000000000', schoolA.termId, {})
+  )
+})

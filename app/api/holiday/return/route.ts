@@ -13,6 +13,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
 import { recordHolidayReturn } from '@/lib/holiday/return'
 import { KE_CBC } from '@/lib/curriculum/regional/ke-cbc'
+import { resolveTeacherOwnership } from '@/lib/compass/ownership'
 
 const BodySchema = z.object({
   studentId:      z.string().uuid(),
@@ -40,13 +41,19 @@ export async function POST(req: Request): Promise<Response> {
     const parsed = BodySchema.safeParse(await req.json())
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
 
-    // Ownership: the student must belong to this teacher — never trust
-    // studentId from the request body alone.
+    // Ownership: never trust studentId from the request body alone. Checked
+    // via students.teacher_id OR current class_students roster membership —
+    // not students.teacher_id alone, which records who originally entered
+    // the student, not who currently teaches them (CLAUDE.md Architecture
+    // Rules; same anti-pattern already fixed for learner_evidence's RLS
+    // policy in supabase/migrations/20260720120000_sprint1_critical_rls_fixes.sql).
+    const ownership = await resolveTeacherOwnership(user.id, parsed.data.studentId)
+    if (!ownership.allowed) return apiForbidden()
+
     const { data: student } = await db
       .from('students')
       .select('id, name')
       .eq('id', parsed.data.studentId)
-      .eq('teacher_id', teacher.id)
       .maybeSingle()
     if (!student) return apiForbidden()
 

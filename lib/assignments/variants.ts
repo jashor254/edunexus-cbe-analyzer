@@ -170,9 +170,16 @@ export async function findVariantById(variantId: string): Promise<VariantRow | n
  * A teacher's manual edit to a still-draft variant. Always flips
  * `generated_by` to 'teacher_edited' — provenance (the row's `id`,
  * `question_id`, `variant_type`, `sub_strand_id`, `learning_outcome`) is
- * untouched; only content and authorship change. The lifecycle trigger
- * (Sprint 9 Slice 1) only allows this while the row is still 'draft' — an
- * approved/rejected variant must go through regenerateVariant() instead.
+ * untouched; only content and authorship change.
+ *
+ * Draft-only is enforced HERE, not by the lifecycle trigger (Sprint 9 Slice
+ * 1) — that trigger only guards `status` transitions, and this function
+ * never touches `status`, so an `UPDATE` that omits it sails through the
+ * trigger's guard regardless of the row's current status. Forensic audit
+ * finding: without this explicit check, an approved/rejected variant's
+ * content could be silently rewritten underneath its own approval, with no
+ * re-review — an approved/rejected variant must go through
+ * regenerateVariant() instead, which always produces a fresh draft.
  */
 export async function editVariant(variantId: string, patch: {
   questionText?: string
@@ -182,6 +189,13 @@ export async function editVariant(variantId: string, patch: {
   learnerExplanation?: string | null
 }): Promise<VariantRow> {
   const db = createServiceClient()
+
+  const existing = await findVariantById(variantId)
+  if (!existing) throw new Error('Variant not found')
+  if (existing.status !== 'draft') {
+    throw new Error(`Cannot edit a variant with status '${existing.status}' — only draft variants may be edited; use regenerateVariant() instead`)
+  }
+
   const update: Record<string, unknown> = { generated_by: 'teacher_edited' }
   if (patch.questionText !== undefined) update.question_text = patch.questionText
   if (patch.choices !== undefined) update.choices = patch.choices
@@ -193,6 +207,7 @@ export async function editVariant(variantId: string, patch: {
     .from('assignment_question_variants')
     .update(update)
     .eq('id', variantId)
+    .eq('status', 'draft')
     .select(VARIANT_COLUMNS)
     .single()
   if (error) throw new Error(`Failed to edit variant: ${error.message}`)
