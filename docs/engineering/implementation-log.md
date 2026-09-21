@@ -23,6 +23,22 @@ Entries are never edited to rewrite history — if a change is later reverted or
 
 ---
 
+## 2026-09-21 — Forensic authorization closure, CBC-level bands, Paper Intelligence prototype, Compass pedagogy (landed as 14 commits, `4a475f8..41b9a4a`)
+
+**What changed**: a ~six-week carried working tree (47 modified + 40 new files, 2026-08-08 → 2026-09-21) was reviewed, split into 14 single-purpose commits, verified per-commit, and pushed. Four security closures from the 2026-09-03 forensic pass: the `class_students` INSERT policy that let any authenticated user forge a parent link to any school's learner (live-reproduced pre-fix, P0); the missing `teacher_classes` check on `remedial/generate`; `holiday/return` and `report-cards` ownership resolved through current roster / school scope instead of `teacher_id`; `editVariant` draft-only enforced in code (the lifecycle trigger never covered content-only UPDATEs). WhatsApp webhook now verifies `X-Hub-Signature-256`. Adaptive bands re-keyed on real CBC levels (BE/AE/ME/EE) with a `guided_practice` tier so `BAND_TO_TIER` is 1:1. Paper Intelligence Prototype 01 (AI-proposed marks from answer-page photos, `pending_review` only, trust tier 1). Compass pedagogy state (misconception → remediation → re-check, in-session only). Academic projector now groups `bySubject` by canonical subject — raw `"Mathematics"` evidence was silently unreachable. SOW/holiday/variant generation now actually deducts tokens.
+
+**Also found and fixed on the way**: `components/feedback/FeedbackSystem.tsx` had `'`use client'` (stray backtick — `tsc` accepts it as a string expression, so the directive was silently dead); `lib/academicClinic/reportContentContract.test.ts` still guarded a component deleted in `fdc2c21`, leaving `main` with 2 failing tests; the legacy `supabase/teacher_portal_migration.sql` still created the open `USING (TRUE)` read policy and the forgeable insert policy the new migration removes — because SELECT policies OR together, re-running it would have exposed every `class_students` row.
+
+**Kept out of the repo** (gitignored, still on disk): `scripts/_tmp/` (~70 probes including real-Kangai seeders and invite-link fetchers), `scripts/second-brain/` (hardcoded home paths), `blender-validation/` (video scaffold).
+
+**Architectural documents referenced**: Constitution; RAS §3 (canonical domains); `learner-record-layer-decisions.md` Decision 5 (Paper Intelligence writes only through `persistEvidenceBatch`); `academic-evidence-layer.md` §3 (`teacher_id` is "who entered this," never access control).
+
+**ADR**: None — no trigger condition met. Paper Intelligence adds a payload variant to the existing shared jsonb column (Phase C precedent), not a new layer or domain.
+
+**Tests added**: `reportCardOwnership.security.test.ts` (+41), `returnOwnership.http.integration.test.ts`, `generateRoute.http.integration.test.ts`, `mark/route.http.integration.test.ts` (Gate 5), `paperIntelligence/{validation,validation.adversarial,evidence}.test.ts`, `mark-page/route.test.ts`, `compass/pedagogy.test.ts`, `projection/academicProjector.test.ts` (excluded-tests — needs credentials at import). Standard suite 1274/1274 at HEAD. Each of the 13 code commits compiles independently (`tsc --noEmit` on a detached checkout of each).
+
+**Rollback considerations**: the `class_students` policy drop is safe to leave even if everything else reverts — no legitimate write path used it. The `adaptive_bands_cbc_levels` migration renames band values; reverting the code without reverting the migration leaves rows with unknown bands. `remedial_plans_unique_upsert_key` is additive. Three new project skills live in `.claude/skills/` (`/assess`, `/decide`, `/pilot-review`) — plain markdown, no runtime impact.
+
 ## 2026-08-03 — Projection and Blueprint Equivalence Gate
 
 **What changed**: implemented the projection-equivalence test harness the Evidence Migration Trigger ADR named as a mandatory precondition — no evidence migrated, no foreign keys changed, no dual-write, no fix to the broader `students.user_id` identity model. Purely a test harness proving (or, if it ever regresses, disproving) that resolving a learner through Core identity produces identical intelligence output to resolving the same learner directly through legacy identity.
