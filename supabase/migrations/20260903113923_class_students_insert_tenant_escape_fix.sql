@@ -1,0 +1,46 @@
+-- class_students: close a cross-tenant parent-link forgery (P0)
+--
+-- Multi-tenant isolation forensic audit (2026-09-03) found and live-reproduced
+-- a CRITICAL vulnerability: the "class_students: insert" policy's WITH CHECK
+-- was `(auth.uid() = parent_id)` only — no check that class_id/student_id
+-- were legitimately related to the caller, or belonged to any school the
+-- caller has a real relationship with. Reproduced live, pre-fix, as a genuine
+-- authenticated (non-service-role) session:
+--   POST /rest/v1/class_students {class_id: <School B's real class>,
+--     student_id: <School B's real student>, parent_id: <School A user>}
+--   -> 201, row created
+--   GET  /rest/v1/learner_evidence?learner_id=eq.<School B's student>
+--   -> 200, the victim's real evidence returned
+-- The fabricated row satisfied auth_is_parent_of_student()
+-- (20260720130000_sprint1_evidence_rls_bypass_fix.sql), which gates
+-- learner_evidence/learner_projections SELECT — any authenticated user could
+-- self-grant read access to any other school's learner's evidence purely by
+-- guessing/observing a real class_id + student_id pair.
+--
+-- Fix: remove the authenticated INSERT policy entirely, no replacement.
+-- Traced every real class_students write path in the repository (Phase 1 of
+-- the fix pass) — exactly three INSERTs and one UPDATE
+-- (app/api/student/join-class/route.ts, gated by a real class_code lookup +
+-- requireStudent's self-ownership check; app/api/teacher/classes/[classId]/
+-- students/route.ts, gated by requireClassTeacher; lib/repositories/
+-- promotion.repository.ts's addStudentToClass; app/api/class/join/route.ts's
+-- parent-linking UPDATE, gated by a real, expiring class_invites.invite_code)
+-- — and every one of them already uses createServiceClient(), which bypasses
+-- RLS entirely. No legitimate flow relies on a direct authenticated client
+-- insert. This is the same pattern already applied to token_balances (its
+-- vulnerable self-grant UPDATE policy was dropped with no replacement,
+-- 20260720120000_sprint1_critical_rls_fixes.sql) and school_users (write-only
+-- via service role, 20260726090000_fix_school_users_self_escalation.sql) —
+-- not a new mechanism, reusing this codebase's own established precedent.
+--
+-- The "class_students: owner read" SELECT policy and every downstream
+-- consumer (auth_is_parent_of_student, auth_is_direct_teacher_of_student,
+-- learner_evidence/learner_projections RLS) are untouched — they were doing
+-- their job correctly; the defect was the forgeable relationship row itself.
+
+drop policy if exists "class_students: insert" on class_students;
+
+-- No replacement authenticated-role INSERT policy. Every legitimate write
+-- goes through a service-role-backed API route or repository method, each
+-- independently authorized (requireClassTeacher / requireStudent + a real
+-- class_code / a real, expiring class_invites.invite_code) before the write.
