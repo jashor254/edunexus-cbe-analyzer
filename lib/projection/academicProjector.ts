@@ -6,6 +6,7 @@
 import type { EvidenceRow } from '@/lib/repositories/evidence.repository'
 import type { Projection, AcademicValue, SubjectPerformance, SubStrandPerformance, Trend } from './types'
 import { computeCoverage, computeProjectionConfidence, sortEvidenceChronologically } from './coverage'
+import { mapSubject } from '@/lib/intelligence/subjectMapping'
 
 export const ACADEMIC_PROJECTION_VERSION = 'academic-v1'
 
@@ -37,11 +38,26 @@ export function projectAcademic(evidence: EvidenceRow[], now: Date = new Date())
   const scored = evidence.filter(e => e.cbc_level !== null)
   if (scored.length === 0) return null
 
+  // Grouped by canonical subject (mapSubject().canonicalSubject) — the same
+  // normalization `lib/adaptiveLearning/recommend.ts`'s resolveAcademicSignal()
+  // applies before its own `bySubject[canonicalSubject]` lookup. Evidence
+  // producers are not all consistent about what they write to `subject`:
+  // `lib/assessments/evidence.ts` already canonicalizes before persisting,
+  // but `lib/formativeSignals/evidence.ts` and `lib/compass/evidence.ts`
+  // persist the raw human-entered form (e.g. "Mathematics"). Grouping by the
+  // raw string here meant a confirmed evidence row with `subject: "Mathematics"`
+  // produced `bySubject["Mathematics"]`, which the canonical-keyed read side
+  // (`bySubject["mathematics"]`) could never find — silently indistinguishable
+  // from having no evidence at all, regardless of how much confirmed evidence
+  // actually existed. Normalizing here, at the one place bySubject is built,
+  // makes every producer's evidence reachable without requiring each producer
+  // to agree on casing.
   const bySubjectRaw = new Map<string, EvidenceRow[]>()
   for (const e of scored) {
-    const group = bySubjectRaw.get(e.subject) ?? []
+    const canonicalSubject = mapSubject(e.subject).canonicalSubject
+    const group = bySubjectRaw.get(canonicalSubject) ?? []
     group.push(e)
-    bySubjectRaw.set(e.subject, group)
+    bySubjectRaw.set(canonicalSubject, group)
   }
 
   const bySubject: Record<string, SubjectPerformance> = {}
@@ -81,7 +97,11 @@ export function projectAcademic(evidence: EvidenceRow[], now: Date = new Date())
       subStrandId,
       subStrandTitle: latest.sub_strand,
       strandTitle: latest.strand,
-      subject: latest.subject,
+      // Canonicalized for the same reason as bySubject above — resolveAcademicSignal()
+      // matches this against `mapSubject(subject).canonicalSubject`, an exact
+      // string comparison (`subStrand.subject === canonicalSubject`), not a
+      // key lookup, so it needs the same normalization here.
+      subject: mapSubject(latest.subject).canonicalSubject,
       latestLevel: levels[levels.length - 1] as 1 | 2 | 3 | 4,
       trend: computeTrend(levels),
       history: sorted.map(r => ({ level: r.cbc_level as 1 | 2 | 3 | 4, score: r.score, at: r.created_at, evidenceId: r.id })),

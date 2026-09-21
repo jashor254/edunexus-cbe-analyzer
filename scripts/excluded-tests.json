@@ -21,6 +21,7 @@
     "lib/learnerBlueprint/actionPlan/review.mapping.test.ts",
     "lib/learnerBlueprint/actionPlan/reviewWorkspace.mapping.test.ts",
     "lib/learningSignal/didLearningTakePlace.test.ts",
+    "lib/projection/academicProjector.test.ts",
     "lib/remedial/planner.test.ts",
     "lib/remedial/plannerRouterMigration.test.ts",
     "lib/whatsapp/senderFailureLogging.integration.test.ts"
