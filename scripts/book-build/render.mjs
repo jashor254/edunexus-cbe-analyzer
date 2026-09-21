@@ -17,6 +17,24 @@
 import Printer from "pagedjs-cli";
 import { PDFDocument, PDFArray, PDFName, PDFString } from "pdf-lib";
 
+// Heading text reaching this file (via allHeadings[].text) is marked's
+// rendered inline HTML with tags stripped but entities left encoded — correct
+// for the on-page TOC, where the browser resolves "&#39;" back to an
+// apostrophe, but wrong for a PDF outline Title: a PDFString's bytes are
+// displayed as-is by a viewer's bookmarks panel, so "Learner&#39;s Record"
+// would show literally rather than as "Learner's Record". Decode only at
+// this boundary, immediately before each Title is written.
+function decodeHtmlEntities(text) {
+  return text
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number(dec)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
 const PRINT_SETTINGS = {
   printBackground: true,
   displayHeaderFooter: false,
@@ -243,7 +261,7 @@ export async function renderWithLinks(htmlPath, allHeadings) {
     for (let i = 0; i < built.length; i++) {
       const node = built[i];
       const dict = {
-        Title: PDFString.of(node.title),
+        Title: PDFString.of(decodeHtmlEntities(node.title)),
         Parent: outlineRootRef,
         Dest: node.dest,
       };
@@ -259,7 +277,7 @@ export async function renderWithLinks(htmlPath, allHeadings) {
       for (let j = 0; j < node.children.length; j++) {
         const child = node.children[j];
         const childDict = {
-          Title: PDFString.of(child.title),
+          Title: PDFString.of(decodeHtmlEntities(child.title)),
           Parent: node.ref,
           Dest: child.dest,
         };

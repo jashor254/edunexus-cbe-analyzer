@@ -11,6 +11,14 @@
   --code-bg: #f4f2ec;
   --code-border: #d8d3c4;
   --accent: #6b5a2e;
+
+  /* Cover only — Design System tokens (see the published EEI Design System
+     artifact). Interior pages stay on the light-paper palette above by
+     deliberate choice: the ink-navy field is reserved for the cover. */
+  --cover-ink: #0a0d12;
+  --cover-paper: #e9e2d2;
+  --cover-paper-dim: #b9b2a0;
+  --cover-accent: #c09a48;
 }
 
 @page {
@@ -122,8 +130,9 @@ blockquote + p { text-indent: 0; }
 .cover-page {
   break-after: page;
   page: cover;
-  background: #14181f;
-  color: #f2eee4;
+  position: relative;
+  background: var(--cover-ink);
+  color: var(--cover-paper);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -131,6 +140,7 @@ blockquote + p { text-indent: 0; }
   text-align: center;
   min-height: 100%;
   padding: 0 0.6in;
+  overflow: hidden;
 }
 
 @page cover {
@@ -140,11 +150,28 @@ blockquote + p { text-indent: 0; }
   @bottom-center { content: ""; }
 }
 
+/* Bare ring of hairlines standing in for the six-station Educational
+   Intelligence Loop (Evidence -> Projection -> Reasoning -> Recommendation
+   -> Intervention -> Observation -> Evidence) — geometry only, unlabeled;
+   the reader only decodes it after reading the book. See the Design System
+   for the labeled version used inside the book. */
+.cover-page .cover-mark {
+  position: absolute;
+  top: -18%;
+  right: -22%;
+  width: 78%;
+  height: auto;
+  color: var(--cover-accent);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
 .cover-page .cover-rule {
   width: 1.6in;
   height: 1px;
-  background: #a8925a;
+  background: var(--cover-accent);
   margin: 0.35in 0;
+  position: relative;
 }
 
 .cover-page .cover-title {
@@ -153,16 +180,18 @@ blockquote + p { text-indent: 0; }
   font-size: 27pt;
   line-height: 1.25;
   max-width: 4.3in;
+  position: relative;
 }
 
 .cover-page .cover-subtitle {
   font-family: "Noto Serif", serif;
   font-style: italic;
   font-size: 11.5pt;
-  color: #cfc9b8;
+  color: var(--cover-paper-dim);
   max-width: 3.6in;
   margin-top: 0.15in;
   line-height: 1.5;
+  position: relative;
 }
 
 .cover-page .cover-author {
@@ -171,6 +200,7 @@ blockquote + p { text-indent: 0; }
   letter-spacing: 0.08em;
   text-transform: uppercase;
   margin-top: 0.5in;
+  position: relative;
 }
 
 .halftitle-page,
@@ -393,6 +423,141 @@ strong {
 
 em {
   font-style: italic;
+}
+
+/* ---------------- Chapter Two architecture diagram ---------------- */
+/* Interior-only, scoped to this one figure. Uses the Design System's ink/
+   brass as literal SVG attribute values (see build.mjs), not new CSS
+   variables — the interior palette above (--ink, --paper, --accent) is
+   locked and untouched by this rule. */
+
+.ch2-architecture {
+  break-inside: avoid;
+  margin: 0.4in auto 0 auto;
+  max-width: 4.4in;
+  text-align: center;
+}
+
+.ch2-architecture svg {
+  width: 100%;
+  height: auto;
+}
+
+.ch2-architecture figcaption {
+  margin-top: 0.14in;
+  font-family: "Noto Serif", serif;
+  font-style: italic;
+  font-size: 8.6pt;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  text-align: left;
+}
+
+/* ---------------- Chapter Three reasoning diagram ---------------- */
+/* Same scoping rule as .ch2-architecture: interior-only, literal ink/brass
+   SVG attribute values (see build.mjs), interior palette untouched. */
+
+.ch3-reasoning {
+  break-inside: avoid;
+  margin: 0.4in auto 0 auto;
+  max-width: 4.4in;
+  text-align: center;
+}
+
+.ch3-reasoning svg {
+  width: 100%;
+  height: auto;
+}
+
+.ch3-reasoning figcaption {
+  margin-top: 0.14in;
+  font-family: "Noto Serif", serif;
+  font-style: italic;
+  font-size: 8.6pt;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  text-align: left;
+}
+
+/* ---------------- Chapter Four computation diagram ---------------- */
+/* Same scoping rule as .ch2-architecture / .ch3-reasoning: interior-only,
+   literal ink/brass/grey SVG attribute values (see build.mjs), interior
+   palette untouched. */
+
+.ch4-computation {
+  break-inside: avoid;
+  margin: 0.4in auto 0 auto;
+  max-width: 4.4in;
+  text-align: center;
+}
+
+.ch4-computation svg {
+  width: 100%;
+  height: auto;
+}
+
+.ch4-computation figcaption {
+  margin-top: 0.14in;
+  font-family: "Noto Serif", serif;
+  font-style: italic;
+  font-size: 8.6pt;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  text-align: left;
+}
+
+/* ---------------- Chapter Five operational diagram ---------------- */
+/* Same scoping rule as .ch2-architecture / .ch3-reasoning / .ch4-computation:
+   interior-only, literal ink/brass/grey SVG attribute values (see
+   build.mjs), interior palette untouched. */
+
+.ch5-operational {
+  break-inside: avoid;
+  margin: 0.4in auto 0 auto;
+  max-width: 4.4in;
+  text-align: center;
+}
+
+.ch5-operational svg {
+  width: 100%;
+  height: auto;
+}
+
+.ch5-operational figcaption {
+  margin-top: 0.14in;
+  font-family: "Noto Serif", serif;
+  font-style: italic;
+  font-size: 8.6pt;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  text-align: left;
+}
+
+/* ---------------- Chapter Six institution diagram ---------------- */
+/* Same scoping rule as .ch2-architecture / .ch3-reasoning / .ch4-computation
+   / .ch5-operational: interior-only, literal ink/brass/grey SVG attribute
+   values (see build.mjs), interior palette untouched. */
+
+.ch6-institution {
+  break-inside: avoid;
+  margin: 0.4in auto 0 auto;
+  max-width: 4.4in;
+  text-align: center;
+}
+
+.ch6-institution svg {
+  width: 100%;
+  height: auto;
+}
+
+.ch6-institution figcaption {
+  margin-top: 0.14in;
+  font-family: "Noto Serif", serif;
+  font-style: italic;
+  font-size: 8.6pt;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  text-align: left;
 }
 
 /* ---------------- Code / pseudocode ---------------- */
