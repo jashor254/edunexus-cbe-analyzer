@@ -19,7 +19,7 @@ interface DraftQuestion {
 interface VariantRow {
   id: string
   question_id: string
-  variant_type: 'foundation' | 'supported_practice' | 'extension'
+  variant_type: 'foundation' | 'guided_practice' | 'supported_practice' | 'extension'
   question_text: string
   choices: string[]
   status: 'draft' | 'approved' | 'rejected' | 'archived'
@@ -27,6 +27,7 @@ interface VariantRow {
 
 const TIER_LABEL: Record<VariantRow['variant_type'], string> = {
   foundation: 'Foundation',
+  guided_practice: 'Guided Practice',
   supported_practice: 'Supported Practice',
   extension: 'Extension',
 }
@@ -333,6 +334,7 @@ export default function QuizBuilderPage({ params }: { params: Promise<{ assignme
             >
               <option value="all">All tiers</option>
               <option value="foundation">Foundation</option>
+              <option value="guided_practice">Guided Practice</option>
               <option value="supported_practice">Supported Practice</option>
               <option value="extension">Extension</option>
             </select>

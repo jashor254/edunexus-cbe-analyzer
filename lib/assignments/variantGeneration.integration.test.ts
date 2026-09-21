@@ -93,9 +93,9 @@ before(async () => {
   classId = cls.id
 
   // 3 students, seeded with real confirmed Evidence at levels 2 / 3 / 4 —
-  // classifyGroup() maps these to prerequisite_gap (foundation),
-  // concept_confusion (supported_practice), and on_track (extension)
-  // respectively, via the real, unmodified Recommendation layer.
+  // classifyGroup() maps these to AE (guided_practice), ME
+  // (supported_practice), and EE (extension) respectively, via the real,
+  // unmodified Recommendation layer.
   const levelScores = [40, 60, 90] // -> CBC levels 2, 3, 4 (thresholds 75/50/30)
   for (const score of levelScores) {
     const { data: student, error: studentErr } = await db
@@ -148,13 +148,13 @@ after(async () => {
 
 const learners = () => studentIds.map((id, i) => ({ learnerId: id, learnerName: `Student ${i}` }))
 
-test('one canonical question produces exactly three draft variants (foundation, supported_practice, extension)', async () => {
+test('one canonical question produces exactly three draft variants (guided_practice, supported_practice, extension) — no BE learner in this fixture, so no foundation tier', async () => {
   const result = await generateAdaptiveVariants({ questionId, learners: learners(), subject: SUBJECT, callAI: fakeAI('success') })
 
   assert.equal(result.failed.length, 0)
   assert.equal(result.created.length, 3)
   const tiers = result.created.map(v => v.variant_type).sort()
-  assert.deepEqual(tiers, ['extension', 'foundation', 'supported_practice'])
+  assert.deepEqual(tiers, ['extension', 'guided_practice', 'supported_practice'])
   assert.ok(result.created.every(v => v.status === 'draft'))
   assert.ok(result.created.every(v => v.generated_by === 'ai'))
 

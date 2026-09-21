@@ -40,10 +40,10 @@ before(async () => {
 })
 
 test('mapGroupToRoute: the locked routing matrix, exhaustively', () => {
-  assert.equal(mapGroupToRoute('critical_gap'), 'guided')
-  assert.equal(mapGroupToRoute('prerequisite_gap'), 'guided')
-  assert.equal(mapGroupToRoute('concept_confusion'), 'core')
-  assert.equal(mapGroupToRoute('on_track'), 'extension')
+  assert.equal(mapGroupToRoute('BE'), 'guided')
+  assert.equal(mapGroupToRoute('AE'), 'guided')
+  assert.equal(mapGroupToRoute('ME'), 'core')
+  assert.equal(mapGroupToRoute('EE'), 'extension')
   assert.equal(mapGroupToRoute('insufficient_data'), 'core')
   // "failed projection lookup" is represented as null by the caller.
   assert.equal(mapGroupToRoute(null), 'core')

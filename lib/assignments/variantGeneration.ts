@@ -43,16 +43,17 @@ import { createDraftVariants, findLiveVariantTypesForQuestion, findVariantById, 
  */
 export type RoutedCompletionFn = (request: AIRequest) => Promise<AIResponse>
 
-// The one frozen band-to-tier mapping (ADR-0025 §2, reconciled by ADR-0026
-// to "foundation"/"supported_practice"/"extension") — defined exactly once,
-// reused by both variant selection (Sprint 4C design) and generation here.
-// 'extension' is the only tier gated on a real on_track learner actually
-// being present — never generated speculatively.
-export const BAND_TO_TIER: Partial<Record<AdaptiveGroupType, VariantType>> = {
-  critical_gap: 'foundation',
-  prerequisite_gap: 'foundation',
-  concept_confusion: 'supported_practice',
-  on_track: 'extension',
+// The one band-to-tier mapping, now a straight 1:1 with Kenya's real CBC
+// level rubric — one tier per level, never two levels collapsed into one
+// tier as the former critical_gap/prerequisite_gap split into 'foundation'
+// used to. 'extension' remains the only tier gated on a real EE (Exceeding
+// Expectations) learner actually being present — never generated
+// speculatively for a class with nobody currently at that level.
+export const BAND_TO_TIER: Record<AdaptiveGroupType, VariantType> = {
+  BE: 'foundation',
+  AE: 'guided_practice',
+  ME: 'supported_practice',
+  EE: 'extension',
 }
 
 /** Only the fields safe to hand to a language model — never a name, a mark, or an evidence id. */
@@ -118,9 +119,10 @@ Respond with valid JSON only, matching this exact shape, no markdown, no comment
 }`
 
   const tierRules: Record<VariantType, string> = {
-    foundation: 'Foundation tier: smaller reasoning steps, simpler wording, concrete context, worked-example framing inside the stem, explicit guided reasoning. Never remove essential reasoning, never lower the curriculum standard.',
-    supported_practice: 'Supported Practice tier: stay as close as possible to the canonical question — light clarity edits only, moderate scaffolding, reduced (not absent) hints. Never drift toward Foundation or Extension.',
-    extension: 'Extension tier: higher-order reasoning, transfer to a new but still in-grade context, real-world application, connect to a second concept the learner has evidence of readiness for. Never introduce future-grade content or content outside the given curriculum node.',
+    foundation: 'Foundation tier (Below Expectations): smaller reasoning steps, simpler wording, concrete context, worked-example framing inside the stem, explicit guided reasoning. Never remove essential reasoning, never lower the curriculum standard.',
+    guided_practice: 'Guided Practice tier (Approaching Expectations): light-to-moderate scaffolding — clearer step markers and a small amount of context or hinting, but noticeably closer to grade-level phrasing than Foundation. Never as heavily scaffolded as Foundation, never as close to the canonical wording as Supported Practice.',
+    supported_practice: 'Supported Practice tier (Meeting Expectations): stay as close as possible to the canonical question — light clarity edits only, minimal scaffolding, reduced (not absent) hints. Never drift toward Foundation, Guided Practice, or Extension.',
+    extension: 'Extension tier (Exceeding Expectations): higher-order reasoning, transfer to a new but still in-grade context, real-world application, connect to a second concept the learner has evidence of readiness for. Never introduce future-grade content or content outside the given curriculum node.',
   }
 
   const curriculumBlock = curriculum
@@ -142,17 +144,37 @@ Learner readiness context (band only, no personal data): ${context.band}, academ
   return { system, prompt }
 }
 
-function buildVerificationPrompt(learningOutcome: string | null, variant: { questionText: string; choices: string[]; correctIndex: number }): { system: string; prompt: string } {
+// The topic-preservation check (item 2 below) previously went silent
+// whenever no curriculum sub-strand was attached to the assignment — a
+// fully legal, and in practice the DEFAULT, configuration (substrand_id is
+// optional at assignment creation). Forensic audit finding: with no
+// learning outcome, verification degraded to "verify internal consistency
+// only," meaning nothing — deterministic or AI — ever confirmed a tier
+// variant still tests the same concept as the canonical question. The
+// canonical question's own text is always available regardless of
+// curriculum grounding, so it is now always passed in and always checked
+// against, with the learning outcome used as the stricter standard only
+// when one is actually seeded.
+function buildVerificationPrompt(
+  canonicalQuestionText: string,
+  learningOutcome: string | null,
+  variant: { questionText: string; choices: string[]; correctIndex: number },
+): { system: string; prompt: string } {
   const system = `You are an independent verification pass for an AI-generated assessment question — a second, separate check, not the original generator. Verify only; never generate new content. Respond with valid JSON only: {"valid": boolean, "reason": string}.`
-  const prompt = `Learning outcome this question must measure: ${learningOutcome ?? '(not specified — verify internal consistency only)'}
+  const topicStandard = learningOutcome
+    ? `Learning outcome this question must measure: ${learningOutcome}`
+    : `No curriculum learning outcome is seeded for this assignment. The concept being tested must instead match the canonical question below — this is the required standard, not an optional check.`
+  const prompt = `${topicStandard}
 
-Question: "${variant.questionText}"
+Canonical question this variant was derived from: "${canonicalQuestionText}"
+
+Variant question: "${variant.questionText}"
 Choices: ${JSON.stringify(variant.choices)}
 Claimed correct answer index: ${variant.correctIndex}
 
 Check:
 1. Is choices[${variant.correctIndex}] the single, unambiguous correct answer — no other choice could also be defended as correct?
-2. Does this question still measure the given learning outcome, not a different concept?
+2. Does this variant still measure the same underlying concept as the standard above (the learning outcome if given, otherwise the canonical question) — not a different, easier, or unrelated topic?
 3. Is exactly one question being asked (not multiple sub-questions bundled together)?
 
 Respond with {"valid": true, "reason": "..."} only if all three hold, otherwise {"valid": false, "reason": "<which check failed and why>"}.`
@@ -213,7 +235,7 @@ async function generateOneTier(
     const structuralError = validateStructure(parsed)
     if (structuralError) return { error: `Structural validation failed: ${structuralError}` }
 
-    const { system: vSystem, prompt: vPrompt } = buildVerificationPrompt(curriculum?.learningOutcomes[0] ?? null, parsed!)
+    const { system: vSystem, prompt: vPrompt } = buildVerificationPrompt(canonical.question_text, curriculum?.learningOutcomes[0] ?? null, parsed!)
     const verification = await callAI({ prompt: vPrompt, system: vSystem, mode: 'quality', max_tokens: 300, temperature: 0, feature: 'adaptive_variant.verify' })
     const verdict = parseJsonResponse<{ valid: boolean; reason: string }>(verification.text)
 

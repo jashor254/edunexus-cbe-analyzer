@@ -33,10 +33,10 @@ type Fixture = {
   classId: string
   assignmentId: string
   // Roster spans the routing taxonomy on purpose:
-  criticalStudentId: string  // level 1 + declining -> critical_gap -> guided
-  gapStudentId: string       // level 2 -> prerequisite_gap -> guided
-  confusionStudentId: string // level 3 -> concept_confusion -> core
-  onTrackStudentId: string   // level 4 -> on_track -> extension
+  criticalStudentId: string  // level 1 + declining -> BE -> guided
+  gapStudentId: string       // level 2 -> AE -> guided
+  confusionStudentId: string // level 3 -> ME -> core
+  onTrackStudentId: string   // level 4 -> EE -> extension
   noEvidenceStudentId: string // never scored anything -> insufficient_data -> core
   createdRunIds: string[]
 }
@@ -201,25 +201,25 @@ test('POST .../print-routes: the owning teacher generates a draft run covering t
 })
 
 // ── 2/3/4/5. routing rule correctness ───────────────────────────────────────
-test('Routing: critical-gap and prerequisite-gap learners default to Guided Practice', async () => {
+test('Routing: Below-Expectations and Approaching-Expectations learners default to Guided Practice', async () => {
   const critical = draftRoutes.find(r => r.student_id === fx.criticalStudentId)!
   const gap = draftRoutes.find(r => r.student_id === fx.gapStudentId)!
   assert.equal(critical.route, 'guided')
-  assert.equal(critical.evidence_band, 'critical_gap')
+  assert.equal(critical.evidence_band, 'BE')
   assert.equal(gap.route, 'guided')
-  assert.equal(gap.evidence_band, 'prerequisite_gap')
+  assert.equal(gap.evidence_band, 'AE')
 })
 
-test('Routing: concept-confusion learner maps to Core Practice', async () => {
+test('Routing: Meeting-Expectations learner maps to Core Practice', async () => {
   const confusion = draftRoutes.find(r => r.student_id === fx.confusionStudentId)!
   assert.equal(confusion.route, 'core')
-  assert.equal(confusion.evidence_band, 'concept_confusion')
+  assert.equal(confusion.evidence_band, 'ME')
 })
 
-test('Routing: on-track (thick-evidence) learner maps to Extension Practice — never defaulted to Guided', async () => {
+test('Routing: Exceeding-Expectations (thick-evidence) learner maps to Extension Practice — never defaulted to Guided', async () => {
   const onTrack = draftRoutes.find(r => r.student_id === fx.onTrackStudentId)!
   assert.equal(onTrack.route, 'extension')
-  assert.equal(onTrack.evidence_band, 'on_track')
+  assert.equal(onTrack.evidence_band, 'EE')
 })
 
 test('Routing: a learner with zero evidence defaults to Core, never Guided', async () => {
@@ -303,8 +303,14 @@ test('GET .../print (grouped mode): student-facing copies contain no route/evide
   assert.ok(routingSheetEnd > -1, 'routing sheet should be present and marked teacher-only')
   const afterRoutingSheet = html.slice(html.indexOf('</table>', routingSheetEnd))
 
-  for (const banned of ['Guided Practice', 'Core Practice', 'Extension Practice', 'critical_gap', 'prerequisite_gap', 'concept_confusion', 'on_track', 'insufficient_data']) {
+  for (const banned of ['Guided Practice', 'Core Practice', 'Extension Practice']) {
     assert.doesNotMatch(afterRoutingSheet, new RegExp(banned), `student-facing output must not contain "${banned}"`)
+  }
+  // Internal CBC-band codes are only 2 letters (BE/AE/ME/EE) — a plain
+  // substring check would false-positive on ordinary English prose (e.g.
+  // "some", "see", "before"), so these are checked with word boundaries.
+  for (const banned of ['BE', 'AE', 'ME', 'EE', 'insufficient_data']) {
+    assert.doesNotMatch(afterRoutingSheet, new RegExp(`\\b${banned}\\b`), `student-facing output must not contain the internal band code "${banned}"`)
   }
   // ── 14. teacher routing sheet contains the required routing information ──
   assert.match(html, /Guided Practice/)

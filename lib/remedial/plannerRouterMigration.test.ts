@@ -47,8 +47,8 @@ before(async () => {
 
 function fixtureGroups(): RemedialGroup[] {
   return [
-    { type: 'prerequisite_gap', label: 'Group A — Prerequisite Gap (2 students)', students: [], teaching_action: 'Re-teach first', lessons_needed: 2, suggested_activity: 'Practical activity on fractions.' },
-    { type: 'concept_confusion', label: 'Group B — Concept Confusion (1 students)', students: [], teaching_action: 'Focused lesson', lessons_needed: 1, suggested_activity: 'Worked examples.' },
+    { type: 'AE', label: 'Approaching Expectations — Prerequisite Gap (2 students)', students: [], teaching_action: 'Re-teach first', lessons_needed: 2, suggested_activity: 'Practical activity on fractions.' },
+    { type: 'ME', label: 'Meeting Expectations — Concept Confusion (1 students)', students: [], teaching_action: 'Focused lesson', lessons_needed: 1, suggested_activity: 'Worked examples.' },
   ]
 }
 

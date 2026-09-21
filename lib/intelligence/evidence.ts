@@ -153,15 +153,18 @@ export type EvidencePayload =
  * delivery time, and recomputing one at grading time would report the
  * learner's state AFTER this outcome — a different question wearing the
  * right label. Only the served tier, which is a real persisted fact, is
- * recorded. (`critical_gap` and `prerequisite_gap` both deliver
- * `foundation`, so the tier does not let the band be inferred, and this
- * payload never pretends otherwise.)
+ * recorded. (BAND_TO_TIER — lib/assignments/variantGeneration.ts — is now
+ * a straight 1:1 CBC-level-to-tier mapping, so in practice a tier value
+ * DOES identify a unique band today; this field still isn't treated as a
+ * band substitute — the band is a live classification, this is a frozen
+ * delivery fact, and the two must never be conflated even when one happens
+ * to determine the other.)
  */
 export type AdaptiveDeliveryPayload = {
   kind: 'adaptive_delivery'
   payloadVersion: 1
   /** The instructional tier actually served, or null when the learner received the canonical task. */
-  servedTier: 'foundation' | 'supported_practice' | 'extension' | null
+  servedTier: 'foundation' | 'guided_practice' | 'supported_practice' | 'extension' | null
   /** Every distinct variant row this learner was bound to on this assignment. Empty when fully canonical. */
   servedVariantIds: string[]
   /** How many of the assignment's questions were served a variant vs. the teacher's canonical question. */

@@ -35,11 +35,17 @@ import type { RemedialGroup, RemedialGroupType, RemedialPlan, RemedialStudent, T
  * evidence for this subject yet" rather than guessing a level, but a
  * remedial plan's whole purpose is making sure no enrolled student falls
  * through the cracks — so, for this feature only, a student with no academic
- * signal is folded into `critical_gap` (if their platform-wide risk is
- * already flagged critical) or `prerequisite_gap` (the conservative default
- * otherwise), never dropped from the plan and never left unclassified. This
- * mirrors the pre-Sprint-6A code's own intent (it defaulted an unmarked
- * student to `level: 1`) without re-deriving a level from raw marks.
+ * signal is folded into `BE` (if their platform-wide risk is already
+ * flagged critical) or `AE` (the conservative default otherwise), never
+ * dropped from the plan and never left unclassified. This mirrors the
+ * pre-Sprint-6A code's own intent (it defaulted an unmarked student to
+ * `level: 1`) without re-deriving a level from raw marks. This is the one
+ * place in the whole platform risk severity is still allowed to pick a
+ * band outright — not because it changes classification for an already-
+ * classified learner (recommend.ts's rawBand() never lets it do that any
+ * more), but because there is no CBC level here at all to classify from;
+ * risk is a reasonable "assume the worse case" tiebreaker only when there
+ * is nothing else to go on.
  */
 export function resolveRemedialGroupType(
   projection: LearnerIntelligenceProjection | undefined,
@@ -47,7 +53,7 @@ export function resolveRemedialGroupType(
 ): RemedialGroupType | 'insufficient_data' {
   const classified = projection ? classifyGroup(projection, subject) : 'insufficient_data'
   if (classified !== 'insufficient_data') return classified
-  return projection?.risk?.value.overallRiskLevel === 'critical' ? 'critical_gap' : 'prerequisite_gap'
+  return projection?.risk?.value.overallRiskLevel === 'critical' ? 'BE' : 'AE'
 }
 
 type PlannerInput = {
@@ -143,17 +149,17 @@ export async function generateRemedialPlan(input: PlannerInput): Promise<Remedia
     }
   }
 
-  // 7. Build groups based on classification
-  const criticalStudents  = students.filter(s => s.groupType === 'critical_gap')
-  const prereqStudents    = students.filter(s => s.groupType === 'prerequisite_gap')
-  const confusedStudents  = students.filter(s => s.groupType === 'concept_confusion')
-  const onTrackStudents   = students.filter(s => s.groupType === 'on_track')
+  // 7. Build groups based on classification — one per real CBC level.
+  const beStudents = students.filter(s => s.groupType === 'BE')
+  const aeStudents = students.filter(s => s.groupType === 'AE')
+  const meStudents = students.filter(s => s.groupType === 'ME')
+  const eeStudents = students.filter(s => s.groupType === 'EE')
 
-  // Build peer pairs: match on-track students with prereq-gap students
+  // Build peer pairs: match Exceeding-Expectations students with Approaching-Expectations students
   const peerPairs: [string, string][] = []
-  const helpers = [...onTrackStudents]
-  for (let i = 0; i < Math.min(prereqStudents.length, helpers.length); i++) {
-    peerPairs.push([helpers[i].name, prereqStudents[i].name])
+  const helpers = [...eeStudents]
+  for (let i = 0; i < Math.min(aeStudents.length, helpers.length); i++) {
+    peerPairs.push([helpers[i].name, aeStudents[i].name])
   }
 
   const toStudent = (s: StudentData, gap: string): RemedialStudent => ({
@@ -166,11 +172,11 @@ export async function generateRemedialPlan(input: PlannerInput): Promise<Remedia
 
   const groups: RemedialGroup[] = []
 
-  if (criticalStudents.length > 0) {
+  if (beStudents.length > 0) {
     groups.push({
-      type:    'critical_gap',
-      label:   `Group D — Needs Direct Support (${criticalStudents.length} students)`,
-      students: criticalStudents.map(s => toStudent(s, `Multiple prerequisite gaps — missing foundational concepts`)),
+      type:    'BE',
+      label:   `Below Expectations — Needs Direct Support (${beStudents.length} students)`,
+      students: beStudents.map(s => toStudent(s, `Multiple prerequisite gaps — missing foundational concepts`)),
       teaching_action: 'One-on-one or very small group. Start from prerequisites, not current substrand.',
       compass_action:  prerequisiteConcepts[0] ?? input.subStrand,
       lessons_needed:  3,
@@ -178,11 +184,11 @@ export async function generateRemedialPlan(input: PlannerInput): Promise<Remedia
     })
   }
 
-  if (prereqStudents.length > 0) {
+  if (aeStudents.length > 0) {
     groups.push({
-      type:    'prerequisite_gap',
-      label:   `Group A — Prerequisite Gap (${prereqStudents.length} students)`,
-      students: prereqStudents.map(s => toStudent(s, `Missing: ${prerequisiteConcepts[0] ?? 'foundational concept'}`)),
+      type:    'AE',
+      label:   `Approaching Expectations — Prerequisite Gap (${aeStudents.length} students)`,
+      students: aeStudents.map(s => toStudent(s, `Missing: ${prerequisiteConcepts[0] ?? 'foundational concept'}`)),
       teaching_action: `Re-teach ${prerequisiteConcepts[0] ?? input.subStrand} first (2 lessons), then return to ${input.subStrand}.`,
       compass_action:  prerequisiteConcepts[0] ?? input.subStrand,
       peer_pairs:      peerPairs,
@@ -193,24 +199,24 @@ export async function generateRemedialPlan(input: PlannerInput): Promise<Remedia
     })
   }
 
-  if (confusedStudents.length > 0) {
+  if (meStudents.length > 0) {
     groups.push({
-      type:    'concept_confusion',
-      label:   `Group B — Concept Confusion (${confusedStudents.length} students)`,
-      students: confusedStudents.map(s => toStudent(s, `Understands basics but confused on ${input.subStrand} application`)),
+      type:    'ME',
+      label:   `Meeting Expectations — Concept Confusion (${meStudents.length} students)`,
+      students: meStudents.map(s => toStudent(s, `Understands basics but confused on ${input.subStrand} application`)),
       teaching_action: `1 focused lesson with worked examples and peer discussion on ${input.subStrand}.`,
       compass_action:  input.subStrand,
       lessons_needed:  1,
-      suggested_activity: `Diagram or diagram comparison activity. Ask Group B to explain the concept to Group A after mastering it.`,
+      suggested_activity: `Diagram or diagram comparison activity. Ask this group to explain the concept to the Approaching Expectations group after mastering it.`,
     })
   }
 
-  if (onTrackStudents.length > 0) {
+  if (eeStudents.length > 0) {
     groups.push({
-      type:    'on_track',
-      label:   `Group C — On Track (${onTrackStudents.length} students)`,
-      students: onTrackStudents.map(s => toStudent(s, 'Meets expectations — ready for extension')),
-      teaching_action: `Extension activity: deeper application of ${input.subStrand}. Use as peer teachers for Groups A & B.`,
+      type:    'EE',
+      label:   `Exceeding Expectations — On Track (${eeStudents.length} students)`,
+      students: eeStudents.map(s => toStudent(s, 'Meets expectations — ready for extension')),
+      teaching_action: `Extension activity: deeper application of ${input.subStrand}. Use as peer teachers for the below-grade groups.`,
       lessons_needed:  0,
       suggested_activity: `Cross-curricular project connecting ${input.subStrand} to real Kenya context. Let them lead a 10-min peer explanation.`,
     })
@@ -223,7 +229,7 @@ export async function generateRemedialPlan(input: PlannerInput): Promise<Remedia
 
   const weekPlan: string[] = []
   let week = input.currentWeek
-  for (const group of groups.filter(g => g.type !== 'on_track')) {
+  for (const group of groups.filter(g => g.type !== 'EE')) {
     for (let l = 0; l < group.lessons_needed; l += 2) {
       weekPlan.push(`Week ${week}: ${group.label.split('—')[0].trim()} — ${group.suggested_activity.slice(0, 80)}`)
       week++
@@ -234,7 +240,7 @@ export async function generateRemedialPlan(input: PlannerInput): Promise<Remedia
   const allocation: TeacherAllocation = {
     total_remedial_weeks: weeksNeeded,
     week_by_week:         weekPlan,
-    compass_assignments:  prereqStudents.length + criticalStudents.length + confusedStudents.length,
+    compass_assignments:  aeStudents.length + beStudents.length + meStudents.length,
     check_in_week:        checkInWeek,
   }
 
@@ -313,7 +319,7 @@ export async function enrichWithAI(
 ): Promise<{ weekPlan: string[] } | null> {
   try {
     const groupSummary = groups
-      .filter(g => g.type !== 'on_track')
+      .filter(g => g.type !== 'EE')
       .map(g => `${g.label}: ${g.students.length} students — ${g.suggested_activity}`)
       .join('\n')
 

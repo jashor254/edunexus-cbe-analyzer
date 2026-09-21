@@ -66,11 +66,15 @@ export type ActionCandidate = {
   priority: BlueprintActionPriority
 }
 
+// Keyed on the real CBC level bands (lib/adaptiveLearning/recommend.ts's
+// AdaptiveGroupType: BE/AE/ME/EE — Below/Approaching/Meeting/Exceeding
+// Expectations), not the retired critical_gap/prerequisite_gap/
+// concept_confusion/on_track taxonomy.
 const PRIORITY_BY_GROUP: Record<string, BlueprintActionPriority> = {
-  critical_gap: 'high',
-  prerequisite_gap: 'medium',
-  concept_confusion: 'medium',
-  on_track: 'low',
+  BE: 'high',
+  AE: 'medium',
+  ME: 'medium',
+  EE: 'low',
 }
 
 /**

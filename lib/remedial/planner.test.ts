@@ -55,53 +55,53 @@ function projection(overrides: {
 
 // ── Delegation to classifyGroup — the canonical path ──────────────────────────
 
-test('resolveRemedialGroupType: level 1 + subject-specific critical risk → critical_gap (same as classifyGroup)', () => {
+test('resolveRemedialGroupType: level 1 → BE (same as classifyGroup), regardless of risk', () => {
   const p = projection({ level: 1, riskSeverity: 'critical' })
-  assert.equal(resolveRemedialGroupType(p, SUBJECT), 'critical_gap')
+  assert.equal(resolveRemedialGroupType(p, SUBJECT), 'BE')
 })
 
-test('resolveRemedialGroupType: level 2 → prerequisite_gap', () => {
+test('resolveRemedialGroupType: level 2 → AE', () => {
   const p = projection({ level: 2 })
-  assert.equal(resolveRemedialGroupType(p, SUBJECT), 'prerequisite_gap')
+  assert.equal(resolveRemedialGroupType(p, SUBJECT), 'AE')
 })
 
-test('resolveRemedialGroupType: level 3 → concept_confusion', () => {
+test('resolveRemedialGroupType: level 3 → ME', () => {
   const p = projection({ level: 3 })
-  assert.equal(resolveRemedialGroupType(p, SUBJECT), 'concept_confusion')
+  assert.equal(resolveRemedialGroupType(p, SUBJECT), 'ME')
 })
 
-test('resolveRemedialGroupType: level 4 → on_track', () => {
+test('resolveRemedialGroupType: level 4 → EE', () => {
   const p = projection({ level: 4 })
-  assert.equal(resolveRemedialGroupType(p, SUBJECT), 'on_track')
+  assert.equal(resolveRemedialGroupType(p, SUBJECT), 'EE')
 })
 
 // ── Bug fix confirmed: cross-subject risk no longer leaks into this subject's
 // classification (the pre-Sprint-6A code used the platform-wide
 // overallRiskLevel, not the subject-specific flag classifyGroup checks) ──────
 
-test('resolveRemedialGroupType: a critical risk flag for a DIFFERENT subject does not trigger critical_gap here', () => {
+test('resolveRemedialGroupType: a critical risk flag for a DIFFERENT subject does not affect this subject\'s classification', () => {
   const p = projection({ level: 1, riskSeverity: 'critical', riskSubject: 'english' })
-  assert.equal(resolveRemedialGroupType(p, SUBJECT), 'prerequisite_gap')
+  assert.equal(resolveRemedialGroupType(p, SUBJECT), 'BE')
 })
 
 test('resolveRemedialGroupType: overallRiskLevel critical (from an unrelated subject) does not override a healthy level-4 classification', () => {
   const p = projection({ level: 4, overallRiskLevel: 'critical' })
-  assert.equal(resolveRemedialGroupType(p, SUBJECT), 'on_track')
+  assert.equal(resolveRemedialGroupType(p, SUBJECT), 'EE')
 })
 
 // ── insufficient_data fallback — the one piece of logic that belongs to this
 // module, not to classifyGroup (a remedial plan must never drop a student) ───
 
-test('resolveRemedialGroupType: no projection at all → falls back to prerequisite_gap, never dropped', () => {
-  assert.equal(resolveRemedialGroupType(undefined, SUBJECT), 'prerequisite_gap')
+test('resolveRemedialGroupType: no projection at all → falls back to AE, never dropped', () => {
+  assert.equal(resolveRemedialGroupType(undefined, SUBJECT), 'AE')
 })
 
-test('resolveRemedialGroupType: no academic evidence for this subject, platform-wide risk critical → critical_gap', () => {
+test('resolveRemedialGroupType: no academic evidence for this subject, platform-wide risk critical → BE', () => {
   const p = projection({ level: null, overallRiskLevel: 'critical' })
-  assert.equal(resolveRemedialGroupType(p, SUBJECT), 'critical_gap')
+  assert.equal(resolveRemedialGroupType(p, SUBJECT), 'BE')
 })
 
-test('resolveRemedialGroupType: no academic evidence for this subject, risk not critical → prerequisite_gap (conservative default, never confused/on_track)', () => {
+test('resolveRemedialGroupType: no academic evidence for this subject, risk not critical → AE (conservative default, never ME/EE)', () => {
   const p = projection({ level: null, overallRiskLevel: 'watch' })
-  assert.equal(resolveRemedialGroupType(p, SUBJECT), 'prerequisite_gap')
+  assert.equal(resolveRemedialGroupType(p, SUBJECT), 'AE')
 })

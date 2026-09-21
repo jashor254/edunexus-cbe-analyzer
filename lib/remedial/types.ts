@@ -1,10 +1,15 @@
 // lib/remedial/types.ts
 
+// Kenya's real CBC 4-level competency rubric — the same BE/AE/ME/EE codes
+// used platform-wide for report cards and KNEC export. Mirrors
+// lib/adaptiveLearning/recommend.ts's AdaptiveGroupType exactly (this type
+// exists separately only so lib/remedial/ has no import-time dependency on
+// the adaptiveLearning module for its own plan-shape types).
 export type RemedialGroupType =
-  | 'prerequisite_gap'   // Missing foundational concept — re-teach first
-  | 'concept_confusion'  // Understands prerequisite but confused on this concept
-  | 'on_track'           // No remediation needed — extension/peer teaching role
-  | 'critical_gap'       // Severe: multiple prerequisites missing, needs 1-on-1
+  | 'BE'   // Below Expectations — missing foundational concepts, needs 1-on-1
+  | 'AE'   // Approaching Expectations — missing prerequisite, re-teach first
+  | 'ME'   // Meeting Expectations — understands prerequisite, confused on this concept
+  | 'EE'   // Exceeding Expectations — no remediation needed, extension/peer teaching role
 
 export type RemedialStudent = {
   student_id:   string | null  // null if student not yet linked

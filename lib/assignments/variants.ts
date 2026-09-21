@@ -8,7 +8,11 @@
 
 import { createServiceClient } from '@/utils/supabase/service'
 
-export type VariantType = 'foundation' | 'supported_practice' | 'extension'
+// Four tiers, one per real CBC level (BE/AE/ME/EE) — see
+// lib/adaptiveLearning/recommend.ts's AdaptiveGroupType and
+// lib/assignments/variantGeneration.ts's BAND_TO_TIER, which maps each CBC
+// band to exactly one of these, never collapsing two bands into one tier.
+export type VariantType = 'foundation' | 'guided_practice' | 'supported_practice' | 'extension'
 export type VariantStatus = 'draft' | 'approved' | 'rejected' | 'archived'
 
 export type VariantInput = {

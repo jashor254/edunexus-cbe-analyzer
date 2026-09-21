@@ -2674,11 +2674,14 @@ function RemedialPlannerTab({
   const [plan,       setPlan]       = useState<RemedialPlanData | null>(null)
   const [error,      setError]      = useState<string | null>(null)
 
+  // Keyed on the real CBC level bands (BE/AE/ME/EE — Below/Approaching/
+  // Meeting/Exceeding Expectations), not the retired critical_gap/
+  // prerequisite_gap/concept_confusion/on_track taxonomy.
   const groupColors: Record<string, { bg: string; border: string; text: string; dot: string }> = {
-    critical_gap:      { bg: 'bg-red-50',    border: 'border-red-200',    text: 'text-red-800',    dot: 'bg-red-500'    },
-    prerequisite_gap:  { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-800', dot: 'bg-orange-500' },
-    concept_confusion: { bg: 'bg-amber-50',  border: 'border-amber-200',  text: 'text-amber-800',  dot: 'bg-amber-500'  },
-    on_track:          { bg: 'bg-green-50',  border: 'border-green-200',  text: 'text-green-800',  dot: 'bg-green-500'  },
+    BE: { bg: 'bg-red-50',    border: 'border-red-200',    text: 'text-red-800',    dot: 'bg-red-500'    },
+    AE: { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-800', dot: 'bg-orange-500' },
+    ME: { bg: 'bg-amber-50',  border: 'border-amber-200',  text: 'text-amber-800',  dot: 'bg-amber-500'  },
+    EE: { bg: 'bg-green-50',  border: 'border-green-200',  text: 'text-green-800',  dot: 'bg-green-500'  },
   }
 
   async function generate() {

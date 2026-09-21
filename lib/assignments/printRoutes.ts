@@ -8,10 +8,14 @@
 // (buildAdaptiveTask/classifyGroup) — no new learner classifier is
 // introduced here.
 //
-// Locked routing rule (never deviate):
-//   critical_gap | prerequisite_gap        -> guided
-//   concept_confusion                       -> core
-//   on_track                                -> extension
+// Locked routing rule (never deviate). Bands are Kenya's real CBC 4-level
+// rubric (BE/AE/ME/EE — lib/adaptiveLearning/recommend.ts's
+// AdaptiveGroupType); the print pack itself still comes in 3 physical
+// routes (a paper-format constraint, not a classification one), so BE and
+// AE — the two below-grade-level bands — share the same "guided" pack:
+//   BE | AE                                 -> guided
+//   ME                                       -> core
+//   EE                                       -> extension
 //   insufficient_data | no evidence          -> core
 //   failed projection lookup                 -> core
 // Thin, missing, or uncertain evidence must never default a learner to
@@ -55,9 +59,9 @@ export const ROUTE_LABEL: Record<PrintRoute, string> = {
 
 /** The one, locked mapping from adaptive-learning group to print route. Pure, no I/O — the single place this mapping lives. */
 export function mapGroupToRoute(group: AdaptiveGroupType | 'insufficient_data' | null): PrintRoute {
-  if (group === 'critical_gap' || group === 'prerequisite_gap') return 'guided'
-  if (group === 'on_track') return 'extension'
-  // 'concept_confusion', 'insufficient_data', and null (failed lookup) all land here.
+  if (group === 'BE' || group === 'AE') return 'guided'
+  if (group === 'EE') return 'extension'
+  // 'ME', 'insufficient_data', and null (failed lookup) all land here.
   return 'core'
 }
 

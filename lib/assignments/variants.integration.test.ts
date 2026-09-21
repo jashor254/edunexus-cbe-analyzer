@@ -76,7 +76,7 @@ test('createDraftVariants + findVariantsForQuestion: round-trips, always status=
     questionId, variantType: 'foundation',
     questionText: 'Step 1: are the denominators the same? Step 2: add only the numerators.',
     choices: ['5/8', '5/16', '1', '6/8'], correctIndex: 0,
-    difficultyRationale: 'Guided reasoning for a critical_gap learner.',
+    difficultyRationale: 'Guided reasoning for a BE learner.',
   }])
 
   assert.equal(created.status, 'draft')

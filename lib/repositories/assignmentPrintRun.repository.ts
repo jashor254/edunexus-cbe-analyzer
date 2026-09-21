@@ -17,7 +17,10 @@ import { BaseRepository } from './base'
 export type PrintRunStatus = 'draft' | 'approved' | 'superseded'
 export type PrintRoute = 'guided' | 'core' | 'extension'
 export type PrintRouteSource = 'system_suggested' | 'teacher_override'
-export type PrintEvidenceBand = 'critical_gap' | 'prerequisite_gap' | 'concept_confusion' | 'on_track' | 'insufficient_data'
+// Kenya's real CBC 4-level competency rubric (BE/AE/ME/EE), matching
+// lib/adaptiveLearning/recommend.ts's AdaptiveGroupType — not the retired
+// critical_gap/prerequisite_gap/concept_confusion/on_track taxonomy.
+export type PrintEvidenceBand = 'BE' | 'AE' | 'ME' | 'EE' | 'insufficient_data'
 
 export type AssignmentSnapshot = {
   title: string

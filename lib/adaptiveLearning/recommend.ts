@@ -19,8 +19,7 @@
 // Does NOT call `lib/remedial/planner.ts`'s `generateRemedialPlan()` —
 // that function sources learner data via `getClassLearnerProfiles()`
 // (legacy `learner_profiles` reads), which would make this the one
-// channel not deriving from Projection. Only the group taxonomy *shape*
-// (`RemedialGroupType`) is reused; the classification below is
+// channel not deriving from Projection. The classification below is
 // independently computed from Projection. See the architecture doc §2
 // for the full rationale (a contradiction found and fixed before freeze).
 
@@ -29,11 +28,21 @@ import { mapSubject } from '@/lib/intelligence/subjectMapping'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { computeLearnerProjection } from '@/lib/projection/engine'
 import type { LearnerIntelligenceProjection, Trend } from '@/lib/projection/types'
-import type { RemedialGroupType } from '@/lib/remedial/types'
 import { CurriculumService, type CurriculumContext } from '@/lib/curriculum/service'
 
-export type AdaptiveGroupType = RemedialGroupType
-export type TaskStyle = 'foundational' | 'reinforcement' | 'application' | 'enrichment'
+// Keyed directly on Kenya's real CBC 4-level competency rubric — the exact
+// same BE/AE/ME/EE ("Below/Approaching/Meeting/Exceeding Expectations")
+// codes already used platform-wide for report cards, grade scales and KNEC
+// export (lib/curriculum/regional/ke-cbc.ts, lib/core/report-cards.ts,
+// lib/grading/boundaries.ts). Replaces the former critical_gap /
+// prerequisite_gap / concept_confusion / on_track taxonomy, which mixed a
+// CBC level with a separate subject risk-flag check and, by design,
+// collapsed two different CBC levels (1 and 2) into one band. That risk
+// check never changes a learner's band any more — see `riskFlag` on
+// AdaptiveDecision below, which carries the same information without
+// letting it fork classification for a single CBC level.
+export type AdaptiveGroupType = 'BE' | 'AE' | 'ME' | 'EE'
+export type TaskStyle = 'foundational' | 'application' | 'reinforcement' | 'enrichment'
 
 export type AdaptiveTask = Insight & {
   learnerId:  string
@@ -78,43 +87,47 @@ export type LearnerContext = {
 export type ClassGroups = Record<AdaptiveGroupType | 'insufficient_data', AdaptiveTask[]>
 
 const TASK_STYLE_BY_GROUP: Record<AdaptiveGroupType, TaskStyle> = {
-  critical_gap:      'foundational',
-  prerequisite_gap:  'foundational',
-  concept_confusion: 'reinforcement',
-  on_track:          'enrichment', // Group C — brief's enrichment tier
+  BE: 'foundational',
+  AE: 'application',   // previously unused — AE now has its own distinct style, no longer folded into 'foundational'
+  ME: 'reinforcement',
+  EE: 'enrichment',
 }
 
 // Neutral, learner/class-facing labels — per architecture §3's explicit
-// rule: internal group taxonomy names must never reach a learner.
+// rule: internal group taxonomy names must never reach a learner. These
+// double as the same CBC rubric language (Below/Approaching/Meeting/
+// Exceeding Expectations) already shown to learners/parents elsewhere on
+// the platform (report cards, dashboards) — never a second, invented label
+// set for the same real assessment concept.
 const NEUTRAL_LABEL: Record<AdaptiveGroupType, string> = {
-  critical_gap:      'Focused Foundation Work',
-  prerequisite_gap:  'This Week\'s Focus',
-  concept_confusion: 'Practice & Clarify',
-  on_track:          'Challenge Set',
+  BE: 'Below Expectations — Focused Foundation Work',
+  AE: 'Approaching Expectations — This Week\'s Focus',
+  ME: 'Meeting Expectations — Practice & Clarify',
+  EE: 'Exceeding Expectations — Challenge Set',
 }
 
 // Fallback only — used when no curriculum sub-strand has been resolved
 // (see buildGroundedAction). Never presented as curriculum-grounded;
 // curriculumNotice always accompanies it when it's the one in use.
 const GROUP_ACTION_FALLBACK: Record<AdaptiveGroupType, (subject: string) => string> = {
-  critical_gap: subject =>
+  BE: subject =>
     `Start with a one-on-one diagnostic on the foundational concepts behind ${subject} before returning to the current topic.`,
-  prerequisite_gap: subject =>
+  AE: subject =>
     `Re-teach the prerequisite concept behind ${subject} first, then return to the current substrand.`,
-  concept_confusion: subject =>
+  ME: subject =>
     `Work through ${subject} with a focused, worked-example lesson and peer discussion.`,
-  on_track: subject =>
+  EE: subject =>
     `Extend ${subject} with an open-ended, higher-order challenge — no fixed scaffold, connect it to a real-world or career context.`,
 }
 
 const GROUP_ACTION_GROUNDED: Record<AdaptiveGroupType, (outcome: string, curriculum: CurriculumContext) => string> = {
-  critical_gap: (outcome, c) =>
+  BE: (outcome, c) =>
     `Start with a one-on-one diagnostic on the prerequisite skills behind "${c.subStrandTitle}" (${c.strandTitle}) before returning to this learning outcome: ${outcome}`,
-  prerequisite_gap: (outcome, c) =>
+  AE: (outcome, c) =>
     `Re-teach the prerequisite behind "${c.subStrandTitle}" (${c.strandTitle}) first, then return to this learning outcome: ${outcome}`,
-  concept_confusion: (outcome, c) =>
+  ME: (outcome, c) =>
     `Work through "${c.subStrandTitle}" (${c.strandTitle}) with a focused lesson targeting: ${outcome}`,
-  on_track: (outcome, c) =>
+  EE: (outcome, c) =>
     `Extend "${c.subStrandTitle}" (${c.strandTitle}) with an open-ended challenge building on: ${outcome}`,
 }
 
@@ -251,6 +264,14 @@ export type AdaptiveDecision = {
   provisional: boolean
   /** Plain-language why. Always populated — a decision that cannot explain itself must not be delivered. */
   rationale: string
+  /**
+   * This subject's own risk-flag severity, carried through verbatim —
+   * informational only. Used to change how urgently a teacher should treat
+   * this learner (e.g. a UI badge), never which band/tier they're placed
+   * in — `groupType` above is driven by CBC level alone. `null` when
+   * Projection has no risk flag for this subject.
+   */
+  riskFlag: string | null
 }
 
 /**
@@ -270,7 +291,7 @@ export type AdaptiveDecision = {
  * and the adaptive state moves fully — so a real, sustained change is never
  * blocked, only an isolated one is held for confirmation.
  *
- * Damping always lands on the MIDDLE rank (level 3 / `concept_confusion`),
+ * Damping always lands on the MIDDLE rank (level 3 / `ME`),
  * which is by construction never more extreme than the undamped result in
  * either direction.
  */
@@ -325,12 +346,22 @@ function resolveAcademicSignal(
   return { level: bySubject.latestLevel, trend: bySubject.trend, grain: 'subject', history: bySubject.history }
 }
 
-/** The undamped band for a level + this subject's own risk flag — the rule set as it has always been. */
-function rawBand(level: 1 | 2 | 3 | 4, subjectFlagSeverity: string | null): AdaptiveGroupType {
-  if (level === 1 && subjectFlagSeverity === 'critical') return 'critical_gap'
-  if (level <= 2) return 'prerequisite_gap'
-  if (level === 3) return 'concept_confusion'
-  return 'on_track'
+/**
+ * The band for a CBC level — a direct, 1:1 mapping now, deliberately. A
+ * subject risk flag no longer forks this: it used to make a Level 1
+ * learner without a "critical" flag land in the SAME band as a Level 2
+ * learner (`prerequisite_gap`), while a flagged Level 1 learner got its own
+ * band (`critical_gap`) — two different CBC levels sharing one band, and
+ * one CBC level splitting into two bands, both driven by a signal that has
+ * nothing to do with which CBC level the learner is actually at. Risk
+ * severity is real and still surfaces (see `riskFlag` on AdaptiveDecision),
+ * just never as a second axis of classification alongside CBC level.
+ */
+function rawBand(level: 1 | 2 | 3 | 4): AdaptiveGroupType {
+  if (level === 1) return 'BE'
+  if (level === 2) return 'AE'
+  if (level === 3) return 'ME'
+  return 'EE'
 }
 
 /**
@@ -357,6 +388,7 @@ export function decideAdaptive(
       observationCount: 0,
       provisional: false,
       rationale: `No confirmed academic evidence has been resolved for ${subject} yet, at any grain.`,
+      riskFlag: null,
     }
   }
 
@@ -367,7 +399,7 @@ export function decideAdaptive(
   // human-readable subject name.
   const canonicalSubject = mapSubject(subject).canonicalSubject
   const subjectFlag = projection.risk?.value.flags.find(f => f.subject === canonicalSubject) ?? null
-  const undamped = rawBand(signal.level, subjectFlag?.severity ?? null)
+  const undamped = rawBand(signal.level)
 
   const grainLabel = signal.grain === 'subStrand' ? 'this sub-strand' : subject
 
@@ -375,7 +407,7 @@ export function decideAdaptive(
   // move for confirmation, but keep adapting at the middle band.
   if (evidenceState === 'established' && isUncorroboratedReversal(signal.history)) {
     return {
-      groupType: 'concept_confusion',
+      groupType: 'ME',
       evidenceState,
       grain: signal.grain,
       level: signal.level,
@@ -386,6 +418,7 @@ export function decideAdaptive(
         `The most recent observation (Level ${signal.level}) reverses an established pattern across ` +
         `${observationCount} observations in ${grainLabel}. Support is adjusted, but a single observation ` +
         `is not treated as a settled change — the next observation in the same direction will confirm it.`,
+      riskFlag: subjectFlag?.severity ?? null,
     }
   }
 
@@ -401,6 +434,7 @@ export function decideAdaptive(
       ? `Based on the first confirmed observation in ${grainLabel} (Level ${signal.level}). ` +
         `That is enough to begin adapting; it is not yet enough to call this a persistent pattern.`
       : `Based on ${observationCount} confirmed observations in ${grainLabel} (currently Level ${signal.level}, ${signal.trend}).`,
+    riskFlag: subjectFlag?.severity ?? null,
   }
 }
 
@@ -488,9 +522,16 @@ export function buildAdaptiveTask(
   // thin evidence changes how confidently we speak, not whether we help —
   // so the support is still delivered, with the uncertainty stated in the
   // same sentence a teacher reads, never buried in a field nobody renders.
-  const observation = decision.provisional
+  // Same treatment for a critical subject risk flag: it no longer changes
+  // which band/tier this learner lands in (see rawBand's doc comment), but
+  // it is still real, teacher-relevant information — stated, not silently
+  // dropped just because it stopped driving classification.
+  const riskNote = decision.riskFlag === 'critical'
+    ? ` This subject is also flagged as a critical platform-wide risk area for ${learnerName} — treat with added urgency regardless of CBC level.`
+    : ''
+  const observation = (decision.provisional
     ? `${baseObservation} ${decision.rationale}`
-    : baseObservation
+    : baseObservation) + riskNote
 
   return {
     observation,
@@ -526,7 +567,7 @@ export function buildClassRecommendations(
   curriculum: CurriculumContext | null = null,
 ): ClassGroups {
   const groups: ClassGroups = {
-    critical_gap: [], prerequisite_gap: [], concept_confusion: [], on_track: [], insufficient_data: [],
+    BE: [], AE: [], ME: [], EE: [], insufficient_data: [],
   }
   for (const l of learners) {
     const task = buildAdaptiveTask(l.learnerId, l.learnerName, subject, l.projection, { curriculumContext: curriculum })

@@ -339,8 +339,8 @@ test('1. Mary\'s confirmed Mathematics evidence produces a declining, at-risk pr
 
   assert.equal(projection.academic?.value.bySubject.mathematics?.latestLevel, 1)
   assert.equal(projection.risk?.value.overallRiskLevel, 'critical')
-  assert.equal(classifyGroup(projection, 'mathematics'), 'critical_gap',
-    'the one shared classifier names this a critical gap')
+  assert.equal(classifyGroup(projection, 'mathematics'), 'BE',
+    'the one shared classifier names this Below Expectations')
 
   // 1 + 2. Evidence carries the anchor, and Projection resolves it at grain.
   const target = projection.academic!.value.bySubStrand[targetSubStrandId]
@@ -887,7 +887,7 @@ test('AR1. DECISION A — Mary is on_track in this sub-strand, and only the tier
   const projection = await recomputeLearnerProjection(legacyStudentId)
   const decision = decideAdaptive(projection, 'mathematics', otherSubStrandId)
 
-  assert.equal(decision.groupType, 'on_track', 'state A')
+  assert.equal(decision.groupType, 'EE', 'state A')
   assert.equal(decision.grain, 'subStrand', 'decided at curriculum grain, not subject grain')
   assert.equal(decision.observationCount, 1)
   assert.equal(decision.evidenceState, 'initial')
@@ -977,8 +977,8 @@ test('AR4. DECISION B — projection moved, and the adaptive decision moved with
   assert.equal(subStrand.latestLevel, 1)
 
   const decision = decideAdaptive(projection, 'mathematics', otherSubStrandId)
-  assert.notEqual(decision.groupType, 'on_track', 'THE RING CLOSED: state A is no longer state B')
-  assert.equal(decision.groupType, 'critical_gap', 'state B')
+  assert.notEqual(decision.groupType, 'EE', 'THE RING CLOSED: state A is no longer state B')
+  assert.equal(decision.groupType, 'BE', 'state B')
   assert.equal(decision.evidenceState, 'developing', 'two observations now corroborate')
   assert.equal(decision.provisional, false)
 
@@ -1015,7 +1015,7 @@ test('AR5. VARIANT B — the next assignment resolves a genuinely DIFFERENT tier
 
 test('AR6 (Stage 7). a newly-needed tier can be added later without regenerating what is already in review', async () => {
   // Quiz 1's question already holds an approved `extension`. Mary is now
-  // classified `critical_gap` -> `foundation`, a tier that did not exist
+  // classified `BE` -> `foundation`, a tier that did not exist
   // when quiz 1 was generated. Before Stage 7 this could never be filled.
   const before = await findVariantsForQuestion(ringQuestionOneId)
   const beforeTypes = new Set(before.filter(v => v.status !== 'archived').map(v => v.variant_type))
@@ -1113,7 +1113,7 @@ test('TR2. ONE main assessment establishes a usable picture and adaptation may b
   // THE NON-NEGOTIABLE ASSERTION OF THIS SPRINT.
   assert.notEqual(decision.groupType, 'insufficient_data',
     'one trustworthy assessment must never be reported as "not enough evidence"')
-  assert.equal(decision.groupType, 'concept_confusion', 'real, usable adaptive support from assessment one')
+  assert.equal(decision.groupType, 'ME', 'real, usable adaptive support from assessment one')
   assert.equal(decision.evidenceState, 'initial')
   assert.equal(decision.observationCount, 1)
 
@@ -1146,15 +1146,15 @@ test('TR4. a targeted assignment uses the sub-strand picture, and does not distu
 
   const weakDecision = decideAdaptive(projection, 'mathematics', refinementWeakSubStrandId)
   assert.equal(weakDecision.grain, 'subStrand')
-  assert.equal(weakDecision.groupType, 'prerequisite_gap',
+  assert.equal(weakDecision.groupType, 'AE',
     'the specific weakness is acted on even though the subject-level picture looks strong')
 
   const strongDecision = decideAdaptive(projection, 'mathematics', refinementStrongSubStrandId)
-  assert.equal(strongDecision.groupType, 'on_track', 'the unrelated sub-strand is not reclassified')
+  assert.equal(strongDecision.groupType, 'EE', 'the unrelated sub-strand is not reclassified')
 
   const subjectDecision = decideAdaptive(projection, 'mathematics')
   assert.equal(subjectDecision.grain, 'subject')
-  assert.equal(subjectDecision.groupType, 'on_track')
+  assert.equal(subjectDecision.groupType, 'EE')
 
   // Blueprint composes over the refined record without claiming precision
   // the evidence does not support — it still reports at subject grain, and

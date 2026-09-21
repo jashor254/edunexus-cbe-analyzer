@@ -64,58 +64,54 @@ function projection(overrides: {
   }
 }
 
-// ── classifyGroup ─────────────────────────────────────────────────────────────
+// ── classifyGroup — a direct 1:1 with the real CBC level rubric ──────────────
 
 test('classifyGroup: no academic projection → insufficient_data', () => {
   const p = projection({ level: null })
   assert.equal(classifyGroup(p, SUBJECT), 'insufficient_data')
 })
 
-test('classifyGroup: level 1 + critical risk severity → critical_gap', () => {
-  const p = projection({ level: 1, riskSeverity: 'critical' })
-  assert.equal(classifyGroup(p, SUBJECT), 'critical_gap')
+test('classifyGroup: level 1 → BE (Below Expectations), regardless of risk', () => {
+  assert.equal(classifyGroup(projection({ level: 1, riskSeverity: 'critical' }), SUBJECT), 'BE')
+  assert.equal(classifyGroup(projection({ level: 1, riskSeverity: 'at_risk' }), SUBJECT), 'BE')
+  assert.equal(classifyGroup(projection({ level: 1, riskSeverity: null }), SUBJECT), 'BE')
 })
 
-test('classifyGroup: level 1 without critical severity → prerequisite_gap, not critical_gap', () => {
-  const p = projection({ level: 1, riskSeverity: 'at_risk' })
-  assert.equal(classifyGroup(p, SUBJECT), 'prerequisite_gap')
-})
-
-test('classifyGroup: level 2 → prerequisite_gap regardless of risk', () => {
+test('classifyGroup: level 2 → AE (Approaching Expectations), regardless of risk', () => {
   const p = projection({ level: 2, riskSeverity: null })
-  assert.equal(classifyGroup(p, SUBJECT), 'prerequisite_gap')
+  assert.equal(classifyGroup(p, SUBJECT), 'AE')
 })
 
-test('classifyGroup: level 3 → concept_confusion', () => {
+test('classifyGroup: level 3 → ME (Meeting Expectations)', () => {
   const p = projection({ level: 3 })
-  assert.equal(classifyGroup(p, SUBJECT), 'concept_confusion')
+  assert.equal(classifyGroup(p, SUBJECT), 'ME')
 })
 
-test('classifyGroup: level 4 → on_track (Group C)', () => {
+test('classifyGroup: level 4 → EE (Exceeding Expectations)', () => {
   const p = projection({ level: 4 })
-  assert.equal(classifyGroup(p, SUBJECT), 'on_track')
+  assert.equal(classifyGroup(p, SUBJECT), 'EE')
 })
 
 test('classifyGroup: a risk flag for a different subject is ignored', () => {
   const p = projection({ level: 1, riskSeverity: 'critical' })
   p.risk!.value.flags[0] = { subject: 'english', reason: 'x', severity: 'critical', evidenceIds: [] }
-  assert.equal(classifyGroup(p, SUBJECT), 'prerequisite_gap')
+  assert.equal(classifyGroup(p, SUBJECT), 'BE')
 })
 
 // ── classifyGroup — curriculum-aware (ADR-0024 Phase 3) ───────────────────────
 
 test('classifyGroup: a resolved sub-strand level overrides the subject-level level', () => {
-  const p = projection({ level: 4 }) // subject-level says on_track
+  const p = projection({ level: 4 }) // subject-level says EE
   p.academic!.value.bySubStrand['ss-1'] = {
     subStrandId: 'ss-1', subStrandTitle: 'Fractions', strandTitle: 'NUMBERS',
     subject: SUBJECT, latestLevel: 1, trend: 'declining', history: [],
   }
-  assert.equal(classifyGroup(p, SUBJECT, 'ss-1'), 'prerequisite_gap')
+  assert.equal(classifyGroup(p, SUBJECT, 'ss-1'), 'BE')
 })
 
 test('classifyGroup: an unresolved subStrandId falls back to subject-level, never guesses', () => {
   const p = projection({ level: 2 })
-  assert.equal(classifyGroup(p, SUBJECT, 'ss-not-present'), 'prerequisite_gap')
+  assert.equal(classifyGroup(p, SUBJECT, 'ss-not-present'), 'AE')
 })
 
 test('classifyGroup: a sub-strand entry for a different subject is not used', () => {
@@ -124,7 +120,7 @@ test('classifyGroup: a sub-strand entry for a different subject is not used', ()
     subStrandId: 'ss-1', subStrandTitle: 'Grammar', strandTitle: 'LANGUAGE',
     subject: 'english', latestLevel: 1, trend: 'declining', history: [],
   }
-  assert.equal(classifyGroup(p, SUBJECT, 'ss-1'), 'on_track')
+  assert.equal(classifyGroup(p, SUBJECT, 'ss-1'), 'EE')
 })
 
 // ── buildAdaptiveTask (Insight shape) ─────────────────────────────────────────
@@ -142,7 +138,7 @@ test('buildAdaptiveTask: insufficient data produces the shared insufficientEvide
 test('buildAdaptiveTask: every task carries observation, evidence, confidence, action (LI-2)', () => {
   const p = projection({ level: 2, evidenceIds: ['ev-a', 'ev-b'] })
   const task = buildAdaptiveTask('learner-1', 'Amina', SUBJECT, p)
-  assert.equal(task.groupType, 'prerequisite_gap')
+  assert.equal(task.groupType, 'AE')
   assert.ok(task.observation.length > 0)
   assert.deepEqual(task.evidence, ['ev-a', 'ev-b'])
   assert.ok(['Low', 'Medium', 'High'].includes(task.confidence))
@@ -155,10 +151,33 @@ test('buildAdaptiveTask: career note is appended to the action when provided', (
   assert.match(task.action, /Future Engineer/)
 })
 
-test('buildAdaptiveTask: on_track maps to enrichment task style', () => {
-  const p = projection({ level: 4 })
-  const task = buildAdaptiveTask('learner-1', 'Amina', SUBJECT, p)
-  assert.equal(task.taskStyle, 'enrichment')
+test('buildAdaptiveTask: each CBC band maps to its own distinct task style', () => {
+  assert.equal(buildAdaptiveTask('l1', 'A', SUBJECT, projection({ level: 1 })).taskStyle, 'foundational')
+  assert.equal(buildAdaptiveTask('l1', 'A', SUBJECT, projection({ level: 2 })).taskStyle, 'application')
+  assert.equal(buildAdaptiveTask('l1', 'A', SUBJECT, projection({ level: 3 })).taskStyle, 'reinforcement')
+  assert.equal(buildAdaptiveTask('l1', 'A', SUBJECT, projection({ level: 4 })).taskStyle, 'enrichment')
+})
+
+// ── Risk severity is informational only — never a second classification axis ─
+
+test('a critical subject risk flag never changes groupType — CBC level is the only classification axis', () => {
+  const withFlag = decideAdaptive(projection({ level: 1, riskSeverity: 'critical' }), SUBJECT)
+  const noFlag = decideAdaptive(projection({ level: 1, riskSeverity: null }), SUBJECT)
+  assert.equal(withFlag.groupType, 'BE')
+  assert.equal(noFlag.groupType, 'BE')
+  assert.equal(withFlag.groupType, noFlag.groupType)
+})
+
+test('riskFlag on AdaptiveDecision carries the subject risk severity verbatim, informational only', () => {
+  assert.equal(decideAdaptive(projection({ level: 1, riskSeverity: 'critical' }), SUBJECT).riskFlag, 'critical')
+  assert.equal(decideAdaptive(projection({ level: 1, riskSeverity: null }), SUBJECT).riskFlag, null)
+  assert.equal(decideAdaptive(projection({ level: null }), SUBJECT).riskFlag, null)
+})
+
+test('a critical risk flag is stated in the observation a teacher reads, without changing the band', () => {
+  const task = buildAdaptiveTask('l1', 'Amina', SUBJECT, projection({ level: 1, riskSeverity: 'critical' }))
+  assert.equal(task.groupType, 'BE')
+  assert.match(task.observation, /critical platform-wide risk area/)
 })
 
 // ── Curriculum Grounding Layer (Wave 7) ───────────────────────────────────────
@@ -211,7 +230,7 @@ test('buildAdaptiveTask: without a curriculum context, academicGrain is subject-
 })
 
 test('buildAdaptiveTask: when Projection has resolved sub-strand evidence, the task consumes it — level, trend, and grain all come from bySubStrand', () => {
-  const p = projection({ level: 4, trend: 'stable' }) // subject-level says on_track, improving would mislead
+  const p = projection({ level: 4, trend: 'stable' }) // subject-level says EE, improving would mislead
   p.academic!.value.bySubStrand['ss1'] = {
     subStrandId: 'ss1', subStrandTitle: 'Fractions', strandTitle: 'NUMBERS',
     subject: SUBJECT, latestLevel: 1, trend: 'declining', history: [],
@@ -224,7 +243,7 @@ test('buildAdaptiveTask: when Projection has resolved sub-strand evidence, the t
 
   assert.equal(task.academicGrain, 'subStrand')
   assert.equal(task.level, 1)
-  assert.equal(task.groupType, 'prerequisite_gap') // driven by the sub-strand level, not the subject's on_track
+  assert.equal(task.groupType, 'BE') // driven by the sub-strand level, not the subject's EE
   assert.match(task.observation, /Level 1 in NUMBERS — Fractions \(declining\)/)
   assert.match(task.observation, /specific to this sub-strand/)
 })
@@ -247,7 +266,7 @@ test('buildAdaptiveTask: a sub-strand entry for a different subject never leaks 
 // ── neutralGroupLabel — must never leak internal taxonomy to a learner ────────
 
 test('neutralGroupLabel: no internal group name appears in any neutral label', () => {
-  const internalNames = ['critical_gap', 'prerequisite_gap', 'concept_confusion', 'on_track', 'insufficient_data']
+  const internalNames = ['BE', 'AE', 'ME', 'EE', 'insufficient_data']
   for (const g of internalNames) {
     const label = neutralGroupLabel(g as never)
     for (const name of internalNames) {
@@ -260,21 +279,21 @@ test('neutralGroupLabel: no internal group name appears in any neutral label', (
 
 test('buildClassRecommendations: sorts learners into the correct groups', () => {
   const learners = [
-    { learnerId: 'l1', learnerName: 'Critical Learner', projection: projection({ level: 1, riskSeverity: 'critical' }) },
-    { learnerId: 'l2', learnerName: 'Gap Learner', projection: projection({ level: 2 }) },
-    { learnerId: 'l3', learnerName: 'Confused Learner', projection: projection({ level: 3 }) },
-    { learnerId: 'l4', learnerName: 'On Track Learner', projection: projection({ level: 4 }) },
+    { learnerId: 'l1', learnerName: 'Below Learner', projection: projection({ level: 1, riskSeverity: 'critical' }) },
+    { learnerId: 'l2', learnerName: 'Approaching Learner', projection: projection({ level: 2 }) },
+    { learnerId: 'l3', learnerName: 'Meeting Learner', projection: projection({ level: 3 }) },
+    { learnerId: 'l4', learnerName: 'Exceeding Learner', projection: projection({ level: 4 }) },
     { learnerId: 'l5', learnerName: 'No Data Learner', projection: projection({ level: null }) },
   ]
 
   const groups = buildClassRecommendations(learners, SUBJECT)
 
-  assert.equal(groups.critical_gap.length, 1)
-  assert.equal(groups.critical_gap[0].learnerId, 'l1')
-  assert.equal(groups.prerequisite_gap.length, 1)
-  assert.equal(groups.prerequisite_gap[0].learnerId, 'l2')
-  assert.equal(groups.concept_confusion.length, 1)
-  assert.equal(groups.on_track.length, 1)
+  assert.equal(groups.BE.length, 1)
+  assert.equal(groups.BE[0].learnerId, 'l1')
+  assert.equal(groups.AE.length, 1)
+  assert.equal(groups.AE[0].learnerId, 'l2')
+  assert.equal(groups.ME.length, 1)
+  assert.equal(groups.EE.length, 1)
   assert.equal(groups.insufficient_data.length, 1)
 })
 
@@ -304,7 +323,7 @@ test('ONE valid assessment is enough to adapt — never insufficient_data', () =
 
 test('a single weak assessment adapts immediately — the learner gets support, not a refusal', () => {
   const decision = decideAdaptive(projection({ level: 2, history: [2] }), SUBJECT)
-  assert.equal(decision.groupType, 'prerequisite_gap', 'support is offered on the first observation')
+  assert.equal(decision.groupType, 'AE', 'support is offered on the first observation')
   assert.equal(decision.provisional, true, 'but it is explicitly revisable, not asserted as a settled pattern')
 })
 
@@ -331,56 +350,46 @@ test('provisional clears once a second observation corroborates', () => {
 
 // ── Stage 3: one score must not overturn an established pattern ─────────────
 
-test('one weak score does NOT drop an established strong learner into foundation work', () => {
-  // 4, 4, then a single 2. Undamped this is prerequisite_gap -> foundation tier.
+test('one weak score does NOT drop an established strong learner all the way to Below Expectations', () => {
+  // 4, 4, then a single 2. Undamped this is AE -> guided_practice tier.
   const decision = decideAdaptive(projection({ level: 2, history: [4, 4, 2] }), SUBJECT)
-  assert.equal(decision.groupType, 'concept_confusion',
-    'damped to supported practice — the learner still gets more support, just not foundation work')
+  assert.equal(decision.groupType, 'ME',
+    'damped to Meeting Expectations — the learner still gets more support, just not the most intensive tier')
   assert.equal(decision.provisional, true)
   assert.match(decision.rationale, /reverses an established pattern/)
 })
 
 test('a SECOND consecutive weak score confirms the change and the state moves fully', () => {
   const decision = decideAdaptive(projection({ level: 2, history: [4, 4, 2, 2] }), SUBJECT)
-  assert.equal(decision.groupType, 'prerequisite_gap', 'corroborated — the adaptive state moves')
+  assert.equal(decision.groupType, 'AE', 'corroborated — the adaptive state moves')
   assert.equal(decision.provisional, false)
 })
 
 test('damping is symmetric — one strong score does not jump an established weak learner to enrichment', () => {
   const decision = decideAdaptive(projection({ level: 4, history: [1, 1, 4] }), SUBJECT)
-  assert.equal(decision.groupType, 'concept_confusion',
+  assert.equal(decision.groupType, 'ME',
     'a single strong result must not withdraw support a learner may still need')
   assert.equal(decision.provisional, true)
 })
 
-test('damping never fires on a wobble within the same instructional tier', () => {
-  // 1 and 2 both mean foundation work — a 1->2 move is not a reversal worth damping.
+test('damping never fires on a wobble within the same severity rank', () => {
+  // 1 and 2 both rank as the more severe half — a 1->2 move is not a reversal worth damping.
   const decision = decideAdaptive(projection({ level: 1, history: [2, 2, 1] }), SUBJECT)
-  assert.equal(decision.groupType, 'prerequisite_gap')
+  assert.equal(decision.groupType, 'BE')
   assert.equal(decision.provisional, false)
 })
 
 test('a consistent established pattern is never damped', () => {
   const decision = decideAdaptive(projection({ level: 1, history: [1, 1, 1] }), SUBJECT)
-  assert.equal(decision.groupType, 'prerequisite_gap')
+  assert.equal(decision.groupType, 'BE')
   assert.equal(decision.provisional, false)
   assert.equal(decision.evidenceState, 'established')
 })
 
 test('damping cannot fire on two observations — there is no established pattern to protect', () => {
   const decision = decideAdaptive(projection({ level: 1, history: [4, 1] }), SUBJECT)
-  assert.equal(decision.groupType, 'prerequisite_gap', 'developing evidence follows the latest observation')
+  assert.equal(decision.groupType, 'BE', 'developing evidence follows the latest observation')
   assert.equal(decision.evidenceState, 'developing')
-})
-
-test('critical_gap still requires a critical risk flag, which itself requires corroboration', () => {
-  // Undamped path: level 1 + critical severity, on a consistent pattern.
-  const withFlag = decideAdaptive(projection({ level: 1, riskSeverity: 'critical', history: [2, 1, 1] }), SUBJECT)
-  assert.equal(withFlag.groupType, 'critical_gap')
-
-  // Same level, no critical flag -> never critical_gap.
-  const noFlag = decideAdaptive(projection({ level: 1, riskSeverity: null, history: [2, 1, 1] }), SUBJECT)
-  assert.equal(noFlag.groupType, 'prerequisite_gap')
 })
 
 test('classifyGroup and decideAdaptive can never disagree — one computation, two surfaces', () => {
@@ -428,7 +437,7 @@ test('sub-strand decisions are corroborated by SUB-STRAND history, never by subj
   assert.equal(decision.grain, 'subStrand')
   assert.equal(decision.observationCount, 1, 'counts sub-strand observations only, not the subject\'s three')
   assert.equal(decision.evidenceState, 'initial')
-  assert.equal(decision.groupType, 'prerequisite_gap',
+  assert.equal(decision.groupType, 'AE',
     'the sub-strand weakness is acted on despite a strong subject picture')
   assert.equal(decision.provisional, true)
 })

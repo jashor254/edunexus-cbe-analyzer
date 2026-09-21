@@ -28,7 +28,7 @@ let teacherId: string
 let classId: string
 let assignmentId: string
 let questionId: string
-let studentId: string // level 2 -> prerequisite_gap -> foundation
+let studentId: string // level 2 -> AE -> guided_practice
 
 before(async () => {
   const { data: auth, error: authErr } = await db.auth.admin.createUser({
@@ -59,7 +59,7 @@ before(async () => {
   studentId = student.id
   await db.from('class_students').insert({ class_id: classId, student_id: studentId })
 
-  // Level 2 (40%, thresholds 75/50/30) -> classifyGroup -> prerequisite_gap -> foundation tier.
+  // Level 2 (40%, thresholds 75/50/30) -> classifyGroup -> AE -> guided_practice tier.
   await recordQuizAutoGradeEvidence({
     studentId, initiatedBy: authUserId,
     assignmentId: `${SYNTHETIC_MARKER}-seed`,
@@ -254,7 +254,7 @@ test('fallback path: a tier with no approved variant serves the canonical questi
   const { data: student3 } = await db.from('students').insert({ user_id: null, name: `${SYNTHETIC_MARKER} Fallback`, grade: 8, level: 'Junior School' }).select('id').single()
   await db.from('class_students').insert({ class_id: classId, student_id: student3!.id })
   await db.from('assignment_submissions').insert({ assignment_id: assignmentId, student_id: student3!.id, class_id: classId, status: 'pending' })
-  // Level 4 -> on_track -> extension tier; no approved extension variant exists for this question.
+  // Level 4 -> EE -> extension tier; no approved extension variant exists for this question.
   await recordQuizAutoGradeEvidence({
     studentId: student3!.id, initiatedBy: authUserId, assignmentId: `${SYNTHETIC_MARKER}-fallback-seed`,
     subject: SUBJECT, topic: 'Fractions', substrandId: null, score: 95, maxScore: 100, academicYear: 2026, term: 1,
@@ -303,7 +303,7 @@ test('Stage 6: a null bound BEFORE approval stays null after the matching tier i
   await db.from('class_students').insert({ class_id: classId, student_id: student5!.id })
   await db.from('assignment_submissions').insert({ assignment_id: assignmentId, student_id: student5!.id, class_id: classId, status: 'pending' })
 
-  // Level 4 -> on_track -> extension tier, which has no approved variant yet.
+  // Level 4 -> EE -> extension tier, which has no approved variant yet.
   await recordQuizAutoGradeEvidence({
     studentId: student5!.id, initiatedBy: authUserId, assignmentId: `${SYNTHETIC_MARKER}-preapproval-seed`,
     subject: SUBJECT, topic: 'Fractions', substrandId: null, score: 95, maxScore: 100, academicYear: 2026, term: 1,
