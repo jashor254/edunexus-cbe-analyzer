@@ -63,6 +63,11 @@ next-env.d.ts
 .mcp.json
 e2e-edunexus.mjs
 
+# Claude Code — personal permission rules + agent worktrees are per-machine;
+# .claude/skills/ is intentionally NOT ignored so project skills are shared
+.claude/settings.local.json
+.claude/worktrees/
+
 # generated test/debug artifacts — not source
 generated-reports/*.pdf
 !generated-reports/.gitkeep
