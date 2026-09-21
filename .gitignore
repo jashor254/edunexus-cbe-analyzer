@@ -77,6 +77,16 @@ generated-reports/*.pdf
 scripts/growth/output/
 .aider*
 
+# throwaway probe/seed scripts — several seed or look up real schools and
+# teachers (Kangai, invite links, resends); same PII reasoning as above
+scripts/_tmp/
+
+# personal tooling with hardcoded home paths (Obsidian vault sync)
+scripts/second-brain/
+
+# video-pipeline experiment scaffold, not app source — lives with manim-projects
+blender-validation/
+
 # book build pipeline — isolated node project + generated PDF, not source
 scripts/book-build/node_modules/
 docs/manuscript/engineering-educational-intelligence/dist/
