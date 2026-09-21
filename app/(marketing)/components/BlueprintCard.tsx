@@ -13,8 +13,12 @@ import { KCSE_STUDENT } from '@/components/demo/kcse/kcseMockData'
 export function BlueprintCardMockup() {
   return (
     <div className="relative">
+      <div
+        className="absolute -inset-6 rounded-3xl opacity-70 blur-2xl pointer-events-none"
+        style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--color-nexusteal-500) 35%, transparent), transparent 70%)' }}
+      />
       <div className="absolute inset-0 bg-white/5 border border-white/10 rounded-2xl rotate-1 translate-x-2 translate-y-1" />
-      <div className="relative bg-white/8 border border-white/15 rounded-2xl -rotate-2 w-64 p-7">
+      <div className="relative bg-white/8 backdrop-blur-xl border border-white/15 rounded-2xl -rotate-2 w-64 p-7 shadow-2xl shadow-black/40">
         <div className="text-[10px] font-bold text-teal-400 tracking-[0.15em] uppercase mb-1">
           EDUNEXUS
         </div>

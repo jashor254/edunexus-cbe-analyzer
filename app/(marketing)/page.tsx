@@ -102,7 +102,7 @@ export default function LandingPage() {
       line1:         'Plan your full term.',
       line2:         'Before the bell rings Monday.',
       gradientLine:  'EduNexus handles the paperwork.',
-      lineClass:     'text-amber-400',
+      lineClass:     'bg-linear-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent',
       subtitle:      'Schemes of work, lesson plans, and class insights — ready when you need them, formatted the way TSC expects.',
       ctaHref:       '/signup?role=teacher',
       ctaLabel:      'Start Planning for Free',
@@ -116,7 +116,7 @@ export default function LandingPage() {
       line1:         'Finally know',
       line2:         'where your child truly stands.',
       gradientLine:  'Their real potential, not just a mark on a report.',
-      lineClass:     'text-teal-400',
+      lineClass:     'bg-linear-to-r from-teal-300 to-nexusteal-400 bg-clip-text text-transparent',
       subtitle:      "The Learner Blueprint shows you exactly which strands are holding your child back — and a precise plan to close the gap before next term.",
       ctaHref:       '/signup?role=parent',
       ctaLabel:      'Get Your Child\'s Free Report',
@@ -130,7 +130,7 @@ export default function LandingPage() {
       line1:         'Schools should never',
       line2:         'discover a problem too late.',
       gradientLine:  'EduNexus shortens that gap.',
-      lineClass:     'text-nexusteal-400',
+      lineClass:     'bg-linear-to-r from-nexusteal-300 to-nexusteal-500 bg-clip-text text-transparent',
       subtitle:      'EduNexus shortens the distance between when a learning problem begins and when someone notices — while there is still time to act on it.',
       ctaHref:       '/signup?role=school',
       ctaLabel:      'Create Your School Account',
@@ -181,7 +181,15 @@ export default function LandingPage() {
   return (
     <>
       {/* ── TRANSFORMATION (HERO) ─────────────────────────────────────────────── */}
-      <section className="pt-16 md:pt-24 pb-16 md:pb-24 bg-white/3 overflow-hidden">
+      <section className="relative pt-16 md:pt-24 pb-16 md:pb-24 bg-white/3 overflow-hidden">
+        <div
+          className="absolute -top-64 -left-40 w-200 h-200 rounded-full opacity-60 blur-sm -z-10 pointer-events-none"
+          style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--color-nexusteal-500) 35%, transparent), transparent 70%)' }}
+        />
+        <div
+          className="absolute -top-30 -right-55 w-195 h-195 rounded-full opacity-60 blur-sm -z-10 pointer-events-none"
+          style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--color-trustblue-500) 30%, transparent), transparent 70%)' }}
+        />
         <div className="max-w-290 mx-auto px-6">
           <div className="grid lg:grid-cols-[1.35fr_0.65fr] gap-12 lg:gap-16 items-center">
 
@@ -238,7 +246,7 @@ export default function LandingPage() {
               <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-6 mt-2">
                 <Link
                   href={hero.ctaHref}
-                  className={`inline-flex items-center gap-2 bg-brass-500 text-nexus-ink px-8 py-4 rounded-full font-bold hover:bg-brass-400 hover:scale-105 transition-all shadow-2xl shadow-brass-600/30 ${FOCUS_RING}`}
+                  className={`inline-flex items-center gap-2 bg-linear-to-br from-brass-400 to-brass-600 text-nexus-ink px-8 py-4 rounded-full font-bold hover:scale-105 transition-all shadow-[0_20px_45px_-12px_color-mix(in_srgb,var(--color-brass-600)_55%,transparent)] ${FOCUS_RING}`}
                 >
                   {hero.ctaLabel}
                   <ArrowRight className="w-4 h-4" />
@@ -303,7 +311,11 @@ export default function LandingPage() {
       </section>
 
       {/* ── EVIDENCE HIGHLIGHT + COMPACT OVERVIEW GRID ─────────────────────────── */}
-      <section id="evidence" className="bg-white/5 py-20 md:py-28">
+      <section id="evidence" className="relative bg-white/5 py-20 md:py-28 overflow-hidden">
+        <div
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-275 h-130 rounded-full opacity-40 blur-sm -z-10 pointer-events-none"
+          style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--color-brass-500) 14%, transparent), transparent 72%)' }}
+        />
         <div className="max-w-275 mx-auto px-6">
 
           <div className="text-center max-w-140 mx-auto mb-14 md:mb-16">
@@ -319,7 +331,7 @@ export default function LandingPage() {
             </p>
             <Link
               href="/learner-blueprint"
-              className={`inline-flex items-center gap-2 bg-white/8 border border-brass-500/25 hover:bg-white/14 hover:border-brass-400/40 text-white px-7 py-3.5 rounded-full font-bold transition-all ${FOCUS_RING}`}
+              className={`inline-flex items-center gap-2 bg-white/8 backdrop-blur-xl border border-brass-500/25 hover:bg-white/14 hover:border-brass-400/40 text-white px-7 py-3.5 rounded-full font-bold transition-all ${FOCUS_RING}`}
             >
               Explore the Learner Blueprint
               <ArrowRight className="w-4 h-4" />
@@ -331,7 +343,7 @@ export default function LandingPage() {
               <Link
                 key={card.href}
                 href={card.href}
-                className={`group bg-white/4 border border-white/10 hover:border-white/25 hover:bg-white/6 rounded-2xl p-6 transition-all ${FOCUS_RING}`}
+                className={`group bg-white/5 backdrop-blur-xl border border-white/10 hover:border-white/20 hover:bg-white/8 rounded-2xl p-6 shadow-[0_30px_60px_-30px_rgba(0,0,0,0.5)] transition-all ${FOCUS_RING}`}
               >
                 <div className="flex items-center justify-between mb-4">
                   <card.icon className={`w-6 h-6 ${card.iconClass}`} />
@@ -413,7 +425,11 @@ export default function LandingPage() {
       </section>
 
       {/* ── CLOSING CTA ───────────────────────────────────────────────────────── */}
-      <section className="bg-white/3 py-24 md:py-32">
+      <section className="relative bg-white/3 py-24 md:py-32 overflow-hidden">
+        <div
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-230 h-160 rounded-full opacity-50 blur-sm -z-10 pointer-events-none"
+          style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--color-nexusteal-500) 20%, transparent), transparent 70%)' }}
+        />
         <div className="max-w-190 mx-auto px-6 text-center">
 
           <p className="text-white/35 text-sm font-semibold tracking-wide mb-6">
@@ -435,7 +451,7 @@ export default function LandingPage() {
               href={closing.href}
               target="_blank"
               rel="noopener noreferrer"
-              className={`inline-flex items-center gap-2 bg-brass-500 text-nexus-ink px-10 py-4 rounded-full font-bold text-lg hover:bg-brass-400 hover:scale-105 transition-all shadow-2xl shadow-brass-600/30 ${FOCUS_RING}`}
+              className={`inline-flex items-center gap-2 bg-linear-to-br from-brass-400 to-brass-600 text-nexus-ink px-10 py-4 rounded-full font-bold text-lg hover:scale-105 transition-all shadow-[0_20px_45px_-12px_color-mix(in_srgb,var(--color-brass-600)_55%,transparent)] ${FOCUS_RING}`}
             >
               {closing.label}
               <ArrowRight className="w-5 h-5" />
@@ -443,7 +459,7 @@ export default function LandingPage() {
           ) : (
             <Link
               href={closing.href}
-              className={`inline-flex items-center gap-2 bg-brass-500 text-nexus-ink px-10 py-4 rounded-full font-bold text-lg hover:bg-brass-400 hover:scale-105 transition-all shadow-2xl shadow-brass-600/30 ${FOCUS_RING}`}
+              className={`inline-flex items-center gap-2 bg-linear-to-br from-brass-400 to-brass-600 text-nexus-ink px-10 py-4 rounded-full font-bold text-lg hover:scale-105 transition-all shadow-[0_20px_45px_-12px_color-mix(in_srgb,var(--color-brass-600)_55%,transparent)] ${FOCUS_RING}`}
             >
               {closing.label}
               <ArrowRight className="w-5 h-5" />
