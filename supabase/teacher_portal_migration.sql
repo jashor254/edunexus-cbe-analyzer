@@ -129,8 +129,6 @@ ALTER TABLE student_alerts ENABLE ROW LEVEL SECURITY;
 -- Drop existing policies first to avoid conflicts
 DROP POLICY IF EXISTS "teachers: own crud" ON teachers;
 DROP POLICY IF EXISTS "classes: teacher crud" ON teacher_classes;
-DROP POLICY IF EXISTS "class_students: read" ON class_students;
-DROP POLICY IF EXISTS "class_students: insert" ON class_students;
 DROP POLICY IF EXISTS "assignments: teacher manage" ON assignments;
 DROP POLICY IF EXISTS "assignments: student read" ON assignments;
 DROP POLICY IF EXISTS "submissions: own access" ON assignment_submissions;
@@ -149,13 +147,14 @@ CREATE POLICY "classes: teacher crud"
     )
   );
 
-CREATE POLICY "class_students: read"
-  ON class_students FOR SELECT
-  USING (TRUE);
-
-CREATE POLICY "class_students: insert"
-  ON class_students FOR INSERT
-  WITH CHECK (auth.uid() = parent_id);
+-- class_students RLS is owned by supabase/migrations/, not this bootstrap.
+-- The original "read USING (TRUE)" and "insert WITH CHECK (auth.uid() = parent_id)"
+-- policies were removed here because SELECT policies are OR'd — re-creating the
+-- open read policy alongside the current "owner read" policy would expose every
+-- row, and the insert policy let any user forge a parent link to any learner.
+-- Current policies: 20260710_sprint14_security_hardening.sql (owner read),
+-- 20260903113923_class_students_insert_tenant_escape_fix.sql (insert dropped;
+-- all writes go through service-role API routes).
 
 CREATE POLICY "assignments: teacher manage"
   ON assignments FOR ALL
