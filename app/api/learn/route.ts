@@ -6,6 +6,7 @@ import { resolveCompassLearnerIntelligence } from '@/lib/compass/learnerContext'
 import { bindDeliveryToSession } from '@/lib/compass/deliveryBinding'
 import { resolveCompassMutationAccess, resolveSessionOwnership } from '@/lib/compass/ownership'
 import { buildCompassPrompt, type CompassPromptParams, type KnowledgeContextBlock } from '@/lib/compass/prompt'
+import { parsePedagogyBlock, stripPedagogyBlock, shouldBlockMasteryForPedagogy, buildUnresolvedPedagogyNote } from '@/lib/compass/pedagogy'
 import type { RootCauseResult } from '@/lib/knowledgeGraph/types'
 import { getGradeTopics } from '@/lib/compass/topics'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
@@ -427,6 +428,7 @@ export async function POST(req: Request) {
       teacherRecommendation,
       teacherSuggested,
       knowledgeContext,
+      activePedagogy: savedSession?.pedagogy ?? null,
       sessionsWithoutImprovement: (ctx?.sessions_without_improvement as number | null) ?? 0,
       mode,
       holidayWeek,
@@ -545,9 +547,18 @@ export async function POST(req: Request) {
           }
         }
 
-        const visibleResponse = parsedEval
+        const visibleResponseWithEval = parsedEval
           ? (accumulated.slice(0, evalStartIdx) + accumulated.slice(evalEndIdx + EVAL_END.length)).trim()
           : accumulated.trim()
+
+        // Structured misconception -> remediation -> re-check state (see
+        // lib/compass/pedagogy.ts). Parsed from the same raw model output as
+        // the eval block, independently strippable. No block this turn means
+        // "nothing changed" — the prior session's state carries forward
+        // unchanged, not reset to null.
+        const turnPedagogy = parsePedagogyBlock(accumulated)
+        const nextPedagogy = turnPedagogy ?? savedSession?.pedagogy ?? null
+        const visibleResponse = stripPedagogyBlock(visibleResponseWithEval)
 
         // Increment exchange count
         await recordExchange(activeSessionId)
@@ -575,8 +586,16 @@ export async function POST(req: Request) {
             ?? (ctx?.sessions_without_improvement as number | null)
             ?? 0
           try {
+            // Phase 7 — carries an unresolved misconception into the NEXT
+            // session's prompt via the existing lastSessionSummary channel
+            // (no new memory system). Deterministic, server-computed from
+            // validated pedagogy state — never model-authored text, so this
+            // can't be used to smuggle claims into the summary.
+            const summaryWithPedagogyNote =
+              parsedEval.one_line_summary + buildUnresolvedPedagogyNote(nextPedagogy)
+
             await db.from('compass_sessions')
-              .update({ one_line_summary: parsedEval.one_line_summary })
+              .update({ one_line_summary: summaryWithPedagogyNote })
               .eq('id', activeSessionId)
 
             await db.from('student_learning_context')
@@ -593,10 +612,17 @@ export async function POST(req: Request) {
         }
 
         // A substrand the AI itself assessed as genuine progress this exchange
-        // counts as evidence of mastery for the Learner Model at session end.
+        // counts as evidence of mastery for the Learner Model at session end —
+        // UNLESS there is still an open misconception re-check for this
+        // session (shouldBlockMasteryForPedagogy). A model saying
+        // genuine_progress=true right after remediating an error, with no
+        // re-check passed yet, must never be recorded as mastery: this is the
+        // server-side check that makes that guarantee regardless of what the
+        // eval block claims (see lib/compass/pedagogy.ts).
+        const pedagogyBlocksMastery = shouldBlockMasteryForPedagogy(nextPedagogy)
         const priorMastered = savedSession?.masteredConcepts ?? []
         const masteredConcepts =
-          parsedEval?.genuine_progress && activeSubstrand && !priorMastered.includes(activeSubstrand)
+          parsedEval?.genuine_progress && activeSubstrand && !pedagogyBlocksMastery && !priorMastered.includes(activeSubstrand)
             ? [...priorMastered, activeSubstrand].slice(-20)
             : priorMastered
 
@@ -610,6 +636,7 @@ export async function POST(req: Request) {
           overallLevel:     level,
           initialized:      true,
           masteredConcepts,
+          pedagogy:         nextPedagogy,
         })
 
         // Log messages

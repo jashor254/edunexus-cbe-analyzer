@@ -144,3 +144,45 @@ test('10. the persistent context block is built only from typed enum/string fiel
   const prompt = buildCompassPrompt(baseParams({ persistentIntelligence: ctx }))
   assert.match(prompt, /Conflicting evidence for mathematics/)
 })
+
+// ── 11. ACTIVE PEDAGOGY STATE block (misconception -> remediation -> re-check) ──
+
+test('11. no activePedagogy: no ACTIVE PEDAGOGY STATE section at all', () => {
+  const prompt = buildCompassPrompt(baseParams())
+  assert.doesNotMatch(prompt, /ACTIVE PEDAGOGY STATE/)
+})
+
+test('12. activePedagogy with an open re-check: renders the block with the "not confirmed evidence" framing', () => {
+  const prompt = buildCompassPrompt(baseParams({
+    activePedagogy: {
+      decision: 'REMEDIATE',
+      misconceptionType: 'prerequisite_gap',
+      concept: 'fractions',
+      remediation: { started: true, completed: false },
+      recheck: { required: true, completed: false, passed: false },
+    },
+  }))
+  assert.match(prompt, /ACTIVE PEDAGOGY STATE \(session-only hypothesis, not confirmed evidence\)/)
+  assert.match(prompt, /prerequisite_gap/)
+  assert.match(prompt, /"fractions"/)
+  assert.match(prompt, /do not report genuine progress on this concept until the learner demonstrates understanding/)
+})
+
+test('13. activePedagogy already passed its re-check: no block rendered — resolved state is silent', () => {
+  const prompt = buildCompassPrompt(baseParams({
+    activePedagogy: {
+      decision: 'RECHECK',
+      misconceptionType: 'procedure_error',
+      concept: 'long division',
+      remediation: { started: true, completed: true },
+      recheck: { required: true, completed: true, passed: true },
+    },
+  }))
+  assert.doesNotMatch(prompt, /ACTIVE PEDAGOGY STATE/)
+})
+
+test('14. STRUCTURED PEDAGOGY OUTPUT instructions and the advancement-rule tie-in are always present', () => {
+  const prompt = buildCompassPrompt(baseParams())
+  assert.match(prompt, /STRUCTURED PEDAGOGY OUTPUT/)
+  assert.match(prompt, /Never report genuine_progress for a concept with an unresolved re-check/)
+})

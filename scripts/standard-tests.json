@@ -54,6 +54,7 @@
     "lib/career/provisionalPreview.test.ts",
     "lib/compass/blueprintCompassConvergence.architecture.test.ts",
     "lib/compass/endingLevelSource.test.ts",
+    "lib/compass/pedagogy.test.ts",
     "lib/compass/prompt.test.ts",
     "lib/config/attendanceOperatingMode.test.ts",
     "lib/config/kjseaRules.test.ts",

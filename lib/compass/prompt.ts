@@ -1,5 +1,7 @@
 // lib/compass/prompt.ts
 
+import type { CompassPedagogyState } from './pedagogy'
+
 // Knowledge graph context injected when student_learning_context has root cause data.
 // All fields are AI-internal — never quoted verbatim to the student.
 export type KnowledgeContextBlock = {
@@ -61,6 +63,13 @@ export interface CompassPromptParams {
 
   // Knowledge graph context
   knowledgeContext?: KnowledgeContextBlock
+
+  /**
+   * Carried-forward in-session pedagogy hypothesis (misconception ->
+   * remediation -> re-check) from a prior turn this same session — see
+   * lib/compass/pedagogy.ts. Undefined/null renders no block at all.
+   */
+  activePedagogy?: CompassPedagogyState | null
 
   // Mode
   mode: 'school' | 'holiday'
@@ -146,6 +155,26 @@ Address the cause before continuing. Do not simply provide the correct answer.
 
 ---
 
+## STRUCTURED PEDAGOGY OUTPUT
+
+When you identify a real misconception (not a one-off careless slip), and again at each later turn where its status changes, output this block immediately after your normal reply to the learner (in addition to your reply, never instead of it):
+
+COMPASS_PEDAGOGY_START
+{"decision":"REMEDIATE","misconception_type":"prerequisite_gap","concept":"short topic name","remediation":{"started":true,"completed":false},"recheck":{"required":true,"completed":false,"passed":false}}
+COMPASS_PEDAGOGY_END
+
+decision must be exactly one of: TEACH, PROBE, REMEDIATE, RECHECK, ADVANCE.
+misconception_type must be exactly one of: prerequisite_gap, concept_misunderstanding, procedure_error, vocabulary_language_confusion, careless_error, unknown.
+
+Rules:
+- The turn you notice the misconception: decision REMEDIATE, remediation.started=true, remediation.completed=false, recheck.required=true, recheck.completed=false, recheck.passed=false.
+- The turn you finish teaching/correcting it: remediation.completed=true, recheck still not completed. Then ask a re-check question that tests the SAME concept in a DIFFERENT way — never a repeat of your own example.
+- The turn the learner answers the re-check: decision RECHECK, recheck.completed=true, and recheck.passed=true only if they clearly demonstrated understanding on their own, otherwise false.
+- Never set recheck.passed=true unless recheck.completed=true and remediation.completed=true — a partially-remediated or unchecked concept is never "passed."
+- If nothing about this changed this turn, omit the block entirely — do not repeat it unchanged.
+
+---
+
 ## TEACHING RULES
 
 When a learner asks to learn a topic: teach the complete requested concept before asking questions.
@@ -190,13 +219,15 @@ READY → advance to next skill.
 NOT_READY → gather more evidence.
 NEEDS_REMEDIATION → move to prerequisite support.
 
+Never report genuine_progress for a concept with an unresolved re-check (see STRUCTURED PEDAGOGY OUTPUT: recheck.required=true and recheck.passed is not yet true). One correct answer immediately after an explanation is not mastery — mastery requires the re-check to actually pass.
+
 ---
 
 ## LEARNER
 
 ${p.firstName} | Grade ${p.grade} | Level ${p.level}/4 (${['BE','AE','ME','EE'][p.level - 1]})${!p.isJunior && p.pathway ? ` | Pathway: ${p.pathway}` : ''}${p.levelSource && p.levelSource !== 'projection' ? ` (provisional — no confirmed evidence yet, treat as a starting point only)` : ''}
 ${p.lastSessionSummary ? `Last session: ${p.lastSessionSummary}` : 'First session.'}${p.sessionsWithoutImprovement >= 2 ? `\nNote: ${p.sessionsWithoutImprovement} sessions without improvement — try a different approach.` : ''}
-${buildPersistentContextBlock(p.persistentIntelligence)}
+${buildPersistentContextBlock(p.persistentIntelligence)}${buildPedagogyContextBlock(p.activePedagogy)}
 ---
 
 ## SESSION
@@ -263,6 +294,26 @@ function buildPersistentContextBlock(ctx: CompassPersistentContext | undefined):
   lines.push('RULE: this is a starting point, not a constraint. If the learner performs above or below this record during the session, trust what they show you now and adjust immediately — do not hold them to this background note.')
 
   return lines.join('\n') + '\n'
+}
+
+/**
+ * Renders the carried-forward in-session pedagogy hypothesis (if any is
+ * still open) as a short instruction, not a fact — mirrors
+ * buildPersistentContextBlock's "background only" framing. Returns '' when
+ * there is nothing open, so a normal session (no misconception this session,
+ * or one already re-checked and passed) is completely unaffected.
+ */
+function buildPedagogyContextBlock(state: CompassPedagogyState | null | undefined): string {
+  if (!state || !state.recheck.required || state.recheck.passed === true) return ''
+
+  const concept = state.concept ? `"${state.concept}"` : 'the current topic'
+  const remediationNote = state.remediation.completed
+    ? 'Remediation was already given.'
+    : 'Remediation has not been completed yet.'
+
+  return `ACTIVE PEDAGOGY STATE (session-only hypothesis, not confirmed evidence)
+A possible ${state.misconceptionType ?? 'unknown'} misconception was identified around ${concept}. ${remediationNote} A re-check is still required — do not report genuine progress on this concept until the learner demonstrates understanding via a fresh question that tests the same idea a different way, not a repeat of your remediation example.
+`
 }
 
 function buildModeNote(p: CompassPromptParams): string {

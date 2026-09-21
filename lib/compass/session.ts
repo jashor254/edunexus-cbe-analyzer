@@ -5,6 +5,7 @@
 import { repos } from '@/lib/repositories'
 import { publishEvent } from '@/lib/events'
 import { readCompassAcademicProjection, resolveCompassSubjectRanking } from './learnerContext'
+import type { CompassPedagogyState } from './pedagogy'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -18,6 +19,13 @@ export interface CompassSession {
   overallLevel:     number
   initialized:      boolean
   masteredConcepts: string[]
+  /**
+   * In-session-only pedagogical hypothesis (misconception -> remediation ->
+   * re-check). Optional/absent on every session created before this field
+   * existed — always read back as null in that case, never a broken shape.
+   * Never confirmed learner evidence; see lib/compass/pedagogy.ts.
+   */
+  pedagogy?: CompassPedagogyState | null
 }
 
 export interface SessionHandle {
@@ -284,6 +292,7 @@ export async function readSession(
     overallLevel:     (s.overallLevel     as number)         ?? 2,
     initialized:      (s.initialized     as boolean)        ?? false,
     masteredConcepts: (s.masteredConcepts as string[] | null) ?? [],
+    pedagogy:         (s.pedagogy as CompassPedagogyState | null | undefined) ?? null,
   }
 }
 
