@@ -1,11 +1,68 @@
-import { test } from 'node:test'
+// app/api/webhooks/whatsapp/route.test.ts
+//
+// mock.module is registered BEFORE ./route (and its transitive imports of
+// @/lib/parentPulse/observationPipeline, @/lib/whatsapp/sender and
+// @/lib/learnerModel/queries — each of which pulls in the eagerly-
+// constructing @/lib/repositories singleton) is ever imported, so the real
+// repos object never loads in this process. Same pattern as
+// lib/paperIntelligence/evidence.test.ts. A single mutable
+// `pipelineResult` drives what the mocked processInboundReply returns,
+// since node:test's mock.module is unreliable across repeated
+// mock/restore cycles in one process (same constraint noted in
+// lib/remedial/plannerRouterMigration.test.ts).
+//
+// Run: npx tsx --experimental-test-module-mocks --test app/api/webhooks/whatsapp/route.test.ts
+
+import { test, before, mock } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import { NextRequest } from 'next/server'
-import { GET, POST } from './route'
 
 const VERIFY_TOKEN = 'test-verify-token'
 const APP_SECRET = 'test-app-secret'
+
+type PipelineResult = { processed: boolean; outcome?: 'demonstrated' | 'struggled' | 'not_attempted' | 'free_form'; teacherNotified?: boolean }
+
+let pipelineResult: PipelineResult = { processed: false }
+let pipelineShouldThrow = false
+let capturedInbound: { fromPhone: string; rawBody: string } | null = null
+
+mock.module('@/lib/parentPulse/observationPipeline', {
+  namedExports: {
+    processInboundReply: async (inbound: { fromPhone: string; rawBody: string }) => {
+      capturedInbound = inbound
+      if (pipelineShouldThrow) throw new Error('boom')
+      return pipelineResult
+    },
+    buildAcknowledgement: () => 'unused in these tests',
+  },
+})
+
+mock.module('@/lib/whatsapp/sender', {
+  namedExports: {
+    sendWhatsApp: async () => ({ success: true }),
+  },
+})
+
+mock.module('@/lib/learnerModel/queries', {
+  namedExports: {
+    getLearnerProfile: async () => null,
+  },
+})
+
+// The service-client factory that route.ts's ack-lookup helper calls is
+// deliberately left unmocked here: the STANDARD test runner never loads
+// .env.local, so with those connection env vars absent the real factory
+// just throws immediately (no network call) — caught by route.ts's own
+// try/catch around the acknowledgement lookup — whenever a test below
+// drives a structured outcome that reaches that code path.
+
+let GET: typeof import('./route').GET
+let POST: typeof import('./route').POST
+
+before(async () => {
+  ;({ GET, POST } = await import('./route'))
+})
 
 async function withEnv<T>(env: Record<string, string | undefined>, fn: () => Promise<T>): Promise<T> {
   const original: Record<string, string | undefined> = {}
@@ -80,7 +137,8 @@ test('GET returns 403 when the verify token env var is not configured', async ()
   })
 })
 
-test('POST returns 200 for a valid signature and valid JSON', async () => {
+test('POST returns 200 for a valid signature and valid JSON with no message (status/receipt event)', async () => {
+  pipelineResult = { processed: false }
   await withEnv({ WHATSAPP_APP_SECRET: APP_SECRET }, async () => {
     const body = JSON.stringify({ object: 'whatsapp_business_account', entry: [] })
     const res = await POST(postReq(body, sign(body, APP_SECRET)))
@@ -119,4 +177,49 @@ test('POST returns 400 for malformed JSON with a valid signature', async () => {
     const res = await POST(postReq(body, sign(body, APP_SECRET)))
     assert.equal(res.status, 400)
   })
+})
+
+test('POST extracts a Meta Cloud API message and runs it through the pipeline', async () => {
+  pipelineResult = { processed: true, outcome: 'free_form' }
+  capturedInbound = null
+  await withEnv({ WHATSAPP_APP_SECRET: APP_SECRET }, async () => {
+    const body = JSON.stringify({
+      object: 'whatsapp_business_account',
+      entry: [{ changes: [{ value: { messages: [{ from: '254712345678', text: { body: 'Went well!' } }] } }] }],
+    })
+    const res = await POST(postReq(body, sign(body, APP_SECRET)))
+    assert.equal(res.status, 200)
+    assert.deepEqual(await res.json(), { ok: true, outcome: 'free_form' })
+    assert.equal(capturedInbound?.fromPhone, '254712345678')
+    assert.equal(capturedInbound?.rawBody, 'Went well!')
+  })
+})
+
+test('POST extracts a Twilio-format message and runs it through the pipeline', async () => {
+  pipelineResult = { processed: true, outcome: 'demonstrated' }
+  capturedInbound = null
+  await withEnv({ WHATSAPP_APP_SECRET: APP_SECRET }, async () => {
+    const body = JSON.stringify({ From: 'whatsapp:+254712345678', Body: '1' })
+    const res = await POST(postReq(body, sign(body, APP_SECRET)))
+    assert.equal(res.status, 200)
+    assert.equal(capturedInbound?.fromPhone, '254712345678')
+    assert.equal(capturedInbound?.rawBody, '1')
+  })
+})
+
+test('POST returns 200 even when the pipeline throws — never causes a Meta retry', async () => {
+  pipelineShouldThrow = true
+  try {
+    await withEnv({ WHATSAPP_APP_SECRET: APP_SECRET }, async () => {
+      const body = JSON.stringify({
+        object: 'whatsapp_business_account',
+        entry: [{ changes: [{ value: { messages: [{ from: '254712345678', text: { body: 'hi' } }] } }] }],
+      })
+      const res = await POST(postReq(body, sign(body, APP_SECRET)))
+      assert.equal(res.status, 200)
+      assert.deepEqual(await res.json(), { ok: false, error: 'internal_error' })
+    })
+  } finally {
+    pipelineShouldThrow = false
+  }
 })
