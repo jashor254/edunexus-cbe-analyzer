@@ -6,6 +6,8 @@ import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } fr
 import { generateHolidayPlan, generateClassHolidayPlans, type HolidayBatchProgress } from '@/lib/holiday/planner'
 import { KE_CBC } from '@/lib/curriculum/regional/ke-cbc'
 import { repos } from '@/lib/repositories'
+import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
+import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
 
 export const HOLIDAY_BATCH_JOB_TYPE = 'ai.holiday_plan.generate'
 
@@ -32,6 +34,19 @@ const ClassSchema = z.object({
 
 export async function POST(req: Request): Promise<Response> {
   try {
+    const access = await checkFeatureAccess('holiday_plan')
+    if (access.allowed === false) {
+      return apiError(
+        access.reason === 'insufficient_tokens' ? 'Insufficient tokens. Please top up to generate a holiday plan.' : 'Access denied',
+        access.reason === 'unauthenticated' ? 401 : 403,
+      )
+    }
+
+    const rateLimit = await checkDailyCallLimit(access.userId, 'holiday_plan')
+    if (rateLimit.allowed === false) {
+      return apiError(`Daily limit of ${rateLimit.limit} holiday plan generations reached. Resets at ${rateLimit.resetAt}`, 429)
+    }
+
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return apiUnauthorized()
@@ -138,9 +153,21 @@ export async function POST(req: Request): Promise<Response> {
             parsed.data.studentIds,
           )
 
+          const generatedCount = results.filter(r => r.plan !== null).length
+
+          // Charged per plan actually generated, only for token-tier users,
+          // only after success — never for students whose generation failed.
+          // Deliberately outside the per-student worker loop in
+          // generateClassHolidayPlans() (lib/holiday/planner.ts) so billing
+          // stays a route-level concern, not something the generation
+          // function itself needs to know about.
+          if (access.deductTokens && generatedCount > 0) {
+            await deductFeatureTokens(access.userId, 'holiday_plan', access.cost * generatedCount)
+          }
+
           await repos.jobs.markComplete(job.id, {
             total,
-            generated: results.filter(r => r.plan !== null).length,
+            generated: generatedCount,
             failed:    results.filter(r => r.plan === null).length,
             completed: total,
             currentStudentName: null,
@@ -173,6 +200,10 @@ export async function POST(req: Request): Promise<Response> {
       holidayDays:   parsed.data.holidayDays,
       schoolId:      parsed.data.schoolId,
     })
+
+    if (access.deductTokens) {
+      await deductFeatureTokens(access.userId, 'holiday_plan', access.cost)
+    }
 
     return apiSuccess({ plan, term, year })
   } catch (e: unknown) {

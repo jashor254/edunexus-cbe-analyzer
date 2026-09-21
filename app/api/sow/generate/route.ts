@@ -4,7 +4,7 @@
 import { z } from 'zod'
 import { after } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
-import { checkFeatureAccess } from '@/lib/payments/access'
+import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
 import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
 import { type FeatureKey } from '@/lib/payments/config'
 import { repos } from '@/lib/repositories'
@@ -217,6 +217,15 @@ export async function POST(req: Request) {
             },
           })
           return
+        }
+
+        // Charged per lesson actually generated, only for token-tier users,
+        // only after success — never for a run that generated nothing. Mirrors
+        // the holiday-planner route's post-pipeline deduction; this was
+        // missing entirely, so pay-as-you-go teachers generated full schemes
+        // of work for free regardless of outcome.
+        if (access.deductTokens && generated > 0) {
+          await deductFeatureTokens(access.userId, FEATURE, access.cost)
         }
 
         // Counts come from the result, not from `total` — a partial run that

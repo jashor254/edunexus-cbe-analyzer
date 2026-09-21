@@ -47,7 +47,11 @@ export async function POST(
 
     const result = await generateVariantsForAssignmentQuestion(assignmentId, questionId, ctx)
 
-    if (access.deductTokens) {
+    // Charge only when a variant was actually produced — a request that
+    // fails structural validation or independent verification is not a
+    // successful AI response (matches the guard already correct in the
+    // sibling generate-all/route.ts, which this route previously lacked).
+    if (access.deductTokens && result.created.length > 0) {
       await deductFeatureTokens(access.userId, 'adaptive_variant_generate', access.cost)
     }
 

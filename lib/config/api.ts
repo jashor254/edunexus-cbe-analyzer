@@ -151,24 +151,6 @@ export const RESEND_CONFIG = {
 }
 
 // ============================================================
-// TOKEN CONFIG
-// ============================================================
-
-export const TOKEN_CONFIG = {
-  // Free tokens on signup
-  FREE_TOKENS_ON_SIGNUP: 1,
-
-  // Admin gets unlimited (effectively)
-  ADMIN_TOKENS: 999999,
-
-  // Tokens per referral
-  TOKENS_PER_REFERRAL: 2,
-
-  // Token cost per AI analysis
-  TOKENS_PER_ANALYSIS: 1,
-}
-
-// ============================================================
 // ADMIN CONFIG
 // ============================================================
 
