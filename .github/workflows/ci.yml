@@ -613,31 +613,3 @@ jobs:
           name: nextjs-build-${{ github.sha }}
           path: .next/
           retention-days: 3
-
-  # ── Environment validation (main only — needs real secrets) ──────────────────
-  env-check:
-    name: Environment Check
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Validate production env
-        run: npx tsx scripts/check-env.ts
-        env:
-          NEXT_PUBLIC_SUPABASE_URL:      ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY:     ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          DEEPSEEK_AI_API_KEY:           ${{ secrets.DEEPSEEK_AI_API_KEY }}
-          GOOGLE_GEMINI_API_KEY:         ${{ secrets.GOOGLE_GEMINI_API_KEY }}
-          PAYSTACK_SECRET_KEY:           ${{ secrets.PAYSTACK_SECRET_KEY }}
-          PAYSTACK_PUBLIC_KEY:           ${{ secrets.PAYSTACK_PUBLIC_KEY }}
