@@ -19,6 +19,7 @@ import { processInboundReply, buildAcknowledgement } from '@/lib/parentPulse/obs
 import { sendWhatsApp } from '@/lib/whatsapp/sender'
 import { createServiceClient } from '@/utils/supabase/service'
 import { getLearnerProfile } from '@/lib/learnerModel/queries'
+import { logger } from '@/lib/observability/logger'
 
 export const runtime = 'nodejs'
 
@@ -60,11 +61,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 })
   }
 
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('[webhooks/whatsapp] event received', {
-      object: isRecord(payload) ? payload.object : undefined,
-    })
-  }
+  logger.debug('[webhooks/whatsapp] event received', {
+    object: isRecord(payload) ? payload.object : undefined,
+  })
 
   // Once the request is authenticated, never return a non-200 — a non-200
   // makes Meta retry delivery indefinitely. Business-logic failures below

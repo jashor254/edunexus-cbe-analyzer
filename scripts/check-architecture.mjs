@@ -64,6 +64,12 @@ function listFiles() {
   return files
 }
 
+// Test files are not deployed code. They legitimately construct their own
+// clients against local/test targets, dump fixture reports with console.log,
+// and snapshot whole rows with select('*') — so the "production code" rules
+// below skip them rather than letting test growth trip the production gate.
+const isTestFile = rel => /\.test\.tsx?$/.test(rel)
+
 function stripComments(src) {
   // Good enough for regex scanning: blank out // line comments and /* */ blocks
   // without disturbing line numbers (so reported line numbers stay accurate).
@@ -76,6 +82,7 @@ function stripComments(src) {
 function checkDirectClientImports(files) {
   const violations = []
   for (const file of files) {
+    if (isTestFile(relative(ROOT, file))) continue
     const rel = relative(ROOT, file)
     if (APPROVED_CLIENT_FILES.some(a => rel.endsWith(a))) continue
 
@@ -186,6 +193,7 @@ function checkPostgrestCatch(files) {
 function checkConsoleLog(files) {
   const violations = []
   for (const file of files) {
+    if (isTestFile(relative(ROOT, file))) continue
     const raw = readFileSync(file, 'utf8')
     const src = stripComments(raw)
     const lines = src.split('\n')
@@ -202,6 +210,7 @@ function checkConsoleLog(files) {
 function checkSelectStar(files) {
   const violations = []
   for (const file of files) {
+    if (isTestFile(relative(ROOT, file))) continue
     const raw = readFileSync(file, 'utf8')
     const src = stripComments(raw)
     const lines = src.split('\n')

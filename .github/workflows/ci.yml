@@ -30,7 +30,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
   # Minimal env vars required for build — real secrets not needed for type-check.
   # next build touches these at import time in a few config modules even
   # when the routes that actually use them are never invoked during build.
@@ -38,6 +38,10 @@ env:
   NEXT_PUBLIC_SUPABASE_ANON_KEY: 'placeholder-anon-key'
   SUPABASE_SERVICE_ROLE_KEY: 'placeholder-service-key'
   DEEPSEEK_AI_API_KEY: 'placeholder-deepseek-key'
+  # lib/resend-client.ts throws at MODULE IMPORT TIME when unset, which fails
+  # `next build` page-data collection for any route that transitively imports
+  # the email sender (e.g. /api/core/teachers). Never used to send.
+  RESEND_API_KEY: 'ci-unset'
   NEXT_PUBLIC_APP_VERSION: ${{ github.sha }}
 
 jobs:
