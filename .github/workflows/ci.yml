@@ -197,7 +197,7 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.117.0
 
       # Start an EMPTY local stack. db:bootstrap:test below rebuilds the schema
       # itself (final_schema.sql + recovery SQL + migrations, in order); letting
@@ -290,7 +290,7 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.117.0
 
       # Start an EMPTY local stack. db:bootstrap:test below rebuilds the schema
       # itself (final_schema.sql + recovery SQL + migrations, in order); letting
@@ -419,7 +419,7 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.117.0
 
       # Start an EMPTY local stack. db:bootstrap:test below rebuilds the schema
       # itself (final_schema.sql + recovery SQL + migrations, in order); letting
@@ -553,7 +553,7 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.117.0
 
       # Start an EMPTY local stack. db:bootstrap:test below rebuilds the schema
       # itself (final_schema.sql + recovery SQL + migrations, in order); letting
