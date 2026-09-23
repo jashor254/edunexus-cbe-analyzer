@@ -94,8 +94,6 @@ test('POST /api/teacher/classes creates NO school for a teacher with no membersh
   createdUserIds.push(teacher.authId)
   createdTeacherIds.push(teacher.teacherId)
 
-  const { count: schoolsBefore } = await db.from('schools').select('id', { count: 'exact', head: true })
-
   const res = await fetch(`${BASE_URL}/api/teacher/classes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: teacher.session.cookieHeader },
@@ -107,8 +105,13 @@ test('POST /api/teacher/classes creates NO school for a teacher with no membersh
 
   assert.equal(body.data.class.school_id, null, 'a private class with no institution behind it is school-less')
 
-  const { count: schoolsAfter } = await db.from('schools').select('id', { count: 'exact', head: true })
-  assert.equal(schoolsAfter, schoolsBefore, 'no school was manufactured')
+  // Scoped to this teacher, not a global count: the other HTTP_PR files run
+  // in parallel (node --test file concurrency) and insert their own schools,
+  // so a before/after count of the whole table races. Every app-side school
+  // insert (schoolRepository.create) stamps created_by.
+  const { count: schoolsCreated } = await db
+    .from('schools').select('id', { count: 'exact', head: true }).eq('created_by', teacher.authId)
+  assert.equal(schoolsCreated, 0, 'no school was manufactured')
 
   // And no school_admin membership was conjured for them anywhere.
   const { data: memberships } = await db.from('school_users').select('id').eq('user_id', teacher.authId)
@@ -121,8 +124,6 @@ test('POST /api/teacher/classes stamps the REAL school for a teacher who has one
   createdTeacherIds.push(teacher.teacherId)
   const schoolId = await attachToSchool(teacher.authId, 'member')
 
-  const { count: schoolsBefore } = await db.from('schools').select('id', { count: 'exact', head: true })
-
   const res = await fetch(`${BASE_URL}/api/teacher/classes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: teacher.session.cookieHeader },
@@ -134,8 +135,9 @@ test('POST /api/teacher/classes stamps the REAL school for a teacher who has one
 
   assert.equal(body.data.class.school_id, schoolId, 'the class adopts the school that actually employs them')
 
-  const { count: schoolsAfter } = await db.from('schools').select('id', { count: 'exact', head: true })
-  assert.equal(schoolsAfter, schoolsBefore, 'and still creates nothing new')
+  const { count: schoolsCreated } = await db
+    .from('schools').select('id', { count: 'exact', head: true }).eq('created_by', teacher.authId)
+  assert.equal(schoolsCreated, 0, 'and still creates nothing new')
 })
 
 test('a second class from the same teacher reuses the same resolved school', async () => {
@@ -236,8 +238,6 @@ test('adding a learner to an historical class leaves it school-less when the tea
     .single()
   createdClassIds.push(historicalClass!.id)
 
-  const { count: schoolsBefore } = await db.from('schools').select('id', { count: 'exact', head: true })
-
   const studentRes = await fetch(`${BASE_URL}/api/teacher/classes/${historicalClass!.id}/students`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: teacher.session.cookieHeader },
@@ -247,8 +247,9 @@ test('adding a learner to an historical class leaves it school-less when the tea
   const studentId = (await studentRes.json()).data.results[0].studentId
   createdStudentIds.push(studentId)
 
-  const { count: schoolsAfter } = await db.from('schools').select('id', { count: 'exact', head: true })
-  assert.equal(schoolsAfter, schoolsBefore, 'no school was manufactured to fill the column')
+  const { count: schoolsCreated } = await db
+    .from('schools').select('id', { count: 'exact', head: true }).eq('created_by', teacher.authId)
+  assert.equal(schoolsCreated, 0, 'no school was manufactured to fill the column')
 
   const { data: cls } = await db.from('teacher_classes').select('school_id').eq('id', historicalClass!.id).single()
   assert.equal(cls?.school_id, null)

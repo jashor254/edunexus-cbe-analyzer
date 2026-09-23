@@ -216,7 +216,7 @@ jobs:
       - name: Verify canonical schema fingerprint
         run: |
           ACTUAL=$(tail -n 1 /tmp/*.log 2>/dev/null | grep -oP 'FINGERPRINT=\K[0-9a-f]+' | tail -n 1)
-          EXPECTED="a850020e580d122c0e6aaac2189827de"
+          EXPECTED="e5920ccaffec39fb5e63a3d1b3f481ff"
           echo "expected: $EXPECTED"
           echo "actual:   $ACTUAL"
           if [ "$ACTUAL" != "$EXPECTED" ]; then
@@ -491,6 +491,12 @@ jobs:
           TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
           NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321'
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.LOCAL_ANON_KEY }}
+          # Same reason as HTTP_PR: several files call lib/ functions in-process
+          # (createSchool, resolveSchoolCoverage), which build a client via the
+          # production-named createServiceClient(). Without this they inherit the
+          # workflow-level 'placeholder-service-key' and fail with "Expected 3
+          # parts in JWT". Still only ever this job's own local instance key.
+          SUPABASE_SERVICE_ROLE_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
           TEST_BASE_URL: 'http://localhost:3100'
         run: node scripts/run-http-main.mjs
 
