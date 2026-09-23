@@ -10,7 +10,6 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { createTestServiceClient } from '../utils/supabase/test-service.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const repoRoot = join(__dirname, '..')
@@ -24,15 +23,18 @@ if (preflight.status !== 0) process.exit(preflight.status ?? 1)
 const manifest = JSON.parse(readFileSync(join(__dirname, 'deep-nightly-tests.json'), 'utf8'))
 
 if (manifest.requiresContentSeed) {
-  const db = createTestServiceClient()
-  const { data, error } = await db
-    .from('sow_substrands')
-    .select('id')
-    .eq('id', '00000000-0000-4000-8000-000000000005')
-    .maybeSingle()
-  if (error || !data) {
+  // Probed the same way the seed is applied (package.json db:seed:test-content):
+  // docker exec into the local container. Plain `node` can't import
+  // utils/supabase/test-service.ts (extensionless .ts imports), and under tsx
+  // its named exports don't cross the CJS/ESM boundary into this .mjs.
+  const probe = spawnSync('docker', [
+    'exec', 'supabase_db_edunexus', 'psql', '-U', 'postgres', '-d', 'postgres', '-tAc',
+    "SELECT 1 FROM sow_substrands WHERE id = '00000000-0000-4000-8000-000000000005'",
+  ], { encoding: 'utf8' })
+  if (probe.status !== 0 || probe.stdout.trim() !== '1') {
     console.error('REFUSE: DEEP_NIGHTLY requires the deterministic content seed.')
     console.error('Run `npm run db:seed:test-content` after the schema bootstrap first.')
+    if (probe.stderr) console.error(probe.stderr.trim())
     process.exit(1)
   }
 }
