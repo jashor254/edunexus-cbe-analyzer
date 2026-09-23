@@ -7,6 +7,12 @@
 # analytics.aggregate, data.import/export) still need something to drain
 # them, so this workflow pings the routes externally instead.
 #
+# events/dispatch (outbound webhook delivery) is NOT scheduled: its tables
+# (platform_events, event_subscriptions, event_deliveries) and the
+# claim_pending_deliveries() RPC never reached production — they depend on the
+# unapplied Phase 8 organizations layer — so every call returned 500. Re-add the
+# job only after that schema lands in prod.
+#
 # Also drains evidence_projection_events (Projection Event Pipeline
 # activation) — same outbox-consumer pattern as events/dispatch above.
 #
@@ -22,22 +28,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  dispatch-events:
-    name: Dispatch Pending Events
-    runs-on: ubuntu-latest
-    steps:
-      - name: Call /api/cron/events/dispatch
-        run: |
-          STATUS=$(curl -s -o /tmp/response.json -w "%{http_code}" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ vars.PRODUCTION_URL }}/api/cron/events/dispatch")
-          cat /tmp/response.json
-          echo "HTTP status: $STATUS"
-          if [ "$STATUS" != "200" ]; then
-            echo "❌ events/dispatch failed with status $STATUS"
-            exit 1
-          fi
-
   process-jobs:
     name: Process Job Queues
     runs-on: ubuntu-latest
