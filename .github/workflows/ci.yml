@@ -199,7 +199,15 @@ jobs:
         with:
           version: latest
 
+      # Start an EMPTY local stack. db:bootstrap:test below rebuilds the schema
+      # itself (final_schema.sql + recovery SQL + migrations, in order); letting
+      # `supabase start` apply supabase/migrations/ first fails on a fresh runner
+      # at the very first migration (20260520000000_whatsapp_layer.sql alters
+      # notification_log, which only final_schema/notification_layer creates).
       - name: Start local Supabase
+        env:
+          SUPABASE_DB_MIGRATIONS_ENABLED: 'false'
+          SUPABASE_DB_SEED_ENABLED: 'false'
         run: supabase start
 
       - name: Deterministic local bootstrap
@@ -278,7 +286,15 @@ jobs:
         with:
           version: latest
 
+      # Start an EMPTY local stack. db:bootstrap:test below rebuilds the schema
+      # itself (final_schema.sql + recovery SQL + migrations, in order); letting
+      # `supabase start` apply supabase/migrations/ first fails on a fresh runner
+      # at the very first migration (20260520000000_whatsapp_layer.sql alters
+      # notification_log, which only final_schema/notification_layer creates).
       - name: Start local Supabase
+        env:
+          SUPABASE_DB_MIGRATIONS_ENABLED: 'false'
+          SUPABASE_DB_SEED_ENABLED: 'false'
         run: supabase start
 
       - name: Deterministic local bootstrap
@@ -399,7 +415,15 @@ jobs:
         with:
           version: latest
 
+      # Start an EMPTY local stack. db:bootstrap:test below rebuilds the schema
+      # itself (final_schema.sql + recovery SQL + migrations, in order); letting
+      # `supabase start` apply supabase/migrations/ first fails on a fresh runner
+      # at the very first migration (20260520000000_whatsapp_layer.sql alters
+      # notification_log, which only final_schema/notification_layer creates).
       - name: Start local Supabase
+        env:
+          SUPABASE_DB_MIGRATIONS_ENABLED: 'false'
+          SUPABASE_DB_SEED_ENABLED: 'false'
         run: supabase start
 
       - name: Deterministic local bootstrap
@@ -519,7 +543,15 @@ jobs:
         with:
           version: latest
 
+      # Start an EMPTY local stack. db:bootstrap:test below rebuilds the schema
+      # itself (final_schema.sql + recovery SQL + migrations, in order); letting
+      # `supabase start` apply supabase/migrations/ first fails on a fresh runner
+      # at the very first migration (20260520000000_whatsapp_layer.sql alters
+      # notification_log, which only final_schema/notification_layer creates).
       - name: Start local Supabase
+        env:
+          SUPABASE_DB_MIGRATIONS_ENABLED: 'false'
+          SUPABASE_DB_SEED_ENABLED: 'false'
         run: supabase start
 
       - name: Deterministic local bootstrap
