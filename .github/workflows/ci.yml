@@ -224,6 +224,12 @@ jobs:
             exit 1
           fi
 
+      # After the fingerprint (it covers schema only). The two sub-strand files
+      # (schemeLessonsSubStrandId, lessonPlansSubStrandId) are CONTENT_SEED_REQUIRED
+      # — they need the canonical Grade 8 SOW hierarchy — same seed DEEP_NIGHTLY runs.
+      - name: Deterministic test-content seed
+        run: npm run db:seed:test-content
+
       - name: Resolve local anon/service-role keys
         run: |
           node -e "

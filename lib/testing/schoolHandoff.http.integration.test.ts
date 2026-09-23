@@ -334,10 +334,16 @@ test('B9. deterministic test-fixture markers are surfaced, and real names are no
 })
 
 test('B10-B11. the endpoint writes nothing, and no browser queries schools directly', async () => {
-  const before = await db.from('schools').select('id', { count: 'exact', head: true })
+  // Scoped to the founder making the GETs, not a global count: other HTTP_MAIN
+  // files run in parallel (node --test file concurrency) and insert/delete
+  // their own schools, so a whole-table before/after count races. Any school
+  // this endpoint wrote would be stamped created_by = the caller.
+  const countFounderSchools = () => db.from('schools')
+    .select('id', { count: 'exact', head: true }).eq('created_by', founderId)
+  const before = await countFounderSchools()
   await listSchools(founderCookie)
   await listSchools(founderCookie, 'anything')
-  const after = await db.from('schools').select('id', { count: 'exact', head: true })
+  const after = await countFounderSchools()
   assert.equal(after.count, before.count, 'the school count changed across GETs')
 
   const post = await fetch(`${BASE}/api/admin/schools`, {
