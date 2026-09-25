@@ -3,6 +3,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { callDeepSeek } from '@/lib/ai/deepseek'
+import { LEARNER_NAME_TOKEN, learnerFirstName, restoreLearnerName } from '@/lib/ai/learnerPseudonym'
 import { buildClinicReport } from './clinicReportBuilder'
 
 // ── compass_bridge ownership ─────────────────────────────────────────────────
@@ -171,7 +172,7 @@ export async function generateCompassBridge(
 
     const prompt = `You are generating a personalized Learning Compass briefing for a Kenyan student.
 
-Student: ${student.name as string}, Grade ${student.grade as number}
+Student: ${LEARNER_NAME_TOKEN} (placeholder for the student's first name — write it exactly as given, braces included), Grade ${student.grade as number}
 Curriculum: ${(student.curriculum_type as string) ?? 'cbc'}
 Overall Level: ${overallTier}
 Career / Pathway Target: ${targetCareer}
@@ -250,14 +251,14 @@ Return ONLY valid JSON in this exact shape:
       "checkConcept": "concept"
     }
   ],
-  "parentWhatsAppMessage": "Hi! ${student.name as string}'s report is ready. This week Learning Compass will focus on [concept] in [subject] — their biggest gap toward [pathway/career]. Start their first free session here: edunexus.co.ke/learn"
+  "parentWhatsAppMessage": "Hi! ${LEARNER_NAME_TOKEN}'s report is ready. This week Learning Compass will focus on [concept] in [subject] — their biggest gap toward [pathway/career]. Start their first free session here: edunexus.co.ke/learn"
 }
 
 Include top 3 subjects in subjectPriorities. Keep parentWhatsAppMessage under 50 words. Be encouraging, not alarming.`
 
     const raw = await callDeepSeek(prompt, 'You are a Kenyan education AI. Return ONLY valid JSON. No markdown.')
     const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-    const bridge = JSON.parse(cleaned) as CompassBridge
+    const bridge = restoreLearnerName(JSON.parse(cleaned) as CompassBridge, learnerFirstName(student.name as string))
 
     // Validate start difficulty is 1-3; enforce 1 for uniformly-low students
     if (![1, 2, 3].includes(bridge.startDifficulty)) {

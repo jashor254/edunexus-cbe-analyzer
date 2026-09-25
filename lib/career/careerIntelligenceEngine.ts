@@ -6,6 +6,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { callDeepSeek } from '@/lib/ai/deepseek'
+import { LEARNER_NAME_TOKEN, learnerFirstName, restoreLearnerName } from '@/lib/ai/learnerPseudonym'
 import { buildClinicReport } from './clinicReportBuilder'
 import { getAllCareersWithCOS } from './careerEngine'
 import { computeCapabilityMatches, confidenceFromAssessmentCount } from './capabilityMatchEngine'
@@ -474,7 +475,9 @@ async function generateNarrativeSections(
   confidenceLevel: ConfidenceLevel,
   mode:           'exploration' | 'planning',
 ): Promise<NarrativeSections> {
-  const firstName = studentName.split(' ')[0]
+  // The prompt carries a placeholder, never the learner's name — the real
+  // first name is restored locally after the response (lib/ai/learnerPseudonym.ts).
+  const firstName = LEARNER_NAME_TOKEN
   const pathwayStr = pathway ?? 'General'
   const modeNote = mode === 'exploration'
     ? `${firstName} is in Junior School — this stage is about exploring broad fields, not predicting a career. topMatchTitles below are FIELD CATEGORIES, not specific job titles — never write as if a specific career has been identified or matched. Use language like "worth exploring," "an area to try," never "you should become" or "you are suited for."`
@@ -499,7 +502,7 @@ GROUNDING RULES — every sentence you write must obey these:
 - If a section of the profile below says "not yet assessed", say so plainly rather than filling the gap with a confident-sounding guess.
 
 STUDENT PROFILE:
-- Name: ${studentName} (use first name "${firstName}" in writing)
+- Name: ${firstName} (a placeholder for the learner's first name — write it exactly as given, braces included)
 - Grade: ${grade} | Age: ${age} years
 - CBC Pathway: ${pathwayStr}
 - Dominant capabilities: ${dominantCluster.length > 0 ? dominantCluster.join(', ') : 'not yet assessed'}
@@ -547,7 +550,7 @@ Return ONLY valid JSON. No markdown. No explanation. Just JSON.`
 
   try {
     const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-    return JSON.parse(cleaned) as NarrativeSections
+    return restoreLearnerName(JSON.parse(cleaned) as NarrativeSections, learnerFirstName(studentName))
   } catch {
     throw new Error('Career Intelligence Engine: AI returned invalid JSON. Please retry.')
   }

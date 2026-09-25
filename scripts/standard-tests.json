@@ -22,6 +22,7 @@
     "lib/academy/aiJudge.test.ts",
     "lib/adaptiveLearning/riskTaskStyleBoundary.architecture.test.ts",
     "lib/ai/deepseekWrapperContract.test.ts",
+    "lib/ai/learnerPseudonym.test.ts",
     "lib/assessments/analyticsStats.test.ts",
     "lib/assessments/assessmentTypeCatalog.test.ts",
     "lib/assessments/buildPositionMap.regression.test.ts",

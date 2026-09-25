@@ -14,6 +14,7 @@
 
 import { repos } from '@/lib/repositories'
 import { callDeepSeek } from '@/lib/ai/deepseek'
+import { LEARNER_NAME_TOKEN, learnerFirstName, restoreLearnerName } from '@/lib/ai/learnerPseudonym'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { buildAdaptiveTask } from '@/lib/adaptiveLearning/recommend'
 import { buildCareerIntelligence } from '@/lib/learnerIntelligence/careerIntelligenceOrchestration'
@@ -402,7 +403,7 @@ async function enrichPlanWithAI(
   try {
     const prompt = `You are writing a WhatsApp holiday plan for a Kenyan parent.
 
-Student: ${plan.student_name}, Grade ${plan.grade}
+Student: ${LEARNER_NAME_TOKEN} (placeholder for the student's first name — write it exactly as given, braces included), Grade ${plan.grade}
 Holiday: ${plan.holiday_period} (${plan.weeks.length} weeks)
 Priority gaps: ${plan.priority_gaps.join(', ') || 'none — student is on track'}
 ${dreamCareer ? `Dream career: ${dreamCareer}` : ''}
@@ -429,10 +430,10 @@ SUMMARY:
     const waMatch = text.match(/WHATSAPP:\n([\s\S]+?)(?=SUMMARY:|$)/)
     const sumMatch = text.match(/SUMMARY:\n([\s\S]+?)$/)
 
-    return {
+    return restoreLearnerName({
       whatsappMessage: waMatch?.[1]?.trim(),
       parentSummary:   sumMatch?.[1]?.trim(),
-    }
+    }, learnerFirstName(plan.student_name))
   } catch (err) {
     // Falls back to the non-AI template message (see buildWhatsAppMessage) —
     // but that fallback was previously indistinguishable from "AI enrichment
