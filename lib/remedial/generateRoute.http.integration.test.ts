@@ -165,8 +165,9 @@ test('POST /api/remedial/generate: a teacher who does not own classId is denied 
 
   assert.equal(res.status, 403, `expected 403, got ${res.status}: ${JSON.stringify(responseBody)}`)
   // Distinguishes an ownership rejection (apiForbidden() -> "Access denied")
-  // from a billing rejection ("Insufficient tokens...") — both are 403, so
-  // status alone would not prove WHICH boundary fired. Both teachers were
+  // from a billing rejection. Billing now answers 402 (lib/payments/paywall.ts),
+  // but it was 403 when this was written, and the message check below keeps
+  // the ownership boundary explicit either way. Both teachers were
   // seeded with 1000 tokens specifically so this could never be the
   // billing message; asserting it anyway makes the distinction explicit
   // rather than merely implicit in the fixture.

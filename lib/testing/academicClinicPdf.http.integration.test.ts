@@ -133,7 +133,9 @@ test('a user with zero tokens and no subscription is rejected, no PDF, no deduct
     method: 'POST', headers: cookie(outsider.session),
     body: JSON.stringify(validBody(outsiderStudentId)),
   })
-  assert.equal(res.status, 403)
+  // 402, not 403: out of tokens is a pay prompt, not an auth failure
+  // (lib/payments/paywall.ts).
+  assert.equal(res.status, 402)
   assert.equal(await tokenBalance(outsider.authId), 0)
 })
 

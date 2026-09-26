@@ -149,6 +149,7 @@
     "scripts/testManifestConsistency.test.ts",
     "lib/paperIntelligence/validation.test.ts",
     "lib/paperIntelligence/validation.adversarial.test.ts",
-    "lib/paperIntelligence/evidence.test.ts"
+    "lib/paperIntelligence/evidence.test.ts",
+    "lib/payments/paywall.test.ts"
   ]
 }

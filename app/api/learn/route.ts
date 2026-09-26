@@ -10,6 +10,7 @@ import { parsePedagogyBlock, stripPedagogyBlock, shouldBlockMasteryForPedagogy, 
 import type { RootCauseResult } from '@/lib/knowledgeGraph/types'
 import { getGradeTopics } from '@/lib/compass/topics'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
+import { apiPaymentRequired } from '@/lib/payments/paywall'
 import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
 import { type FeatureKey } from '@/lib/payments/config'
 import { apiError } from '@/lib/api/response'
@@ -171,6 +172,7 @@ export async function POST(req: Request) {
 
     // ── Auth result ───────────────────────────────────────────────────────────
     if (access.allowed === false) {
+      if (access.reason === 'insufficient_tokens') return apiPaymentRequired(FEATURE)
       const status = access.reason === 'unauthenticated' ? 401 : 403
       return apiError(access.reason, status)
     }

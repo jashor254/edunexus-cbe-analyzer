@@ -17,6 +17,9 @@ import {
   TOKEN_COSTS,
   TEACHER_PLANNING_BUNDLE,
   SUBSCRIPTION_PLANS,
+  TEACHER_TOOL_PRODUCTS,
+  INSHA_MARKING_PACK,
+  FEATURE_PAYWALL_PRODUCT,
 } from './config'
 
 // The exact set of product ids any public CTA can emit. Kept here rather than
@@ -26,6 +29,11 @@ import {
 // then proves the server honours it.
 const PUBLIC_CTA_PRODUCT_IDS = [
   'planning_bundle', // Teacher tab — Term Planning Bundle
+  'class_reports',   // Teacher tab — Other teacher tools
+  'insha_pack',
+  'slides',
+  'remedial_plan',
+  'holiday_plan',
   'term',            // Family tab — Term Plan
   'family',          // Family tab — Family Plan
 ]
@@ -150,6 +158,37 @@ test('lesson plans and Record of Work cost nothing after the bundle is bought', 
   // time can never be blocked partway through the term with a zero balance.
   assert.equal(TOKEN_COSTS.lesson_plan_generate, 0)
   assert.equal(TOKEN_COSTS.row_generate, 0)
+})
+
+// ── Teacher tools ─────────────────────────────────────────────────────────────
+
+test('every teacher tool grants exactly what one use of its feature consumes', () => {
+  // A product that grants less than its feature costs sells a teacher
+  // something they then cannot use; one that grants more gives tokens away.
+  for (const product of TEACHER_TOOL_PRODUCTS) {
+    assert.equal(TOKEN_GRANTS[product.id], TOKEN_COSTS[product.feature], `${product.id} grant`)
+    assert.equal(PURCHASABLE_PRODUCTS[product.id].tokens, TOKEN_COSTS[product.feature], `${product.id} tokens`)
+  }
+})
+
+test('teacher tools are priced at the Planning Bundle rate of KES 50 a token', () => {
+  const rate = TEACHER_PLANNING_BUNDLE.priceKes / TEACHER_PLANNING_BUNDLE.tokens
+  for (const product of TEACHER_TOOL_PRODUCTS) {
+    assert.equal(PURCHASABLE_PRODUCTS[product.id].price, TOKEN_COSTS[product.feature] * rate, product.id)
+  }
+})
+
+test('class reports and the insha marking pack are KES 100, as agreed', () => {
+  assert.equal(PURCHASABLE_PRODUCTS['class_reports'].price, 100)
+  assert.equal(PURCHASABLE_PRODUCTS['insha_pack'].price, 100)
+  assert.equal(INSHA_MARKING_PACK.essays, 40)
+})
+
+test('every paywalled feature points at a product the payment registry sells', () => {
+  for (const [feature, productId] of Object.entries(FEATURE_PAYWALL_PRODUCT)) {
+    if (productId === null) continue
+    assert.ok(PURCHASABLE_PRODUCTS[productId], `${feature} paywall points at unsellable '${productId}'`)
+  }
 })
 
 // ── Schools ───────────────────────────────────────────────────────────────────

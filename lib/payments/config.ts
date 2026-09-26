@@ -72,6 +72,21 @@ export const TOKEN_COSTS = {
   // (single or "Generate All", charged once per question actually generated)
   adaptive_variant_generate: 1,
 
+  // Class reports — one AI report per learner for a whole class, charged once
+  // per class run (2 tokens = KES 100), only when at least one report succeeds.
+  class_reports_generate: 2,
+
+  // Kiswahili insha feedback — sold as a marking pack, not per essay. The
+  // first essay after a pack is exhausted opens a new one (2 tokens = KES 100)
+  // and the next INSHA_MARKING_PACK.essays - 1 essays cost nothing more.
+  // See lib/kiswahili/inshaBilling.ts.
+  kiswahili_insha_pack: 2,
+
+  // Quick-checks are generated against a scheme of work the teacher already
+  // owns, so they are part of that scheme's Planning Bundle — like
+  // lesson_plan_generate and row_generate — not a separate purchase.
+  teaching_quick_check: 0,
+
   // Unknown-career research (lib/career/knowledgeRequests.ts) — free to the
   // learner (never token-charged; this is exploration, not a purchased
   // report), but still needs a TokenFeature key so the existing
@@ -100,6 +115,46 @@ export const TEACHER_PLANNING_BUNDLE = {
   tokens:   TOKEN_COSTS.sow_generate,
 } as const
 
+// ===== TEACHER TOOL PRODUCTS =====
+// Every paid teacher tool outside the Planning Bundle, sold as the outcome it
+// produces. Each grants exactly what one use of its feature costs — `tokens`
+// is derived from TOKEN_COSTS and `priceKes` from the same KES-per-token rate
+// the Planning Bundle uses — so a product can never grant more or less than
+// the feature it is named after consumes.
+//
+// Without these, a solo teacher who hit "insufficient tokens" on slides,
+// remedial plans or holiday plans had nothing to buy but a Planning Bundle.
+const TEACHER_KES_PER_TOKEN = TEACHER_PLANNING_BUNDLE.priceKes / TEACHER_PLANNING_BUNDLE.tokens // 50
+
+function teacherTool<const Id extends string>(id: Id, name: string, feature: TokenFeature) {
+  return {
+    id,
+    name,
+    feature,
+    tokens:   TOKEN_COSTS[feature],
+    priceKes: TOKEN_COSTS[feature] * TEACHER_KES_PER_TOKEN,
+  } as const
+}
+
+export const CLASS_REPORTS_PRODUCT = teacherTool('class_reports', 'Class Reports', 'class_reports_generate')
+export const SLIDES_PRODUCT        = teacherTool('slides', 'Lesson Slides', 'slides_generate')
+export const REMEDIAL_PRODUCT      = teacherTool('remedial_plan', 'Remedial Plan', 'remedial_planner')
+export const HOLIDAY_PRODUCT       = teacherTool('holiday_plan', 'Holiday Plan', 'holiday_plan')
+
+// Insha feedback is bought as a class set of essays, not per essay.
+export const INSHA_MARKING_PACK = {
+  ...teacherTool('insha_pack', 'Insha Marking Pack', 'kiswahili_insha_pack'),
+  essays: 40,
+} as const
+
+export const TEACHER_TOOL_PRODUCTS = [
+  CLASS_REPORTS_PRODUCT,
+  INSHA_MARKING_PACK,
+  SLIDES_PRODUCT,
+  REMEDIAL_PRODUCT,
+  HOLIDAY_PRODUCT,
+] as const
+
 // ===== PURCHASABLE PRODUCTS =====
 // The complete set of products a NEW payment may be initialized against.
 // Both payment entry points (app/api/payments/initialize and
@@ -125,6 +180,14 @@ export const PURCHASABLE_PRODUCTS: Record<string, PurchasableProduct> = {
     label:  TEACHER_PLANNING_BUNDLE.name,
     tokens: TEACHER_PLANNING_BUNDLE.tokens,
   },
+  ...Object.fromEntries(
+    TEACHER_TOOL_PRODUCTS.map(p => [p.id, {
+      price:  p.priceKes,
+      type:   'token' as const,
+      label:  p.name,
+      tokens: p.tokens,
+    }]),
+  ),
   [SUBSCRIPTION_PLANS.TERMLY_SINGLE.id]: {
     price: SUBSCRIPTION_PLANS.TERMLY_SINGLE.priceKes,
     type:  'subscription',
@@ -146,6 +209,31 @@ export const PURCHASABLE_PRODUCTS: Record<string, PurchasableProduct> = {
 export const TOKEN_GRANTS: Record<string, number> = {
   [TOKEN_PACK.id]:              TOKEN_PACK.tokens,               // historical only
   [TEACHER_PLANNING_BUNDLE.id]: TEACHER_PLANNING_BUNDLE.tokens,
+  ...Object.fromEntries(TEACHER_TOOL_PRODUCTS.map(p => [p.id, p.tokens])),
+}
+
+// ===== WHAT TO BUY WHEN A FEATURE IS OUT OF TOKENS =====
+// The product a paywall points at for each feature. Teacher features resolve
+// to the product named after them; parent/learner features resolve to the
+// Term Plan, which makes all of them free per use. `null` means there is no
+// single honest product for it (a variant costs 1 token, and no product
+// grants exactly 1) — the paywall then opens the teacher tab without a
+// preselection.
+export const FEATURE_PAYWALL_PRODUCT: Record<TokenFeature, string | null> = {
+  sow_generate:               TEACHER_PLANNING_BUNDLE.id,
+  lesson_plan_generate:       TEACHER_PLANNING_BUNDLE.id,
+  row_generate:               TEACHER_PLANNING_BUNDLE.id,
+  teaching_quick_check:       TEACHER_PLANNING_BUNDLE.id,
+  slides_generate:            SLIDES_PRODUCT.id,
+  remedial_planner:           REMEDIAL_PRODUCT.id,
+  holiday_plan:               HOLIDAY_PRODUCT.id,
+  class_reports_generate:     CLASS_REPORTS_PRODUCT.id,
+  kiswahili_insha_pack:       INSHA_MARKING_PACK.id,
+  adaptive_variant_generate:  null,
+  clinic_report:              SUBSCRIPTION_PLANS.TERMLY_SINGLE.id,
+  learning_compass:           SUBSCRIPTION_PLANS.TERMLY_SINGLE.id,
+  career_intelligence_report: SUBSCRIPTION_PLANS.TERMLY_SINGLE.id,
+  career_knowledge_request:   null,
 }
 
 // ===== FEATURE ACCESS MATRIX =====
@@ -163,6 +251,9 @@ export const FEATURE_ACCESS = {
   learning_compass:           { teacher: 'token', subscriber: 'full',  token: 'token' },
   career_intelligence_report: { teacher: 'token', subscriber: 'full',  token: 'token' },
   adaptive_variant_generate:  { teacher: 'free',  subscriber: 'full',  token: 'token' },
+  class_reports_generate:     { teacher: 'free',  subscriber: 'full',  token: 'token' },
+  kiswahili_insha_pack:       { teacher: 'free',  subscriber: 'full',  token: 'token' },
+  teaching_quick_check:       { teacher: 'free',  subscriber: 'full',  token: 'token' },
 } as const
 
 export type FeatureKey = keyof typeof FEATURE_ACCESS

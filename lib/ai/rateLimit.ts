@@ -23,6 +23,10 @@ export const DAILY_CALL_LIMITS: Record<TokenFeature, number> = {
   // gates ordinary canonical DB search. Conservative like clinic_report: this
   // is an ungrounded free-generation call (Phase 9 finding), not a cheap lookup.
   career_knowledge_request:   5,
+  class_reports_generate:     5,
+  // Per essay, not per pack — a teacher marking a class set in one sitting.
+  kiswahili_insha_pack:       60,
+  teaching_quick_check:       30,
 }
 
 export type RateLimitResult =

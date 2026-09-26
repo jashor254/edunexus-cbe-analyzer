@@ -4,6 +4,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
 import { generateRemedialPlan } from '@/lib/remedial/planner'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
+import { apiPaymentRequired } from '@/lib/payments/paywall'
 import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
 
 const Schema = z.object({
@@ -22,8 +23,9 @@ export async function POST(req: Request): Promise<Response> {
   try {
     const access = await checkFeatureAccess('remedial_planner')
     if (access.allowed === false) {
+      if (access.reason === 'insufficient_tokens') return apiPaymentRequired('remedial_planner')
       return apiError(
-        access.reason === 'insufficient_tokens' ? 'Insufficient tokens. Please top up to generate a remedial plan.' : 'Access denied',
+        'Access denied',
         access.reason === 'unauthenticated' ? 401 : 403,
       )
     }

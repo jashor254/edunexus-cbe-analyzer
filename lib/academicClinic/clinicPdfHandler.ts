@@ -10,6 +10,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
+import { apiPaymentRequired } from '@/lib/payments/paywall'
 import { repos } from '@/lib/repositories'
 import { adaptCanonicalCareersForClinic } from '@/lib/academicClinic/canonicalCareerAdapter'
 import {
@@ -36,11 +37,10 @@ export async function handleClinicPdfDownload(req: Request): Promise<NextRespons
     // ── 1. Check access — admin bypass, teacher tier, subscription, OR token balance ──
     const access = await checkFeatureAccess('clinic_report')
     if (access.allowed === false) {
+      if (access.reason === 'insufficient_tokens') return apiPaymentRequired('clinic_report')
       return NextResponse.json(
         {
-          error: access.reason === 'unauthenticated'
-            ? 'Unauthorized'
-            : 'No active subscription or tokens. Please upgrade.',
+          error: access.reason === 'unauthenticated' ? 'Unauthorized' : 'Access denied',
         },
         { status: access.reason === 'unauthenticated' ? 401 : 403 }
       )

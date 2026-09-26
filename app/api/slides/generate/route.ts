@@ -2,6 +2,7 @@
 import { z } from 'zod'
 import { createServiceClient } from '@/utils/supabase/service'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
+import { apiPaymentRequired } from '@/lib/payments/paywall'
 import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
 import { generateSlideContent } from '@/lib/slides/aiSlideGenerator'
 import { buildPptx } from '@/lib/slides/pptxBuilder'
@@ -29,11 +30,10 @@ export async function POST(req: Request): Promise<Response> {
     // 2. Auth + access check
     const access = await checkFeatureAccess('slides_generate')
     if (access.allowed === false) {
+      if (access.reason === 'insufficient_tokens') return apiPaymentRequired('slides_generate')
       const reason = access.reason
       return apiError(
-        reason === 'unauthenticated'      ? 'Unauthorized'
-        : reason === 'insufficient_tokens' ? 'Insufficient tokens. Please top up to generate slides.'
-        : 'Access denied',
+        reason === 'unauthenticated' ? 'Unauthorized' : 'Access denied',
         reason === 'unauthenticated' ? 401 : 403,
       )
     }

@@ -5,6 +5,7 @@ import { requireClassTeacher } from '@/lib/core/permissions'
 import { UnauthorizedError, ResourceOwnershipError } from '@/lib/core/errors'
 import { repos } from '@/lib/repositories'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
+import { apiPaymentRequired } from '@/lib/payments/paywall'
 import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
 import { regenerateOneVariant } from '@/lib/assignments/variantGeneration'
 
@@ -26,8 +27,9 @@ export async function POST(
   try {
     const access = await checkFeatureAccess('adaptive_variant_generate')
     if (access.allowed === false) {
+      if (access.reason === 'insufficient_tokens') return apiPaymentRequired('adaptive_variant_generate')
       return apiError(
-        access.reason === 'insufficient_tokens' ? 'Insufficient tokens. Please top up to regenerate this variant.' : 'Access denied',
+        'Access denied',
         access.reason === 'unauthenticated' ? 401 : 403,
       )
     }

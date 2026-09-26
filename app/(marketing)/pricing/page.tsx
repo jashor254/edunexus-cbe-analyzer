@@ -20,7 +20,7 @@ import {
 import Link from 'next/link'
 import type { User } from '@supabase/supabase-js'
 import { FOCUS_RING, SCHOOL_DEMO_WA_LINK } from '../constants'
-import { SUBSCRIPTION_PLANS, TEACHER_PLANNING_BUNDLE } from '@/lib/payments/config'
+import { SUBSCRIPTION_PLANS, TEACHER_PLANNING_BUNDLE, TEACHER_TOOL_PRODUCTS, INSHA_MARKING_PACK } from '@/lib/payments/config'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -133,7 +133,31 @@ const TEACHER_PLANNING_PRODUCT: PayProduct = {
   note: 'One subject, one term. Teaching three subjects? That is three bundles.',
 }
 
-const TEACHER_PAY_PLANS: PayProduct[] = [TEACHER_PLANNING_PRODUCT]
+// Paid teacher tools outside the Planning Bundle. Ids and prices come from
+// TEACHER_TOOL_PRODUCTS so these rows cannot drift from what the server
+// charges; only the wording lives here.
+const TEACHER_TOOL_COPY: Record<(typeof TEACHER_TOOL_PRODUCTS)[number]['id'], { billing: string; tagline: string }> = {
+  class_reports: { billing: 'per class',                          tagline: 'A written report for every learner in one class.' },
+  insha_pack:    { billing: `per ${INSHA_MARKING_PACK.essays} essays`, tagline: 'Kiswahili insha marked with CBC feedback — a whole class set.' },
+  slides:        { billing: 'per slide deck',                     tagline: 'Lesson slides generated from your lesson plan.' },
+  remedial_plan: { billing: 'per plan',                           tagline: 'A differentiated catch-up plan for one class.' },
+  holiday_plan:  { billing: 'per learner',                        tagline: 'A personalised holiday plan for one learner.' },
+}
+
+const TEACHER_TOOL_PAY_PLANS: PayProduct[] = TEACHER_TOOL_PRODUCTS.map(p => ({
+  id:        p.id,
+  name:      p.name,
+  price:     p.priceKes,
+  billing:   TEACHER_TOOL_COPY[p.id].billing,
+  tagline:   TEACHER_TOOL_COPY[p.id].tagline,
+  badge:     '',
+  highlight: false,
+  features:  [],
+  cta:       `Get ${p.name} — KES ${p.priceKes}`,
+  note:      '',
+}))
+
+const TEACHER_PAY_PLANS: PayProduct[] = [TEACHER_PLANNING_PRODUCT, ...TEACHER_TOOL_PAY_PLANS]
 
 // ─── Family products ──────────────────────────────────────────────────────────
 
@@ -475,7 +499,7 @@ function TeacherSection({
 
       {/* Plan card */}
       <div className="max-w-md mx-auto mb-14">
-        {TEACHER_PAY_PLANS.map((plan) => (
+        {[TEACHER_PLANNING_PRODUCT].map((plan) => (
           <div
             key={plan.id}
             onClick={() => onSelect(plan)}
@@ -542,6 +566,36 @@ function TeacherSection({
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Other teacher tools — same pay bar below, one tap to select */}
+      <div className="max-w-md mx-auto mb-14">
+        <p className="text-sm font-black text-white/70 mb-3">Other teacher tools</p>
+        <div className="space-y-2">
+          {TEACHER_TOOL_PAY_PLANS.map((plan) => (
+            <button
+              key={plan.id}
+              type="button"
+              onClick={() => onSelect(plan)}
+              className={`w-full flex items-center justify-between gap-4 rounded-2xl border px-4 py-3 text-left transition-all ${FOCUS_RING} ${
+                selected.id === plan.id
+                  ? 'bg-white/10 border-amber-500/50'
+                  : 'bg-white/4 border-white/10 hover:border-white/20'
+              }`}
+            >
+              <span>
+                <span className="block text-sm font-bold text-white">{plan.name}</span>
+                <span className="block text-xs text-white/40 mt-0.5">{plan.tagline}</span>
+              </span>
+              <span className="shrink-0 text-right">
+                <span className="block text-sm font-black text-white">KES {plan.price.toLocaleString()}</span>
+                <span className="block text-[10px] text-white/35">
+                  {selected.id === plan.id ? '✓ Selected' : plan.billing}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* School nudge */}
