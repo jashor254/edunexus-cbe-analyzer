@@ -4,6 +4,8 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
 import { evaluateInsha } from '@/lib/kiswahili/inshaEvaluator'
+import { resolveInshaCharge, recordInshaEssay } from '@/lib/kiswahili/inshaBilling'
+import { apiPaymentRequired } from '@/lib/payments/paywall'
 import type { InshaType } from '@/lib/kiswahili/inshaEvaluator'
 
 const INSHA_TYPES: InshaType[] = ['masimulizi', 'hoja', 'maelezo', 'barua_rasmi', 'mazungumzo']
@@ -43,7 +45,18 @@ export async function POST(req: NextRequest) {
       if (!student) return apiError('Student not found or access denied', 403)
     }
 
+    // Sold as an Insha Marking Pack (lib/kiswahili/inshaBilling.ts).
+    const charge = await resolveInshaCharge(user.id)
+    if (charge.allowed === false) {
+      if (charge.reason === 'payment_required') return apiPaymentRequired('kiswahili_insha_pack')
+      return charge.reason === 'unauthenticated' ? apiUnauthorized() : apiError('Access denied', 403)
+    }
+
     const feedback = await evaluateInsha({ insha, inshaType, grade })
+
+    // Recorded only for a genuine evaluation — a fallback placeholder (AI
+    // failed) never uses up an essay or opens a pack.
+    if (!feedback.isFallback) await recordInshaEssay(charge)
 
     return apiSuccess({ feedback })
   } catch (err) {

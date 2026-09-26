@@ -140,6 +140,33 @@ export class BillingRepository extends BaseRepository {
     })
   }
 
+  /** How many token_usage rows a user has for one action. */
+  async countTokenUsage(userId: string, action: string): Promise<number> {
+    return timedQuery('token_usage', 'countTokenUsage', async () => {
+      const { count, error } = await this.db
+        .from('token_usage')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('action', action)
+      if (error) throw new Error(`Failed to count token usage: ${error.message}`)
+      return count ?? 0
+    })
+  }
+
+  /**
+   * Record a use that consumed no tokens of its own — e.g. one essay drawn
+   * from an already-paid Insha Marking Pack. Paid uses are recorded by the
+   * deduct_tokens RPC itself.
+   */
+  async recordFreeUsage(userId: string, action: string, metadata: Record<string, unknown>): Promise<void> {
+    return timedQuery('token_usage', 'recordFreeUsage', async () => {
+      const { error } = await this.db
+        .from('token_usage')
+        .insert({ user_id: userId, action, tokens_used: 0, metadata })
+      if (error) throw new Error(`Failed to record usage: ${error.message}`)
+    })
+  }
+
   /**
    * Fetch usage events for an organization within a date range.
    */

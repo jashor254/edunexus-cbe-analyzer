@@ -8,6 +8,9 @@ import {
 import Link from 'next/link'
 import type { InshaFeedback, InshaType, CbcLevel } from '@/lib/kiswahili/inshaEvaluator'
 import { friendlyMessage } from '@/lib/errors/friendlyMessage'
+import PaywallNotice from '@/components/pricing/PaywallNotice'
+import type { PaywallInfo } from '@/lib/payments/paywall'
+import { INSHA_MARKING_PACK } from '@/lib/payments/config'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -260,6 +263,7 @@ export default function InshaFeedbackPage() {
   const [loading, setLoading]       = useState(false)
   const [feedback, setFeedback]     = useState<InshaFeedback | null>(null)
   const [error, setError]           = useState<string | null>(null)
+  const [paywall, setPaywall]       = useState<PaywallInfo | null>(null)
 
   const wordCount = insha.trim().split(/\s+/).filter(Boolean).length
   const charCount = insha.length
@@ -272,6 +276,7 @@ export default function InshaFeedbackPage() {
 
     setLoading(true)
     setError(null)
+    setPaywall(null)
     setFeedback(null)
 
     try {
@@ -280,6 +285,11 @@ export default function InshaFeedbackPage() {
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ insha: insha.trim(), inshaType, grade }),
       })
+      if (res.status === 402) {
+        const paywallData: { data: PaywallInfo } = await res.json()
+        setPaywall(paywallData.data)
+        return
+      }
       const data: { success: boolean; data?: { feedback: InshaFeedback }; error?: string } = await res.json()
 
       if (!res.ok || !data.success) {
@@ -393,6 +403,13 @@ export default function InshaFeedbackPage() {
           </div>
 
           {/* Error */}
+          {paywall && (
+            <PaywallNotice
+              info={paywall}
+              message={`Insha marking is sold as a class set: KES ${INSHA_MARKING_PACK.priceKes} marks ${INSHA_MARKING_PACK.essays} essays. Pay, then press the button below again.`}
+            />
+          )}
+
           {error && (
             <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-xl px-4 py-3 text-sm">
               {friendlyMessage(error).message}

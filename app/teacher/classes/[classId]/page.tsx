@@ -20,6 +20,8 @@ import {
   type SeniorPathway,
 } from '@/lib/curriculum/subjects'
 import { friendlyMessage } from '@/lib/errors/friendlyMessage'
+import PaywallNotice from '@/components/pricing/PaywallNotice'
+import type { PaywallInfo } from '@/lib/payments/paywall'
 import { buildAssessmentTitle } from '@/lib/assessments/assessmentTypeCatalog'
 
 type Tab = 'students' | 'gaps' | 'assignments' | 'holiday' | 'remedial' | 'compass' | 'clinic' | 'upload' | 'analytics'
@@ -417,6 +419,10 @@ function UploadAssessmentTab({
   const [progress, setProgress] = useState({ done: 0, total: 0, currentStudentName: null as string | null })
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [reportJobId, setReportJobId] = useState<string | null>(null)
+  // Marks already saved for a run that stopped at the paywall — retrying after
+  // payment regenerates from these instead of saving a duplicate assessment.
+  const [pendingAssessmentId, setPendingAssessmentId] = useState<string | null>(null)
+  const [paywall, setPaywall] = useState<PaywallInfo | null>(null)
 
   // Live progress while report generation runs server-side — same pattern as
   // the Holiday Planner (HOTFIX 2/4, pilot-readiness sprint). Previously
@@ -490,22 +496,44 @@ function UploadAssessmentTab({
         throw new Error(marksData.error ?? 'Failed to save marks')
       }
 
-      // 3. Generate reports with compass_bridge — starts a background job and
-      // returns immediately; the polling effect above tracks it to 'done'.
-      setPhase('generating')
-      setProgress({ done: 0, total: students.length, currentStudentName: null })
+      await startReportGeneration(assessmentId)
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'An error occurred')
+      setPhase('error')
+    }
+  }
 
-      const genRes = await fetch(`/api/teacher/classes/${classId}/generate-reports`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assessmentIds: [assessmentId] }),
-      })
-      const genData = await genRes.json()
-      if (!genRes.ok || !genData.success) {
-        throw new Error(genData.error ?? 'Failed to generate reports')
-      }
+  // 3. Generate reports with compass_bridge — starts a background job and
+  // returns immediately; the polling effect above tracks it to 'done'.
+  async function startReportGeneration(assessmentId: string) {
+    setPaywall(null)
+    setPhase('generating')
+    setProgress({ done: 0, total: students.length, currentStudentName: null })
 
-      setReportJobId(genData.data.jobId as string)
+    const genRes = await fetch(`/api/teacher/classes/${classId}/generate-reports`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assessmentIds: [assessmentId] }),
+    })
+    const genData = await genRes.json()
+    if (genRes.status === 402) {
+      setPendingAssessmentId(assessmentId)
+      setPaywall(genData.data as PaywallInfo)
+      setPhase('entry')
+      return
+    }
+    if (!genRes.ok || !genData.success) {
+      throw new Error(genData.error ?? 'Failed to generate reports')
+    }
+
+    setPendingAssessmentId(null)
+    setReportJobId(genData.data.jobId as string)
+  }
+
+  async function retryAfterPayment() {
+    if (!pendingAssessmentId) return
+    try {
+      await startReportGeneration(pendingAssessmentId)
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'An error occurred')
       setPhase('error')
@@ -565,6 +593,14 @@ function UploadAssessmentTab({
           Enter student scores below. Reports and personalized Compass briefings will generate automatically.
         </p>
       </div>
+
+      {paywall && (
+        <PaywallNotice
+          info={paywall}
+          message={`Your marks are saved. Writing a report for every learner in ${className} is KES ${paywall.priceKes ?? 100} for the whole class.`}
+          onRetry={() => { void retryAfterPayment() }}
+        />
+      )}
 
       {phase === 'error' && errorMsg && (
         <div className="flex items-center justify-between gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">

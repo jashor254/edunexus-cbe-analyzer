@@ -9,6 +9,9 @@ import { repos } from '@/lib/repositories'
 import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissions'
 import { resolveTeacher } from '@/lib/core/identity'
 import { UnauthorizedError } from '@/lib/core/errors'
+import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
+import { apiPaymentRequired } from '@/lib/payments/paywall'
+import { logger } from '@/lib/observability/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,6 +63,15 @@ export async function POST(
 
     if (total === 0) return apiSuccess({ success: 0, failed: 0, total: 0, results: [] })
 
+    // One charge per class run (TOKEN_COSTS.class_reports_generate) for solo
+    // teachers; free for school-covered teachers. Checked after the empty-class
+    // early return so an empty class never needs payment.
+    const access = await checkFeatureAccess('class_reports_generate')
+    if (access.allowed === false) {
+      if (access.reason === 'insufficient_tokens') return apiPaymentRequired('class_reports_generate')
+      return access.reason === 'unauthenticated' ? apiUnauthorized() : apiForbidden()
+    }
+
     // Same pattern as Holiday Planner (see app/api/holiday/generate/route.ts):
     // a full class of students, each needing its own DeepSeek call, does not
     // fit inside one request/response. Inserted already `processing` in a
@@ -87,6 +99,16 @@ export async function POST(
             result: { total: progress.total, completed: progress.completed, currentStudentName: progress.currentStudentName },
           })
         })
+        // Charged after the run, and only when at least one report was
+        // produced. The reports are already written by this point, so a failed
+        // deduction (balance spent elsewhere meanwhile) is logged, not undone.
+        if (access.deductTokens && result.success > 0) {
+          try {
+            await deductFeatureTokens(access.userId, 'class_reports_generate', access.cost)
+          } catch (deductErr) {
+            logger.error('Class reports charge failed after reports were written', { operation: 'generate-reports.charge', job_id: job.id, user_id: access.userId }, deductErr)
+          }
+        }
         await repos.jobs.markComplete(job.id, {
           total,
           completed: total,
