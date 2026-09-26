@@ -10,6 +10,8 @@ import {
 } from '@/lib/api/response'
 import { buildCareerIntelligenceReport } from '@/lib/career/careerIntelligenceEngine'
 import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
+import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
+import { apiPaymentRequired } from '@/lib/payments/paywall'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,6 +38,14 @@ export async function GET(req: NextRequest) {
     const isParent = student.parent_user_id === user.id
     if (!isOwner && !isParent) return apiForbidden()
 
+    // Priced at TOKEN_COSTS.career_intelligence_report, free on a Term Plan.
+    // This route previously ran the paid report for anyone with no charge.
+    const access = await checkFeatureAccess('career_intelligence_report')
+    if (access.allowed === false) {
+      if (access.reason === 'insufficient_tokens') return apiPaymentRequired('career_intelligence_report')
+      return access.reason === 'unauthenticated' ? apiUnauthorized() : apiForbidden()
+    }
+
     // Rate limit check — 2 intelligence reports per user per day
     const rateCheck = await checkDailyCallLimit(user.id, 'career_intelligence_report')
     if (!rateCheck.allowed) {
@@ -47,6 +57,11 @@ export async function GET(req: NextRequest) {
 
     const db = createServiceClient()
     const report = await buildCareerIntelligenceReport(studentId, db)
+
+    // Charged only after the report was built — never for a failed run.
+    if (access.deductTokens) {
+      await deductFeatureTokens(access.userId, 'career_intelligence_report', access.cost)
+    }
 
     return apiSuccess({ report })
   } catch (err) {

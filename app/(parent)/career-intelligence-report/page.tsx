@@ -9,6 +9,8 @@ import {
   GraduationCap, Building2, User, Bot, Heart, Award,
 } from 'lucide-react'
 import type { CareerIntelligenceReport } from '@/lib/career/types'
+import PaywallNotice from '@/components/pricing/PaywallNotice'
+import type { PaywallInfo } from '@/lib/payments/paywall'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -148,6 +150,7 @@ export default function CareerIntelligenceReportPage() {
   const [loadingStudents, setLoadingStudents] = useState(true)
   const [generating, setGenerating]   = useState(false)
   const [error, setError]             = useState<string | null>(null)
+  const [paywall, setPaywall]         = useState<PaywallInfo | null>(null)
 
   useEffect(() => {
     fetch('/api/students/list')
@@ -164,10 +167,15 @@ export default function CareerIntelligenceReportPage() {
   async function generateReport(studentId: string) {
     setGenerating(true)
     setError(null)
+    setPaywall(null)
     setReport(null)
     try {
       const res = await fetch(`/api/career/intelligence-report?studentId=${studentId}`)
       const data = await res.json()
+      if (res.status === 402) {
+        setPaywall(data.data as PaywallInfo)
+        return
+      }
       if (!res.ok || data.error) {
         setError(data.error ?? 'Failed to generate report')
         return
@@ -267,6 +275,14 @@ export default function CareerIntelligenceReportPage() {
               <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-300 text-sm">
                 {error}
               </div>
+            )}
+
+            {paywall && (
+              <PaywallNotice
+                info={paywall}
+                message={`The Career Intelligence Report is included in the ${paywall.label ?? 'Term Plan'} (KES ${paywall.priceKes ?? ''}) — along with every other report and Learning Compass session this term.`}
+                onRetry={() => generateReport(selected.id)}
+              />
             )}
 
             <button
