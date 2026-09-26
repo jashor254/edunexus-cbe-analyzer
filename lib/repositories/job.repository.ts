@@ -222,6 +222,78 @@ export class JobRepository extends BaseRepository {
   }
 
   /**
+   * Every non-failed job of one type for a user — the small summary the
+   * free-first-scheme rule reads (lib/sow/generationJob.ts). A teacher has a
+   * handful of these at most, so no pagination.
+   */
+  async listJobsForUser(
+    userId: string,
+    type: string
+  ): Promise<Array<{ id: string; status: string; created_at: string; started_at: string | null; payload: Record<string, unknown> | null }>> {
+    const { data, error } = await this.db
+      .from('jobs')
+      .select('id, status, created_at, started_at, payload')
+      .eq('user_id', userId)
+      .eq('type', type)
+      .in('status', ['processing', 'completed'])
+
+    if (error) throw new Error(`Failed to list jobs for user: ${error.message}`)
+    return (data ?? []) as Array<{ id: string; status: string; created_at: string; started_at: string | null; payload: Record<string, unknown> | null }>
+  }
+
+  /**
+   * Reserve a completed job's output for a one-time save by stamping
+   * `payload.saved_at`. The conditional update is the guard: of two
+   * concurrent claims only one matches a row whose `saved_at` is still null.
+   */
+  async claimForSave(
+    jobId: string,
+    userId: string,
+    type: string
+  ): Promise<'claimed' | 'not_found' | 'not_ready' | 'already_saved'> {
+    const { data: job } = await this.db
+      .from('jobs')
+      .select('id, status, payload')
+      .eq('id', jobId)
+      .eq('user_id', userId)
+      .eq('type', type)
+      .maybeSingle()
+
+    if (!job) return 'not_found'
+    if (job.status !== 'completed') return 'not_ready'
+    const payload = (job.payload ?? {}) as Record<string, unknown>
+    if (payload.saved_at) return 'already_saved'
+
+    const { data: claimed, error } = await this.db
+      .from('jobs')
+      .update({ payload: { ...payload, saved_at: new Date().toISOString() } })
+      .eq('id', jobId)
+      .is('payload->>saved_at', null)
+      .select('id')
+
+    if (error) throw new Error(`Failed to claim job for save: ${error.message}`)
+    return claimed && claimed.length > 0 ? 'claimed' : 'already_saved'
+  }
+
+  /** Remove a save claim after the save itself failed. */
+  async releaseSaveClaim(jobId: string): Promise<void> {
+    const { data: job } = await this.db
+      .from('jobs')
+      .select('payload')
+      .eq('id', jobId)
+      .maybeSingle()
+    if (!job) return
+
+    const { saved_at: _released, ...payload } = (job.payload ?? {}) as Record<string, unknown>
+    const { error } = await this.db
+      .from('jobs')
+      .update({ payload })
+      .eq('id', jobId)
+
+    if (error) throw new Error(`Failed to release job save claim: ${error.message}`)
+  }
+
+  /**
    * Mark a job as completed and store its result.
    */
   async markComplete(jobId: string, result: Record<string, unknown>): Promise<void> {

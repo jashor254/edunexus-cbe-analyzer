@@ -55,8 +55,10 @@ async function hasServer(): Promise<boolean> {
 const userIds: string[] = []
 const teacherIds: string[] = []
 const schemeIds: string[] = []
+const generationJobIds: string[] = []
 
 after(async () => {
+  if (generationJobIds.length) await db.from('jobs').delete().in('id', generationJobIds)
   if (schemeIds.length) {
     await db.from('generation_jobs').delete().in('sow_id', schemeIds)
     await db.from('lesson_plans').delete().in('sow_id', schemeIds)
@@ -240,6 +242,19 @@ function lesson(week: number, les: number, extra: Record<string, unknown> = {}) 
   }
 }
 
+// /api/sow/save only saves the output of a completed generation it can bind
+// to (lib/sow/generationJob.ts). These tests exercise the save's own
+// persistence rules, so each save gets a completed generation of its own.
+async function makeGeneration(authId: string): Promise<string> {
+  const { data, error } = await db.from('jobs').insert({
+    queue_name: 'ai.generation', type: 'ai.sow.generate', user_id: authId,
+    status: 'completed', payload: { total: 1 }, result: { total: 1, completed: 1, failed: 0 },
+  }).select('id').single()
+  if (error || !data) throw new Error(`makeGeneration: ${error?.message}`)
+  generationJobIds.push(data.id as string)
+  return data.id as string
+}
+
 async function postSave(session: { cookieHeader: string }, body: unknown) {
   const res = await fetch(`${BASE_URL}/api/sow/save`, {
     method: 'POST',
@@ -256,7 +271,7 @@ test('F: a healthy save persists header, JSON and normalized lessons together', 
   const session = await retryAsync(() => signInForHttpTest(f.email, f.password))
 
   const lessons = [lesson(1, 1), lesson(1, 2)]
-  const { status, body } = await postSave(session, savePayload(lessons))
+  const { status, body } = await postSave(session, { ...savePayload(lessons), jobId: await makeGeneration(f.authId) })
 
   assert.equal(status, 200)
   assert.equal(body.success, true)
@@ -282,7 +297,7 @@ test('E: when the normalized lesson write fails, the API does NOT report success
   // `scheme_lessons.week` is NOT NULL — a null week forces the normalized
   // insert to fail while the header insert would otherwise have succeeded.
   const bad = [lesson(1, 1), { ...lesson(1, 2), week: null }]
-  const { body } = await postSave(session, savePayload(bad, { totalLessons: 2 }))
+  const { body } = await postSave(session, { ...savePayload(bad, { totalLessons: 2 }), jobId: await makeGeneration(f.authId) })
 
   assert.notEqual(body.success, true, 'a partial save must never be reported as success')
   assert.ok(body.error, 'an error message must be returned')
@@ -304,7 +319,7 @@ test('E2: a scheme claiming lessons but sending none is rejected before anything
   // The live shape of scheme ad66de3d: a header claiming lessons, with an
   // empty lessons array. It previously saved as `status: 'active'` with no
   // lesson structure at all, and the Friday cron then read it as a break week.
-  const { body } = await postSave(session, savePayload([], { totalLessons: 4 }))
+  const { body } = await postSave(session, { ...savePayload([], { totalLessons: 4 }), jobId: await makeGeneration(f.authId) })
 
   assert.notEqual(body.success, true, 'an empty scheme must not be accepted')
 
@@ -325,13 +340,13 @@ test('G: save is insert-only, so failure can never destroy a pre-existing scheme
   const f = await makeTeacher('save-insert-only')
   const session = await retryAsync(() => signInForHttpTest(f.email, f.password))
 
-  const okRes = await postSave(session, savePayload([lesson(1, 1)]))
+  const okRes = await postSave(session, { ...savePayload([lesson(1, 1)]), jobId: await makeGeneration(f.authId) })
   assert.equal(okRes.body.success, true)
   const existingId = okRes.body.data!.schemeId!
   schemeIds.push(existingId)
 
   // A second, failing save by the same teacher.
-  const badRes = await postSave(session, savePayload([{ ...lesson(2, 1), week: null }], { totalLessons: 1 }))
+  const badRes = await postSave(session, { ...savePayload([{ ...lesson(2, 1), week: null }], { totalLessons: 1 }), jobId: await makeGeneration(f.authId) })
   assert.notEqual(badRes.body.success, true)
 
   // The earlier, valid scheme is untouched.

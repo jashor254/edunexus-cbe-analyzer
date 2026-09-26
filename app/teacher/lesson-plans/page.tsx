@@ -273,7 +273,7 @@ export default function LessonPlansPage() {
           <h2 className="text-xl font-bold text-gray-900 mb-2">No Schemes of Work yet</h2>
           <p className="text-gray-500 mb-6">Generate a Scheme of Work first, then come back to create lesson plans.</p>
           <Link
-            href="/sow"
+            href="/teacher/scheme-of-work/new"
             className="bg-teal-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-teal-700 transition inline-flex items-center gap-2"
           >
             <Zap className="w-4 h-4" /> Generate SOW

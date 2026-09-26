@@ -8,6 +8,8 @@ import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
 import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
 import { type FeatureKey } from '@/lib/payments/config'
 import { repos } from '@/lib/repositories'
+import { apiPaymentRequired } from '@/lib/payments/paywall'
+import { SOW_GENERATE_JOB_TYPE, confirmFreeTrialJob } from '@/lib/sow/generationJob'
 import {
   apiSuccess,
   apiError,
@@ -16,7 +18,6 @@ import {
 } from '@/lib/api/response'
 
 const FEATURE: FeatureKey = 'sow_generate'
-export const SOW_GENERATE_JOB_TYPE = 'ai.sow.generate'
 
 // The context fields the PIPELINE actually dereferences, not the ones that
 // merely look like identifiers. The two were inverted: `learningArea` and
@@ -69,6 +70,7 @@ export async function POST(req: Request) {
     // ── Access check ──────────────────────────────────────────────────────────
     const access = await checkFeatureAccess(FEATURE)
     if (access.allowed === false) {
+      if (access.reason === 'insufficient_tokens') return apiPaymentRequired(FEATURE)
       const status = access.reason === 'unauthenticated' ? 401 : 403
       return apiError(access.reason, status)
     }
@@ -77,6 +79,9 @@ export async function POST(req: Request) {
     if (rateLimit.allowed === false) {
       return apiError(`Daily limit of ${rateLimit.limit} SOW generations reached. Resets at ${rateLimit.resetAt}`, 429)
     }
+
+    // This generation is the teacher's one free scheme of work.
+    const isFreeTrial = access.deductTokens === false && access.freeTrial === true
 
     // ── Verify teacher record (needed for teacher_id FK in downstream queries) ─
     const db = createServiceClient()
@@ -170,12 +175,22 @@ export async function POST(req: Request) {
         user_id:    access.userId,
         status:     'processing',
         started_at: new Date().toISOString(),
-        payload:    { total },
+        // free_trial marks the teacher's one free scheme; confirmFreeTrialJob
+        // reads it to pick a single winner among concurrent trial requests.
+        payload:    isFreeTrial ? { total, free_trial: true } : { total },
         result:     { total, completed: 0, failed: 0 },
       })
       .select('id')
       .single()
     if (jobErr || !job) return apiError('Could not start scheme of work generation')
+
+    if (isFreeTrial && !(await confirmFreeTrialJob(access.userId, job.id))) {
+      await repos.jobs.updateProgress(job.id, {
+        status: 'failed',
+        result: { total, completed: 0, failed: 0, errorMessage: 'Your free scheme of work is already being generated.' },
+      })
+      return apiPaymentRequired(FEATURE)
+    }
 
     after(async () => {
       try {

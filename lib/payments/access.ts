@@ -8,6 +8,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { repos } from '@/lib/repositories'
 import { resolveSchoolCoverage } from '@/lib/core/schoolEntitlement'
+import { hasUsedFirstScheme } from '@/lib/sow/generationJob'
 import {
   TOKEN_COSTS,
   FEATURE_ACCESS,
@@ -16,11 +17,20 @@ import {
 } from '@/lib/payments/config'
 
 export type AccessResult =
-  | { allowed: true;  tier: Exclude<UserTier, 'token' | 'none'>; deductTokens: false; userId: string }
+  // freeTrial: this is the teacher's one free Scheme of Work. The route must
+  // mark the job it starts as the trial (see lib/sow/generationJob.ts).
+  | { allowed: true;  tier: Exclude<UserTier, 'token' | 'none'>; deductTokens: false; userId: string; freeTrial?: true }
   | { allowed: true;  tier: 'token'; deductTokens: true; cost: number; userId: string }
   | { allowed: false; reason: 'unauthenticated' | 'insufficient_tokens' | 'no_access' }
 
 // In-process, per-server-instance, keyed on user+feature.
+//
+// ONLY standing entitlements are cached — admin, school coverage, an active
+// subscription — because using them does not use them up. Consumable answers
+// (the free first scheme, a token balance) and denials are never cached:
+// caching "free first scheme: allowed" let a teacher start several free
+// schemes inside the 60s window, and caching a denial kept a teacher who had
+// just paid locked out for up to a minute.
 //
 // MAXIMUM STALE-ACCESS WINDOW: 60 seconds. This is the documented bound on
 // every entitlement change:
@@ -140,26 +150,25 @@ export async function checkFeatureAccess(
   // 6b. First-SOW trial — a genuinely first-ever Scheme of Work is free,
   //     for any teacher, affiliated or not (affiliated teachers already
   //     returned free at step 5; this specifically covers the self-teacher
-  //     path). Checked against real SOW history, never a flag that could
-  //     go stale — "first" means zero rows in schemes_of_work, checked now.
+  //     path). Checked against real history, never a flag that could go
+  //     stale — "first" means no scheme generated (or saved) yet, checked
+  //     now. Saved rows alone were bypassable by downloading without saving;
+  //     see lib/sow/generationJob.ts.
   if (feature === 'sow_generate') {
     const teacherId = await repos.billing.findTeacherIdByUserId(user.id)
-    if (teacherId) {
-      const priorSOWCount = await repos.curriculum.countByTeacher(teacherId)
-      if (priorSOWCount === 0) {
-        return cacheAndReturn({ allowed: true, tier: 'teacher', deductTokens: false, userId: user.id })
-      }
+    if (teacherId && !(await hasUsedFirstScheme(user.id, teacherId))) {
+      return { allowed: true, tier: 'teacher', deductTokens: false, userId: user.id, freeTrial: true }
     }
   }
 
-  // 7. Token balance — last resort
+  // 7. Token balance — last resort. Never cached (see accessCache).
   const cost      = TOKEN_COSTS[feature]
   const available = balance?.balance ?? 0
   if (available < cost) {
-    return cacheAndReturn({ allowed: false, reason: 'insufficient_tokens' })
+    return { allowed: false, reason: 'insufficient_tokens' }
   }
 
-  return cacheAndReturn({ allowed: true, tier: 'token', deductTokens: true, cost, userId: user.id })
+  return { allowed: true, tier: 'token', deductTokens: true, cost, userId: user.id }
 }
 
 /**

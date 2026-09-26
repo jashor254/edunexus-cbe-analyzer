@@ -13,14 +13,20 @@ import {
 import type { SOWPreviewData } from '@/lib/sow/types'
 import { z } from 'zod'
 import { publishEvent } from '@/lib/events'
+import { claimGenerationForSave, releaseGenerationClaim } from '@/lib/sow/generationJob'
 
 const SaveSOWSchema = z.object({
+  // The generation this scheme came from. Saving is bound to a generation —
+  // each completed, paid-for (or free-trial) generation saves exactly once —
+  // so a scheme the server never generated and charged for cannot be stored
+  // and then used for free lesson plans and Records of Work.
+  jobId: z.uuid({ error: 'jobId must be the id of the generation being saved' }),
   schemeData: z.object({
     meta: z.object({
       school:          z.string().min(1),
       // "Grade 9", "Form 3" — matches schemes_of_work.grade (text), not a
-      // bare 1-12 number. Neither real caller (Step5Preview.tsx, the live
-      // wizard page) has ever sent a number here.
+      // bare 1-12 number. The caller (the wizard page) has never sent a
+      // number here.
       grade:           z.string().min(1),
       learningArea:    z.string().min(1),
       // Both callers send `String(term)` — coerce rather than requiring the
@@ -75,7 +81,13 @@ export async function POST(req: Request) {
       return apiBadRequest(parsed.error.message ?? 'Invalid request body')
     }
     // Cast through unknown — Zod validates structure, SOWPreviewData adds domain-specific types
-    const { schemeData } = parsed.data as unknown as { schemeData: SOWPreviewData }
+    const { schemeData, jobId } = parsed.data as unknown as { schemeData: SOWPreviewData; jobId: string }
+
+    // ── Bind this save to its generation ──────────────────────────────────────
+    const claim = await claimGenerationForSave(jobId, user.id)
+    if (claim === 'not_found') return apiForbidden()
+    if (claim === 'not_ready') return apiBadRequest('This scheme of work has not finished generating yet.')
+    if (claim === 'already_saved') return apiError('This scheme of work is already saved.', 409)
 
     const { meta, lessons, breaks } = schemeData
 
@@ -122,6 +134,7 @@ export async function POST(req: Request) {
 
     if (schemeErr) {
       console.error('[sow/save] scheme insert error:', schemeErr)
+      await releaseGenerationClaim(jobId)
       return apiError('Failed to save scheme: ' + schemeErr.message)
     }
 
@@ -186,6 +199,8 @@ export async function POST(req: Request) {
         const { error: rollbackErr } = await db.from('schemes_of_work').delete().eq('id', schemeId)
         if (rollbackErr) {
           console.error('[sow/save] rollback failed, scheme may be incomplete:', rollbackErr.message, { schemeId })
+        } else {
+          await releaseGenerationClaim(jobId)
         }
 
         return apiError('Could not save the scheme’s lessons. Nothing was saved — please try again.')

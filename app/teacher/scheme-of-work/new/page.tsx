@@ -21,6 +21,8 @@ import { buildTermSchedule } from '@/lib/sow/termSchedule'
 import type { TermScheduleResult } from '@/lib/sow/termSchedule'
 import { applyBreaksToSchedule } from '@/lib/sow/breakEngine'
 import { friendlyMessage } from '@/lib/errors/friendlyMessage'
+import PaywallNotice from '@/components/pricing/PaywallNotice'
+import type { PaywallInfo } from '@/lib/payments/paywall'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -150,6 +152,9 @@ export default function SchemeOfWorkPage() {
   const [generating, setGenerating]   = useState(false)
   const [progress, setProgress]       = useState('')
   const [genJobId,  setGenJobId]      = useState<string | null>(null)
+  // The finished generation the preview came from — the save is bound to it.
+  const [resultJobId, setResultJobId] = useState<string | null>(null)
+  const [paywall, setPaywall]         = useState<PaywallInfo | null>(null)
   const [genCounts, setGenCounts]     = useState<{ completed: number; total: number } | null>(null)
   const genStartedAtRef = useRef<number>(0)
   const [result, setResult]           = useState<SOWGenerationResult | null>(null)
@@ -279,9 +284,12 @@ export default function SchemeOfWorkPage() {
     if (selections.length === 0) { setProgress('Please select at least one strand in Step 2.'); return }
 
     setGenerating(true)
+    setPaywall(null)
     setProgress('Looking up official KICD content for this subject…')
     setGenCounts(null)
     setResult(null)
+    setResultJobId(null)
+    setSavedSchemeId(null)
 
     // Real curriculum grounding, not free generation — same lookup the
     // Step5Preview flow already uses. When this comes back empty (no KICD
@@ -316,6 +324,13 @@ export default function SchemeOfWorkPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ context, lessonStructure, selectedSubstrands, breaks: breaksToSend }),
       })
+      if (res.status === 402) {
+        const data = await res.json()
+        setPaywall(data.data as PaywallInfo)
+        setProgress('')
+        setGenerating(false)
+        return
+      }
       if (res.status === 401 || res.status === 403) {
         window.location.href = '/teacher/setup'
         return
@@ -349,6 +364,7 @@ export default function SchemeOfWorkPage() {
         setGenCounts({ completed: job.result.completed, total: job.result.total })
         if (job.status === 'completed' && job.result.result) {
           setResult(job.result.result)
+          setResultJobId(genJobId)
           setProgress('')
           setGenerating(false)
           setGenJobId(null)
@@ -389,12 +405,12 @@ export default function SchemeOfWorkPage() {
   async function ensureSaved(): Promise<string | null> {
     if (savedSchemeId) return savedSchemeId
     const schemeData = buildSchemeData()
-    if (!schemeData) return null
+    if (!schemeData || !resultJobId) return null
     try {
       const res = await fetch('/api/sow/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ schemeData }),
+        body: JSON.stringify({ jobId: resultJobId, schemeData }),
       })
       const d = await res.json()
       if (d.success) {
@@ -1096,6 +1112,16 @@ export default function SchemeOfWorkPage() {
                 Dismiss and try again
               </button>
             )}
+          </div>
+        )}
+
+        {step === 4 && paywall && !generating && (
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8">
+            <PaywallNotice
+              info={paywall}
+              message={`You have used your free scheme of work. This subject's ${paywall.label ?? 'Term Planning Bundle'} — the scheme, every lesson plan and the Record of Work for the term — is KES ${paywall.priceKes ?? 100}.`}
+              onRetry={() => { void handleGenerate() }}
+            />
           </div>
         )}
 

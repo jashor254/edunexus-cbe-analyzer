@@ -120,6 +120,7 @@ before(async () => {
 after(async () => {
   for (const id of createdUsers) {
     await db.from('jobs').delete().eq('user_id', id)
+    await db.from('token_balances').delete().eq('user_id', id)
     await db.from('teachers').delete().eq('user_id', id)
     await db.auth.admin.deleteUser(id)
   }
@@ -188,9 +189,35 @@ test('6-8. a valid request still completes, with lessons and a complete result',
     'reported completed count disagrees with lessons generated')
 })
 
+// ── Only the first scheme is free ────────────────────────────────────────────
+
+test('8b. once the free scheme has been generated, the next one asks for payment and starts nothing', async () => {
+  // 6-8 generated this teacher's free scheme and never saved it. Before the
+  // fix, "first scheme" was counted from SAVED schemes only, so an unsaved
+  // (downloaded) scheme left the teacher on the free path forever.
+  const { count: before } = await db.from('jobs')
+    .select('id', { count: 'exact', head: true }).eq('user_id', teacher.id).eq('type', JOB_TYPE)
+
+  const res = await call(teacher.cookie, validBody())
+  assert.equal(res.status, 402, `a second scheme was not asked to pay: ${res.raw}`)
+  const paywall = res.json.data as { code?: string; productId?: string; priceKes?: number } | undefined
+  assert.equal(paywall?.code, 'payment_required')
+  assert.equal(paywall?.productId, 'planning_bundle')
+  assert.equal(paywall?.priceKes, 100)
+  assert.ok(!/jobId/.test(res.raw), 'a paywalled request handed back a jobId')
+
+  await new Promise(r => setTimeout(r, 750))
+  const { count: after } = await db.from('jobs')
+    .select('id', { count: 'exact', head: true }).eq('user_id', teacher.id).eq('type', JOB_TYPE)
+  assert.equal(after, before, 'a paywalled request created a job')
+})
+
 // ── STALL-3 must stay closed ─────────────────────────────────────────────────
 
 test('9. missing required context is still rejected before any job exists', async () => {
+  // The free scheme is used (8b), so give this teacher a paid balance: the
+  // point here is body validation, which runs after the payment gate.
+  await db.from('token_balances').upsert({ user_id: teacher.id, balance: 2, total_ever: 2 }, { onConflict: 'user_id' })
   const { count: before } = await db.from('jobs')
     .select('id', { count: 'exact', head: true }).eq('user_id', teacher.id).eq('type', JOB_TYPE)
 
