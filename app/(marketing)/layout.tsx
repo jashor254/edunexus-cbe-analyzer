@@ -198,7 +198,7 @@ function MarketingFooter() {
         <div className="border-t border-white/10 pt-6 text-center space-y-1">
           <p className="text-xs text-white/50">© 2026 EduNexus Kenya. All rights reserved.</p>
           <p className="text-xs text-white/20">Developed by Jashor Technologies</p>
-          <p className="text-xs text-white/15">AI-assisted · edunexus.co.ke</p>
+          <p className="text-xs text-white/25">A learning-intelligence engine · built in Nairobi, Kenya · edunexus.co.ke</p>
         </div>
       </div>
     </footer>

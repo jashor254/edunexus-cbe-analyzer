@@ -27,6 +27,53 @@ export default function AboutPage() {
         </p>
       </div>
 
+      <div className="mt-14">
+        <h2 className="text-2xl font-black tracking-tight mb-5 text-white">How the intelligence works</h2>
+        <div className="space-y-6 text-white/70 text-lg leading-relaxed">
+          <p>
+            At the core is a{' '}
+            <strong className="text-white">deterministic learner-intelligence engine</strong>: it
+            turns teacher-entered evidence into a strand-by-strand profile of each learner — the
+            Learner Blueprint — without AI guesswork, so every insight traces back to a real
+            observation.
+          </p>
+          <p>
+            Around that engine, we run{' '}
+            <strong className="text-white">AI models</strong> for the language-heavy work teachers
+            spend the most time on: generating CBC-aligned schemes of work and lesson plans, marking
+            written work such as essays and insha, tutoring learners on the exact gap holding them
+            back, and mapping career pathways from Grade 7. This is where accelerated computing
+            matters to us — inference is the workload we run at scale as more schools come on board.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-14">
+        <h2 className="text-2xl font-black tracking-tight mb-5 text-white">Where learner data lives</h2>
+        <div className="space-y-6 text-white/70 text-lg leading-relaxed">
+          <p>
+            Kenyan children&apos;s work is not ours to give away. We already strip learner names
+            before any text reaches an AI model. Our priority now is to bring that inference{' '}
+            <strong className="text-white">in-house, on infrastructure we control</strong>, so that
+            learner data never has to leave the country to be understood — the reason we are pursuing
+            accelerated-computing partnerships to power EduNexus.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-14">
+        <h2 className="text-2xl font-black tracking-tight mb-5 text-white">Who is building this</h2>
+        <div className="space-y-6 text-white/70 text-lg leading-relaxed">
+          <p>
+            EduNexus is founded and built by{' '}
+            <strong className="text-white">Dennis Kariuki</strong>, based in Nairobi. It operates as
+            EduNexus Kenya, registered in Kenya as a sole proprietorship under Jashor Technologies.
+            We are in our pioneer phase, working directly with Kenyan teachers to make sure every
+            feature earns its place in a real classroom.
+          </p>
+        </div>
+      </div>
+
       <div className="mt-10 bg-white/5 border border-white/10 rounded-2xl p-6">
         <p className="text-xs font-bold text-white/40 uppercase tracking-widest mb-3">Contact EduNexus Kenya</p>
         <div className="flex flex-wrap gap-x-8 gap-y-2 text-white/70 text-base">
