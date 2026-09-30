@@ -4,7 +4,7 @@ import next from "eslint-config-next";
 
 const config = [
   {
-    ignores: [".claude/**", "node_modules/**", ".next/**"],
+    ignores: [".claude/**", "node_modules/**", ".next/**", "scripts/_tmp/**"],
   },
   js.configs.recommended,
   ...next,
