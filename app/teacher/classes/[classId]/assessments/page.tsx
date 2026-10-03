@@ -42,6 +42,16 @@ function getSubjectList(
   return { core: CBC_SENIOR_CORE, extra: pathwaySubjects, religion: [] }
 }
 
+type ClassData = {
+  class?: {
+    id?: string
+    name: string
+    grade: number
+    subject: string
+    academic_year: string | number
+  }
+}
+
 // ── Component ────────────────────────────────────────────────────────────
 export default function ClassAssessmentsPage({
   params,
@@ -50,7 +60,7 @@ export default function ClassAssessmentsPage({
 }) {
   const { classId } = use(params)
 
-  const [classData, setClassData]       = useState<any>(null)
+  const [classData, setClassData]       = useState<ClassData | null>(null)
   const [assessments, setAssessments]   = useState<AssessmentWithStats[]>([])
   const [gradeScales, setGradeScales]   = useState<DbGradeScale[]>([])
   const [loading, setLoading]           = useState(true)

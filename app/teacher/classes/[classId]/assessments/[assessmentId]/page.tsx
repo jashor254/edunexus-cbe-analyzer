@@ -117,7 +117,7 @@ export default function MarksheetPage({
 
   const [tab, setTab]               = useState<PageTab>('marksheet')
   const [assessment, setAssessment] = useState<ClassAssessment | null>(null)
-  const [classInfo, setClassInfo]   = useState<any>(null)
+  const [classInfo, setClassInfo]   = useState<{ name?: string; grade?: number } | null>(null)
   const [teacherInfo, setTeacher]   = useState<{ full_name: string; school: string } | null>(null)
   const [rows, setRows]             = useState<MarkRow[]>([])
   const [loading, setLoading]       = useState(true)

@@ -12,6 +12,8 @@ import {
   MessageSquare, CalendarDays, ThumbsUp, HelpCircle, AlertCircle, ClipboardCheck,
   RefreshCw, Table2,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import type { SubjectInsight } from '@/lib/teacherWorkspace/classDetailProjectionPure'
 import {
   SENIOR_PATHWAYS,
   SENIOR_PATHWAY_ELECTIVES,
@@ -1088,6 +1090,21 @@ function ClassAnalyticsTab({
 
 // ─── Clinic: Generate Reports component ───────────────────────────────────────
 
+type ClinicReportRow = {
+  studentId:    string
+  studentName:  string
+  generatedAt:  string | null
+  whatsappSent: boolean
+  hasPhone:     boolean
+  emailSent:    boolean
+  hasEmail:     boolean
+  parentOpened: boolean
+}
+type ClinicReportData = {
+  stats?:   { total: number; whatsappSent: number; emailSent: number; parentOpened: number }
+  reports?: ClinicReportRow[]
+}
+
 function ClinicReportsTab({
   classId,
   students,
@@ -1097,7 +1114,7 @@ function ClinicReportsTab({
   students:  ClinicStudent[]
   className: string
 }) {
-  const [reportData, setReportData]       = useState<any>(null)
+  const [reportData, setReportData]       = useState<ClinicReportData | null>(null)
   const [loadingData, setLoadingData]     = useState(true)
   const [showConfirm, setShowConfirm]     = useState(false)
   const [generating, setGenerating]       = useState(false)
@@ -1183,7 +1200,7 @@ function ClinicReportsTab({
   const errorStudents  = progress.filter(p => p.status === 'error')
 
   const stats = reportData?.stats
-  const lastGenerated = reportData?.reports?.find((r: any) => r.generatedAt)?.generatedAt
+  const lastGenerated = reportData?.reports?.find((r) => r.generatedAt)?.generatedAt
 
   return (
     <div className="space-y-5">
@@ -1429,7 +1446,7 @@ function ClinicReportsTab({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {reportData.reports.map((r: any) => (
+                {reportData.reports.map((r) => (
                   <tr key={r.studentId} className="hover:bg-gray-50">
                     <td className="px-5 py-3 font-medium text-gray-900">{r.studentName}</td>
                     <td className="px-5 py-3 text-gray-500">
@@ -2943,14 +2960,77 @@ function rowColor(avg: number | null) {
   return 'border-l-red-400'
 }
 
+// Row shape returned by /api/teacher/classes/[classId] for each student.
+// Superset of StudentProjection — the response also carries curriculum_type,
+// current_pathway and parent-contact fields used by the derivations below.
+type ClassStudentRow = {
+  id:                  string
+  name:                string
+  grade:               number
+  avgScore:            number | null
+  daysInactive:        number | null
+  subjectScores:       Record<string, number>
+  assessment:          { id: string; term: number; year: number; subject_scores: Record<string, number> } | null
+  assessment_id?:      string | null
+  latestAssessmentId?: string | null
+  parent_email?:       string | null
+  parent_phone?:       string | null
+  parent_id?:          string | null
+  parent_user_id?:     string | null
+  whatsapp_verified?:  boolean | null
+  curriculum_type?:    string | null
+  current_pathway?:    string | null
+}
+
+type ClassDetailData = {
+  class?: {
+    id:            string
+    class_code:    string
+    name:          string
+    grade:         number
+    subject:       string
+    academic_year: string | number
+  } | null
+  students?:       ClassStudentRow[]
+  insights?:       SubjectInsight[]
+  recommendations?: string[]
+  teacherName?:    string
+  teacherSchool?:  string
+}
+
+type HolidayRisk = Array<{ id: string; name: string; grade: number; riskLevel: string; isActive: boolean }>
+
+type ClassInsightsSummary = {
+  activeStudents?: number
+  holidayRisk?:    HolidayRisk
+  riskLevels?:     { high?: number; medium?: number; low?: number }
+}
+
+type CompassStudent = {
+  id:                 string
+  name:               string
+  grade:              number
+  hasCompassData:     boolean
+  compassTier:        string | null
+  confidenceLevel:    string | null
+  lastActive:         string | null
+  lastSubject:        string | null
+  strengths:          string[]
+  challenges:         string[]
+  masteredConcepts:   string[]
+  strugglingConcepts: string[]
+  subjectTiers:       Record<string, string>
+  latestInsight:      string | null
+}
+
 export default function ClassDetailPage({ params }: { params: Promise<{ classId: string }> }) {
   const { classId } = use(params)
   const [tab, setTab] = useState<Tab>('students')
-  const [data, setData] = useState<any>(null)
-  const [insights, setInsights] = useState<any>(null)
+  const [data, setData] = useState<ClassDetailData | null>(null)
+  const [insights, setInsights] = useState<ClassInsightsSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
-  const [compassData, setCompassData]   = useState<any[]>([])
+  const [compassData, setCompassData]   = useState<CompassStudent[]>([])
   const [compassLoading, setCompassLoading] = useState(false)
   const [compassLoaded, setCompassLoaded]   = useState(false)
   const [showAddStudent, setShowAddStudent] = useState(false)
@@ -3063,7 +3143,7 @@ na kuwasaidia vizuri zaidi darasani.
   }
 
   const cls = data.class
-  const rawStudents: Record<string, unknown>[] = data.students || []
+  const rawStudents: ClassStudentRow[] = data.students || []
   const students: AnalyticsStudent[] = rawStudents.map(s => ({
     id:              s.id as string,
     name:            s.name as string,
@@ -3081,9 +3161,9 @@ na kuwasaidia vizuri zaidi darasani.
     parent_phone:       (s.parent_phone as string | null) ?? null,
     assessment:         s.assessment as ClinicStudent['assessment'],
   }))
-  const subjectInsights: Record<string, unknown>[] = data.insights || []
+  const subjectInsights: SubjectInsight[] = data.insights || []
 
-  const tabs: { key: Tab; label: string; icon: any }[] = [
+  const tabs: { key: Tab; label: string; icon: LucideIcon }[] = [
     { key: 'students',    label: 'Students',        icon: Users         },
     { key: 'gaps',        label: 'Gap Radar',       icon: BarChart3     },
     { key: 'assignments', label: 'Assignments',     icon: BookOpen      },
@@ -3239,7 +3319,7 @@ na kuwasaidia vizuri zaidi darasani.
                         </button>
                       </td>
                     </tr>
-                  ) : rawStudents.map((s: any) => {
+                  ) : rawStudents.map((s) => {
                     const badge      = s.avgScore !== null ? levelBadge(s.avgScore) : null
                     const isDone     = processedIds.has(s.id)
                     const isBusy     = processingId === s.id
@@ -3389,7 +3469,7 @@ na kuwasaidia vizuri zaidi darasani.
             </div>
           ) : (
             <>
-              {subjectInsights.map((si: any) => {
+              {subjectInsights.map((si) => {
                 const pct = (si.avg / 4) * 100
                 const barColor = si.avg >= 3.5 ? 'bg-purple-500' : si.avg >= 2.5 ? 'bg-green-500' : si.avg >= 1.5 ? 'bg-amber-500' : 'bg-red-500'
                 return (
@@ -3490,7 +3570,7 @@ na kuwasaidia vizuri zaidi darasani.
               <p className="text-gray-400">No students in this class yet.</p>
             </div>
           ) : (
-            compassData.map((s: any) => {
+            compassData.map((s) => {
               const tierBadge   = compassTierBadge(s.compassTier)
               const confBadge   = confidenceBadge(s.confidenceLevel)
               const daysInactive = s.lastActive
@@ -3760,7 +3840,7 @@ na kuwasaidia vizuri zaidi darasani.
       {tab === 'holiday' && (
         <HolidayPlannerTab
           classId={classId}
-          students={students.map((s: any) => ({ id: s.id, name: s.name }))}
+          students={students.map((s) => ({ id: s.id, name: s.name }))}
           className={cls.name}
           existingHolidayRisk={insights?.holidayRisk}
         />
@@ -3775,7 +3855,7 @@ na kuwasaidia vizuri zaidi darasani.
       {tab === 'upload' && (
         <UploadAssessmentTab
           classId={classId}
-          students={students.map((s: any) => ({ id: s.id, name: s.name }))}
+          students={students.map((s) => ({ id: s.id, name: s.name }))}
           className={cls.name}
         />
       )}
@@ -3793,7 +3873,7 @@ na kuwasaidia vizuri zaidi darasani.
       {showFormative && (
         <FormativeSignalModal
           classId={classId}
-          students={students.map((s: any) => ({ id: s.id, name: s.name }))}
+          students={students.map((s) => ({ id: s.id, name: s.name }))}
           onClose={() => setShowFormative(false)}
         />
       )}
@@ -3802,7 +3882,7 @@ na kuwasaidia vizuri zaidi darasani.
       {showTopical && (
         <TopicalCheckModal
           classId={classId}
-          students={students.map((s: any) => ({ id: s.id, name: s.name }))}
+          students={students.map((s) => ({ id: s.id, name: s.name }))}
           onClose={() => setShowTopical(false)}
         />
       )}

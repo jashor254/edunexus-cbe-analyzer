@@ -118,8 +118,8 @@ export default function GroupPage() {
       const { data: mems } = await supabase
         .from('study_group_members').select('id, user_id, student_name, points, streak_days').eq('group_id', groupId).order('points', { ascending: false })
       if (mems) setMembers(mems)
-    } catch (err: any) {
-      alert(err.message)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to submit answer')
     } finally {
       setSubmitting(false)
     }

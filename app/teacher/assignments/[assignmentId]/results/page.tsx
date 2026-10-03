@@ -133,11 +133,11 @@ export default function ResultsPage({ params }: { params: Promise<{ assignmentId
       .then(d => {
         if (d.success) {
           setAssignment(d.data.assignment)
-          const subs: Array<{ student_id: string; score: number | null; status: string }> = d.data.submissions || []
+          const subs: Array<{ student_id: string; score: number | null; status: string; students?: { name?: string } | null }> = d.data.submissions || []
           const subMap = new Map(subs.map(s => [s.student_id, s]))
 
           // Build student list from submissions
-          const rows: Student[] = subs.map((s: any) => ({
+          const rows: Student[] = subs.map((s) => ({
             id: s.student_id,
             name: s.students?.name || 'Unknown',
             existing_score: s.score,

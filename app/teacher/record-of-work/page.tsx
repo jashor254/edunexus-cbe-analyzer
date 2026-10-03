@@ -34,6 +34,10 @@ interface SavedScheme {
   school: string
 }
 
+type RowCreatePayload =
+  | { schemeId: string; school: string; grade: string; learningArea: string; term: string; year: number; curriculumMode: string }
+  | { school: string; grade: string; learningArea: string; term: string; year: number }
+
 const TERM_COLORS: Record<string, string> = {
   '1': 'from-teal-500 to-emerald-500',
   '2': 'from-indigo-500 to-violet-500',
@@ -70,7 +74,7 @@ export default function RecordOfWorkListPage() {
 
   async function handleCreate() {
     setCreating(true)
-    let payload: any
+    let payload: RowCreatePayload
 
     if (fromScheme === 'scheme' && selectedSchemeId) {
       const scheme = schemes.find(s => s.id === selectedSchemeId)!

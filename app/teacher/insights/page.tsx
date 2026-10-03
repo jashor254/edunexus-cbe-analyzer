@@ -6,13 +6,30 @@ import { getStandingLabel, getStandingColorClasses } from '@/lib/teacherWorkspac
 
 interface TeacherClass { id: string; name: string; grade: number; subject: string }
 
+type RiskLevels = { high?: number; medium?: number; low?: number }
+type ClassInsightsSummary = {
+  totalStudents: number
+  activeStudents: number
+  riskLevels?: RiskLevels
+}
+type SubjectDistribution = { below: number; approaching: number; meets: number; exceeds: number }
+type SubjectInsight = {
+  subject: string
+  avg: number
+  distribution: SubjectDistribution
+}
+type ClassInsightData = {
+  insights?: SubjectInsight[]
+  recommendations?: string[]
+}
+
 const levelLabel = (avg: number) => getStandingLabel(avg, 'short')
 
 export default function InsightsPage() {
   const [classes, setClasses] = useState<TeacherClass[]>([])
   const [selectedClass, setSelectedClass] = useState('')
-  const [insights, setInsights] = useState<any>(null)
-  const [classData, setClassData] = useState<any>(null)
+  const [insights, setInsights] = useState<ClassInsightsSummary | null>(null)
+  const [classData, setClassData] = useState<ClassInsightData | null>(null)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -38,7 +55,7 @@ export default function InsightsPage() {
     }).finally(() => setLoading(false))
   }, [selectedClass])
 
-  const subjectInsights: any[] = classData?.insights || []
+  const subjectInsights: SubjectInsight[] = classData?.insights || []
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -95,7 +112,7 @@ export default function InsightsPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {subjectInsights.map((si: any) => {
+              {subjectInsights.map((si) => {
                 const pct = (si.avg / 4) * 100
                 const { bar: barColor, badge: badgeColor } = getStandingColorClasses(si.avg)
                 return (

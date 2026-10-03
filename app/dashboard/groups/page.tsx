@@ -27,6 +27,21 @@ interface MyGroup {
   todayAnswered: boolean
 }
 
+// The study_groups relation is a to-one FK, so it is a single object at
+// runtime; the generated types widen it to an array, so we correct it here.
+type MembershipRow = {
+  points: number
+  group_id: string
+  study_groups: {
+    id: string
+    name: string
+    subject: string
+    grade: number
+    invite_code: string
+    max_members: number
+  } | null
+}
+
 export default function StudyGroupsPage() {
   const supabase = createClient()
   const router = useRouter()
@@ -62,11 +77,12 @@ export default function StudyGroupsPage() {
         )
       `)
       .eq('user_id', user.id)
+      .overrideTypes<MembershipRow[], { merge: false }>()
 
     if (!memberships) { setLoading(false); return }
 
     const enriched: MyGroup[] = await Promise.all(
-      memberships.map(async (m: any) => {
+      memberships.map(async (m) => {
         const g = m.study_groups
         if (!g) return null
 
@@ -76,7 +92,7 @@ export default function StudyGroupsPage() {
           supabase.from('study_group_challenges').select('id').eq('group_id', g.id).eq('date', today).single(),
         ])
 
-        const rank = allMembers ? allMembers.findIndex((mem: any) => mem.user_id === user.id) + 1 : 0
+        const rank = allMembers ? allMembers.findIndex((mem) => mem.user_id === user.id) + 1 : 0
 
         let todayAnswered = false
         if (todayChallenge?.id) {
@@ -119,8 +135,8 @@ export default function StudyGroupsPage() {
       setCreatedGroup({ inviteCode: data.data.inviteCode, groupId: data.data.groupId })
       setCreateName(''); setCreateStudentName('')
       loadGroups()
-    } catch (err: any) {
-      alert(err.message)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to create group')
     } finally {
       setCreating(false)
     }
@@ -142,8 +158,8 @@ export default function StudyGroupsPage() {
       setJoinSuccess(`Joined "${data.data.groupName}"! 🎉`)
       setInviteCode(''); setJoinStudentName('')
       loadGroups()
-    } catch (err: any) {
-      setJoinError(err.message)
+    } catch (err) {
+      setJoinError(err instanceof Error ? err.message : 'Failed to join group')
     } finally {
       setJoining(false)
     }
