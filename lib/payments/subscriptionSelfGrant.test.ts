@@ -188,7 +188,7 @@ test('10. self-declaring teachers.role=admin no longer grants access to subscrip
 
 // ── Positive: reads and legitimate writers must still work ───────────────────
 
-test('11. a user can still READ their own subscription (lib/api-protection.ts depends on this)', async () => {
+test('11. a user can still READ their own subscription (access checks depend on this)', async () => {
   const v = await mkUser('reader')
   await db.from('subscriptions').insert({
     user_id: v.id, plan: 'term', status: 'active',
