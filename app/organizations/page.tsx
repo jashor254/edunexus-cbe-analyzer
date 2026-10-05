@@ -13,7 +13,7 @@ const ROLE_ICON: Record<string, React.ElementType> = {
 }
 
 const TYPE_COLOR: Record<string, string> = {
-  school:     'bg-blue-500/20 text-blue-300',
+  school:     'bg-ochre-500/20 text-ochre-300',
   district:   'bg-purple-500/20 text-purple-300',
   county:     'bg-orange-500/20 text-orange-300',
   ministry:   'bg-red-500/20 text-red-300',
@@ -47,7 +47,7 @@ export default async function OrganizationsPage() {
           </div>
           <Link
             href="/organizations/new"
-            className="flex items-center gap-2 bg-teal-500 hover:bg-teal-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            className="flex items-center gap-2 bg-ochre-500 hover:bg-ochre-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
           >
             <Plus className="w-4 h-4" />
             New Organization
@@ -62,7 +62,7 @@ export default async function OrganizationsPage() {
             <p className="text-white/40 text-sm mb-6">Create your first organization to get started</p>
             <Link
               href="/organizations/new"
-              className="inline-flex items-center gap-2 bg-teal-500 hover:bg-teal-400 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
+              className="inline-flex items-center gap-2 bg-ochre-500 hover:bg-ochre-400 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
             >
               <Plus className="w-4 h-4" />
               Create Organization
@@ -80,11 +80,11 @@ export default async function OrganizationsPage() {
               <Link
                 key={org.id}
                 href={`/organizations/${org.id}`}
-                className="flex items-center justify-between p-5 bg-white/5 hover:bg-white/8 border border-white/10 hover:border-teal-500/30 rounded-xl transition-all group"
+                className="flex items-center justify-between p-5 bg-white/5 hover:bg-white/8 border border-white/10 hover:border-ochre-500/30 rounded-xl transition-all group"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-teal-500/20 flex items-center justify-center flex-shrink-0">
-                    <Building2 className="w-6 h-6 text-teal-400" />
+                  <div className="w-12 h-12 rounded-xl bg-ochre-500/20 flex items-center justify-center flex-shrink-0">
+                    <Building2 className="w-6 h-6 text-ochre-400" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
@@ -107,7 +107,7 @@ export default async function OrganizationsPage() {
                     <RoleIcon className="w-3.5 h-3.5" />
                     <span>{org.membership.role}</span>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-white/30 group-hover:text-teal-400 transition-colors" />
+                  <ArrowRight className="w-4 h-4 text-white/30 group-hover:text-ochre-400 transition-colors" />
                 </div>
               </Link>
             )

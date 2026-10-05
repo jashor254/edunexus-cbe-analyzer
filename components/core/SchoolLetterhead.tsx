@@ -32,7 +32,7 @@ export function SchoolLetterhead({ school, contextLine }: Props) {
   const contactParts = [school.contact_phone, school.contact_email].filter(Boolean)
 
   return (
-    <div className="flex items-start gap-4 pb-4 border-b border-white/10">
+    <div className="flex items-start gap-4 pb-4 border-b-2 border-ochre-500/40">
       {school.logo_url && (
         // eslint-disable-next-line @next/next/no-img-element -- external, school-supplied logo URL; not a static/local asset next/image can optimize
         <img
