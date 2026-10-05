@@ -29,6 +29,14 @@ platform. The design feels:
 - Red/Rose: #ef4444 → #f43f5e
   Used for: Alerts, warnings
 
+### Anchor Color (Kenya-rooted)
+- Ochre/Terracotta: #c65d3b (anchor), #a8431f → #86341a (text on white), #e8a87c (on dark)
+  Used for: the neutral / school-default state. A terracotta earth tone — murram
+  roads, Rift Valley soil, Maasai ochre — chosen as the one color genuinely tied
+  to Kenya. Red-brown, so it doesn't collide with amber (teacher), teal (family),
+  blue (IGCSE) or violet (AI). Tokens: `--color-ochre-300..700` in `globals.css`.
+  Decision: `docs/decisions/2026-10-05-kenya-anchor-color.md`.
+
 ### Semantic Colors
 - Success: #22c55e
 - Warning: #f59e0b  
@@ -167,11 +175,14 @@ default palette of the tools that built it.
    underlines, small squares, or plain text labels with a colored dot. Reserve full-rounding for
    actual buttons.
 
-6. **Ground it visibly in Kenya**, not just in the copy. Real teacher/student photography (even
-   phone-shot, unpolished — that reads as *more* credible for a pioneer-stage platform, not less),
-   a texture or motif drawn from local visual language, or county/school names used as concrete
-   detail instead of generic "50+ pioneer teachers." Specificity beats polish for trust with this
-   audience.
+6. **Ground it visibly in Kenya**, not just in the copy. ⏳ IN PROGRESS (2026-10-05) — the
+   **color** half is done: adopted `ochre` (terracotta earth tone — murram/Maasai ochre) as the
+   Kenya-rooted anchor for the school/neutral state, tokens in `globals.css`, rationale in
+   `docs/decisions/2026-10-05-kenya-anchor-color.md`. Still open: real teacher/student photography
+   (phone-shot is fine — reads as *more* credible for a pioneer-stage platform), a texture/motif
+   from local visual language, and county/school names as concrete detail instead of generic
+   "50+ pioneer teachers." Specificity beats polish for trust with this audience. (Photography and
+   named-school copy need real assets/founder input — not inventable.)
 
 7. **Retire `hover:scale-105` as the universal hover state.** It's the default AI-template
    micro-interaction. A color/shadow shift or a more considered custom transition reads as more

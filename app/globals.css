@@ -41,6 +41,19 @@
   --color-brass-500: #c9a255;
   --color-brass-600: #a9843f;
   --color-brass-700: #866831;
+
+  /* Ochre — the Kenya-rooted anchor color for the neutral / school-default
+     state (DESIGN.md audit item #6; see docs/decisions/2026-10-05-kenya-anchor-color.md).
+     A terracotta earth tone: murram roads, Rift Valley soil, Maasai ochre —
+     chosen because it reads as unmistakably Kenyan and, being red-brown, does
+     not collide with any reserved audience color (amber=teacher yellow-gold,
+     teal=family, blue=IGCSE, violet=AI). -500 is the anchor; -600/-700 are the
+     text-on-white steps (>=4.5:1); -300 is the on-dark accent step. */
+  --color-ochre-300: #e8a87c;
+  --color-ochre-400: #d98355;
+  --color-ochre-500: #c65d3b;
+  --color-ochre-600: #a8431f;
+  --color-ochre-700: #86341a;
 }
 
 @media (prefers-color-scheme: dark) {
