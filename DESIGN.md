@@ -130,12 +130,19 @@ default palette of the tools that built it.
 
 ### What to change, in priority order
 
-1. **Kill the violet/purple gradient as the default identity color.** Keep amber/gold (teacher),
-   teal (family) — those already carry local, warm meaning per this doc's own Brand Identity
-   section. Give the neutral/school-default state its own real color decision, not violet-by-default
-   just because that's what AI page-builders reach for. Consider a color genuinely tied to Kenya
-   (terracotta/ochre earth tones, savanna gold, deep forest green) instead of adding a fourth
-   generic tech-purple to the existing amber/teal/violet/blue set.
+1. **Kill the violet/purple gradient as the default identity color.** ✅ DONE (2026-10-05).
+   Decision after studying how high-end edutech (Khan Academy, Coursera, Duolingo) handles color:
+   the standard is **one calm anchor hue (almost always blue/green), reserved semantic colors kept
+   separate, and purple used sparingly if at all** — never a default-identity gradient. So violet is
+   now **reserved for its one real job: the AI indicator** (per the AI Branding Rules below). Applied:
+   - `dashboard` (teacher/parent) — all 43 decorative violet/purple refs retired to amber/orange,
+     the teacher action color the surface already led with. No violet remains.
+   - `learn` (AI tutor) — violet **kept intentionally**: there it IS the AI-tutor signal (chat,
+     avatar, send, composer), which is exactly what purple is reserved for. Retiring it would have
+     contradicted the AI indicator rule.
+   - marketing already moved to the Brass / TrustBlue / NexusTeal system (see `globals.css @theme`).
+   Still open: give the neutral/school-default state a color genuinely tied to Kenya (terracotta/
+   ochre, savanna gold, deep forest green) rather than leaning on amber everywhere.
 
 2. **Replace the generic Lucide-icon-in-a-glass-card pattern with something illustrated or
    custom for the 3-4 highest-visibility moments** (hero, the three role cards, the evidence

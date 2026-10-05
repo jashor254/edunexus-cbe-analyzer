@@ -105,21 +105,21 @@ function getGreetingEmoji(): string {
 }
 
 function cbcLevelLabel(avg: number): { label: string; color: string; border: string } {
-  if (avg >= 3.5) return { label: 'Exceeding (EE)', color: 'text-purple-600', border: 'border-l-purple-500' }
+  if (avg >= 3.5) return { label: 'Exceeding (EE)', color: 'text-orange-600', border: 'border-l-orange-500' }
   if (avg >= 2.5) return { label: 'Meets (ME)', color: 'text-green-600', border: 'border-l-green-500' }
   if (avg >= 1.5) return { label: 'Approaching (AE)', color: 'text-amber-600', border: 'border-l-amber-500' }
   return { label: 'Below (BE)', color: 'text-red-600', border: 'border-l-red-500' }
 }
 
 function cbcLevelBadge(avg: number): string {
-  if (avg >= 3.5) return 'bg-purple-100 text-purple-700'
+  if (avg >= 3.5) return 'bg-orange-100 text-orange-700'
   if (avg >= 2.5) return 'bg-green-100 text-green-700'
   if (avg >= 1.5) return 'bg-amber-100 text-amber-700'
   return 'bg-red-100 text-red-700'
 }
 
 function igcseGradeColor(grade: string): { color: string; border: string } {
-  if (grade === 'A*' || grade === 'A') return { color: 'text-purple-600', border: 'border-l-purple-500' }
+  if (grade === 'A*' || grade === 'A') return { color: 'text-orange-600', border: 'border-l-orange-500' }
   if (grade === 'B') return { color: 'text-green-600', border: 'border-l-green-500' }
   if (grade === 'C') return { color: 'text-blue-600', border: 'border-l-blue-500' }
   if (grade === 'D' || grade === 'E') return { color: 'text-amber-600', border: 'border-l-amber-500' }
@@ -313,7 +313,7 @@ function AddStudentModal({
 
             <button
               onClick={() => setStep('create')}
-              className="w-full text-left p-4 rounded-2xl border-2 border-violet-200 bg-violet-50 hover:border-violet-400 hover:bg-violet-100 transition-all group"
+              className="w-full text-left p-4 rounded-2xl border-2 border-amber-200 bg-amber-50 hover:border-amber-400 hover:bg-amber-100 transition-all group"
             >
               <div className="flex items-start gap-3">
                 <span className="text-2xl">🏠</span>
@@ -371,7 +371,7 @@ function AddStudentModal({
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="e.g. Grace Wanjiku"
-              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
             />
           </div>
 
@@ -416,7 +416,7 @@ function AddStudentModal({
             <select
               value={grade}
               onChange={e => handleGradeChange(Number(e.target.value))}
-              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
             >
               {gradeOptions.map(g => (
                 <option key={g} value={g}>
@@ -439,7 +439,7 @@ function AddStudentModal({
                 <select
                   value={pathway}
                   onChange={e => handlePathwayChange(e.target.value as SeniorPathway | '')}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                 >
                   <option value="">Select pathway…</option>
                   {SENIOR_PATHWAYS.map(p => (
@@ -487,10 +487,10 @@ function AddStudentModal({
                           className={[
                             'text-xs px-2.5 py-1 rounded-full border font-medium transition-all',
                             selected
-                              ? 'bg-violet-600 border-violet-600 text-white'
+                              ? 'bg-amber-600 border-amber-600 text-white'
                               : maxed
                               ? 'bg-slate-50 border-slate-200 text-slate-300 cursor-not-allowed'
-                              : 'bg-white border-slate-200 text-slate-700 hover:border-violet-400 hover:text-violet-700',
+                              : 'bg-white border-slate-200 text-slate-700 hover:border-amber-400 hover:text-amber-700',
                           ].join(' ')}
                         >
                           {subject}
@@ -516,7 +516,7 @@ function AddStudentModal({
               value={school}
               onChange={e => setSchool(e.target.value)}
               placeholder="e.g. Nairobi School"
-              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
             />
           </div>
 
@@ -530,7 +530,7 @@ function AddStudentModal({
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-linear-to-r from-violet-600 to-purple-600 text-white py-3.5 rounded-xl font-black hover:scale-[1.02] transition-all disabled:opacity-60 disabled:scale-100"
+            className="w-full bg-linear-to-r from-amber-600 to-orange-600 text-white py-3.5 rounded-xl font-black hover:scale-[1.02] transition-all disabled:opacity-60 disabled:scale-100"
           >
             {loading ? 'Adding...' : 'Add Student'}
           </button>
@@ -618,7 +618,7 @@ function StudentCard({
           </p>
           <div className="w-full bg-slate-100 rounded-full h-2">
             <div
-              className="h-2 rounded-full bg-gradient-to-r from-violet-500 to-purple-500 transition-all"
+              className="h-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all"
               style={{ width: `${Math.min(100, Math.max(4, summary.pct))}%` }}
             />
           </div>
@@ -868,7 +868,7 @@ export default function DashboardPage() {
     return (
       <span className="text-xs font-black bg-slate-100 text-slate-500 border border-slate-200 px-3 py-1.5 rounded-full flex items-center gap-1.5">
         Free account ·{' '}
-        <Link href="/pricing" className="text-violet-600 hover:underline">Upgrade</Link>
+        <Link href="/pricing" className="text-amber-600 hover:underline">Upgrade</Link>
       </span>
     )
   }
@@ -914,7 +914,7 @@ export default function DashboardPage() {
               Welcome to your EduNexus dashboard
             </p>
             <div className="flex items-center gap-2 mt-2">
-              <span className="inline-flex items-center gap-1.5 bg-violet-50 border border-violet-200 text-violet-600 px-3 py-1 rounded-full text-xs font-bold">
+              <span className="inline-flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-600 px-3 py-1 rounded-full text-xs font-bold">
                 <Sparkles className="w-3 h-3" />
                 Personalised Learning
               </span>
@@ -946,11 +946,11 @@ export default function DashboardPage() {
                 icon: Users,
                 value: stats?.studentsCount ?? 0,
                 label: 'Students',
-                color: 'text-violet-600',
-                bg: 'bg-violet-50',
-                border: 'border-violet-100',
+                color: 'text-amber-600',
+                bg: 'bg-amber-50',
+                border: 'border-amber-100',
                 extra: stats?.studentsCount === 0 && (
-                  <button onClick={() => setShowAddModal(true)} className="text-xs text-violet-600 hover:underline font-bold mt-1">Add student</button>
+                  <button onClick={() => setShowAddModal(true)} className="text-xs text-amber-600 hover:underline font-bold mt-1">Add student</button>
                 ),
               },
               {
@@ -1018,12 +1018,12 @@ export default function DashboardPage() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
-              <Users className="w-5 h-5 text-violet-600" />
+              <Users className="w-5 h-5 text-amber-600" />
               My Students
             </h2>
             <button
               onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-black px-4 py-2 rounded-xl transition-colors"
+              className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-black px-4 py-2 rounded-xl transition-colors"
             >
               <PlusCircle className="w-4 h-4" /> Add Student
             </button>
@@ -1201,8 +1201,8 @@ export default function DashboardPage() {
                 icon: BarChart3,
                 title: 'Learner Intelligence Reports',
                 sub: 'Parent verified',
-                gradient: 'from-violet-500 to-purple-500',
-                shadow: 'shadow-violet-500/20',
+                gradient: 'from-amber-500 to-orange-500',
+                shadow: 'shadow-amber-500/20',
                 href: '/dashboard/clinic',
                 badge: null,
               },
@@ -1287,7 +1287,7 @@ export default function DashboardPage() {
                 icon: Zap,
                 title: 'Calendar',
                 sub: 'Dates & announcements',
-                gradient: 'from-indigo-500 to-violet-600',
+                gradient: 'from-indigo-500 to-amber-600',
                 shadow: 'shadow-indigo-500/20',
                 href: '/calendar',
                 badge: null,
@@ -1427,7 +1427,7 @@ export default function DashboardPage() {
 
         {/* ── SECTION 7: Upgrade banner ─────────────────────────────────────── */}
         {!statsLoading && showUpgradeBanner && (
-          <div className="bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-200 rounded-2xl p-6 text-center">
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-6 text-center">
             <p className="font-black text-slate-900 text-lg mb-2">🚀 Ready to unlock full access?</p>
             <p className="text-slate-500 mb-5 text-sm">
               Get unlimited Learning Compass sessions, Learner Intelligence Reports, and more.
@@ -1441,7 +1441,7 @@ export default function DashboardPage() {
               </Link>
               <Link
                 href="/pricing"
-                className="bg-violet-600 hover:bg-violet-700 text-white px-6 py-3 rounded-xl font-black hover:scale-105 transition-all text-sm shadow-lg shadow-violet-500/20"
+                className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-xl font-black hover:scale-105 transition-all text-sm shadow-lg shadow-amber-500/20"
               >
                 View Plans →
               </Link>
