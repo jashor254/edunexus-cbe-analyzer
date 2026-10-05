@@ -4,7 +4,26 @@ import { ToastProvider } from '@/components/toast-system'
 import { Analytics } from '@vercel/analytics/react'
 import WhatsAppButton from '@/components/WhatsAppButton'
 import Script from 'next/script'
+import { Montserrat, Inter } from 'next/font/google'
 import './globals.css'
+
+// App-wide typographic system (DESIGN.md §Typography): Montserrat is the
+// distinctive display face for headings, Inter the plain body face. Exposed
+// as CSS variables so Tailwind's `font-sans` (body) and `font-display`
+// (headings) utilities resolve to them — see @theme in globals.css. Marketing
+// / demo / pitch set these same two fonts locally and are unaffected.
+const montserrat = Montserrat({
+  subsets: ['latin'],
+  weight: ['600', '700', '800'],
+  variable: '--font-montserrat',
+  display: 'swap',
+})
+const inter = Inter({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-inter',
+  display: 'swap',
+})
 
 // ✅ SEO na Marketing ya Kenya
 export const metadata: Metadata = {
@@ -114,7 +133,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className="scroll-smooth" data-scroll-behavior="smooth">
+    <html lang="en" className={`scroll-smooth ${montserrat.variable} ${inter.variable}`} data-scroll-behavior="smooth">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

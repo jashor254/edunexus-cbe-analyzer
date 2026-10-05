@@ -36,7 +36,14 @@ platform. The design feels:
 - AI indicator: #8b5cf6
 
 ## Typography
-- Font: System font stack (font-black for headings)
+- **Display face (headings): Montserrat** — the distinctive H1/H2 face, loaded via
+  `next/font` (weights 600/700/800). Applied app-wide through a base `h1, h2` rule in
+  `globals.css` (`var(--font-display)`); also available as the `font-display` utility.
+- **Body face: Inter** — loaded via `next/font` (weights 400/500/600); the `body`
+  default and Tailwind's `font-sans`.
+- Fonts are wired once at the root in `app/layout.tsx`; marketing/demo/pitch set the
+  same two locally. Was previously a plain system font stack everywhere — see the
+  anti-slop audit item #3 below.
 - Hero headings: text-5xl to text-8xl, font-black
 - Section headings: text-3xl to text-6xl, font-black
 - Body: text-lg to text-xl, text-white/60
@@ -136,11 +143,12 @@ default palette of the tools that built it.
    family instantly breaks the "every AI product" fingerprint. Keep Lucide for utility chrome
    (nav, footer, form icons) where custom art isn't worth it.
 
-3. **Get a real typographic system.** Currently system-font-stack + font-black everywhere is
-   the "no decision was made" default. Pick one distinctive display face for H1/H2 (even a single
-   licensed or Google Font used with intent) paired with a plain body face. This is the single
-   highest-leverage, lowest-cost differentiator per current design research — typography reads as
-   premium without needing new illustration or motion budget.
+3. **Get a real typographic system.** ✅ DONE (2026-10-05) — Montserrat display face for H1/H2
+   + Inter body, wired app-wide via `next/font` in `app/layout.tsx` and a base `h1, h2` rule in
+   `globals.css` (reusing the pairing already proven on the marketing site). See the Typography
+   section above. ~~Currently system-font-stack + font-black everywhere is the "no decision was
+   made" default. Pick one distinctive display face for H1/H2 paired with a plain body face. This
+   is the single highest-leverage, lowest-cost differentiator per current design research.~~
 
 4. **Break the symmetry.** Replace at least the hero and one feature section from the standard
    centered-stack-of-rounded-cards layout with an asymmetric composition — off-center headline,
