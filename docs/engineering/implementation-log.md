@@ -3564,3 +3564,21 @@ Verifying the nine fixes above against a live session surfaced two more, both of
 **Rollback considerations**: Low for the code. Note the data effect: marks saved from now on link to learners and produce Evidence, which is the intended behaviour but does mean Projection will start moving for classes where it previously sat still. Marks saved *before* this fix remain unlinked — backfilling them is a separate, deliberate migration and was not attempted here.
 
 **Related, flagged not fixed**: `public.platform_events` is absent from the schema cache, so `publishEvent` fails for every event (observed on `teacher.assessment.created`, `teacher.assessment.graded`, `student.session.completed`). Same unapplied-migration family as `organization_members`.
+
+## 2026-10-06 — Blueprint pre-composer bridge lookup could throw the whole record away
+
+**Found during an architecture-alignment review** ("is everything aligned to the single-source-of-truth / graceful-degradation design?"). The audit claimed `composeBlueprint` should use `Promise.allSettled`, and that `composeRecommendedNextSteps`, `composePortfolio` and `composeAchievement` were unguarded. Reading the code corrected all three: every composer already degrades its own failure to an `unavailable` section — the latter two via the shared `composeSummarySection` catch, `composeRecommendedNextSteps` via its own. `Promise.all` is therefore safe *given* the composers never reject, which is the ratified "each composer owns its own degradation" model (ADR-0008 failure model).
+
+**Root cause**: the one read that runs *before* the composer layer — `resolveLegacyStudentId(ids.coreLearnerId)`, the Core↔legacy bridge resolution — was unguarded. It returns `null` for the ordinary "no bridge yet" case (a newly-enrolled learner with no legacy row), but a genuine query/infrastructure failure of that lookup rejects. Because it sits above the composer layer, a rejection threw the entire Blueprint before a single section composed — a 500 where a degraded-but-useful Blueprint (Core-space sections live, legacy-space sections explained) should have returned.
+
+**Fix**: extracted the resolution into `lib/learnerBlueprint/legacyBridgeAccess.ts` — a sibling of `projectionAccess.ts` / `careerAccess.ts` / `compassAccess.ts`, the existing thin catch-and-degrade access wrappers — exposing `resolveLegacyStudentIdOrDegrade()`. A failed lookup degrades to the same `null` the "no bridge yet" case already produces (which every legacy-space composer already handles), logged via `console.error`, not swallowed. `composeBlueprint` imports it instead of calling `resolveLegacyStudentId` directly. This extends per-composer resilience to the pre-composer read rather than adding a second, competing safety layer — `Promise.allSettled` was considered and rejected on those grounds.
+
+**Architectural documents referenced**: `docs/architecture/learner-record-layer-decisions.md` (Blueprint-as-consumer), ADR-0008 (section failure model); governed by the `/assess` Phase B verdict (✅ Safe to Implement, no ADR — no identity/ownership/layer/intelligence-boundary change).
+
+**Tests**: `lib/learnerBlueprint/legacyBridgeAccess.pure.test.ts` — 3 cases (reject→null without rejecting, null passthrough, id passthrough), genuinely env-free via `mock.module` on `@/lib/core/identity` (so the real module's repositories/env boot never loads). Added to `scripts/standard-tests.json`; manifest guard green; full STANDARD suite 1307→1310, all pass.
+
+**Verification performed**: `npm test` green (1310 pass, 0 fail); `npm run build` — "Compiled successfully", no error referencing the changed files (the two pre-existing `.next/dev/types` errors concern the `ochre-preview` page and generated route types, untouched here).
+
+**Rollback considerations**: Low. Pure degradation-on-failure; no schema, API, auth or behaviour change for the success path. A previously-throwing lookup now yields an `unavailable` legacy section — strictly better for every caller. Revert = drop `legacyBridgeAccess.ts` + test, restore the inline `resolveLegacyStudentId` call, remove the manifest line.
+
+**Note**: this log had fallen ~2 months behind (previous entry 2026-08-08) despite steady work on main — the Phase B rule to log each change here needs re-establishing.
