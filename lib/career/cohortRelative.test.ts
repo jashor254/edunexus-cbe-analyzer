@@ -79,6 +79,17 @@ test('missing evidence: learner confidence 0 → that dimension null; too few pe
   assert.equal(typeof r.percentiles.analytical_reasoning, 'number')
 })
 
+test('resilience below 2 assessments is a placeholder, never ranked (live-data regression)', () => {
+  // Everyone on one assessment carries the identical 0.40 / confidence 0.15
+  // placeholder; ranking it put every learner at exactly the 50th percentile.
+  const oneShot = (raw: number): CapabilityProfile => ({ ...profile(raw), assessment_count: 1, resilience: score(0.40, 0.15) })
+  const r = computeCohortRelative(oneShot(0.6), Array.from({ length: 19 }, (_, i) => oneShot((i + 1) / 21)), COHORT)
+  assert.equal(r.status, 'available')
+  if (r.status !== 'available') return
+  assert.equal(r.percentiles.resilience, null)
+  assert.equal(typeof r.percentiles.analytical_reasoning, 'number', 'subject dimensions are still ranked')
+})
+
 test('the cohort view never alters a career match score', () => {
   const caps: Partial<CareerCapabilityRequirements> = {
     analytical_reasoning: { minimum: 0.4, ideal: 0.7, weight: 0.6, note: 'n' },

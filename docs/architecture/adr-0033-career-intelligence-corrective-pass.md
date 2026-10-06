@@ -107,6 +107,8 @@ The single production caller passes `career.verification_source ?? null`, so a m
 
 **Placement.** The pure math is in `lib/career/cohortRelative.ts`. The extractor stays DB-free and returns `cohort_relative: null`. The orchestration layer attaches the view inside `resolveFreshCapabilityProfile`. Saved profiles are written by the extractor directly, so a cohort view is never persisted. Peer ids are filtered in bounded chunks of 100.
 
+**Placeholder fix (found by live testing).** Resilience below 2 assessments is the extractor's fixed placeholder (0.40, confidence 0.15). Because its confidence is non-zero, the first version ranked it, and a live read-only check on a cohort where everyone had one assessment put every learner at exactly the 50th percentile. Resilience is now ranked only for profiles with 2+ assessments.
+
 **Never in the score.** A test proves that adding the view leaves every match unchanged, and a source guard proves the match engine never references `cohort_relative`.
 
 **Equity report.** `scripts/career-tier-distribution.ts` is read-only and reports each learner's best tier per school (optionally per grade), as a terminal table plus CSV, with small samples flagged and no learner identifiers.

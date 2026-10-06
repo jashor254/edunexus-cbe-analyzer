@@ -126,7 +126,7 @@ Senior matching is partly circular: a learner's CBC pathway decides their subjec
 
 Raw CBC levels mix a learner's ability with the quality of their school. Alongside the absolute profile, the system can show where a learner stands among peers in the **same school and grade**:
 
-- **Method:** for each dimension, a mid-rank percentile, `100 × (peers below + ½ × (peers tied + 1)) ÷ n`, computed from peers' most recently saved capability profiles. Peers with no evidence for a dimension are left out of that dimension.
+- **Method:** for each dimension, a mid-rank percentile, `100 × (peers below + ½ × (peers tied + 1)) ÷ n`, computed from peers' most recently saved capability profiles. Peers with no evidence for a dimension are left out of that dimension, and so is resilience for anyone with fewer than two assessments (it is a fixed placeholder at that point, not a measurement).
 - **Minimum cohort:** 15 learners with evidence, applied to the whole cohort and to each dimension. Below that, no percentile is shown, only a reason. A learner with no evidence for a dimension gets no percentile for it.
 - **It never affects matching.** The career score uses only the learner's own evidence; a test checks that adding the cohort view leaves every match score unchanged.
 - "School" means the school record a learner is enrolled under. Learners not linked to a school record get no cohort view, and the reason is given.
