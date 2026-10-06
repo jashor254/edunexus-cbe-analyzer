@@ -20,6 +20,8 @@ import type {
 } from '@/lib/career/types'
 import type { ProvisionalCareerPreview as ProvisionalPreview } from '@/lib/career/provisionalPreview'
 import type { CareerFamilyInsight } from '@/lib/learnerIntelligence/careerIntelligence'
+import { careerModeForGrade } from '@/lib/learnerIntelligence/careerIntelligence'
+import { SENIOR_PATHWAY_FIELDS } from '@/lib/curriculum/pathwayFields'
 import { CAPABILITY_LABELS } from '@/lib/career/capabilityExtractor'
 import { alignmentToPercent, tierLabel, tierColor, demandLabel } from '@/lib/career/capabilityMatchEngine'
 
@@ -440,6 +442,43 @@ function CareerExplorationPanel({ report }: { report: CareerExplorationReport })
 
 // ── Explore career card ───────────────────────────────────────────────────────
 
+// ── Junior pathway panel (Grades 7–9) ────────────────────────────────────────
+// Agreed rule: until the Grade 9 pathway choice, Junior learners are guided
+// toward a Senior School pathway and the broad fields it opens — not toward a
+// catalogue of careers. Content comes from lib/curriculum/pathwayFields.ts, the
+// same copy the Academic Clinic report uses.
+
+function JuniorPathwayPanel({ grade }: { grade: number }) {
+  return (
+    <section className="space-y-4">
+      <div>
+        <h2 className="text-white font-bold text-xl">Your Senior School pathway</h2>
+        <p className="text-white/50 text-sm mt-1 leading-relaxed">
+          At the end of Grade 9 you choose one of three Senior School pathways. Specific careers come after that —
+          for now, here are the fields each pathway opens.
+        </p>
+      </div>
+      <div className="grid sm:grid-cols-3 gap-4">
+        {SENIOR_PATHWAY_FIELDS.map(p => (
+          <div key={p.pathway} className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3">
+            <h3 className="text-white font-bold text-base">{p.pathway}</h3>
+            <div className="flex flex-wrap gap-1.5">
+              {p.fields.map(f => (
+                <span key={f} className="text-[11px] bg-violet-500/10 border border-violet-500/20 text-violet-200 rounded-full px-2 py-0.5">{f}</span>
+              ))}
+            </div>
+            <p className="text-white/50 text-xs leading-relaxed">{p.whyItFits}</p>
+          </div>
+        ))}
+      </div>
+      <Link href="/student/blueprint" className="inline-flex items-center gap-1 text-violet-300 text-sm font-semibold hover:text-violet-200">
+        {grade === 9 ? 'See where you stand for the pathway choice' : 'See how your work this year counts toward the pathway choice'}
+        <ChevronRight className="w-4 h-4" />
+      </Link>
+    </section>
+  )
+}
+
 function CareerCard({ career }: { career: CareerSummary }) {
   const badge    = AI_IMPACT_BADGE[career.ai_impact.level] ?? AI_IMPACT_BADGE.medium
   const salaryMin = career.salary_range_kes?.entry
@@ -529,6 +568,10 @@ export default function CareerPage() {
   const [category,        setCategory]        = useState('')
   const [pathway,         setPathway]         = useState('')
   const [studentId,       setStudentId]       = useState<string | null>(null)
+  const [grade,           setGrade]           = useState<number | null>(null)
+  // True once the learner record has loaded (or failed to) — until then we
+  // don't know whether to show pathways or the catalogue, so we show neither.
+  const [learnerResolved, setLearnerResolved] = useState(false)
   const [seeded,          setSeeded]          = useState(false)
 
   // Load student
@@ -541,9 +584,11 @@ export default function CareerPage() {
           const s = students[0]
           setStudentId(s.id as string)
           if (s.current_pathway) setPathway(s.current_pathway as string)
+          if (typeof s.grade === 'number') setGrade(s.grade)
         }
       })
       .catch(() => null)
+      .finally(() => setLearnerResolved(true))
   }, [])
 
   // Load capability profile + matches + growth when studentId is ready
@@ -627,6 +672,9 @@ export default function CareerPage() {
     }
   }
 
+  // Grades 7–9 see pathways, not the career catalogue (canonical gate).
+  const isJunior = grade !== null && careerModeForGrade(grade) === 'exploration'
+
   // Load careers
   const loadCareers = useCallback(async () => {
     setLoading(true)
@@ -650,7 +698,7 @@ export default function CareerPage() {
     }
   }, [query, category, pathway])
 
-  useEffect(() => { loadCareers() }, [loadCareers])
+  useEffect(() => { if (learnerResolved && !isJunior) loadCareers() }, [loadCareers, isJunior, learnerResolved])
 
   // Search demand telemetry (Phase 9.1) — deliberately decoupled from the
   // fetch above so the real search stays exactly as responsive as it is
@@ -771,7 +819,10 @@ export default function CareerPage() {
           </section>
         )}
 
-        {/* ── EXPLORE ALL CAREERS ──────────────────────────────────────────── */}
+        {/* ── EXPLORE ALL CAREERS (Senior) / PATHWAYS (Junior) ─────────────── */}
+        {!learnerResolved ? null : isJunior && grade !== null ? (
+          <JuniorPathwayPanel grade={grade} />
+        ) : (
         <section>
           <h2 className="text-white font-bold text-xl mb-4 flex items-center gap-2">
             <Search className="w-5 h-5 text-violet-400" />
@@ -876,6 +927,7 @@ export default function CareerPage() {
             </div>
           )}
         </section>
+        )}
 
         {/* ── SKILL AGE TIMELINE TEASER ────────────────────────────────────── */}
         <section className="bg-gradient-to-br from-violet-900/20 to-indigo-900/20 border border-violet-500/20 rounded-3xl p-8">
