@@ -36,7 +36,44 @@ export type CapabilityProfile = {
   computed_at:          string
   assessment_count:     number
   disclaimer:           string
+  /**
+   * FIX 5 — where this learner sits among their school + grade cohort, per
+   * dimension. INFORMATIONAL ONLY: never read by the match engine. The pure
+   * extractor always leaves this null (it has no cohort to compare against);
+   * the orchestration layer (resolveFreshCapabilityProfile) attaches it.
+   */
+  cohort_relative?: CohortRelative | null
 }
+
+/**
+ * FIX 5 — cohort-relative capability. Absolute CBC levels mix learner ability
+ * with school quality; this view says where a learner stands among peers in
+ * the same school and grade. Never an estimate: below the minimum cohort size
+ * it reports why it is missing instead of a number.
+ */
+export type CohortRelative =
+  | {
+      status: 'available'
+      cohort: { schoolId: string; grade: number; size: number }
+      minimumCohortSize: number
+      /**
+       * Mid-rank percentile 0–100 per dimension. Null for a dimension the
+       * learner has no evidence for, or where fewer than the minimum number of
+       * cohort members have evidence for it.
+       */
+      percentiles: Record<CapabilityDimension, number | null>
+      method: string
+    }
+  | {
+      status: 'insufficient_cohort'
+      cohort: { schoolId: string; grade: number; size: number }
+      minimumCohortSize: number
+      reason: string
+    }
+  | {
+      status: 'unavailable'
+      reason: string
+    }
 
 export type CapabilityDimension =
   | 'analytical_reasoning'

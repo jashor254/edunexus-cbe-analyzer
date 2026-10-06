@@ -359,6 +359,11 @@ export async function recomputeAndSaveCapabilityProfile(
   return profile
 }
 
+/** FIX 5 — saved capability profiles of the learner's school + grade cohort (read-only). */
+export async function getCohortCapabilityProfiles(studentId: string): ReturnType<typeof repos.careers.findCohortCapabilityProfiles> {
+  return repos.careers.findCohortCapabilityProfiles(studentId)
+}
+
 export async function getCapabilityProfile(
   studentId: string
 ): Promise<CapabilityProfile | null> {

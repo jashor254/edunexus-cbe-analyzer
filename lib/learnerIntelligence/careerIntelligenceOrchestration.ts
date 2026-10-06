@@ -15,7 +15,8 @@
 import { getStudentBasicInfo } from '@/lib/learnerModel'
 import { extractCapabilityProfile } from '@/lib/career/capabilityExtractor'
 import { computeCapabilityMatches, alignmentToPercent } from '@/lib/career/capabilityMatchEngine'
-import { getAllCareersWithCOS, getCareerBySlugWithCOS, getCapabilityProfile } from '@/lib/career/careerEngine'
+import { getAllCareersWithCOS, getCareerBySlugWithCOS, getCapabilityProfile, getCohortCapabilityProfiles } from '@/lib/career/careerEngine'
+import { computeCohortRelative } from '@/lib/career/cohortRelative'
 import { COS_DISCLAIMER } from '@/lib/career/types'
 import { assessCareerKnowledge } from '@/lib/career/knowledgeLifecycle'
 import type { CareerKnowledgeState } from '@/lib/career/knowledgeLifecycle'
@@ -32,7 +33,7 @@ import {
 import type {
   CareerFamilyInsight, CareerMatchInsight, CareerMode,
 } from './careerIntelligence'
-import type { CapabilityCareerMatch, CareerPathway } from '@/lib/career/types'
+import type { CapabilityCareerMatch, CareerPathway, CohortRelative } from '@/lib/career/types'
 import type { Insight } from './insight'
 
 export type CareerIntelligence = {
@@ -135,9 +136,34 @@ export async function resolveFreshCapabilityProfile(studentId: string): Promise<
   const scoreHistory = projectionToScoreHistory(projection)
   if (scoreHistory.length === 0) return null
 
+  const profile = extractCapabilityProfile(scoreHistory)
+  // FIX 5: attached here, at the orchestration boundary — the extractor stays
+  // DB-free and leaves this null. Informational only; the match engine never
+  // reads it.
+  profile.cohort_relative = await loadCohortRelative(studentId, profile)
+
   return {
-    profile: extractCapabilityProfile(scoreHistory),
+    profile,
     evidenceFreshnessDays: projection.completeness?.coverage.freshnessDays ?? null,
+  }
+}
+
+/**
+ * FIX 5 — cohort-relative view for one learner. A failure to load the cohort
+ * must never cost the learner their Career Intelligence, so it degrades to an
+ * explicit `unavailable` with the reason logged — never to an estimate.
+ */
+async function loadCohortRelative(studentId: string, profile: CapabilityProfile): Promise<CohortRelative> {
+  try {
+    const cohort = await getCohortCapabilityProfiles(studentId)
+    if (cohort.kind === 'missing') return { status: 'unavailable', reason: cohort.reason }
+    return computeCohortRelative(profile, cohort.peers, { schoolId: cohort.schoolId, grade: cohort.grade })
+  } catch (err) {
+    console.error('[careerIntelligence] cohort-relative view failed; profile returned without it', {
+      studentId,
+      message: err instanceof Error ? err.message : String(err),
+    })
+    return { status: 'unavailable', reason: 'The cohort comparison could not be loaded right now.' }
   }
 }
 

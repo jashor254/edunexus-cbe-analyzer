@@ -48,6 +48,7 @@
     "lib/career/capabilityExtractor.test.ts",
     "lib/career/capabilityMatchEngine.test.ts",
     "lib/career/careerProvenance.test.ts",
+    "lib/career/cohortRelative.test.ts",
     "lib/career/resilience.test.ts",
     "lib/career/capabilityExtractorPurity.architecture.test.ts",
     "lib/career/careerSignals.test.ts",

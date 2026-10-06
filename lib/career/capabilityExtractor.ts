@@ -529,6 +529,9 @@ export function extractCapabilityProfile(
     computed_at:       new Date().toISOString(),
     assessment_count:  scoreHistory.length,
     disclaimer:        COS_DISCLAIMER,
+    // FIX 5: the pure extractor has no cohort to compare against; the
+    // orchestration layer attaches the cohort-relative view.
+    cohort_relative:   null,
   }
 }
 

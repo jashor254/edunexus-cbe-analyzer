@@ -270,6 +270,127 @@ export class CareerRepository extends BaseRepository {
     return (data?.capability_profile as CapabilityProfile) ?? null
   }
 
+  /**
+   * FIX 5 — the saved capability profiles of a learner's school + grade cohort,
+   * excluding the learner's own row. Read-only.
+   *
+   * "School" is the Core school (`learners.school_id`), reached through the
+   * legacy→Core bridge `students.external_id = learners.id`; `students.school_id`
+   * is not populated and the free-text `students.school` is not an identity.
+   * Returns `{ kind: 'missing', reason }` when the learner has no grade, no
+   * Core bridge, or a Core learner without a school — never a guessed cohort.
+   * The learner-id list is filtered in bounded chunks so a large school never
+   * produces an oversized request.
+   */
+  async findCohortCapabilityProfiles(studentId: string): Promise<
+    | { kind: 'found'; schoolId: string; grade: number; peers: CapabilityProfile[] }
+    | { kind: 'missing'; reason: string }
+  > {
+    const { data: student, error: sErr } = await this.db
+      .from('students')
+      .select('id, grade, external_id')
+      .eq('id', studentId)
+      .maybeSingle()
+    if (sErr) throw new Error(`findCohortCapabilityProfiles: student lookup failed: ${sErr.message}`)
+    if (!student) return { kind: 'missing', reason: 'Learner record not found.' }
+    if (student.grade == null) return { kind: 'missing', reason: 'This learner has no grade on record, so there is no grade cohort to compare against.' }
+    if (!student.external_id) return { kind: 'missing', reason: 'This learner is not linked to a school record yet, so there is no school cohort to compare against.' }
+
+    const { data: core, error: cErr } = await this.db
+      .from('learners')
+      .select('school_id')
+      .eq('id', student.external_id)
+      .maybeSingle()
+    if (cErr) throw new Error(`findCohortCapabilityProfiles: school lookup failed: ${cErr.message}`)
+    if (!core?.school_id) return { kind: 'missing', reason: 'This learner has no school on record, so there is no school cohort to compare against.' }
+
+    const { data: schoolLearners, error: lErr } = await this.db
+      .from('learners')
+      .select('id')
+      .eq('school_id', core.school_id)
+    if (lErr) throw new Error(`findCohortCapabilityProfiles: cohort lookup failed: ${lErr.message}`)
+    const learnerIds = (schoolLearners ?? []).map(l => l.id as string)
+
+    const ID_CHUNK = 100
+    const peers: CapabilityProfile[] = []
+    for (let i = 0; i < learnerIds.length; i += ID_CHUNK) {
+      const { data: rows, error: pErr } = await this.db
+        .from('students')
+        .select('id, capability_profile')
+        .in('external_id', learnerIds.slice(i, i + ID_CHUNK))
+        .eq('grade', student.grade)
+        .not('capability_profile', 'is', null)
+        .neq('id', studentId)
+      if (pErr) throw new Error(`findCohortCapabilityProfiles: profile lookup failed: ${pErr.message}`)
+      for (const row of rows ?? []) peers.push(row.capability_profile as CapabilityProfile)
+    }
+
+    return { kind: 'found', schoolId: core.school_id as string, grade: student.grade as number, peers }
+  }
+
+  /**
+   * FIX 5 — analysis only (scripts/career-tier-distribution.ts). Every saved
+   * capability profile with its Core school (via students.external_id →
+   * learners.school_id) and school name. Read-only; never used to score an
+   * individual learner. Rows without a Core school come back with
+   * schoolId null so the caller can report them instead of dropping them.
+   */
+  async findSavedCapabilityProfilesWithSchool(): Promise<Array<{
+    studentId: string
+    grade: number | null
+    schoolId: string | null
+    schoolName: string | null
+    profile: CapabilityProfile
+  }>> {
+    const PAGE = 1000
+    const students: Array<{ id: string; grade: number | null; external_id: string | null; capability_profile: CapabilityProfile }> = []
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await this.db
+        .from('students')
+        .select('id, grade, external_id, capability_profile')
+        .not('capability_profile', 'is', null)
+        .order('id')
+        .range(from, from + PAGE - 1)
+      if (error) throw new Error(`findSavedCapabilityProfilesWithSchool: students failed: ${error.message}`)
+      students.push(...((data ?? []) as typeof students))
+      if (!data || data.length < PAGE) break
+    }
+
+    const ID_CHUNK = 100
+    const externalIds = [...new Set(students.map(s => s.external_id).filter((v): v is string => !!v))]
+    const schoolByLearner = new Map<string, string | null>()
+    for (let i = 0; i < externalIds.length; i += ID_CHUNK) {
+      const { data, error } = await this.db
+        .from('learners')
+        .select('id, school_id')
+        .in('id', externalIds.slice(i, i + ID_CHUNK))
+      if (error) throw new Error(`findSavedCapabilityProfilesWithSchool: learners failed: ${error.message}`)
+      for (const l of data ?? []) schoolByLearner.set(l.id as string, (l.school_id as string | null) ?? null)
+    }
+
+    const schoolIds = [...new Set([...schoolByLearner.values()].filter((v): v is string => !!v))]
+    const nameBySchool = new Map<string, string | null>()
+    for (let i = 0; i < schoolIds.length; i += ID_CHUNK) {
+      const { data, error } = await this.db
+        .from('schools')
+        .select('id, school_name')
+        .in('id', schoolIds.slice(i, i + ID_CHUNK))
+      if (error) throw new Error(`findSavedCapabilityProfilesWithSchool: schools failed: ${error.message}`)
+      for (const s of data ?? []) nameBySchool.set(s.id as string, (s.school_name as string | null) ?? null)
+    }
+
+    return students.map(s => {
+      const schoolId = s.external_id ? schoolByLearner.get(s.external_id) ?? null : null
+      return {
+        studentId:  s.id,
+        grade:      s.grade,
+        schoolId,
+        schoolName: schoolId ? nameBySchool.get(schoolId) ?? null : null,
+        profile:    s.capability_profile,
+      }
+    })
+  }
+
   async findCapabilityHistory(
     studentId: string,
     limit = 10,
