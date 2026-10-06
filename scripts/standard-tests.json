@@ -110,6 +110,7 @@
     "lib/learnerIntelligence/careerCanonicalization.architecture.test.ts",
     "lib/learnerIntelligence/careerIntelligencePurity.architecture.test.ts",
     "lib/learnerIntelligence/careerPathwayHonesty.test.ts",
+    "lib/learnerIntelligence/careerJuniorFamilies.test.ts",
     "lib/learnerIntelligence/careerSyntheticLearners.test.ts",
     "lib/learnerIntelligence/careerMode.architecture.test.ts",
     "lib/learnerIntelligence/careerMode.pure.test.ts",

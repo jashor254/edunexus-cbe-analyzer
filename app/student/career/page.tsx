@@ -403,11 +403,13 @@ function CareerFamilyCard({ family }: { family: CareerFamilyInsight }) {
         </ul>
       )}
       <p className="text-violet-300/80 text-xs leading-relaxed">{family.insight.action}</p>
-      <div className="flex flex-wrap gap-1.5 pt-1">
-        {family.exampleCareerTitles.map(t => (
-          <span key={t} className="text-[11px] bg-white/5 border border-white/10 text-white/50 rounded-full px-2 py-0.5">{t}</span>
-        ))}
-      </div>
+      {family.usualPathway && (
+        <div className="pt-1">
+          <span className="text-[11px] bg-white/5 border border-white/10 text-white/50 rounded-full px-2 py-0.5">
+            Usually continues through {family.usualPathway}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

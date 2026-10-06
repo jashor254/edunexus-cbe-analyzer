@@ -27,6 +27,7 @@
 
 import type { CapabilityCareerMatch, CareerCategory, CareerPathway } from '@/lib/career/types'
 import { SENIOR_PATHWAYS } from '@/lib/curriculum/subjects'
+import { CAPABILITY_LABELS } from '@/lib/career/capabilityExtractor'
 import type { Insight } from './insight'
 
 // Exported (Sprint 12M) so `getCareerBlueprintSummary`
@@ -47,10 +48,16 @@ export const CATEGORY_LABEL: Record<CareerCategory, string> = {
 }
 
 export type CareerFamilyInsight = {
-  category:            CareerCategory
-  categoryLabel:        string
-  insight:              Insight
-  exampleCareerTitles:  string[]
+  category:      CareerCategory
+  categoryLabel: string
+  insight:       Insight
+  /**
+   * The Senior School pathway most careers in this family continue through,
+   * taken from the corpus (each career is filed under exactly one pathway).
+   * Null on a tie. Points a Junior learner at the Grade 9 pathway choice —
+   * never at a career.
+   */
+  usualPathway:  CareerPathway | null
 }
 
 export type CareerMatchInsight = {
@@ -147,9 +154,17 @@ export function careerModeForGrade(grade: number): CareerMode {
 // Junior-safe view every consumer of computeCapabilityMatches() must use
 // instead of surfacing individual ranked/percentage predictions. Pure
 // function over CapabilityCareerMatch[] so any consumer (Career Explorer,
-// Parent Intelligence, the Career Intelligence Report) can reuse the exact
-// same grouping instead of inventing its own — same matcher, same data,
-// just regrouped for the audience the Career Principle requires.
+// Parent Intelligence, the Career Intelligence Report, the Blueprint, the
+// Holiday Planner) can reuse the exact same grouping instead of inventing its
+// own — same matcher, same data, just regrouped for the audience the Career
+// Principle requires.
+//
+// Junior alignment (2026-10-06): Grades 7–9 are guided toward a Senior
+// pathway, not toward careers. A family therefore carries NO career title
+// anywhere — not in a list, not in the action, not in the evidence. The
+// evidence is rebuilt from capability dimensions (match narratives name the
+// career, e.g. "a genuine asset for Medical Doctor", so they are not reused).
+// What it adds instead is the family's usual Senior pathway.
 export function familiesFromMatches(all: CapabilityCareerMatch[]): CareerFamilyInsight[] {
   const byCategory = new Map<CareerCategory, CapabilityCareerMatch[]>()
   for (const match of all) {
@@ -162,23 +177,25 @@ export function familiesFromMatches(all: CapabilityCareerMatch[]): CareerFamilyI
   for (const [category, matches] of byCategory) {
     matches.sort((a, b) => b.alignment_score - a.alignment_score)
     const top = matches[0]
-    const exampleTitles = matches.slice(0, 3).map(m => m.career_title)
+    const label = CATEGORY_LABEL[category] ?? category
+    const usualPathway = mostCommonPathway(matches)
 
     const evidence = [
-      ...top.strengths.map(s => s.narrative),
-      ...top.gaps.slice(0, 1).map(g => g.narrative),
+      ...top.strengths.map(st => `${CAPABILITY_LABELS[st.dimension] ?? st.dimension} is a clear strength for this field.`),
+      ...top.gaps.slice(0, 1).map(g => `${CAPABILITY_LABELS[g.dimension] ?? g.dimension} is still developing — worth building before Senior School.`),
     ]
 
     families.push({
       category,
-      categoryLabel: CATEGORY_LABEL[category] ?? category,
+      categoryLabel: label,
       insight: {
-        observation: `Current evidence suggests an emerging capability alignment with ${CATEGORY_LABEL[category] ?? category}.`,
+        observation: `Current evidence suggests an emerging capability alignment with ${label}.`,
         evidence:    evidence.length > 0 ? evidence : ['Not enough capability data yet to break this down further.'],
         confidence:  top.confidence,
-        action:      `Explore this field through subjects, clubs, or projects related to: ${exampleTitles.join(', ')}.`,
+        action:      `Explore ${label} through the subjects, clubs and projects that build these strengths.` +
+          (usualPathway ? ` Fields like this usually continue through the ${usualPathway} pathway in Senior School.` : ''),
       },
-      exampleCareerTitles: exampleTitles,
+      usualPathway,
     })
   }
 
@@ -187,4 +204,14 @@ export function familiesFromMatches(all: CapabilityCareerMatch[]): CareerFamilyI
     const scoreB = Math.max(...(byCategory.get(b.category) ?? []).map(m => m.alignment_score))
     return scoreB - scoreA
   })
+}
+
+/** The pathway most of these careers are filed under; null on a tie or when none is recorded. */
+function mostCommonPathway(matches: CapabilityCareerMatch[]): CareerPathway | null {
+  const counts = new Map<CareerPathway, number>()
+  for (const m of matches) if (m.pathway) counts.set(m.pathway, (counts.get(m.pathway) ?? 0) + 1)
+  const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1])
+  if (ranked.length === 0) return null
+  if (ranked.length > 1 && ranked[0][1] === ranked[1][1]) return null
+  return ranked[0][0]
 }

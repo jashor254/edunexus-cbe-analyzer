@@ -18,6 +18,7 @@ import { LEARNER_NAME_TOKEN, learnerFirstName, restoreLearnerName } from '@/lib/
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { buildAdaptiveTask } from '@/lib/adaptiveLearning/recommend'
 import { buildCareerIntelligence } from '@/lib/learnerIntelligence/careerIntelligenceOrchestration'
+import { careerModeForGrade } from '@/lib/learnerIntelligence/careerIntelligence'
 import { publishEvent } from '@/lib/events'
 import type { HolidayPlanData, HolidayWeek } from './types'
 
@@ -53,6 +54,9 @@ export async function generateHolidayPlan(input: PlanInput): Promise<HolidayPlan
     console.error('[holiday/planner] student has no grade on record — defaulting to 8, plan content may be wrong for this learner', { studentId: input.studentId })
   }
   const grade = (student?.grade as number) ?? 8
+  // Junior (Grades 7–9) is guided toward a Senior pathway, not toward careers —
+  // the same canonical gate every Career surface uses.
+  const isJunior = careerModeForGrade(grade) === 'exploration'
 
   // 2. Priority subjects, weakest first (subject-level — see module header).
   const subjectPerformance = projection.academic ? Object.values(projection.academic.value.bySubject) : []
@@ -115,7 +119,9 @@ export async function generateHolidayPlan(input: PlanInput): Promise<HolidayPlan
           week: w, label: `Week ${w} — Rest & Explore`,
           compass_topics: careerSlug ? [careerSlug] : [],
           parent_action: 'Let your child rest. Congratulate them on the term.',
-          student_task: `Optional: explore one career that interests you in the Career Explorer.`,
+          student_task: isJunior
+            ? 'Optional: look at the three Senior School pathways in the Career section and think about which one fits you.'
+            : 'Optional: explore one career that interests you in the Career Explorer.',
           is_rest_week: true,
         })
       } else if (w === 1) {
@@ -155,7 +161,9 @@ export async function generateHolidayPlan(input: PlanInput): Promise<HolidayPlan
           week: w, label: `Week ${w} — Explore`,
           compass_topics: [],
           parent_action: 'Encourage your child to read something they enjoy — any topic.',
-          student_task: 'Explore the Career section — read about one career path that interests you.',
+          student_task: isJunior
+            ? 'Explore the Career section — read about one Senior School pathway and the fields it opens.'
+            : 'Explore the Career section — read about one career path that interests you.',
           is_rest_week: false,
         })
       }

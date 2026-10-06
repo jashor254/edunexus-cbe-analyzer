@@ -315,7 +315,8 @@ function buildOpportunityLandscape(
     for (const f of families.slice(0, 3)) {
       strong_fit_now.push({
         career: f.categoryLabel,
-        reason: `${f.insight.observation} Worth exploring through: ${f.exampleCareerTitles.join(', ')}.`,
+        // Junior: a field and its usual Senior pathway — never career titles.
+        reason: `${f.insight.observation}${f.usualPathway ? ` Fields like this usually continue through the ${f.usualPathway} pathway in Senior School.` : ''}`,
       })
     }
     // fit_after_improvement / unlikely_today intentionally left empty —
@@ -480,7 +481,7 @@ async function generateNarrativeSections(
   const firstName = LEARNER_NAME_TOKEN
   const pathwayStr = pathway ?? 'General'
   const modeNote = mode === 'exploration'
-    ? `${firstName} is in Junior School — this stage is about exploring broad fields, not predicting a career. topMatchTitles below are FIELD CATEGORIES, not specific job titles — never write as if a specific career has been identified or matched. Use language like "worth exploring," "an area to try," never "you should become" or "you are suited for."`
+    ? `${firstName} is in Junior School — this stage is about exploring broad fields, not predicting a career. topMatchTitles below are FIELD CATEGORIES, not specific job titles — never write as if a specific career has been identified or matched. Use language like "worth exploring," "an area to try," never "you should become" or "you are suited for." Do not name any specific job title or profession at all — talk about broad fields and the Senior School pathway ${firstName} will choose at the end of Grade 9.`
     : `${firstName} is in Senior School — specific career guidance proportional to the evidence is appropriate, but every claim must still be hedged by the evidence note below and framed as a direction, not a destiny.`
   const evidenceNote = confidenceLevel === 'Low'
     ? `Evidence is THIN — only ${assessmentCount} assessment${assessmentCount === 1 ? '' : 's'} so far. Hedge every claim accordingly ("early signal", "based on what we've seen so far") and do not state anything as a settled conclusion.`

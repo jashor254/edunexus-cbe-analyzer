@@ -141,9 +141,6 @@ test('accelerating learner at or above ideal: alignment never exceeds 100%', asy
 })
 
 test('Junior learner: families only — no ranked matches, no per-career tier or alignment', async () => {
-  // Enforced Career Principle as built: exploration mode, career FAMILIES, never
-  // a ranked or scored single career. Families still list unranked example
-  // titles (exampleCareerTitles) by existing design — see ADR-0033 FIX 7 note.
   const ci = await orch.buildCareerIntelligence('syn-junior')
   assert.equal(ci.mode, 'exploration')
   assert.equal(ci.matches, undefined)
@@ -152,6 +149,18 @@ test('Junior learner: families only — no ranked matches, no per-career tier or
     assert.ok(!('tier' in f) && !('alignmentPct' in f))
     assert.doesNotMatch(f.insight.observation, /strong match/i)
   }
+})
+
+test('Junior learner: ZERO career titles anywhere in the output or the Blueprint summary (pathway first)', async () => {
+  // Agreed rule: Grades 7–9 are guided toward a Senior pathway, not toward
+  // careers. Checks every string the Junior output and its Blueprint summary
+  // carry against every career title and slug in the curated corpus.
+  const ci = await orch.buildCareerIntelligence('syn-junior')
+  const summary = await orch.getCareerBlueprintSummary('syn-junior')
+  const text = JSON.stringify({ ci, summary }).toLowerCase()
+  const leaks = corpus.flatMap(c => [c.title, c.slug]).filter(t => text.includes(t.toLowerCase()))
+  assert.deepEqual(leaks, [], `Junior output names careers: ${leaks.join(', ')}`)
+  for (const f of ci.families ?? []) assert.ok('usualPathway' in f, 'each family points to a Senior pathway (or null on a tie)')
 })
 
 test('no-evidence learner: a single notice, no matches, no families', async () => {
