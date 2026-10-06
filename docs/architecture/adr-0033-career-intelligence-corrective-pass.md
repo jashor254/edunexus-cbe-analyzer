@@ -128,6 +128,16 @@ The single production caller passes `career.verification_source ?? null`, so a m
 4. **The FIX 3 coverage floor never fires on the curated corpus.** No career relies on one dimension for more than 50% of its weight (max creative share: 40%).
 5. **Live tier report, after the migration (2026-10-06, 328 learners with saved profiles).** Overall best tier: Strong 11%, Stretch 48%, Alternative 41%; entrepreneurial 10% (34/328, real data, against the synthetic 85%). **Kangai Junior School (first pilot, 197 learners): 0% Strong, 32% Stretch, 68% Alternative.** Every Kangai learner has exactly one assessment (so a 65% cap, never Strong), and average normalized analytical/technical scores are 0.04 in Grades 7 and 9 (≈ CBC 1.1), 0.18 in Grade 8. This is either a genuinely low-attaining cohort or a marks→CBC-level conversion problem in the Kangai import. **Check the import before reading these results to the school.** Juniors with no Strong/Stretch match see the existing "Add more assessments to unlock exploration areas" message, not a blank page.
 
+## Follow-up — silent subject-key mismatch (found by live testing, 2026-10-06)
+
+**Context.** Evidence keeps the source spelling ("integrated science", "pre-technical studies", "creative arts & sports", "christian religious education"), but the analytical normalizer (`normalizeSubjectKey`) only lowercased. Every analytical consumer keys on snake_case (capability weight maps, KJSEA subject groups, Compass matching), so those subjects were silently dropped, along with `kiswahili_lugha` (406 learners) and `history_citizenship` (45).
+
+**Decision.** `normalizeSubjectKey` canonicalises spelling form (trim, lowercase, drop `&`, non-alphanumeric runs → `_`) before the alias lookup. New analytical-family aliases: `kiswahili_lugha → kiswahili`, `history_citizenship → history`, plus `…_and_…` variants. The identity normalizer (`normalizeSubjectKeyForIdentity`) and the Core-Maths family merge are untouched, so the `subjectMapping.ts` decision holds. No weight map changed.
+
+**Measured effect (read-only replay of the live path, Kangai, 197 learners).** Communication/Social measured 83% → 100% of learners. Grade 9 STEM gate viable **2 → 9 of 71**. Best tier Stretch 32% → 17%, Alternative 68% → 83%. The added subjects are recorded low too (Integrated Science ≈ CBC 1.4–1.7, Social Studies ≈ 1.1–1.3), so **the earlier reading that the bug explained the Alternative-heavy result was wrong.** Kangai's results mainly reflect its recorded marks; mathematics is ≈ CBC 1.0–1.1 in every grade, and verifying those marks is the open question. Separately, 34 Grade 8 learners have 272 marks in `pending_review` awaiting teacher confirmation (by design, excluded until confirmed).
+
+**Still open.** Stored evidence carries two spellings of the same subject ("integrated science" vs "integrated_science"), an identity-layer data issue not addressed here. Agriculture & Nutrition has no capability weight. `ss-math` is unrecognised.
+
 ---
 
 ## Tests

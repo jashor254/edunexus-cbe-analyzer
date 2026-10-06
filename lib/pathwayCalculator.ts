@@ -44,10 +44,48 @@ const SUBJECT_KEY_ALIASES: Record<string, string> = {
   'history & government':      'history_and_government',
   'history and government':    'history_and_government',
   'history_&_government':      'history_and_government',
+  // Canonical-form variants (see canonicalSubjectForm): '&' is dropped, so
+  // "History & Government" arrives as history_government; "and" spellings of
+  // subjects whose canonical key omits it arrive with _and_.
+  history_government:          'history_and_government',
+  creative_arts_and_sports:    'creative_arts_sports',
+  agriculture_and_nutrition:   'agriculture_nutrition',
+  // Senior / CBC subject keys that belong to an existing analytical family.
+  // Lossy on purpose — this is the FAMILY normalizer (see
+  // lib/intelligence/subjectMapping.ts for the identity-preserving one).
+  kiswahili_lugha:             'kiswahili',
+  history_citizenship:         'history',
+  history_and_citizenship:     'history',
+}
+
+/**
+ * Spelling FORM only, never meaning: trim, lowercase, drop '&', and turn every
+ * run of non-alphanumerics (spaces, hyphens, slashes) into one underscore.
+ * "Pre-Technical Studies" → pre_technical_studies, "Creative Arts & Sports" →
+ * creative_arts_sports, "Kiswahili/KSL" → kiswahili_ksl.
+ *
+ * Why (2026-10-06): evidence written through the identity normalizer keeps
+ * spaces ("integrated science"), while every analytical consumer — the
+ * capability weight maps, the KJSEA subject groups, Compass matching — keys on
+ * snake_case. Without this, those subjects were silently dropped: a whole
+ * pilot school's Career Intelligence profile was built from Maths, English and
+ * Kiswahili alone, and its Grade 9 STEM gate read Integrated Science as absent.
+ */
+function canonicalSubjectForm(key: string): string {
+  return key
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, ' ')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
 }
 
 export function normalizeSubjectKey(key: string): string {
-  return SUBJECT_KEY_ALIASES[key.toLowerCase()] ?? key.toLowerCase()
+  const lower = key.trim().toLowerCase()
+  const direct = SUBJECT_KEY_ALIASES[lower]
+  if (direct) return direct
+  const canonical = canonicalSubjectForm(key)
+  return SUBJECT_KEY_ALIASES[canonical] ?? canonical
 }
 
 export function normalizeSubjectScores(scores: SubjectScores): SubjectScores {

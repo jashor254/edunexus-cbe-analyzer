@@ -118,6 +118,7 @@
     "lib/parentExperience/attentionAction.test.ts",
     "lib/parentExperience/growthTimeline.pure.test.ts",
     "lib/pathwayCalculator.stemGate.test.ts",
+    "lib/pathwayCalculator.subjectKeys.test.ts",
     "lib/payments/pricingSurface.test.ts",
     "lib/pitch/deck.test.ts",
     "lib/projection/curriculumAware.test.ts",
