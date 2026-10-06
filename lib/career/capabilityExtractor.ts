@@ -178,6 +178,123 @@ function detectTrend(history: number[]): CapabilityTrendDirection {
 // ── Resilience Computation ────────────────────────────────────────────────────
 // Resilience is not derived from a single subject — it's a meta-signal from
 // the trajectory across all subjects over time.
+//
+// FIX 1 (Career Intelligence corrective pass). The previous version scored
+// only each subject's first→last delta, which (a) gave a learner who held CBC
+// 3.8 every term ~0.43 "developing" because flat cannot "improve", and (b)
+// gave near-maximum credit to a learner whose only "growth" was one bad first
+// assessment followed by their normal level (regression to the mean). Each
+// subject is now classified into exactly one trajectory category, so
+// stability, improvement and recovery are separate signals.
+//
+// SCALES — read before touching any threshold:
+//   * Per-subject values here are RAW CBC 1–4. normalizeSubjectScores() only
+//     canonicalises subject KEYS; it never rescales values. Every *_CBC
+//     constant below is therefore in CBC points.
+//   * The stable-hold credit converts a subject's average level to the
+//     NORMALIZED 0–1 scale via normalizeCBC before weighting it.
+//   * The overall trend uses detectTrend() on NORMALIZED 0–1 per-assessment
+//     averages (unchanged).
+//   * Every *_CREDIT / *_PENALTY / *_BONUS and the ceiling are on the
+//     resilience raw_score scale, NORMALIZED 0–1.
+
+/** CBC 1–4. A first→last rise above this is improvement (unchanged from before). */
+const RESILIENCE_IMPROVE_DELTA_CBC = 0.25
+/** CBC 1–4. A first→last rise at or above this is strong momentum (unchanged). */
+const RESILIENCE_STRONG_MOMENTUM_DELTA_CBC = 0.75
+/** CBC 1–4. A first→last fall below minus this is decline (unchanged). */
+const RESILIENCE_DECLINE_DELTA_CBC = 0.25
+/** CBC 1–4. A consecutive move bigger than this counts as a "big move" (dips, volatility). */
+const RESILIENCE_BIG_MOVE_CBC = 0.25
+/** CBC 1–4 (≈ normalized 0.83). A subject held at or above this at every point is sustained strength. */
+const RESILIENCE_SUSTAINED_STRONG_MIN_CBC = 3.5
+/** Minimum points in one subject before sustained strength or a bad-first pattern can be judged. */
+const RESILIENCE_MIN_POINTS_FOR_PATTERN = 3
+/** CBC 1–4. After one low first point, the remaining points must sit within this range to count as "settled". */
+const RESILIENCE_SETTLED_RANGE_CBC = 0.5
+
+/** Normalized 0–1 resilience credits, each multiplied by the share of subjects in that category. */
+const RESILIENCE_BASE              = 0.35
+const RESILIENCE_IMPROVE_CREDIT    = 0.40
+// 0.33 (not 0.30) keeps an all-subjects recovery off the 0.70 "strong"
+// boundary: 0.73 with 4+ assessments, 0.68 with 3.
+const RESILIENCE_RECOVERY_CREDIT   = 0.33
+const RESILIENCE_BAD_FIRST_CREDIT  = 0.15
+const RESILIENCE_SUSTAINED_CREDIT  = 0.25
+// 0.20 (not 0.15) so a learner flat at CBC 3.0 lands clearly inside
+// "capable" rather than on the 0.50 boundary, where float rounding decided
+// the label. Scaled by the normalized level held, so flat-low earns ~0.03.
+const RESILIENCE_STABLE_HOLD_CREDIT = 0.20
+const RESILIENCE_DECLINE_PENALTY   = 0.20
+const RESILIENCE_MOMENTUM_BONUS    = 0.08
+const RESILIENCE_LONGEVITY_BONUS   = 0.05
+/**
+ * Normalized 0–1. With no improving and no recovered subject, resilience may
+ * not reach "strong" (scoreToLevel's 0.70) — stability alone earns at most
+ * "capable". Strong requires actual upward movement or a genuine recovery.
+ */
+const RESILIENCE_STABILITY_ONLY_CEILING = 0.69
+
+type SubjectTrajectory =
+  | 'volatile' | 'recovered' | 'declining' | 'bad_first'
+  | 'improving' | 'sustained_strong' | 'stable'
+
+function subjectLabel(subject: string): string {
+  return subject
+    .split('_')
+    .map(w => (w.length > 0 ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(' ')
+}
+
+/**
+ * Number of direction reversals among big consecutive moves (CBC 1–4).
+ * down→up→down or up→down→up is 2. A monotonic decline is 0, a single dip
+ * and recovery is 1.
+ */
+function bigMoveReversals(history: number[]): number {
+  const signs: number[] = []
+  for (let i = 1; i < history.length; i++) {
+    const d = history[i] - history[i - 1]
+    if (Math.abs(d) > RESILIENCE_BIG_MOVE_CBC) signs.push(Math.sign(d))
+  }
+  let reversals = 0
+  for (let i = 1; i < signs.length; i++) {
+    if (signs[i] !== signs[i - 1]) reversals++
+  }
+  return reversals
+}
+
+/**
+ * Genuine mid-history recovery (CBC 1–4): some point after the first drops
+ * more than RESILIENCE_BIG_MOVE_CBC below the peak reached BEFORE it, and the
+ * subject's latest point is back at or above that earlier peak. A low FIRST
+ * point can never qualify — there is no earlier high for it to fall from —
+ * which is what separates recovery from regression to the mean.
+ */
+function findRecovery(history: number[]): { peak: number; trough: number } | null {
+  for (let k = 1; k < history.length; k++) {
+    const peakBefore = Math.max(...history.slice(0, k))
+    if (history[k] < peakBefore - RESILIENCE_BIG_MOVE_CBC && history[history.length - 1] >= peakBefore) {
+      return { peak: peakBefore, trough: Math.min(...history.slice(k)) }
+    }
+  }
+  return null
+}
+
+/**
+ * One low first point, then the learner's normal level (CBC 1–4): the first
+ * point is the strict minimum, the rest sit clearly above it, and the rest
+ * are settled within RESILIENCE_SETTLED_RANGE_CBC. Counts as a return to the
+ * learner's usual level, not as growth.
+ */
+function isBadFirstPoint(history: number[]): boolean {
+  if (history.length < RESILIENCE_MIN_POINTS_FOR_PATTERN) return false
+  const [first, ...rest] = history
+  if (!rest.every(v => v > first)) return false
+  const restAvg = rest.reduce((a, b) => a + b, 0) / rest.length
+  const restRange = Math.max(...rest) - Math.min(...rest)
+  return restAvg - first > RESILIENCE_BIG_MOVE_CBC && restRange <= RESILIENCE_SETTLED_RANGE_CBC
+}
 
 function computeResilience(
   allHistory: Array<Record<string, number>>
@@ -193,9 +310,12 @@ function computeResilience(
   }
 
   const allSubjects = [...new Set(allHistory.flatMap(s => Object.keys(s)))]
-  let improvingCount = 0
-  let decliningCount = 0
+  const counts: Record<SubjectTrajectory, number> = {
+    volatile: 0, recovered: 0, declining: 0, bad_first: 0,
+    improving: 0, sustained_strong: 0, stable: 0,
+  }
   let strongMomentumCount = 0
+  let stableHoldNormalizedSum = 0
   const evidence: string[] = []
 
   for (const subject of allSubjects) {
@@ -205,29 +325,67 @@ function computeResilience(
 
     if (subjectHistory.length < 2) continue
 
+    const label = subjectLabel(subject)
     const first = subjectHistory[0]
     const last  = subjectHistory[subjectHistory.length - 1]
-    const delta = last - first
+    const delta = last - first   // CBC 1–4
+    const recovery = findRecovery(subjectHistory)
 
-    if (delta >= 0.75) {
-      strongMomentumCount++
-      improvingCount++
-      evidence.push(`${subject.replace(/_/g, ' ')}: ${first.toFixed(1)} → ${last.toFixed(1)} (+${delta.toFixed(1)})`)
-    } else if (delta > 0.25) {
-      improvingCount++
-      evidence.push(`${subject.replace(/_/g, ' ')}: improving (+${delta.toFixed(1)})`)
-    } else if (delta < -0.25) {
-      decliningCount++
+    // Exactly one category per subject, checked in this order.
+    if (bigMoveReversals(subjectHistory) >= 2) {
+      // Noisy oscillation is never rewarded as resilience. If it also nets
+      // downward it still carries the decline penalty.
+      if (delta < -RESILIENCE_DECLINE_DELTA_CBC) {
+        counts.declining++
+        evidence.push(`${label} moved up and down sharply and ended lower (${first.toFixed(1)} → ${last.toFixed(1)})`)
+      } else {
+        counts.volatile++
+        evidence.push(`${label} moved up and down sharply — not counted as growth`)
+      }
+    } else if (recovery) {
+      counts.recovered++
+      evidence.push(`Recovered in ${label} after a dip (${recovery.peak.toFixed(1)} → ${recovery.trough.toFixed(1)} → ${last.toFixed(1)})`)
+    } else if (delta < -RESILIENCE_DECLINE_DELTA_CBC) {
+      counts.declining++
+      evidence.push(`Declined in ${label} (${first.toFixed(1)} → ${last.toFixed(1)})`)
+    } else if (isBadFirstPoint(subjectHistory)) {
+      counts.bad_first++
+      evidence.push(`${label} returned to its usual level after one low early assessment (${first.toFixed(1)} → ${last.toFixed(1)})`)
+    } else if (delta > RESILIENCE_IMPROVE_DELTA_CBC) {
+      counts.improving++
+      if (delta >= RESILIENCE_STRONG_MOMENTUM_DELTA_CBC) strongMomentumCount++
+      evidence.push(`Improved in ${label} (${first.toFixed(1)} → ${last.toFixed(1)}, +${delta.toFixed(1)})`)
+    } else if (
+      subjectHistory.length >= RESILIENCE_MIN_POINTS_FOR_PATTERN &&
+      Math.min(...subjectHistory) >= RESILIENCE_SUSTAINED_STRONG_MIN_CBC
+    ) {
+      counts.sustained_strong++
+      evidence.push(`Held strong performance in ${label} across ${subjectHistory.length} assessments`)
+    } else {
+      counts.stable++
+      const avg = subjectHistory.reduce((a, b) => a + b, 0) / subjectHistory.length
+      stableHoldNormalizedSum += normalizeCBC(avg)   // normalized 0–1
     }
   }
 
-  const observed  = allSubjects.length
-  const improveRate = observed > 0 ? improvingCount / observed : 0
-  const declineRate = observed > 0 ? decliningCount / observed : 0
-  const momentumBonus = strongMomentumCount > 0 ? 0.08 : 0
+  const classified = Object.values(counts).reduce((a, b) => a + b, 0)
+  const rate = (n: number): number => (classified > 0 ? n / classified : 0)
+  const avgStableHold = counts.stable > 0 ? stableHoldNormalizedSum / counts.stable : 0
 
-  // Base: 0.35 (developing), boosted by improvement rate, penalised by decline
-  const raw = Math.max(0.05, Math.min(1, 0.35 + (improveRate * 0.45) - (declineRate * 0.20) + momentumBonus + (allHistory.length >= 4 ? 0.08 : 0)))
+  let raw = RESILIENCE_BASE
+    + rate(counts.improving)        * RESILIENCE_IMPROVE_CREDIT
+    + rate(counts.recovered)        * RESILIENCE_RECOVERY_CREDIT
+    + rate(counts.bad_first)        * RESILIENCE_BAD_FIRST_CREDIT
+    + rate(counts.sustained_strong) * RESILIENCE_SUSTAINED_CREDIT
+    + rate(counts.stable) * avgStableHold * RESILIENCE_STABLE_HOLD_CREDIT
+    - rate(counts.declining)        * RESILIENCE_DECLINE_PENALTY
+    + (strongMomentumCount > 0 ? RESILIENCE_MOMENTUM_BONUS : 0)
+    + (allHistory.length >= 4 ? RESILIENCE_LONGEVITY_BONUS : 0)
+
+  if (counts.improving + counts.recovered === 0) {
+    raw = Math.min(raw, RESILIENCE_STABILITY_ONLY_CEILING)
+  }
+  raw = Math.max(0.05, Math.min(1, raw))
 
   // Trend: look at average overall score across assessment snapshots
   const avgPerAssessment = allHistory.map(s => {
@@ -237,7 +395,7 @@ function computeResilience(
 
   const defaultEvidence = evidence.length > 0
     ? evidence
-    : [`Improving in ${improvingCount} of ${observed} subjects assessed`]
+    : [`Held a steady level in ${counts.stable} of ${classified} subjects assessed`]
 
   return {
     level:      scoreToLevel(raw),
