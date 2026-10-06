@@ -3582,3 +3582,26 @@ Verifying the nine fixes above against a live session surfaced two more, both of
 **Rollback considerations**: Low. Pure degradation-on-failure; no schema, API, auth or behaviour change for the success path. A previously-throwing lookup now yields an `unavailable` legacy section — strictly better for every caller. Revert = drop `legacyBridgeAccess.ts` + test, restore the inline `resolveLegacyStudentId` call, remove the manifest line.
 
 **Note**: this log had fallen ~2 months behind (previous entry 2026-08-08) despite steady work on main — the Phase B rule to log each change here needs re-establishing.
+
+## 2026-10-06 — Career Intelligence corrective pass (FIX 1–7)
+
+**Stage**: founder-directed corrective pass over the in-school Career Intelligence pipeline. Not a redesign: no weight map, tier cut-off or level band changed. `/assess` run before Phase A (match engine) and Phase C (migration) — both ✅, no ADR trigger; ADR written at the founder's request.
+
+**What changed** (commits `52dc307` → Phase F):
+- **FIX 2** (`capabilityMatchEngine.ts`): each dimension contribution capped at its weight after the trend multiplier; `rawScore` clamped to [0,1]. A perfect accelerating learner had reached 108%.
+- **FIX 3** (same file): confidence-0 dimensions (the extractor's 0.35 placeholder) excluded from score, gaps and narrative; >50% of a career's required weight unmeasured → Low + caveat; nothing measured → career skipped. Previously "no evidence" produced a fabricated gap.
+- **FIX 1** (`capabilityExtractor.ts` `computeResilience`): one trajectory category per subject (volatile / recovered / declining / bad-first / improving / sustained-strong / stable); stability alone capped below "strong". Flat CBC 3.8: 0.43 → 0.65 capable; bad-first: 0.96 → 0.55; recovery: 0.43 → 0.73 strong. `<2` branch unchanged.
+- **FIX 6**: migration `20261006120000_careers_verification_source.sql` (nullable `verification_source`; 18 seed rows → human; 25 rows of unprovable authorship left NULL for review). Provenance-aware `assessCareerKnowledge`; `ai_drafted`/unrecorded never fresh. Human re-verify: `markCareerHumanVerified` + `POST /api/admin/career/verify` (reuses the orphaned repo stamp, `requireGrowthUser` gate). Finding: no autonomous AI path ever stamped verification.
+- **FIX 4**: Senior matches tagged within/cross pathway; strongest cross-pathway Stretch+ match surfaced; one-line circularity note. 410/413 Senior learners have no pathway on record.
+- **FIX 5**: nullable `cohort_relative` (mid-rank percentile, school + grade, ≥15 floor) attached in orchestration only; never read by the match engine. `scripts/career-tier-distribution.ts` equity report.
+- **FIX 7**: `docs/career-intelligence/METHODOLOGY.md`; end-to-end synthetic suite on the real curated corpus.
+
+**Architectural documents referenced**: ADR-0029 + H2D addendum, ADR-0006 §4, learner-record-layer-decisions.md Decision 6, CLAUDE.md Architecture/Security rules.
+
+**ADR**: `docs/architecture/adr-0033-career-intelligence-corrective-pass.md`.
+
+**Tests added** (all STANDARD, env-free): `capabilityMatchEngine.test.ts` (9), `resilience.test.ts` (15), `careerProvenance.test.ts` (11), Guard P in `reviewPublishGuards.architecture.test.ts` (6, mutation-checked), `careerPathwayHonesty.test.ts` (8), `cohortRelative.test.ts` (7), `careerSyntheticLearners.test.ts` (9). Standard suite 1310 → 1375, green. ESLint clean on all touched files. The `careerIntelligenceEvidenceFirst` integration test could not run in this session (its safety guard requires a disposable TEST_SUPABASE target).
+
+**Findings flagged, not acted on**: entrepreneurial tier 85% base rate (unchanged by this pass); Junior families list unranked example career titles (spec asked for none — product decision); ceiling saturation (many careers tie at 100%); the >50% coverage floor never fires on the curated corpus; flat-low learner reads "developing".
+
+**Rollback considerations**: Code first, then column (`drop column verification_source`). **Deployment order: the migration must be applied before this code deploys** — the code selects `careers.verification_source`, and every career query fails without it (observed when running the tier report before applying).

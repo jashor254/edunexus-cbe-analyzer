@@ -1,6 +1,6 @@
 # ADR-0033 — Career Intelligence Corrective Pass
 
-**Status**: Accepted — FIX 2, 3, 1, 6 implemented (2026-10-06). FIX 4, 5, 7 recorded in their own sections as they land.
+**Status**: Accepted — FIX 1–7 implemented (2026-10-06). The FIX 6 migration is written but must be applied to the live database before the code deploys (see FIX 6, Deployment order).
 **Depends on**: ADR-0029 + addendum H2D (momentumTrend vs netTrend stay separate), ADR-0006 §4 (Junior = orientation, never a job title), `docs/architecture/learner-record-layer-decisions.md` Decision 6 (capabilityExtractor is the Reasoning layer's first citizen).
 **Scope**: The in-school Career Intelligence pipeline only — `lib/career/capabilityExtractor.ts` → `capabilityMatchEngine.ts` → `lib/learnerIntelligence/careerIntelligence(Orchestration).ts`, plus the career corpus and its freshness/provenance (`knowledgeLifecycle.ts`, `knowledgeRequests.ts`, `careers` table). Not a redesign: no weight map, tier cut-off or level band was changed.
 
@@ -87,6 +87,45 @@ The single production caller passes `career.verification_source ?? null`, so a m
 
 **Deployment order.** The migration must be applied before deploying code that selects `verification_source`; roll back code before the column.
 
+## FIX 4 — Senior pathway honesty
+
+**Context.** Senior matching is partly circular: pathway choice → subjects taken → capability dimensions → matches. So Senior matches mostly confirm the pathway already chosen, while presenting as a neutral reading of the learner.
+
+**Decision.** Not redesigned; disclosed. Each Senior `CareerMatchInsight` carries `careerPathway` and `pathwayRelation` (`within_pathway` | `cross_pathway`), which is null when the learner's pathway is not on record. The strongest cross-pathway match reaching at least the Stretch tier is surfaced as `outsidePathway` (entrepreneurial-tier duplicates excluded). Every Senior output carries a one-line `pathwayNote`: matches reflect subject choices, "not which careers would suit you best". Scores, tiers and order are unchanged. Pathway names validate against `SENIOR_PATHWAYS`.
+
+**Alternatives considered.** Down-weighting within-pathway matches — rejected as a redesign that would invent a correction with no evidence behind its size.
+
+**Data finding.** 410 of 413 Senior learners have no `current_pathway`, so today most Senior outputs carry the "not on record" note and no tags. The tagging is correct; the input data is missing.
+
+**Not done.** The new fields are in the lib/API output. No UI component renders `outsidePathway` or `pathwayNote` yet (components are UI-only; a follow-up).
+
+## FIX 5 — Cohort-relative capability (additive only)
+
+**Context.** Raw CBC levels mix learner ability with school quality.
+
+**Decision.** `CapabilityProfile.cohort_relative` (nullable): a per-dimension mid-rank percentile among learners in the same Core school (`students.external_id → learners.school_id`; `students.school_id` is unpopulated for all rows) and grade, from peers' saved profiles. Below 15 learners with evidence → `insufficient_cohort` with a reason. The same floor applies per dimension, and a dimension with learner confidence 0 → null. Missing grade, bridge or school → `unavailable` with the reason. A load failure degrades to `unavailable` (logged) and never costs the learner their Career Intelligence.
+
+**Placement.** The pure math is in `lib/career/cohortRelative.ts`. The extractor stays DB-free and returns `cohort_relative: null`. The orchestration layer attaches the view inside `resolveFreshCapabilityProfile`. Saved profiles are written by the extractor directly, so a cohort view is never persisted. Peer ids are filtered in bounded chunks of 100.
+
+**Never in the score.** A test proves that adding the view leaves every match unchanged, and a source guard proves the match engine never references `cohort_relative`.
+
+**Equity report.** `scripts/career-tier-distribution.ts` is read-only and reports each learner's best tier per school (optionally per grade), as a terminal table plus CSV, with small samples flagged and no learner identifiers.
+
+**Real cohorts (2026-10-06).** One school's Grades 7, 8 and 9 (57–71 learners with profiles each) and one school's Grade 10 (22 of 136) clear the floor.
+
+## FIX 7 — Validity
+
+- `docs/career-intelligence/METHODOLOGY.md`: the full method for an external evaluator, with an explicit limitations section.
+- `lib/learnerIntelligence/careerSyntheticLearners.test.ts`: synthetic learners run end to end through the real extractor, engine and orchestration against the curated 18-career corpus (fixtures: `lib/testing/careerSyntheticLearners.ts`; `CAREER_COS_META` is exported for this).
+
+**Findings recorded, not acted on** (per the instruction to flag rather than change):
+
+1. **Entrepreneurial tier base rate is 85%** (17 of 20 deterministic synthetic Senior learners), identical before and after this pass. The cause is the "any one of creative / resilience / social ≥ 0.50" rule, which most learners clear (in that set, 14/20 for each dimension individually). Threshold unchanged; for review.
+2. **Junior output names example careers.** The spec required "zero job titles" for Juniors. As built, Junior families list unranked `exampleCareerTitles`, rendered on the student Career Explorer and the parent Career Intelligence page. What is actually enforced (and now tested) is no ranked or scored single career for a Junior. Removing the examples is a product decision, left open.
+3. **Ceiling saturation.** Learners near the top of every subject reach 100% on many careers at once, and the order among ties is corpus order. This predates the pass (ties previously sat at 104–108%).
+4. **The FIX 3 coverage floor never fires on the curated corpus.** No career relies on one dimension for more than 50% of its weight (max creative share: 40%).
+5. **Live tier report, after the migration (2026-10-06, 328 learners with saved profiles).** Overall best tier: Strong 11%, Stretch 48%, Alternative 41%; entrepreneurial 10% (34/328, real data, against the synthetic 85%). **Kangai Junior School (first pilot, 197 learners): 0% Strong, 32% Stretch, 68% Alternative.** Every Kangai learner has exactly one assessment (so a 65% cap, never Strong), and average normalized analytical/technical scores are 0.04 in Grades 7 and 9 (≈ CBC 1.1), 0.18 in Grade 8. This is either a genuinely low-attaining cohort or a marks→CBC-level conversion problem in the Kangai import. **Check the import before reading these results to the school.** Juniors with no Strong/Stretch match see the existing "Add more assessments to unlock exploration areas" message, not a blank page.
+
 ---
 
 ## Tests
@@ -96,6 +135,9 @@ The single production caller passes `career.verification_source ?? null`, so a m
 | `lib/career/capabilityMatchEngine.test.ts` (new) | FIX 2 bounds incl. exactly-1.0 accelerating; momentum preserved; FIX 3 Cases A–D; no fabricated weakness; confidence caps |
 | `lib/career/resilience.test.ts` (new) | FIX 1 behavioural contract — flat low/middle/high ordering, stability-only ceiling, improving/accelerating/recovery ≥ strong, bad-first < recovery, volatility not rewarded, `<2` branch value-for-value |
 | `lib/career/careerProvenance.test.ts` (new) | FIX 6 — the three provenance classes cannot be conflated; ai_drafted/unrecorded never fresh; publish records source_cited over a hostile payload; human verify needs reviewer + note; Blueprint note names the real cause |
+| `lib/learnerIntelligence/careerPathwayHonesty.test.ts` (new) | FIX 4 — labelling, highlight selection (stretch floor, entrepreneurial excluded), note wording |
+| `lib/career/cohortRelative.test.ts` (new) | FIX 5 — <15 / exactly 15 / >15, missing evidence, never alters a match, engine never reads it, extractor leaves it null |
+| `lib/learnerIntelligence/careerSyntheticLearners.test.ts` (new) | FIX 7 — end-to-end synthetic learners on the real corpus + entrepreneurial base-rate print |
 | `lib/career/reviewPublishGuards.architecture.test.ts` (+Guard P) | AI drafts declare `ai_drafted` and carry no verification date; the learner/AI request path never writes the corpus; source_cited is set after the payload spread; the human stamp has exactly one caller behind a named reviewer; the verify route gates before verifying; the production freshness caller always passes provenance |
 
 Existing suites (`capabilityExtractor.test.ts` CAP-003/CAP-004, `knowledgeLifecycle.test.ts`, `knowledgeRequests.test.ts`, the purity tests) pass unmodified.

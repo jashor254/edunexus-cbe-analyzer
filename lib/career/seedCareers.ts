@@ -2000,7 +2000,9 @@ type COSMeta = {
   complementary_career_slugs: string[]
 }
 
-const CAREER_COS_META: Record<string, COSMeta> = {
+// Exported (FIX 7) so the deterministic synthetic regression suite can score
+// learners against the real curated corpus without a database.
+export const CAREER_COS_META: Record<string, COSMeta> = {
 
   'software-engineer': {
     required_capabilities: {
