@@ -98,6 +98,7 @@
     "lib/learnerBlueprint/composePathwayReadiness.test.ts",
     "lib/learnerBlueprint/composeRisk.test.ts",
     "lib/learnerBlueprint/curriculumVoice.test.ts",
+    "lib/learnerBlueprint/legacyBridgeAccess.pure.test.ts",
     "lib/learnerBlueprint/gradeBand.test.ts",
     "lib/learnerBlueprint/pdfExport.test.ts",
     "lib/learnerBlueprint/readSection.test.ts",

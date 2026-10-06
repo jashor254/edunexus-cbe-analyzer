@@ -26,7 +26,7 @@
 // them grows a real write path, re-adding its composer here is a five-line
 // change.
 
-import { resolveLegacyStudentId } from '@/lib/core/identity'
+import { resolveLegacyStudentIdOrDegrade } from './legacyBridgeAccess'
 import { composeIdentity } from './composeIdentity'
 import { composeAcademicRecord } from './composeAcademicRecord'
 import { composeProgrammeAcademicRecord } from './composeProgrammeAcademicRecord'
@@ -84,8 +84,10 @@ export async function composeBlueprint(ids: BlueprintIdentifiers): Promise<Compo
   // remains a consumer, never an identity resolver: this is a pure, read-only
   // lookup (never creates a bridge), and every legacy-space composer below
   // still independently handles a null result by degrading explicitly,
-  // exactly as before. No composer re-implements this lookup.
-  const legacyStudentId = await resolveLegacyStudentId(ids.coreLearnerId)
+  // exactly as before. No composer re-implements this lookup. Wrapped so a
+  // failed *lookup* degrades to the same null the "no bridge yet" case
+  // already produces — see resolveLegacyStudentIdOrDegrade.
+  const legacyStudentId = await resolveLegacyStudentIdOrDegrade(ids.coreLearnerId)
 
   // Blueprint Section Access Boundary Fix — Career and Compass are now
   // acquired here (one canonical read each, same as Projection already was)
