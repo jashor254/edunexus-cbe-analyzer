@@ -2,6 +2,7 @@
 
 import { CareerEngine, analyzeDreamCareer, type CareerData } from './careerEngine'
 import { calculateJuniorPathwayAffinity, formatSubjectName as pathwayFormatSubjectName, PATHWAY_RULES } from '@/lib/pathwayCalculator'
+import { SENIOR_PATHWAY_FIELDS } from '@/lib/curriculum/pathwayFields'
 import {
   StudentProfile,
   SubjectProgress,
@@ -1079,23 +1080,14 @@ function buildTermActionPlan(
   return { thisWeek, thisMonth, beforeGrade10 }
 }
 
-const JUNIOR_FUTURE_OPPORTUNITIES: JuniorFutureOpportunity[] = [
-  {
-    pathway: 'STEM',
-    examples: ['Medicine & Health', 'Engineering', 'Computing', 'Applied Sciences'],
-    whyItFits: 'Strong Mathematics and Science performance builds the foundation for analytical, technical, and problem-solving careers in high demand in Kenya and globally.',
-  },
-  {
-    pathway: 'Social Sciences',
-    examples: ['Law', 'Business & Finance', 'Education', 'Public Administration'],
-    whyItFits: 'Strong language and reasoning skills align with careers that require clear communication, critical thinking, and working effectively with communities and institutions.',
-  },
-  {
-    pathway: 'Arts & Sports Science',
-    examples: ['Creative Industries', 'Sports Science', 'Design', 'Media'],
-    whyItFits: 'Strong creative and practical competencies open Kenya\'s growing creative economy, sports industry, and digital media sector.',
-  },
-]
+// The pathway → broad-fields content lives in one place
+// (lib/curriculum/pathwayFields.ts), shared with the Career Explorer's junior
+// pathway panel. Same three entries, same order, same wording as before.
+const JUNIOR_FUTURE_OPPORTUNITIES: JuniorFutureOpportunity[] = SENIOR_PATHWAY_FIELDS.map(p => ({
+  pathway:   p.pathway,
+  examples:  p.fields,
+  whyItFits: p.whyItFits,
+}))
 
 // ─── Career Insight Meta ──────────────────────────────────────────────────────
 
