@@ -26,11 +26,13 @@ import { insufficientEvidenceInsight } from './insight'
 import type { ConfidenceLevel } from './insight'
 import {
   CATEGORY_LABEL, careerModeForGrade, familiesFromMatches,
+  asCareerPathway, pathwayRelationFor, selectCrossPathwayHighlight,
+  crossPathwayInsight, seniorPathwayNote,
 } from './careerIntelligence'
 import type {
   CareerFamilyInsight, CareerMatchInsight, CareerMode,
 } from './careerIntelligence'
-import type { CapabilityCareerMatch } from '@/lib/career/types'
+import type { CapabilityCareerMatch, CareerPathway } from '@/lib/career/types'
 import type { Insight } from './insight'
 
 export type CareerIntelligence = {
@@ -51,6 +53,16 @@ export type CareerIntelligence = {
 
   // Senior only
   matches?: CareerMatchInsight[]
+  /** Senior only (FIX 4). The learner's Senior pathway, or null when not on record. */
+  learnerPathway?: CareerPathway | null
+  /** Senior only (FIX 4). One line explaining matches are shaped by the chosen pathway's subjects. */
+  pathwayNote?: string
+  /**
+   * Senior only (FIX 4). The strongest cross-pathway match reaching at least
+   * the stretch tier, surfaced as an explicit "outside your pathway" insight.
+   * Absent when there is none or the learner's pathway is not on record.
+   */
+  outsidePathway?: { match: CareerMatchInsight; insight: Insight }
 }
 
 function matchToInsight(match: CapabilityCareerMatch): Insight {
@@ -76,17 +88,25 @@ function matchToInsight(match: CapabilityCareerMatch): Insight {
   }
 }
 
-async function buildSeniorMatches(studentId: string, profile: ReturnType<typeof extractCapabilityProfile>, careers: Awaited<ReturnType<typeof getAllCareersWithCOS>>): Promise<CareerMatchInsight[]> {
+async function buildSeniorMatches(
+  studentId: string,
+  profile: ReturnType<typeof extractCapabilityProfile>,
+  careers: Awaited<ReturnType<typeof getAllCareersWithCOS>>,
+  learnerPathway: CareerPathway | null,
+): Promise<CareerMatchInsight[]> {
   const report = computeCapabilityMatches(studentId, profile, careers)
   const all = [...report.primary, ...report.stretch, ...report.alternative, ...report.entrepreneurial]
 
+  // Order and scores are exactly as before; FIX 4 only tags each match.
   return all.map(match => ({
-    careerSlug:     match.career_slug,
-    careerTitle:    match.career_title,
-    careerCategory: match.career_category,
-    tier:           match.tier,
-    alignmentPct:   alignmentToPercent(match.alignment_score),
-    insight:        matchToInsight(match),
+    careerSlug:      match.career_slug,
+    careerTitle:     match.career_title,
+    careerCategory:  match.career_category,
+    tier:            match.tier,
+    alignmentPct:    alignmentToPercent(match.alignment_score),
+    insight:         matchToInsight(match),
+    careerPathway:   match.pathway ?? null,
+    pathwayRelation: pathwayRelationFor(match.pathway, learnerPathway),
   }))
 }
 
@@ -182,7 +202,18 @@ export async function buildCareerIntelligence(studentId: string): Promise<Career
     const report = computeCapabilityMatches(studentId, profile, careers)
     return { ...base, families: familiesFromMatches([...report.primary, ...report.stretch]) }
   }
-  return { ...base, matches: await buildSeniorMatches(studentId, profile, careers) }
+  const learnerPathway = asCareerPathway(student.current_pathway)
+  const matches = await buildSeniorMatches(studentId, profile, careers, learnerPathway)
+  const highlight = learnerPathway ? selectCrossPathwayHighlight(matches) : null
+  return {
+    ...base,
+    matches,
+    learnerPathway,
+    pathwayNote: seniorPathwayNote(learnerPathway),
+    ...(highlight && learnerPathway
+      ? { outsidePathway: { match: highlight, insight: crossPathwayInsight(highlight, learnerPathway) } }
+      : {}),
+  }
 }
 
 // ── Blueprint-safe summary (Sprint 12M) ────────────────────────────────────────

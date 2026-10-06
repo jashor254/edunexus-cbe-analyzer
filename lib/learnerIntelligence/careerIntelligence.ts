@@ -25,7 +25,8 @@
 // careerMode.architecture.test.ts and careerCanonicalization.architecture.test.ts
 // enforce.
 
-import type { CapabilityCareerMatch, CareerCategory } from '@/lib/career/types'
+import type { CapabilityCareerMatch, CareerCategory, CareerPathway } from '@/lib/career/types'
+import { SENIOR_PATHWAYS } from '@/lib/curriculum/subjects'
 import type { Insight } from './insight'
 
 // Exported (Sprint 12M) so `getCareerBlueprintSummary`
@@ -60,6 +61,70 @@ export type CareerMatchInsight = {
   tier:          CapabilityCareerMatch['tier']
   alignmentPct:  number
   insight:       Insight
+  /** The CBC Senior pathway the corpus files this career under (FIX 4). */
+  careerPathway: CareerPathway | null
+  /**
+   * Whether this career sits inside the learner's own Senior pathway (FIX 4).
+   * Null when the learner's pathway is not on record (or the career has no
+   * pathway), so no inside/outside claim is made without evidence.
+   */
+  pathwayRelation: PathwayRelation | null
+}
+
+// ── Senior pathway honesty (FIX 4) ──────────────────────────────────────────
+//
+// Senior matching is partly circular: pathway choice → subjects taken →
+// capability dimensions → matches, so most matches confirm the pathway the
+// learner already chose. This is not redesigned. Instead each match is tagged
+// within/cross pathway, the strongest cross-pathway match that reaches at
+// least the stretch tier is surfaced on its own, and the output carries one
+// line explaining the circularity. None of this changes any score or order,
+// and nothing here implies a within-pathway career is the better career.
+
+export type PathwayRelation = 'within_pathway' | 'cross_pathway'
+
+/** Validates a stored pathway string against the one canonical list (lib/curriculum/subjects.ts). */
+export function asCareerPathway(value: string | null | undefined): CareerPathway | null {
+  return value && (SENIOR_PATHWAYS as readonly string[]).includes(value) ? (value as CareerPathway) : null
+}
+
+export function pathwayRelationFor(
+  careerPathway: CareerPathway | null | undefined,
+  learnerPathway: CareerPathway | null,
+): PathwayRelation | null {
+  if (!learnerPathway || !careerPathway) return null
+  return careerPathway === learnerPathway ? 'within_pathway' : 'cross_pathway'
+}
+
+/**
+ * The strongest cross-pathway match that reaches at least the stretch tier,
+ * or null. Entrepreneurial-tier entries are excluded — they are a separate
+ * promotion of one career that already appears in its scored tier.
+ */
+export function selectCrossPathwayHighlight(matches: CareerMatchInsight[]): CareerMatchInsight | null {
+  let best: CareerMatchInsight | null = null
+  for (const m of matches) {
+    if (m.pathwayRelation !== 'cross_pathway') continue
+    if (m.tier !== 'primary' && m.tier !== 'stretch') continue
+    if (!best || m.alignmentPct > best.alignmentPct) best = m
+  }
+  return best
+}
+
+export function crossPathwayInsight(match: CareerMatchInsight, learnerPathway: CareerPathway): Insight {
+  return {
+    observation: `${match.careerTitle} sits outside your ${learnerPathway} pathway, yet your current evidence already reaches ${match.alignmentPct}% alignment with it.`,
+    evidence:    match.insight.evidence,
+    confidence:  match.insight.confidence,
+    action:      `If it interests you, talk with your teacher or careers adviser about what moving toward ${match.careerTitle} from your current pathway would involve.`,
+  }
+}
+
+/** The one-line circularity note every Senior output carries. */
+export function seniorPathwayNote(learnerPathway: CareerPathway | null): string {
+  return learnerPathway
+    ? `These matches are shaped by the subjects you take in your ${learnerPathway} pathway, so most will sit inside it — that reflects your subject choices, not which careers would suit you best.`
+    : 'Your Senior School pathway is not on record, so these matches are not marked as inside or outside it; they are still shaped by the subjects you have been assessed in.'
 }
 
 // ── Career Principle grade gate ─────────────────────────────────────────────

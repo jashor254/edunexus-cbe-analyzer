@@ -108,6 +108,7 @@
     "lib/learnerInnovation/innovationBoundary.architecture.test.ts",
     "lib/learnerIntelligence/careerCanonicalization.architecture.test.ts",
     "lib/learnerIntelligence/careerIntelligencePurity.architecture.test.ts",
+    "lib/learnerIntelligence/careerPathwayHonesty.test.ts",
     "lib/learnerIntelligence/careerMode.architecture.test.ts",
     "lib/learnerIntelligence/careerMode.pure.test.ts",
     "lib/learnerWellbeing/wellbeingBoundary.architecture.test.ts",
