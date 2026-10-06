@@ -216,7 +216,11 @@ jobs:
       - name: Verify canonical schema fingerprint
         run: |
           ACTUAL=$(tail -n 1 /tmp/*.log 2>/dev/null | grep -oP 'FINGERPRINT=\K[0-9a-f]+' | tail -n 1)
-          EXPECTED="e5920ccaffec39fb5e63a3d1b3f481ff"
+          # 2026-10-06: e5920cca… → 764147d8… for migration
+          # 20261006120000_careers_verification_source.sql (adds nullable
+          # careers.verification_source + CHECK). Reviewed: it was the only
+          # schema change; bootstrap FAIL_COUNT=9 UNRECOVERED=0, unchanged.
+          EXPECTED="764147d87a8e10ff4a6d8610f2a6798f"
           echo "expected: $EXPECTED"
           echo "actual:   $ACTUAL"
           if [ "$ACTUAL" != "$EXPECTED" ]; then
