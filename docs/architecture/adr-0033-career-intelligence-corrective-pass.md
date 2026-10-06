@@ -123,7 +123,7 @@ The single production caller passes `career.verification_source ?? null`, so a m
 **Findings recorded, not acted on** (per the instruction to flag rather than change):
 
 1. **Entrepreneurial tier base rate is 85%** (17 of 20 deterministic synthetic Senior learners), identical before and after this pass. The cause is the "any one of creative / resilience / social ≥ 0.50" rule, which most learners clear (in that set, 14/20 for each dimension individually). Threshold unchanged; for review.
-2. **Junior output names example careers.** The spec required "zero job titles" for Juniors. As built, Junior families list unranked `exampleCareerTitles`, rendered on the student Career Explorer and the parent Career Intelligence page. What is actually enforced (and now tested) is no ranked or scored single career for a Junior. Removing the examples is a product decision, left open.
+2. **Junior output names example careers.** Resolved 2026-10-06; see "Junior alignment" below.
 3. **Ceiling saturation.** Learners near the top of every subject reach 100% on many careers at once, and the order among ties is corpus order. This predates the pass (ties previously sat at 104–108%).
 4. **The FIX 3 coverage floor never fires on the curated corpus.** No career relies on one dimension for more than 50% of its weight (max creative share: 40%).
 5. **Live tier report, after the migration (2026-10-06, 328 learners with saved profiles).** Overall best tier: Strong 11%, Stretch 48%, Alternative 41%; entrepreneurial 10% (34/328, real data, against the synthetic 85%). **Kangai Junior School (first pilot, 197 learners): 0% Strong, 32% Stretch, 68% Alternative.** Every Kangai learner has exactly one assessment (so a 65% cap, never Strong), and average normalized analytical/technical scores are 0.04 in Grades 7 and 9 (≈ CBC 1.1), 0.18 in Grade 8. This is either a genuinely low-attaining cohort or a marks→CBC-level conversion problem in the Kangai import. **Check the import before reading these results to the school.** Juniors with no Strong/Stretch match see the existing "Add more assessments to unlock exploration areas" message, not a blank page.
@@ -137,6 +137,18 @@ The single production caller passes `career.verification_source ?? null`, so a m
 **Measured effect (read-only replay of the live path, Kangai, 197 learners).** Communication/Social measured 83% → 100% of learners. Grade 9 STEM gate viable **2 → 9 of 71**. Best tier Stretch 32% → 17%, Alternative 68% → 83%. The added subjects are recorded low too (Integrated Science ≈ CBC 1.4–1.7, Social Studies ≈ 1.1–1.3), so **the earlier reading that the bug explained the Alternative-heavy result was wrong.** Kangai's results mainly reflect its recorded marks; mathematics is ≈ CBC 1.0–1.1 in every grade, and verifying those marks is the open question. Separately, 34 Grade 8 learners have 272 marks in `pending_review` awaiting teacher confirmation (by design, excluded until confirmed).
 
 **Still open.** Stored evidence carries two spellings of the same subject ("integrated science" vs "integrated_science"), an identity-layer data issue not addressed here. Agriculture & Nutrition has no capability weight. `ss-math` is unrecognised.
+
+## Junior alignment — pathway first, no careers until Senior (2026-10-06)
+
+**Rule (founder).** Grades 7–9 are guided toward a Senior School pathway, chosen at the end of Grade 9, not toward careers.
+
+**Audit.** The Blueprint, the Academic Clinic report and both career APIs already gated correctly. Career names still reached Juniors through four routes, all traced to `familiesFromMatches` (the one canonical Junior grouping) plus two loose ends: the family `exampleCareerTitles` and the "related to: X, Y, Z" action text (shown on the student and parent pages, reused verbatim as the Blueprint's Junior "future direction" and the Holiday Plan note); family evidence reusing match narratives ("a genuine asset for Medical Doctor"); the Career Intelligence Report's Junior reason; and the Career Explorer's ungated catalogue of every career. An earlier status report wrongly marked the Blueprint as clean.
+
+**Decision.** `CareerFamilyInsight` loses `exampleCareerTitles` (removed rather than emptied, so the compiler finds every consumer) and gains `usualPathway`: the pathway most of the family's careers are filed under, or null on a tie. Action and evidence are title-free. The report's Junior reason shows the field plus its pathway, and its AI prompt forbids job titles for Juniors. Holiday Plan tasks point Juniors to pathways. The Career Explorer replaces the catalogue with a pathway panel for Grades 7–9 (content from `lib/curriculum/pathwayFields.ts`, now the single copy shared with the Clinic report), waits for the learner record before choosing a view, and does not fetch the catalogue for Juniors. Grade 10+ is unchanged.
+
+**Tests.** `careerJuniorFamilies.test.ts`; the synthetic suite asserts zero corpus career titles or slugs in the Junior learner's full output and Blueprint summary (mutation-checked); `juniorCareerSurfaces.architecture.test.ts` covers the page gate, single pathway copy, no `exampleCareerTitles`, the prompt rule and the planner gate.
+
+**Not covered.** Career detail pages remain reachable by direct URL (they already hide the personal match score from Juniors). A Junior's own stated dream career is still reflected back to them, because it is their input.
 
 ---
 

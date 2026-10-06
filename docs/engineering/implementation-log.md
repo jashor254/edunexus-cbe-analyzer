@@ -3605,3 +3605,11 @@ Verifying the nine fixes above against a live session surfaced two more, both of
 **Findings flagged, not acted on**: entrepreneurial tier 85% base rate (unchanged by this pass); Junior families list unranked example career titles (spec asked for none — product decision); ceiling saturation (many careers tie at 100%); the >50% coverage floor never fires on the curated corpus; flat-low learner reads "developing".
 
 **Rollback considerations**: Code first, then column (`drop column verification_source`). **Deployment order: the migration must be applied before this code deploys** — the code selects `careers.verification_source`, and every career query fails without it (observed when running the tier report before applying).
+
+## 2026-10-06 — Follow-ups to the Career Intelligence pass: subject keys, profile refresh, Junior alignment
+
+- **Subject-key fix** (`008257f`): `normalizeSubjectKey` canonicalises spelling (spaces, `&` and hyphens become `_`) before alias lookup, and adds `kiswahili_lugha → kiswahili` and `history_citizenship → history`. Subjects such as "integrated science" had been silently dropped from capability profiles, the KJSEA STEM gate and Compass matching. Kangai Grade 9 STEM-gate viable went from 2 to 9 of 71. The identity normalizer is unchanged.
+- **Push** (`56bc257`): via a `fix/` branch first. CI's pinned DEEP_PR schema fingerprint was re-pinned for the `verification_source` migration after review. Main CI and the production deploy are green.
+- **Profile refresh**: all 328 saved capability profiles were recomputed through `recomputeAndSaveCapabilityProfile` after deploy (0 failures, 330 history rows, backup kept in the session scratchpad).
+- **Junior alignment** (`5e1f209`, `7d203b8`, `ff73479`): Grades 7–9 see pathways, not careers. Details in ADR-0033, "Junior alignment". Tests: `careerJuniorFamilies.test.ts`, the synthetic zero-titles assertion, and `juniorCareerSurfaces.architecture.test.ts`. Standard suite 1383 → 1392.
+- **Rollback**: each commit reverts on its own. The profile refresh can be restored from the backup if ever needed.

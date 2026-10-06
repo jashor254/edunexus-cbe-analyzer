@@ -109,9 +109,16 @@ bounded to **0–1**, shown as **0–100%**. If more than **half** of a career's
 
 **Reality check** (shown alongside, not part of the score): whether the KCSE grade the career typically requires looks reachable (e.g. A/A− expects Analytical ≥ 0.70 and Technical ≥ 0.60; B+ expects Analytical ≥ 0.55), the cost barrier (minimum cost above KES 500,000 high, above 150,000 medium), time to first income, risk, difficulty and Kenyan demand.
 
-## 7. Junior learners (Grades 7–9)
+## 7. Junior learners (Grades 7–9): pathway first
 
-The same scoring runs, but the output is regrouped by career family. Families are formed from Strong and Stretch matches and sorted by the best alignment in each family. A Junior learner sees family-level observations and suggested ways to explore (subjects, clubs, projects), plus **unranked example careers within each family**. They never see a ranked or scored single career. The Learner Blueprint shows Juniors only the single top cluster, with no career names.
+Junior learners are guided toward a **Senior School pathway**, chosen at the end of Grade 9, not toward careers. The same scoring runs, but nothing a Junior learner or their parent sees names a specific career:
+
+- Matches are regrouped into **career families** (e.g. "Health Sciences"), formed from Strong and Stretch matches and sorted by the best alignment in each family. Each family states its capability evidence, suggests ways to explore (subjects, clubs, projects) and names the **Senior pathway** most of its careers continue through. When the corpus is split evenly, no pathway is named.
+- **No career titles appear anywhere in Junior output**: not in lists, suggestions or evidence, not in the Learner Blueprint, the parent page, the Holiday Plan or the Career Intelligence Report. The report's AI-written narrative is instructed not to name job titles for Junior learners.
+- The Career Explorer shows Junior learners the **three Senior pathways and the broad fields each opens** instead of the career catalogue.
+- **Grade 9** gets a full pathway forecast in the Learner Blueprint (KJSEA composite, what it qualifies for, and the one subject that would open the next pathway). **Grades 7–8** are told that their school-based work already counts toward placement.
+
+Specific careers, ranked matches and alignment percentages begin in Grade 10, after the pathway is chosen.
 
 ## 8. Senior pathway context
 
