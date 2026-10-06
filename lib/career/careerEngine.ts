@@ -158,6 +158,10 @@ Rules for capability weights: all 6 weights must sum to exactly 1.0. Minimum val
     complementary_career_slugs: Array.isArray(ai.complementary_career_slugs) ? ai.complementary_career_slugs as string[] : [],
     source:                     'ai_generated',
     search_count:               0,
+    // FIX 6: a fresh model draft is unreviewed by definition. It carries no
+    // knowledge_verified_at and declares itself ai_drafted; only
+    // publishReviewedCareer (a person) may turn it into 'source_cited'.
+    verification_source:        'ai_drafted',
   } as unknown as Omit<Career, 'id' | 'created_at' | 'updated_at'>
 }
 

@@ -20,14 +20,14 @@ const CAREER_FULL_COLS = [
   'required_subjects', 'skill_timeline', 'future_skills',
   'kenya_examples', 'pathway', 'disclaimer',
   'created_at', 'updated_at',
-  'knowledge_verified_at', 'knowledge_source_note',
+  'knowledge_verified_at', 'knowledge_source_note', 'verification_source',
 ].join(', ')
 
 const CAREER_SUMMARY_COLS = [
   'id', 'slug', 'title', 'category', 'description',
   'ai_impact', 'kenya_market_outlook',
   'salary_range_kes', 'required_subjects', 'pathway',
-  'knowledge_verified_at',
+  'knowledge_verified_at', 'verification_source',
 ].join(', ')
 
 const CAREER_COS_COLS = [
@@ -38,7 +38,7 @@ const CAREER_COS_COLS = [
   'saturation_note', 'kcse_minimum', 'time_to_income_years', 'cost_to_qualify',
   'risk_level', 'prestige_level', 'social_reality',
   'alternative_career_slugs', 'complementary_career_slugs',
-  'knowledge_verified_at', 'knowledge_source_note',
+  'knowledge_verified_at', 'knowledge_source_note', 'verification_source',
 ].join(', ')
 
 const INTEREST_COLS =
@@ -512,17 +512,30 @@ export class CareerRepository extends BaseRepository {
     }>
   }
 
-  /** Stamp a career as confirmed. The only place `knowledge_verified_at` moves. */
+  /**
+   * Stamp an existing career as confirmed BY A PERSON (FIX 6). Sets
+   * `verification_source = 'human'` alongside the date — this method is the
+   * human re-verification primitive, so it never records any other provenance
+   * and is never called from an AI path (guarded by
+   * reviewPublishGuards.architecture.test.ts). Throws when no career has this
+   * slug rather than silently updating zero rows.
+   */
   async markCareerKnowledgeVerified(
     slug: string,
     verifiedAt: string,
     sourceNote: string,
   ): Promise<void> {
-    const { error } = await this.db
+    const { data, error } = await this.db
       .from('careers')
-      .update({ knowledge_verified_at: verifiedAt, knowledge_source_note: sourceNote })
+      .update({
+        knowledge_verified_at: verifiedAt,
+        knowledge_source_note: sourceNote,
+        verification_source:   'human',
+      })
       .eq('slug', slug)
+      .select('id')
     if (error) throw new Error(`Failed to mark ${slug} verified: ${error.message}`)
+    if (!data || data.length === 0) throw new Error(`No career with slug ${slug} to mark verified`)
   }
 
   // ── Market cache ──────────────────────────────────────────────────────────────

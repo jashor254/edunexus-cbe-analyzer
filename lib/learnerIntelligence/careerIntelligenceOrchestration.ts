@@ -326,7 +326,9 @@ export async function getCareerBlueprintSummary(studentId: string): Promise<Care
     try {
       const career = await getCareerBySlugWithCOS(top.careerSlug)
       if (career) {
-        knowledge = assessCareerKnowledge(career.knowledge_verified_at)
+        // FIX 6: provenance is always passed; a missing value becomes null
+        // (unrecorded → never fresh), never "assume human".
+        knowledge = assessCareerKnowledge(career.knowledge_verified_at, new Date(), career.verification_source ?? null)
         doorsPreview = buildDoorsPreview(career.doors ?? [])
         // One consolidated paragraph, built only from the structured
         // `replacing`/`human_advantage` arrays — deliberately never

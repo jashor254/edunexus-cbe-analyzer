@@ -29,10 +29,24 @@
 // answer, carried on the composed data.
 
 import { CAREER_KNOWLEDGE_THRESHOLDS } from '@/lib/config/careerKnowledge'
+import type { VerificationSource } from './types'
 
 export type CareerKnowledgeFreshness = 'fresh' | 'aging' | 'stale' | 'unknown'
 
+/**
+ * WHO confirmed a career's facts, as carried on the composed state (FIX 6).
+ * `unrecorded` = the row has no provenance on record (careers.verification_source
+ * IS NULL) — never assumed to be human.
+ */
+export type CareerKnowledgeProvenance = VerificationSource | 'unrecorded'
+
 export type CareerKnowledgeState = {
+  /**
+   * Provenance of the facts. `null` only when the CALLER supplied no
+   * provenance at all (time-only assessment); every production caller passes
+   * the row's `verification_source`, so a real render always carries one.
+   */
+  provenance: CareerKnowledgeProvenance | null
   freshness: CareerKnowledgeFreshness
   /** Whole days since verification. Null when never verified. */
   ageDays: number | null
@@ -60,16 +74,78 @@ function formatVerifiedDate(iso: string): string {
   })
 }
 
+const STARTING_POINT = 'treat them as a starting point for a conversation, not as current market data.'
+
 /**
- * Classify how current a career's knowledge is.
+ * Classify how current AND how trustworthy a career's knowledge is.
  *
  * `now` is injectable so tests pin a date rather than racing the clock, and so
  * a Blueprint snapshot can be re-read later against the date it was taken.
+ *
+ * `verificationSource` (FIX 6) is the row's `careers.verification_source`.
+ * Pass `row.verification_source ?? null` — a missing value must arrive as
+ * `null` (unrecorded), never be left out:
+ *   human        — time-based freshness, original labels.
+ *   source_cited — time-based freshness, label says a person reviewed an AI
+ *                  draft, so it can never be mistaken for hand-curated data.
+ *   ai_drafted   — never fresh: `unknown`, historical framing, its own label.
+ *   null         — provenance unrecorded: never fresh, same framing, own label.
+ * Omitting the argument entirely gives the time-only assessment
+ * (`provenance: null`); production callers never omit it (guarded by
+ * reviewPublishGuards.architecture.test.ts).
  */
 export function assessCareerKnowledge(
   verifiedAt: string | null | undefined,
   now: Date = new Date(),
+  verificationSource?: VerificationSource | null,
 ): CareerKnowledgeState {
+  const temporal = assessTemporalFreshness(verifiedAt, now)
+
+  if (verificationSource === undefined) return { provenance: null, ...temporal }
+  if (verificationSource === 'human') return { provenance: 'human', ...temporal }
+  if (verificationSource === 'source_cited') {
+    return {
+      provenance: 'source_cited',
+      ...temporal,
+      asOfLabel: `Drafted with AI and reviewed by a person. ${temporal.asOfLabel}`,
+    }
+  }
+
+  // ai_drafted or unrecorded: no person has confirmed these facts (or we
+  // cannot show that one has), so the date — if any — is a draft or row-write
+  // date, not a confirmation. Never fresh, never present tense.
+  const dated = temporal.verifiedAt ? formatVerifiedDate(temporal.verifiedAt) : null
+  if (verificationSource === 'ai_drafted') {
+    return {
+      provenance: 'ai_drafted',
+      freshness: 'unknown',
+      ageDays: null,
+      verifiedAt: null,
+      asOfLabel: dated
+        ? `AI-drafted, not yet confirmed by a person (as of ${dated}) — ${STARTING_POINT}`
+        : `AI-drafted, not yet confirmed by a person — ${STARTING_POINT}`,
+      requiresHistoricalFraming: true,
+    }
+  }
+  return {
+    provenance: 'unrecorded',
+    freshness: 'unknown',
+    ageDays: null,
+    verifiedAt: null,
+    asOfLabel: dated
+      ? `We have no record of who confirmed these figures (last updated ${dated}) — ${STARTING_POINT}`
+      : `We have no record of who confirmed these figures, or when — ${STARTING_POINT}`,
+    requiresHistoricalFraming: true,
+  }
+}
+
+type TemporalKnowledgeState = Omit<CareerKnowledgeState, 'provenance'>
+
+/** Time-only freshness from the verification date (unchanged behaviour). */
+function assessTemporalFreshness(
+  verifiedAt: string | null | undefined,
+  now: Date,
+): TemporalKnowledgeState {
   if (!verifiedAt) {
     return {
       freshness: 'unknown',
@@ -135,8 +211,11 @@ export function assessCareerKnowledge(
 export function needsReverification(
   verifiedAt: string | null | undefined,
   now: Date = new Date(),
+  verificationSource?: VerificationSource | null,
 ): boolean {
-  return assessCareerKnowledge(verifiedAt, now).freshness !== 'fresh'
+  // ai_drafted and unrecorded provenance resolve to `unknown`, so they are
+  // always due — a person has to look at them before anything else.
+  return assessCareerKnowledge(verifiedAt, now, verificationSource).freshness !== 'fresh'
 }
 
 /**

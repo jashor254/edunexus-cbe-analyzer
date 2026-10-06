@@ -182,6 +182,11 @@ export async function publishReviewedCareer(
     source:                'ai_generated',
     knowledge_verified_at: now,
     knowledge_source_note: `Reviewed and published by ${reviewerId}${reviewerNotes ? ` — ${reviewerNotes}` : ''}`,
+    // FIX 6: an AI draft a person reviewed and published. Distinct from
+    // hand-curated ('human') so readers can tell the two apart; set AFTER the
+    // payload spread so a generated payload can never smuggle in its own
+    // provenance claim.
+    verification_source:   'source_cited' as const,
   }
 
   const published = await repos.careers.upsertCareer(
@@ -189,6 +194,36 @@ export async function publishReviewedCareer(
   )
   await repos.careers.markCareerReviewDecided(reviewId, 'published', reviewerId, reviewerNotes)
   return published
+}
+
+/**
+ * A person re-verifies an EXISTING canonical career (FIX 6).
+ *
+ * Distinct from publishReviewedCareer: nothing enters the corpus here and the
+ * review queue is not touched — this confirms facts already in `careers` (the
+ * rows whose provenance was never recorded, or anything gone stale) and
+ * records them as `verification_source = 'human'` with today's date. It is
+ * the only caller of repos.careers.markCareerKnowledgeVerified, it always
+ * needs a named reviewer, and it refuses an empty note: "verified" must say
+ * what was checked and against what, or it is just a new way to overclaim.
+ * No AI path calls this (reviewPublishGuards.architecture.test.ts).
+ */
+export async function markCareerHumanVerified(
+  slug: string,
+  reviewerId: string,
+  note: string,
+): Promise<void> {
+  const trimmedSlug = slug.trim()
+  const trimmedNote = note.trim()
+  if (!trimmedSlug) throw new Error('A career slug is required to verify career knowledge')
+  if (!reviewerId) throw new Error('A named reviewer is required to verify career knowledge')
+  if (!trimmedNote) throw new Error('A verification note is required — say what was checked and against which source')
+
+  await repos.careers.markCareerKnowledgeVerified(
+    trimmedSlug,
+    new Date().toISOString(),
+    `Verified by ${reviewerId} — ${trimmedNote}`,
+  )
 }
 
 export async function rejectReviewedCareer(

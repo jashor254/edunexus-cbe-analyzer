@@ -2688,6 +2688,8 @@ export async function seedCareers(): Promise<{ inserted: number; errors: string[
         ...career,
         knowledge_verified_at: verifiedAt,
         knowledge_source_note: 'Curated seed corpus (lib/career/seedCareers.ts)',
+        // FIX 6: the hand-curated seed corpus is human-authored knowledge.
+        verification_source:   'human',
       })
       inserted++
     } catch (err) {

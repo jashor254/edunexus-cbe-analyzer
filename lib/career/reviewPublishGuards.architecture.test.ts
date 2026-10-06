@@ -73,3 +73,78 @@ test('Guard D — publish still requires an explicit reviewerId and reviewId arg
   assert.ok(sig![1].includes('reviewId'))
   assert.ok(sig![1].includes('reviewerId'))
 })
+
+// ── FIX 6 — AI may draft, AI may request review, AI may not self-verify ──────
+//
+// Source-text guards for the provenance boundary added by
+// supabase/migrations/20261006120000_careers_verification_source.sql. They
+// prove what a live DB test can't cheaply: that no AI path can stamp a
+// verified provenance, and that the only human-verify stamp is reachable only
+// through a named-reviewer function behind the admin gate.
+
+/** Drop // line comments and /* block comments *\/ so guards match code, never prose. */
+function codeOnly(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/.*$/gm, '')
+}
+
+function sliceBetween(source: string, start: string, end: string): string {
+  const from = source.indexOf(start)
+  assert.ok(from >= 0, `marker not found: ${start}`)
+  const to = source.indexOf(end, from + start.length)
+  return to >= 0 ? source.slice(from, to) : source.slice(from)
+}
+
+test('Guard P (provenance) — generateCareerProfile drafts declare ai_drafted and never claim a verification', () => {
+  const body = codeOnly(sliceBetween(read('lib/career/careerEngine.ts'), 'export async function generateCareerProfile', '// ── READ'))
+  assert.ok(/verification_source:\s*'ai_drafted'/.test(body), 'AI drafts must declare themselves ai_drafted')
+  assert.ok(!/verification_source:\s*'(human|source_cited)'/.test(body), 'an AI draft must never claim human/source_cited')
+  assert.ok(!/knowledge_verified_at\s*:/.test(body), 'an AI draft must never carry a verification date')
+  assert.ok(!body.includes('markCareerKnowledgeVerified('), 'an AI draft must never call the human stamp')
+})
+
+test('Guard P (provenance) — requestCareerKnowledge (the learner/AI path) never writes the corpus or stamps verification', () => {
+  const body = codeOnly(sliceBetween(read('lib/career/knowledgeRequests.ts'), 'export async function requestCareerKnowledge', 'export async function publishReviewedCareer'))
+  assert.ok(!body.includes('upsertCareer('), 'requestCareerKnowledge must not write the corpus')
+  assert.ok(!body.includes('markCareerKnowledgeVerified('), 'requestCareerKnowledge must not call the human stamp')
+  assert.ok(!/knowledge_verified_at\s*:/.test(body), 'requestCareerKnowledge must not set a verification date')
+  assert.ok(!/verification_source\s*:/.test(body), 'requestCareerKnowledge must not set provenance')
+})
+
+test('Guard P (provenance) — publishReviewedCareer sets source_cited AFTER spreading the payload (payload cannot override it)', () => {
+  const body = codeOnly(sliceBetween(read('lib/career/knowledgeRequests.ts'), 'export async function publishReviewedCareer', 'export async function markCareerHumanVerified'))
+  const spreadAt = body.indexOf('...(review.payload')
+  const provenanceAt = body.search(/verification_source:\s*'source_cited'/)
+  assert.ok(spreadAt >= 0 && provenanceAt > spreadAt, 'source_cited must be assigned after the payload spread')
+})
+
+test('Guard P (provenance) — the human stamp is called only from markCareerHumanVerified, which requires a named reviewer', () => {
+  const lib = codeOnly(read('lib/career/knowledgeRequests.ts'))
+  assert.equal((lib.match(/markCareerKnowledgeVerified\(/g) ?? []).length, 1, 'exactly one caller of the human stamp')
+  const sig = lib.match(/export async function markCareerHumanVerified\(([^)]*)\)/)
+  assert.ok(sig && sig[1].includes('reviewerId'), 'markCareerHumanVerified must take a reviewerId')
+  for (const file of [
+    'lib/career/careerEngine.ts',
+    'app/api/career/search/route.ts',
+    'app/api/career/[slug]/route.ts',
+    'app/api/admin/career/review/route.ts',
+  ]) {
+    assert.ok(!codeOnly(read(file)).includes('markCareerKnowledgeVerified('), `${file} must not call the human stamp`)
+  }
+})
+
+test('Guard P (provenance) — the verify route authenticates through the admin gate before verifying', () => {
+  const route = read('app/api/admin/career/verify/route.ts')
+  const gateAt = route.indexOf('await requireGrowthUser(supabase)')
+  const verifyAt = route.indexOf('await markCareerHumanVerified(')
+  assert.ok(gateAt >= 0, 'verify route must use requireGrowthUser')
+  assert.ok(verifyAt > gateAt, 'the gate must run before any verification')
+})
+
+test('Guard P (provenance) — the production freshness caller always passes provenance', () => {
+  const orchestration = codeOnly(read('lib/learnerIntelligence/careerIntelligenceOrchestration.ts'))
+  const callLines = orchestration.split('\n').filter(line => line.includes('assessCareerKnowledge('))
+  assert.ok(callLines.length >= 1, 'expected the Blueprint summary to assess career knowledge')
+  for (const line of callLines) {
+    assert.ok(line.includes('verification_source'), `freshness call omits provenance: ${line.trim()}`)
+  }
+})

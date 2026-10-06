@@ -95,6 +95,15 @@ export type CareerCategory =
 
 export type DoorType = 'employment' | 'self_employment' | 'entrepreneurship' | 'ai_era'
 
+/**
+ * Provenance of a career's facts — mirrors the `careers.verification_source`
+ * CHECK constraint (supabase/migrations/20261006120000_careers_verification_source.sql).
+ *   human        — hand-curated, or re-verified by a person via the admin action
+ *   source_cited — an AI draft a person reviewed and published (publishReviewedCareer)
+ *   ai_drafted   — generated and NOT human-reviewed; never presented as verified
+ */
+export type VerificationSource = 'human' | 'source_cited' | 'ai_drafted'
+
 // The 3 official CBC senior-school pathways — every career must fall under exactly one.
 export type CareerPathway = 'STEM' | 'Social Sciences' | 'Arts & Sports Science'
 
@@ -209,6 +218,12 @@ export type Career = {
    */
   knowledge_verified_at?: string | null
   knowledge_source_note?: string | null
+  /**
+   * WHO or WHAT confirmed this career's facts (FIX 6). Null means provenance
+   * was never recorded — treated as not-fresh by `assessCareerKnowledge()`
+   * until a person verifies it. Read it through lib/career/knowledgeLifecycle.ts.
+   */
+  verification_source?: VerificationSource | null
   // ── COS Phase 1: Capability Intelligence ──────────────────────────────────
   required_capabilities?:      CareerCapabilityRequirements
   capability_cluster?:         string[]
