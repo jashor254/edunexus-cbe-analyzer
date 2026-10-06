@@ -51,6 +51,14 @@ const TREND_MULTIPLIER: Record<string, number> = {
 
 // ── Core scoring ─────────────────────────────────────────────────────────────
 
+// Clamp to the closed unit interval [0, 1]. Every score in this engine is a
+// fraction of required weight, so nothing may legitimately leave that range
+// (FIX 2). All the numbers here are already on the normalized 0–1 scale the
+// capability profile produces — never raw CBC 1–4.
+function clamp01(n: number): number {
+  return Math.max(0, Math.min(1, n))
+}
+
 function scoreDimension(
   studentScore:  number,
   req:           { minimum: number; ideal: number; weight: number },
@@ -69,7 +77,14 @@ function scoreDimension(
     base = req.weight * Math.max(0, 0.5 - severity * 0.65)  // 0%→50% of weight
   }
 
-  return base * (TREND_MULTIPLIER[trend] ?? 1.0)
+  // FIX 2: the trend multiplier (accelerating = 1.08) must never push a
+  // dimension's contribution above its own weight — that is exactly what let a
+  // perfect accelerating learner reach rawScore 1.08 and alignmentToPercent
+  // 108%. Cap at `weight` AFTER applying the multiplier. Momentum reweighting
+  // is preserved for learners below ideal: there `base < weight`, so a
+  // 1.04–1.08× nudge still lands at or under full credit, and the cap only
+  // bites when the nudge would otherwise exceed the dimension's own ceiling.
+  return Math.min(req.weight, base * (TREND_MULTIPLIER[trend] ?? 1.0))
 }
 
 // ── Gap/strength extraction ────────────────────────────────────────────────────
@@ -220,20 +235,46 @@ function scoreCareer(
   dimensionScores: Partial<Record<CapabilityDimension, number>>
   gaps:            CapabilityGap[]
   strengths:       CapabilityStrength[]
+  /**
+   * FIX 3: the share of this career's required dimension weight that was
+   * dropped because the learner has zero evidence (confidence 0) for it. The
+   * caller uses this to force Low confidence + a caveat when more than half of
+   * what the career needs is unmeasured — "we scored you on the evidence we
+   * have, but it's thin for this career," never a fabricated weakness.
+   */
+  excludedWeightRatio: number
+  /** The dimensions excluded for lack of evidence, for the caveat text. */
+  unobservedDimensions: CapabilityDimension[]
 } | null {
   const req = career.required_capabilities
   if (!req) return null   // career has no COS data yet — skip
 
-  let totalWeight  = 0
-  let totalScore   = 0
+  let totalWeight    = 0   // observed required weight (denominator)
+  let totalScore     = 0   // observed contributions (numerator)
+  let excludedWeight = 0   // required weight dropped for zero-evidence dims
   const dimensionScores: Partial<Record<CapabilityDimension, number>> = {}
   const gaps:      CapabilityGap[]      = []
   const strengths: CapabilityStrength[] = []
+  const unobservedDimensions: CapabilityDimension[] = []
 
   for (const dim of DIMENSIONS) {
     const dimReq     = req[dim]
     const dimProfile = profile[dim]
     if (!dimReq || !dimProfile) continue
+
+    // FIX 3: a dimension with confidence 0 has no observed subjects behind it —
+    // its raw_score is the extractor's 0.35 placeholder, NOT a measurement.
+    // Treat it as unknown, never weakness: exclude it from the numerator, the
+    // denominator, gap/weakness classification AND the gap narrative. Scoring
+    // it (as the engine did before) turned "no evidence" into a fabricated
+    // moderate gap and dragged the score down. "No evidence = unknown, never
+    // weakness." Only the required weight is remembered, so the caller can tell
+    // how much of the career went unmeasured.
+    if (dimProfile.confidence === 0) {
+      excludedWeight += dimReq.weight
+      unobservedDimensions.push(dim)
+      continue
+    }
 
     const contribution = scoreDimension(dimProfile.raw_score, dimReq, dimProfile.trend)
     dimensionScores[dim] = contribution
@@ -261,9 +302,17 @@ function scoreCareer(
     }
   }
 
+  // No observed required dimension at all — every dimension the career needs is
+  // unmeasured. Returning null skips the career rather than inventing a score
+  // from nothing (FIX 3 Case C: no fabricated weaknesses, no misleading match).
   if (totalWeight === 0) return null
 
-  let rawScore = totalScore / totalWeight
+  // FIX 2: clamp to [0, 1] BEFORE the confidence caps. With scoreDimension now
+  // capping each contribution at its weight, totalScore <= totalWeight already,
+  // so this is a belt-and-suspenders guarantee of the score contract rather
+  // than the primary bound — it also protects against any future scorer whose
+  // contribution could exceed its weight.
+  let rawScore = clamp01(totalScore / totalWeight)
 
   // Confidence cap: low assessment count → constrain score ceiling
   if (profile.assessment_count < 2) rawScore = Math.min(rawScore, 0.65)
@@ -273,7 +322,11 @@ function scoreCareer(
   const severityOrder: GapSeverity[] = ['significant', 'moderate', 'minor', 'none']
   gaps.sort((a, b) => severityOrder.indexOf(a.gap_severity) - severityOrder.indexOf(b.gap_severity))
 
-  return { score: rawScore, dimensionScores, gaps, strengths }
+  // Share of required weight (observed + excluded) that went unmeasured.
+  const totalRequiredWeight = totalWeight + excludedWeight
+  const excludedWeightRatio = totalRequiredWeight > 0 ? excludedWeight / totalRequiredWeight : 0
+
+  return { score: rawScore, dimensionScores, gaps, strengths, excludedWeightRatio, unobservedDimensions }
 }
 
 // ── Tier classification ────────────────────────────────────────────────────────
@@ -307,6 +360,12 @@ function qualifiesForEntrepreneurialTier(profile: CapabilityProfile): boolean {
   )
 }
 
+// FIX 3: when more than this share of a career's required dimension weight is
+// unmeasured (confidence 0), the match confidence is floored to Low with a
+// caveat. Half is the line: at or below it, the match still rests on the
+// majority of what the career needs; above it, it does not.
+const INSUFFICIENT_EVIDENCE_WEIGHT_THRESHOLD = 0.5
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export function computeCapabilityMatches(
@@ -328,11 +387,28 @@ export function computeCapabilityMatches(
     if (!result) continue
     totalScored++
 
+    // FIX 3: when more than half of a career's required dimension weight was
+    // excluded for lack of evidence (confidence 0), the match is built on too
+    // little of what the career actually needs — floor its confidence to Low
+    // and say so, regardless of how many assessments exist overall. A learner
+    // can have plenty of assessments yet no evidence for the dimensions THIS
+    // career leans on.
+    const evidenceInsufficient = result.excludedWeightRatio > INSUFFICIENT_EVIDENCE_WEIGHT_THRESHOLD
+    const matchConfidence: ConfidenceLevel = evidenceInsufficient ? 'Low' : confidence
+
     const tier = classifyTier(result.score)
     const realityCheck = buildRealityCheck(career, profile)
-    const narrative    = buildMatchNarrative(
+    // The assessment-count `confidence` is passed to the narrative so its
+    // generic "small number of assessments" caveat stays accurate to evidence
+    // VOLUME; the evidence-COVERAGE caveat below names the specific unmeasured
+    // dimensions, so neither caveat misstates the other's cause.
+    let narrative = buildMatchNarrative(
       tier, career, result.gaps, result.strengths, result.score, profile, confidence
     )
+    if (evidenceInsufficient) {
+      const dims = result.unobservedDimensions.map(d => CAPABILITY_LABELS[d]).join(', ')
+      narrative += ` This match is based on incomplete capability evidence — there is not yet evidence for ${dims}, which ${career.title} relies on, so treat it as provisional until more assessments arrive.`
+    }
 
     const match: CapabilityCareerMatch = {
       career_slug:      career.slug,
@@ -341,7 +417,7 @@ export function computeCapabilityMatches(
       pathway:          career.pathway,
       tier,
       alignment_score:  Math.round(result.score * 1000) / 1000,
-      confidence,
+      confidence:       matchConfidence,
       dimension_scores: result.dimensionScores,
       gaps:             result.gaps,
       strengths:        result.strengths,
@@ -360,7 +436,10 @@ export function computeCapabilityMatches(
       entrepreneurial.push({
         ...match,
         tier:      'entrepreneurial',
-        narrative: buildMatchNarrative('entrepreneurial', career, result.gaps, result.strengths, result.score, profile, confidence),
+        // Inherits matchConfidence via the spread; the narrative uses the same
+        // floored confidence so a thin-evidence entrepreneurial promotion still
+        // reads as provisional.
+        narrative: buildMatchNarrative('entrepreneurial', career, result.gaps, result.strengths, result.score, profile, matchConfidence),
       })
     }
   }

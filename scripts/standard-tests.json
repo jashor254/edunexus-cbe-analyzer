@@ -46,6 +46,7 @@
     "lib/calendar/calendar.pure.test.ts",
     "lib/career/capabilityConvergence.architecture.test.ts",
     "lib/career/capabilityExtractor.test.ts",
+    "lib/career/capabilityMatchEngine.test.ts",
     "lib/career/capabilityExtractorPurity.architecture.test.ts",
     "lib/career/careerSignals.test.ts",
     "lib/career/knowledgeLifecycle.test.ts",
