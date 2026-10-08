@@ -72,3 +72,47 @@ export type PaperVisionResponse = {
   questions: RecognizedQuestionAnswer[]
   metadata: PaperRecognitionMetadata
 }
+
+// ── Scheme extraction (Phase 1) ──────────────────────────────────────────
+// Reading a photographed marking scheme into structured, teacher-editable
+// rubrics. The AI PROPOSES; the teacher authors on confirm — open_response_
+// rubrics stays teacher-authored (Prototype 01 Gate 2), the AI never writes
+// it directly. Extraction output is shown on an editable screen first; only
+// a teacher's Confirm persists it.
+
+export type SchemeImage = {
+  /** Raw image bytes, base64-encoded — a scheme page the teacher photographed. */
+  imageBase64: string
+  mimeType: 'image/jpeg' | 'image/png' | 'image/webp'
+}
+
+export type AcceptedAnswer = {
+  text: string
+  synonyms: string[]
+}
+
+export type RubricMode = 'strict' | 'accept_relevant'
+
+export type ExtractedRubric = {
+  /** Question label as printed, e.g. "1a", "2", "7". Not a DB id. */
+  questionId: string
+  /** The verb that sets the marking bar — "State", "Explain", "Discuss", … */
+  commandWord: string
+  topic: string
+  /** "Any 5x1=5" → 5; "Any 4x2=8" → 4. How many points earn marks. */
+  pointsRequired: number
+  /** "5x1" → 1; "4x2" → 2 (a 2-mark point = named + explained). */
+  marksPerPoint: number
+  maxMarks: number
+  mode: RubricMode
+  curriculumStrand: string | null
+  acceptedAnswers: AcceptedAnswer[]
+  /** True when part of this question could not be read confidently — surfaced for teacher review, never guessed past. */
+  uncertain: boolean
+  uncertaintyNote: string | null
+}
+
+export type SchemeExtractionResponse = {
+  rubrics: ExtractedRubric[]
+  metadata: PaperRecognitionMetadata
+}
