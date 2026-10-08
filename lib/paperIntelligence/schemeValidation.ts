@@ -14,7 +14,12 @@ const AcceptedAnswerSchema = z.object({
   synonyms: z.array(z.string()).optional().default([]),
 })
 
-const RawRubricSchema = z.object({
+/**
+ * One extracted rubric's shape. Exported so the persist route can validate a
+ * teacher-confirmed (possibly edited) rubric against the exact same contract
+ * the model output is held to — one schema, no drift.
+ */
+export const ExtractedRubricSchema = z.object({
   questionId: z.string().min(1),
   commandWord: z.string(),
   topic: z.string(),
@@ -29,7 +34,7 @@ const RawRubricSchema = z.object({
 })
 
 const RawSchemeResponseSchema = z.object({
-  rubrics: z.array(RawRubricSchema),
+  rubrics: z.array(ExtractedRubricSchema),
 })
 
 export type ExtractedRubricValidationResult =

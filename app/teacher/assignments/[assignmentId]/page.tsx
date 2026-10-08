@@ -448,12 +448,20 @@ export default function AssignmentMarkingPage({ params }: { params: Promise<{ as
           <Link href="/teacher/assignments" className="text-sm text-gray-400 hover:text-gray-600 font-medium">
             ← Back to Assignments
           </Link>
-          <Link
-            href={`/teacher/assignments/${assignmentId}/results`}
-            className="text-sm font-bold text-teal-600 hover:text-teal-800 border border-teal-200 hover:border-teal-400 px-3 py-1.5 rounded-xl transition"
-          >
-            Upload Paper Results
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/teacher/assignments/${assignmentId}/paper-intelligence`}
+              className="text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 px-3 py-1.5 rounded-xl transition"
+            >
+              ✨ Mark with Paper Intelligence
+            </Link>
+            <Link
+              href={`/teacher/assignments/${assignmentId}/results`}
+              className="text-sm font-bold text-teal-600 hover:text-teal-800 border border-teal-200 hover:border-teal-400 px-3 py-1.5 rounded-xl transition"
+            >
+              Upload Paper Results
+            </Link>
+          </div>
         </div>
 
         <div className="mt-3">
