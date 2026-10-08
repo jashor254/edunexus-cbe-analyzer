@@ -226,7 +226,13 @@ jobs:
           # 20261006120000_careers_verification_source.sql (adds nullable
           # careers.verification_source + CHECK). Reviewed: it was the only
           # schema change; bootstrap FAIL_COUNT=9 UNRECOVERED=0, unchanged.
-          EXPECTED="764147d87a8e10ff4a6d8610f2a6798f"
+          # 2026-10-08: 764147d8… → 2f4e920c… for migration
+          # 20261008120000_paper_intelligence_phase1_marking.sql (adds
+          # open_response_rubrics.accepted_answers + tables
+          # assignment_submission_pages, paper_intelligence_rubric_audit, all
+          # additive). Reviewed: only schema change; FAIL_COUNT=9 UNRECOVERED=0,
+          # unchanged.
+          EXPECTED="2f4e920c699f91a29e8bbd6379ab1a37"
           echo "expected: $EXPECTED"
           echo "actual:   $ACTUAL"
           if [ "$ACTUAL" != "$EXPECTED" ]; then
