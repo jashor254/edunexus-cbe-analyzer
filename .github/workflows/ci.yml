@@ -232,7 +232,12 @@ jobs:
           # assignment_submission_pages, paper_intelligence_rubric_audit, all
           # additive). Reviewed: only schema change; FAIL_COUNT=9 UNRECOVERED=0,
           # unchanged.
-          EXPECTED="2f4e920c699f91a29e8bbd6379ab1a37"
+          # 2026-10-08: 2f4e920c… → 82de47d1… for migration
+          # 20261008123000_open_response_rubrics_phase1_fields.sql (adds
+          # open_response_rubrics.question_label/mode/points_required/
+          # marks_per_point, all additive). Reviewed: only schema change;
+          # FAIL_COUNT=9 UNRECOVERED=0, unchanged.
+          EXPECTED="82de47d10f5f6716662d2b1161f60008"
           echo "expected: $EXPECTED"
           echo "actual:   $ACTUAL"
           if [ "$ACTUAL" != "$EXPECTED" ]; then
