@@ -125,7 +125,7 @@ const TEACHER_PLANNING_PRODUCT: PayProduct = {
   features: [
     'Scheme of Work for the full term',
     'Every lesson plan in that scheme\n(generated week by week, as you teach)',
-    'Record of Work — kept up to date for you',
+    'Record of Work — structured from your plan, you confirm what you taught',
     'CBC-aligned, TSC inspection ready',
     'PDF downloads for all three',
   ],
@@ -481,8 +481,8 @@ function TeacherSection({
               <p className="text-sm font-black text-amber-400 mb-1">How it works</p>
               <p className="text-sm text-white/60 leading-relaxed">
                 You buy one subject&apos;s planning for one term. The Scheme of Work comes first,
-                then its lesson plans week by week as you teach, and the Record of Work keeps
-                itself up to date behind you. <strong className="text-white">One payment, at the start —
+                then its lesson plans week by week as you teach, and the Record of Work is laid out
+                ready for you to confirm what you actually taught. <strong className="text-white">One payment, at the start —
                 nothing more for that subject, that term.</strong>
               </p>
             </div>
