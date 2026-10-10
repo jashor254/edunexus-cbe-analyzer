@@ -209,11 +209,11 @@ const FAQ_ITEMS: FAQItem[] = [
   },
   {
     q: 'What is the Term Planning Bundle exactly?',
-    a: 'One bundle covers one subject for one term: the Scheme of Work, every lesson plan in that scheme, and the Record of Work. You pay KES 100 once, at the start — the lesson plans and the Record of Work that follow cost nothing extra. A teacher who teaches three subjects buys three bundles.',
+    a: `One bundle covers one subject for one term: the Scheme of Work, every lesson plan in that scheme, and the Record of Work. You pay KES ${TEACHER_PLANNING_BUNDLE.priceKes} once, at the start — the lesson plans and the Record of Work that follow cost nothing extra. A teacher who teaches three subjects buys three bundles.`,
   },
   {
     q: 'What is the first free Scheme of Work?',
-    a: 'Your genuinely first Scheme of Work is free — no card, no payment. It lets you see exactly what EduNexus produces before deciding to continue. After that, each subject you plan for the term is one KES 100 bundle.',
+    a: `Your genuinely first Scheme of Work is free — no card, no payment. It lets you see exactly what EduNexus produces before deciding to continue. After that, each subject you plan for the term is one KES ${TEACHER_PLANNING_BUNDLE.priceKes} bundle.`,
   },
   {
     q: 'Which curriculum does EduNexus support?',

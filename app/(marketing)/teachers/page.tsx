@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ArrowRight, CheckCircle2 } from 'lucide-react'
 import { FOCUS_RING } from '../constants'
 import { TeacherWorkspaceCards, TeacherAutomationTimeline } from '../components/TeacherWorkspace'
+import { TEACHER_PLANNING_BUNDLE } from '@/lib/payments/config'
 
 export const metadata = {
   title: 'For Teachers | EduNexus',
@@ -142,7 +143,7 @@ export default function TeachersPage() {
           <p className="text-white/55 leading-relaxed mb-8">
             Every teacher&apos;s genuinely first Scheme of Work is free — no card, no payment.
             After that, a Term Planning Bundle (one scheme, all its lesson plans, and its Record of
-            Work) is KES 100 per subject, per term. If your school is on EduNexus, your whole
+            Work) is KES {TEACHER_PLANNING_BUNDLE.priceKes} per subject, per term. If your school is on EduNexus, your whole
             teacher workspace is included automatically, at no cost to you.
           </p>
           <Link
