@@ -101,6 +101,12 @@ jobs:
       - name: Architecture check
         run: node scripts/check-architecture.mjs
 
+      # Every app/api route is guarded or a reviewed exception in
+      # scripts/security/route-auth-registry.json; crons use CRON_SECRET only;
+      # webhooks verify signatures; no test/debug routes.
+      - name: Route auth check
+        run: node scripts/check-route-auth.mjs
+
   # ── Standard tests ────────────────────────────────────────────────────────────
   # Runs scripts/standard-tests.json (Phase H1A/H1S-FIX/H1C) — every file in it
   # was individually verified to need zero Supabase/AI/payment/WhatsApp

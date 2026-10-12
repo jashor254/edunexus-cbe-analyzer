@@ -162,6 +162,7 @@
     "lib/paperIntelligence/evidence.test.ts",
     "lib/sow/generationJob.test.ts",
     "lib/kiswahili/inshaBilling.test.ts",
-    "lib/payments/paywall.test.ts"
+    "lib/payments/paywall.test.ts",
+    "scripts/security/route-auth-rules.test.ts"
   ]
 }

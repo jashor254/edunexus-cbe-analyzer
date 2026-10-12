@@ -1,0 +1,129 @@
+{
+  "description": "Reviewed exceptions for scripts/check-route-auth.mjs. A route lands here only if it is genuinely public, authenticates inside a named lib/ function, or re-exports another route. Every entry needs a reason and a reviewed date. Adding an entry is a security decision — review the route before adding it; never add one just to make CI pass.",
+  "routes": {
+    "health": {
+      "kind": "public",
+      "reason": "Uptime monitoring (UptimeRobot). Returns only aggregate status from checkHealth().",
+      "reviewed": "2026-10-12"
+    },
+    "platform/health": {
+      "kind": "public",
+      "reason": "Monitoring endpoint. FOLLOW-UP (low, docs/security/findings.md SEC-2026-10-12-05): returns raw DB error text, AI provider names and queue counts to anonymous callers, and runs 4 service-role queries per hit.",
+      "reviewed": "2026-10-12"
+    },
+    "callback": {
+      "kind": "public",
+      "reason": "Supabase OAuth/magic-link callback — exchanges the one-time code for a session; there is no user yet.",
+      "reviewed": "2026-10-12"
+    },
+    "beta/teacher-count": {
+      "kind": "public",
+      "reason": "Marketing counter — reads a single aggregate value from beta_stats.",
+      "reviewed": "2026-10-12"
+    },
+    "early-access/register": {
+      "kind": "public",
+      "reason": "Pre-signup lead capture form (insert-only into early_access_leads).",
+      "reviewed": "2026-10-12"
+    },
+    "insights/newsletter": {
+      "kind": "public",
+      "reason": "Public newsletter subscribe form for the Insights blog.",
+      "reviewed": "2026-10-12"
+    },
+    "insights/search": {
+      "kind": "public",
+      "reason": "Search over published public Insights articles.",
+      "reviewed": "2026-10-12"
+    },
+    "insights/views": {
+      "kind": "public",
+      "reason": "Public article view counter (increment_insights_view).",
+      "reviewed": "2026-10-12"
+    },
+    "academic-clinic/pdf": {
+      "kind": "delegated",
+      "guard": "handleClinicPdfDownload",
+      "reason": "lib/academicClinic/clinicPdfHandler.ts calls checkFeatureAccess('clinic_report') first and returns 401 on 'unauthenticated'.",
+      "reviewed": "2026-10-12"
+    },
+    "teacher/assignments/[id]/print-routes/[printRunId]/approve": {
+      "kind": "delegated",
+      "guard": "approvePrintRun",
+      "reason": "lib/assignments/printRoutes.ts: requireAuthentication + resolveTeacher + assignment ownership before any write.",
+      "reviewed": "2026-10-12"
+    },
+    "teacher/assignments/[id]/print-routes/[printRunId]/regenerate": {
+      "kind": "delegated",
+      "guard": "regeneratePrintRun",
+      "reason": "lib/assignments/printRoutes.ts: requireAuthentication + resolveTeacher + assignment ownership before any write.",
+      "reviewed": "2026-10-12"
+    },
+    "teacher/blueprint/actions": {
+      "kind": "delegated",
+      "guard": "listBlueprintActionsForLearner",
+      "reason": "GET -> listBlueprintActionsForLearner (requireManageAccess); POST -> proposeBlueprintAction (requireAuthentication + requireManageAccess), lib/learnerBlueprint/actionPlan/lifecycle.ts.",
+      "reviewed": "2026-10-12"
+    },
+    "teacher/blueprint/actions/[actionItemId]/approve": {
+      "kind": "delegated",
+      "guard": "approveBlueprintAction",
+      "reason": "recordDecision(): requireAuthentication + requireManageAccess, lib/learnerBlueprint/actionPlan/lifecycle.ts.",
+      "reviewed": "2026-10-12"
+    },
+    "teacher/blueprint/actions/[actionItemId]/defer": {
+      "kind": "delegated",
+      "guard": "deferBlueprintAction",
+      "reason": "recordDecision(): requireAuthentication + requireManageAccess, lib/learnerBlueprint/actionPlan/lifecycle.ts.",
+      "reviewed": "2026-10-12"
+    },
+    "teacher/blueprint/actions/[actionItemId]/reject": {
+      "kind": "delegated",
+      "guard": "rejectBlueprintAction",
+      "reason": "recordDecision(): requireAuthentication + requireManageAccess, lib/learnerBlueprint/actionPlan/lifecycle.ts.",
+      "reviewed": "2026-10-12"
+    },
+    "teacher/blueprint/actions/[actionItemId]/deliver-assignment": {
+      "kind": "delegated",
+      "guard": "deliverBlueprintActionAsAssignment",
+      "reason": "lib/learnerBlueprint/actionPlan/delivery/assignment.ts: requireAuthentication first.",
+      "reviewed": "2026-10-12"
+    },
+    "teacher/blueprint/actions/[actionItemId]/deliver-compass": {
+      "kind": "delegated",
+      "guard": "deliverBlueprintActionToCompass",
+      "reason": "lib/learnerBlueprint/actionPlan/delivery/compass.ts: requireAuthentication first.",
+      "reviewed": "2026-10-12"
+    },
+    "admin/init": {
+      "kind": "shared-secret",
+      "secret": "ADMIN_CONFIG.adminSecret",
+      "reason": "One-time admin bootstrap; Bearer ADMIN_SECRET compared with timingSafeEqualString before the service client is built.",
+      "reviewed": "2026-10-12"
+    },
+    "admin/trigger-cleanup": {
+      "kind": "shared-secret",
+      "secret": "ADMIN_CONFIG.adminSecret",
+      "reason": "Manual trigger for cron/cleanup-users; Bearer ADMIN_SECRET compared with timingSafeEqualString.",
+      "reviewed": "2026-10-12"
+    },
+    "admin/cleanup-stats": {
+      "kind": "shared-secret",
+      "secret": "ADMIN_CONFIG.adminSecret",
+      "reason": "Cleanup statistics (includes user emails); Bearer ADMIN_SECRET compared with timingSafeEqualString before any query.",
+      "reviewed": "2026-10-12"
+    },
+    "learner-accounts/claim": {
+      "kind": "delegated",
+      "guard": "claimLearnerAccountActivation",
+      "reason": "Bootstraps a learner's FIRST session, so no prior user exists. Authority = possession of a one-time school-issued activation token validated in lib/core/learnerAccounts.ts; never a client-supplied identity.",
+      "reviewed": "2026-10-12"
+    },
+    "whatsapp/inbound": {
+      "kind": "reexport",
+      "target": "webhooks/whatsapp",
+      "reason": "Legacy callback URL; re-exports the signature-verified webhook so either URL registered with Meta works.",
+      "reviewed": "2026-10-12"
+    }
+  }
+}
