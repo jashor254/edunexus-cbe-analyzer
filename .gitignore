@@ -72,6 +72,12 @@ e2e-edunexus.mjs
 generated-reports/*.pdf
 !generated-reports/.gitkeep
 /*-test.pdf
+# root-level PDFs are always generated reports (some from real learner rows,
+# e.g. scripts/testMarionReport.ts) and the repo is public — never commit them
+/*.pdf
+# root-level throwaway key/probe pages (test-paystack.html shipped a key)
+/test-*.html
+/final-check.js
 
 # growth outreach data — real school contact PII / campaign logs, not source
 scripts/growth/output/
