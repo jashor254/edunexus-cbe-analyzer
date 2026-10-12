@@ -1,0 +1,91 @@
+# .github/workflows/security.yml
+# EduNexus security early-warning pipeline (docs/security/README.md).
+#
+# On every push / PR:
+#   - dependency audit gate: blocks on any high/critical production advisory
+#     not in docs/security/accepted-risks.json (scripts/check-dependency-audit.mjs)
+#   - gitleaks: scans ONLY the commits in this push/PR for secrets. A full
+#     history scan would fire forever on leaks already removed and rotated;
+#     GitHub secret scanning + push protection keep covering full history.
+#
+# Nightly (03:00 UTC, ~06:00 EAT): re-runs the dependency gate against code
+# that has NOT changed — this is what catches an advisory published today.
+# A failure opens (or comments on) a single `security-nightly` issue, so a
+# finding reaches the founder's inbox instead of waiting for a manual audit.
+#
+# The route-auth gate runs in ci.yml's Architecture job; CodeQL in codeql.yml.
+
+name: Security
+
+on:
+  push:
+    branches: [main, develop, 'feat/**', 'fix/**', 'refactor/**']
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Audits the committed lockfile (--package-lock-only) — no npm ci needed.
+      - name: Dependency audit gate
+        run: node scripts/check-dependency-audit.mjs
+
+  secret-scan:
+    name: Secret scan (new commits)
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  nightly-alert:
+    name: Open issue on nightly failure
+    needs: [dependency-audit]
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the security-nightly issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh label create security-nightly --color B60205 \
+            --description 'Raised by the nightly security workflow' 2>/dev/null || true
+          existing=$(gh issue list --label security-nightly --state open --json number --jq '.[0].number')
+          body="The nightly security check failed on unchanged code — most likely a newly published advisory.
+
+          Run: ${RUN_URL}
+
+          Next step: read the failing step's output, then upgrade (and \`npm run build\`), or — only after proving it is unreachable — add a dated entry to docs/security/accepted-risks.json. See docs/security/README.md."
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --label security-nightly \
+              --title "Security: nightly check failed ($(date -u +%Y-%m-%d))" --body "$body"
+          fi
