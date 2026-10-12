@@ -1,0 +1,23 @@
+{
+  "description": "Reviewed, consciously accepted security advisories. scripts/check-dependency-audit.mjs blocks CI on any high/critical production advisory NOT listed here, and on any entry past its 'expires' date — so an acceptance is a dated decision that must be re-reviewed, never a permanent mute. Add an entry only after checking reachability in our own code; record how you checked in 'reason'.",
+  "advisories": [
+    {
+      "id": "GHSA-5p2g-fcmc-qvqq",
+      "package": "image-size",
+      "severity": "high",
+      "via": "pptxgenjs@4.0.1 (latest; pins image-size@^1.2.1)",
+      "reason": "DoS in the JXL/HEIF image parsers. Not reachable: lib/slides/pptxBuilder.ts (the only pptxgenjs user) builds slides from shapes/text/colours and never calls addImage, so image-size never parses input. Re-verified 2026-10-12 (no addImage/image-size use in lib/app/components). No upstream fix.",
+      "accepted": "2026-09-30",
+      "expires": "2027-01-12"
+    },
+    {
+      "id": "GHSA-w3rx-r6r6-pgpr",
+      "package": "image-size",
+      "severity": "high",
+      "via": "pptxgenjs@4.0.1 (latest; pins image-size@^1.2.1)",
+      "reason": "DoS in the ICNS image parser. Not reachable for the same reason as GHSA-5p2g-fcmc-qvqq: no image is ever added to a generated deck. Re-verified 2026-10-12. No upstream fix.",
+      "accepted": "2026-09-30",
+      "expires": "2027-01-12"
+    }
+  ]
+}
