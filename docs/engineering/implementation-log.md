@@ -3613,3 +3613,27 @@ Verifying the nine fixes above against a live session surfaced two more, both of
 - **Profile refresh**: all 328 saved capability profiles were recomputed through `recomputeAndSaveCapabilityProfile` after deploy (0 failures, 330 history rows, backup kept in the session scratchpad).
 - **Junior alignment** (`5e1f209`, `7d203b8`, `ff73479`): Grades 7–9 see pathways, not careers. Details in ADR-0033, "Junior alignment". Tests: `careerJuniorFamilies.test.ts`, the synthetic zero-titles assertion, and `juniorCareerSurfaces.architecture.test.ts`. Standard suite 1383 → 1392.
 - **Rollback**: each commit reverts on its own. The profile refresh can be restored from the backup if ever needed.
+
+## 2026-10-12 — Security early-warning system + baseline sweep
+
+**Stage**: founder-requested ("track any security vulnerability as early as possible, learn from best practice"). The work moves from occasional manual audits to standing tripwires at commit, push, nightly and monthly cadence, each comparing against a dated, reviewed exception list so only *new* problems fail. Full description: `docs/security/README.md`. Findings: `docs/security/findings.md`.
+
+**What changed** (commits `a6a7d66` → docs commit):
+- **Leaks removed from HEAD** (`a6a7d66`, `1247a0a`): `final-check.js` (Google key), `test-paystack.html` (Paystack test key), and two generated learner-report PDFs, one built from a real learner row. `/*.pdf` and `/test-*.html` are now ignored.
+- **Versioned pre-commit hook** (`53e3e05`): `scripts/hooks/pre-commit`, activated by `npm install` (`prepare` → `scripts/install-git-hooks.mjs`). New patterns (Google, `sb_secret_`, Meta); reports file:line and never echoes the secret.
+- **Cron auth fix** (`db5c7fb`): four crons accepted a spoofable `x-vercel-cron` header instead of `CRON_SECRET`. This reverses the H4A "deliberate trust path" decision: Vercel documents no header-stripping guarantee.
+- **Route-auth gate** (`b0159d1`): `scripts/check-route-auth.mjs` in ci.yml Architecture. 295 routes; 22 reviewed exceptions in `scripts/security/route-auth-registry.json`.
+- **next 16.3.3 → 16.3.8 + npm audit fix** (`cf80b81`): clears 1 critical + 5 high in prod deps. The 16.3.7 font regression is fixed in 16.3.8, and the pin stays exact.
+- **Dependency audit gate + `docs/security/accepted-risks.json`** (`26d4794`), **Security + CodeQL workflows** (`deedc04`), **Dependabot config** (`63d20e5`), **Supabase advisor gate** (`2c7ca11`, nightly; needs the `SUPABASE_ACCESS_TOKEN` secret).
+- **Settings, not in git**: Dependabot alerts + security updates on; private vulnerability reporting on. Secret scanning + push protection were already on.
+- **Docs**: `SECURITY.md`, `docs/security/README.md`, `docs/security/findings.md`.
+
+**Architectural documents referenced**: CLAUDE.md Security Rules + "What NOT To Do"; `docs/architecture/security.md`; `docs/security/dependency-audit-2026-09-30.md`; `docs/security/remediation-report.md`.
+
+**ADR**: none. Tooling and route-level hardening only; no canonical domain, schema or write path changed.
+
+**Tests added**: `scripts/security/route-auth-rules.test.ts` (25), `audit-rules.test.ts` (12), `db-advisor-rules.test.ts` (10), all STANDARD and verified with an empty environment. The `cronAuthBoundary.integration.test.ts` spoof tests (+4, DEEP_PR 164 → 168) fail 5/5 on the old code. Standard suite 1404 → 1451. Full gate green: tsc, lint (0 errors), tests, architecture, route-auth, dependency audit, manifest, DEEP_PR classification, `next build` 275/275.
+
+**Open founder actions** (findings.md): disable legacy Supabase JWT keys or rotate the JWT secret (a leaked prod service-role key is in public history); rotate the old project's keys; revoke the Google key; roll the Paystack test key; decide on a history purge for the learner PDF; enable leaked-password protection; add the `SUPABASE_ACCESS_TOKEN` secret; make Security + CodeQL required checks.
+
+**Rollback considerations**: each commit reverts independently. Reverting `db5c7fb` reopens the cron bypass, so don't. Reverting `cf80b81` restores the critical advisory. The gates fail closed, so if one misfires, fix the rule or the registry rather than removing the CI step.

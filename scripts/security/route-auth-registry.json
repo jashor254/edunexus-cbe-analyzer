@@ -8,7 +8,7 @@
     },
     "platform/health": {
       "kind": "public",
-      "reason": "Monitoring endpoint. FOLLOW-UP (low, docs/security/findings.md SEC-2026-10-12-05): returns raw DB error text, AI provider names and queue counts to anonymous callers, and runs 4 service-role queries per hit.",
+      "reason": "Monitoring endpoint. FOLLOW-UP (low, docs/security/findings.md SEC-2026-10-12-08): returns raw DB error text, AI provider names and queue counts to anonymous callers, and runs 4 service-role queries per hit.",
       "reviewed": "2026-10-12"
     },
     "callback": {
