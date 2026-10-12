@@ -1,0 +1,31 @@
+# .github/dependabot.yml
+# Dependabot alerts + security updates are enabled in repo settings
+# (2026-10-12); this file tunes what Dependabot opens PRs for.
+#
+# npm: SECURITY updates only. open-pull-requests-limit: 0 switches off routine
+# version-bump PRs (noise for a solo founder) without affecting security PRs,
+# which Dependabot raises whenever an advisory has a fix. `next` is pinned
+# exactly — a Dependabot PR that moves it must pass `npm run build` before
+# merge (16.3.7 once broke next/font/google; see docs/security/README.md).
+#
+# github-actions: weekly grouped version updates — CI actions are supply
+# chain too, and each one runs with repo tokens.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    labels: [dependencies, security]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ['*']
+    labels: [dependencies, ci]
