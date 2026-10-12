@@ -1,5 +1,35 @@
 {
-  "description": "Reviewed, consciously accepted security advisories. scripts/check-dependency-audit.mjs blocks CI on any high/critical production advisory NOT listed here, and on any entry past its 'expires' date — so an acceptance is a dated decision that must be re-reviewed, never a permanent mute. Add an entry only after checking reachability in our own code; record how you checked in 'reason'.",
+  "description": "Reviewed, consciously accepted security advisories. scripts/check-dependency-audit.mjs blocks CI on any high/critical production advisory NOT listed in 'advisories'; scripts/check-supabase-advisors.mjs blocks on any WARN/ERROR Supabase security-advisor finding NOT listed in 'database'. Both block on any entry past its 'expires' date — an acceptance is a dated decision that must be re-reviewed, never a permanent mute. Add an entry only after checking reachability/impact; record how you checked in 'reason'.",
+  "database": [
+    {
+      "lint": "anon_security_definer_function_executable",
+      "entities": ["auth_is_direct_teacher_of_student", "auth_is_parent_of_student", "auth_is_school_admin_of", "increment_insights_view", "is_growth_user"],
+      "reason": "Reviewed definitions 2026-10-12. The auth_* helpers and is_growth_user only test the CALLER's own relationship via auth.uid() (null for anon → false); they are RLS policy helpers (SECURITY DEFINER avoids policy recursion) with search_path pinned. increment_insights_view only bumps view_count on a published article — worst case is inflated public view counts.",
+      "accepted": "2026-10-12",
+      "expires": "2027-01-12"
+    },
+    {
+      "lint": "authenticated_security_definer_function_executable",
+      "entities": ["auth_is_direct_teacher_of_student", "auth_is_group_member", "auth_is_guardian_of", "auth_is_parent_of_student", "auth_is_school_admin_of", "auth_is_teacher_of_student", "auth_owns_student", "auth_teacher_id", "get_grade_topics", "increment_insights_view", "is_admin", "is_growth_user"],
+      "reason": "Reviewed definitions 2026-10-12. Every auth_*/is_* helper is scoped to auth.uid() — it reveals only the caller's own relationship/role, which RLS policies need. get_grade_topics returns public curriculum substrand titles. All have search_path pinned.",
+      "accepted": "2026-10-12",
+      "expires": "2027-01-12"
+    },
+    {
+      "lint": "extension_in_public",
+      "entities": ["pg_trgm"],
+      "reason": "Hygiene, not exposure: pg_trgm functions in public are harmless. Moving the extension risks breaking existing trigram indexes; revisit with a planned migration.",
+      "accepted": "2026-10-12",
+      "expires": "2027-01-12"
+    },
+    {
+      "lint": "auth_leaked_password_protection",
+      "entities": ["Auth"],
+      "reason": "FOUNDER ACTION, short expiry on purpose: enable in Supabase Dashboard → Authentication → Settings (HaveIBeenPwned check; may require the Pro plan). Resurfaces as a nightly failure on expiry if still off.",
+      "accepted": "2026-10-12",
+      "expires": "2026-10-26"
+    }
+  ],
   "advisories": [
     {
       "id": "GHSA-5p2g-fcmc-qvqq",
