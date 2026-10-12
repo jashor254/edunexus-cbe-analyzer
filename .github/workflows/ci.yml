@@ -253,7 +253,7 @@ jobs:
       - name: DEEP_PR classification guard
         run: node scripts/check-deep-pr-classification.mjs
 
-      - name: DEEP_PR manifest (expect 22/22 files, 164 tests)
+      - name: DEEP_PR manifest (expect 22/22 files, 168 tests)
         run: node scripts/run-deep-pr.mjs
 
       - name: Cleanup gate — dry-run reaper, expect 0 residual

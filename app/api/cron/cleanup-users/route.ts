@@ -1,7 +1,6 @@
 // app/api/cron/cleanup-users/route.ts
-// ✅ Protected by middleware.ts (Bearer token check)
-// ✅ Double-checks auth here as backup
-// ✅ Proper error handling
+// Deletes marked/idle users — the CRON_SECRET check below is the ONLY gate
+// (proxy.ts does not guard /api/cron/*), so it runs before anything else.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
@@ -9,20 +8,22 @@ import { getErrorMessage } from '@/lib/api/response'
 import { timingSafeEqualString } from '@/lib/api/secretCompare'
 
 export async function POST(request: NextRequest) {
-  // Create service client per-request to avoid shared state across serverless invocations
-  const supabase = createServiceClient()
   try {
-    // ✅ Double-check auth (middleware handles first layer)
     const authHeader = request.headers.get('authorization')
     const cronSecret = process.env.CRON_SECRET
-    const isVercelCron = request.headers.get('x-vercel-cron') === '1'
 
-    if (!isVercelCron && (!cronSecret || !timingSafeEqualString(authHeader, `Bearer ${cronSecret}`))) {
+    // CRON_SECRET only — `x-vercel-cron` is a client-settable header, not
+    // proof of origin. Vercel Cron sends `Authorization: Bearer $CRON_SECRET`.
+    if (!cronSecret || !timingSafeEqualString(authHeader, `Bearer ${cronSecret}`)) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       )
     }
+
+    // Create service client per-request (after auth) to avoid shared state
+    // across serverless invocations
+    const supabase = createServiceClient()
 
     console.info('[cron/cleanup-users] Starting cleanup job')
 

@@ -1,6 +1,6 @@
 {
   "description": "DEEP_PR — critical in-process (D1) DEEP tests, proven 2x consecutive fresh-bootstrap clean (H1D-3/H1D-4/H1D-3B). Runs against local disposable Supabase only. No Next server required. Every reclassification of this set must go through scripts/check-deep-pr-classification.mjs, not a silent edit.",
-  "expectedTests": 164,
+  "expectedTests": 168,
   "files": [
     "lib/config/env.test.ts",
     "lib/core/schoolUsersRlsRegression.integration.test.ts",

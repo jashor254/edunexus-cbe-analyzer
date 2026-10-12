@@ -24,9 +24,10 @@ const RETENTION_DAYS = 90
 function isAuthorizedCronRequest(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1'
 
-  return isVercelCron || (!!cronSecret && timingSafeEqualString(authHeader, `Bearer ${cronSecret}`))
+  // CRON_SECRET only — `x-vercel-cron` is a client-settable header, not proof
+  // of origin. Vercel Cron sends `Authorization: Bearer $CRON_SECRET` itself.
+  return !!cronSecret && timingSafeEqualString(authHeader, `Bearer ${cronSecret}`)
 }
 
 async function anonymizeStaleAiLogs(): Promise<{ anonymisedCount: number }> {

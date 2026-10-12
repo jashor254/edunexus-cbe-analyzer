@@ -8,9 +8,10 @@ import { timingSafeEqualString } from '@/lib/api/secretCompare'
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
-  const isVercelCron = request.headers.get('x-vercel-cron') === '1'
 
-  if (!isVercelCron && (!cronSecret || !timingSafeEqualString(authHeader, `Bearer ${cronSecret}`))) {
+  // CRON_SECRET only — `x-vercel-cron` is a client-settable header, not proof
+  // of origin. Vercel Cron sends `Authorization: Bearer $CRON_SECRET` itself.
+  if (!cronSecret || !timingSafeEqualString(authHeader, `Bearer ${cronSecret}`)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

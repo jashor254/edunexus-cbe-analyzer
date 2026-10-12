@@ -8,17 +8,16 @@
 // `Bearer <secret>` header — a real, existing mechanism with ZERO test
 // coverage anywhere before this file (no test referenced CRON_SECRET at
 // all). This calls the real, unmodified exported route handlers directly
-// (no mocked auth check) for a representative sample covering both auth
-// patterns found in the codebase:
-//   - secret-only routes (the majority: events/dispatch, jobs/process,
-//     term-readiness, billing-renewals)
-//   - the secret-OR-vercel-header routes (academy-nudge, cleanup-users,
-//     snapshot-metrics) — these also accept `x-vercel-cron: 1` with NO
-//     secret at all, trusting Vercel's platform guarantee that this header
-//     is stripped from client-supplied requests and only ever set
-//     internally by Vercel's own cron dispatcher. This is a real,
-//     deliberate second trust path this test documents rather than
-//     silently assumes — see the H4A closeout report's named finding.
+// (no mocked auth check) for a representative sample.
+//
+// 2026-10-12 (security early-warning pass): four routes (academy-nudge,
+// cleanup-users, snapshot-metrics, ai-log-retention) used to ALSO accept
+// `x-vercel-cron: 1` with no secret, on the assumption that Vercel strips
+// that header from client requests. Vercel documents no such guarantee —
+// its cron docs authenticate with CRON_SECRET, which Vercel Cron sends as
+// `Authorization: Bearer` itself — and proxy.ts does not guard /api/cron/*.
+// The H4A FINDING test that pinned the bypass is now inverted: the header
+// alone must be rejected on every one of those routes.
 //
 // Run: npx tsx --env-file=.env.local --experimental-test-module-mocks --test app/api/cron/cronAuthBoundary.integration.test.ts
 import { test } from 'node:test'
@@ -28,6 +27,9 @@ import { GET as eventsDispatchGET } from './events/dispatch/route'
 import { GET as jobsProcessGET } from './jobs/process/route'
 import { GET as billingRenewalsGET } from './billing-renewals/route'
 import { POST as academyNudgePOST } from './academy-nudge/route'
+import { POST as cleanupUsersPOST } from './cleanup-users/route'
+import { POST as snapshotMetricsPOST } from './snapshot-metrics/route'
+import { GET as aiLogRetentionGET, POST as aiLogRetentionPOST } from './ai-log-retention/route'
 
 const CRON_SECRET = process.env.CRON_SECRET ?? 'h4a-test-cron-secret-fixture'
 process.env.CRON_SECRET = CRON_SECRET
@@ -73,19 +75,32 @@ test('OPS-CRON-001: billing-renewals rejects a wrong secret', async () => {
   assert.equal(res.status, 401)
 })
 
-// ── Secret-OR-Vercel-header routes ───────────────────────────────────────────
+// ── Formerly secret-OR-Vercel-header routes ──────────────────────────────────
 
-test('OPS-CRON-001: academy-nudge rejects a request with neither a secret nor the Vercel cron header', async () => {
+test('OPS-CRON-001: academy-nudge rejects a request with no secret', async () => {
   const res = await academyNudgePOST(req('/api/cron/academy-nudge'))
   assert.equal(res.status, 401)
 })
 
-test('OPS-CRON-001: academy-nudge rejects a wrong secret with no Vercel header', async () => {
+test('OPS-CRON-001: academy-nudge rejects a wrong secret', async () => {
   const res = await academyNudgePOST(req('/api/cron/academy-nudge', { authorization: 'Bearer wrong-secret' }))
   assert.equal(res.status, 401)
 })
 
-test('OPS-CRON-001 FINDING: academy-nudge accepts x-vercel-cron: 1 with NO secret at all — documents the real, deliberate second trust path', async () => {
-  const res = await academyNudgePOST(req('/api/cron/academy-nudge', { 'x-vercel-cron': '1' }))
-  assert.notEqual(res.status, 401, 'this pins the actual current behavior: the Vercel-header path trusts the platform to strip this header from client requests, with no in-app secret check as a second layer — see the H4A closeout report')
-})
+// A spoofed `x-vercel-cron: 1` (any client can send it) must not stand in for
+// the secret — on every route that used to accept it.
+const SPOOFED_VERCEL_HEADER = { 'x-vercel-cron': '1' }
+const formerHeaderTrustRoutes: Array<[string, (r: NextRequest) => Promise<Response>]> = [
+  ['academy-nudge POST', academyNudgePOST],
+  ['cleanup-users POST', cleanupUsersPOST],
+  ['snapshot-metrics POST', snapshotMetricsPOST],
+  ['ai-log-retention GET', aiLogRetentionGET],
+  ['ai-log-retention POST', aiLogRetentionPOST],
+]
+
+for (const [name, handler] of formerHeaderTrustRoutes) {
+  test(`OPS-CRON-001: ${name} rejects a spoofed x-vercel-cron header with no secret`, async () => {
+    const res = await handler(req('/api/cron/x', SPOOFED_VERCEL_HEADER))
+    assert.equal(res.status, 401)
+  })
+}
