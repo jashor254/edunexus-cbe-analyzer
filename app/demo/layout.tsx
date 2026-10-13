@@ -10,12 +10,10 @@
 
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
-import { Montserrat, Inter } from 'next/font/google'
+import { demoHeading as heading, demoBody as body } from '@/app/fonts/fonts'
 
-// Same faces as the marketing route group, self-hosted at build time by
-// next/font. Montserrat for headings, Inter for everything else.
-const heading = Montserrat({ subsets: ['latin'], weight: ['600', '700', '800'], variable: '--font-demo-heading' })
-const body    = Inter({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--font-demo-body' })
+// Same faces as the marketing route group (self-hosted, app/fonts/fonts.ts).
+// Montserrat for headings, Inter for everything else.
 
 export const metadata: Metadata = {
   // Resets the root layout's '%s | EduNexus Kenya' template so the title is

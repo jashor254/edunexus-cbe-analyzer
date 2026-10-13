@@ -3,18 +3,9 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { X, Menu } from 'lucide-react'
-import { Montserrat, Inter } from 'next/font/google'
+import { inter } from '@/app/fonts/fonts'
 import { Logo } from '@/components/ui/Logo'
 import { CURRICULA_COMPACT, FOCUS_RING } from './constants'
-
-export const montserrat = Montserrat({
-  subsets: ['latin'],
-  weight: ['600', '700', '800'],
-})
-const inter = Inter({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-})
 
 // ─── Navigation ────────────────────────────────────────────────────────────────
 function MarketingNav() {

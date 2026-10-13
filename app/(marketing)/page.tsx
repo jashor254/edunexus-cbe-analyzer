@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { FOCUS_RING, SCHOOL_DEMO_WA_LINK } from './constants'
 import { BlueprintCardMockup } from './components/BlueprintCard'
-import { montserrat } from './layout'
+import { montserrat } from '@/app/fonts/fonts'
 
 const OVERVIEW_CARDS = [
   {

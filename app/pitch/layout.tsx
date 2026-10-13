@@ -12,13 +12,11 @@
 
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
-import { Montserrat, Inter } from 'next/font/google'
+import { demoHeading as heading, demoBody as body } from '@/app/fonts/fonts'
 
-// Same faces as /demo and the marketing route group, self-hosted at build
-// time by next/font. The variable names match the ones .demo-shell's
+// Same faces as /demo and the marketing route group (self-hosted,
+// app/fonts/fonts.ts). The variable names match the ones .demo-shell's
 // descendants already reference.
-const heading = Montserrat({ subsets: ['latin'], weight: ['600', '700', '800'], variable: '--font-demo-heading' })
-const body    = Inter({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--font-demo-body' })
 
 export const metadata: Metadata = {
   // Resets the root layout's '%s | EduNexus Kenya' template so the tab reads

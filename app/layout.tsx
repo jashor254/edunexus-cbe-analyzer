@@ -4,26 +4,14 @@ import { ToastProvider } from '@/components/toast-system'
 import { Analytics } from '@vercel/analytics/react'
 import WhatsAppButton from '@/components/WhatsAppButton'
 import Script from 'next/script'
-import { Montserrat, Inter } from 'next/font/google'
+import { montserrat, inter } from '@/app/fonts/fonts'
 import './globals.css'
 
 // App-wide typographic system (DESIGN.md §Typography): Montserrat is the
 // distinctive display face for headings, Inter the plain body face. Exposed
 // as CSS variables so Tailwind's `font-sans` (body) and `font-display`
-// (headings) utilities resolve to them — see @theme in globals.css. Marketing
-// / demo / pitch set these same two fonts locally and are unaffected.
-const montserrat = Montserrat({
-  subsets: ['latin'],
-  weight: ['600', '700', '800'],
-  variable: '--font-montserrat',
-  display: 'swap',
-})
-const inter = Inter({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-inter',
-  display: 'swap',
-})
+// (headings) utilities resolve to them — see @theme in globals.css. Fonts are
+// self-hosted; every layout's definitions live in app/fonts/fonts.ts.
 
 // ✅ SEO na Marketing ya Kenya
 export const metadata: Metadata = {

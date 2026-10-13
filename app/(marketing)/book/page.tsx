@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { Download } from 'lucide-react'
-import { montserrat } from '../layout'
+import { montserrat } from '@/app/fonts/fonts'
 import { FOCUS_RING } from '../constants'
 
 export const metadata: Metadata = {
