@@ -19,6 +19,7 @@
 // Run once per environment: npx tsx scripts/create-compass-auto-confirm-account.ts
 // Then set the printed id as COMPASS_AUTO_CONFIRM_USER_ID in that environment.
 
+import { randomBytes } from 'node:crypto'
 import { config } from 'dotenv'
 config({ path: '.env.local' })
 
@@ -41,7 +42,7 @@ async function main() {
 
   const { data, error } = await supabase.auth.admin.createUser({
     email: SYSTEM_ACCOUNT_EMAIL,
-    password: `system-${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`,
+    password: `system-${randomBytes(24).toString('base64url')}`,
     email_confirm: true,
     user_metadata: {
       system_account: true,

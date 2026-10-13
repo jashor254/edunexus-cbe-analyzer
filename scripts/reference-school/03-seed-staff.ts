@@ -15,6 +15,7 @@
 // have no behavioral difference in the Core system yet.
 //
 // Run: npx tsx scripts/reference-school/03-seed-staff.ts
+import { randomBytes } from 'node:crypto'
 import { config } from 'dotenv'
 config({ path: '.env.local' })
 import { db, AUTH_EMAIL_DOMAIN, randomFullName, randomPhone, rand } from './shared'
@@ -67,7 +68,7 @@ export async function seedStaff() {
 
     const { data: authUser, error: authErr } = await supabase.auth.admin.createUser({
       email,
-      password: `RefSchool!${Math.random().toString(36).slice(2, 10)}`,
+      password: `RefSchool!${randomBytes(12).toString('base64url')}`,
       email_confirm: true,
       user_metadata: { full_name: fullName, reference_school: true, title: plan.title },
     })

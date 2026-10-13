@@ -10,6 +10,7 @@
 // authenticated request, cleanup. Exits non-zero (BLOCK the wave) on any
 // failure — never retries in a loop.
 
+import { randomBytes } from 'node:crypto'
 import { createTestServiceClient } from '../utils/supabase/test-service'
 import { signInForHttpTest } from '../lib/testing/httpAuthTestHelper'
 
@@ -22,7 +23,7 @@ async function main() {
 
   const db = createTestServiceClient()
   const email = 'sentinel-' + Date.now() + '@example.com'
-  const password = 'Test!' + Math.random().toString(36).slice(2, 10)
+  const password = 'Test!' + randomBytes(12).toString('base64url')
 
   const { data, error } = await db.auth.admin.createUser({ email, password, email_confirm: true })
   if (error || !data?.user) {

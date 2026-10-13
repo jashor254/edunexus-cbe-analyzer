@@ -10,6 +10,7 @@
 //
 // Run: npx tsx --env-file=.env.local scripts/verify-print-routes.ts
 
+import { randomBytes } from 'node:crypto'
 import * as dotenv from 'dotenv'
 import * as path from 'path'
 import * as fs from 'fs'
@@ -34,7 +35,7 @@ async function main() {
   try {
     console.log('▸ Creating synthetic teacher + Grade 9 class + roster…')
     const email = `${SYNTHETIC_MARKER.toLowerCase()}-${Date.now()}@example.com`
-    const password = `Test!${Math.random().toString(36).slice(2, 10)}`
+    const password = `Test!${randomBytes(12).toString('base64url')}`
     const { data: authUser, error: authErr } = await db.auth.admin.createUser({ email, password, email_confirm: true })
     if (authErr) throw authErr
     cleanup.push(async () => { await db.auth.admin.deleteUser(authUser.user.id) })
