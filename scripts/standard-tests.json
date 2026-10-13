@@ -164,6 +164,7 @@
     "lib/kiswahili/inshaBilling.test.ts",
     "lib/payments/paywall.test.ts",
     "lib/payments/reference.test.ts",
+    "lib/validation/sanitizeInput.test.ts",
     "scripts/security/route-auth-rules.test.ts",
     "scripts/security/audit-rules.test.ts",
     "scripts/security/db-advisor-rules.test.ts"

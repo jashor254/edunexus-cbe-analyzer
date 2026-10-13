@@ -795,8 +795,8 @@ function PricingContent() {
         setDashboardHref(profile?.role === 'teacher' ? '/teacher/dashboard' : '/dashboard')
       }
 
-      const productId  = searchParams.get('product') ?? localStorage.getItem('pending_plan')
-      const savedPhone = localStorage.getItem('pending_phone')
+      const productId  = searchParams.get('product') ?? sessionStorage.getItem('pending_plan')
+      const savedPhone = sessionStorage.getItem('pending_phone')
       const tabParam   = searchParams.get('tab') as TabId | null
 
       if (tabParam) setActiveTab(tabParam)
@@ -842,8 +842,8 @@ function PricingContent() {
       })
       const data = await res.json() as { authorization_url?: string; error?: string }
       if (data.authorization_url) {
-        localStorage.removeItem('pending_plan')
-        localStorage.removeItem('pending_phone')
+        sessionStorage.removeItem('pending_plan')
+        sessionStorage.removeItem('pending_phone')
         window.location.href = data.authorization_url
       } else {
         alert(data.error ?? 'Payment failed. Please try again.')
@@ -867,8 +867,10 @@ function PricingContent() {
       return
     }
     if (!user) {
-      localStorage.setItem('pending_plan',  familySel.id)
-      localStorage.setItem('pending_phone', clean)
+      // sessionStorage, not localStorage: the M-PESA number must not outlive
+      // the tab on a shared device — init() above auto-starts checkout with it.
+      sessionStorage.setItem('pending_plan',  familySel.id)
+      sessionStorage.setItem('pending_phone', clean)
       router.push(`/login?returnTo=/pricing?tab=family&product=${familySel.id}`)
       return
     }
@@ -882,8 +884,8 @@ function PricingContent() {
       return
     }
     if (!user) {
-      localStorage.setItem('pending_plan',  teacherSel.id)
-      localStorage.setItem('pending_phone', clean)
+      sessionStorage.setItem('pending_plan',  teacherSel.id)
+      sessionStorage.setItem('pending_phone', clean)
       router.push(`/login?returnTo=/pricing?tab=teacher&product=${teacherSel.id}`)
       return
     }

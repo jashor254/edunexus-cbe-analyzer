@@ -218,11 +218,14 @@ export async function checkDuplicateAssessment(
 // SANITIZATION
 // ===========================================
 
+// Strips every '<' and '>' rather than trying to match tags with regexes —
+// tag-matching is bypassable (`<scr<script>ipt>`); removing the brackets is
+// not. Output is plain text: render it with React's normal escaping, never
+// dangerouslySetInnerHTML.
 export function sanitizeInput(input: string): string {
   return input
     .trim()
-    .replace(/<script.*?>.*?<\/script>/gi, '') // Remove script tags
-    .replace(/<.*?>/g, '') // Remove HTML tags
+    .replace(/[<>]/g, '')
     .slice(0, 1000) // Limit length
 }
 

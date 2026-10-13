@@ -38,9 +38,11 @@ export default function PaystackButton({
     }
 
     if (!email) {
-      // Save pending payment info and redirect to login
-      localStorage.setItem('pending_plan', productId)
-      localStorage.setItem('pending_phone', cleanPhone)
+      // Save pending payment info and redirect to login. sessionStorage, not
+      // localStorage: the M-PESA number must not outlive the tab on a shared
+      // device (the pricing page auto-starts checkout with it after login).
+      sessionStorage.setItem('pending_plan', productId)
+      sessionStorage.setItem('pending_phone', cleanPhone)
       router.push(`/login?returnTo=/pricing&product=${productId}`)
       return
     }
@@ -69,8 +71,8 @@ export default function PaystackButton({
 
       if (data.authorization_url) {
         // Clean up pending items
-        localStorage.removeItem('pending_plan')
-        localStorage.removeItem('pending_phone')
+        sessionStorage.removeItem('pending_plan')
+        sessionStorage.removeItem('pending_phone')
         window.location.href = data.authorization_url
       } else {
         throw new Error('No authorization URL received')

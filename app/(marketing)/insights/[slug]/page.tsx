@@ -85,7 +85,8 @@ export default async function ArticlePage({ params }: PageProps) {
 
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        // Escape '<' so article text containing `</script>` can't close the tag.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
       />
 
       {/* ── ARTICLE HERO ──────────────────────────────────────────────────────── */}
