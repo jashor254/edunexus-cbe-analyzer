@@ -3,6 +3,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { createHmac, timingSafeEqual } from 'crypto'
 import { publishEvent } from '@/lib/events'
 import { fulfillPayment } from '@/lib/payments/fulfillment'
+import { isValidPaymentReference } from '@/lib/payments/reference'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL!
 
@@ -12,6 +13,10 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL!
 async function processPayment(
   reference: string
 ): Promise<'success' | 'failed' | 'already_processed' | 'not_found'> {
+  // Caller-supplied (GET query / webhook body) — never let it reach the DB
+  // query or the Paystack URL path unless it has the shape we issue.
+  if (!isValidPaymentReference(reference)) return 'not_found'
+
   const db = createServiceClient()
 
   // 1. Fetch payment record
@@ -36,7 +41,7 @@ async function processPayment(
 
   // 3. Verify with Paystack
   const verifyRes = await fetch(
-    `https://api.paystack.co/transaction/verify/${reference}`,
+    `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
     { headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` } }
   )
 
@@ -108,13 +113,13 @@ export async function GET(req: Request) {
 
     if (result === 'success' || result === 'already_processed') {
       return NextResponse.redirect(
-        `${SITE_URL}/payment/success?plan=${plan}&reference=${reference}`
+        `${SITE_URL}/payment/success?plan=${encodeURIComponent(plan)}&reference=${encodeURIComponent(reference)}`
       )
     }
 
     if (result === 'failed') {
       return NextResponse.redirect(
-        `${SITE_URL}/payment/failed?reference=${reference}`
+        `${SITE_URL}/payment/failed?reference=${encodeURIComponent(reference)}`
       )
     }
 

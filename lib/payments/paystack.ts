@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { isValidPaymentReference } from './reference';
 
 export interface InitializePaymentParams {
   email: string;
@@ -80,7 +81,10 @@ export class PaystackClient {
   }
 
   async verifyPayment(reference: string) {
-    const response = await fetch(`${this.baseUrl}/transaction/verify/${reference}`, {
+    if (!isValidPaymentReference(reference)) {
+      throw new Error('Invalid payment reference');
+    }
+    const response = await fetch(`${this.baseUrl}/transaction/verify/${encodeURIComponent(reference)}`, {
       headers: {
         Authorization: `Bearer ${this.secretKey}`,
       },
