@@ -57,7 +57,7 @@
     "pptxgenjs": "^4.0.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "react-email": "^5.2.8",
+    "react-email": "^6.11.1",
     "react-markdown": "^10.1.0",
     "recharts": "^3.8.1",
     "remark-gfm": "^4.0.1",
@@ -82,7 +82,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
     "tailwindcss": "^4",
-    "tsx": "^4.21.0",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3"
   }
 }
