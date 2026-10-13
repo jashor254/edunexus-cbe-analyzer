@@ -2,6 +2,15 @@
 
 One row per finding, newest first. IDs are `SEC-<date>-<n>`. A finding stays **Open** until a founder action or code change closes it. Accepted risks live in [accepted-risks.json](accepted-risks.json), and the system is described in [README.md](README.md).
 
+## 2026-10-13: first push, first CodeQL scan
+
+| ID | Severity | Finding | Status |
+|---|---|---|---|
+| SEC-2026-10-12-12 | Critical → triaged | **First CodeQL scan: 50 alerts** (1 critical, 37 high, 12 medium), never looked at before. Breakdown: 20 in production code, the rest in tests and local scripts. | **Fixed:** Paystack reference request-forgery in the callback **and** in `PaystackClient.verifyPayment`, which CodeQL missed (4c71bcf); unencoded redirect params (4c71bcf); M-PESA number left in `localStorage` and auto-used for the next login on a shared device (ae009b7); bypassable `sanitizeInput` (ae009b7); `Math.random` account passwords in 5 scripts (3a44ed6). Also hardened Insights JSON-LD against `</script>` (ae009b7). **Dismissed with written reasons on each alert:** 10 `user-controlled-bypass` (every action branch runs its own guard), 2 `xss-through-dom` (fixed path prefix), 1 ReDoS (input can't contain the pattern), test-only and local-tool alerts. **Open (backlog, low):** 10 medium `log-injection` (user values written to logs; use the structured logger with fields), 1 `identity-replacement` in `lib/compass/topicSelector.ts`. |
+| SEC-2026-10-12-13 | Medium (reliability) | CI "Production Build" failed on `main` with `Can't resolve '@vercel/turbopack-next/internal/font/google/font'`. **The same commit passed** on the branch and on re-run. The identical error hit a Dependabot branch still on **next 16.3.3** (run 38287127691). So this is an intermittent failure of `next/font/google` **downloading fonts from Google at build time**, not a version bug, and the 2026-09-30 conclusion that "16.3.7 breaks next/font/google" was very likely the same flake. | **Open: recommended fix.** Self-host the fonts with `next/font/local` (same Inter files, identical rendering). Builds then stop depending on Google at build time, flaky red CI stops eroding trust in the gates, and one third-party fetch disappears from the build. Until then, re-run a failed build once before investigating. |
+| SEC-2026-10-12-14 | Info | Reviewed every `dangerouslySetInnerHTML` (6). Static JSON-LD, a constant presentation, static print CSS, hard-coded instruction strings, and `academy_lessons.content` (admin-only writes under RLS). | **No action** beyond the JSON-LD escape above. |
+| SEC-2026-10-12-15 | Info | Checked whether a client-supplied price could be paid: `/api/payments/initialize` and `/api/payments/mobile-init` both ignore any client amount and price from `PURCHASABLE_PRODUCTS`. | **No action.** Correct as built. |
+
 ## 2026-10-12: baseline sweep while building the early-warning system
 
 | ID | Severity | Finding | Status |
