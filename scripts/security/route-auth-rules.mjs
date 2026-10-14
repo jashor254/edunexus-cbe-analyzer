@@ -28,6 +28,10 @@ export const DIRECT_GUARD_CALLS = [
   'requireParent',
   'requireParentOfLegacyStudent',
   'requireOwnedAssignment',
+  // lib/paperIntelligence/auth.ts — both call requireAuthentication (→ auth.getUser)
+  // first, then requireClassTeacher on the assignment's / submission's class.
+  'requireScriptAccess',
+  'requireAssignmentClassTeacher',
   'requireLearnerAccess',
   'verifyTeacherTeachesStudent',
   'verifyStudent',
