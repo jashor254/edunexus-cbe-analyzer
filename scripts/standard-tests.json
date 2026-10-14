@@ -165,6 +165,8 @@
     "lib/paperIntelligence/scriptScoring.test.ts",
     "lib/paperIntelligence/scriptValidation.test.ts",
     "lib/paperIntelligence/markScript.test.ts",
+    "lib/paperIntelligence/reviewGrouping.test.ts",
+    "lib/paperIntelligence/review.test.ts",
     "lib/sow/generationJob.test.ts",
     "lib/kiswahili/inshaBilling.test.ts",
     "lib/payments/paywall.test.ts",

@@ -7,7 +7,7 @@
 // rubrics.ts; callers authorize first.
 
 import { createServiceClient } from '@/utils/supabase/service'
-import { PAPER_INTELLIGENCE_LIMITS } from '@/lib/config/paperIntelligence'
+import { needsAttention } from './reviewGrouping'
 import type { MarkedPoint, ScriptQuestionMark } from './types'
 
 export type ScriptMarkStatus = 'proposed' | 'confirmed' | 'overridden'
@@ -120,13 +120,72 @@ export async function findScriptMarkTotalsForAssignment(assignmentId: string): P
   return totals
 }
 
+// ── Review (Commit 5) ─────────────────────────────────────────────────────
+
+/** Every proposal on an assignment — one query for the whole class's review-by-question. */
+export async function findScriptMarksForAssignment(assignmentId: string): Promise<ScriptMarkRow[]> {
+  const db = createServiceClient()
+  const { data, error } = await db
+    .from('paper_intelligence_script_marks')
+    .select(MARK_COLS)
+    .eq('assignment_id', assignmentId)
+  if (error) throw new Error(`findScriptMarksForAssignment: ${error.message}`)
+  return (data ?? []) as unknown as ScriptMarkRow[]
+}
+
+export async function findScriptMarksForSubmissions(submissionIds: string[]): Promise<ScriptMarkRow[]> {
+  if (submissionIds.length === 0) return []
+  const db = createServiceClient()
+  const { data, error } = await db
+    .from('paper_intelligence_script_marks')
+    .select(MARK_COLS)
+    .in('submission_id', submissionIds)
+  if (error) throw new Error(`findScriptMarksForSubmissions: ${error.message}`)
+  return (data ?? []) as unknown as ScriptMarkRow[]
+}
+
+/** Record one teacher decision across many rows that share it (a confirmed group, or one card). */
+export async function applyReviewDecision(markIds: string[], decision: { status: Exclude<ScriptMarkStatus, 'proposed'>; finalMark: number; reviewedBy: string }): Promise<void> {
+  if (markIds.length === 0) return
+  const db = createServiceClient()
+  const now = new Date().toISOString()
+  const { error } = await db
+    .from('paper_intelligence_script_marks')
+    .update({ status: decision.status, final_mark: decision.finalMark, reviewed_by: decision.reviewedBy, reviewed_at: now, updated_at: now })
+    .in('id', markIds)
+  if (error) throw new Error(`applyReviewDecision: ${error.message}`)
+}
+
+export type TeacherEnteredMark = {
+  submissionId: string
+  assignmentId: string
+  rubricId: string
+  maxMark: number
+  finalMark: number
+  reviewedBy: string
+}
+
 /**
- * A proposal a teacher should look at rather than wave through: the AI could
- * not read it, was unsure of its own marking, or found answers the scheme does
- * not list (the teacher decides whether they earn). Phase 0: the AI's own
- * uncertainty flags covered 3 of the 4 questions where it and the teacher
- * disagreed.
+ * A mark the teacher entered for a question the AI returned nothing for. No
+ * AI proposal and no evidence row — recorded as 'overridden' (the teacher's
+ * own mark), proposed 0.
  */
-export function needsAttention(m: { uncertain: boolean; grading_confidence: number | null; proposed_mark: number; plausible_mark: number }): boolean {
-  return m.uncertain || (m.grading_confidence ?? 0) < PAPER_INTELLIGENCE_LIMITS.reviewBelowGradingConfidence || m.plausible_mark > m.proposed_mark
+export async function insertTeacherEnteredMarks(rows: TeacherEnteredMark[]): Promise<void> {
+  if (rows.length === 0) return
+  const db = createServiceClient()
+  const now = new Date().toISOString()
+  const { error } = await db.from('paper_intelligence_script_marks').insert(rows.map(r => ({
+    submission_id: r.submissionId,
+    assignment_id: r.assignmentId,
+    rubric_id: r.rubricId,
+    proposed_mark: 0,
+    plausible_mark: 0,
+    max_mark: r.maxMark,
+    status: 'overridden',
+    final_mark: r.finalMark,
+    reviewed_by: r.reviewedBy,
+    reviewed_at: now,
+    rationale: 'Entered by the teacher — the AI found no answer to this question.',
+  })))
+  if (error) throw new Error(`insertTeacherEnteredMarks: ${error.message}`)
 }
