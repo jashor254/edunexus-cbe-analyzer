@@ -11,7 +11,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import type { AssignmentReview } from '@/lib/paperIntelligence/review'
 import type { ConfirmResponse } from '@/app/api/teacher/assignments/[id]/paper-intelligence/review/confirm/route'
-import { QuestionReviewPanel, type ReviewDecision } from '@/components/paperIntelligence/QuestionReviewPanel'
+import { QuestionReviewPanel, type ReviewDecision, type AnswerDecisionRequest } from '@/components/paperIntelligence/QuestionReviewPanel'
 import { ScriptPhotos } from '@/components/paperIntelligence/ScriptPhotos'
 
 type Photos = { learnerName: string; pages: Array<{ pageNumber: number; url: string }> | null; error: string | null }
@@ -71,6 +71,30 @@ export default function PaperIntelligenceReviewPage() {
     }
   }
 
+  async function decideAnswer(request: AnswerDecisionRequest) {
+    setBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const res = await fetch(`${base}/answers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rubricId: request.rubricId, answerKey: request.answerKey, decision: request.decision }),
+      })
+      const body = await res.json()
+      if (!res.ok) { setError(body?.error ?? 'Could not record that decision — try again.'); await load(); return }
+      const n = body.data.learnersAffected as number
+      setNotice(request.decision === 'accept'
+        ? `“${request.answerText}” is now in the scheme — ${n} learner${n === 1 ? '' : 's'} re-marked.`
+        : `“${request.answerText}” doesn’t earn marks — ${n} learner${n === 1 ? '' : 's'} re-marked.`)
+      await load()
+    } catch {
+      setError('Network error while saving — try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function viewScript(submissionId: string, learnerName: string) {
     setPhotos({ learnerName, pages: null, error: null })
     try {
@@ -115,7 +139,7 @@ export default function PaperIntelligenceReviewPage() {
           </p>
           <div className="flex gap-2 overflow-x-auto pb-2 mb-4 -mx-4 px-4">
             {review.questions.map(q => {
-              const left = q.yourCall.length + q.agreeGroups.reduce((n, g) => n + g.items.length, 0)
+              const left = q.plausibleAnswers.length + q.yourCall.length + q.agreeGroups.reduce((n, g) => n + g.items.length, 0)
               return (
                 <button key={q.id} onClick={() => setActive(q.id)}
                   className={`shrink-0 rounded-xl px-3 py-2 text-sm font-bold ${q.id === active ? 'bg-teal-600 text-white' : left > 0 ? 'bg-white border border-gray-200 text-gray-700' : 'bg-teal-50 text-teal-700'}`}>
@@ -125,7 +149,7 @@ export default function PaperIntelligenceReviewPage() {
               )
             })}
           </div>
-          {question && <QuestionReviewPanel key={question.id} question={question} busy={busy} onConfirm={confirm} onViewScript={viewScript} />}
+          {question && <QuestionReviewPanel key={question.id} question={question} busy={busy} onConfirm={confirm} onDecideAnswer={decideAnswer} onViewScript={viewScript} />}
         </>
       )}
 

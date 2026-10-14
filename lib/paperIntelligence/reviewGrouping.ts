@@ -16,6 +16,7 @@
 // its total can be finalized.
 
 import { PAPER_INTELLIGENCE_LIMITS } from '@/lib/config/paperIntelligence'
+import { collectPlausibleAnswers } from './answerDecisions'
 import type { ScriptMarkRow, ScriptMarkStatus } from './scriptMarks'
 import type { MarkedPoint } from './types'
 
@@ -62,7 +63,15 @@ export type ReviewItem = {
 
 export type AgreeGroup = { mark: number; items: ReviewItem[] }
 
+export type PlausibleAnswerSummary = {
+  key: string
+  text: string
+  learners: string[]
+}
+
 export type QuestionReview = ReviewRubric & {
+  /** Answers not in the scheme, grouped across the class — decided once for everyone (Commit 6). */
+  plausibleAnswers: PlausibleAnswerSummary[]
   agreeGroups: AgreeGroup[]
   yourCall: ReviewItem[]
   reviewed: ReviewItem[]
@@ -107,8 +116,16 @@ export function buildQuestionReviews(
       else agree.set(m.proposed_mark, [...(agree.get(m.proposed_mark) ?? []), item])
     }
 
+    const unreviewed = marks.filter(m => m.rubric_id === rubric.id && m.status === 'proposed')
+    const plausibleAnswers = collectPlausibleAnswers(unreviewed).map(g => ({
+      key: g.key,
+      text: g.text,
+      learners: g.submissionIds.map(id => nameBySubmission.get(id) ?? 'Unnamed learner').sort((a, b) => a.localeCompare(b)),
+    }))
+
     return {
       ...rubric,
+      plausibleAnswers,
       // Highest mark first — full-mark groups are the fastest to wave through.
       agreeGroups: [...agree.entries()].sort((a, b) => b[0] - a[0]).map(([mark, items]) => ({ mark, items })),
       yourCall,

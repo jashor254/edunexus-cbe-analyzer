@@ -62,3 +62,13 @@ test('needsAttention', () => {
   assert.equal(needsAttention({ ...base, grading_confidence: null }), true)
   assert.equal(needsAttention({ ...base, plausible_mark: 4 }), true)
 })
+
+test('plausible answers are grouped across the class from unreviewed proposals only', () => {
+  const pts = (text: string) => [{ text, classification: 'plausible_not_in_scheme' as const, explained: false, merit: 1, counted: true, awarded: 0, matchedAnswer: null, note: null }]
+  const [q1] = buildQuestionReviews([R1], [
+    mark('s1', 'r1', { points: pts('Courage'), plausible_mark: 5, proposed_mark: 4 }),
+    mark('s2', 'r1', { points: pts('courage.'), plausible_mark: 5, proposed_mark: 4 }),
+    mark('s3', 'r1', { points: pts('Courage'), status: 'confirmed', final_mark: 5 }),
+  ], LEARNERS)
+  assert.deepEqual(q1.plausibleAnswers, [{ key: 'courage', text: 'Courage', learners: ['Amani', 'Zuri'] }])
+})

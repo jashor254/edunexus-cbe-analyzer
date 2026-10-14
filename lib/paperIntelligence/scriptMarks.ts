@@ -189,3 +189,28 @@ export async function insertTeacherEnteredMarks(rows: TeacherEnteredMark[]): Pro
   })))
   if (error) throw new Error(`insertTeacherEnteredMarks: ${error.message}`)
 }
+
+// ── Answer decisions (Commit 6) ───────────────────────────────────────────
+
+/** A question's proposals not yet reviewed — the ones a class-wide answer decision may re-score. */
+export async function findProposedMarksForRubric(rubricId: string): Promise<ScriptMarkRow[]> {
+  const db = createServiceClient()
+  const { data, error } = await db
+    .from('paper_intelligence_script_marks')
+    .select(MARK_COLS)
+    .eq('rubric_id', rubricId)
+    .eq('status', 'proposed')
+  if (error) throw new Error(`findProposedMarksForRubric: ${error.message}`)
+  return (data ?? []) as unknown as ScriptMarkRow[]
+}
+
+/** Write re-scored proposals in one statement — each row carries its own new marks. */
+export async function saveRescoredProposals(rows: ScriptMarkRow[]): Promise<void> {
+  if (rows.length === 0) return
+  const db = createServiceClient()
+  const now = new Date().toISOString()
+  const { error } = await db
+    .from('paper_intelligence_script_marks')
+    .upsert(rows.map(r => ({ ...r, updated_at: now })), { onConflict: 'id' })
+  if (error) throw new Error(`saveRescoredProposals: ${error.message}`)
+}

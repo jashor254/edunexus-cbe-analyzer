@@ -242,8 +242,10 @@ export default function PaperIntelligencePage() {
   }
 
   function rephotographScheme() {
-    const marked = roster?.learners.some(l => l.marks) ?? false
-    if (marked && !window.confirm('Scripts have already been marked against this scheme. Confirming a new scheme clears those AI marks. Continue?')) return
+    if (roster?.learners.some(l => l.marks)) {
+      setError('Scripts have already been marked against this scheme, so it can no longer be replaced. To add an answer, accept it from the review screen.')
+      return
+    }
     setRubrics([])
     setRejected([])
     setMarkedOutOf(null)

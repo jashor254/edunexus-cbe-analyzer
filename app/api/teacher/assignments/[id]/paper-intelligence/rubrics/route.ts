@@ -16,7 +16,7 @@ import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized, apiNotFound, apiBadRequest } from '@/lib/api/response'
 import { UnauthorizedError } from '@/lib/core/errors'
 import { requireOwnedAssignment, AssignmentOwnershipError } from '@/lib/paperIntelligence/auth'
-import { replaceRubricsForAssignment, findRubricsForAssignment } from '@/lib/paperIntelligence/rubrics'
+import { replaceRubricsForAssignment, findRubricsForAssignment, SchemeInUseError } from '@/lib/paperIntelligence/rubrics'
 import { ExtractedRubricSchema, validateExtractedRubrics } from '@/lib/paperIntelligence/schemeValidation'
 import { setMarkedOutOf, MarkedOutOfLockedError } from '@/lib/paperIntelligence/markedOutOf'
 
@@ -90,13 +90,12 @@ export async function POST(
 
     try {
       await setMarkedOutOf(assignmentId, parsed.data.markedOutOf)
+      const saved = await replaceRubricsForAssignment(assignmentId, auth.owned.teacherId, parsed.data.rubrics)
+      return apiSuccess({ saved: saved.length, markedOutOf: parsed.data.markedOutOf })
     } catch (err) {
-      if (err instanceof MarkedOutOfLockedError) return apiError(err.message, 409)
+      if (err instanceof MarkedOutOfLockedError || err instanceof SchemeInUseError) return apiError(err.message, 409)
       throw err
     }
-
-    const saved = await replaceRubricsForAssignment(assignmentId, auth.owned.teacherId, parsed.data.rubrics)
-    return apiSuccess({ saved: saved.length, markedOutOf: parsed.data.markedOutOf })
   } catch (e: unknown) {
     console.error('[paperIntelligence/rubrics POST]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')

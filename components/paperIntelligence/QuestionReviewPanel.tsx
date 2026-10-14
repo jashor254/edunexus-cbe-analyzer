@@ -1,8 +1,9 @@
 // components/paperIntelligence/QuestionReviewPanel.tsx
 //
 // Paper Intelligence — review ONE question across the whole class. UI only:
-// the parent page sends the decisions. Three areas, in the order a teacher
-// works: agree-with-AI groups (one tap per group), "your call" cards (one tap
+// the parent page sends the decisions. Four areas, in the order a teacher
+// works: answers not in the scheme (decided once for every learner who wrote
+// them), agree-with-AI groups (one tap per group), "your call" cards (one tap
 // per learner, or adjust), and already-reviewed marks (tap to change).
 
 'use client'
@@ -12,15 +13,17 @@ import type { QuestionReview, ReviewItem } from '@/lib/paperIntelligence/reviewG
 import type { MarkedPoint } from '@/lib/paperIntelligence/types'
 
 export type ReviewDecision = { submissionId: string; rubricId: string; finalMark: number }
+export type AnswerDecisionRequest = { rubricId: string; answerKey: string; answerText: string; decision: 'accept' | 'reject' }
 
 type Props = {
   question: QuestionReview
   busy: boolean
   onConfirm: (decisions: ReviewDecision[]) => void
+  onDecideAnswer: (request: AnswerDecisionRequest) => void
   onViewScript: (submissionId: string, learnerName: string) => void
 }
 
-export function QuestionReviewPanel({ question, busy, onConfirm, onViewScript }: Props) {
+export function QuestionReviewPanel({ question, busy, onConfirm, onDecideAnswer, onViewScript }: Props) {
   const [showAnswers, setShowAnswers] = useState(false)
   const remaining = question.yourCall.length + question.agreeGroups.reduce((n, g) => n + g.items.length, 0)
 
@@ -39,6 +42,27 @@ export function QuestionReviewPanel({ question, busy, onConfirm, onViewScript }:
 
       {remaining === 0 && question.reviewed.length > 0 && (
         <p className="mb-4 rounded-xl bg-teal-50 text-teal-800 text-sm font-semibold px-3 py-2">✓ Every learner reviewed on this question.</p>
+      )}
+
+      {question.plausibleAnswers.length > 0 && (
+        <div className="mb-5">
+          <h3 className="text-xs font-bold uppercase tracking-wide text-amber-600 mb-1">Answers not in the scheme ({question.plausibleAnswers.length})</h3>
+          <p className="text-xs text-gray-500 mb-2">Decide each once — it applies to every learner who wrote it. Accepted answers join the scheme for scripts marked later.</p>
+          <div className="space-y-2">
+            {question.plausibleAnswers.map(a => (
+              <div key={a.key} className="rounded-2xl bg-white border border-amber-200 p-3">
+                <p className="font-bold text-gray-800">“{a.text}”</p>
+                <p className="text-xs text-gray-500 mb-2">{a.learners.length} learner{a.learners.length > 1 ? 's' : ''}: {a.learners.join(', ')}</p>
+                <div className="flex gap-2">
+                  <button disabled={busy} onClick={() => onDecideAnswer({ rubricId: question.id, answerKey: a.key, answerText: a.text, decision: 'accept' })}
+                    className="flex-1 rounded-xl bg-teal-600 text-white text-sm font-bold py-2.5 disabled:opacity-40">✓ Accept into scheme</button>
+                  <button disabled={busy} onClick={() => onDecideAnswer({ rubricId: question.id, answerKey: a.key, answerText: a.text, decision: 'reject' })}
+                    className="flex-1 rounded-xl bg-gray-100 text-gray-700 text-sm font-bold py-2.5 disabled:opacity-40">✗ Doesn’t earn</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {question.agreeGroups.length > 0 && (

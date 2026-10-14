@@ -32,9 +32,15 @@ mock.module('@/lib/paperIntelligence/auth', {
   },
 })
 
+class FakeSchemeInUseError extends Error {}
+let schemeInUse = false
 mock.module('@/lib/paperIntelligence/rubrics', {
   namedExports: {
-    replaceRubricsForAssignment: async (_a: string, _t: string, rubrics: unknown[]) => { saveCalls++; lastSaved = rubrics; return rubrics.map((_, i) => ({ id: `r${i}` })) },
+    SchemeInUseError: FakeSchemeInUseError,
+    replaceRubricsForAssignment: async (_a: string, _t: string, rubrics: unknown[]) => {
+      if (schemeInUse) throw new FakeSchemeInUseError('Scripts have already been marked against this scheme')
+      saveCalls++; lastSaved = rubrics; return rubrics.map((_, i) => ({ id: `r${i}` }))
+    },
     findRubricsForAssignment: async () => ([
       { id: 'r1', question_number: 1, question_label: '1a', question_text: 'Give: traits', max_marks: 5, mode: 'accept_relevant', points_required: 5, marks_per_point: 1, accepted_answers: [{ text: 'Patience', synonyms: [] }] },
     ]),
@@ -59,7 +65,7 @@ let POST: (req: Request, ctx: { params: Promise<{ id: string }> }) => Promise<Re
 let GET: (req: Request, ctx: { params: Promise<{ id: string }> }) => Promise<Response>
 
 before(async () => { ({ POST, GET } = await import('./route')) })
-beforeEach(() => { authThrow = null; saveCalls = 0; lastSaved = []; outOfThrow = null; outOfSet = null })
+beforeEach(() => { authThrow = null; saveCalls = 0; lastSaved = []; outOfThrow = null; outOfSet = null; schemeInUse = false })
 
 const ctx = { params: Promise.resolve({ id: 'a1' }) }
 function req(body: unknown) {
@@ -115,6 +121,14 @@ test('POST when learners already have scores on another scale → 409, rubric NO
   const res = await POST(req({ rubrics: [RUBRIC], markedOutOf: 50 }), ctx)
   assert.equal(res.status, 409)
   assert.match((await res.json()).error, /already have scores/)
+  assert.equal(saveCalls, 0)
+})
+
+test('POST once scripts are marked against the scheme → 409, nothing replaced', async () => {
+  schemeInUse = true
+  const res = await POST(req({ rubrics: [RUBRIC], markedOutOf: 50 }), ctx)
+  assert.equal(res.status, 409)
+  assert.match((await res.json()).error, /already been marked/)
   assert.equal(saveCalls, 0)
 })
 

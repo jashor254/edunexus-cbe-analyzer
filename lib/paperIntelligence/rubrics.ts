@@ -45,6 +45,9 @@ export type RubricRow = {
   updated_at: string
 }
 
+/** The scheme already has AI marks against it — replacing it would destroy them. */
+export class SchemeInUseError extends Error {}
+
 const RUBRIC_COLS = 'id, assignment_id, question_number, question_label, sub_strand_id, question_text, expected_answer_summary, marking_criteria, max_marks, mode, points_required, marks_per_point, accepted_answers, created_by, created_at, updated_at' as const
 
 export async function createRubric(input: CreateRubricInput): Promise<RubricRow> {
@@ -153,6 +156,18 @@ export async function replaceRubricsForAssignment(
   rubrics: ExtractedRubric[],
 ): Promise<RubricRow[]> {
   const db = createServiceClient()
+  // Replacing the rubric rows would cascade-delete every AI mark made against
+  // them (and orphan their pending evidence). Once a script is marked, the
+  // scheme changes only through audited answer decisions (answerReview.ts).
+  const { count, error: countErr } = await db
+    .from('paper_intelligence_script_marks')
+    .select('id', { count: 'exact', head: true })
+    .eq('assignment_id', assignmentId)
+  if (countErr) throw new Error(`replaceRubricsForAssignment marked check: ${countErr.message}`)
+  if ((count ?? 0) > 0) {
+    throw new SchemeInUseError('Scripts have already been marked against this scheme, so it can no longer be replaced. Accept or reject answers from the review screen instead.')
+  }
+
   const { error: delErr } = await db
     .from('open_response_rubrics')
     .delete()
@@ -203,4 +218,54 @@ export function toRubricForScriptMarking(row: RubricRow): RubricForScriptMarking
     marksPerPoint: row.marks_per_point,
     acceptedAnswers: row.accepted_answers ?? [],
   }
+}
+
+export async function findRubricById(rubricId: string): Promise<RubricRow | null> {
+  const db = createServiceClient()
+  const { data, error } = await db.from('open_response_rubrics').select(RUBRIC_COLS).eq('id', rubricId).maybeSingle()
+  if (error) throw new Error(`findRubricById: ${error.message}`)
+  return data as unknown as RubricRow | null
+}
+
+/**
+ * Add a teacher-accepted answer to a rubric's answer bank, so every later
+ * marking pass sees it as a scheme answer. Idempotent on the answer's
+ * normalized text; spellings seen on scripts are merged in as synonyms.
+ */
+export async function appendAcceptedAnswer(rubric: RubricRow, answer: AcceptedAnswer, normalize: (t: string) => string): Promise<void> {
+  const key = normalize(answer.text)
+  const existing = rubric.accepted_answers ?? []
+  const match = existing.find(a => normalize(a.text) === key)
+  const next = match
+    ? existing.map(a => a === match ? { ...a, synonyms: [...new Set([...a.synonyms, ...answer.synonyms])] } : a)
+    : [...existing, answer]
+  const db = createServiceClient()
+  const { error } = await db
+    .from('open_response_rubrics')
+    .update({ accepted_answers: next, updated_at: new Date().toISOString() })
+    .eq('id', rubric.id)
+  if (error) throw new Error(`appendAcceptedAnswer: ${error.message}`)
+}
+
+export type RubricAuditEntry = {
+  rubricId: string
+  assignmentId: string
+  actorTeacherId: string
+  action: 'append_accepted_answer' | 'edit_rubric'
+  answerAdded: Record<string, unknown> | null
+  learnersReaffected: number
+}
+
+/** SBA defensibility: who changed which rubric, to what, when, and how many learners it re-marked. */
+export async function recordRubricAudit(entry: RubricAuditEntry): Promise<void> {
+  const db = createServiceClient()
+  const { error } = await db.from('paper_intelligence_rubric_audit').insert({
+    rubric_id: entry.rubricId,
+    assignment_id: entry.assignmentId,
+    actor_teacher_id: entry.actorTeacherId,
+    action: entry.action,
+    answer_added: entry.answerAdded,
+    learners_reaffected: entry.learnersReaffected,
+  })
+  if (error) throw new Error(`recordRubricAudit: ${error.message}`)
 }
