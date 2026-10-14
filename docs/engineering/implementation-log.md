@@ -23,6 +23,28 @@ Entries are never edited to rewrite history — if a change is later reverted or
 
 ---
 
+## 2026-10-14 — Paper Intelligence Phase 1 shipped to production + Commit 6: decide an answer once (`8932fa9`, `0bda91b`)
+
+**Shipped**: Phase 1 Commits 1–5 went live on 2026-10-14. The three Phase 1 migrations were applied to production first (all additive; the Supabase security advisor showed nothing new). The work went `feat/paper-intelligence-phase1` → CI → fast-forward of `main` `8b5235e..8932fa9`, and the Vercel production deploy is Ready. The first CI run failed at the route-auth gate: the new guards `requireScriptAccess` / `requireAssignmentClassTeacher` were not in `DIRECT_GUARD_CALLS`. They were reviewed and listed, since both call `requireAuthentication` first.
+
+**Commit 6 — what changed**: each question's review now opens with *Answers not in the scheme*: every answer the AI marked plausible, grouped across the class by the point's name ("Ethics" ≡ "-Ethics -> involves good behaviour"; explanation quality is already scored separately). One tap decides it for every learner who wrote it:
+- **Accept** appends it to the rubric's answer bank, so later scripts are marked with it, and records it in `paper_intelligence_rubric_audit` (who, what, when, how many learners re-marked). Every unreviewed proposal containing it is re-scored through `scriptScoring`.
+- **Reject** re-scores those proposals with the answer as incorrect; the scheme is untouched.
+
+Reviewed proposals are never reopened. A re-scored proposal's pending evidence is retired with `rejectReview` (the reason names the decision) and unlinked, after the new proposals are saved. The Commit 4 gap is closed: replacing a scheme that already has marks is refused (409) instead of cascade-deleting them.
+
+**Live result**: accepting Language / Nationality / Socio-economic status on Q3 moved both learners from 4–7 to 7–7 — the founder's Phase 0 mark — and into a one-tap group. Ruling out "Fires in forest" on Q1b matched Phase 0. With only two scripts most plausible answers are singletons (25 answers, 41 taps → 35 after 5 decisions). The saving grows with class size, because the same answers recur across learners; a full class is the real measure.
+
+**Known limit**: a rejected answer is not remembered for scripts marked after the decision — only accepted ones join the scheme. If teachers mark in waves, a `rejected_answers` list on the rubric would close this (needs a migration).
+
+**ADR**: None — no trigger condition met.
+
+**Tests added**: `lib/paperIntelligence/{answerDecisions,answerReview}.test.ts` plus a grouping case (standard manifest, +22); `paper-intelligence/answers/route.test.ts` and a rubrics scheme-in-use case (+6).
+
+**Rollback considerations**: reverting the code leaves appended answers in `open_response_rubrics.accepted_answers` and the audit rows, both valid. No schema change.
+
+---
+
 ## 2026-10-14 — Paper Intelligence Phase 1, Commit 5: review by question → gradebook (`54e34b2..eeaa426`)
 
 **What changed**: a teacher reviews the AI's proposals one question at a time across the class. Confident proposals with nothing to decide come in groups confirmed with one tap ("5/5 · 12 learners"). Judgment calls (unreadable, low confidence, plausible answers the scheme doesn't list, or no answer found) come as cards, with the learner's photos one tap away. When a learner's last question is reviewed, their total is written to the gradebook. The scheme screen now also asks for the paper's own **"marked out of"**, which becomes `assignments.max_score`. Founder rule: it varies per exam and isn't always the questions' sum ("answer any five"). It is locked once learners hold scores. A total above it is held back for the teacher, never clamped.
