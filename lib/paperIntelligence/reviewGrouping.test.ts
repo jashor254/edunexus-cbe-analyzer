@@ -6,8 +6,8 @@ import assert from 'node:assert/strict'
 import { buildQuestionReviews, scriptCompletion, needsAttention, type ReviewRubric } from './reviewGrouping'
 import type { ScriptMarkRow } from './scriptMarks'
 
-const R1: ReviewRubric = { id: 'r1', questionNumber: 1, label: '1a', questionText: 'Give: traits', maxMarks: 5, acceptedAnswers: ['Honesty'] }
-const R2: ReviewRubric = { id: 'r2', questionNumber: 2, label: '1b', questionText: 'State: problems', maxMarks: 5, acceptedAnswers: [] }
+const R1: ReviewRubric = { id: 'r1', questionNumber: 1, label: '1a', questionText: 'Give: traits', maxMarks: 5, mode: 'accept_relevant', acceptedAnswers: ['Honesty'] }
+const R2: ReviewRubric = { id: 'r2', questionNumber: 2, label: '1b', questionText: 'State: problems', maxMarks: 5, mode: 'strict', acceptedAnswers: [] }
 
 function mark(submission_id: string, rubric_id: string, over: Partial<ScriptMarkRow> = {}): ScriptMarkRow {
   return {

@@ -109,6 +109,8 @@ export async function requireScriptAccess(
 
 export type AssignmentClassAccess = {
   teacherUserId: string
+  /** teachers.id — the reviewer identity on paper_intelligence_script_marks. */
+  teacherId: string
   assignment: { id: string; class_id: string; subject: string | null; title: string | null; max_score: number | null }
 }
 
@@ -132,5 +134,7 @@ export async function requireAssignmentClassTeacher(
     if (err instanceof ResourceOwnershipError) throw new AssignmentOwnershipError('Assignment not found.')
     throw err
   }
-  return { teacherUserId: user.id, assignment }
+  const teacher = await resolveTeacher(user.id)
+  if (!teacher) throw new AssignmentOwnershipError('Assignment not found.')
+  return { teacherUserId: user.id, teacherId: teacher.id, assignment }
 }

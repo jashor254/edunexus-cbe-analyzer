@@ -387,6 +387,13 @@ export default function PaperIntelligencePage() {
           <p className="text-sm text-gray-500 mb-4">
             {roster.assignmentTitle ? `${roster.assignmentTitle} · ` : ''}{roster.rubricCount} questions · out of {roster.markedOutOf ?? roster.maxTotal}. Tap a learner to photograph their script.
           </p>
+          {roster.learners.some(l => l.marks) && (
+            <Link href={`/teacher/assignments/${assignmentId}/paper-intelligence/review`}
+              className="mb-4 flex items-center justify-between rounded-2xl bg-teal-600 text-white font-bold px-4 py-4">
+              <span>Review marks, question by question</span>
+              <span aria-hidden>→</span>
+            </Link>
+          )}
           <ScriptRosterList learners={roster.learners} maxTotal={roster.markedOutOf ?? roster.maxTotal} marking={marking} onPick={openLearner} />
           <p className="mt-6 text-xs text-gray-400">
             AI marks are proposals only — nothing counts until you review it.{' '}

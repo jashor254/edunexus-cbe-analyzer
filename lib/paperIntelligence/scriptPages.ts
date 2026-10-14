@@ -182,3 +182,18 @@ export async function loadScriptPages(rows: ScriptPageRow[]): Promise<ScriptPage
     }
   }))
 }
+
+/** Short-lived links to view a learner's pages during review — the bucket stays private. */
+export async function signScriptPageUrls(submissionId: string): Promise<Array<{ pageNumber: number; url: string }>> {
+  const rows = await listScriptPages(submissionId)
+  if (rows.length === 0) return []
+  const db = createServiceClient()
+  const { data, error } = await db.storage
+    .from(BUCKET)
+    .createSignedUrls(rows.map(r => r.file_path), PAPER_INTELLIGENCE_LIMITS.pageViewUrlTtlSeconds)
+  if (error || !data) throw new Error(`signScriptPageUrls: ${error?.message ?? 'no data'}`)
+  const urlByPath = new Map(data.map(d => [d.path, d.signedUrl]))
+  return rows
+    .map(r => ({ pageNumber: r.page_number, url: urlByPath.get(r.file_path) ?? '' }))
+    .filter(p => p.url)
+}

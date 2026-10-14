@@ -36,6 +36,7 @@ export type ReviewRubric = {
   label: string
   questionText: string
   maxMarks: number
+  mode: 'strict' | 'accept_relevant'
   acceptedAnswers: string[]
 }
 

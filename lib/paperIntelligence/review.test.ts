@@ -39,8 +39,8 @@ mock.module('@/lib/assignments/markSubmission', {
 mock.module('./rubrics', {
   namedExports: {
     findRubricsForAssignment: async () => [
-      { id: 'r1', question_number: 1, question_label: '1a', question_text: 'q1', max_marks: 5, accepted_answers: [] },
-      { id: 'r2', question_number: 2, question_label: '1b', question_text: 'q2', max_marks: 5, accepted_answers: [] },
+      { id: 'r1', question_number: 1, question_label: '1a', question_text: 'q1', max_marks: 5, mode: 'accept_relevant', accepted_answers: [] },
+      { id: 'r2', question_number: 2, question_label: '1b', question_text: 'q2', max_marks: 5, mode: 'strict', accepted_answers: [] },
     ],
   },
 })

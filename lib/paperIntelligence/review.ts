@@ -60,6 +60,7 @@ export async function getAssignmentReview(assignmentId: string): Promise<Assignm
         label: r.question_label ?? String(r.question_number),
         questionText: r.question_text,
         maxMarks: r.max_marks,
+        mode: r.mode,
         acceptedAnswers: (r.accepted_answers ?? []).map(a => a.text),
       })),
       marks,

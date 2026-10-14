@@ -21,6 +21,7 @@ let authThrow: Error | null = null
 let saveThrow: Error | null = null
 let saveCalls = 0
 let deleteResult = true
+let signCalls = 0
 
 mock.module('@/lib/core/errors', { namedExports: { UnauthorizedError: FakeUnauthorizedError } })
 mock.module('@/utils/supabase/server', { namedExports: { createClient: async () => ({}) } })
@@ -44,15 +45,17 @@ mock.module('@/lib/paperIntelligence/scriptPages', {
       return { page: { page_number: input.pageNumber }, sharpness: { score: 0.8, acceptable: true } }
     },
     deleteScriptPage: async () => deleteResult,
+    signScriptPageUrls: async () => { signCalls++; return [{ pageNumber: 1, url: 'https://signed/p1' }] },
   },
 })
 
 const SUB = '11111111-1111-4111-8111-111111111111'
 let POST: (req: Request, ctx: { params: Promise<{ id: string }> }) => Promise<Response>
 let DELETE: (req: Request, ctx: { params: Promise<{ id: string }> }) => Promise<Response>
+let GET: (req: Request, ctx: { params: Promise<{ id: string }> }) => Promise<Response>
 
-before(async () => { ({ POST, DELETE } = await import('./route')) })
-beforeEach(() => { authThrow = null; saveThrow = null; saveCalls = 0; deleteResult = true })
+before(async () => { ({ POST, DELETE, GET } = await import('./route')) })
+beforeEach(() => { authThrow = null; saveThrow = null; saveCalls = 0; deleteResult = true; signCalls = 0 })
 
 const ctx = { params: Promise.resolve({ id: 'a1' }) }
 const req = (method: string, body: unknown) => new Request('http://t/pages', { method, body: JSON.stringify(body), headers: { 'content-type': 'application/json' } })
@@ -119,4 +122,15 @@ test('DELETE: auth first, 404 when the page does not exist, 200 when removed', a
   assert.equal((await DELETE(req('DELETE', { submissionId: SUB, pageNumber: 2 }), ctx)).status, 404)
   deleteResult = true
   assert.equal((await DELETE(req('DELETE', { submissionId: SUB, pageNumber: 2 }), ctx)).status, 200)
+})
+
+test('GET signed page links: needs a submissionId, auth before signing, then returns links', async () => {
+  assert.equal((await GET(new Request('http://t/pages'), ctx)).status, 400)
+  authThrow = new FakeScriptAccessError()
+  assert.equal((await GET(new Request(`http://t/pages?submissionId=${SUB}`), ctx)).status, 403)
+  assert.equal(signCalls, 0)
+  authThrow = null
+  const res = await GET(new Request(`http://t/pages?submissionId=${SUB}`), ctx)
+  assert.equal(res.status, 200)
+  assert.equal((await res.json()).data.pages[0].url, 'https://signed/p1')
 })

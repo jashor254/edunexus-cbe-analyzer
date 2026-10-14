@@ -5,6 +5,7 @@
 //            fails the server's own sharpness check is refused with 422 and
 //            NOT stored — the teacher retakes it.
 //   DELETE → remove a wrongly captured page.
+//   GET ?submissionId= → short-lived signed links to view the pages (review).
 //
 // Only `submissionId` identifies the learner; student and class come from the
 // submission row. Authorization (currently teaches this learner's class)
@@ -17,7 +18,7 @@ import { UnauthorizedError } from '@/lib/core/errors'
 import { PAPER_INTELLIGENCE_LIMITS } from '@/lib/config/paperIntelligence'
 import { UPLOAD_LIMITS } from '@/lib/config/uploads'
 import { requireScriptAccess, ScriptAccessError, SubmissionNotFoundError, type ScriptAccess } from '@/lib/paperIntelligence/auth'
-import { saveScriptPage, deleteScriptPage, BlurryPageError, InvalidPageError } from '@/lib/paperIntelligence/scriptPages'
+import { saveScriptPage, deleteScriptPage, signScriptPageUrls, BlurryPageError, InvalidPageError } from '@/lib/paperIntelligence/scriptPages'
 import type { SharpnessResult } from '@/lib/paperIntelligence/sharpness'
 
 const PageRef = {
@@ -45,6 +46,27 @@ async function authorize(assignmentId: string, submissionId: string): Promise<{ 
     if (err instanceof SubmissionNotFoundError) return { response: apiNotFound('Submission not found for this assignment') }
     if (err instanceof ScriptAccessError) return { response: apiForbidden() }
     throw err
+  }
+}
+
+export type PageUrlsResponse = { pages: Array<{ pageNumber: number; url: string }> }
+
+export async function GET(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id: assignmentId } = await params
+  try {
+    const submissionId = z.string().uuid().safeParse(new URL(req.url).searchParams.get('submissionId'))
+    if (!submissionId.success) return apiBadRequest('submissionId is required')
+
+    const auth = await authorize(assignmentId, submissionId.data)
+    if ('response' in auth) return auth.response
+
+    return apiSuccess<PageUrlsResponse>({ pages: await signScriptPageUrls(submissionId.data) })
+  } catch (e: unknown) {
+    console.error('[paperIntelligence/pages GET]', e instanceof Error ? e.message : String(e))
+    return apiError('Internal server error')
   }
 }
 

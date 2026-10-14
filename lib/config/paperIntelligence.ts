@@ -17,4 +17,6 @@ export const PAPER_INTELLIGENCE_LIMITS = {
   minSharpnessScore: 0.15,
   /** A question the AI marked with less than this confidence (0..1) is routed to the teacher rather than offered for one-tap confirm. */
   reviewBelowGradingConfidence: 0.7,
+  /** Lifetime of the signed links a teacher uses to view a learner's script photos during review. */
+  pageViewUrlTtlSeconds: 600,
 } as const
