@@ -6,7 +6,7 @@
 // avoids touching lib/repositories/index.ts for this prototype.
 
 import { createServiceClient } from '@/utils/supabase/service'
-import type { AcceptedAnswer, ExtractedRubric, MarkingCriterion, RubricForMarking, RubricMode } from './types'
+import type { AcceptedAnswer, ExtractedRubric, MarkingCriterion, RubricForMarking, RubricForScriptMarking, RubricMode } from './types'
 
 export type CreateRubricInput = {
   assignmentId: string
@@ -190,5 +190,17 @@ export function toRubricForMarking(row: RubricRow): RubricForMarking {
     expectedAnswerSummary: row.expected_answer_summary,
     markingCriteria: row.marking_criteria,
     maxMarks: row.max_marks,
+  }
+}
+
+/** The richer shape whole-script marking needs — the Phase 1 point structure and answer bank ride along. */
+export function toRubricForScriptMarking(row: RubricRow): RubricForScriptMarking {
+  return {
+    ...toRubricForMarking(row),
+    questionLabel: row.question_label,
+    mode: row.mode,
+    pointsRequired: row.points_required,
+    marksPerPoint: row.marks_per_point,
+    acceptedAnswers: row.accepted_answers ?? [],
   }
 }
