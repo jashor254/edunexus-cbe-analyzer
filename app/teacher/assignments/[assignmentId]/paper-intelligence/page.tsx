@@ -1,28 +1,73 @@
 'use client'
 
-// Paper Intelligence — mobile marking flow (Phase 1, Commit 3 slice: scheme
-// capture → editable rubric → confirm). Script capture + review-by-question
-// arrive in Commits 4-5. Mobile-first: big touch targets, one column, works on
-// a cheap Android phone. UI only — all logic lives behind the API routes.
+// Paper Intelligence — mobile marking flow. Phase 1 so far: scheme capture →
+// editable rubric → confirm (Commit 3), then the class list → photograph each
+// learner's script page by page → AI marks it in the background while the
+// teacher moves to the next learner (Commit 4). Review-by-question arrives in
+// Commit 5. Mobile-first: big touch targets, one column, works on a cheap
+// Android phone. UI only — all logic lives behind the API routes.
 
-import { useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useCallback, useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { compressImage, formatBytes, type CompressedImage } from '@/lib/paperIntelligence/clientImage'
+import { PAPER_INTELLIGENCE_LIMITS } from '@/lib/config/paperIntelligence'
 import type { ExtractedRubric } from '@/lib/paperIntelligence/types'
+import type { ScriptRosterEntry } from '@/lib/paperIntelligence/scriptRoster'
+import type { ScriptsResponse } from '@/app/api/teacher/assignments/[id]/paper-intelligence/scripts/route'
+import { ScriptRosterList, type MarkingState } from '@/components/paperIntelligence/ScriptRosterList'
+import { ScriptCapture, type CapturedPage } from '@/components/paperIntelligence/ScriptCapture'
 
-type Stage = 'capture' | 'extracting' | 'edit' | 'saving' | 'done'
+type Stage = 'loading' | 'capture' | 'extracting' | 'edit' | 'saving' | 'scripts' | 'learner'
 type RejectedRubric = { questionId: string; reason: string }
+type PageState = CapturedPage & { onServer: boolean }
+
+const BLURRY_MESSAGE = 'Too blurry to read — hold the phone steady and retake'
 
 export default function PaperIntelligencePage() {
   const { assignmentId } = useParams<{ assignmentId: string }>()
-  const router = useRouter()
+  const base = `/api/teacher/assignments/${assignmentId}/paper-intelligence`
 
-  const [stage, setStage] = useState<Stage>('capture')
+  const [stage, setStage] = useState<Stage>('loading')
   const [images, setImages] = useState<CompressedImage[]>([])
   const [rubrics, setRubrics] = useState<ExtractedRubric[]>([])
   const [rejected, setRejected] = useState<RejectedRubric[]>([])
   const [error, setError] = useState<string | null>(null)
+
+  const [roster, setRoster] = useState<ScriptsResponse | null>(null)
+  const [learner, setLearner] = useState<ScriptRosterEntry | null>(null)
+  const [pages, setPages] = useState<PageState[]>([])
+  const [pageBusy, setPageBusy] = useState(false)
+  const [marking, setMarking] = useState<Record<string, MarkingState>>({})
+
+  const loadRoster = useCallback(async (): Promise<ScriptsResponse | null> => {
+    try {
+      const res = await fetch(`${base}/scripts`)
+      const body = await res.json()
+      if (!res.ok) {
+        setError(body?.error ?? 'Could not load the class list.')
+        return null
+      }
+      setRoster(body.data)
+      return body.data as ScriptsResponse
+    } catch {
+      setError('Network error — check your connection and reload.')
+      return null
+    }
+  }, [base])
+
+  useEffect(() => {
+    loadRoster().then(r => setStage(r && r.rubricCount > 0 ? 'scripts' : 'capture'))
+  }, [loadRoster])
+
+  // Closing the tab mid-mark could cut a marking request short.
+  const anyMarking = Object.values(marking).includes('marking')
+  useEffect(() => {
+    if (!anyMarking) return
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault() }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [anyMarking])
 
   const avgBytes = images.length ? Math.round(images.reduce((s, i) => s + i.bytes, 0) / images.length) : 0
 
@@ -83,11 +128,122 @@ export default function PaperIntelligencePage() {
         setStage('edit')
         return
       }
-      setStage('done')
+      setImages([])
+      await loadRoster()
+      setStage('scripts')
     } catch {
       setError('Network error while saving — retry.')
       setStage('edit')
     }
+  }
+
+  // ── Script capture ──────────────────────────────────────────────────────
+  function openLearner(l: ScriptRosterEntry) {
+    setError(null)
+    setLearner(l)
+    setPages(l.pageNumbers.map(n => ({ pageNumber: n, previewUrl: null, status: 'saved', onServer: true })))
+    setStage('learner')
+  }
+
+  function putPage(page: PageState) {
+    setPages(prev => [...prev.filter(p => p.pageNumber !== page.pageNumber), page].sort((a, b) => a.pageNumber - b.pageNumber))
+  }
+
+  async function onPhoto(file: File, pageNumber: number) {
+    if (!learner) return
+    const wasOnServer = pages.find(p => p.pageNumber === pageNumber)?.onServer ?? false
+    let img: CompressedImage
+    try {
+      img = await compressImage(file)
+    } catch {
+      putPage({ pageNumber, previewUrl: null, status: 'failed', message: 'That photo could not be processed — retake', onServer: wasOnServer })
+      return
+    }
+    const previewUrl = `data:${img.mimeType};base64,${img.imageBase64}`
+    if (!img.sharpness.acceptable) {
+      putPage({ pageNumber, previewUrl, status: 'blurry', message: BLURRY_MESSAGE, onServer: wasOnServer })
+      return
+    }
+    putPage({ pageNumber, previewUrl, status: 'uploading', onServer: wasOnServer })
+    try {
+      const res = await fetch(`${base}/pages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ submissionId: learner.submissionId, pageNumber, imageBase64: img.imageBase64, mimeType: img.mimeType }),
+      })
+      const body = await res.json()
+      if (res.status === 422) putPage({ pageNumber, previewUrl, status: 'blurry', message: BLURRY_MESSAGE, onServer: wasOnServer })
+      else if (!res.ok) putPage({ pageNumber, previewUrl, status: 'failed', message: body?.error ?? 'Upload failed — retake', onServer: wasOnServer })
+      else putPage({ pageNumber, previewUrl, status: 'saved', onServer: true })
+    } catch {
+      putPage({ pageNumber, previewUrl, status: 'failed', message: 'No connection — retake when back online', onServer: wasOnServer })
+    }
+  }
+
+  async function onRemove(pageNumber: number) {
+    if (!learner) return
+    const page = pages.find(p => p.pageNumber === pageNumber)
+    if (page?.onServer) {
+      setPageBusy(true)
+      try {
+        const res = await fetch(`${base}/pages`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ submissionId: learner.submissionId, pageNumber }),
+        })
+        if (!res.ok && res.status !== 404) {
+          setError('Could not remove that page — try again.')
+          return
+        }
+      } catch {
+        setError('No connection — could not remove the page.')
+        return
+      } finally {
+        setPageBusy(false)
+      }
+    }
+    setPages(prev => prev.filter(p => p.pageNumber !== pageNumber))
+  }
+
+  function markAndContinue() {
+    if (!learner || !roster) return
+    const { submissionId } = learner
+    setMarking(prev => ({ ...prev, [submissionId]: 'marking' }))
+
+    // Marking runs in the background (~10-20s); the teacher moves straight on.
+    fetch(`${base}/mark-script`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ submissionId }),
+    })
+      .then(async res => {
+        if (!res.ok) throw new Error(String(res.status))
+        setMarking(prev => { const next = { ...prev }; delete next[submissionId]; return next })
+        await loadRoster()
+      })
+      .catch(() => setMarking(prev => ({ ...prev, [submissionId]: 'failed' })))
+
+    const order = roster.learners
+    const from = order.findIndex(l => l.submissionId === submissionId)
+    const next = [...order.slice(from + 1), ...order.slice(0, from)]
+      .find(l => l.pageNumbers.length === 0 && !l.marks && !marking[l.submissionId])
+    if (next) openLearner(next)
+    else backToList()
+  }
+
+  function backToList() {
+    setLearner(null)
+    setPages([])
+    setStage('scripts')
+    loadRoster()
+  }
+
+  function rephotographScheme() {
+    const marked = roster?.learners.some(l => l.marks) ?? false
+    if (marked && !window.confirm('Scripts have already been marked against this scheme. Confirming a new scheme clears those AI marks. Continue?')) return
+    setRubrics([])
+    setRejected([])
+    setStage('capture')
   }
 
   return (
@@ -200,16 +356,36 @@ export default function PaperIntelligencePage() {
         </section>
       )}
 
-      {/* ── Done ──────────────────────────────────────────────────────── */}
-      {stage === 'done' && (
-        <section className="text-center pt-10">
-          <div className="text-5xl mb-3">✅</div>
-          <h1 className="text-xl font-bold text-gray-800 mb-1">Rubric saved</h1>
-          <p className="text-sm text-gray-500 mb-6">{rubrics.length} questions ready. Script capture is the next step (coming soon).</p>
-          <button onClick={() => router.push(`/teacher/assignments/${assignmentId}`)} className="rounded-2xl bg-teal-600 text-white font-bold py-3 px-6">
-            Back to assignment
-          </button>
+      {stage === 'loading' && <p className="text-sm text-gray-400 text-center pt-10">Loading…</p>}
+
+      {/* ── Step 3: class list ─────────────────────────────────────────── */}
+      {stage === 'scripts' && roster && (
+        <section>
+          <h1 className="text-xl font-bold text-gray-800 mb-1">Learner scripts</h1>
+          <p className="text-sm text-gray-500 mb-4">
+            {roster.assignmentTitle ? `${roster.assignmentTitle} · ` : ''}{roster.rubricCount} questions · {roster.maxTotal} marks. Tap a learner to photograph their script.
+          </p>
+          <ScriptRosterList learners={roster.learners} maxTotal={roster.maxTotal} marking={marking} onPick={openLearner} />
+          <p className="mt-6 text-xs text-gray-400">
+            AI marks are proposals only — nothing counts until you review it.{' '}
+            <button onClick={rephotographScheme} className="underline">Re-photograph the scheme</button>
+          </p>
         </section>
+      )}
+
+      {/* ── Step 4: one learner's script ───────────────────────────────── */}
+      {stage === 'learner' && learner && (
+        <ScriptCapture
+          learnerName={learner.name}
+          pages={pages}
+          maxPages={PAPER_INTELLIGENCE_LIMITS.maxPagesPerScript}
+          busy={pageBusy || marking[learner.submissionId] === 'marking'}
+          alreadyMarked={!!learner.marks}
+          onPhoto={onPhoto}
+          onRemove={onRemove}
+          onMark={markAndContinue}
+          onBack={backToList}
+        />
       )}
     </main>
   )

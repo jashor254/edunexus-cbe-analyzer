@@ -5,7 +5,10 @@
 // re-encode as JPEG, so a 4-8 MB phone photo becomes a few hundred KB over a
 // cheap mobile connection. Pure client util (uses Image/canvas) — never
 // imported by a server route. Shared by scheme capture (Commit 3) and script
-// capture (Commit 4).
+// capture (Commit 4). sharpness.ts is pure and runtime-agnostic, so the phone
+// runs the server's exact focus measure.
+
+import { analysisSize, assessSharpness, type SharpnessResult } from './sharpness'
 
 export type CompressedImage = {
   /** Raw base64, no "data:" prefix — the shape the API routes expect. */
@@ -13,6 +16,12 @@ export type CompressedImage = {
   mimeType: 'image/jpeg'
   /** Approximate byte size of the compressed JPEG. */
   bytes: number
+  /**
+   * The same focus measure the server applies, taken on the compressed image
+   * the server will receive — so "too blurry, retake" shows before any upload.
+   * Advisory only: the server re-measures every page itself.
+   */
+  sharpness: SharpnessResult
 }
 
 function readAsDataUrl(file: File): Promise<string> {
@@ -60,7 +69,24 @@ export async function compressImage(
   const jpegDataUrl = canvas.toDataURL('image/jpeg', quality)
   const base64 = jpegDataUrl.split(',')[1] ?? ''
   const bytes = Math.ceil(base64.length * 0.75)
-  return { imageBase64: base64, mimeType: 'image/jpeg', bytes }
+  const sharpness = measureSharpness(await loadImage(jpegDataUrl))
+  return { imageBase64: base64, mimeType: 'image/jpeg', bytes, sharpness }
+}
+
+function measureSharpness(img: HTMLImageElement): SharpnessResult {
+  const size = analysisSize(img.width, img.height)
+  const canvas = document.createElement('canvas')
+  canvas.width = size.width
+  canvas.height = size.height
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  if (!ctx) throw new Error('Canvas 2D context is unavailable on this device')
+  ctx.drawImage(img, 0, 0, size.width, size.height)
+  const rgba = ctx.getImageData(0, 0, size.width, size.height).data
+  const grey = new Uint8ClampedArray(size.width * size.height)
+  for (let i = 0, j = 0; j < grey.length; i += 4, j++) {
+    grey[j] = 0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2]
+  }
+  return assessSharpness({ pixels: grey, width: size.width, height: size.height })
 }
 
 /** Human-readable KB/MB for the "average upload size" readout. */

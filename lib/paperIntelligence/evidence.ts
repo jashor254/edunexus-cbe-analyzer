@@ -62,9 +62,17 @@ export type PaperIntelligenceEvidenceInput = {
   /** Per-rubric, resolved once by the caller — never re-resolved here (same discipline as every other producer). */
   subStrandIdByRubricId: Map<string, string | null>
   answers: RecognizedQuestionAnswer[]
+  /** The vision model that read the page(s). Defaults to the Prototype 01 single-page model. */
+  model?: string
+  /** Defaults to the Prototype 01 single-page method. */
+  extractionMethod?: string
 }
 
-export type PaperIntelligenceEvidenceResult = PersistEvidenceResult & { failedWrites: number }
+export type PaperIntelligenceEvidenceResult = PersistEvidenceResult & {
+  failedWrites: number
+  /** rubricId → the evidence row written for it. Absent for a failed write or an identical-retry no-op. */
+  evidenceIdByRubricId: Map<string, string>
+}
 
 /**
  * Never throws on an individual evidence-write failure — logs it durably
@@ -126,7 +134,7 @@ export async function recordPaperIntelligenceEvidence(
       gradingConfidence: answer.gradingConfidence,
       rationale: answer.rationale,
       provider: 'gemini',
-      model: 'gemini-2.5-flash-lite',
+      model: input.model ?? 'gemini-2.5-flash-lite',
       imageRef: input.imageRef,
     }
 
@@ -144,7 +152,7 @@ export async function recordPaperIntelligenceEvidence(
       evidenceSource: SOURCE,
       trustTier: EVIDENCE_SOURCE_TRUST_TIER[SOURCE],
       evidenceConfidence: confidence,
-      extractionMethod: 'paper_intelligence_gemini_vision_v1',
+      extractionMethod: input.extractionMethod ?? 'paper_intelligence_gemini_vision_v1',
       reviewStatus,
       rawInputRef: `assignment:${input.assignmentId}:question=${answer.questionNumber}:image=${input.imageRef}`,
       importedAt,
@@ -183,5 +191,11 @@ export async function recordPaperIntelligenceEvidence(
     processingDurationMs: 0,
   })
 
-  return { ...result, failedWrites }
+  const evidenceIdByRubricId = new Map<string, string>()
+  for (const row of result.inserted) {
+    const rubricId = row.payload?.rubricId
+    if (typeof rubricId === 'string') evidenceIdByRubricId.set(rubricId, row.id)
+  }
+
+  return { ...result, failedWrites, evidenceIdByRubricId }
 }
