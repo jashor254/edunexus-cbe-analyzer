@@ -33,6 +33,8 @@ export default function PaperIntelligencePage() {
   const [rubrics, setRubrics] = useState<ExtractedRubric[]>([])
   const [rejected, setRejected] = useState<RejectedRubric[]>([])
   const [error, setError] = useState<string | null>(null)
+  // null = follow the scheme's total until the teacher types their own.
+  const [markedOutOf, setMarkedOutOf] = useState<number | null>(null)
 
   const [roster, setRoster] = useState<ScriptsResponse | null>(null)
   const [learner, setLearner] = useState<ScriptRosterEntry | null>(null)
@@ -69,6 +71,7 @@ export default function PaperIntelligencePage() {
     return () => window.removeEventListener('beforeunload', warn)
   }, [anyMarking])
 
+  const schemeTotal = rubrics.reduce((sum, r) => sum + (Number.isFinite(r.maxMarks) ? r.maxMarks : 0), 0)
   const avgBytes = images.length ? Math.round(images.reduce((s, i) => s + i.bytes, 0) / images.length) : 0
 
   async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -120,7 +123,7 @@ export default function PaperIntelligencePage() {
       const res = await fetch(`/api/teacher/assignments/${assignmentId}/paper-intelligence/rubrics`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rubrics }),
+        body: JSON.stringify({ rubrics, markedOutOf: markedOutOf ?? schemeTotal }),
       })
       const body = await res.json()
       if (!res.ok) {
@@ -243,6 +246,7 @@ export default function PaperIntelligencePage() {
     if (marked && !window.confirm('Scripts have already been marked against this scheme. Confirming a new scheme clears those AI marks. Continue?')) return
     setRubrics([])
     setRejected([])
+    setMarkedOutOf(null)
     setStage('capture')
   }
 
@@ -346,9 +350,27 @@ export default function PaperIntelligencePage() {
             ))}
           </div>
 
+          <div className="mt-5 rounded-2xl bg-white border border-gray-200 p-4">
+            <label className="flex items-center justify-between gap-3">
+              <span>
+                <span className="block font-bold text-gray-800">This paper is marked out of</span>
+                <span className="block text-xs text-gray-500">The questions add up to {schemeTotal}. Change this if learners answer only some questions.</span>
+              </span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                value={markedOutOf ?? schemeTotal}
+                onChange={e => setMarkedOutOf(parseInt(e.target.value, 10) || 0)}
+                className="w-20 rounded-xl border border-gray-200 py-2 px-2 text-center font-bold text-gray-800 focus:outline-none focus:border-teal-400"
+                aria-label="Marked out of"
+              />
+            </label>
+          </div>
+
           <button
             onClick={save}
-            disabled={stage === 'saving' || rubrics.length === 0 || rubrics.some(r => r.maxMarks !== r.pointsRequired * r.marksPerPoint)}
+            disabled={stage === 'saving' || rubrics.length === 0 || (markedOutOf ?? schemeTotal) < 1 || rubrics.some(r => r.maxMarks !== r.pointsRequired * r.marksPerPoint)}
             className="mt-5 w-full rounded-2xl bg-teal-600 text-white font-bold py-4 disabled:opacity-40"
           >
             {stage === 'saving' ? 'Saving…' : `Confirm rubric (${rubrics.length})`}
@@ -363,9 +385,9 @@ export default function PaperIntelligencePage() {
         <section>
           <h1 className="text-xl font-bold text-gray-800 mb-1">Learner scripts</h1>
           <p className="text-sm text-gray-500 mb-4">
-            {roster.assignmentTitle ? `${roster.assignmentTitle} · ` : ''}{roster.rubricCount} questions · {roster.maxTotal} marks. Tap a learner to photograph their script.
+            {roster.assignmentTitle ? `${roster.assignmentTitle} · ` : ''}{roster.rubricCount} questions · out of {roster.markedOutOf ?? roster.maxTotal}. Tap a learner to photograph their script.
           </p>
-          <ScriptRosterList learners={roster.learners} maxTotal={roster.maxTotal} marking={marking} onPick={openLearner} />
+          <ScriptRosterList learners={roster.learners} maxTotal={roster.markedOutOf ?? roster.maxTotal} marking={marking} onPick={openLearner} />
           <p className="mt-6 text-xs text-gray-400">
             AI marks are proposals only — nothing counts until you review it.{' '}
             <button onClick={rephotographScheme} className="underline">Re-photograph the scheme</button>

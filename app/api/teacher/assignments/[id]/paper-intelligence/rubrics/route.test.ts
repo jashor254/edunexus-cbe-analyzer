@@ -41,6 +41,16 @@ mock.module('@/lib/paperIntelligence/rubrics', {
   },
 })
 
+let outOfThrow: Error | null = null
+let outOfSet: number | null = null
+class FakeMarkedOutOfLockedError extends Error {}
+mock.module('@/lib/paperIntelligence/markedOutOf', {
+  namedExports: {
+    MarkedOutOfLockedError: FakeMarkedOutOfLockedError,
+    setMarkedOutOf: async (_a: string, n: number) => { if (outOfThrow) throw outOfThrow; outOfSet = n },
+  },
+})
+
 mock.module('@/utils/supabase/server', {
   namedExports: { createClient: async () => ({}) },
 })
@@ -49,7 +59,7 @@ let POST: (req: Request, ctx: { params: Promise<{ id: string }> }) => Promise<Re
 let GET: (req: Request, ctx: { params: Promise<{ id: string }> }) => Promise<Response>
 
 before(async () => { ({ POST, GET } = await import('./route')) })
-beforeEach(() => { authThrow = null; saveCalls = 0; lastSaved = [] })
+beforeEach(() => { authThrow = null; saveCalls = 0; lastSaved = []; outOfThrow = null; outOfSet = null })
 
 const ctx = { params: Promise.resolve({ id: 'a1' }) }
 function req(body: unknown) {
@@ -59,32 +69,53 @@ const RUBRIC = { questionId: '1a', commandWord: 'Give', topic: 'traits', pointsR
 
 test('POST unauthorized → 401, no save', async () => {
   authThrow = new FakeUnauthorizedError()
-  const res = await POST(req({ rubrics: [RUBRIC] }), ctx)
+  const res = await POST(req({ rubrics: [RUBRIC], markedOutOf: 50 }), ctx)
   assert.equal(res.status, 401)
   assert.equal(saveCalls, 0)
 })
 
 test('POST non-owner → 404, no save', async () => {
   authThrow = new FakeAssignmentOwnershipError()
-  const res = await POST(req({ rubrics: [RUBRIC] }), ctx)
+  const res = await POST(req({ rubrics: [RUBRIC], markedOutOf: 50 }), ctx)
   assert.equal(res.status, 404)
   assert.equal(saveCalls, 0)
 })
 
 test('POST rubric whose marks do not add up → 400, no save', async () => {
   const bad = { ...RUBRIC, maxMarks: 9 } // 5×1 ≠ 9
-  const res = await POST(req({ rubrics: [bad] }), ctx)
+  const res = await POST(req({ rubrics: [bad], markedOutOf: 50 }), ctx)
   assert.equal(res.status, 400)
   assert.equal(saveCalls, 0)
 })
 
 test('POST happy path → 200, saved count, lib called with the rubrics', async () => {
-  const res = await POST(req({ rubrics: [RUBRIC] }), ctx)
+  const res = await POST(req({ rubrics: [RUBRIC], markedOutOf: 50 }), ctx)
   assert.equal(res.status, 200)
   const body = await res.json()
   assert.equal(body.data.saved, 1)
   assert.equal(saveCalls, 1)
   assert.equal(lastSaved.length, 1)
+})
+
+test('POST without a "marked out of" → 400, no save', async () => {
+  const res = await POST(req({ rubrics: [RUBRIC] }), ctx)
+  assert.equal(res.status, 400)
+  assert.equal(saveCalls, 0)
+})
+
+test('POST sets the marked-out-of before saving', async () => {
+  const res = await POST(req({ rubrics: [RUBRIC], markedOutOf: 40 }), ctx)
+  assert.equal(res.status, 200)
+  assert.equal(outOfSet, 40)
+  assert.equal((await res.json()).data.markedOutOf, 40)
+})
+
+test('POST when learners already have scores on another scale → 409, rubric NOT replaced', async () => {
+  outOfThrow = new FakeMarkedOutOfLockedError('3 learner(s) already have scores out of 100.')
+  const res = await POST(req({ rubrics: [RUBRIC], markedOutOf: 50 }), ctx)
+  assert.equal(res.status, 409)
+  assert.match((await res.json()).error, /already have scores/)
+  assert.equal(saveCalls, 0)
 })
 
 test('GET unauthorized → 401', async () => {
@@ -100,4 +131,5 @@ test('GET happy path → returns mapped rubrics', async () => {
   assert.equal(body.data.rubrics.length, 1)
   assert.equal(body.data.rubrics[0].questionLabel, '1a')
   assert.equal(body.data.rubrics[0].pointsRequired, 5)
+  assert.equal(body.data.markedOutOf, 50)
 })

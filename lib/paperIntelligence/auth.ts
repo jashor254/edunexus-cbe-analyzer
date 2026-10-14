@@ -109,7 +109,7 @@ export async function requireScriptAccess(
 
 export type AssignmentClassAccess = {
   teacherUserId: string
-  assignment: { id: string; class_id: string; subject: string | null; title: string | null }
+  assignment: { id: string; class_id: string; subject: string | null; title: string | null; max_score: number | null }
 }
 
 /** The class-level twin of requireScriptAccess, for reads across a whole class's scripts. */
@@ -121,7 +121,7 @@ export async function requireAssignmentClassTeacher(
   const db = createServiceClient()
   const { data: assignment } = await db
     .from('assignments')
-    .select('id, class_id, subject, title')
+    .select('id, class_id, subject, title, max_score')
     .eq('id', assignmentId)
     .maybeSingle()
 

@@ -21,7 +21,7 @@ mock.module('@/lib/paperIntelligence/auth', {
     AssignmentOwnershipError: FakeAssignmentOwnershipError,
     requireAssignmentClassTeacher: async () => {
       if (authThrow) throw authThrow
-      return { teacherUserId: 'u1', assignment: { id: 'a1', class_id: 'c1', subject: 'Social Studies', title: 'SBA' } }
+      return { teacherUserId: 'u1', assignment: { id: 'a1', class_id: 'c1', subject: 'Social Studies', title: 'SBA', max_score: 40 } }
     },
   },
 })
@@ -54,4 +54,5 @@ test('happy path returns the roster with the assignment title', async () => {
   assert.equal(body.data.assignmentTitle, 'SBA')
   assert.equal(body.data.learners[0].pageNumbers.length, 2)
   assert.equal(body.data.maxTotal, 50)
+  assert.equal(body.data.markedOutOf, 40)
 })

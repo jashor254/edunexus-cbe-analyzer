@@ -12,7 +12,11 @@ import { UnauthorizedError } from '@/lib/core/errors'
 import { requireAssignmentClassTeacher, AssignmentOwnershipError } from '@/lib/paperIntelligence/auth'
 import { getScriptRoster, type ScriptRoster } from '@/lib/paperIntelligence/scriptRoster'
 
-export type ScriptsResponse = ScriptRoster & { assignmentTitle: string | null }
+export type ScriptsResponse = ScriptRoster & {
+  assignmentTitle: string | null
+  /** The paper's "marked out of" (assignments.max_score) — what a learner's total is out of. */
+  markedOutOf: number | null
+}
 
 export async function GET(
   _req: Request,
@@ -21,16 +25,16 @@ export async function GET(
   const { id: assignmentId } = await params
   try {
     const supabase = await createClient()
-    let title: string | null
+    let assignment: Awaited<ReturnType<typeof requireAssignmentClassTeacher>>['assignment']
     try {
-      title = (await requireAssignmentClassTeacher(supabase, assignmentId)).assignment.title
+      assignment = (await requireAssignmentClassTeacher(supabase, assignmentId)).assignment
     } catch (err) {
       if (err instanceof UnauthorizedError) return apiUnauthorized()
       if (err instanceof AssignmentOwnershipError) return apiNotFound('Assignment not found')
       throw err
     }
     const roster = await getScriptRoster(assignmentId)
-    return apiSuccess<ScriptsResponse>({ ...roster, assignmentTitle: title })
+    return apiSuccess<ScriptsResponse>({ ...roster, assignmentTitle: assignment.title, markedOutOf: assignment.max_score })
   } catch (e: unknown) {
     console.error('[paperIntelligence/scripts GET]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')

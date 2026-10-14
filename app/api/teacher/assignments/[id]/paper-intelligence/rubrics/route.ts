@@ -2,7 +2,8 @@
 //
 // Paper Intelligence Phase 1 — rubric persistence + read.
 //   GET  → the current confirmed rubrics for this assignment (editor preload).
-//   POST → persist the teacher-CONFIRMED (and possibly edited) rubric set.
+//   POST → persist the teacher-CONFIRMED (and possibly edited) rubric set,
+//          plus the paper's "marked out of" (→ assignments.max_score).
 //
 // POST is the only path that writes open_response_rubrics for this feature,
 // and it runs exclusively on teacher-submitted, teacher-reviewed data — the
@@ -17,9 +18,12 @@ import { UnauthorizedError } from '@/lib/core/errors'
 import { requireOwnedAssignment, AssignmentOwnershipError } from '@/lib/paperIntelligence/auth'
 import { replaceRubricsForAssignment, findRubricsForAssignment } from '@/lib/paperIntelligence/rubrics'
 import { ExtractedRubricSchema, validateExtractedRubrics } from '@/lib/paperIntelligence/schemeValidation'
+import { setMarkedOutOf, MarkedOutOfLockedError } from '@/lib/paperIntelligence/markedOutOf'
 
 const PersistSchema = z.object({
   rubrics: z.array(ExtractedRubricSchema).min(1).max(50),
+  /** The paper's own "marked out of" — becomes the assignment's max score. Not necessarily the sum of the questions ("answer any five"). */
+  markedOutOf: z.number().int().min(1).max(1000),
 })
 
 async function authorize(supabase: Awaited<ReturnType<typeof createClient>>, assignmentId: string) {
@@ -44,6 +48,7 @@ export async function GET(
 
     const rows = await findRubricsForAssignment(assignmentId)
     return apiSuccess({
+      markedOutOf: auth.owned.assignment.max_score,
       rubrics: rows.map(r => ({
         id: r.id,
         questionNumber: r.question_number,
@@ -83,8 +88,15 @@ export async function POST(
       return apiBadRequest(`Some rubrics do not add up: ${invalid.map(i => `${i.questionId} (${i.reason})`).join('; ')}`)
     }
 
+    try {
+      await setMarkedOutOf(assignmentId, parsed.data.markedOutOf)
+    } catch (err) {
+      if (err instanceof MarkedOutOfLockedError) return apiError(err.message, 409)
+      throw err
+    }
+
     const saved = await replaceRubricsForAssignment(assignmentId, auth.owned.teacherId, parsed.data.rubrics)
-    return apiSuccess({ saved: saved.length })
+    return apiSuccess({ saved: saved.length, markedOutOf: parsed.data.markedOutOf })
   } catch (e: unknown) {
     console.error('[paperIntelligence/rubrics POST]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')
