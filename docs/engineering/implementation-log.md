@@ -23,6 +23,26 @@ Entries are never edited to rewrite history — if a change is later reverted or
 
 ---
 
+## 2026-10-14 — Paper Intelligence Phase 1, Commit 5: review by question → gradebook (`54e34b2..eeaa426`)
+
+**What changed**: a teacher reviews the AI's proposals one question at a time across the class. Confident proposals with nothing to decide come in groups confirmed with one tap ("5/5 · 12 learners"). Judgment calls (unreadable, low confidence, plausible answers the scheme doesn't list, or no answer found) come as cards, with the learner's photos one tap away. When a learner's last question is reviewed, their total is written to the gradebook. The scheme screen now also asks for the paper's own **"marked out of"**, which becomes `assignments.max_score`. Founder rule: it varies per exam and isn't always the questions' sum ("answer any five"). It is locked once learners hold scores. A total above it is held back for the teacher, never clamped.
+
+**Shared mark path**: the manual-mark write (bounds, status/score, notification, assignment-mark evidence with its correction key) was extracted from `mark/route.ts` into `lib/assignments/markSubmission.ts`. The route is now a thin caller, and Paper Intelligence finalizes through the same function. `mark/route.http.integration.test.ts` was re-run on the local stack after the refactor: 4/4.
+
+**Evidence handling**: per-question AI evidence moves only through the lifecycle. Agree → `confirmReview`. A different mark → `rejectReview`, with a reason that records both marks. A confirmed mark changed later → `retractEvidence`. The teacher's actual marks reach the learner record through the finalized assignment score.
+
+**Live result**: on the local stack, with real Gemini and the founder's own Phase 0 marks as decisions, both scripts finalized at exactly 37/50 and 41/50. Per-question evidence ended as 4 `reviewed_confirmed` / 12 `reviewed_rejected`. An edit chain 41 → 40 → 41 superseded correctly. **Finding**: the founder's mark equalled the AI's *if-accepted* total on 9/16 questions vs 4/16 for scheme-only, and fell in its range on 13/16. "Accept relevant" cards now pre-select the if-accepted mark. Only 3/16 decisions fell into one-tap groups — the plausible-answer decisions dominate the teacher's work, which is what Commit 6 (accept an answer once → re-apply class-wide) targets.
+
+**Architectural documents referenced**: CLAUDE.md (thin routes; reviewer identity from the session, never the body; no queries in loops — lifecycle calls are per row because the lifecycle has no batch form, and review updates are batched per decision); `learner-record-layer-decisions.md` Decision 5 (review reads `paper_intelligence_script_marks`, never `learner_evidence`).
+
+**ADR**: None — no trigger condition met.
+
+**Tests added**: `lib/paperIntelligence/{reviewGrouping,review}.test.ts` (standard manifest, 14); route tests for `review`, `review/confirm`, `pages` GET, and `rubrics` marked-out-of (+11, run via the `*` glob). Live E2E 11/11.
+
+**Rollback considerations**: reverting the mark-route extraction restores the inline route — behavior is identical. Finalized scores are ordinary `assignment_submissions` scores; undoing them is a normal re-mark. Still local-only: the three Phase 1 migrations are not applied to production, and every Paper Intelligence commit is unpushed.
+
+---
+
 ## 2026-10-14 — Paper Intelligence Phase 1, Commit 4: script capture → whole-script AI marking (`3ab360e..dbea539`)
 
 **What changed**: a teacher can now photograph each learner's script page by page on a phone and have it marked against the confirmed scheme, all pages in one Gemini call (answers cross page breaks), while moving straight on to the next learner. The model only reads and classifies each point (`matches_scheme` / `plausible_not_in_scheme` / `incorrect`, plus *explained?*); every mark is derived in code (first-N points count; name = 1, name + explanation = 2; scheme-only vs if-accepted totals). Everything lands as `pending_review` evidence plus a per-question proposal row in the new feature-local `paper_intelligence_script_marks` table, which review (Commit 5) and accept-answer re-apply (Commit 6) read instead of `learner_evidence` (founder decision, this date). Blurry photos are refused on the phone and again on the server (`sharp`), using one shared, pure focus measure.
