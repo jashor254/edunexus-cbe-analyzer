@@ -237,7 +237,12 @@ jobs:
           # open_response_rubrics.question_label/mode/points_required/
           # marks_per_point, all additive). Reviewed: only schema change;
           # FAIL_COUNT=9 UNRECOVERED=0, unchanged.
-          EXPECTED="82de47d10f5f6716662d2b1161f60008"
+          # 2026-10-14: 82de47d1… → f996277a… for migration
+          # 20261014090000_paper_intelligence_script_marks.sql (adds table
+          # paper_intelligence_script_marks, additive). Reviewed: only schema
+          # change; FAIL_COUNT=9 UNRECOVERED=0, unchanged. Computed on an
+          # isolated throwaway stack that first reproduced 82de47d1 at HEAD.
+          EXPECTED="f996277adfe1cba18c2023537ee04697"
           echo "expected: $EXPECTED"
           echo "actual:   $ACTUAL"
           if [ "$ACTUAL" != "$EXPECTED" ]; then
