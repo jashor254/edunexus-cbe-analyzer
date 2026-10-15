@@ -3789,3 +3789,20 @@ Founder approved building the self-report path now (auto-derivation still deferr
 **Feeds / next**: the lens output plugs into the existing AI Reality Check + the beyond-Gatsby "AI-era readiness" benchmark, and pairs learner-evolution × career-evolution. SEPARATE ongoing track (sourced content, not invented): curate legal-profession and other signals into `CAREER_SIGNALS` so the engine actually has change to trace — the real "keep tracing over time" work.
 
 **Not pushed**: joins the held batch.
+
+### Follow-on — Career Evolution surfaced in the Career Intelligence Report (same day)
+
+Audit (READY WITH CONDITIONS) → approved vertical slice. Mode-gated to planning (Senior) only; Junior/other → null, Junior experience untouched; existing-evidence only; no new API/table/AI/package.
+
+- `lib/career/careerEvolution.ts`: new pure `resolveCareerEvolutionForReport(mode, topCareerDetail)` — planning-only; signals via `getCareerSignalsForCareer(slug)`; `durableTasks`/`shiftingTasks` only from the career's `ai_impact.human_advantage`/`.replacing`. **Placed here, not in the report engine** — importing `careerIntelligenceEngine` constructs the Supabase service client at module load (fail-closed without env), which would break a STANDARD env-free test; the pure seam belongs in a pure module.
+- `lib/career/types.ts`: `career_evolution: CareerEvolutionView | null` on `CareerIntelligenceReport` (type-only import of `CareerEvolutionView`; the types→careerEvolution→careerSignals→types chain is all `import type`, erased at runtime, no cycle).
+- `lib/career/careerIntelligenceEngine.ts`: compute + assign `career_evolution` next to `ai_reality_check` (3-line additive wiring; AI Reality Check semantics and career selection untouched).
+- `app/(parent)/career-intelligence-report/page.tsx`: "How This Career Is Evolving" section after S5 — narrative + chronological trajectory with per-signal provenance (source link, date, confidence), a "not a prediction of your child's future" disclaimer, and a "reflects currently available documented signals" note (honest about the ≤3-signal accessor cap). Renders nothing when `career_evolution` is null.
+
+**Architectural documents referenced**: §16 (non-prescriptive), ADR-0033, `learner-record-layer-decisions.md` Decision 5 (no direct evidence-repo reads — this reads only the in-memory signal corpus + the already-resolved `top_career_detail`), CLAUDE.md.
+
+**ADR**: none. Additive field + pure composition; no identity/table/write-path/AI/auth change.
+
+**Tests**: `lib/career/careerEvolutionReport.test.ts` (5 pure, STANDARD — planning+signals, planning no-signals graceful, junior→null, non-planning→null, missing-career→null). End-to-end mode-gating added to `careerIntelligenceEvidenceFirst.integration.test.ts` (DEEP): Grade 8 → `career_evolution` null; Grade 10 (planning) → null-or-well-formed view (CAREER-EVO-001). Suite 1659 → 1664, green; tsc clean; `next build` clean; eslint clean on touched files. DEEP integration not run in this session (no `TEST_SUPABASE`) — runs in CI.
+
+**Rollback**: additive; reverts cleanly per file. **Not pushed**: joins the held batch.
