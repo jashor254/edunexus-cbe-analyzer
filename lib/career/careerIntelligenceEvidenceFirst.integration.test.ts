@@ -85,6 +85,24 @@ test('PROD-EVD-001: a learner with ZERO admissible signal in either backbone sti
   assert.equal(report.student_id, studentId)
   assert.deepEqual(report.hidden_strengths, [], 'no fabricated hidden strengths from nonexistent evidence')
   assert.deepEqual(report.current_strengths, [], 'no fabricated current strengths from nonexistent evidence')
+  // Junior → Senior continuity regression: a Junior (Grade 8, exploration)
+  // report must NOT carry a continuity section — Junior output is unchanged.
+  assert.equal(report.mode, 'exploration')
+  assert.equal(report.journey_continuity, null, 'Junior reports carry no journey_continuity section')
+})
+
+test('CONTINUITY-001: a Senior (planning) report carries a journey_continuity section that continues the record', async () => {
+  const studentId = await makeStudent('senior-continuity', 10)
+
+  const report = await buildCareerIntelligenceReport(studentId, db)
+
+  assert.equal(report.mode, 'planning', 'Grade 10 is a Senior/planning report')
+  assert.ok(report.journey_continuity, 'Senior reports carry a journey_continuity section')
+  // No promotion history was seeded, so the record does not reach back into
+  // Junior — the section must say so gracefully, not fabricate a Junior span.
+  assert.equal(report.journey_continuity.spans_junior, false)
+  assert.deepEqual(report.journey_continuity.junior_grades_covered, [])
+  assert.match(report.journey_continuity.continuity_note, /begins in Senior School/)
 })
 
 test('PROD-EVD-001: sparse evidence in ONE backbone (legacy assessments only) still produces a real, populated report — not "insufficient data"', async () => {

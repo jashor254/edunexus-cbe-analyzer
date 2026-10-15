@@ -693,6 +693,10 @@ export type CareerIntelligenceReport = {
   current_challenges:   string[]
   learning_habits_note: string
 
+  // Junior → Senior continuity. Senior (planning) reports only; null for
+  // Junior (exploration), so Junior output is unchanged.
+  journey_continuity: JourneyContinuity | null
+
   // S2: Hidden Strengths
   hidden_strengths: HiddenStrength[]
 

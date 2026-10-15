@@ -11,6 +11,8 @@ import { buildClinicReport } from './clinicReportBuilder'
 import { getAllCareersWithCOS } from './careerEngine'
 import { computeCapabilityMatches, confidenceFromAssessmentCount } from './capabilityMatchEngine'
 import { CAPABILITY_LABELS, extractCapabilityProfile } from './capabilityExtractor'
+import { buildJourneyContinuity } from './journeyContinuity'
+import { getLearnerTimeline } from '@/lib/learnerRecord/timeline'
 import { STANDARD_DISCLAIMER } from './types'
 import { familiesFromMatches, careerModeForGrade } from '@/lib/learnerIntelligence/careerIntelligence'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
@@ -664,6 +666,19 @@ export async function buildCareerIntelligenceReport(
     mode,
   )
 
+  // Junior → Senior continuity. Senior (planning) only — a Junior report
+  // stays exploration-only and unchanged. Reads the canonical longitudinal
+  // record (getLearnerTimeline) so Senior guidance continues the Junior
+  // record instead of recomputing cold at the Grade-10 stage flip.
+  const journeyContinuity = mode === 'planning'
+    ? buildJourneyContinuity(
+        learnerFirstName(clinicReport.student_name),
+        clinicReport.grade,
+        await getLearnerTimeline(studentId),
+        profile,
+      )
+    : null
+
   return {
     student_id:   studentId,
     student_name: clinicReport.student_name,
@@ -680,6 +695,8 @@ export async function buildCareerIntelligenceReport(
     current_strengths:    currentStrengths,
     current_challenges:   currentChallenges,
     learning_habits_note: learningHabitsNote,
+
+    journey_continuity: journeyContinuity,
 
     hidden_strengths: hiddenStrengths,
     growth_barriers:  growthBarriers,
