@@ -3716,3 +3716,23 @@ Verifying the nine fixes above against a live session surfaced two more, both of
 **Rollback considerations**: each commit reverts independently and in reverse order. The feature is additive and Senior-only; reverting Commit 2 leaves the pure helper unused (harmless) and Senior reports revert to recomputing cold. No data migration, nothing to backfill.
 
 **Follow-ups**: (1) run the integration assertions against the DEEP stack / confirm in CI; (2) scope-b decision (persist junior-era recommendations so Senior can quote the literal junior wording) if ever wanted — needs an ADR; (3) next queued build: the CBC-adapted Gatsby School Effectiveness Check diagnostic (its own `/assess`).
+
+## 2026-10-15 — CBC-Gatsby School Effectiveness Check (diagnostic backbone)
+
+**Stage**: founder-requested, same PE-1 freeze exception. The GTM diagnostic behind "sell what the buyer needs" (one diagnostic → prioritised gaps → fitted EduNexus programmes → one evidence spine). Grounded in the two-day Career Intelligence scan: the UK Gatsby Benchmarks of Good Career Guidance (statutory in England since 2018) adapted to Kenya CBC/CBE. Assessed via `/assess`: ✅ — pure/DB-free/no canonical-domain touch (ratings passed in), no ADR trigger. This is the first increment; rating source (self-report vs auto-derived vs hybrid), persistence, API and sales UI are later, separately-assessed increments.
+
+**What changed** (commits `cbad09f` → `84bb96c`):
+- **Commit 1** (`cbad09f`): new pure `lib/schoolEffectiveness/` — `types.ts` + `benchmarks.ts`, the 8 Gatsby benchmarks adapted to CBC, each with a 0–4 maturity rubric, its revealing signal, and the real EduNexus programme(s) that close a gap (Career Intelligence, Blueprint, Gradebook/Evidence, Adaptive, SOW, Lesson Plans, Compass). Honesty invariant, tested: benchmarks 5 & 6 (employer encounters, workplace experiences) are the market-wide blind spot EduNexus does not yet address — marked `horizon: true` with no programme, never mapped to a fake product.
+- **Commit 2** (`84bb96c`): `scoring.ts` — `scoreSchoolEffectiveness(ratings)`: overall maturity (mean 0–4, percent, stage absent→embedded), prioritised gaps (biggest shortfall first; addressable before horizon at equal shortfall), de-duplicated recommended programmes (strongest-leverage first), honestly-flagged unaddressed gaps, deterministic summary sentence. Partial ratings allowed; unknown ids ignored; duplicate id = last wins.
+
+**Architectural documents referenced**: CLAUDE.md Architecture Rules ("lib only" domain logic, explicit return types, no `any`); the honesty/evidence principle from ADR-0033 and `docs/architecture/learner-record-layer-decisions.md` (Benchmark 3 maps to the demonstrated-evidence record, the moat). External: UK Gatsby Benchmarks framework.
+
+**ADR**: none. New pure `lib/` module; no canonical identity, ownership, write path, repository, service, auth or migration change.
+
+**Tests added**: `lib/schoolEffectiveness/benchmarks.test.ts` (5 — config integrity + honesty) and `scoring.test.ts` (7 — maturity maths, prioritisation, programme mapping, horizon honesty, determinism, edge cases). STANDARD/env-free. Standard suite 1633 → 1644, green; tsc clean.
+
+**Rollback considerations**: each commit reverts independently; the module is additive and unreferenced by any route/UI, so removal has no runtime effect. No schema, nothing to backfill.
+
+**Follow-ups** (own `/assess` or `/decide` each): (1) rating source — self-report form vs auto-derived from existing school data (gradebook/evidence coverage, career-report usage, pathway completeness) vs hybrid; this is the key design fork; (2) persistence of a completed Check; (3) API + sales-facing report UI; (4) revisit benchmarks 5 & 6 if an employer-encounters programme is ever built.
+
+**Not pushed**: this and the Junior→Senior continuity work (commits `3f5ffe9`..`f02468b`, `cbad09f`..`84bb96c`) are on local `main`, held for one CI architecture-gate run + founder go, to push together.
