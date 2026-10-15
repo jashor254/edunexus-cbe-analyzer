@@ -356,6 +356,37 @@ export default function CareerIntelligenceReportPage() {
               </div>
             </SectionCard>
 
+            {/* ── Journey So Far (Senior only — continues the Junior record) ── */}
+            {report.journey_continuity && (
+              <SectionCard icon={GraduationCap} title="Journey So Far" subtitle="How Senior School continues the Junior record" accent="blue">
+                <div className="space-y-3">
+                  <p className="text-white/70 text-sm leading-relaxed">{report.journey_continuity.continuity_note}</p>
+                  {report.journey_continuity.carried_capabilities.length > 0 && (
+                    <div>
+                      <p className="text-xs text-white/40 uppercase tracking-wide mb-1.5 font-semibold">Capabilities carried through</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {report.journey_continuity.carried_capabilities.map(c => <Chip key={c} text={c} variant="violet" />)}
+                      </div>
+                    </div>
+                  )}
+                  {report.journey_continuity.promotion_path.length > 0 && (
+                    <div>
+                      <p className="text-xs text-white/40 uppercase tracking-wide mb-1.5 font-semibold">Grade progression on record</p>
+                      <div className="flex flex-wrap items-center gap-1.5 text-white/60 text-xs">
+                        {report.journey_continuity.promotion_path.map((p, i) => (
+                          <span key={i} className="inline-flex items-center gap-1.5">
+                            {i > 0 && <ChevronRight className="w-3 h-3 text-white/30" />}
+                            <span>{p.from_grade != null ? `Grade ${p.from_grade} → ` : ''}Grade {p.to_grade}</span>
+                            <span className="text-white/30">({p.academic_year})</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </SectionCard>
+            )}
+
             {/* ── S2: Hidden Strengths ──────────────────────────────────────── */}
             <SectionCard icon={Lightbulb} title="Hidden Strengths" subtitle="What the marks don't always show" accent="green">
               <div className="space-y-3">
