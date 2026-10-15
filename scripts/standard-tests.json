@@ -51,6 +51,7 @@
     "lib/career/journeyContinuity.test.ts",
     "lib/schoolEffectiveness/benchmarks.test.ts",
     "lib/schoolEffectiveness/scoring.test.ts",
+    "lib/schoolEffectiveness/merge.test.ts",
     "lib/career/careerProvenance.test.ts",
     "lib/career/cohortRelative.test.ts",
     "lib/career/resilience.test.ts",

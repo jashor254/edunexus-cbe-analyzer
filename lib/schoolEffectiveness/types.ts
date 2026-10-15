@@ -68,6 +68,12 @@ export type SchoolEffectivenessBenchmark = {
   addressed_by: readonly ProgrammeRef[]
   /** True when EduNexus has no programme for this benchmark yet (5 and 6). */
   horizon:      boolean
+  /**
+   * Hybrid rating model: 'hybrid' = auto-derived from existing EduNexus data
+   * when a signal exists, otherwise self-reported; 'self_report' = always
+   * asked (process/encounter benchmarks we cannot derive — 1, 5, 6).
+   */
+  ratingSource: 'self_report' | 'hybrid'
 }
 
 /** A single benchmark's maturity rating, 0–4, as fed into the diagnostic. */
@@ -76,6 +82,16 @@ export type BenchmarkRating = {
   /** 0 (absent) … 4 (fully embedded). */
   level:       0 | 1 | 2 | 3 | 4
 }
+
+/** Where a stored rating came from in the hybrid model. */
+export type RatingProvenance = 'auto' | 'self_report'
+
+/**
+ * A rating plus its provenance — the shape mergeRatings() produces and a stored
+ * Check persists. Accepted anywhere a BenchmarkRating fits (the scorer ignores
+ * `source`).
+ */
+export type SourcedRating = BenchmarkRating & { source: RatingProvenance }
 
 /** How urgently a gap should be addressed. */
 export type GapPriority = 'critical' | 'high' | 'moderate' | 'low'

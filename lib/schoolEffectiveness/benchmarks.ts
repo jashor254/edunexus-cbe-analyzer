@@ -70,6 +70,7 @@ export const CBC_GATSBY_BENCHMARKS: readonly SchoolEffectivenessBenchmark[] = [
     ),
     addressed_by: [P.career_intelligence],
     horizon: false,
+    ratingSource: 'self_report',
   },
   {
     id: 'pathway_labour_market_info',
@@ -90,6 +91,7 @@ export const CBC_GATSBY_BENCHMARKS: readonly SchoolEffectivenessBenchmark[] = [
     ),
     addressed_by: [P.career_intelligence],
     horizon: false,
+    ratingSource: 'hybrid',
   },
   {
     id: 'each_learners_needs',
@@ -110,6 +112,7 @@ export const CBC_GATSBY_BENCHMARKS: readonly SchoolEffectivenessBenchmark[] = [
     ),
     addressed_by: [P.blueprint, P.gradebook, P.adaptive],
     horizon: false,
+    ratingSource: 'hybrid',
   },
   {
     id: 'curriculum_career_linkage',
@@ -130,6 +133,7 @@ export const CBC_GATSBY_BENCHMARKS: readonly SchoolEffectivenessBenchmark[] = [
     ),
     addressed_by: [P.sow, P.lesson_plan, P.career_intelligence],
     horizon: false,
+    ratingSource: 'hybrid',
   },
   {
     id: 'employer_encounters',
@@ -150,6 +154,7 @@ export const CBC_GATSBY_BENCHMARKS: readonly SchoolEffectivenessBenchmark[] = [
     ),
     addressed_by: [],
     horizon: true,
+    ratingSource: 'self_report',
   },
   {
     id: 'workplace_experiences',
@@ -170,6 +175,7 @@ export const CBC_GATSBY_BENCHMARKS: readonly SchoolEffectivenessBenchmark[] = [
     ),
     addressed_by: [],
     horizon: true,
+    ratingSource: 'self_report',
   },
   {
     id: 'transition_guidance',
@@ -190,6 +196,7 @@ export const CBC_GATSBY_BENCHMARKS: readonly SchoolEffectivenessBenchmark[] = [
     ),
     addressed_by: [P.career_intelligence],
     horizon: false,
+    ratingSource: 'hybrid',
   },
   {
     id: 'personal_guidance',
@@ -210,6 +217,7 @@ export const CBC_GATSBY_BENCHMARKS: readonly SchoolEffectivenessBenchmark[] = [
     ),
     addressed_by: [P.compass, P.blueprint],
     horizon: false,
+    ratingSource: 'hybrid',
   },
 
   // ── EduNexus beyond-Gatsby dimensions (order 9–11) ───────────────────────
@@ -234,6 +242,7 @@ export const CBC_GATSBY_BENCHMARKS: readonly SchoolEffectivenessBenchmark[] = [
     ),
     addressed_by: [P.career_intelligence],
     horizon: false,
+    ratingSource: 'hybrid',
   },
   {
     id: 'enterprise_livelihood',
@@ -253,6 +262,7 @@ export const CBC_GATSBY_BENCHMARKS: readonly SchoolEffectivenessBenchmark[] = [
     ),
     addressed_by: [P.career_intelligence],
     horizon: false,
+    ratingSource: 'hybrid',
   },
   {
     id: 'whole_child_talent',
@@ -272,5 +282,6 @@ export const CBC_GATSBY_BENCHMARKS: readonly SchoolEffectivenessBenchmark[] = [
     ),
     addressed_by: [P.learner_portfolio, P.achievements],
     horizon: false,
+    ratingSource: 'hybrid',
   },
 ]
