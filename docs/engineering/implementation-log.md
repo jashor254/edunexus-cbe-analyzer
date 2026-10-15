@@ -3771,3 +3771,21 @@ Founder approved building the self-report path now (auto-derivation still deferr
 **Verified**: tsc clean; `next build` clean (277 pages; both new routes registered); route-auth gate green; STANDARD suite 1652, green. **NOT run here**: SEC-001 integration + any HTTP route test (need the DEEP TEST_SUPABASE target + a running server — CI). Migration still unapplied (applies in CI/deploy).
 
 **Still deferred (unchanged)**: auto-derivation heuristics — calibrate against Kangai pilot data, do not invent. The service already accepts `auto` ratings, so wiring a calibrated derivation needs no rewrite.
+
+## 2026-10-15 — Career Evolution lens (careers evolve, they don't die)
+
+**Stage**: founder-requested ("prepare for career evolution… an engine that keeps tracing the changes with time… like a traditional lawyer but what changes for tomorrow's one"). A code survey showed the tracing engine already exists — `lib/career/careerSignals.ts` is a dated (`observedAt`), sourced (tiered URLs + dated claims), confidence-tiered (EARLY/EMERGING/ESTABLISHED), Kenya-aware, non-prescriptive ledger of career change, kept fresh by `knowledgeLifecycle.ts` + `knowledgeRequests.ts`. Two gaps: no evolution *lens* over the signals, and thin coverage (11 signals, no legal profession). This increment builds the lens. Assessed via `/assess`: ✅ (pure, no canonical domain, no ADR).
+
+**What changed** (commit `0bf3e81`): `lib/career/careerEvolution.ts` — `buildCareerEvolution(careerSlug, signals, opts?)` composes a career's `CareerSignal[]` into a `CareerEvolutionView`: chronological trajectory (oldest→newest), change-types by frequency, strongest confidence, earliest/latest observed, durable-core vs shifting-tasks (ONLY from passed-in ai_impact, never invented), and a deterministic "direction not destiny" narrative. Honesty guardrail enforced + tested: never declares a role dead, never fabricates a future, absence of signals ≠ "static".
+
+**Architectural documents referenced**: §16 (non-prescriptive career guidance), ADR-0033 (sourced/fresh/honest, no AI in per-learner path), CLAUDE.md.
+
+**ADR**: none. Pure lens over existing in-memory data; no DB/identity/write-path/AI.
+
+**Tests**: `careerEvolution.test.ts` (7, STANDARD/env-free) — chronology, change-type counting, strongest confidence, the lawyer durable-vs-shifting example, no-invention-without-ai_impact, empty-signal grace, determinism. Suite 1652 → 1659, green; tsc clean.
+
+**Rollback**: single additive module, unreferenced by routes/UI; reverts cleanly.
+
+**Feeds / next**: the lens output plugs into the existing AI Reality Check + the beyond-Gatsby "AI-era readiness" benchmark, and pairs learner-evolution × career-evolution. SEPARATE ongoing track (sourced content, not invented): curate legal-profession and other signals into `CAREER_SIGNALS` so the engine actually has change to trace — the real "keep tracing over time" work.
+
+**Not pushed**: joins the held batch.
