@@ -648,6 +648,32 @@ export type LearnerChallenge = {
   how_to_do_it: string
 }
 
+// Junior → Senior continuity. Present on Senior (planning) reports only;
+// null for Junior (exploration). Describes the learner's DOCUMENTED past —
+// Evidence recorded and grade promotions crossed — so a Senior report
+// continues the Junior record instead of recomputing cold at the Grade-10
+// stage flip. It states what is recorded; it never retroactively assigns a
+// career to the Junior years (the Career Principle gates Junior OUTPUT; this
+// is Senior output describing the past factually).
+export type JourneyContinuityPromotion = {
+  from_grade:    number | null
+  to_grade:      number
+  academic_year: string
+}
+
+export type JourneyContinuity = {
+  /** True when the documented record (promotions) reaches back into Grade 7–9. */
+  spans_junior:          boolean
+  junior_grades_covered: number[]
+  /** Count of recorded Evidence that still stands (excludes retracted/erased). */
+  total_evidence_count:  number
+  promotion_path:        JourneyContinuityPromotion[]
+  /** Evidence-backed dominant capabilities carried across the journey (labelled). */
+  carried_capabilities:  string[]
+  /** One deterministic sentence; no career prediction, no job titles. */
+  continuity_note:       string
+}
+
 export type CareerIntelligenceReport = {
   student_id:   string
   student_name: string
