@@ -38,6 +38,7 @@ import { PortfolioRepository } from './portfolio.repository'
 import { ProjectRepository } from './project.repository'
 import { ProjectionRepository } from './projection.repository'
 import { PromotionRepository } from './promotion.repository'
+import { SchoolEffectivenessRepository } from './schoolEffectiveness.repository'
 import { SchoolRepository } from './school.repository'
 import { TeacherRepository } from './teacher.repository'
 import { TeacherReflectionRepository } from './teacherReflection.repository'
@@ -97,6 +98,7 @@ export const repos = {
   projects:            new ProjectRepository(),
   projections:         new ProjectionRepository(),
   promotions:          new PromotionRepository(),
+  schoolEffectiveness: new SchoolEffectivenessRepository(),
   schools:             new SchoolRepository(),
   teachers:            new TeacherRepository(),
   teacherReflections:  new TeacherReflectionRepository(),
@@ -144,6 +146,7 @@ export { PortfolioRepository } from './portfolio.repository'
 export { ProjectRepository } from './project.repository'
 export { ProjectionRepository } from './projection.repository'
 export { PromotionRepository } from './promotion.repository'
+export { SchoolEffectivenessRepository } from './schoolEffectiveness.repository'
 export { SchoolRepository } from './school.repository'
 export { TeacherRepository } from './teacher.repository'
 export { TeacherReflectionRepository } from './teacherReflection.repository'
