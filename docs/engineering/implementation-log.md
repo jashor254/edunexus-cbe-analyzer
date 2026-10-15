@@ -3759,3 +3759,15 @@ Verifying the nine fixes above against a live session surfaced two more, both of
 **Rollback considerations**: each commit reverts independently. The migration is unapplied, so nothing to roll back in any DB. The pure modules are additive and unreferenced by routes/UI.
 
 **Not pushed**: joins the held batch for one CI architecture-gate run + founder go.
+
+### Follow-on — self-report repository + API + UI (same day)
+
+Founder approved building the self-report path now (auto-derivation still deferred to pilot-data calibration). Commits `7f155ca` → `1c91c77` → `c83f286` → `5c73f01`:
+- **C3** (`7f155ca`): `SchoolEffectivenessRepository` (create + findLatestForSchool), registered in `repos`; domain service `createSchoolEffectivenessCheck` (merge → score → persist) + `getLatestSchoolEffectivenessCheck`.
+- **C4** (`1c91c77`): `app/api/school/effectiveness-check/route.ts` — POST/GET, `requireSchoolStaff`/`requireSchoolMembership`, Zod, school-membership ownership (never teacher_id). Passed `scripts/check-route-auth.mjs` (302 routes).
+- **C5** (`c83f286`): `app/teacher/core-effectiveness-check/page.tsx` — self-report UI (11 benchmarks, 0–4 rubric, Gatsby-core vs EduNexus-beyond groups, horizon flags) → scored profile with gaps/programmes. UI only.
+- **C6** (`5c73f01`): `service.integration.test.ts` (SEC-001) — DEEP-tier, runs in CI.
+
+**Verified**: tsc clean; `next build` clean (277 pages; both new routes registered); route-auth gate green; STANDARD suite 1652, green. **NOT run here**: SEC-001 integration + any HTTP route test (need the DEEP TEST_SUPABASE target + a running server — CI). Migration still unapplied (applies in CI/deploy).
+
+**Still deferred (unchanged)**: auto-derivation heuristics — calibrate against Kangai pilot data, do not invent. The service already accepts `auto` ratings, so wiring a calibrated derivation needs no rewrite.
