@@ -3738,3 +3738,24 @@ Verifying the nine fixes above against a live session surfaced two more, both of
 **Beyond-Gatsby extension** (founder note: "we go beyond normal traditional career guidance — check what we are doing"): a code survey confirmed EduNexus ships several things the Gatsby framework and the Kenyan matching-quiz competitors do not do — AI Reality Check (per-career automation exposure), the Four Career Doors (employment/self-employment/business-creation/AI-augmented), Learner Portfolio and Achievements. So the benchmark model gained a `framework: 'gatsby_core' | 'edunexus_beyond'` tag and three beyond-Gatsby dimensions (order 9–11, all mapped to *shipped* surfaces, honesty invariant intact): **AI-era readiness** → Career Intelligence; **Enterprise & pathways to livelihood** → Four Doors; **Whole-child talent recognition** → Portfolio + Achievements. The Check now scores an edge no traditional/quiz tool can be measured on. Benchmarks 8 → 11; tests updated (standard suite 1644 → 1645, green; tsc clean). Option B (full learner-development model, adding wellbeing/leadership/projects/competitions) was declined for now because those domains are built but not yet user-surfaced (would be sold as horizons).
 
 **Not pushed**: this and the Junior→Senior continuity work (commits `3f5ffe9`..`f02468b`, `cbad09f`..beyond-Gatsby extension) are on local `main`, held for one CI architecture-gate run + founder go, to push together.
+
+## 2026-10-15 — School Effectiveness Check: hybrid persistence + rating model (ADR-0034)
+
+**Stage**: founder-requested, PE-1 exception. Rating-source decision = HYBRID (self-report backbone that works for a cold prospect; auto-derivation enriches once a school is onboarded). Assessed via `/assess`: ⚠ Needs ADR (persisting a school-level, human-entered diagnostic = a new canonical identity + first school-level Intelligence artifact) → ADR-0034 accepted.
+
+**What changed** (commits `abcd9e9` → `659baf8` → `f2327d5`):
+- **ADR-0034** (`abcd9e9`): `docs/architecture/adr-0034-school-level-effectiveness-assessment.md` — Intelligence-owned table (the `learner_projections` pattern), non-null `school_id`, `school_users` RLS, canonical read-paths only (Decision 5), permission service for roles, never `teacher_id`.
+- **Migration** (`659baf8`): `supabase/migrations/20261015120000_school_effectiveness_checks.sql` — reviewed-ready, NOT applied (this session's env is prod-linked; applies in CI/deploy). school_id FK + created_by/updated_by + framework_version + ratings jsonb (each tagged auto|self_report) + profile jsonb + `school_users` membership RLS + FK indexes.
+- **Hybrid rating model** (`f2327d5`): per-benchmark `ratingSource` ('hybrid' for 2,3,4,7,8,9,10,11; 'self_report' for 1,5,6); `SourcedRating` provenance; pure `mergeRatings()` (auto wins for hybrid, self-report fills, self-report-only never takes auto, cold prospect = all self-report).
+
+**Architectural documents referenced**: ADR-0034; RAS §9 (Intelligence separation) + Operating-Layer ownership rules; `learner-record-layer-decisions.md` Decision 5; CLAUDE.md DB/Security rules.
+
+**Tests added**: `merge.test.ts` (7) + the earlier `benchmarks.test.ts` (6) / `scoring.test.ts` (7). All STANDARD/env-free. Standard suite 1645 → 1652, green; tsc clean; `next build` clean.
+
+**Deliberately NOT built yet (honest scope cut)**:
+- **Repository + domain service + API route + UI** — buildable and would typecheck/build, but cannot be runtime-tested in this session (no DEEP TEST_SUPABASE target). Next focused increment.
+- **Auto-derivation heuristics** (`deriveBenchmarkRatings`) — turning a school's canonical data into a 0–4 level per hybrid benchmark needs *threshold heuristics* that no ratified document specifies. Per this codebase's standing discipline (do NOT invent heuristics without a spec — see the learner-record Phase -1/G notes), these thresholds must be **calibrated against real pilot data (Kangai)**, not guessed. The merge layer + persistence are ready to receive auto ratings the moment a calibrated derivation exists; until then the Check runs fully on self-report (which is exactly the prospect use case).
+
+**Rollback considerations**: each commit reverts independently. The migration is unapplied, so nothing to roll back in any DB. The pure modules are additive and unreferenced by routes/UI.
+
+**Not pushed**: joins the held batch for one CI architecture-gate run + founder go.
