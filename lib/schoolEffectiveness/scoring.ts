@@ -96,7 +96,8 @@ export function scoreSchoolEffectiveness(ratings: readonly BenchmarkRating[]): S
     gaps.push({
       benchmarkId: b.id,
       name: b.name,
-      gatsbyNumber: b.gatsbyNumber,
+      order: b.order,
+      framework: b.framework,
       level,
       shortfall,
       priority: priorityFor(shortfall),
@@ -110,7 +111,7 @@ export function scoreSchoolEffectiveness(ratings: readonly BenchmarkRating[]): S
   gaps.sort((a, b) => {
     if (b.shortfall !== a.shortfall) return b.shortfall - a.shortfall
     if (a.unaddressed !== b.unaddressed) return a.unaddressed ? 1 : -1
-    return a.gatsbyNumber - b.gatsbyNumber
+    return a.order - b.order
   })
 
   // Recommended programmes: de-duplicated across addressable gaps, ordered by

@@ -19,7 +19,7 @@ function rate(ids: string[], level: 0 | 1 | 2 | 3 | 4): BenchmarkRating[] {
 test('no ratings: returns an empty, honest "nothing to diagnose" profile', () => {
   const p = scoreSchoolEffectiveness([])
   assert.equal(p.benchmarks_rated, 0)
-  assert.equal(p.benchmarks_total, 8)
+  assert.equal(p.benchmarks_total, 11)
   assert.equal(p.overall_maturity, 0)
   assert.equal(p.overall_stage, 'absent')
   assert.deepEqual(p.prioritised_gaps, [])
@@ -29,7 +29,7 @@ test('no ratings: returns an empty, honest "nothing to diagnose" profile', () =>
 
 test('all benchmarks fully embedded: no gaps, no recommendations, embedded stage', () => {
   const p = scoreSchoolEffectiveness(rate(ALL_IDS, 4))
-  assert.equal(p.benchmarks_rated, 8)
+  assert.equal(p.benchmarks_rated, 11)
   assert.equal(p.overall_maturity, 4)
   assert.equal(p.overall_percent, 100)
   assert.equal(p.overall_stage, 'embedded')
@@ -39,26 +39,26 @@ test('all benchmarks fully embedded: no gaps, no recommendations, embedded stage
   assert.match(p.summary, /No benchmark falls below full maturity/)
 })
 
-test('all benchmarks absent: 8 critical gaps, absent stage, 7 available programmes, 2 unaddressed', () => {
+test('all benchmarks absent: 11 critical gaps, absent stage, 9 available programmes, 2 unaddressed', () => {
   const p = scoreSchoolEffectiveness(rate(ALL_IDS, 0))
   assert.equal(p.overall_maturity, 0)
   assert.equal(p.overall_stage, 'absent')
-  assert.equal(p.prioritised_gaps.length, 8)
+  assert.equal(p.prioritised_gaps.length, 11)
   assert.ok(p.prioritised_gaps.every((g) => g.priority === 'critical' && g.shortfall === 4))
 
   // At equal shortfall, addressable gaps come before horizon gaps.
-  const lastTwo = p.prioritised_gaps.slice(-2).map((g) => g.gatsbyNumber).sort((a, b) => a - b)
+  const lastTwo = p.prioritised_gaps.slice(-2).map((g) => g.order).sort((a, b) => a - b)
   assert.deepEqual(lastTwo, [5, 6], 'the two horizon gaps sort last')
 
   // Honesty: exactly benchmarks 5 and 6 are unaddressed.
-  assert.deepEqual(p.unaddressed_gaps.map((g) => g.gatsbyNumber).sort(), [5, 6])
+  assert.deepEqual(p.unaddressed_gaps.map((g) => g.order).sort((a, b) => a - b), [5, 6])
   for (const g of p.unaddressed_gaps) assert.deepEqual(g.recommended, [])
 
-  // All seven real programmes are recommended; no horizon programme leaks in.
+  // All nine real programmes are recommended; no horizon programme leaks in.
   const keys = p.recommended_programmes.map((r) => r.key)
-  assert.equal(p.recommended_programmes.length, 7)
+  assert.equal(p.recommended_programmes.length, 9)
   assert.ok(keys.includes('career_intelligence'))
-  assert.ok(keys.includes('blueprint'))
+  assert.ok(keys.includes('learner_portfolio'))
   assert.ok(p.recommended_programmes.every((r) => r.status === 'available'))
 })
 

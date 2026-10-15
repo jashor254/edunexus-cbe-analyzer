@@ -36,10 +36,23 @@ export type MaturityBand = {
   descriptor:  string
 }
 
+/**
+ * Which framework a benchmark belongs to. `gatsby_core` = one of the 8 Gatsby
+ * Benchmarks of Good Career Guidance. `edunexus_beyond` = a dimension where
+ * EduNexus goes beyond traditional career guidance (AI-era readiness,
+ * enterprise/livelihood, whole-child talent) — things the Gatsby framework,
+ * and the Kenyan matching-quiz competitors, do not cover.
+ */
+export type BenchmarkFramework = 'gatsby_core' | 'edunexus_beyond'
+
 export type SchoolEffectivenessBenchmark = {
-  /** Stable id, e.g. 'stable_programme'. Gatsby order 1–8 via `gatsbyNumber`. */
+  /** Stable id, e.g. 'stable_programme'. */
   id:           string
-  gatsbyNumber: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
+  framework:    BenchmarkFramework
+  /** Universal display/sort order: Gatsby 1–8, then beyond 9+. */
+  order:        number
+  /** The Gatsby number (1–8); set only for gatsby_core benchmarks. */
+  gatsbyNumber?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   name:         string
   /** What this benchmark means in the CBC/CBE context. */
   definition:   string
@@ -71,7 +84,8 @@ export type GapPriority = 'critical' | 'high' | 'moderate' | 'low'
 export type BenchmarkGap = {
   benchmarkId:   string
   name:          string
-  gatsbyNumber:  number
+  order:         number
+  framework:     BenchmarkFramework
   level:         number
   /** 4 - level: how far below "fully embedded" this benchmark sits. */
   shortfall:     number

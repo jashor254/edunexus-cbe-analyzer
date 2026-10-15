@@ -1,17 +1,26 @@
 // lib/schoolEffectiveness/benchmarks.ts
 //
-// The eight CBC-adapted Gatsby benchmarks. Source framework: the UK Gatsby
-// Benchmarks of Good Career Guidance (Sir John Holman, statutory in England
-// since 2018), adapted to Kenya's CBC/CBE Grade 7–12 context. Each benchmark
-// carries a 0–4 maturity rubric and the real EduNexus programme(s) that close
-// a gap on it. Benchmarks 5 and 6 (employer encounters, workplace experiences)
-// are the market-wide blind spot — EduNexus has no programme for them yet, so
-// they are marked `horizon: true` with no programmes, and the diagnostic
-// reports them as honestly unaddressed rather than mapping a fake product.
+// The School Effectiveness Check benchmarks.
+//
+// CORE: the eight UK Gatsby Benchmarks of Good Career Guidance (Sir John
+// Holman; statutory in England since 2018), adapted to Kenya's CBC/CBE
+// Grade 7–12 context (framework 'gatsby_core', order 1–8).
+//
+// BEYOND: three dimensions where EduNexus goes beyond traditional career
+// guidance (framework 'edunexus_beyond', order 9–11) — AI-era readiness,
+// enterprise/livelihood, and whole-child talent. The Gatsby framework has no
+// benchmark for these, and the Kenyan matching-quiz competitors do not do
+// them, so the Check scores an edge no traditional tool can be measured on.
+//
+// Each benchmark carries a 0–4 maturity rubric and the real EduNexus
+// programme(s) that close a gap on it. Benchmarks 5 and 6 (employer
+// encounters, workplace experiences) are the market-wide blind spot EduNexus
+// has no programme for yet — `horizon: true`, no programme, reported honestly
+// as unaddressed, never mapped to a fake product.
 
 import type { ProgrammeRef, SchoolEffectivenessBenchmark } from './types'
 
-// Real EduNexus programme surfaces (keys are stable; labels are user-facing).
+// Real, shipped EduNexus programme surfaces (keys stable; labels user-facing).
 const P = {
   career_intelligence: { key: 'career_intelligence', label: 'Career Intelligence', status: 'available' },
   blueprint:           { key: 'blueprint',           label: 'Learner Blueprint',   status: 'available' },
@@ -20,6 +29,8 @@ const P = {
   sow:                 { key: 'sow',                 label: 'Scheme of Work',      status: 'available' },
   lesson_plan:         { key: 'lesson_plan',         label: 'Lesson Plans',        status: 'available' },
   compass:             { key: 'compass',             label: 'Compass',             status: 'available' },
+  learner_portfolio:   { key: 'learner_portfolio',   label: 'Learner Portfolio',   status: 'available' },
+  achievements:        { key: 'achievements',        label: 'Achievements',        status: 'available' },
 } as const satisfies Record<string, ProgrammeRef>
 
 // A reusable 0–4 maturity shape; each benchmark supplies its own descriptors.
@@ -42,6 +53,8 @@ function rubric(
 export const CBC_GATSBY_BENCHMARKS: readonly SchoolEffectivenessBenchmark[] = [
   {
     id: 'stable_programme',
+    framework: 'gatsby_core',
+    order: 1,
     gatsbyNumber: 1,
     name: 'A stable, structured guidance programme',
     definition:
@@ -60,6 +73,8 @@ export const CBC_GATSBY_BENCHMARKS: readonly SchoolEffectivenessBenchmark[] = [
   },
   {
     id: 'pathway_labour_market_info',
+    framework: 'gatsby_core',
+    order: 2,
     gatsbyNumber: 2,
     name: 'CBC pathway & labour-market information',
     definition:
@@ -78,6 +93,8 @@ export const CBC_GATSBY_BENCHMARKS: readonly SchoolEffectivenessBenchmark[] = [
   },
   {
     id: 'each_learners_needs',
+    framework: 'gatsby_core',
+    order: 3,
     gatsbyNumber: 3,
     name: "Addressing each learner's needs",
     definition:
@@ -88,7 +105,7 @@ export const CBC_GATSBY_BENCHMARKS: readonly SchoolEffectivenessBenchmark[] = [
       'No individual record; guidance treats learners as a single group.',
       'Only the latest marks are available; no history or capability view.',
       'Some per-learner history exists but is scattered and under-used.',
-      "A longitudinal record informs guidance for most learners.",
+      'A longitudinal record informs guidance for most learners.',
       "Every learner's demonstrated-evidence record drives tailored, continuous guidance.",
     ),
     addressed_by: [P.blueprint, P.gradebook, P.adaptive],
@@ -96,6 +113,8 @@ export const CBC_GATSBY_BENCHMARKS: readonly SchoolEffectivenessBenchmark[] = [
   },
   {
     id: 'curriculum_career_linkage',
+    framework: 'gatsby_core',
+    order: 4,
     gatsbyNumber: 4,
     name: 'Linking curriculum learning to careers',
     definition:
@@ -114,6 +133,8 @@ export const CBC_GATSBY_BENCHMARKS: readonly SchoolEffectivenessBenchmark[] = [
   },
   {
     id: 'employer_encounters',
+    framework: 'gatsby_core',
+    order: 5,
     gatsbyNumber: 5,
     name: 'Encounters with employers and people in work',
     definition:
@@ -132,6 +153,8 @@ export const CBC_GATSBY_BENCHMARKS: readonly SchoolEffectivenessBenchmark[] = [
   },
   {
     id: 'workplace_experiences',
+    framework: 'gatsby_core',
+    order: 6,
     gatsbyNumber: 6,
     name: 'Experiences of workplaces',
     definition:
@@ -150,6 +173,8 @@ export const CBC_GATSBY_BENCHMARKS: readonly SchoolEffectivenessBenchmark[] = [
   },
   {
     id: 'transition_guidance',
+    framework: 'gatsby_core',
+    order: 7,
     gatsbyNumber: 7,
     name: 'Senior-school, TVET & higher-education transition guidance',
     definition:
@@ -168,6 +193,8 @@ export const CBC_GATSBY_BENCHMARKS: readonly SchoolEffectivenessBenchmark[] = [
   },
   {
     id: 'personal_guidance',
+    framework: 'gatsby_core',
+    order: 8,
     gatsbyNumber: 8,
     name: 'Personal guidance',
     definition:
@@ -182,6 +209,68 @@ export const CBC_GATSBY_BENCHMARKS: readonly SchoolEffectivenessBenchmark[] = [
       'Every learner has timely, record-grounded personal guidance.',
     ),
     addressed_by: [P.compass, P.blueprint],
+    horizon: false,
+  },
+
+  // ── EduNexus beyond-Gatsby dimensions (order 9–11) ───────────────────────
+  // Where we go past traditional career guidance. No Gatsby number — these
+  // are not in the Gatsby framework, and the matching-quiz competitors do not
+  // do them. Each maps to a shipped EduNexus surface.
+  {
+    id: 'ai_era_readiness',
+    framework: 'edunexus_beyond',
+    order: 9,
+    name: 'AI-era readiness',
+    definition:
+      'Guidance prepares learners for an AI-shaped labour market — which parts of a career AI will change, what humans still do, and how to work AI-augmented — rather than pretending the job market is static.',
+    signal:
+      'Does guidance ever address how AI changes the careers learners are considering, or treat the world of work as frozen?',
+    rubric: rubric(
+      'AI and its effect on careers is never discussed.',
+      'Mentioned in passing, as a vague threat, with no specifics.',
+      'Some discussion for some careers, not grounded or consistent.',
+      'Guidance routinely covers how AI changes specific careers and how to prepare.',
+      'AI-era readiness is embedded in every career conversation, with concrete, per-career reality.',
+    ),
+    addressed_by: [P.career_intelligence],
+    horizon: false,
+  },
+  {
+    id: 'enterprise_livelihood',
+    framework: 'edunexus_beyond',
+    order: 10,
+    name: 'Enterprise & pathways to livelihood',
+    definition:
+      'Learners see self-employment, business creation and AI-augmented work as real routes to a livelihood — not just formal employment — which matters most where formal jobs are scarce.',
+    signal:
+      'Does guidance only point learners at "getting a job", or also at creating one?',
+    rubric: rubric(
+      'Guidance assumes formal employment is the only route.',
+      'Enterprise is mentioned, but not as a serious, supported path.',
+      'Some enterprise framing for some learners, inconsistently.',
+      'Guidance routinely presents employment, self-employment and enterprise as real options.',
+      'The full range of livelihood routes is embedded in guidance for every learner.',
+    ),
+    addressed_by: [P.career_intelligence],
+    horizon: false,
+  },
+  {
+    id: 'whole_child_talent',
+    framework: 'edunexus_beyond',
+    order: 11,
+    name: 'Whole-child talent recognition',
+    definition:
+      'The school recognises and records a learner\'s talent beyond exam marks — projects, achievements and a portfolio of real work — in line with CBC\'s own ambition to nurture every learner\'s potential.',
+    signal:
+      'Is a learner only their marks here, or is their wider talent seen, recorded and built on?',
+    rubric: rubric(
+      'Only exam marks are recorded; wider talent is invisible.',
+      'Talent is noticed informally but never recorded or used.',
+      'Some talent is recorded for some learners, not systematically.',
+      'Most learners have a recorded portfolio of work and achievements.',
+      "Every learner's wider talent is recorded and feeds guidance and recognition.",
+    ),
+    addressed_by: [P.learner_portfolio, P.achievements],
     horizon: false,
   },
 ]
