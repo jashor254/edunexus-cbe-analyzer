@@ -3697,3 +3697,22 @@ Verifying the nine fixes above against a live session surfaced two more, both of
 **Open founder actions** (findings.md): revoke the legacy JWT secret (legacy keys already disabled, verified 2026-10-13; a leaked prod service-role key is in public history); rotate the old project's keys; revoke the Google key; roll the Paystack test key; decide on a history purge for the learner PDF; enable leaked-password protection; add the `SUPABASE_ACCESS_TOKEN` secret; make Security + CodeQL required checks.
 
 **Rollback considerations**: each commit reverts independently. Reverting `db5c7fb` reopens the cron bypass, so don't. Reverting `cf80b81` restores the critical advisory. The gates fail closed, so if one misfires, fix the rule or the registry rather than removing the CI step.
+
+## 2026-10-15 — Junior → Senior career journey continuity
+
+**Stage**: founder-requested, explicit PE-1 freeze exception ("senior school should be a continuation of the longitudinal career guide"). Came out of a two-day Career Intelligence market scan (Kenya: Ramani/ElimuQuest, Tathmini, govt free tool; international: OECD 2025 teenage-career-prep + UK Gatsby Benchmarks). The scan's conclusion — mature markets build a *longitudinal record*, not a one-shot match, and 12–15 guidance is exploration not decision — validated extending the existing stage model rather than building anything new. Assessed via `/assess`: ✅ for narrative continuity over already-cumulative data (scope a); persisting junior-era report snapshots (scope b) deferred to a future ADR as it would add a write path.
+
+**What changed** (commits `3f5ffe9` → `6b3dd77` → `9b8ef39`):
+- **Commit 1** (`3f5ffe9`): new pure, DB-free, token-free `lib/career/journeyContinuity.ts` — `buildJourneyContinuity(firstName, grade, timeline, profile)` turns the canonical `getLearnerTimeline()` (Evidence + promotions) + the cumulative `CapabilityProfile` into a `JourneyContinuity` section (`JourneyContinuity`/`JourneyContinuityPromotion` types added to `lib/career/types.ts`). Describes the documented past; never retroactively assigns a career to the Junior years. Registered in `scripts/standard-tests.json`.
+- **Commit 2** (`6b3dd77`): `buildCareerIntelligenceReport` attaches `journey_continuity` for Senior (planning) reports only — Junior (exploration) stays `null` and unchanged. Reads `getLearnerTimeline` only in planning mode (no extra DB call for Juniors).
+- **Commit 3** (`9b8ef39`): parent-facing report page renders a "Journey So Far" card (continuity note, carried capabilities, grade progression) only when `journey_continuity` is present. UI-only.
+
+**Architectural documents referenced**: ADR-0033 (career pipeline invariants: no AI in per-learner path, deterministic/token-free), ADR-0006 §4 (Junior = orientation, never a job title), `docs/architecture/learner-record-layer-decisions.md` (getLearnerTimeline is *the* canonical record; capabilityExtractor is the Reasoning layer's first citizen), CLAUDE.md Architecture Rules.
+
+**ADR**: none. No canonical identity, ownership, write path, repository, security or migration change — an additive read-only section over existing longitudinal data. (A future scope-b "junior report snapshot" store would need its own ADR.)
+
+**Tests added**: `lib/career/journeyContinuity.test.ts` (5, STANDARD, env-free, pure) — junior-history continuity across the G9→G10 crossing, graceful no-junior-history case, retracted/erased excluded, null-profile, determinism. Standard suite 1628 → 1633, green; tsc clean; `next build` clean. Integration assertions added to `careerIntelligenceEvidenceFirst.integration.test.ts` (Junior-unchanged regression + `CONTINUITY-001` senior-wiring) **type-check but could not execute this session** — the DEEP tier requires a configured `TEST_SUPABASE_*` target, which this environment does not have; they run in CI.
+
+**Rollback considerations**: each commit reverts independently and in reverse order. The feature is additive and Senior-only; reverting Commit 2 leaves the pure helper unused (harmless) and Senior reports revert to recomputing cold. No data migration, nothing to backfill.
+
+**Follow-ups**: (1) run the integration assertions against the DEEP stack / confirm in CI; (2) scope-b decision (persist junior-era recommendations so Senior can quote the literal junior wording) if ever wanted — needs an ADR; (3) next queued build: the CBC-adapted Gatsby School Effectiveness Check diagnostic (its own `/assess`).
