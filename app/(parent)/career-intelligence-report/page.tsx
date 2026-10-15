@@ -495,6 +495,49 @@ export default function CareerIntelligenceReportPage() {
               </SectionCard>
             )}
 
+            {/* ── Career Evolution (Senior/planning only) — how the profession changes ── */}
+            {report.career_evolution && (
+              <SectionCard icon={TrendingUp} title="How This Career Is Evolving" subtitle="Documented changes in the profession — a direction, not a destiny" accent="blue">
+                <div className="space-y-3">
+                  <p className="text-white/40 text-xs italic">
+                    This section describes documented changes in the profession. It is not a prediction of your child&apos;s future or an assessment of their suitability for the career.
+                  </p>
+                  <p className="text-white/70 text-sm leading-relaxed">{report.career_evolution.narrative}</p>
+
+                  {report.career_evolution.trajectory.length > 0 && (
+                    <>
+                      <div className="space-y-2">
+                        {report.career_evolution.trajectory.map((stage, i) => (
+                          <div key={i} className="bg-white/5 border border-white/10 rounded-xl p-3 space-y-1.5">
+                            <div className="flex items-start justify-between gap-3">
+                              <p className="text-white/85 text-sm font-medium">{stage.title}</p>
+                              <span className="shrink-0 text-[10px] tracking-wide text-white/40 border border-white/15 rounded-full px-2 py-0.5 capitalize">
+                                {stage.confidence.toLowerCase()} confidence
+                              </span>
+                            </div>
+                            <p className="text-white/50 text-xs">{stage.whatsChanging}</p>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-white/40">
+                              <span className="capitalize">{stage.signalType.replace(/_/g, ' ').toLowerCase()}</span>
+                              <span aria-hidden>·</span>
+                              <span>Observed {stage.observedAt}</span>
+                              {stage.sources.map((src, j) => (
+                                <a key={j} href={src.url} target="_blank" rel="noopener noreferrer" className="underline text-violet-400 hover:text-violet-300">
+                                  {src.publisher} ({src.publishedAt})
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-white/40 text-xs italic">
+                        This reflects the documented signals currently available — not a complete history of the profession.
+                      </p>
+                    </>
+                  )}
+                </div>
+              </SectionCard>
+            )}
+
             {/* ── S6: Four Career Doors ─────────────────────────────────────── */}
             {report.four_doors && (
               <SectionCard icon={Lock} title="The Four Career Doors" subtitle="Four ways the same skills can create value" accent="pink">

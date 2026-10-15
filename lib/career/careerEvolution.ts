@@ -22,6 +22,8 @@ import type {
   CareerSignalSource,
   CareerSignalGeography,
 } from './careerSignals'
+import { getCareerSignalsForCareer } from './careerSignals'
+import type { Career } from './types'
 
 const CONFIDENCE_RANK: Record<CareerSignalConfidence, number> = {
   EARLY: 0,
@@ -167,4 +169,26 @@ function buildNarrative(
     out += ` Some tasks — ${joinList(shifting)} — are increasingly shifting to tools.`
   }
   return out
+}
+
+// Career Evolution for the Career Intelligence Report. Planning (Senior) mode
+// only — Junior (exploration) and any case without a selected career get null,
+// so the Junior experience is untouched. Pure: the signal corpus is in-memory,
+// so no DB/AI call and no learner personalization. Durable/shifting task lists
+// come only from the career's existing ai_impact fields, never invented. Lives
+// here (not in the DB-bound report engine) so it stays importable in pure,
+// env-free tests.
+export function resolveCareerEvolutionForReport(
+  mode: 'exploration' | 'planning',
+  topCareerDetail: Career | null,
+): CareerEvolutionView | null {
+  if (mode !== 'planning' || !topCareerDetail) return null
+  return buildCareerEvolution(
+    topCareerDetail.slug,
+    getCareerSignalsForCareer(topCareerDetail.slug),
+    {
+      durableTasks:  topCareerDetail.ai_impact.human_advantage,
+      shiftingTasks: topCareerDetail.ai_impact.replacing,
+    },
+  )
 }

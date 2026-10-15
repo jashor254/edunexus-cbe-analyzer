@@ -1,6 +1,9 @@
 // lib/career/types.ts
 import type { PathwayResult } from '@/lib/pathwayCalculator'
 import type { ConfidenceLevel } from '@/lib/learnerIntelligence/insight'
+// Type-only import — the chain types → careerEvolution → careerSignals → types
+// is entirely `import type`, so it is erased at runtime and forms no cycle.
+import type { CareerEvolutionView } from './careerEvolution'
 export type { PathwayResult }
 
 // ── COS Disclaimer ────────────────────────────────────────────────────────────
@@ -710,6 +713,11 @@ export type CareerIntelligenceReport = {
 
   // S5: AI Reality Check (from top career's ai_impact)
   ai_reality_check: CIEAIRealityCheck | null
+
+  // Career Evolution — how the profession is changing over time, from
+  // documented CareerSignals. Planning (Senior) mode only; null for Junior
+  // (exploration) and when there is no selected career. Sits adjacent to S5.
+  career_evolution: CareerEvolutionView | null
 
   // S6: Four Career Doors (from top career's doors)
   four_doors: CIEFourDoors | null

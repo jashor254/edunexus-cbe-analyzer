@@ -89,6 +89,8 @@ test('PROD-EVD-001: a learner with ZERO admissible signal in either backbone sti
   // report must NOT carry a continuity section — Junior output is unchanged.
   assert.equal(report.mode, 'exploration')
   assert.equal(report.journey_continuity, null, 'Junior reports carry no journey_continuity section')
+  // Career Evolution is Senior-only too: a Junior report never carries it.
+  assert.equal(report.career_evolution, null, 'Junior reports carry no career_evolution section')
 })
 
 test('CONTINUITY-001: a Senior (planning) report carries a journey_continuity section that continues the record', async () => {
@@ -102,6 +104,13 @@ test('CONTINUITY-001: a Senior (planning) report carries a journey_continuity se
   // Junior — the section must say so gracefully, not fabricate a Junior span.
   assert.equal(report.journey_continuity.spans_junior, false)
   assert.deepEqual(report.journey_continuity.junior_grades_covered, [])
+  // CAREER-EVO-001: planning mode wires career_evolution end-to-end — null when
+  // no career is selected, otherwise a well-formed view (and it never throws).
+  assert.ok(
+    report.career_evolution === null ||
+      (typeof report.career_evolution.careerSlug === 'string' && Array.isArray(report.career_evolution.trajectory)),
+    'Senior report has either no selected career (null) or a well-formed CareerEvolutionView',
+  )
   assert.match(report.journey_continuity.continuity_note, /begins in Senior School/)
 })
 

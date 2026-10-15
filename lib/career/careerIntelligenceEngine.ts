@@ -13,6 +13,7 @@ import { computeCapabilityMatches, confidenceFromAssessmentCount } from './capab
 import { CAPABILITY_LABELS, extractCapabilityProfile } from './capabilityExtractor'
 import { buildJourneyContinuity } from './journeyContinuity'
 import { getLearnerTimeline } from '@/lib/learnerRecord/timeline'
+import { resolveCareerEvolutionForReport } from './careerEvolution'
 import { STANDARD_DISCLAIMER } from './types'
 import { familiesFromMatches, careerModeForGrade } from '@/lib/learnerIntelligence/careerIntelligence'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
@@ -605,6 +606,7 @@ export async function buildCareerIntelligenceReport(
   const landscape       = buildOpportunityLandscape(matchReport, clinicReport, mode)
   const educationChains = buildEducationChains(clinicReport)
   const aiRealityCheck  = buildAIRealityCheck(clinicReport)
+  const careerEvolution = resolveCareerEvolutionForReport(mode, clinicReport.top_career_detail)
   const fourDoors       = buildFourDoors(clinicReport)
   const parentGuidance  = buildParentGuidance(clinicReport)
 
@@ -706,6 +708,7 @@ export async function buildCareerIntelligenceReport(
     unlikely_today:        landscape.unlikely_today,
 
     ai_reality_check: aiRealityCheck,
+    career_evolution: careerEvolution,
     four_doors:       fourDoors,
     education_chains: educationChains,
 

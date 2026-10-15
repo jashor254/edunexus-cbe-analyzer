@@ -50,6 +50,7 @@
     "lib/career/capabilityMatchEngine.test.ts",
     "lib/career/journeyContinuity.test.ts",
     "lib/career/careerEvolution.test.ts",
+    "lib/career/careerEvolutionReport.test.ts",
     "lib/schoolEffectiveness/benchmarks.test.ts",
     "lib/schoolEffectiveness/scoring.test.ts",
     "lib/schoolEffectiveness/merge.test.ts",
