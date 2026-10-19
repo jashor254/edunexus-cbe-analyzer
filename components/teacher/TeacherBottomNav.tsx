@@ -234,7 +234,7 @@ export default function TeacherBottomNav({ isAdminTier }: Props = {}) {
         <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
           <div>
             <span className="text-white font-black text-base">Create</span>
-            <p className="text-slate-500 text-xs mt-0.5">Prepare your teaching materials</p>
+            <p className="text-slate-500 text-xs mt-0.5">Prepare materials and mark papers</p>
           </div>
           <button
             onClick={() => setCreateOpen(false)}

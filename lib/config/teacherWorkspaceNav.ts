@@ -38,6 +38,7 @@ import {
   AlertTriangle, ClipboardList, Settings,
   Scroll, NotebookPen, Sparkles, FolderOpen, GraduationCap, BookMarked,
   Languages, Presentation, CalendarCheck, UserCheck, PieChart, Building2,
+  Camera,
 } from 'lucide-react'
 
 /**
@@ -107,6 +108,11 @@ export const TEACHER_WORKSPACE_NAV: TeacherNavItem[] = [
   { href: '/teacher/classes',    icon: BookOpen,      label: 'My Classes',            group: 'school', mobileGroup: 'more' },
   { href: '/teacher/attendance', icon: UserCheck,     label: 'Attendance',            group: 'school', mobileGroup: 'more' },
   { href: '/teacher/assignments',icon: FileText,      label: 'Assignments',           group: 'school', mobileGroup: 'more' },
+  // Paper Intelligence had no nav entry — it lived only as a button inside
+  // one assignment, so teachers never found it. This is a picker: choose the
+  // assignment, then the existing photo-marking flow. In the mobile Create
+  // sheet so it is one tap from the bottom bar.
+  { href: '/teacher/mark-papers',icon: Camera,        label: 'Mark Papers',           group: 'school', hint: 'Photo-mark scripts with AI', mobileGroup: 'create' },
   // Assessment — PRP-1 found no unifying nav entry existed; marks entry and
   // end-of-term lock/publish are two steps of one job.
   { href: '/teacher/assessment', icon: PieChart,      label: 'Assessment',            group: 'school', mobileGroup: 'more' },

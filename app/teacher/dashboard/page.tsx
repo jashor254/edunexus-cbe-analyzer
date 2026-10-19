@@ -16,6 +16,7 @@ import { DashboardDataProvider } from '@/components/teacher/DashboardDataProvide
 import { getPendingAssessments } from '@/lib/assessments/getters'
 import { getTeacherDashboardProjection } from '@/lib/teacherWorkspace/dashboardProjection'
 import MyTeaching from '@/components/teacher/MyTeaching'
+import MarkPapersCard from '@/components/teacher/MarkPapersCard'
 
 function getTermInfo() {
   const month = new Date().getMonth() + 1
@@ -90,6 +91,12 @@ export default async function TeacherDashboardPage() {
               record of work), and it renders for any teacher with schemes,
               with or without a class. */}
           <ContinueWorking />
+
+          {/* ── 2a. Mark Papers ───────────────────────────────────────────
+              Paper Intelligence's front door. Shown to every teacher: the
+              picker it opens explains that marking needs an assignment and
+              offers to create one. */}
+          <MarkPapersCard />
 
           {/* ── 2b. My Teaching ──────────────────────────────────────────
               The institutional assignments the school made, read from Core

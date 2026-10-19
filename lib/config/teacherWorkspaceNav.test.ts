@@ -54,6 +54,12 @@ const DESTINATIONS_BEFORE_PHASE_1 = [
   '/teacher/settings',
 ] as const
 
+// Destinations deliberately added after Phase 1. A new nav entry is a product
+// decision, so it is named here rather than slipping in via a length change.
+const DESTINATIONS_ADDED_AFTER_PHASE_1 = [
+  '/teacher/mark-papers',
+] as const
+
 // ── Test A — no destination disappears ──────────────────────────────────────
 
 test('A: every pre-Phase-1 destination still exists in the canonical nav', () => {
@@ -62,11 +68,14 @@ test('A: every pre-Phase-1 destination still exists in the canonical nav', () =>
   for (const href of DESTINATIONS_BEFORE_PHASE_1) {
     assert.ok(hrefs.has(href), `navigation destination disappeared: ${href}`)
   }
+  for (const href of DESTINATIONS_ADDED_AFTER_PHASE_1) {
+    assert.ok(hrefs.has(href), `added navigation destination missing: ${href}`)
+  }
 
   assert.equal(
     TEACHER_WORKSPACE_NAV.length,
-    DESTINATIONS_BEFORE_PHASE_1.length,
-    'Phase 1 must neither add nor remove destinations — only regroup them',
+    DESTINATIONS_BEFORE_PHASE_1.length + DESTINATIONS_ADDED_AFTER_PHASE_1.length,
+    'no destination may be added or removed without being named in this file',
   )
 })
 
@@ -146,7 +155,7 @@ test('D2: the teaching group is the first group in the sidebar', () => {
 test('E: school-owned and class-scoped capabilities are grouped under My School', () => {
   assert.deepEqual(
     itemsInGroup('school').map(i => i.label),
-    ['My Classes', 'Attendance', 'Assignments', 'Assessment', 'Official Report Cards', 'Parent Reports'],
+    ['My Classes', 'Attendance', 'Assignments', 'Mark Papers', 'Assessment', 'Official Report Cards', 'Parent Reports'],
   )
 })
 
@@ -155,6 +164,7 @@ test('E2: grouping changed no route and no capability for school items', () => {
     'My Classes':            '/teacher/classes',
     'Attendance':            '/teacher/attendance',
     'Assignments':           '/teacher/assignments',
+    'Mark Papers':           '/teacher/mark-papers',
     'Assessment':            '/teacher/assessment',
     'Official Report Cards': '/teacher/core-term',
     'Parent Reports':        '/teacher/reports',
@@ -202,7 +212,7 @@ test('G: every destination remains reachable on mobile', () => {
     ...moreSheetItems(false).map(i => i.href),
   ])
 
-  for (const href of DESTINATIONS_BEFORE_PHASE_1) {
+  for (const href of [...DESTINATIONS_BEFORE_PHASE_1, ...DESTINATIONS_ADDED_AFTER_PHASE_1]) {
     assert.ok(reachable.has(href), `unreachable on mobile after regrouping: ${href}`)
   }
 })

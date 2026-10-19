@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { FileText, PlusCircle, ChevronRight, Clock, CheckCircle2, XCircle } from 'lucide-react'
+import { FileText, PlusCircle, ChevronRight, Clock, CheckCircle2, XCircle, Camera } from 'lucide-react'
 
 function statusBadge(status: string) {
   if (status === 'active') return 'bg-green-100 text-green-700'
@@ -141,6 +141,12 @@ export default function AssignmentsPage() {
                       <span className="text-xs text-gray-500 font-bold whitespace-nowrap">{a.submitted_count}/{a.total_students}</span>
                     </div>
                     <Link
+                      href={`/teacher/assignments/${a.id}/paper-intelligence`}
+                      className="text-white bg-teal-600 hover:bg-teal-700 font-bold text-xs flex items-center gap-1 px-2.5 py-1.5 rounded-lg shrink-0"
+                    >
+                      <Camera className="w-3 h-3" /> Mark
+                    </Link>
+                    <Link
                       href={`/teacher/assignments/${a.id}`}
                       className="text-teal-600 hover:text-teal-800 font-bold text-xs flex items-center gap-0.5 shrink-0"
                     >
@@ -219,12 +225,20 @@ export default function AssignmentsPage() {
                       </span>
                     </td>
                     <td className="px-5 py-4">
-                      <Link
-                        href={`/teacher/assignments/${a.id}`}
-                        className="text-teal-600 hover:text-teal-800 font-bold text-sm flex items-center gap-1"
-                      >
-                        View <ChevronRight className="w-4 h-4" />
-                      </Link>
+                      <div className="flex items-center gap-3 justify-end">
+                        <Link
+                          href={`/teacher/assignments/${a.id}/paper-intelligence`}
+                          className="text-white bg-teal-600 hover:bg-teal-700 font-bold text-sm flex items-center gap-1 px-3 py-1.5 rounded-lg whitespace-nowrap"
+                        >
+                          <Camera className="w-4 h-4" /> Mark papers
+                        </Link>
+                        <Link
+                          href={`/teacher/assignments/${a.id}`}
+                          className="text-teal-600 hover:text-teal-800 font-bold text-sm flex items-center gap-1"
+                        >
+                          View <ChevronRight className="w-4 h-4" />
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 )
