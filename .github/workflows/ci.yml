@@ -242,7 +242,20 @@ jobs:
           # paper_intelligence_script_marks, additive). Reviewed: only schema
           # change; FAIL_COUNT=9 UNRECOVERED=0, unchanged. Computed on an
           # isolated throwaway stack that first reproduced 82de47d1 at HEAD.
-          EXPECTED="f996277adfe1cba18c2023537ee04697"
+          # 2026-10-16: f996277a… → 3e9bb65d… for migration
+          # 20261015120000_school_effectiveness_checks.sql (adds table
+          # school_effectiveness_checks, additive — school-level Intelligence
+          # diagnostic, ADR-0034). Reviewed: only schema change; FAIL_COUNT=9
+          # UNRECOVERED=0, unchanged. Computed on an isolated throwaway pifp
+          # stack that first reproduced f996277a at the pre-migration tree.
+          # 2026-10-19: 3e9bb65d… → 28ff24ca… for migration
+          # 20261019120000_paper_mark_uploads.sql (adds table
+          # paper_mark_uploads + assignments.origin +
+          # assignment_submission_pages.capture_source, additive, plus a
+          # data-only backfill). Reviewed: only schema change; FAIL_COUNT=9
+          # UNRECOVERED=0, unchanged. Computed on an isolated throwaway pifp
+          # stack that first reproduced 3e9bb65d at HEAD.
+          EXPECTED="28ff24ca07243bcf18a41d69a21b42f9"
           echo "expected: $EXPECTED"
           echo "actual:   $ACTUAL"
           if [ "$ACTUAL" != "$EXPECTED" ]; then
