@@ -24,6 +24,7 @@ const EXPECTED = {
   midterm:    { titleLabel: 'Mid-Term',   badgeLabel: 'Midterm',    purposeCode: 'summative'  },
   endterm:    { titleLabel: 'End-Term',   badgeLabel: 'End Term',   purposeCode: 'summative'  },
   exam:       { titleLabel: 'Exam',       badgeLabel: 'Exam',       purposeCode: 'summative'  },
+  sba:        { titleLabel: 'KJSEA SBA',  badgeLabel: 'KJSEA SBA',  purposeCode: 'summative'  },
   assignment: { titleLabel: 'Assignment', badgeLabel: 'Assignment', purposeCode: 'practice'   },
 } as const
 
@@ -35,8 +36,8 @@ test('every teacher label resolves to its exact expected title/badge label and p
   }
 })
 
-test('KNOWN_ASSESSMENT_TYPES contains exactly the 6 platform-seeded labels, in the original dictionary order', () => {
-  assert.deepEqual(KNOWN_ASSESSMENT_TYPES, ['opener', 'cat', 'midterm', 'endterm', 'exam', 'assignment'])
+test('KNOWN_ASSESSMENT_TYPES contains the 6 platform-seeded labels in the original dictionary order, plus KJSEA SBA before Assignment', () => {
+  assert.deepEqual(KNOWN_ASSESSMENT_TYPES, ['opener', 'cat', 'midterm', 'endterm', 'exam', 'sba', 'assignment'])
 })
 
 test('every canonical purpose code appears at least once (diagnostic, formative, summative, practice)', () => {

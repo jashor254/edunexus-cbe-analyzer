@@ -12,6 +12,7 @@
 import { createServiceClient } from '@/utils/supabase/service'
 import { AssessmentRepository } from '@/lib/repositories/assessment.repository'
 import { mergeGradebook, type Gradebook } from './gradebookPure'
+import { LISTED_ASSIGNMENTS_FILTER } from '@/lib/assignments/visibility'
 
 export type { Gradebook, GradebookColumn, GradebookRow } from './gradebookPure'
 export { gradebookToCSV } from './gradebookPure'
@@ -31,6 +32,7 @@ export async function buildGradebook(classId: string, teacherId: string): Promis
       .select('id, title, due_date, max_score')
       .eq('class_id', classId)
       .eq('teacher_id', teacherId)
+      .or(LISTED_ASSIGNMENTS_FILTER)
       .order('due_date', { ascending: true }),
   ])
 

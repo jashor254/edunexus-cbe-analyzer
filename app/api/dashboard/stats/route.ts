@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
+import { LISTED_ASSIGNMENTS_FILTER } from '@/lib/assignments/visibility'
 
 const ADMIN_EMAIL = 'kariukidennis092@gmail.com'
 
@@ -84,6 +85,7 @@ export async function GET() {
             .from('assignments')
             .select('id', { count: 'exact', head: true })
             .in('class_id', classIds)
+            .or(LISTED_ASSIGNMENTS_FILTER)
             .gt('due_date', new Date().toISOString())
           pendingAssignments = count ?? 0
         }
@@ -112,6 +114,7 @@ export async function GET() {
             .from('assignments')
             .select('id', { count: 'exact', head: true })
             .eq('teacher_id', teacherId)
+            .or(LISTED_ASSIGNMENTS_FILTER)
             .gt('due_date', new Date().toISOString()),
         ])
         teacherStudentsCount = linkedStudents.count ?? 0

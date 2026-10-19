@@ -7,6 +7,7 @@ import { requireAuthentication } from '@/lib/core/permissions'
 import { resolveTeacher } from '@/lib/core/identity'
 import { UnauthorizedError, ForbiddenError, ValidationError } from '@/lib/core/errors'
 import { createAssignment } from '@/lib/assignments/create'
+import { LISTED_ASSIGNMENTS_FILTER } from '@/lib/assignments/visibility'
 
 const CreateAssignmentSchema = z.object({
   // Exactly one of class_id (Solo Teacher — legacy teacher_classes.id) or
@@ -70,6 +71,7 @@ export async function GET() {
         teacher_classes(name, grade)
       `)
       .eq('teacher_id', teacher.id)
+      .or(LISTED_ASSIGNMENTS_FILTER)
       .order('created_at', { ascending: false }))
 
     if (error) return apiError('Failed to fetch assignments')

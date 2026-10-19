@@ -4,6 +4,7 @@
 import { createServiceClient } from '@/utils/supabase/service'
 import { repos } from '@/lib/repositories'
 import { mergeCalendar, type CalendarEntry } from './calendarPure'
+import { LISTED_ASSIGNMENTS_FILTER } from '@/lib/assignments/visibility'
 
 export type { CalendarEntry } from './calendarPure'
 
@@ -11,7 +12,7 @@ export async function buildClassCalendar(classId: string): Promise<CalendarEntry
   const db = createServiceClient()
   const [events, { data: assignments }] = await Promise.all([
     repos.classCalendar.findEventsByClass(classId),
-    db.from('assignments').select('id, class_id, title, due_date').eq('class_id', classId),
+    db.from('assignments').select('id, class_id, title, due_date').eq('class_id', classId).or(LISTED_ASSIGNMENTS_FILTER),
   ])
   return mergeCalendar({ events, assignments: assignments ?? [] })
 }
@@ -21,7 +22,7 @@ export async function buildCalendarForClassIds(classIds: string[]): Promise<Cale
   const db = createServiceClient()
   const [events, { data: assignments }] = await Promise.all([
     repos.classCalendar.findEventsByClassIds(classIds),
-    db.from('assignments').select('id, class_id, title, due_date').in('class_id', classIds),
+    db.from('assignments').select('id, class_id, title, due_date').in('class_id', classIds).or(LISTED_ASSIGNMENTS_FILTER),
   ])
   return mergeCalendar({ events, assignments: assignments ?? [] })
 }

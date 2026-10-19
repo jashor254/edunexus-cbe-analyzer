@@ -36,9 +36,13 @@ export type AssignmentRow = {
   lesson_plan_id: string | null
   blueprint_action_item_id: string | null
   status: string
+  /** 'paper_marking' = quick-created from Mark Papers (always created 'draft'); every other assignment is 'standard'. */
+  origin: AssignmentOrigin
   created_at: string
   updated_at: string | null
 }
+
+export type AssignmentOrigin = 'standard' | 'paper_marking'
 
 export type InsertAssignmentInput = {
   class_id: string
@@ -60,6 +64,8 @@ export type InsertAssignmentInput = {
   /** Server-derived only — see module header. `null`/omitted for every ordinary-route assignment. */
   blueprint_action_item_id: string | null
   status: string
+  /** Omitted = the column default, 'standard'. */
+  origin?: AssignmentOrigin
 }
 
 export type InsertAssignmentSubmissionInput = {
@@ -70,7 +76,7 @@ export type InsertAssignmentSubmissionInput = {
 }
 
 const ASSIGNMENT_COLS =
-  'id, class_id, teacher_id, title, subject, topic, substrand_id, instructions, due_date, type, max_score, is_quiz, is_adaptive, is_compass_guided, is_holiday_assignment, holiday_period, lesson_plan_id, blueprint_action_item_id, status, created_at, updated_at'
+  'id, class_id, teacher_id, title, subject, topic, substrand_id, instructions, due_date, type, max_score, is_quiz, is_adaptive, is_compass_guided, is_holiday_assignment, holiday_period, lesson_plan_id, blueprint_action_item_id, status, origin, created_at, updated_at'
 
 export class AssignmentRepository extends BaseRepository {
   /**

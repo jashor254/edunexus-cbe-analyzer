@@ -46,6 +46,7 @@ const ASSESSMENT_TYPES: { value: string; label: string }[] = [
   { value: 'midterm', label: 'Mid-Term Exam' },
   { value: 'endterm', label: 'End-Term Exam' },
   { value: 'exam', label: 'Exam' },
+  { value: 'sba', label: 'KJSEA SBA' },
   { value: 'assignment', label: 'Assignment' },
 ]
 

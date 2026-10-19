@@ -20,7 +20,12 @@
 // matching each prior call site's own pre-existing fallback behavior
 // exactly — never a guess, never a thrown error for a valid-but-custom name.
 
-export const KNOWN_ASSESSMENT_TYPES = ['opener', 'cat', 'midterm', 'endterm', 'exam', 'assignment'] as const
+// 'sba' (KJSEA school-based assessment, CBC Junior School) added 2026-10-19
+// for Mark Papers: a school that keeps its KNEC SBA marks in learners'
+// records here files them as their own type. Uploading to the KNEC portal
+// stays outside EduNexus. Created per teacher on first use
+// (resolveOrCreateAssessmentType) — no seeded row needed.
+export const KNOWN_ASSESSMENT_TYPES = ['opener', 'cat', 'midterm', 'endterm', 'exam', 'sba', 'assignment'] as const
 
 export type AssessmentType = typeof KNOWN_ASSESSMENT_TYPES[number]
 
@@ -41,6 +46,7 @@ const CATALOG: Record<AssessmentType, AssessmentTypeMeta> = {
   midterm:    { titleLabel: 'Mid-Term',   badgeLabel: 'Midterm',    badgeClass: 'bg-orange-100 text-orange-700', purposeCode: 'summative'  },
   endterm:    { titleLabel: 'End-Term',   badgeLabel: 'End Term',   badgeClass: 'bg-red-100 text-red-700',       purposeCode: 'summative'  },
   exam:       { titleLabel: 'Exam',       badgeLabel: 'Exam',       badgeClass: 'bg-blue-100 text-blue-700',     purposeCode: 'summative'  },
+  sba:        { titleLabel: 'KJSEA SBA',  badgeLabel: 'KJSEA SBA',  badgeClass: 'bg-indigo-100 text-indigo-700', purposeCode: 'summative'  },
   assignment: { titleLabel: 'Assignment', badgeLabel: 'Assignment', badgeClass: 'bg-green-100 text-green-700',   purposeCode: 'practice'   },
 }
 
@@ -78,7 +84,7 @@ export function buildAssessmentTitle(type: string, term: string, year: number): 
 
 /**
  * Comparator sorting known types in KNOWN_ASSESSMENT_TYPES order (Opener →
- * CAT → Midterm → End-Term → Exam → Assignment). Matches
+ * CAT → Midterm → End-Term → Exam → KJSEA SBA → Assignment). Matches
  * app/teacher/analytics/page.tsx's prior `aTypeSort` exactly, including its
  * pre-existing quirk: `Array.prototype.indexOf` never returns a nullish
  * value, so an unrecognized type gets -1 (sorts first), not the `?? 99`

@@ -51,7 +51,7 @@ import { ensureAssignmentCompatibilityClass } from '@/lib/core/assignmentCompati
 import { syncAssignmentCompatibilityRoster } from '@/lib/core/assignmentLearnerBridge'
 import { publishEvent } from '@/lib/events'
 import { repos } from '@/lib/repositories'
-import type { AssignmentRow } from '@/lib/repositories/assignment.repository'
+import type { AssignmentOrigin, AssignmentRow } from '@/lib/repositories/assignment.repository'
 
 export type CreateAssignmentCommand = {
   /** Solo Teacher mode — legacy `teacher_classes.id`. Exactly one of `classId`/`classSubjectId` must be set. */
@@ -82,6 +82,12 @@ export type CreateAssignmentCommand = {
   lessonPlanId: string | undefined
   /** Server-derived provenance only — see module header. Omit for every ordinary caller. */
   blueprintActionItemId?: string | null
+  /**
+   * 'paper_marking' — a paper quick-created from Mark Papers to be marked and
+   * then filed (docs/engineering/mark-papers-flow-plan.md). Always created
+   * 'draft' so learners never see it. Omitted = 'standard'.
+   */
+  origin?: AssignmentOrigin
 }
 
 export type CreateAssignmentResult = {
@@ -136,6 +142,7 @@ export async function createAssignment(
   // same as before this column existed.
   const adaptive = command.isAdaptive === true
   const quiz = adaptive ? true : command.isQuiz === true
+  const origin: AssignmentOrigin = command.origin ?? 'standard'
 
   const assignment = await repos.assignments.createAssignmentRecord({
     class_id: resolved.storageClassId,
@@ -156,7 +163,8 @@ export async function createAssignment(
     holiday_period: command.isHolidayAssignment ? (command.holidayPeriod || null) : null,
     lesson_plan_id: command.lessonPlanId || null,
     blueprint_action_item_id: command.blueprintActionItemId ?? null,
-    status: adaptive ? 'draft' : 'active',
+    status: adaptive || origin === 'paper_marking' ? 'draft' : 'active',
+    origin,
   })
 
   await fanOutPendingSubmissions(assignment, resolved.storageClassId)
