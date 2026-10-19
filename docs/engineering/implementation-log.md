@@ -3806,3 +3806,22 @@ Audit (READY WITH CONDITIONS) → approved vertical slice. Mode-gated to plannin
 **Tests**: `lib/career/careerEvolutionReport.test.ts` (5 pure, STANDARD — planning+signals, planning no-signals graceful, junior→null, non-planning→null, missing-career→null). End-to-end mode-gating added to `careerIntelligenceEvidenceFirst.integration.test.ts` (DEEP): Grade 8 → `career_evolution` null; Grade 10 (planning) → null-or-well-formed view (CAREER-EVO-001). Suite 1659 → 1664, green; tsc clean; `next build` clean; eslint clean on touched files. DEEP integration not run in this session (no `TEST_SUPABASE`) — runs in CI.
 
 **Rollback**: additive; reverts cleanly per file. **Not pushed**: joins the held batch.
+
+---
+
+### 2026-10-19 — Mark Papers: mark first, file after (+ bulk scan S1)
+
+Founder decision: Paper Intelligence must not write to the gradebook as each script is reviewed. The teacher marks the whole paper, then uploads the marks to ONE place — a topical assignment (gradebook) or a termly assessment (Opener, CAT, Mid-Term, End-Term, Exam, KJSEA SBA → report cards). Adaptive assignments are excluded until they are finalised. Capture is the teacher's choice: phone (existing) or one scanned class PDF. Plan: `docs/engineering/mark-papers-flow-plan.md`.
+
+Commits (each green): `c55dfef` schema · `5729104` quick-paper origin + visibility filter + `sba` type · `46d0b2b` review stops filing; `upload.ts`, `mergeSubjectMarks`, `papers.ts` · `4e872cb` API routes · `7587bbd` screens · `1044a6d` bulk scan.
+
+- **Schema** (`20261019120000_paper_mark_uploads.sql`): `paper_mark_uploads` (UNIQUE per paper → never filed twice), `assignments.origin`, `assignment_submission_pages.capture_source`, backfill of already-finalized PI papers as `topical`. CI pin 3e9bb65d → 28ff24ca (isolated pifp stack reproduced 3e9bb65d first; FAIL_COUNT=9 UNRECOVERED=0). The 3e9bb65d bump for `school_effectiveness_checks` was itself never committed — main CI had been red since that migration was pushed; this commit carries both.
+- **Termly filing** sets ONE subject per learner, keeps every other subject, matches rows by `student_id` first, refuses a name clash with another learner's row and a published assessment; paper "out of" ≠ assessment max → proportional, previewed. Never calls `recordSubmissionMark`, so no mark is evidenced twice.
+- **Quick paper** = draft assignment, `origin = paper_marking`; hidden from gradebook/calendar/assignment list/dashboard counts (`LISTED_ASSIGNMENTS_FILTER`) until filed topical (→ `closed`).
+- **Bulk scan**: pdf.js 6.3.289 (pinned, lazy, web worker) renders pages like phone captures (1600px, JPEG 0.8); class-list order, N pages each, absent skipped, thumbnail confirm + mismatch warning; pages via the existing route (`captureSource: scan`), auto-mark pool of 3. `maxPagesPerScript` 8 → 12.
+
+**ADR**: none — Assessment/Assignment canonical write paths reused (`recordSubmissionMark`, assessment marks + `recordAssessmentEvidence`); no new evidence producer, no identity/ownership change.
+
+**Tests**: subjectMarkMerge (9), upload (10), scanSplit (5), papers route (5) — standard; upload route (7) + confirm route updated — glob-run. Standard 1686 → 1715 green. tsc 0, eslint clean, architecture + route-auth + manifest gates pass, `next build` passes (worker emitted). E2E over real HTTP on the local stack (dev teacher, synthetic learners): quick paper hidden until filed; review files nothing; termly upload into a new KJSEA SBA converts 15/20 → 75/100 and keeps English on re-upload; topical after termly → 409; topical closes + scores. Headless Chrome: 3-page synthetic scan split, uploaded (`capture_source=scan`), all 3 marked, no browser errors.
+
+**Before deploy**: apply the migration to production BEFORE the code ships — the visibility filter reads `assignments.origin`. **Open**: S2 (QR paper/page codes + learner stickers), S3 (scan-to-email, queue, exams-officer role); per-school Paper Intelligence gate + B6 before onboarding a scanner school. Local residue: 3 evidence rows for synthetic "Amani Learner" from the E2E (audit-log protected).
