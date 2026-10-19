@@ -178,6 +178,7 @@
     "lib/paperIntelligence/reviewGrouping.test.ts",
     "lib/paperIntelligence/review.test.ts",
     "lib/paperIntelligence/upload.test.ts",
+    "app/api/teacher/paper-intelligence/papers/route.test.ts",
     "lib/paperIntelligence/answerDecisions.test.ts",
     "lib/paperIntelligence/answerReview.test.ts",
     "lib/sow/generationJob.test.ts",
