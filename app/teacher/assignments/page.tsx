@@ -24,6 +24,8 @@ interface Assignment {
   type: string
   status: string
   due_date: string
+  is_quiz: boolean
+  is_adaptive: boolean
   total_students: number
   submitted_count: number
   teacher_classes: { name: string; grade: number } | null
@@ -140,12 +142,14 @@ export default function AssignmentsPage() {
                       </div>
                       <span className="text-xs text-gray-500 font-bold whitespace-nowrap">{a.submitted_count}/{a.total_students}</span>
                     </div>
-                    <Link
-                      href={`/teacher/assignments/${a.id}/paper-intelligence`}
-                      className="text-white bg-teal-600 hover:bg-teal-700 font-bold text-xs flex items-center gap-1 px-2.5 py-1.5 rounded-lg shrink-0"
-                    >
-                      <Camera className="w-3 h-3" /> Mark
-                    </Link>
+                    {!a.is_adaptive && !a.is_quiz && (
+                      <Link
+                        href={`/teacher/assignments/${a.id}/paper-intelligence`}
+                        className="text-white bg-teal-600 hover:bg-teal-700 font-bold text-xs flex items-center gap-1 px-2.5 py-1.5 rounded-lg shrink-0"
+                      >
+                        <Camera className="w-3 h-3" /> Mark
+                      </Link>
+                    )}
                     <Link
                       href={`/teacher/assignments/${a.id}`}
                       className="text-teal-600 hover:text-teal-800 font-bold text-xs flex items-center gap-0.5 shrink-0"
@@ -226,12 +230,14 @@ export default function AssignmentsPage() {
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3 justify-end">
-                        <Link
-                          href={`/teacher/assignments/${a.id}/paper-intelligence`}
-                          className="text-white bg-teal-600 hover:bg-teal-700 font-bold text-sm flex items-center gap-1 px-3 py-1.5 rounded-lg whitespace-nowrap"
-                        >
-                          <Camera className="w-4 h-4" /> Mark papers
-                        </Link>
+                        {!a.is_adaptive && !a.is_quiz && (
+                          <Link
+                            href={`/teacher/assignments/${a.id}/paper-intelligence`}
+                            className="text-white bg-teal-600 hover:bg-teal-700 font-bold text-sm flex items-center gap-1 px-3 py-1.5 rounded-lg whitespace-nowrap"
+                          >
+                            <Camera className="w-4 h-4" /> Mark papers
+                          </Link>
+                        )}
                         <Link
                           href={`/teacher/assignments/${a.id}`}
                           className="text-teal-600 hover:text-teal-800 font-bold text-sm flex items-center gap-1"

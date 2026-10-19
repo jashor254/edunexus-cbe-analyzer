@@ -14,6 +14,7 @@ import type { AssignmentReview } from '@/lib/paperIntelligence/review'
 import type { ConfirmResponse } from '@/app/api/teacher/assignments/[id]/paper-intelligence/review/confirm/route'
 import { QuestionReviewPanel, type ReviewDecision, type AnswerDecisionRequest } from '@/components/paperIntelligence/QuestionReviewPanel'
 import { ScriptPhotos } from '@/components/paperIntelligence/ScriptPhotos'
+import { UploadMarksPanel } from '@/components/paperIntelligence/UploadMarksPanel'
 
 type Photos = { learnerName: string; pages: Array<{ pageNumber: number; url: string }> | null; error: string | null }
 
@@ -28,6 +29,8 @@ export default function PaperIntelligenceReviewPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [overOutOf, setOverOutOf] = useState<ConfirmResponse['overMarkedOutOf']>([])
   const [photos, setPhotos] = useState<Photos | null>(null)
+  // Bumped on every review reload so the Upload panel re-reads readiness.
+  const [reviewVersion, setReviewVersion] = useState(0)
 
   const load = useCallback(async () => {
     try {
@@ -36,6 +39,7 @@ export default function PaperIntelligenceReviewPage() {
       if (!res.ok) { setError(body?.error ?? 'Could not load the marks to review.'); return }
       const data = body.data as AssignmentReview
       setReview(data)
+      setReviewVersion(v => v + 1)
       // Stay on the current question; otherwise open the first with work left.
       setActive(prev => prev ?? (data.questions.find(q => q.yourCall.length + q.agreeGroups.length > 0) ?? data.questions[0])?.id ?? null)
     } catch {
@@ -120,7 +124,7 @@ export default function PaperIntelligenceReviewPage() {
       {notice && <div className="mb-4 rounded-xl bg-teal-50 border border-teal-200 text-teal-800 text-sm font-medium px-4 py-3">{notice}</div>}
       {overOutOf.length > 0 && (
         <div className="mb-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-sm px-4 py-3">
-          <p className="font-bold mb-1">Not saved to the gradebook — total is above the paper’s “marked out of”:</p>
+          <p className="font-bold mb-1">Can’t be uploaded — total is above the paper’s “marked out of”:</p>
           <ul className="list-disc ml-5">
             {overOutOf.map(o => <li key={o.submissionId}>{o.learnerName}: {o.total}/{o.markedOutOf}. Lower a mark for questions the learner should not have answered.</li>)}
           </ul>
@@ -151,6 +155,7 @@ export default function PaperIntelligenceReviewPage() {
             })}
           </div>
           {question && <QuestionReviewPanel key={question.id} question={question} busy={busy} onConfirm={confirm} onDecideAnswer={decideAnswer} onViewScript={viewScript} />}
+          <UploadMarksPanel assignmentId={assignmentId} refreshKey={reviewVersion} />
         </>
       )}
 

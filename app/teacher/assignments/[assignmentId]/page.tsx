@@ -449,12 +449,15 @@ export default function AssignmentMarkingPage({ params }: { params: Promise<{ as
             ← Back to Assignments
           </Link>
           <div className="flex items-center gap-2">
-            <Link
-              href={`/teacher/assignments/${assignmentId}/paper-intelligence`}
-              className="text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 px-3 py-1.5 rounded-xl transition"
-            >
-              ✨ Mark with Paper Intelligence
-            </Link>
+            {/* Adaptive (not finalised) and online quizzes have no single paper to photo-mark. */}
+            {!assignment.is_adaptive && !assignment.is_quiz && (
+              <Link
+                href={`/teacher/assignments/${assignmentId}/paper-intelligence`}
+                className="text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 px-3 py-1.5 rounded-xl transition"
+              >
+                ✨ Mark with Paper Intelligence
+              </Link>
+            )}
             <Link
               href={`/teacher/assignments/${assignmentId}/results`}
               className="text-sm font-bold text-teal-600 hover:text-teal-800 border border-teal-200 hover:border-teal-400 px-3 py-1.5 rounded-xl transition"
