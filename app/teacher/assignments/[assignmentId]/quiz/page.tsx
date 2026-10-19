@@ -4,6 +4,8 @@ import { useEffect, useState, use, useMemo } from 'react'
 import Link from 'next/link'
 import { Plus, Trash2, Save, Sparkles, Check, X, RefreshCw, Search } from 'lucide-react'
 import { friendlyMessage } from '@/lib/errors/friendlyMessage'
+import { buildVariantReviewModel, isBulkSelectable, type CanonicalForComparison, type VariantReviewModel } from '@/lib/assignments/variantReview'
+import VariantReviewContent from '@/components/teacher/VariantReviewContent'
 
 interface DraftQuestion {
   /** Present for a question loaded from the server — preserved on save so its identity survives edits (Sprint 9 Slice 1). Absent for a newly added question. */
@@ -16,12 +18,22 @@ interface DraftQuestion {
 // Adaptive Variant Generation Pipeline — variants are review artifacts over
 // the canonical question above, never a second quiz editor (see the sprint's
 // own "canonical question remains the editing surface" rule).
+// Audit F-02: GET /variants already returns the full row; the card used to
+// read only question_text, so teachers approved answer keys they never saw.
 interface VariantRow {
   id: string
   question_id: string
   variant_type: 'foundation' | 'guided_practice' | 'supported_practice' | 'extension'
   question_text: string
   choices: string[]
+  correct_index: number
+  learning_outcome: string | null
+  cognitive_intent: string | null
+  difficulty_rationale: string | null
+  expected_misconceptions: string[]
+  teacher_explanation: string | null
+  learner_explanation: string | null
+  generated_by: 'ai' | 'teacher_edited'
   status: 'draft' | 'approved' | 'rejected' | 'archived'
 }
 
@@ -42,6 +54,10 @@ function emptyQuestion(): DraftQuestion {
   return { questionText: '', choices: ['', ''], correctIndex: 0 }
 }
 
+function toCanonicalMap(rows: Array<{ id: string; choices: string[]; correct_index: number }>): Record<string, CanonicalForComparison> {
+  return Object.fromEntries(rows.map(r => [r.id, { choices: r.choices, correctIndex: r.correct_index }]))
+}
+
 export default function QuizBuilderPage({ params }: { params: Promise<{ assignmentId: string }> }) {
   const { assignmentId } = use(params)
   const [questions, setQuestions] = useState<DraftQuestion[]>([])
@@ -54,6 +70,9 @@ export default function QuizBuilderPage({ params }: { params: Promise<{ assignme
   const [generating, setGenerating] = useState<Record<string, boolean>>({})
   const [variantError, setVariantError] = useState<Record<string, string>>({})
   const [busyVariantId, setBusyVariantId] = useState<string | null>(null)
+  // Each question as last SAVED (not the editor's unsaved text) — what its
+  // variants were generated from, so "changed from your original" is honest.
+  const [savedCanonical, setSavedCanonical] = useState<Record<string, CanonicalForComparison>>({})
 
   // Sprint 8 (Assessment Excellence) — Review Dashboard state. Filter/search
   // are pure client-side reads of variantsByQuestion, already fetched in
@@ -77,6 +96,7 @@ export default function QuizBuilderPage({ params }: { params: Promise<{ assignme
             id: q.id, questionText: q.question_text, choices: q.choices, correctIndex: q.correct_index,
           }))
           setQuestions(loaded)
+          setSavedCanonical(toCanonicalMap(d.data.questions))
           if (loaded.some(q => q.id)) void loadAllVariants()
         } else {
           setQuestions([emptyQuestion()])
@@ -159,14 +179,14 @@ export default function QuizBuilderPage({ params }: { params: Promise<{ assignme
 
   /** Sprint 8 — bulk approve/reject over every currently-selected variant, via the one batch endpoint (no new lifecycle logic — same approveVariant()/rejectVariant() every single click already calls). */
   async function handleBulkAction(action: 'approve' | 'reject') {
-    if (selectedVariantIds.size === 0) return
+    if (effectiveSelection.size === 0) return
     setBulkActing(true)
     setBulkError('')
     try {
       const res = await fetch(`/api/teacher/assignments/${assignmentId}/variants/bulk-action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ variantIds: [...selectedVariantIds], action }),
+        body: JSON.stringify({ variantIds: [...effectiveSelection], action }),
       })
       const data = await res.json()
       if (!data.success) { setBulkError(data.error || `Bulk ${action} failed`); return }
@@ -190,6 +210,20 @@ export default function QuizBuilderPage({ params }: { params: Promise<{ assignme
     if (searchText.trim() && !v.question_text.toLowerCase().includes(searchText.trim().toLowerCase())) return false
     return true
   }
+
+  const reviewModels = useMemo(
+    () => new Map<string, VariantReviewModel>(allVariants.map(v => [v.id, buildVariantReviewModel(v, savedCanonical[v.question_id])])),
+    [allVariants, savedCanonical],
+  )
+
+  // Audit F-02 — bulk actions only ever cover versions the teacher can see on
+  // screen right now with a readable answer key. A selection hidden by a later
+  // filter change, or a version whose key can't be shown, drops out of the
+  // count and the request instead of being approved unseen.
+  const effectiveSelection = new Set(allVariants
+    .filter(v => selectedVariantIds.has(v.id) && matchesFilter(v))
+    .filter(v => { const m = reviewModels.get(v.id); return m !== undefined && isBulkSelectable(v.status, m) })
+    .map(v => v.id))
 
   function updateQuestion(index: number, patch: Partial<DraftQuestion>) {
     setQuestions(prev => prev.map((q, i) => (i === index ? { ...q, ...patch } : q)))
@@ -247,6 +281,7 @@ export default function QuizBuilderPage({ params }: { params: Promise<{ assignme
       })
       const data = await res.json()
       if (!data.success) { setError(data.error || 'Failed to save'); return }
+      if (Array.isArray(data.data?.questions)) setSavedCanonical(toCanonicalMap(data.data.questions))
       setSaved(true)
     } finally {
       setSaving(false)
@@ -345,9 +380,9 @@ export default function QuizBuilderPage({ params }: { params: Promise<{ assignme
               {allVariants.filter(matchesFilter).length} of {allVariants.filter(v => v.status !== 'archived').length} variant{allVariants.length === 1 ? '' : 's'} shown
               {hasActiveFilter ? ' (filtered)' : ''}
             </p>
-            {selectedVariantIds.size > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-gray-500">{selectedVariantIds.size} selected</span>
+            {effectiveSelection.size > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-gray-500">{effectiveSelection.size} selected</span>
                 <button
                   onClick={() => handleBulkAction('approve')}
                   disabled={bulkActing}
@@ -447,17 +482,20 @@ export default function QuizBuilderPage({ params }: { params: Promise<{ assignme
                 )}
 
                 <div className="space-y-2">
-                  {(variantsByQuestion[q.id] ?? []).filter(matchesFilter).map(v => (
-                    <div key={v.id} className={`bg-gray-50 rounded-xl p-3 text-sm ${selectedVariantIds.has(v.id) ? 'ring-2 ring-teal-400' : ''}`}>
-                      <div className="flex items-center justify-between mb-1">
+                  {(variantsByQuestion[q.id] ?? []).filter(matchesFilter).map(v => {
+                    const model = reviewModels.get(v.id) ?? buildVariantReviewModel(v, savedCanonical[v.question_id])
+                    return (
+                    <div key={v.id} className={`bg-gray-50 rounded-xl p-3 text-sm ${effectiveSelection.has(v.id) ? 'ring-2 ring-teal-400' : ''}`}>
+                      <div className="flex items-center justify-between gap-2 mb-2">
                         <div className="flex items-center gap-2">
-                          {v.status === 'draft' && (
+                          {isBulkSelectable(v.status, model) && (
                             <input
                               type="checkbox"
-                              checked={selectedVariantIds.has(v.id)}
+                              checked={effectiveSelection.has(v.id)}
                               onChange={() => toggleVariantSelected(v.id)}
                               className="w-3.5 h-3.5 accent-teal-600"
                               title="Select for bulk approve/reject"
+                              aria-label={`Select ${TIER_LABEL[v.variant_type]} version for bulk approve or reject`}
                             />
                           )}
                           <span className="font-black text-xs text-gray-500">{TIER_LABEL[v.variant_type]}</span>
@@ -468,13 +506,14 @@ export default function QuizBuilderPage({ params }: { params: Promise<{ assignme
                             : 'text-xs font-bold text-gray-500'
                         }>{v.status}</span>
                       </div>
-                      <p className="text-gray-700 mb-2">{v.question_text}</p>
-                      <div className="flex gap-3">
+                      <VariantReviewContent model={model} />
+                      <div className="flex flex-wrap gap-3 mt-3">
                         {v.status === 'draft' && (
                           <>
                             <button
                               onClick={() => handleVariantAction(q.id!, v.id, 'approve')}
-                              disabled={busyVariantId === v.id}
+                              disabled={busyVariantId === v.id || !model.answerKeyVerifiable}
+                              title={model.answerKeyVerifiable ? undefined : 'This version’s answer key can’t be shown, so it can’t be approved'}
                               className="flex items-center gap-1 text-xs font-bold text-green-700 hover:text-green-800 disabled:opacity-60"
                             >
                               <Check className="w-3.5 h-3.5" /> Approve
@@ -497,7 +536,8 @@ export default function QuizBuilderPage({ params }: { params: Promise<{ assignme
                         </button>
                       </div>
                     </div>
-                  ))}
+                    )
+                  })}
                   {(variantsByQuestion[q.id] ?? []).filter(v => v.status !== 'archived').length > 0
                     && (variantsByQuestion[q.id] ?? []).filter(matchesFilter).length === 0 && (
                     <p className="text-xs text-gray-400 italic">No variants match the current filter.</p>

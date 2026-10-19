@@ -27,6 +27,9 @@ import { routedCompletion } from '@/lib/ai-orchestration/router'
 import type { AIRequest, AIResponse } from '@/lib/ai-orchestration/types'
 import { findQuestionById, type TeacherQuestionRow } from '@/lib/quiz/quiz'
 import { createDraftVariants, findLiveVariantTypesForQuestion, findVariantById, regenerateVariant, type VariantInput, type VariantRow, type VariantType } from './variants'
+import { buildGenerationPrompt, buildVerificationPrompt, type RedactedContext } from './variantPrompt'
+import { generateWithVerification, verifyResponse, type VerifiedGenerationFailureKind } from './variantVerification'
+import { ADAPTIVE_VARIANT_MAX_GENERATION_ATTEMPTS } from '@/lib/config/adaptiveVariants'
 
 /**
  * The AI call surface this module depends on — real dependency injection,
@@ -56,19 +59,17 @@ export const BAND_TO_TIER: Record<AdaptiveGroupType, VariantType> = {
   EE: 'extension',
 }
 
-/** Only the fields safe to hand to a language model — never a name, a mark, or an evidence id. */
-type RedactedContext = {
-  subject: string
-  band: EducationalAIContext['band']
-  academicGrain: EducationalAIContext['academicGrain']
-  confidence: EducationalAIContext['confidence']
-}
-
 function redactForPrompt(ctx: EducationalAIContext): RedactedContext {
   return { subject: ctx.subject, band: ctx.band, academicGrain: ctx.academicGrain, confidence: ctx.confidence }
 }
 
-export type GenerationFailure = { tier: VariantType; reason: string }
+export type GenerationFailure = {
+  tier: VariantType
+  reason: string
+  /** P0-2 — why verification did not produce a savable draft. Absent for provider errors. */
+  failure?: VerifiedGenerationFailureKind
+  attempts?: number
+}
 export type GenerationResult = { created: VariantRow[]; failed: GenerationFailure[]; tiersConsidered: VariantType[] }
 
 /**
@@ -94,92 +95,8 @@ export async function resolveTiersForClass(
   return representativeTaskByTier
 }
 
-function buildGenerationPrompt(
-  canonical: TeacherQuestionRow,
-  curriculum: CurriculumContext | null,
-  tier: VariantType,
-  context: RedactedContext,
-): { system: string; prompt: string } {
-  const system = `You transform one teacher-authored canonical assessment question into an instructional variant.
-
-First Principle: you transform instruction, never curriculum. Every variant must measure the exact same learning outcome as the canonical question. You may change wording, scaffolding, examples, representation, and cognitive load. You may NEVER change the concept being tested, invent content outside the given curriculum node, or produce a question that could be answered correctly in more than one way.
-
-Non-negotiable structural rule: you always produce exactly ONE question with exactly ONE stem, ONE choice list, and ONE correct answer index — never multiple numbered sub-questions, never a multi-part item. Scaffolding (worked steps, guided reasoning) must live entirely inside the single question's own text, never as separate gradable parts.
-
-Respond with valid JSON only, matching this exact shape, no markdown, no commentary:
-{
-  "questionText": string,
-  "choices": string[],
-  "correctIndex": number,
-  "cognitiveIntent": string,
-  "difficultyRationale": string,
-  "expectedMisconceptions": string[],
-  "teacherExplanation": string,
-  "learnerExplanation": string
-}`
-
-  const tierRules: Record<VariantType, string> = {
-    foundation: 'Foundation tier (Below Expectations): smaller reasoning steps, simpler wording, concrete context, worked-example framing inside the stem, explicit guided reasoning. Never remove essential reasoning, never lower the curriculum standard.',
-    guided_practice: 'Guided Practice tier (Approaching Expectations): light-to-moderate scaffolding — clearer step markers and a small amount of context or hinting, but noticeably closer to grade-level phrasing than Foundation. Never as heavily scaffolded as Foundation, never as close to the canonical wording as Supported Practice.',
-    supported_practice: 'Supported Practice tier (Meeting Expectations): stay as close as possible to the canonical question — light clarity edits only, minimal scaffolding, reduced (not absent) hints. Never drift toward Foundation, Guided Practice, or Extension.',
-    extension: 'Extension tier (Exceeding Expectations): higher-order reasoning, transfer to a new but still in-grade context, real-world application, connect to a second concept the learner has evidence of readiness for. Never introduce future-grade content or content outside the given curriculum node.',
-  }
-
-  const curriculumBlock = curriculum
-    ? `Curriculum node: ${curriculum.strandTitle} — ${curriculum.subStrandTitle}\nLearning outcome: ${curriculum.learningOutcomes[0] ?? '(none seeded — infer the outcome strictly from the canonical question itself, do not invent curriculum content)'}`
-    : `No specific curriculum sub-strand is assigned — ground the variant in the canonical question's own subject-level scope only (${context.subject}), never invent a curriculum node.`
-
-  const prompt = `${curriculumBlock}
-
-Canonical question:
-"${canonical.question_text}"
-Choices: ${JSON.stringify(canonical.choices)}
-Correct answer index: ${canonical.correct_index}
-
-Target instructional tier: ${tier}
-${tierRules[tier]}
-
-Learner readiness context (band only, no personal data): ${context.band}, academic precision: ${context.academicGrain ?? 'unknown'}.`
-
-  return { system, prompt }
-}
-
-// The topic-preservation check (item 2 below) previously went silent
-// whenever no curriculum sub-strand was attached to the assignment — a
-// fully legal, and in practice the DEFAULT, configuration (substrand_id is
-// optional at assignment creation). Forensic audit finding: with no
-// learning outcome, verification degraded to "verify internal consistency
-// only," meaning nothing — deterministic or AI — ever confirmed a tier
-// variant still tests the same concept as the canonical question. The
-// canonical question's own text is always available regardless of
-// curriculum grounding, so it is now always passed in and always checked
-// against, with the learning outcome used as the stricter standard only
-// when one is actually seeded.
-function buildVerificationPrompt(
-  canonicalQuestionText: string,
-  learningOutcome: string | null,
-  variant: { questionText: string; choices: string[]; correctIndex: number },
-): { system: string; prompt: string } {
-  const system = `You are an independent verification pass for an AI-generated assessment question — a second, separate check, not the original generator. Verify only; never generate new content. Respond with valid JSON only: {"valid": boolean, "reason": string}.`
-  const topicStandard = learningOutcome
-    ? `Learning outcome this question must measure: ${learningOutcome}`
-    : `No curriculum learning outcome is seeded for this assignment. The concept being tested must instead match the canonical question below — this is the required standard, not an optional check.`
-  const prompt = `${topicStandard}
-
-Canonical question this variant was derived from: "${canonicalQuestionText}"
-
-Variant question: "${variant.questionText}"
-Choices: ${JSON.stringify(variant.choices)}
-Claimed correct answer index: ${variant.correctIndex}
-
-Check:
-1. Is choices[${variant.correctIndex}] the single, unambiguous correct answer — no other choice could also be defended as correct?
-2. Does this variant still measure the same underlying concept as the standard above (the learning outcome if given, otherwise the canonical question) — not a different, easier, or unrelated topic?
-3. Is exactly one question being asked (not multiple sub-questions bundled together)?
-
-Respond with {"valid": true, "reason": "..."} only if all three hold, otherwise {"valid": false, "reason": "<which check failed and why>"}.`
-  return { system, prompt }
-}
+// buildGenerationPrompt / buildVerificationPrompt live in ./variantPrompt
+// (pure, so the prompt itself is unit-tested in the STANDARD tier).
 
 type ParsedVariant = {
   questionText: string
@@ -211,7 +128,7 @@ function parseJsonResponse<T>(text: string): T | null {
   }
 }
 
-type OneTierResult = { parsed: ParsedVariant } | { error: string }
+type OneTierResult = { parsed: ParsedVariant } | { error: string; failure?: VerifiedGenerationFailureKind; attempts?: number }
 
 /**
  * Generation + independent verification for exactly one (question, tier)
@@ -228,20 +145,33 @@ async function generateOneTier(
   callAI: RoutedCompletionFn,
 ): Promise<OneTierResult> {
   try {
-    const { system, prompt } = buildGenerationPrompt(canonical, curriculum, tier, context)
-    const generation = await callAI({ prompt, system, mode: 'quality', max_tokens: 700, temperature: 0.4, feature: 'adaptive_variant.generate' })
-    const parsed = parseJsonResponse<ParsedVariant>(generation.text)
+    // P0-2 — bounded generate → verify → retry (variantVerification.ts). Only
+    // a fully clean verdict is returned as `parsed` (and so ever persisted);
+    // a regenerated draft is re-verified from scratch, and exhausted attempts
+    // come back as an error, never as the last unverified draft.
+    const result = await generateWithVerification<ParsedVariant>({
+      maxAttempts: ADAPTIVE_VARIANT_MAX_GENERATION_ATTEMPTS,
+      generate: async (feedback) => {
+        const { system, prompt } = buildGenerationPrompt(canonical, curriculum, tier, context, feedback)
+        const generation = await callAI({ prompt, system, mode: 'quality', max_tokens: 700, temperature: 0.4, feature: 'adaptive_variant.generate' })
+        const parsed = parseJsonResponse<ParsedVariant>(generation.text)
+        const structuralError = validateStructure(parsed)
+        return structuralError ? { structuralError } : { draft: parsed! }
+      },
+      verify: async (draft) => {
+        const { system, prompt } = buildVerificationPrompt({
+          canonical,
+          learningOutcome: curriculum?.learningOutcomes[0] ?? null,
+          tier,
+          variant: draft,
+        })
+        const verification = await callAI({ prompt, system, mode: 'quality', max_tokens: 500, temperature: 0, feature: 'adaptive_variant.verify' })
+        return verifyResponse(verification.text)
+      },
+    })
 
-    const structuralError = validateStructure(parsed)
-    if (structuralError) return { error: `Structural validation failed: ${structuralError}` }
-
-    const { system: vSystem, prompt: vPrompt } = buildVerificationPrompt(canonical.question_text, curriculum?.learningOutcomes[0] ?? null, parsed!)
-    const verification = await callAI({ prompt: vPrompt, system: vSystem, mode: 'quality', max_tokens: 300, temperature: 0, feature: 'adaptive_variant.verify' })
-    const verdict = parseJsonResponse<{ valid: boolean; reason: string }>(verification.text)
-
-    if (!verdict?.valid) return { error: `Independent verification failed: ${verdict?.reason ?? 'unparseable verification response'}` }
-
-    return { parsed: parsed! }
+    if (result.status === 'verified') return { parsed: result.draft }
+    return { error: result.reason, failure: result.failure, attempts: result.attempts }
   } catch (err) {
     // Router/provider failure (both providers down, timeout, etc.) — the
     // canonical question and any already-persisted variants are untouched;
@@ -308,7 +238,7 @@ export async function generateAdaptiveVariants(input: {
     const result = await generateOneTier(canonical, curriculum, tier, context, callAI)
 
     if ('error' in result) {
-      failed.push({ tier, reason: result.error })
+      failed.push({ tier, reason: result.error, ...(result.failure ? { failure: result.failure, attempts: result.attempts } : {}) })
       continue
     }
 
