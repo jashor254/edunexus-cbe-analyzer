@@ -193,17 +193,17 @@ export default function LandingPage() {
         <div className="max-w-290 mx-auto px-6">
           <div className="grid lg:grid-cols-[1.35fr_0.65fr] gap-12 lg:gap-16 items-center">
 
-            <div className="text-center lg:text-left">
+            {/* min-w-0: a grid item never shrinks below its widest unbreakable
+                child by default, which pushed this column past a phone's width
+                and the section's overflow-hidden cut the right side off. */}
+            <div className="text-center lg:text-left min-w-0">
 
               <p className="text-white/40 text-sm font-semibold tracking-wide mb-8">
                 Every learner has potential that marks alone cannot measure.
               </p>
 
-              {/* Role selector */}
-              <div
-                className="flex justify-center lg:justify-start gap-2 mb-5 overflow-x-auto [&::-webkit-scrollbar]:hidden"
-                style={{ scrollbarWidth: 'none' }}
-              >
+              {/* Role selector — wraps on a phone so all three roles stay visible */}
+              <div className="flex flex-wrap justify-center lg:justify-start gap-2 mb-5">
                 {ROLES.map((r) => (
                   <button
                     key={r.id}
