@@ -1,6 +1,7 @@
 // lib/paperIntelligence/review.test.ts
-// Unit tests for review + finalize. Every collaborator is mocked — no DB, no
-// lifecycle writes, no network.
+// Unit tests for review. Every collaborator is mocked — no DB, no lifecycle
+// writes, no network. recordSubmissionMark stays mocked so the tests can prove
+// review never files a mark (mark first, file after — upload.ts files).
 // Run with: npm test -- lib/paperIntelligence/review.test.ts
 import { before, beforeEach, mock, test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -115,25 +116,24 @@ test('invalid decisions are refused before anything is written', async () => {
   assert.deepEqual([lifecycle.length, applied.length, entered.length, finalizedScores.length], [0, 0, 0, 0])
 })
 
-test('a script is finalized through the shared mark path once its last question is reviewed', async () => {
-  await review.confirmQuestionMarks({ ...base, decisions: [{ submissionId: 's1', rubricId: 'r1', finalMark: 4 }] })
-  assert.deepEqual(finalizedScores, [], 'one question still unreviewed')
+test('a script is reported complete once its last question is reviewed — and never filed by review', async () => {
+  const first = await review.confirmQuestionMarks({ ...base, decisions: [{ submissionId: 's1', rubricId: 'r1', finalMark: 4 }] })
+  assert.deepEqual(first.completed, [], 'one question still unreviewed')
   const out = await review.confirmQuestionMarks({ ...base, decisions: [{ submissionId: 's1', rubricId: 'r2', finalMark: 3 }] })
-  assert.deepEqual(finalizedScores, [{ submissionId: 's1', score: 7 }])
-  assert.deepEqual(out.finalized, [{ submissionId: 's1', learnerName: 'Amani', total: 7 }])
-  assert.equal(out.followUps.length, 1)
+  assert.deepEqual(out.completed, [{ submissionId: 's1', learnerName: 'Amani', total: 7 }])
+  assert.deepEqual(finalizedScores, [], 'nothing reaches the gradebook until the teacher uploads')
 })
 
 test('a question the AI found nothing for is entered by the teacher and completes the script', async () => {
   const out = await review.confirmQuestionMarks({ ...base, decisions: [{ submissionId: 's2', rubricId: 'r1', finalMark: 4 }, { submissionId: 's2', rubricId: 'r2', finalMark: 2 }] })
   assert.deepEqual(entered.map(e => [e.rubricId, e.finalMark]), [['r2', 2]])
-  assert.deepEqual(out.finalized, [{ submissionId: 's2', learnerName: 'Bravin', total: 6 }])
+  assert.deepEqual(out.completed, [{ submissionId: 's2', learnerName: 'Bravin', total: 6 }])
 })
 
 test('a total above the paper’s "marked out of" is held back, not clamped', async () => {
   maxScore = 8
   const out = await review.confirmQuestionMarks({ ...base, decisions: [{ submissionId: 's1', rubricId: 'r1', finalMark: 5 }, { submissionId: 's1', rubricId: 'r2', finalMark: 5 }] })
-  assert.deepEqual(finalizedScores, [])
+  assert.deepEqual(out.completed, [])
   assert.deepEqual(out.overMarkedOutOf, [{ submissionId: 's1', learnerName: 'Amani', total: 10, markedOutOf: 8 }])
 })
 

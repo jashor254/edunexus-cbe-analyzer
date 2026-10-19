@@ -2,8 +2,9 @@
 //
 // Unit test of the review-confirm route. Auth + review lib are mocked; next's
 // after() is captured. Proves: auth before any write, the reviewer identity
-// comes from the session (never the body), validation errors → 400, finalize
-// follow-ups are scheduled after the response.
+// comes from the session (never the body), validation errors → 400, and the
+// completed scripts are reported with nothing scheduled — review files no
+// marks (mark first, file after; upload files).
 //
 // NOT in scripts/standard-tests.json — the [id] segment defeats the standard
 // runner's path glob. Run:
@@ -44,7 +45,7 @@ mock.module('@/lib/paperIntelligence/review', {
     confirmQuestionMarks: async (input: Record<string, unknown>) => {
       confirmInput = input
       if (confirmThrow) throw confirmThrow
-      return { saved: 1, finalized: [{ submissionId: S, learnerName: 'Amani', total: 37 }], overMarkedOutOf: [], followUps: [async () => {}] }
+      return { saved: 1, completed: [{ submissionId: S, learnerName: 'Amani', total: 37 }], overMarkedOutOf: [] }
     },
   },
 })
@@ -88,13 +89,11 @@ test('a decision the scheme rejects → 400 with its reason', async () => {
   assert.match((await res.json()).error, /0 to 5/)
 })
 
-test('happy path returns the finalized learners and schedules their follow-ups after the response', async () => {
+test('happy path returns the completed learners and schedules nothing — review files no marks', async () => {
   const res = await POST(req(ONE), ctx)
   assert.equal(res.status, 200)
   const body = await res.json()
-  assert.deepEqual(body.data.finalized, [{ submissionId: S, learnerName: 'Amani', total: 37 }])
-  assert.equal(body.data.followUps, undefined)
-  assert.equal(scheduled, 1)
-  await new Promise(r => setImmediate(r))
-  assert.equal(followUpRan, 1)
+  assert.deepEqual(body.data.completed, [{ submissionId: S, learnerName: 'Amani', total: 37 }])
+  assert.equal(scheduled, 0)
+  assert.equal(followUpRan, 0)
 })

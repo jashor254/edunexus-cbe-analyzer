@@ -2,13 +2,12 @@
 //
 // Paper Intelligence Phase 1 — record the teacher's review decisions.
 //   POST { decisions: [{ submissionId, rubricId, finalMark }] }
-// One call per confirmed group or card. Scripts whose last question this call
-// reviewed are finalized into the learner's assignment score through the
-// shared mark path; their notification + evidence run after the response.
+// One call per confirmed group or card. Reports the scripts whose last
+// question this call reviewed; nothing is filed — the teacher uploads the
+// whole paper once satisfied (…/paper-intelligence/upload).
 // The reviewer is the session's teacher — never an id from the body.
 
 import { z } from 'zod'
-import { after } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized, apiNotFound, apiBadRequest } from '@/lib/api/response'
 import { UnauthorizedError } from '@/lib/core/errors'
@@ -23,7 +22,7 @@ const ConfirmSchema = z.object({
   })).min(1).max(300),
 })
 
-export type ConfirmResponse = Omit<ConfirmOutcome, 'followUps'>
+export type ConfirmResponse = ConfirmOutcome
 
 export async function POST(
   req: Request,
@@ -58,9 +57,7 @@ export async function POST(
       throw err
     }
 
-    const { followUps, ...result } = outcome
-    if (followUps.length > 0) after(async () => { await Promise.all(followUps.map(f => f())) })
-    return apiSuccess<ConfirmResponse>(result)
+    return apiSuccess<ConfirmResponse>(outcome)
   } catch (e: unknown) {
     console.error('[paperIntelligence/review/confirm POST]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')

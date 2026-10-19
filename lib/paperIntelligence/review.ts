@@ -1,24 +1,22 @@
 // lib/paperIntelligence/review.ts
 //
 // Paper Intelligence Phase 1, Commit 5 — the teacher's review of AI proposals,
-// question by question across the class, and finalizing reviewed scripts into
-// the learner's real assignment score.
+// question by question across the class.
+//
+// Mark first, file after (docs/engineering/mark-papers-flow-plan.md): review
+// no longer writes a completed script's total anywhere. It reports which
+// scripts are complete; the teacher files the whole paper once satisfied —
+// topical or termly — through lib/paperIntelligence/upload.ts.
 //
 // Evidence is moved only through the canonical lifecycle functions:
 //   - teacher agrees with the AI's proposal  → confirmReview
 //   - teacher gives a different mark         → rejectReview (reason records both)
 //   - a confirmed proposal later changed     → retractEvidence
-// The teacher's actual marks reach the learner record through the finalized
-// assignment score (recordSubmissionMark → assignment-mark evidence, whose
-// correction key supersedes on any later change) — the same path a
-// hand-entered mark takes.
-//
-// A finalized total that exceeds the paper's "marked out of" is NOT written:
-// it is returned for the teacher to resolve (e.g. a learner who answered more
-// optional questions than allowed). Never clamped.
+// A completed total that exceeds the paper's "marked out of" is reported for
+// the teacher to resolve (e.g. a learner who answered more optional questions
+// than allowed) — upload refuses it too. Never clamped.
 
 import { confirmReview, rejectReview, retractEvidence } from '@/lib/intelligence/evidenceLifecycle'
-import { recordSubmissionMark } from '@/lib/assignments/markSubmission'
 import { findRubricsForAssignment } from './rubrics'
 import {
   findScriptMarksForAssignment,
@@ -75,10 +73,9 @@ export async function getAssignmentReview(assignmentId: string): Promise<Assignm
 
 export type ConfirmOutcome = {
   saved: number
-  finalized: Array<{ submissionId: string; learnerName: string; total: number }>
+  /** Scripts whose last question this call reviewed — ready to upload. */
+  completed: Array<{ submissionId: string; learnerName: string; total: number }>
   overMarkedOutOf: Array<{ submissionId: string; learnerName: string; total: number; markedOutOf: number }>
-  /** Notification + assignment-mark evidence for each finalized script — run after the response. */
-  followUps: Array<() => Promise<void>>
 }
 
 export async function confirmQuestionMarks(input: {
@@ -146,31 +143,19 @@ export async function confirmQuestionMarks(input: {
     insertTeacherEnteredMarks(entered),
   ])
 
-  // ── Finalize every script this call completed ─────────────────────────
+  // ── Report every script this call completed (nothing is filed here) ────
   const rubricIds = rubricRows.map(r => r.id)
   const fresh = groupBySubmission(await findScriptMarksForSubmissions(affected))
   const markedOutOf = assignment.max_score ?? 100
-  const outcome: ConfirmOutcome = { saved: decisions.length, finalized: [], overMarkedOutOf: [], followUps: [] }
+  const outcome: ConfirmOutcome = { saved: decisions.length, completed: [], overMarkedOutOf: [] }
 
-  const toFinalize: Array<{ submissionId: string; learnerName: string; total: number }> = []
   for (const submissionId of affected) {
     const completion = scriptCompletion(rubricIds, fresh.get(submissionId) ?? [])
     if (!completion.complete) continue
     const learnerName = submissionById.get(submissionId)?.name ?? 'Unnamed learner'
     if (completion.total > markedOutOf) outcome.overMarkedOutOf.push({ submissionId, learnerName, total: completion.total, markedOutOf })
-    else toFinalize.push({ submissionId, learnerName, total: completion.total })
+    else outcome.completed.push({ submissionId, learnerName, total: completion.total })
   }
-
-  // One shared-mark-path write per finalized learner — each total differs.
-  const results = await Promise.all(toFinalize.map(f => recordSubmissionMark({
-    assignment,
-    target: { submissionId: f.submissionId },
-    score: f.total,
-    teacherId: input.teacherId,
-    teacherUserId: input.teacherUserId,
-  })))
-  outcome.finalized = toFinalize
-  outcome.followUps = results.map(r => r.followUp)
   return outcome
 }
 

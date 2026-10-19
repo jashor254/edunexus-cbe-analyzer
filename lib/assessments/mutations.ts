@@ -5,6 +5,7 @@ import { publishEvent } from '@/lib/events'
 import { getDefaultPurposeCode } from '@/lib/assessments/assessmentTypeCatalog'
 import { computeRankings } from '@/lib/ranking'
 import { buildMarkLinker } from './markLinking'
+import { mergeSubjectIntoMarks, type SubjectMarkEntry, type MergeOutcome } from './subjectMarkMerge'
 import type { ClassAssessment, LearnerMark, MarkInput, CurriculumType } from './types'
 
 function sumScores(scores: Record<string, number>): number {
@@ -228,18 +229,7 @@ export async function upsertMarksCSV(
   const unlinked = rows.filter((r) => r.student_id == null).length
 
   await repos.assessments.upsertMarks(rows)
-
-  const allMarks = await repos.assessments.findMarkTotalsForAssessment(assessmentId, teacherId)
-
-  const posMap = buildPositionMap(
-    allMarks.map((r) => ({ id: r.id, total: r.total_marks || 0 }))
-  )
-
-  await Promise.all(
-    Array.from(posMap.entries()).map(([id, position]) =>
-      repos.assessments.updateMarkPosition(id, position)
-    )
-  )
+  await recomputePositions(assessmentId, teacherId)
 
   const final = await repos.assessments.findMarksByAssessment(assessmentId, teacherId)
 
@@ -256,6 +246,95 @@ export async function upsertMarksCSV(
   }).catch(err => console.error('[events] teacher.assessment.graded:', err instanceof Error ? err.message : String(err)))
 
   return { inserted, updated, unlinked, marks: final }
+}
+
+/** Re-ranks every learner in an assessment from their stored totals. */
+async function recomputePositions(assessmentId: string, teacherId: string): Promise<void> {
+  const allMarks = await repos.assessments.findMarkTotalsForAssessment(assessmentId, teacherId)
+
+  const posMap = buildPositionMap(
+    allMarks.map((r) => ({ id: r.id, total: r.total_marks || 0 }))
+  )
+
+  await Promise.all(
+    Array.from(posMap.entries()).map(([id, position]) =>
+      repos.assessments.updateMarkPosition(id, position)
+    )
+  )
+}
+
+export class AssessmentLockedError extends Error {}
+
+/**
+ * Mark Papers — files ONE subject's marks (a marked paper) into a termly
+ * assessment, keeping every other subject each learner already has. The
+ * subject is added to the assessment's subject list if it is not there yet.
+ * Refuses a published (locked) assessment, exactly like the manual and CSV
+ * paths. Callers authorize first (the assessment must be this teacher's) and
+ * run triggerLearnerModelUpdates + recordAssessmentEvidence afterwards, as the
+ * CSV upload route does.
+ */
+export async function mergeSubjectMarks(input: {
+  assessment: ClassAssessment
+  teacherId: string
+  subject: string
+  entries: SubjectMarkEntry[]
+}): Promise<{ written: number; refused: MergeOutcome['refused'] }> {
+  const { assessment, teacherId, subject } = input
+  if (assessment.is_published) {
+    throw new AssessmentLockedError('This assessment is locked — marks cannot be added once it is published. Unpublish it first if a correction is genuinely needed.')
+  }
+
+  if (!assessment.subjects.includes(subject)) {
+    await repos.assessments.updateAssessment(assessment.id, teacherId, { subjects: [...assessment.subjects, subject] })
+  }
+
+  const existing = await repos.assessments.findMarksByAssessment(assessment.id, teacherId)
+  const { rows: merged, refused } = mergeSubjectIntoMarks(
+    existing.map(m => ({
+      student_name: m.student_name,
+      admission_number: m.admission_number,
+      student_id: (m as LearnerMark & { student_id?: string | null }).student_id ?? null,
+      subject_scores: m.subject_scores,
+    })),
+    subject,
+    input.entries,
+  )
+  if (merged.length === 0) return { written: 0, refused }
+
+  const curriculumType = assessment.curriculum_type ?? 'cbc'
+  const now = new Date().toISOString()
+  await repos.assessments.upsertMarks(merged.map(m => {
+    const ms = calculateMeanScore(m.subject_scores)
+    return {
+      assessment_id:    assessment.id,
+      class_id:         assessment.class_id,
+      teacher_id:       teacherId,
+      student_name:     m.student_name,
+      admission_number: m.admission_number,
+      subject_scores:   m.subject_scores,
+      total_marks:      sumScores(m.subject_scores),
+      mean_score:       ms,
+      mean_grade:       calculateMeanGrade(ms, assessment.max_score, curriculumType),
+      student_id:       m.student_id,
+      updated_at:       now,
+    }
+  }))
+  await recomputePositions(assessment.id, teacherId)
+
+  void publishEvent({
+    event_type:    'teacher.assessment.graded',
+    resource_type: 'assessment',
+    resource_id:   assessment.id,
+    actor_id:      teacherId,
+    payload: {
+      assessment_id: assessment.id,
+      class_id:      assessment.class_id,
+      marks_count:   merged.length,
+    },
+  }).catch(err => console.error('[events] teacher.assessment.graded:', err instanceof Error ? err.message : String(err)))
+
+  return { written: merged.length, refused }
 }
 
 export async function triggerLearnerModelUpdates(

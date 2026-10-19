@@ -3,7 +3,8 @@
 // Paper Intelligence — review AI marks question by question across the class
 // (Phase 1, Commit 5). A teacher confirms a confident group in one tap, makes
 // the judgment calls one card at a time, and each learner's script total is
-// finalized into the gradebook the moment its last question is reviewed.
+// reported complete once its last question is reviewed; the teacher uploads
+// the whole paper's marks when satisfied (mark first, file after).
 // UI only — all logic lives behind the review routes.
 
 import { useCallback, useEffect, useState } from 'react'
@@ -57,8 +58,8 @@ export default function PaperIntelligenceReviewPage() {
       const body = await res.json()
       if (!res.ok) { setError(body?.error ?? 'Could not save those marks — try again.'); return }
       const data = body.data as ConfirmResponse
-      setNotice(data.finalized.length > 0
-        ? `Saved. Script complete: ${data.finalized.map(f => `${f.learnerName} ${f.total}${review?.markedOutOf ? `/${review.markedOutOf}` : ''}`).join(', ')} — in the gradebook now.`
+      setNotice(data.completed.length > 0
+        ? `Saved. Script complete: ${data.completed.map(f => `${f.learnerName} ${f.total}${review?.markedOutOf ? `/${review.markedOutOf}` : ''}`).join(', ')} — upload the marks when you are happy with the whole paper.`
         : `Saved ${data.saved} mark${data.saved === 1 ? '' : 's'}.`)
       if (data.overMarkedOutOf.length > 0) {
         setOverOutOf(prev => [...prev.filter(p => !data.overMarkedOutOf.some(o => o.submissionId === p.submissionId)), ...data.overMarkedOutOf])
