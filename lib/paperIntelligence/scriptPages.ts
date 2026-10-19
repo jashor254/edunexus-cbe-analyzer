@@ -62,6 +62,8 @@ export type SaveScriptPageInput = {
   pageNumber: number
   imageBase64: string
   mimeType: PageMimeType
+  /** How the page arrived — a phone photo (default) or a page split from a scanned PDF. */
+  captureSource?: 'phone' | 'scan'
 }
 
 /**
@@ -103,6 +105,7 @@ export async function saveScriptPage(input: SaveScriptPageInput): Promise<{ page
       file_path: filePath,
       file_type: input.mimeType,
       blur_score: sharpness.score,
+      capture_source: input.captureSource ?? 'phone',
       updated_at: new Date().toISOString(),
     }, { onConflict: 'submission_id,page_number' })
     .select(PAGE_COLS)

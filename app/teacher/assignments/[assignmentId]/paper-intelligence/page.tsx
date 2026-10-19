@@ -1,6 +1,8 @@
 'use client'
 
-// Paper Intelligence — mobile marking flow. Phase 1 so far: scheme capture →
+// Paper Intelligence — mobile marking flow. Scripts arrive either by phone,
+// one learner at a time, or as one scanned class PDF (BulkScanUpload — Mark
+// Papers S1). Phase 1 so far: scheme capture →
 // editable rubric → confirm (Commit 3), then the class list → photograph each
 // learner's script page by page → AI marks it in the background while the
 // teacher moves to the next learner (Commit 4). Review-by-question arrives in
@@ -17,6 +19,7 @@ import type { ScriptRosterEntry } from '@/lib/paperIntelligence/scriptRoster'
 import type { ScriptsResponse } from '@/app/api/teacher/assignments/[id]/paper-intelligence/scripts/route'
 import { ScriptRosterList, type MarkingState } from '@/components/paperIntelligence/ScriptRosterList'
 import { ScriptCapture, type CapturedPage } from '@/components/paperIntelligence/ScriptCapture'
+import { BulkScanUpload } from '@/components/paperIntelligence/BulkScanUpload'
 
 type Stage = 'loading' | 'capture' | 'extracting' | 'edit' | 'saving' | 'scripts' | 'learner'
 type RejectedRubric = { questionId: string; reason: string }
@@ -41,6 +44,7 @@ export default function PaperIntelligencePage() {
   const [pages, setPages] = useState<PageState[]>([])
   const [pageBusy, setPageBusy] = useState(false)
   const [marking, setMarking] = useState<Record<string, MarkingState>>({})
+  const [scanOpen, setScanOpen] = useState(false)
 
   const loadRoster = useCallback(async (): Promise<ScriptsResponse | null> => {
     try {
@@ -387,8 +391,21 @@ export default function PaperIntelligencePage() {
         <section>
           <h1 className="text-xl font-bold text-gray-800 mb-1">Learner scripts</h1>
           <p className="text-sm text-gray-500 mb-4">
-            {roster.assignmentTitle ? `${roster.assignmentTitle} · ` : ''}{roster.rubricCount} questions · out of {roster.markedOutOf ?? roster.maxTotal}. Tap a learner to photograph their script.
+            {roster.assignmentTitle ? `${roster.assignmentTitle} · ` : ''}{roster.rubricCount} questions · out of {roster.markedOutOf ?? roster.maxTotal}. Tap a learner to photograph their script — or upload the whole class as one scanned PDF.
           </p>
+          {scanOpen ? (
+            <BulkScanUpload
+              base={base}
+              maxPagesPerScript={PAPER_INTELLIGENCE_LIMITS.maxPagesPerScript}
+              learners={roster.learners.map(l => ({ submissionId: l.submissionId, name: l.name, alreadyCaptured: l.pageNumbers.length > 0 || !!l.marks }))}
+              onClose={() => { setScanOpen(false); loadRoster() }}
+            />
+          ) : (
+            <button onClick={() => setScanOpen(true)}
+              className="mb-4 w-full rounded-2xl border-2 border-dashed border-teal-300 bg-white text-teal-700 font-bold px-4 py-3 text-sm">
+              🖨️ Upload a scanned PDF of the whole class
+            </button>
+          )}
           {roster.learners.some(l => l.marks) && (
             <Link href={`/teacher/assignments/${assignmentId}/paper-intelligence/review`}
               className="mb-4 flex items-center justify-between rounded-2xl bg-teal-600 text-white font-bold px-4 py-4">

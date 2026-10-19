@@ -31,6 +31,8 @@ const SavePageSchema = z.object({
   // base64 is ~4/3 of the byte size
   imageBase64: z.string().min(1).max(Math.ceil(UPLOAD_LIMITS.maxFileSizeBytes * 4 / 3)),
   mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+  // Mark Papers bulk scan: pages split from a scanned PDF in the browser.
+  captureSource: z.enum(['phone', 'scan']).optional(),
 })
 
 const DeletePageSchema = z.object(PageRef)
@@ -78,17 +80,19 @@ export async function POST(
   try {
     const parsed = SavePageSchema.safeParse(await req.json().catch(() => null))
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
-    const { submissionId, pageNumber, imageBase64, mimeType } = parsed.data
+    const { submissionId, pageNumber, imageBase64, mimeType, captureSource } = parsed.data
 
     const auth = await authorize(assignmentId, submissionId)
     if ('response' in auth) return auth.response
 
     try {
-      const { page, sharpness } = await saveScriptPage({ assignmentId, submissionId, pageNumber, imageBase64, mimeType })
+      const { page, sharpness } = await saveScriptPage({ assignmentId, submissionId, pageNumber, imageBase64, mimeType, captureSource })
       return apiSuccess<SavePageResponse>({ pageNumber: page.page_number, sharpness })
     } catch (err) {
       if (err instanceof BlurryPageError) {
-        return apiError('This photo is too blurry to read. Hold the phone steady and retake it.', 422)
+        return apiError(captureSource === 'scan'
+          ? 'This scanned page is too faint or blurry to read. Rescan it at 300 dpi in greyscale.'
+          : 'This photo is too blurry to read. Hold the phone steady and retake it.', 422)
       }
       if (err instanceof InvalidPageError) return apiBadRequest(err.message)
       throw err

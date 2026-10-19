@@ -4,8 +4,13 @@
 // both judge a photo against the same numbers.
 
 export const PAPER_INTELLIGENCE_LIMITS = {
-  /** A learner's script rarely runs past 4 pages; 8 covers long papers without inviting a whole exercise book. */
-  maxPagesPerScript: 8,
+  /**
+   * A learner's script rarely runs past 4 pages; 12 covers an end-term answer
+   * booklet (raised from 8 for scanned exam papers, 2026-10-19) without
+   * inviting a whole exercise book. Every page goes to the vision model in one
+   * marking call — raise further only after measuring time and cost.
+   */
+  maxPagesPerScript: 12,
   /** Sharpness is measured on a copy resized to this long edge, so the score does not depend on the phone's camera resolution. */
   sharpnessAnalysisEdgePx: 800,
   /**
