@@ -190,7 +190,8 @@ export async function generateSchemePipeline(
           subjectType,
           previousVerbs,
           diversitySeed,
-          textbook:       context.textbook ?? 'Class textbook',
+          // Teacher-typed names arrive with stray spaces ("Top Scholar Kiswahili  Gredi  Ya Tisa").
+          textbook:       context.textbook?.replace(/\s+/g, ' ').trim() || 'Class textbook',
           kicdSlice:      kicdSlices[i + batchIdx] ?? undefined,
           costContext:    context.costContext,
         }).then(result => ({ slot, result, kicdSlice: kicdSlices[i + batchIdx] }))

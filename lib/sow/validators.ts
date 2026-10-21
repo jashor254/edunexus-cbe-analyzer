@@ -207,6 +207,53 @@ function validatePresent(items: unknown, what: string): { valid: boolean; reason
 export type ValidateLessonOptions = {
   outcomesFromKicd?: boolean
   inquiryFromKicd?: boolean
+  // Language lessons (Kiswahili, English) never need to name an ethnic
+  // community — the KICD language designs name none — so a generated one
+  // that does is rejected and retried. Names that appear in `allowedText`
+  // (strand / sub-strand titles, KICD slice) are permitted.
+  rejectEthnicReferences?: boolean
+  allowedText?: string
+}
+
+// People-forms of Kenyan community names, plus "jamii ya / kabila la"
+// constructions. People-forms only, so place names (Kisii town, Meru,
+// Embu, Turkana county) in a neutral context are not flagged.
+const ETHNIC_TERMS = [
+  'kikuyu', 'wakikuyu', 'agikuyu', 'gikuyu', 'luo', 'waluo', 'luhya', 'waluhya', 'abaluhya',
+  'kalenjin', 'wakalenjin', 'kamba', 'wakamba', 'akamba', 'wakisii', 'abagusii', 'gusii',
+  'wameru', 'ameru', 'maasai', 'wamaasai', 'masai', 'mijikenda', 'wamijikenda', 'wasomali',
+  'waturkana', 'waembu', 'wataita', 'wapokot', 'wasamburu', 'wateso', 'wakuria', 'wanandi', 'wakipsigis',
+]
+const COMMUNITY_CONSTRUCTION = /\b(?:jamii\s+ya|kabila\s+la|makabila\s+ya|harusi\s+za|wazee\s+wa)\s+(?:wa)?([A-Z][a-z]+)/g
+
+export function findEthnicReferences(texts: string[], allowedText = ''): string[] {
+  const allowed = allowedText.toLowerCase()
+  const found = new Set<string>()
+  for (const text of texts) {
+    const lower = text.toLowerCase()
+    for (const term of ETHNIC_TERMS) {
+      if (new RegExp(`\\b${term}\\b`).test(lower) && !allowed.includes(term)) found.add(term)
+    }
+    for (const m of text.matchAll(COMMUNITY_CONSTRUCTION)) {
+      const name = m[1].toLowerCase()
+      // "jamii ya Kenya" / "jamii ya Kikenya" is the nation, not a community.
+      if (!/^(ki)?kenya/.test(name) && !allowed.includes(name)) found.add(name)
+    }
+  }
+  return [...found]
+}
+
+function validateNoEthnicReferences(lesson: Record<string, unknown>, allowedText: string): { valid: boolean; reason?: string } {
+  const texts = [
+    ...((lesson.learning_outcomes as string[]) || []),
+    ...((lesson.learning_experiences as string[]) || []),
+    ...((lesson.key_inquiry_questions as string[]) || []),
+    ...((lesson.assessment_methods as string[]) || []),
+  ].filter((t): t is string => typeof t === 'string')
+  const found = findEthnicReferences(texts, allowedText)
+  return found.length
+    ? { valid: false, reason: `Names an ethnic community (${found.join(', ')})` }
+    : { valid: true }
 }
 
 // ================= MAIN EXPORT =================
@@ -228,6 +275,9 @@ export function validateLesson(
     validateAssessmentMethods(lesson.assessment_methods as string[]),
     validateLearningResources(lesson.learning_resources as string[]),
     validateSubstrandAlignment(lesson, substrandTitle),
+    ...(options.rejectEthnicReferences
+      ? [validateNoEthnicReferences(lesson, `${substrandTitle} ${options.allowedText ?? ''}`)]
+      : []),
   ]
 
   const failed = checks.filter(c => !c.valid)

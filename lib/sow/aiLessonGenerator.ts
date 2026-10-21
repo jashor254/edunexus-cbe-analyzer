@@ -8,7 +8,7 @@ import { callDeepSeek as callAI, type AICostContext } from '@/lib/ai/deepseek'
 import type { CurriculumMode } from './types'
 import type { DiversitySeed } from './diversityEngine'
 import type { KicdLessonSlice } from '@/lib/curriculum/kicdEntries'
-import { KICD_PCI_OPTIONS } from '@/lib/curriculum/kicdVocabulary'
+import { KICD_PCI_OPTIONS, KISWAHILI_SKILL_GUIDE, kiswahiliSkillOf } from '@/lib/curriculum/kicdVocabulary'
 
 const MAX_RETRIES   = 5
 const MAX_CONFIDENCE = 0.92
@@ -59,19 +59,20 @@ Usitumie "Ni nini kingetokea kama..." au "Kwa nini..." katika zaidi ya somo 1 ka
 Zungusha kati ya: Sababu, Ulinganishi, Tathmini, Kudhania, Uhusiano wa Kibinafsi, Utabiri,
   Uchunguzi, Kihakiki, Kiunganishi, Matumizi, Huria
 
-KANUNI 4 — UTOFAUTI WA SHUGHULI ZA UFUNZAJI
+KANUNI 4 — UTOFAUTI NA UTEKELEZEKAJI WA SHUGHULI ZA UJIFUNZAJI
 Usianzishe zaidi ya shughuli 1 kati ya 3 mfululizo kwa "Wanafunzi wanafanya kazi kwa vikundi kuangalia na..."
-Shughuli ZOTE lazima zifanyike NDANI ya darasa. Hakuna safari za nje, hakuna wageni wa nje,
-  hakuna kwenda sehemu nyingine. Hakuna kualika watu wa jamii darasani.
-Zungusha miundo ya shughuli: Onyesho, Utatuzi wa matatizo, Uchunguzi kifani, Uigaji,
-  Matembezi ya maonyesho, Mdahalo, Jigsaw, Igizo dhima, Fikiri-Jozi-Shiriki,
-  Maswali na Majibu, Majadiliano, Kutoa mawazo, Kupanga, Kufundishana wenzao
+Shughuli zitekelezeke katika shule ya kawaida: darasani kwa kawaida. Panapowezekana, mtaala wa KICD
+  unaruhusu: vifaa vya kidijitali (rununu, redio, kinasasauti, projekta), mgeni mwalikwa, na kazi ya
+  nyumbani ya kumshirikisha mzazi au mlezi (k.m. "kumsomea mzazi muhtasari"). Hakuna safari za nje.
+Zungusha miundo ya shughuli: Onyesho, Kusikiliza na kujibu, Kusoma kwa sauti, Uchunguzi kifani,
+  Matembezi ya maonyesho, Mdahalo, Jigsaw, Igizo dhima, Fikiri-Jozi-Shiriki, Maswali na Majibu,
+  Majadiliano, Kutoa mawazo, Kupanga, Kufundishana wenzao
 
 KANUNI YA URefu — SI YA KUJADILIWA:
 Kila shughuli ya ufunzaji = SENTENSI MOJA tu. Maneno 20 kiwango cha juu.
 Sentensi wazi pekee — HAKUNA lebo za aina ya shughuli au utangulizi.
-MBAYA: "Fikiri-Jozi-Shiriki: Wanafunzi watambue chanzo cha mgogoro wa mpaka Kisumu."
-NZURI: "Wanafunzi watambue chanzo cha mgogoro wa mpaka kwa kutumia uchunguzi kifani wa Kisumu."
+MBAYA: "Fikiri-Jozi-Shiriki: Wanafunzi watambue sifa za hotuba ya kushawishi."
+NZURI: "Wanafunzi watambue sifa za hotuba ya kushawishi katika kielelezo cha hotuba ya mkutano wa shule."
 
 KANUNI YA RAMANI — SI YA KUJADILIWA:
 Usitaje ramani mahususi ya jiji ambayo mwalimu hawezi kupata (mfano "ramani ya Kisumu", "ramani ya Nairobi").
@@ -95,21 +96,21 @@ Kila somo lazima litumie mbinu TATU HASA. Zungusha kutoka kwenye orodha hii:
 KAMWE usirudie mbinu ile ile moja katika masomo mfululizo.
 Sambaza mbinu zote 12 katika mpango mzima. Hakuna mbinu inayopaswa kutokea zaidi ya mara moja kila masomo 4.
 
-KANUNI YA MUKTADHA WA KIKENYA:
-Kila shughuli ya ufunzaji LAZIMA utaje angalau sehemu, zao, jamii, au desturi mahususi ya Kenya —
-lakini kama mifano ya MAJADILIANO darasani pekee, si kama mahali linalotembelewa kimwili.
-Sahihi: "Wanafunzi wanajadili jinsi wakulima wa mahindi katika Bonde la Ufa wanavyodhibiti mmomonyoko wa udongo"
-Sahihi: "Wanafunzi wanachanganua desturi za biashara sokoni Gikomba kwa kutumia kadi za uchunguzi kifani"
-MBAYA: "Wanafunzi wanatembelea soko la Gikomba" / "Mwalike mzee wa jamii darasani"
+KANUNI YA MUKTADHA — SI YA KUJADILIWA:
+Tumia miktadha inayojulikana na mwanafunzi (shuleni, nyumbani, sokoni, kijijini, mjini) pale inaposaidia
+  ujuzi unaofundishwa — si lazima kila shughuli itaje mahali.
+KAMWE usitaje kabila au jamii ya kikabila (k.m. "jamii ya Wa...", "harusi za [kabila]") isipokuwa mada ndogo yenyewe inahusu jamii hiyo.
+KAMWE usihusishe tabia hasi (ulevi, uhalifu, ugomvi, kushindwa, umaskini) na eneo, kaunti, dini au jamii yoyote.
+Usirudie mahali pale pale lenye jina katika masomo mengi.
 
 KANUNI YA NYENZO — SI YA KUJADILIWA:
-Toa nyenzo TATU HASA. Si zaidi, si pungufu.
-Mfumo: jina safi pekee — hakuna nambari za ukurasa, hakuna maelezo, hakuna mistari, hakuna maandishi ya ziada.
-1. "[Jina la kitabu]"
-2. "Mwongozo wa Mwalimu wa [Somo] [Nambari ya Gredi pekee — mfano 8, si Gredi 8]"
-3. "[Kitu kimoja cha darasani: chati / mchoro ubaoni / kipande cha gazeti / kifaa halisi]"
-KAMWE: nambari za ukurasa, maelezo baada ya jina, watu rasilimali wa jamii,
-  matembezi shambani, kanda za redio, ramani za serikali, vifaa vilivyonunuliwa, rasilimali za mtandaoni.`
+Toa nyenzo TATU au NNE, majina safi pekee:
+1. "[Jina la kitabu cha mwanafunzi kama lilivyotolewa]"
+2. "Mwongozo wa Mwalimu wa [Somo] [Nambari ya Gredi pekee]"
+3–4. Vitu halisi vinavyotumika katika shughuli za somo HILI (k.m. kamusi, kadi maneno, chati,
+  kifaa cha kidijitali, kielelezo cha insha, mgeni mwalikwa) — kila kitu kinachotajwa katika
+  shughuli kiorodheshwe hapa.
+KAMWE usibuni nambari za ukurasa — mwalimu ataziandika mwenyewe. Hakuna maelezo marefu baada ya jina.`
 }
 
 function getDiversitySystemRules(isKiswahili: boolean): string {
@@ -145,10 +146,11 @@ Never use "What would happen if..." or "Why is..." in more than 1 of every 4 les
 Rotate: Causal, Comparative, Evaluative, Hypothetical, Personal, Predictive,
   Investigative, Critical, Connective, Application, Open
 
-RULE 4 — LEARNING EXPERIENCE DIVERSITY
+RULE 4 — LEARNING EXPERIENCE DIVERSITY AND FEASIBILITY
 Never start more than 1 in 3 consecutive experiences with "Learners work in groups to observe and..."
-ALL activities MUST happen INSIDE the classroom. No field trips, no external visitors,
-  no going to other locations. No inviting community members to class.
+Activities must be feasible in an ordinary school: in the classroom by default. Where possible, the
+  KICD designs also allow digital devices (phone, radio, projector), a resource person, and a home task
+  involving a parent or guardian. No field trips.
 Rotate activity structures: Demonstration, Problem-solving, Case study, Simulation,
   Gallery walk, Debate, Jigsaw, Role play, Think-Pair-Share, Question and Answer,
   Discussion, Brainstorming, Sorting, Peer teaching
@@ -156,8 +158,8 @@ Rotate activity structures: Demonstration, Problem-solving, Case study, Simulati
 LENGTH RULE — NON-NEGOTIABLE:
 Each learning experience = ONE sentence only. Maximum 20 words.
 Plain sentence only — NO activity-type labels or prefixes.
-WRONG: "Think-Pair-Share: Learners identify conflict triggers from a Kisumu boundary dispute."
-RIGHT: "Learners identify conflict triggers from a boundary dispute case study in Kisumu."
+WRONG: "Think-Pair-Share: Learners identify the features of a persuasive speech."
+RIGHT: "Learners identify the features of a persuasive speech in a model school-assembly speech."
 
 MAP RULE — NON-NEGOTIABLE:
 Never reference a specific city map a teacher cannot access (e.g. "map of Kisumu", "Nairobi map", "map of Mombasa").
@@ -181,21 +183,21 @@ Each lesson must use EXACTLY 3 methods. Rotate continuously from this list:
 NEVER repeat the same single method in back-to-back lessons.
 Distribute all 12 methods across the full scheme. No method should appear more than once every 4 lessons.
 
-KENYAN CONTEXT RULE:
-Every learning experience MUST reference at least one specific Kenyan location, crop,
-community, or practice — but as classroom DISCUSSION EXAMPLES only, never as physical visits.
-Correct: "Learners discuss how maize farmers in the Rift Valley manage soil erosion"
-Correct: "Learners analyse trade practices at Gikomba market using case study cards"
-WRONG:   "Learners visit Gikomba market" / "Invite a local elder to class"
+CONTEXT RULE — NON-NEGOTIABLE:
+Use contexts familiar to Kenyan learners (school, home, market, village, town) where they help the
+  skill being taught — not every experience needs a named place.
+NEVER name an ethnic community or tribe unless the sub-strand itself is about that community.
+NEVER associate negative behaviour (alcohol abuse, crime, conflict, failure, poverty) with any region,
+  county, religion or community.
+Do not reuse the same named place across many lessons.
 
 RESOURCE RULE — NON-NEGOTIABLE:
-Output EXACTLY 3 resources. No more, no fewer.
-Format: clean name only — no page numbers, no descriptions, no dashes, no extra text.
-1. "[Textbook name]"
-2. "Teacher's Guide for [Subject] [Grade number only — e.g. 8, not Grade 8]"
-3. "[One classroom item: chart / blackboard diagram / newspaper cutout / real object]"
-NEVER: page numbers, "pp.", descriptions after the name, community resource persons,
-  farm visits, radio recordings, government maps, purchased materials, internet resources.`
+Output THREE or FOUR resources, clean names only:
+1. "[Learner's textbook name as given]"
+2. "Teacher's Guide for [Subject] [Grade number only]"
+3–4. Concrete items actually used in THIS lesson's experiences (e.g. dictionary, word cards, chart,
+  specimen, digital device, model essay, resource person) — every item an experience uses is listed here.
+NEVER invent page numbers — the teacher fills them in. No long descriptions after the name.`
 }
 
 // ─── AI call — routes through shared lib/ai/deepseek.ts ─────────────────────
@@ -381,24 +383,22 @@ ${verbAvoidLine}
 
   // ── Experience instruction ──────────────────────────────────────────────────
   const classroomRule = isKiswahili
-    ? `MUHIMU: Shughuli ZOTE zifanyike NDANI ya darasa pekee.
-Hakuna safari za nje, hakuna wageni wa nje, hakuna kwenda sehemu nyingine.
-Tumia tu: majadiliano, igizo dhima, fikiri-jozi-shiriki, matembezi ya maonyesho, uchunguzi kifani, kazi ya kikundi, maswali na majibu, mdahalo, maonyesho.
+    ? `MUHIMU: Shughuli zitekelezeke shuleni — darasani kwa kawaida; vifaa vya kidijitali, mgeni mwalikwa au kazi ya nyumbani na mzazi pale KICD inapopendekeza. Hakuna safari za nje.
+Usitaje kabila au jamii ya kikabila (isipokuwa mada ndogo inaihusu); usihusishe tabia hasi na eneo au jamii yoyote.
 KANUNI YA URefu — SI YA KUJADILIWA: Kila shughuli ya ufunzaji = SENTENSI MOJA tu. Maneno 20 kiwango cha juu.
 Usiweke lebo za aina ya shughuli (si "Fikiri-Jozi-Shiriki:", "Maonyesho:", n.k.).
-MBAYA: "Fikiri-Jozi-Shiriki: Wanafunzi watambue chanzo cha mgogoro wa mpaka Kisumu."
-NZURI: "Wanafunzi watambue chanzo cha mgogoro wa mpaka kwa kutumia uchunguzi kifani wa Kisumu."
+MBAYA: "Fikiri-Jozi-Shiriki: Wanafunzi watambue sifa za hotuba ya kushawishi."
+NZURI: "Wanafunzi watambue sifa za hotuba ya kushawishi katika kielelezo cha hotuba ya mkutano wa shule."
 KANUNI YA RAMANI: Usitaje ramani mahususi ya jiji. Tumia "ramani ya mfano ya topografia", "ramani iliyochapishwa", au "mchoro wa ramani ubaoni" pekee.
-Muktadha wa Kikenya uonekane kama mifano ya majadiliano darasani pekee — si mahali darasa linatembelea kimwili.`
-    : `IMPORTANT: All activities happen INSIDE the classroom only.
-No field trips, no external visitors, no going to other locations.
-Use only: discussion, role play, think-pair-share, gallery walk, case study, group work, Q&A, debate, demonstration.
+Miktadha ya Kikenya itumike pale inaposaidia ujuzi unaofundishwa — si mahali darasa linatembelea kimwili.`
+    : `IMPORTANT: Activities must be feasible in school — in the classroom by default; digital devices, a resource person or a home task with a parent where KICD suggests it. No field trips.
+Never name an ethnic community unless the sub-strand is about it; never associate negative behaviour with any region or community.
 LENGTH RULE — NON-NEGOTIABLE: Each learning experience = ONE plain sentence only. Maximum 20 words.
 No activity-type labels or prefixes (no "Think-Pair-Share:", "Demonstration:", "Pair practice:", etc.).
-BAD: "Think-Pair-Share: Learners identify conflict triggers from a Kisumu boundary dispute."
-GOOD: "Learners identify conflict triggers from a boundary dispute case study in Kisumu."
+BAD: "Think-Pair-Share: Learners identify the features of a persuasive speech."
+GOOD: "Learners identify the features of a persuasive speech in a model school-assembly speech."
 MAP RULE: Never name a specific city map. Use "a sample topographical map", "a printed map", or "a blackboard sketch map" only.
-Kenyan contexts appear as discussion examples only — not as places the class physically visits.`
+Use Kenyan contexts where they help the skill being taught — never as places the class physically visits.`
 
   const experienceInstruction = seed
     ? isKiswahili
@@ -496,19 +496,21 @@ Use THESE specific starters (adapt to topic):
           'Learners [activity 3 — individual task to consolidate]',
         ]
 
+  // KICD's recommended teaching resources for this Kiswahili skill, when the
+  // sub-strand's skill is known — offered as the pool to choose items 3–4 from.
+  const skill = isKiswahili ? kiswahiliSkillOf(substrand) : null
+  const skillResources = skill ? KISWAHILI_SKILL_GUIDE[skill].resources.join(', ') : ''
   const resourcesLabel = isKiswahili
-    ? `NYENZO — VITU 3 HASA, MAJINA SAFI PEKEE:
+    ? `NYENZO — VITU 3 AU 4, MAJINA SAFI PEKEE:
 1. "${textbook || `Kitabu cha ${learningArea} ${isCBC ? 'Gredi' : 'Kidato'} ${gradeNum}`}"
 2. "Mwongozo wa Mwalimu wa ${learningArea} ${isCBC ? 'Gredi' : 'Kidato'} ${gradeNum}"
-3. "[Kitu kimoja cha darasani: chati / mchoro ubaoni / kipande cha gazeti / kifaa halisi]"
-Hakuna nambari za ukurasa. Hakuna maelezo. Hakuna mistari baada ya jina. Majina safi pekee.
-KAMWE: watu rasilimali wa jamii, matembezi shambani, kanda za redio, ramani za serikali, vifaa vilivyonunuliwa.`
-    : `RESOURCES — EXACTLY 3 ITEMS, CLEAN NAMES ONLY:
+3–4. Vitu vinavyotumika katika shughuli za somo hili${skillResources ? ` — chagua kutoka nyenzo zinazopendekezwa na KICD: ${skillResources}` : ' (k.m. kamusi, kadi maneno, chati, kifaa cha kidijitali)'}
+KAMWE usibuni nambari za ukurasa. Kila kitu kinachotumika katika shughuli kiorodheshwe hapa.`
+    : `RESOURCES — 3 OR 4 ITEMS, CLEAN NAMES ONLY:
 1. "${textbook || `${learningArea} ${isCBC ? 'Grade' : 'Form'} ${gradeNum} Textbook`}"
 2. "Teacher's Guide for ${learningArea} ${isCBC ? 'Grade' : 'Form'} ${gradeNum}"
-3. "[One classroom item: chart / blackboard diagram / newspaper cutout / real object]"
-No page numbers. No descriptions. No dashes after the name. Clean names only.
-NEVER: community resource persons, farm visits, radio recordings, government maps, purchased materials.`
+3–4. Items actually used in this lesson's experiences (e.g. dictionary, word cards, chart, specimen, digital device, model essay)
+NEVER invent page numbers. Every item an experience uses is listed here.`
 
   const keywordRequirement = isKiswahili
     ? `SHARTI LA NENO MSINGI:
@@ -585,13 +587,13 @@ ${substrand.split(/[\s\-:,/()]+/).filter(w => w.length >= 4).slice(0, 3).join(',
   const importantNotes = isKiswahili
     ? `MUHIMU:
 ${kicdSlice ? '- Shabaha za KICD zirudishwe kama zilivyotolewa hapo juu\n' : `- Matokeo matatu ya kujifunza: mpangilio wa utambuzi Kiwango 1 → Kiwango 2 → Kiwango 3\n- Kila matokeo lianze MOJA KWA MOJA na kitenzi cha kutenda — USIANDIKE "Kufikia mwisho wa somo" au "Mwanafunzi aweze" kama utangulizi\n`}- Tumia istilahi za ${isCBC ? 'CBC Kenya' : 'KCSE 8-4-4 Kenya'} kwa Kiswahili sanifu
-- Mifano yote lazima itaje sehemu, mazao, desturi, au jamii halisi za Kenya
+- Usitaje kabila au jamii ya kikabila (isipokuwa mada ndogo inaihusu); usihusishe tabia hasi na eneo au jamii yoyote
 - Andika maudhui YOTE (matokeo, uzoefu, maswali, tathmini, nyenzo, maadili, uwezo wa msingi) kwa Kiswahili Sanifu — majina ya sehemu za JSON pekee ndiyo yanabaki kwa Kiingereza
 - Toa JSON SAHIHI PEKEE — bila maandishi mengine
 ${retryNote}`
     : `IMPORTANT:
 ${kicdSlice ? '- Return the KICD outcomes exactly as given above\n' : `- 3 learning outcomes: Level 1 → Level 2 → Level 3 cognitive order\n- Each outcome starts DIRECTLY with the action verb — do NOT write "By the end of the lesson" or "The learner should be able to" as a prefix\n`}- Use ${isCBC ? 'CBC Kenya' : 'KCSE 8-4-4 Kenya'} terminology throughout
-- All examples must reference real Kenyan places, crops, practices, or communities
+- Never name an ethnic community unless the sub-strand is about it; never associate negative behaviour with any region or community
 - Output VALID JSON ONLY — no extra text
 ${retryNote}`
 
@@ -696,6 +698,7 @@ export async function generateValidatedLesson(
   // Computed once, not per-attempt — retryNote below needs it before the
   // prompt is built, and it must stay the same value used for callSowAI.
   const isKiswahiliCtx = isKiswahiliSubject(context.learningArea)
+  const isLanguageLesson = isKiswahiliCtx || /english/i.test(context.learningArea)
 
   while (attempt < MAX_RETRIES) {
     attempt++
@@ -716,6 +719,7 @@ JARIBIO LILILOPITA HALIKUFAULU. Rekebisha suala hili katika jibu lako lijalo, uk
 ${lastError.includes('progress') ? `KUMBUKA: matokeo lazima yaende kwa mpangilio wa Kiwango 1 → Kiwango 2 → Kiwango 3` : ''}
 ${lastError.includes('aligned')  ? `KUMBUKA: lazima liwe na angalau neno moja kutoka: ${skillWords}` : ''}
 ${lastError.includes('verb')     ? `KUMBUKA: tumia vitenzi vya Kiswahili pekee vilivyoorodheshwa hapo juu` : ''}
+${lastError.includes('ethnic')   ? `KUMBUKA: usitaje kabila wala jamii ya kikabila yoyote — tumia miktadha ya shuleni, nyumbani au sokoni` : ''}
 `
         : `
 PREVIOUS ATTEMPT FAILED: ${lastError}
@@ -723,6 +727,7 @@ Fix this specific issue in your next response.
 ${lastError.includes('progress') ? `REMINDER: outcomes must go Level 1 → Level 2 → Level 3 cognitive order` : ''}
 ${lastError.includes('aligned')  ? `REMINDER: must include at least one word from: ${skillWords}` : ''}
 ${isMathsRetry && lastError.includes('progress') ? 'MATHS REMINDER: a)=recall/identify, b)=calculate/apply, c)=appreciate/value' : ''}
+${lastError.includes('ethnic') ? 'REMINDER: do not name any ethnic community — use school, home or market contexts' : ''}
 `
     }
 
@@ -760,6 +765,8 @@ ${isMathsRetry && lastError.includes('progress') ? 'MATHS REMINDER: a)=recall/id
     const validation = validateLesson(lesson, context.substrand, context.subjectType ?? 'default', {
       outcomesFromKicd: !!slice,
       inquiryFromKicd:  !!slice && slice.keyInquiryQuestions.length > 0,
+      rejectEthnicReferences: isLanguageLesson,
+      allowedText: `${context.strand} ${slice ? JSON.stringify(slice) : ''}`,
     })
 
     if (validation.isValid) {

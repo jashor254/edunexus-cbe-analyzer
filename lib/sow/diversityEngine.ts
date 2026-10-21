@@ -243,7 +243,7 @@ Wanalinganisha majibu yao kwa jozi kisha kushiriki na darasa.`,
   },
   {
     label: 'D', name: 'Uchunguzi Kifani',
-    template: `Wanafunzi wanasoma au kusikiliza uchunguzi kifani kuhusu [kilimo, jamii, au hali halisi ya Kenya].
+    template: `Wanafunzi wanasoma au kusikiliza kifungu au uchunguzi kifani kinachohusu [mada ya somo].
 Wanabainisha suala kuu, wanachanganua kilichofanikiwa au kutofanikiwa, na kupendekeza masuluhisho ya kivitendo.
 Matokeo ya uchunguzi yanashirikiwa katika majadiliano ya darasa.`,
   },
@@ -273,7 +273,7 @@ Mwalimu anathibitisha uelewa kwa maswali ya mdomo ya darasa zima.`,
   },
   {
     label: 'I', name: 'Igizo Dhima',
-    template: `Wanafunzi wanaigiza kama [mkulima, mtumiaji, afisa ugani, mwanasayansi, n.k.] katika [hali fulani].
+    template: `Wanafunzi wanaigiza wahusika [k.m. mzungumzaji, msikilizaji, mwandishi, mhojiwa] katika [hali inayohusiana na mada].
 Wanaigiza hali hiyo na kufanya maamuzi kutoka mtazamo waliopewa.
 Darasa linajadili: Maamuzi gani yalifanywa? Ni mambo gani yaliyoathiri? Matokeo halisi yangekuwa yapi?`,
   },
@@ -291,7 +291,7 @@ Darasa linakubaliana kuhusu mfumo bora zaidi wa uainishaji.`,
   },
   {
     label: 'L', name: 'Fikiri-Jozi-Shiriki',
-    template: `Wanafunzi binafsi wanafikiria: "Je, [mada] inafanya kazi vipi katika maisha ya kila siku ya Kenya?" (dakika 3).
+    template: `Wanafunzi binafsi wanafikiria: "Je, [mada] inatumika vipi katika mawasiliano ya kila siku?" (dakika 3).
 Jozi zinashiriki na kuboresha mawazo yao (dakika 4).
 Jozi zilizoteuliwa zinawasilisha; mwalimu anajenga muhtasari wa dhana kutokana na majibu ya darasa.`,
   },
