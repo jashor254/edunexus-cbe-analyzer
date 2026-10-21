@@ -177,7 +177,7 @@ export async function generateSchemePipeline(
 
         // Each lesson in the batch gets a UNIQUE diversity seed
         // so parallel lessons don't all produce the same structure
-        const diversitySeed = diversityEngine.next(isCBC, isKiswahili)
+        const diversitySeed = diversityEngine.next(isCBC, isKiswahili, slot.substrand)
 
         return generateValidatedLesson({
           learningArea:   context.learningAreaName,

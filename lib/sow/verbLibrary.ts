@@ -346,25 +346,20 @@ export const SUBJECT_EXTENSIONS: Record<string, SubjectExtension> = {
 
   kiswahili: [
     [
-      'andika', 'angalia', 'eleza', 'fahamia',
-      'jaza', 'kamilisha', 'nunua', 'orodhesha',
-      'panga', 'soma', 'taja', 'tambua',
-      'tazama', 'toa', 'weka', 'zungumza',
+      'andika', 'eleza', 'orodhesha', 'panga',
+      'soma', 'taja', 'tambua', 'toa',
     ],
     [
-      'changanya', 'eleza kwa kina', 'fafanua',
-      'fuatilia', 'hakiki', 'husisha',
-      'iga', 'onyesha', 'panga upya',
-      'rekebisha', 'tafsiri', 'tathmini',
-      'tunga sentensi', 'tunga aya', 'uchanganye',
-      'wasiliana', 'linganisha', 'chambua',
+      'eleza kwa kina', 'fafanua', 'fuatilia', 'hakiki',
+      'husisha', 'onyesha', 'panga upya', 'rekebisha',
+      'tafsiri', 'tathmini', 'tunga sentensi', 'tunga aya',
+      'linganisha', 'chambua', 'jadili', 'kadiria',
     ],
     [
-      'buni', 'linda', 'onyesha heshima',
-      'pendekeza', 'sisitiza', 'tathmini umuhimu',
-      'tetea', 'thibitisha', 'thamini',
-      'uendeleze', 'ukuzishe', 'unga mkono',
-      'heshimu urithi', 'kukuza Kiswahili', 'onyesha thamani',
+      'buni', 'onyesha heshima', 'pendekeza', 'sisitiza',
+      'tathmini umuhimu', 'tetea', 'thibitisha', 'thamini',
+      'unga mkono', 'heshimu urithi', 'kukuza Kiswahili', 'onyesha thamani',
+      'furahia', 'changamkia',
     ],
   ],
 

@@ -70,6 +70,8 @@
     "lib/curriculum/kicdEntries.test.ts",
     "lib/sow/kicdGrounding.test.ts",
     "lib/sow/aiLessonGenerator.grounded.test.ts",
+    "lib/curriculum/kicdVocabulary.test.ts",
+    "lib/sow/diversityEngine.test.ts",
     "lib/config/attendanceOperatingMode.test.ts",
     "lib/config/kjseaRules.test.ts",
     "lib/config/teacherWorkspaceMemory.test.ts",

@@ -5,6 +5,13 @@
 // and values levels.
 
 import type { GeneratedLesson } from './types'
+import {
+  KICD_CORE_COMPETENCIES,
+  KICD_NATIONAL_VALUES,
+  KISWAHILI_SKILL_GUIDE,
+  kiswahiliSkillOf,
+  rotate,
+} from '@/lib/curriculum/kicdVocabulary'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -97,26 +104,22 @@ const STRUCTURE_KEYS = Object.keys(OUTCOME_STRUCTURES)
 // mkono") are also avoided: getVerbLevel matches single words from the first
 // 4 tokens of a sentence, so a two-word pool entry can never actually match.
 const KISWAHILI_OUTCOME_PATTERNS: Omit<OutcomePattern, 'structure'>[] = [
-  { l1: 'andika',    l2: 'fafanua',     l3: 'thamini'     },
-  { l1: 'angalia',   l2: 'fuatilia',    l3: 'thibitisha'  },
-  { l1: 'eleza',     l2: 'fupisha',     l3: 'uendeleze'   },
-  { l1: 'fahamia',   l2: 'hakiki',      l3: 'ukuzishe'    },
-  { l1: 'jaza',      l2: 'husisha',     l3: 'buni'        },
-  { l1: 'kamilisha', l2: 'iga',         l3: 'linda'       },
-  { l1: 'nunua',     l2: 'linganisha',  l3: 'pendekeza'   },
-  { l1: 'onyesha',   l2: 'rekebisha',   l3: 'sisitiza'    },
-  { l1: 'orodhesha', l2: 'tafsiri',     l3: 'tetea'       },
-  { l1: 'panga',     l2: 'tathmini',    l3: 'thamini'     },
-  { l1: 'soma',      l2: 'tofautisha',  l3: 'thibitisha'  },
-  { l1: 'taja',      l2: 'tumia',       l3: 'uendeleze'   },
-  { l1: 'tambua',    l2: 'uchanganye',  l3: 'ukuzishe'    },
-  { l1: 'tazama',    l2: 'wasiliana',   l3: 'buni'        },
-  { l1: 'toa',       l2: 'changanya',   l3: 'linda'       },
-  { l1: 'weka',      l2: 'chambua',     l3: 'pendekeza'   },
-  { l1: 'zungumza',  l2: 'elezea',      l3: 'sisitiza'    },
-  { l1: 'andika',    l2: 'fafanua',     l3: 'tetea'       },
-  { l1: 'angalia',   l2: 'fuatilia',    l3: 'thamini'     },
-  { l1: 'eleza',     l2: 'fupisha',     l3: 'thibitisha'  },
+  // Only used for lessons with NO matched KICD sub-strand — grounded lessons
+  // take the design's own outcomes. Verbs are real, measurable Kiswahili
+  // curriculum verbs (no "nunua"/"linda"/"iga"/"fahamia"/"ukuzishe"), and L3
+  // is the designs' affective/creative tier (thamini, furahia, changamkia,
+  // tunga, buni) rather than "[verb] umuhimu wa…". Each trio is asserted to
+  // resolve L1 < L2 < L3 in lib/sow/diversityEngine.test.ts.
+  { l1: 'tambua',    l2: 'fafanua',     l3: 'thamini'    },
+  { l1: 'taja',      l2: 'jadili',      l3: 'furahia'    },
+  { l1: 'orodhesha', l2: 'tofautisha',  l3: 'tunga'      },
+  { l1: 'soma',      l2: 'chambua',     l3: 'changamkia' },
+  { l1: 'andika',    l2: 'linganisha',  l3: 'thamini'    },
+  { l1: 'eleza',     l2: 'tumia',       l3: 'buni'       },
+  { l1: 'tambua',    l2: 'kadiria',     l3: 'furahia'    },
+  { l1: 'toa',       l2: 'husisha',     l3: 'tunga'      },
+  { l1: 'panga',     l2: 'fupisha',     l3: 'changamkia' },
+  { l1: 'taja',      l2: 'tafsiri',     l3: 'thamini'    },
 ]
 
 // ─── Experience Frameworks ────────────────────────────────────────────────────
@@ -233,10 +236,10 @@ Kwa vikundi, wanajadili suluhisho linalowezekana, wanachagua mbinu bora, na kuel
 Vikundi vinawasilisha masuluhisho; darasa linachagua lililo bora zaidi kivitendo.`,
   },
   {
-    label: 'C', name: 'Kazi ya Nyanjani au ya Vitendo',
-    template: `Wanafunzi wanaenda [mahali: bustani ya shule, maabara, uwanja, au eneo la karibu] kukusanya [data, sampuli, au uchunguzi].
-Wanaandika matokeo kwa utaratibu katika daftari zao.
-Darasa linakusanya matokeo yote na kubainisha mifumo.`,
+    label: 'C', name: 'Kusikiliza na Kujibu',
+    template: `Wanafunzi wanasikiliza [kifungu, rekodi au mazungumzo kuhusu mada] kutoka kwa mwalimu au kifaa cha kidijitali.
+Wanajibu maswali na kubainisha hoja muhimu walizosikia.
+Wanalinganisha majibu yao kwa jozi kisha kushiriki na darasa.`,
   },
   {
     label: 'D', name: 'Uchunguzi Kifani',
@@ -245,10 +248,10 @@ Wanabainisha suala kuu, wanachanganua kilichofanikiwa au kutofanikiwa, na kupend
 Matokeo ya uchunguzi yanashirikiwa katika majadiliano ya darasa.`,
   },
   {
-    label: 'E', name: 'Jaribio Linaloongozwa',
-    template: `Wanafunzi wanaandaa jaribio rahisi kupima [dhana inayohusiana na mada].
-Wanaandika uchunguzi kwa vipindi maalum, kisha wanatoa hitimisho.
-Vikundi vinalinganisha matokeo na kueleza tofauti zozote.`,
+    label: 'E', name: 'Kusoma kwa Sauti na Kutoa Maoni',
+    template: `Wanafunzi wanasoma kwa sauti [kifungu kinachohusu mada] wakizingatia matamshi, kasi na kiimbo.
+Wenzao wanatoa maoni kwa kutumia vigezo vilivyotolewa na mwalimu.
+Mwalimu anaonyesha usomaji bora na wanafunzi wanarudia sehemu ngumu.`,
   },
   {
     label: 'F', name: 'Matembezi ya Maonyesho',
@@ -416,21 +419,34 @@ const QUESTION_FRAMES: QuestionFrame[] = [
 
 // Kiswahili inquiry question frames — same 12-slot rotation, mirrored 1:1 by
 // index so a Kiswahili lesson keeps the same starter-diversity guarantee.
+// Only used for lessons with NO matched KICD sub-strand (grounded lessons
+// use the design's own inquiry question). Modelled on how the KICD
+// Kiswahili designs phrase theirs ("Ni mambo gani ya kuzingatia…?",
+// "Nini kinafanya sentensi kuwa tata?") — no "X ingeongezeka mara mbili",
+// no causal frames that force agreement errors ("…kingeondolewa").
 const KISWAHILI_QUESTION_FRAMES: QuestionFrame[] = [
   {
-    name: 'Sababu',
+    name: 'Mambo ya Kuzingatia',
     starters: [
-      'Ni nini kinachosababisha [mchakato] kutokea katika [muktadha]?',
-      'Kwa nini [jambo] hutokea kwa njia hii?',
-      'Ni mambo gani yanayosababisha [matokeo]?',
+      'Ni mambo gani ya kuzingatia wakati wa [kutumia ujuzi lengwa]?',
+      'Unazingatia nini ili [kufanikisha kitendo lengwa]?',
+      'Kwa nini ni muhimu [kujifunza dhana lengwa]?',
     ],
   },
   {
-    name: 'Matokeo',
+    name: 'Utambuzi',
     starters: [
-      'Nini hutokea [hali inapobadilika]?',
-      'Ni nini kingebadilika iwapo [kigezo muhimu] kingeondolewa?',
-      'Je, [kitendo] kinaathiri vipi [matokeo] katika [muktadha wa eneo]?',
+      'Ni nini kinachoonyesha kuwa [neno, sentensi au matini] ina [sifa lengwa]?',
+      'Je, [dhana] hujitokeza vipi katika [matini au mazungumzo]?',
+      'Ni maneno gani unayoyajua yaliyo katika [hali au kundi lengwa]?',
+    ],
+  },
+  {
+    name: 'Matumizi ya Lugha',
+    starters: [
+      'Je, [kipengele cha lugha] kina umuhimu gani kwa [msomaji au msikilizaji]?',
+      'Je, [kipengele] kinasaidiaje mawasiliano?',
+      'Ungetumiaje [dhana] katika mazungumzo ya kila siku?',
     ],
   },
   {
@@ -438,78 +454,38 @@ const KISWAHILI_QUESTION_FRAMES: QuestionFrame[] = [
     starters: [
       'Je, [X] inatofautiana vipi na [Y]?',
       'Ni ufanano na tofauti gani zilizopo kati ya [A] na [B]?',
-      'Ni mbinu ipi bora zaidi — [chaguo la 1] au [chaguo la 2] — na kwa nini?',
-    ],
-  },
-  {
-    name: 'Tathmini',
-    starters: [
-      'Je, [mbinu] ina ufanisi kiasi gani katika kutatua [tatizo] nchini Kenya?',
-      'Je, [kigezo] kinaathiri kiasi gani [matokeo]?',
-      'Je, [mbinu] ni njia bora ya [kufikia lengo]? Thibitisha maoni yako.',
+      'Ni lipi linalofaa zaidi — [chaguo la 1] au [chaguo la 2] — katika [muktadha]? Kwa nini?',
     ],
   },
   {
     name: 'Uhusiano wa Kibinafsi',
     starters: [
-      'Umeona wapi [dhana] katika jamii yako?',
-      'Je, [mada] inaathiri vipi maisha yako ya kila siku kama mwanafunzi nchini Kenya?',
-      'Unaweza kutoa mfano kutoka uzoefu wako mwenyewe ambapo [dhana] ilikuwa muhimu?',
+      'Umewahi kusikia au kusoma [dhana] wapi?',
+      'Je, [ujuzi] unakusaidiaje katika mawasiliano yako ya kila siku?',
+      'Toa mfano kutoka maisha yako ambapo [dhana] ilikuwa muhimu.',
     ],
   },
   {
     name: 'Mchakato',
     starters: [
-      'Ni hatua gani zinazohusika katika [mchakato]?',
-      'Je, [mfumo] unafanya kazi vipi tangu mwanzo hadi mwisho?',
-      'Ni katika mfuatano gani hatua za [mzunguko] hutokea?',
+      'Ni hatua gani zinazofuatwa katika [kuandika, kusoma au kuwasilisha]?',
+      'Je, [kitendo] hufanywa vipi tangu mwanzo hadi mwisho?',
+      'Ni kwa mpangilio gani [vipengele] hupangwa katika [utungo]?',
     ],
   },
   {
-    name: 'Kudhania',
+    name: 'Tathmini',
     starters: [
-      'Ni nini kingetokea iwapo [kigezo muhimu] hakingekuwepo?',
-      'Je, [matokeo] yangebadilika vipi iwapo [kigezo] kingeongezeka mara mbili?',
-      'Iwapo [tatizo] lingetatuliwa, maisha yangekuwaje tofauti kwa Wakenya?',
-    ],
-  },
-  {
-    name: 'Uchunguzi',
-    starters: [
-      'Ungefanyaje kuthibitisha kama [dai] ni kweli?',
-      'Ni ushahidi gani unaohitajika kuthibitisha [dhana]?',
-      'Wanafunzi wa shuleni kwako wangewezaje kuchunguza [swali]?',
-    ],
-  },
-  {
-    name: 'Kihakiki',
-    starters: [
-      'Ni hatari gani za [mazoezi] katika [muktadha wa Kenya]?',
-      'Je, [kitendo au sera] inapaswa kuhimizwa au kukatishwa tamaa? Kwa nini?',
-      'Tuna wajibu gani kuhusu [suala] kama raia wa Kenya?',
-    ],
-  },
-  {
-    name: 'Kiunganishi',
-    starters: [
-      'Je, [mada ya sasa] inahusiana vipi na tuliyojifunza kuhusu [mada iliyopita]?',
-      'Je, [mada A] inategemea au kuathiri vipi [mada B]?',
-      'Mawazo ya somo hili yanahusiana vipi na [hali halisi ya Kenya]?',
-    ],
-  },
-  {
-    name: 'Matumizi',
-    starters: [
-      'Je, [dhana] inaweza kutumika vipi kuboresha [kipengele cha maisha ya Kenya]?',
-      'Umeona wapi maishani [dhana] ikitumika?',
-      '[Mkulima / mwanafunzi / kiongozi wa jamii] katika eneo lako angetumiaje [maarifa]?',
+      'Je, [mbinu] inasaidia kiasi gani katika kufanikisha mawasiliano?',
+      'Je, [kipengele] kinaathiri vipi ubora wa [utungo]?',
+      'Ni [utungo] upi bora zaidi kati ya hii? Thibitisha jibu lako.',
     ],
   },
   {
     name: 'Changamoto Huria',
     starters: [
       'Ni kipengele gani muhimu zaidi cha [mada] kwa maoni yako? Kwa nini?',
-      'Je, unaweza kufikiria hali ambapo [kanuni au mazoezi ya kawaida] hayangefaa?',
+      'Ni makosa gani hufanywa mara nyingi katika [ujuzi lengwa]?',
       'Ni swali gani moja kuhusu [mada] ambalo bado ungependa kupata jibu lake?',
     ],
   },
@@ -538,7 +514,7 @@ const KISWAHILI_ASSESSMENT_TYPES: string[] = [
   'Orodha ya uchunguzi kwa [ujuzi mahususi unaoonyeshwa]',
   'Maswali ya mdomo yenye mawazo ya kina',
   'Zoezi la maandishi: [kazi mahususi — mchoro, orodha, aya, ulinganisho]',
-  'Onyesho la vitendo linalotathminiwa kwa rubric ya ujuzi',
+  'Onyesho la vitendo linalotathminiwa kwa vigezo vya ujuzi',
   'Tathmini ya wenzao: wanafunzi wanatathmini kazi za wenzao kwa vigezo walivyopewa',
   'Kujitathmini: wanafunzi wanapima uelewa wao kwa kiwango cha 1-4',
   'Tiketi ya kutoka: swali moja lililolengwa linalojibiwa binafsi kabla ya kutoka',
@@ -549,60 +525,13 @@ const KISWAHILI_ASSESSMENT_TYPES: string[] = [
   'Tathmini ya mdahalo au majadiliano: ushiriki, hoja, matumizi ya ushahidi',
 ]
 
-// ─── Values Rotation (10 sets) ────────────────────────────────────────────────
+// ─── Values and core competencies ─────────────────────────────────────────────
+// Drawn from the official lists (lib/curriculum/kicdVocabulary.ts) — the
+// old rotations included non-KICD items ("Numeracy"/"Umahiri wa kihesabu",
+// "Self-management", "Ubora, Uboreshaji endelevu"). A grounded lesson whose
+// KICD entry lists its own values/competencies uses those instead.
 
-const VALUES_SETS: string[] = [
-  'Respect, Responsibility, Unity',
-  'Integrity, Diligence, Patriotism',
-  'Creativity, Curiosity, Perseverance',
-  'Empathy, Cooperation, Honesty',
-  'Environmental care, Sustainability, Stewardship',
-  'Tolerance, Inclusion, Social justice',
-  'Self-reliance, Initiative, Resilience',
-  'Critical thinking, Objectivity, Open-mindedness',
-  'Community service, Citizenship, National pride',
-  'Innovation, Excellence, Continuous improvement',
-]
-
-// Kiswahili values — same 10-slot rotation, mirrored 1:1 by index.
-const KISWAHILI_VALUES_SETS: string[] = [
-  'Heshima, Uwajibikaji, Umoja',
-  'Uadilifu, Bidii, Uzalendo',
-  'Ubunifu, Udadisi, Uvumilivu',
-  'Huruma, Ushirikiano, Uaminifu',
-  'Utunzaji wa mazingira, Uendelevu, Usimamizi',
-  'Uvumilivu, Ujumuishaji, Haki ya kijamii',
-  'Kujitegemea, Uwezo wa kuanzisha, Uthabiti',
-  'Fikra makini, Uwazi, Kukubali maoni mengine',
-  'Huduma kwa jamii, Uraia, Fahari ya kitaifa',
-  'Ubunifu, Ubora, Uboreshaji endelevu',
-]
-
-// ─── Core Competencies Rotation (8 sets) ─────────────────────────────────────
-
-const COMPETENCY_SETS: string[] = [
-  'Communication, Critical thinking, Collaboration',
-  'Creativity, Self-efficacy, Learning to learn',
-  'Digital literacy, Problem solving, Citizenship',
-  'Numeracy, Communication, Self-management',
-  'Critical thinking, Creativity, Citizenship',
-  'Problem solving, Communication, Learning to learn',
-  'Self-efficacy, Digital literacy, Numeracy',
-  'Collaboration, Critical thinking, Creativity',
-]
-
-// Kiswahili core competencies — same 8-slot rotation, mirrored 1:1 by index,
-// using the official 7 CBC core competencies' Kiswahili names.
-const KISWAHILI_COMPETENCY_SETS: string[] = [
-  'Mawasiliano, Fikra makini, Ushirikiano',
-  'Ubunifu, Kujiamini, Kujifunza kujifunza',
-  'Ujuzi wa kidijitali, Utatuzi wa matatizo, Uraia',
-  'Umahiri wa kihesabu, Mawasiliano, Kujisimamia',
-  'Fikra makini, Ubunifu, Uraia',
-  'Utatuzi wa matatizo, Mawasiliano, Kujifunza kujifunza',
-  'Kujiamini, Ujuzi wa kidijitali, Umahiri wa kihesabu',
-  'Ushirikiano, Fikra makini, Ubunifu',
-]
+const NON_CBC_COMPETENCIES = { en: 'Problem solving, Critical thinking', sw: 'Utatuzi wa matatizo, Fikra makini' }
 
 // ─── DiversityEngine ──────────────────────────────────────────────────────────
 
@@ -618,7 +547,9 @@ export class DiversityEngine {
   // this, a Kiswahili lesson's seed carried English verbs/frameworks/
   // questions/assessments/values/competencies straight through into the
   // prompt regardless of the language instruction wrapped around it.
-  next(isCBC: boolean, isKiswahili = false): DiversitySeed {
+  // `substrandTitle` lets a Kiswahili lesson draw its assessment from the
+  // KICD methods for its skill (Kusikiliza / Kusoma / Kuandika / Sarufi).
+  next(isCBC: boolean, isKiswahili = false, substrandTitle = ''): DiversitySeed {
     const i = this.count
     this.count++
 
@@ -626,16 +557,21 @@ export class DiversityEngine {
     const structureKey = STRUCTURE_KEYS[i % STRUCTURE_KEYS.length]
     const framework    = isKiswahili ? KISWAHILI_EXPERIENCE_FRAMEWORKS[i % KISWAHILI_EXPERIENCE_FRAMEWORKS.length] : EXPERIENCE_FRAMEWORKS[i % EXPERIENCE_FRAMEWORKS.length]
     const qFrame       = isKiswahili ? KISWAHILI_QUESTION_FRAMES[i % KISWAHILI_QUESTION_FRAMES.length] : QUESTION_FRAMES[i % QUESTION_FRAMES.length]
-    const values       = isKiswahili ? KISWAHILI_VALUES_SETS[i % KISWAHILI_VALUES_SETS.length] : VALUES_SETS[i % VALUES_SETS.length]
+    const lang         = isKiswahili ? 'sw' : 'en'
+    const values       = rotate(KICD_NATIONAL_VALUES[lang], i, 3).join(', ')
     const competencies = isCBC
-      ? (isKiswahili ? KISWAHILI_COMPETENCY_SETS[i % KISWAHILI_COMPETENCY_SETS.length] : COMPETENCY_SETS[i % COMPETENCY_SETS.length])
-      : (isKiswahili ? 'Utatuzi wa matatizo, Fikra makini' : 'Problem solving, Critical thinking')
+      ? rotate(KICD_CORE_COMPETENCIES[lang], i * 2, 3).join(', ')
+      : NON_CBC_COMPETENCIES[lang]
 
-    // Pick 3 assessments from non-overlapping positions in the pool
-    const assessmentPool = isKiswahili ? KISWAHILI_ASSESSMENT_TYPES : ASSESSMENT_TYPES
-    const a1 = assessmentPool[i % assessmentPool.length]
-    const a2 = assessmentPool[(i + 4) % assessmentPool.length]
-    const a3 = assessmentPool[(i + 8) % assessmentPool.length]
+    // Kiswahili lessons with a known skill use KICD's methods for that skill;
+    // otherwise 3 from non-overlapping positions in the general pool.
+    const skill = isKiswahili ? kiswahiliSkillOf(substrandTitle) : null
+    const [a1, a2, a3] = skill
+      ? (rotate(KISWAHILI_SKILL_GUIDE[skill].assessment, i, 3) as [string, string, string])
+      : (() => {
+          const pool = isKiswahili ? KISWAHILI_ASSESSMENT_TYPES : ASSESSMENT_TYPES
+          return [pool[i % pool.length], pool[(i + 4) % pool.length], pool[(i + 8) % pool.length]] as [string, string, string]
+        })()
 
     const outcomePattern: OutcomePattern = {
       ...patternBase,

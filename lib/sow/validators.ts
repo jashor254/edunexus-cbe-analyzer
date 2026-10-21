@@ -86,7 +86,7 @@ function validateInquiryQuestions(
   }
 
   const higherOrderStarters = isKiswahiliSubjectType(subjectType)
-    ? ['vipi', 'kwa nini', 'kwa njia gani', 'kwa kiwango gani', 'ni nini', 'ni kwa nini', 'eleza', 'je']
+    ? ['vipi', 'kwa nini', 'kwa njia gani', 'kwa kiwango gani', 'ni nini', 'ni kwa nini', 'eleza', 'je', 'nini', 'gani', 'kina nani']
     : ['how', 'why', 'in what ways', 'to what extent']
 
   if (!higherOrderStarters.some(q => combined.includes(q))) {

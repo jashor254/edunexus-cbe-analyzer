@@ -175,44 +175,40 @@ export const VERB_ORDERS: Record<string, string[][]> = {
   kiswahili: [
     [
       'taja', 'orodhesha', 'tambua', 'andika',
-      'soma', 'onyesha', 'angalia', 'tazama',
-      'toa', 'weka', 'fahamia', 'jaza',
-      'kamilisha', 'panga', 'zungumza',
+      'soma', 'onyesha', 'toa', 'panga',
     ],
     [
       'eleza', 'elezea', 'fupisha', 'linganisha',
       'tofautisha', 'tumia', 'fafanua', 'husisha',
-      'changanya', 'iga', 'panga upya', 'rekebisha',
+      'panga upya', 'rekebisha', 'jadili', 'kadiria',
     ],
     [
       'changanua', 'tathmini', 'tunga', 'buni',
       'chambua', 'hakiki', 'fuatilia', 'tafsiri',
       'pendekeza', 'thamini', 'tetea', 'thibitisha',
+      'furahia', 'changamkia',
     ],
   ],
 
   // ── CBC SENIOR: KISWAHILI (Grade 10-12) ──────────────────────────────────
   cbc_senior_kiswahili: [
     [
-      'andika', 'angalia', 'eleza', 'fahamia',
-      'jaza', 'kamilisha', 'orodhesha', 'panga',
-      'soma', 'taja', 'tambua', 'tazama',
-      'toa', 'weka', 'zungumza', 'nunua',
+      'andika', 'eleza', 'orodhesha', 'panga',
+      'soma', 'taja', 'tambua', 'toa',
     ],
     [
-      'chambua', 'changanya', 'eleza kwa kina',
-      'fafanua', 'fuatilia', 'hakiki',
-      'husisha', 'iga', 'linganisha',
-      'onyesha', 'panga upya', 'rekebisha',
-      'tafsiri', 'tathmini', 'tunga aya',
-      'tunga sentensi', 'uchanganye', 'wasiliana',
+      'chambua', 'eleza kwa kina', 'fafanua', 'fuatilia',
+      'hakiki', 'husisha', 'linganisha', 'onyesha',
+      'panga upya', 'rekebisha', 'tafsiri', 'tathmini',
+      'tunga aya', 'tunga sentensi', 'jadili', 'kadiria',
+      'tofautisha', 'tumia', 'fupisha',
     ],
     [
-      'buni', 'heshimu urithi', 'kukuza Kiswahili',
-      'linda', 'onyesha heshima', 'onyesha thamani',
-      'pendekeza', 'sisitiza', 'tathmini umuhimu',
-      'tetea', 'thamini', 'thibitisha',
-      'uendeleze', 'ukuzishe', 'unga mkono',
+      'buni', 'heshimu urithi', 'kukuza Kiswahili', 'onyesha heshima',
+      'onyesha thamani', 'pendekeza', 'sisitiza', 'tathmini umuhimu',
+      'tetea', 'thamini', 'thibitisha', 'unga mkono',
+      'furahia', 'changamkia',
+      'tunga',
     ],
   ],
 
@@ -544,25 +540,22 @@ export const VERB_ORDERS: Record<string, string[][]> = {
   // ── KCSE: KISWAHILI ──────────────────────────────────────────────────────
   kcse_kiswahili: [
     [
-      'andika', 'angalia', 'eleza', 'fahamia',
-      'jaza', 'kamilisha', 'orodhesha', 'panga',
-      'soma', 'taja', 'tambua', 'tazama',
-      'toa', 'weka', 'zungumza', 'nunua',
+      'andika', 'eleza', 'orodhesha', 'panga',
+      'soma', 'taja', 'tambua', 'toa',
     ],
     [
-      'chambua', 'changanya', 'eleza kwa kina',
-      'fafanua', 'fuatilia', 'hakiki',
-      'husisha', 'iga', 'linganisha',
-      'onyesha', 'panga upya', 'rekebisha',
-      'tafsiri', 'tathmini', 'tunga aya',
-      'tunga sentensi', 'uchanganye', 'wasiliana',
+      'chambua', 'eleza kwa kina', 'fafanua', 'fuatilia',
+      'hakiki', 'husisha', 'linganisha', 'onyesha',
+      'panga upya', 'rekebisha', 'tafsiri', 'tathmini',
+      'tunga aya', 'tunga sentensi', 'jadili', 'kadiria',
+      'tofautisha', 'tumia', 'fupisha',
     ],
     [
-      'buni', 'heshimu urithi', 'kukuza Kiswahili',
-      'linda', 'onyesha heshima', 'onyesha thamani',
-      'pendekeza', 'sisitiza', 'tathmini umuhimu',
-      'tetea', 'thamini', 'thibitisha',
-      'uendeleze', 'ukuzishe', 'unga mkono',
+      'buni', 'heshimu urithi', 'kukuza Kiswahili', 'onyesha heshima',
+      'onyesha thamani', 'pendekeza', 'sisitiza', 'tathmini umuhimu',
+      'tetea', 'thamini', 'thibitisha', 'unga mkono',
+      'furahia', 'changamkia',
+      'tunga',
     ],
   ],
 

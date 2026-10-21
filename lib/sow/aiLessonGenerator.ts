@@ -8,6 +8,7 @@ import { callDeepSeek as callAI, type AICostContext } from '@/lib/ai/deepseek'
 import type { CurriculumMode } from './types'
 import type { DiversitySeed } from './diversityEngine'
 import type { KicdLessonSlice } from '@/lib/curriculum/kicdEntries'
+import { KICD_PCI_OPTIONS } from '@/lib/curriculum/kicdVocabulary'
 
 const MAX_RETRIES   = 5
 const MAX_CONFIDENCE = 0.92
@@ -37,15 +38,14 @@ Rudisha JSON SAHIHI PEKEE. Hakuna markdown. Hakuna maelezo. Hakuna vizuizi vya m
 
 KANUNI ZA UTOFAUTI — SI ZA KUJADILIWA:
 
-KANUNI 1 — UTOFAUTI WA VITENZI
+KANUNI 1 — UTOFAUTI WA VITENZI (kwa masomo yasiyo na shabaha za KICD pekee)
 Usitumie kitenzi kile kile cha kuanzia katika masomo mfululizo.
-Mbadala wa Kiwango 1: taja, angalia, eleza, fahamia, jaza, kamilisha, orodhesha, panga,
-  soma, tambua, tazama, toa, weka, zungumza, andika, onyesha
-Mbadala wa Kiwango 2: changanya, eleza kwa kina, fafanua, fuatilia, hakiki, husisha,
-  iga, panga upya, rekebisha, tafsiri, tathmini, tunga sentensi, tunga aya, uchanganue,
-  wasiliana, linganisha, chambua
-Mbadala wa Kiwango 3: buni, linda, onyesha heshima, pendekeza, sisitiza, tathmini umuhimu,
-  tetea, thibitisha, thamini, uendeleze, ukuzishe, unga mkono, heshimu urithi, onyesha thamani
+Mbadala wa Kiwango 1: taja, orodhesha, tambua, andika, soma, onyesha, toa, panga, eleza
+Mbadala wa Kiwango 2: fafanua, jadili, tofautisha, linganisha, tumia, husisha, chambua,
+  fupisha, kadiria, tafsiri, hakiki, rekebisha
+Mbadala wa Kiwango 3: thamini, furahia, changamkia, tunga, buni, tetea, pendekeza, thibitisha
+Usitumie vitenzi visivyopimika au visivyo sahihi kama: nunua, linda, iga, jaza, fahamia,
+  ukuzishe, uendeleze, changanya, wasiliana.
 
 KANUNI 2 — UTOFAUTI WA MUUNDO WA MATOKEO
 Tumia muundo TOFAUTI wa sentensi kwa kila matokeo ya kujifunza.
@@ -314,11 +314,12 @@ function buildLessonPrompt({
 SHABAHA — KISWAHILI:
 Andika matokeo MATATU kwa Kiswahili Sanifu katika mpangilio huu wa utambuzi:
 a) KIWANGO 1 (maarifa/ufahamu) — anza na: "${l1}" au kitenzi kingine sawa cha kiwango 1
-   mfano: "${l1} sifa za ${substrand} katika muktadha wa Kenya"
+   mfano: "${l1} [dhana au kipengele mahususi cha ${substrand}]"
 b) KIWANGO 2 (ufahamu/matumizi) — anza na: "${l2}" au kitenzi kingine sawa cha kiwango 2
-   mfano: "${l2} jinsi ${substrand} inavyotumika katika hali halisi ya Kenya"
-c) KIWANGO 3 (maadili/utetezi) — anza na: "${l3}" au kitenzi kingine sawa cha kiwango 3
-   mfano: "${l3} umuhimu wa ${substrand} katika jamii au taifa"
+   mfano: "${l2} [ujuzi wa ${substrand}] katika [matini, sentensi au mazungumzo]"
+c) KIWANGO 3 (mtazamo/ubunifu) — anza na: "${l3}" au kitenzi kingine sawa cha kiwango 3
+   mfano: "${l3} [kutumia ${substrand}] ipasavyo ili kufanikisha mawasiliano"
+Shabaha ziwe mahususi kwa ujuzi wa lugha unaofundishwa — usiongeze "katika muktadha wa Kenya".
 
 Muundo wa sentensi kwa somo hili: ${seed?.outcomePattern.structure ?? 'A'} — tofautisha miundo katika matokeo matatu.
 ${verbAvoidLine}
@@ -457,8 +458,14 @@ Use THESE specific starters (adapt to topic):
       : `Choose 3 DIFFERENT assessment methods. Rotate from: observation checklist, oral questions, written exercise, practical demo, peer assessment, self-assessment, exit ticket, portfolio entry, quiz, reflection.`
 
   // ── Values and competencies ─────────────────────────────────────────────────
-  const valuesStr       = seed?.values           ?? (isKiswahili ? 'Heshima, Uwajibikaji, Umoja' : 'Respect, Responsibility, Unity')
-  const competenciesStr = seed?.coreCompetencies ?? (isKiswahili ? 'Mawasiliano, Fikra makini, Ushirikiano' : isCBC ? 'Communication, Critical thinking, Collaboration' : 'Problem solving, Critical thinking')
+  // A KICD entry's own values / competencies (where loaded) win over the
+  // rotation; the rotation itself only ever draws from the official lists.
+  const valuesStr       = kicdSlice?.values.length
+    ? kicdSlice.values.join(', ')
+    : seed?.values ?? (isKiswahili ? 'Heshima, Upendo, Uwajibikaji, Umoja' : 'Respect, Love, Responsibility, Unity')
+  const competenciesStr = kicdSlice?.coreCompetencies.length
+    ? kicdSlice.coreCompetencies.join(', ')
+    : seed?.coreCompetencies ?? (isKiswahili ? 'Mawasiliano na ushirikiano, Uwazaji kina na utatuzi wa matatizo' : isCBC ? 'Communication and collaboration, Critical thinking and problem solving' : 'Problem solving, Critical thinking')
 
   // ── Dynamic JSON example — NEVER hardcode identify/explain/appreciate ───────
   const l1ex = seed?.outcomePattern.l1 ?? (isKiswahili ? 'taja' : 'describe')
@@ -537,9 +544,15 @@ ${substrand.split(/[\s\-:,/()]+/).filter(w => w.length >= 4).slice(0, 3).join(',
         seed?.assessmentMethods[2] ?? 'Written exercise: [specific task]',
       ]
 
-  const pciLinksStr = isKiswahili
-    ? 'Elimu ya Afya, Uraia, Ujuzi wa Maisha'
-    : isCBC ? 'Health Education, Citizenship, Life Skills' : 'Guidance and Counselling, Life Skills'
+  // PCIs used to be one hard-coded string for every lesson. Now: the KICD
+  // entry's own PCIs where loaded, else the model picks 1–2 that fit THIS
+  // strand's theme from the official list.
+  const pciOptions = (isKiswahili ? KICD_PCI_OPTIONS.sw : KICD_PCI_OPTIONS.en).join(', ')
+  const pciLinksStr = kicdSlice?.pcis.length
+    ? kicdSlice.pcis.join(', ')
+    : isKiswahili
+      ? `[masuala mtambuko 1–2 yanayohusiana na mada "${strand}", kutoka: ${pciOptions}]`
+      : `[1–2 PCIs that fit the theme "${strand}", chosen from: ${pciOptions}]`
 
   const outputHeader = isKiswahili
     ? 'MATOKEO — Rudisha MUUNDO huu wa JSON PEKEE (majina ya sehemu za JSON yabaki kwa Kiingereza, thamani zote kwa Kiswahili):'
@@ -547,9 +560,9 @@ ${substrand.split(/[\s\-:,/()]+/).filter(w => w.length >= 4).slice(0, 3).join(',
 
   const learningOutcomeEx = isKiswahili
     ? [
-        `${l1ex} [maarifa mahususi kuhusu ${substrand} katika muktadha wa Kikenya]`,
-        `${l2ex} jinsi ${substrand} [inavyotumika au kufanya kazi katika hali halisi]`,
-        `${l3ex} umuhimu wa ${substrand} katika [jamii au taifa la Kenya]`,
+        `${l1ex} [dhana au kipengele mahususi cha ${substrand}]`,
+        `${l2ex} [ujuzi wa ${substrand}] katika [matini, sentensi au mazungumzo]`,
+        `${l3ex} [kutumia ${substrand}] ipasavyo ili kufanikisha mawasiliano`,
       ]
     : [
         `${l1ex} [specific knowledge about ${substrand} using Kenyan context]`,
@@ -603,7 +616,7 @@ ${resourcesLabel}
 
 ${keywordRequirement}
 
-${seed?.contextBlock ? `\nPER-LESSON DIVERSITY CONTEXT:\n${seed.contextBlock}` : ''}
+${seed?.contextBlock && !kicdSlice ? `\nPER-LESSON DIVERSITY CONTEXT:\n${seed.contextBlock}` : ''}
 
 ${outputHeader}
 {
