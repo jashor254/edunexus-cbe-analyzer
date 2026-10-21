@@ -40,4 +40,4 @@ whose entries were already loaded) only adds competencies / values / PCIs by
 sub-strand number.
 
 **Rollback.** Each `--apply` writes `scripts/kicd/backups/kicd_data-<time>.json`
-(`[{ id, kicd_data }]` — the previous values); upsert those rows back to restore.
+(`[{ id, kicd_data }]` — the previous values); update those rows back to restore.

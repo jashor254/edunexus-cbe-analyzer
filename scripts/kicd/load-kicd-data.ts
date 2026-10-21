@@ -104,7 +104,7 @@ async function main(): Promise<void> {
   const designs = (JSON.parse(readFileSync(join(ROOT, 'scripts/kicd/designs.json'), 'utf8')) as Design[])
     .filter(d => !ONLY || d.file.includes(ONLY))
   const db = createServiceClient()
-  const updates: Array<{ id: string; title: string; learning_area_id: string; kicd_data: unknown; previous: unknown; label: string }> = []
+  const updates: Array<{ id: string; kicd_data: unknown; previous: unknown; label: string }> = []
   let totalRows = 0, groundedBefore = 0, groundedAfter = 0
 
   for (const design of designs) {
@@ -218,7 +218,7 @@ async function main(): Promise<void> {
       for (const r of strand.rows) if (!groundedRows.includes(r) && unmatchedSamples.length < 4) unmatchedSamples.push(`${strand.title} :: ${r}`)
 
       if (next !== strand.kicd_data) {
-        updates.push({ id: strand.id, title: strand.title, learning_area_id: strand.learning_area_id, kicd_data: next, previous: strand.kicd_data, label: design.file })
+        updates.push({ id: strand.id, kicd_data: next, previous: strand.kicd_data, label: design.file })
       }
     }
 
@@ -242,11 +242,22 @@ async function main(): Promise<void> {
   writeFileSync(backupFile, JSON.stringify(updates.map(u => ({ id: u.id, kicd_data: u.previous })), null, 1))
   console.log(`Backup of previous kicd_data: ${backupFile}`)
 
-  const CHUNK = 50
-  for (let i = 0; i < updates.length; i += CHUNK) {
-    const rows = updates.slice(i, i + CHUNK).map(u => ({ id: u.id, title: u.title, learning_area_id: u.learning_area_id, kicd_data: u.kicd_data }))
-    const { error } = await db.from('sow_strands').upsert(rows, { onConflict: 'id' })
-    if (error) throw new Error(`write failed at chunk ${i / CHUNK}: ${error.message} — restore from ${backupFile}`)
+  // Targeted UPDATE of kicd_data only. An upsert carrying a partial row is
+  // rejected by NOT NULL columns it does not send (order_index), and could
+  // overwrite columns it does — this touches nothing else.
+  const CONCURRENCY = 5
+  let written = 0
+  for (let i = 0; i < updates.length; i += CONCURRENCY) {
+    const batch = updates.slice(i, i + CONCURRENCY)
+    const results = await Promise.all(batch.map(u =>
+      db.from('sow_strands').update({ kicd_data: u.kicd_data, updated_at: new Date().toISOString() }).eq('id', u.id).select('id'),
+    ))
+    for (const [k, r] of results.entries()) {
+      if (r.error || !r.data?.length) {
+        throw new Error(`write failed for strand ${batch[k].id} (${written} written so far): ${r.error?.message ?? 'no row updated'} — restore from ${backupFile}`)
+      }
+      written++
+    }
   }
   console.log(`Wrote kicd_data for ${updates.length} strands.`)
 }
