@@ -99,3 +99,6 @@ docs/manuscript/engineering-educational-intelligence/dist/
 
 # KICD loader backups (scripts/kicd/load-kicd-data.ts --apply) — regenerable, kept out of git
 scripts/kicd/backups/
+
+# Python bytecode (scripts/kicd tests)
+__pycache__/
