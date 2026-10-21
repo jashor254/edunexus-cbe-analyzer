@@ -23,6 +23,10 @@ export type KicdEntry = {
   learningExperiences: string[]
   keyInquiryQuestions: string[]
   suggestedLessons: number | null
+  // The design's bullet points under the sub-strand title ("Causes of fire",
+  // "Fire triangle and fire control") — used only to match fine-grained
+  // seeded rows ("Fire control measures") to their sub-strand.
+  content: string[]
   // Present only where the design's "Core competencies / Values / PCIs"
   // blocks have been extracted for this entry. Empty means "not loaded",
   // never "the design lists none".
@@ -82,6 +86,7 @@ export function parseKicdEntries(raw: unknown): KicdEntry[] {
       keyInquiryQuestions: stringList(r.key_inquiry_questions).map(cleanKicdItem).filter(Boolean)
         .map(q => (q.endsWith('?') ? q : `${q}?`)),
       suggestedLessons: lessons,
+      content: stringList(r.content),
       coreCompetencies: stringList(r.core_competencies),
       values: stringList(r.values),
       pcis: stringList(r.pcis),
@@ -105,6 +110,17 @@ const GENERIC_WORDS = new Set([
   'the', 'and', 'of', 'in', 'to', 'for', 'a', 'an', 'on', 'with',
   // English skill labels
   'listening', 'speaking', 'reading', 'writing', 'grammar', 'use',
+])
+
+// Topic-neutral words that appear in seeded row titles across every subject
+// ("Importance of…", "Types of…", "Meaning and…"). Ignored by the content
+// pass so a row is matched by what it is ABOUT.
+const CONTENT_STOP = new Set([
+  'importance', 'meaning', 'types', 'type', 'uses', 'use', 'role', 'roles', 'introduction', 'application',
+  'applications', 'factors', 'process', 'processes', 'effects', 'effect', 'characteristics', 'describing',
+  'demonstrating', 'investigating', 'identifying', 'project', 'review', 'assessment', 'significance',
+  'comparing', 'illustrating', 'structure', 'functions', 'function', 'practical', 'activity', 'activities',
+  'umuhimu', 'maana', 'aina', 'sifa', 'matumizi',
 ])
 
 // Skill → the position KICD language designs number it at (x.1.1 listening,
@@ -165,7 +181,11 @@ type Candidate = { index: number; score: number; shared: number; skillMatch: boo
 // (JSS rows: "Sarufi - Vihusishi vya wakati") and "how much of the entry
 // title the row contains" (senior rows carry long genre prefixes:
 // "Bunilizi na Kazi za Kihalisia - Uchambuzi wa Tamthilia - Maudhui").
-export function matchKicdEntry(substrandTitle: string, entries: KicdEntry[]): number | null {
+// `strict` keeps only the title comparison — no skill-position or content
+// fallback. Used to decide WHICH KICD strand a whole DB strand corresponds
+// to (scripts/kicd/load-kicd-data.ts): every English theme has a listening
+// entry, so a fallback match says nothing about which theme a row is in.
+export function matchKicdEntry(substrandTitle: string, entries: KicdEntry[], options: { strict?: boolean } = {}): number | null {
   if (entries.length === 0) return null
   const rowTokens = contentTokens(substrandTitle)
   const rowSkill = positionFrom(SKILL_POSITIONS, substrandTitle)
@@ -195,10 +215,26 @@ export function matchKicdEntry(substrandTitle: string, entries: KicdEntry[]): nu
 
   const top: Candidate | null = best
   if (top && top.shared > 0 && top.score >= MIN_SCORE) return top.index
+  if (options.strict) return null
 
   // Titles share too little — accept a language-skill position only when it
   // is unambiguous (exactly one entry numbered at that position).
   if (rowSkill !== null && atRowPosition.length === 1) return atRowPosition[0].i
+
+  // Content pass: fine-grained seeded rows ("Atomic number", "Respiratory
+  // structures in fish") name a topic that appears only in the sub-strand's
+  // bullet points. At least two thirds of the row's distinctive words must
+  // appear in one entry's title + content, and that entry must be the clear
+  // winner — a tie means the row is ambiguous and stays ungrounded.
+  const distinctive = [...rowTokens].filter(t => !CONTENT_STOP.has(t))
+  if (distinctive.length === 0) return null
+  const scored = candidates.map(({ e, i }) => {
+    const pool = contentTokens(`${e.title} ${e.content.join(' ')}`)
+    const shared = distinctive.filter(t => pool.has(t) || (t.endsWith('s') && pool.has(t.slice(0, -1)))).length
+    return { i, shared }
+  }).sort((a, b) => b.shared - a.shared)
+  const [first, second] = scored
+  if (first && first.shared / distinctive.length >= 2 / 3 && (!second || first.shared > second.shared)) return first.i
   return null
 }
 

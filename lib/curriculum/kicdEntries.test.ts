@@ -133,6 +133,33 @@ test('matchKicdEntry: senior Fasihi genre filters candidates, so a shared generi
     'shares only "uchambuzi" with 6.2.1, and genre-only fallback is not allowed')
 })
 
+// Real Grade 8 Integrated Science entries (KICD design, data/kicd-pdfs/jss/).
+const SCIENCE = parseKicdEntries([
+  { title: '1.1 Elements and Compounds', learning_outcomes: ['x'], content: ['Atoms, elements and compounds', 'Common elements and symbols', 'Metals and non-metals'] },
+  { title: '1.3 Classes of fire', learning_outcomes: ['x'], content: ['Causes of fire (classes of fire)', 'Fire triangle and Fire control (breaking the fire triangle and use of fire extinguishers)', 'Dangers of fires'] },
+  { title: '3.2 Pressure', learning_outcomes: ['x'], content: ['Pressure in solids', 'Pressure in liquids'] },
+])
+
+test('content pass: a fine-grained seeded row is matched through the sub-strand\'s content points', () => {
+  assert.equal(matchKicdEntry('Use of extinguishers', SCIENCE), 1, '"extinguishers" appears only in 1.3\'s content points')
+  assert.equal(matchKicdEntry('Common elements and their symbols', SCIENCE), 0)
+  assert.equal(matchKicdEntry('Dangers of fires', SCIENCE), 1, 'topic-neutral words ignored; plural "fires" ≈ "fire"')
+})
+
+test('content pass refuses ambiguous or weak evidence', () => {
+  assert.equal(matchKicdEntry('Properties of solids and gases', SCIENCE), null, '"solids" alone is under two thirds of the row')
+  assert.equal(matchKicdEntry('Importance of science', SCIENCE), null)
+  assert.equal(matchKicdEntry('Importance of controlling fires', SCIENCE), null,
+    'no stemming beyond plural -s ("controlling" ≠ "control") — an honest miss, not a guess')
+})
+
+test('strict mode keeps only title evidence (used to decide which KICD strand a DB strand is)', () => {
+  assert.equal(matchKicdEntry('Kusikiliza na Kuzungumza - Mazungumzo ya kila siku', HAKI, { strict: true }), null,
+    'no skill-position fallback in strict mode')
+  assert.equal(matchKicdEntry('Use of extinguishers', SCIENCE, { strict: true }), null, 'no content fallback in strict mode')
+  assert.equal(matchKicdEntry('Sarufi - Mnyambuliko wa vitenzi', HAKI, { strict: true }), 3)
+})
+
 test('assignLessonParts numbers lessons within their entry, in teaching order', () => {
   const parts = assignLessonParts(['s#0', 's#1', 's#2', 's#3', 's#0', null, 's#1'])
   assert.deepEqual(parts, [
