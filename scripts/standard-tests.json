@@ -73,6 +73,7 @@
     "lib/curriculum/kicdVocabulary.test.ts",
     "lib/sow/diversityEngine.test.ts",
     "lib/sow/promptSafety.test.ts",
+    "lib/sow/sowPresentation.test.ts",
     "lib/config/attendanceOperatingMode.test.ts",
     "lib/config/kjseaRules.test.ts",
     "lib/config/teacherWorkspaceMemory.test.ts",

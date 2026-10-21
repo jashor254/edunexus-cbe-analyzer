@@ -71,7 +71,7 @@ export function getColumnConfig(mode: CurriculumMode, isKiswahili = false): ColC
         col3: 'MADA KUU',
         col4: 'MADA NDOGO',
         col5: 'SHABAHA',
-        col6: 'SHUGHULI ZA UFUNZAJI',
+        col6: 'SHUGHULI ZA UJIFUNZAJI',
         col7: 'MASWALI DADISI',
         col8: 'NYENZO',
         col9: 'TATHMINI',

@@ -5,6 +5,14 @@ import { esc } from '@/lib/pdf/utils'
 
 import type { SOWPreviewData, GeneratedLesson, BreakItem } from './types'
 import { isKiswahiliSubject } from '@/lib/curriculum/subjectUtils'
+import {
+  outcomeStem,
+  formatOutcomes,
+  letterLabel,
+  withPageBlank,
+  breakBadge,
+  signOffLines,
+} from './sowPresentation'
 
 const NAMED_BREAK_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   'August Holiday':    { bg: '#FEF3C7', text: '#92400E', border: '#F59E0B' },
@@ -62,7 +70,7 @@ export function generateSOWHtml(data: SOWPreviewData): string {
         strand:    'MADA KUU',
         substrand: 'MADA NDOGO',
         outcomes:  'SHABAHA',
-        experiences: 'SHUGHULI ZA UFUNZAJI',
+        experiences: 'SHUGHULI ZA UJIFUNZAJI',
         inquiry:     'MASWALI DADISI',
         resources:   'NYENZO',
         assessment:  'TATHMINI',
@@ -100,7 +108,7 @@ export function generateSOWHtml(data: SOWPreviewData): string {
       <td class="cell-center" style="color:${c.text};font-weight:700;">${b.startWeek}</td>
       <td class="cell-center" style="color:${c.text};">—</td>
       <td colspan="8" style="padding:5px 8px;">
-        <span style="display:inline-block;background:${c.border};color:#fff;font-size:7pt;font-weight:900;padding:1px 6px;border-radius:3px;letter-spacing:0.5px;">BREAK</span>
+        <span style="display:inline-block;background:${c.border};color:#fff;font-size:7pt;font-weight:900;padding:1px 6px;border-radius:3px;letter-spacing:0.5px;">${breakBadge(isKiswahili)}</span>
         <strong style="color:${c.text};margin-left:6px;">${esc(b.title)}</strong>
         <span style="color:${c.text};font-size:7pt;margin-left:6px;opacity:0.7;">${esc(wkRange)}</span>
       </td>
@@ -126,10 +134,10 @@ export function generateSOWHtml(data: SOWPreviewData): string {
       <td class="cell-center">${l.lesson}</td>
       <td>${esc(l.strand)}</td>
       <td style="${substrandStyle}">${esc(l.substrand)}</td>
-      <td>${bulletList(l.learningOutcomes)}</td>
+      <td>${outcomesCell(l.learningOutcomes, isKiswahili)}</td>
       <td>${bulletList(l.learningExperiences)}</td>
       <td>${bulletList(l.keyInquiryQuestions)}</td>
-      <td>${bulletList(l.learningResources)}</td>
+      <td>${bulletList(withPageBlank(l.learningResources, isKiswahili))}</td>
       <td>${bulletList(l.assessmentMethods)}</td>
       <td>${esc(l.reflection || '')}</td>
     </tr>`)
@@ -165,7 +173,7 @@ export function generateSOWHtml(data: SOWPreviewData): string {
       page-break-after: always;
       border: 2px solid #1a3c5e;
       padding: 24mm 20mm;
-      min-height: 240mm;
+      min-height: 225mm;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -249,6 +257,15 @@ export function generateSOWHtml(data: SOWPreviewData): string {
     .cell-center { text-align: center; }
     ul { margin: 0; padding-left: 14px; }
     ul li { margin-bottom: 2px; }
+    .stem { font-style: italic; margin-bottom: 3px; }
+    ul.lettered { list-style: none; padding-left: 0; }
+    ul.lettered li { padding-left: 14px; text-indent: -14px; }
+    .lbl { display: inline-block; width: 14px; text-indent: 0; font-weight: bold; }
+
+    /* Sign-off */
+    .signoff { margin-top: 16px; width: 100%; border-collapse: collapse; page-break-inside: avoid; }
+    .signoff td { border: none; font-size: 8.5pt; padding: 10px 6px 2px; }
+    .signoff .line { border-bottom: 1px solid #555; min-width: 40mm; display: inline-block; }
 
     /* Break row colors applied via inline styles */
 
@@ -281,7 +298,20 @@ export function generateSOWHtml(data: SOWPreviewData): string {
         print-color-adjust: exact;
         -webkit-print-color-adjust: exact;
       }
-      @page { margin: 10mm; }
+      /* A page-margin box (Chrome 131+) replaces the browser's own header and
+         footer — which printed "about:blank" and a timestamp on every page. */
+      @page {
+        size: A4;
+        margin: 10mm;
+        @top-left     { content: "${cssString(`${meta.learningArea} · ${meta.grade} · Term ${meta.term} ${meta.year}`)}"; font-size: 7pt; color: #666; }
+        @top-right    { content: "${cssString(school)}"; font-size: 7pt; color: #666; }
+        @bottom-right { content: counter(page) " / " counter(pages); font-size: 7pt; color: #666; }
+      }
+      /* Cover portrait; the 10-column table on landscape so outcomes are readable. */
+      .cover-page { page: cover; }
+      .table-page { page: sow; }
+      @page cover { size: A4 portrait; }
+      @page sow   { size: A4 landscape; }
     }
   </style>
 </head>
@@ -301,7 +331,7 @@ export function generateSOWHtml(data: SOWPreviewData): string {
   </div>
 
   <!-- ── Cover page ──────────────────────────────────────────────────────── -->
-  <div class="page">
+  <div class="page cover-page">
     <div class="cover">
 
       <div>
@@ -360,7 +390,7 @@ export function generateSOWHtml(data: SOWPreviewData): string {
   </div>
 
   <!-- ── SOW Table page ──────────────────────────────────────────────────── -->
-  <div class="page">
+  <div class="page table-page">
 
     <!-- Header -->
     <div class="header-title">SCHEME OF WORK</div>
@@ -405,6 +435,16 @@ export function generateSOWHtml(data: SOWPreviewData): string {
       <span>Total Lessons: <strong>${meta.totalLessons}</strong></span>
       <span>EduNexus · For Kenyan Teachers · ${esc(meta.generatedDate)}</span>
     </div>
+
+    <!-- Sign-off -->
+    <table class="signoff">
+      ${signOffLines(isKiswahili, teacherName).map(line => `
+      <tr>
+        <td style="width:34%"><strong>${esc(line.role)}:</strong> <span class="line">${esc(line.name)}</span></td>
+        <td style="width:33%">${isKiswahili ? 'Sahihi' : 'Signature'}: <span class="line"></span></td>
+        <td style="width:33%">${isKiswahili ? 'Tarehe' : 'Date'}: <span class="line"></span></td>
+      </tr>`).join('')}
+    </table>
   </div>
 
 </body>
@@ -482,6 +522,20 @@ export function downloadSOWAsText(data: SOWPreviewData): string {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// A value placed inside a CSS string literal (page-margin box content).
+function cssString(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/[\r\n<>]/g, ' ')
+}
+
+// Outcomes print under the design's stem, labelled a), b), c) — KICD form.
+function outcomesCell(outcomes: string[], isKiswahili: boolean): string {
+  const items = formatOutcomes(outcomes ?? [], isKiswahili)
+  if (items.length === 0) return '—'
+  return `<div class="stem">${esc(outcomeStem(isKiswahili))}</div><ul class="lettered">${
+    items.map((o, i) => `<li><span class="lbl">${letterLabel(i)}</span>${esc(o)}</li>`).join('')
+  }</ul>`
+}
 
 function bulletList(items: string[]): string {
   if (!items || items.length === 0) return '—'
