@@ -95,6 +95,13 @@ function titleOverlap(a: string, b: string): number {
   return ta.size && tb.size ? shared / Math.min(ta.size, tb.size) : 0
 }
 
+function stableJson(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)))
+      : v)
+}
+
 function numberOf(title: string): string | null {
   const m = title.match(/^\s*(\d+(?:\.\d+)+)/)
   return m ? m[1] : null
@@ -217,7 +224,10 @@ async function main(): Promise<void> {
       areaAfter += groundedRows.length
       for (const r of strand.rows) if (!groundedRows.includes(r) && unmatchedSamples.length < 4) unmatchedSamples.push(`${strand.title} :: ${r}`)
 
-      if (next !== strand.kicd_data) {
+      // By content, not reference (merge mode always builds a new array), and
+      // key-order-insensitive (jsonb stores object keys in its own order).
+      if (stableJson(next) !== stableJson(strand.kicd_data)) {
+        if (VERBOSE) console.log(`    changed: ${strand.title}`)
         updates.push({ id: strand.id, kicd_data: next, previous: strand.kicd_data, label: design.file })
       }
     }
