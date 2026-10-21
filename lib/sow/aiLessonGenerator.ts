@@ -208,6 +208,51 @@ function callSowAI(prompt: string, isKiswahili = false, costContext?: AICostCont
   })
 }
 
+// ─── KICD-grounded prompt blocks ─────────────────────────────────────────────
+// Used when the lesson matched a KICD sub-strand (lib/sow/kicdGrounding.ts):
+// the official outcomes and inquiry questions are FIXED inputs the model
+// designs around, not text it writes. generateValidatedLesson() then sets
+// them on the result from the slice itself, so the model cannot reword them.
+
+function lettered(items: string[]): string {
+  return items.map((t, i) => `${String.fromCharCode(97 + i)}) ${t}`).join('\n')
+}
+
+function groundedOutcomeBlock(slice: KicdLessonSlice, isKiswahili: boolean): string {
+  return isKiswahili
+    ? `SHABAHA — ZIMETOLEWA NA MTAALA WA KICD (${slice.entryTitle}, kipindi ${slice.part} kati ya ${slice.parts}).
+Zitatumika KAMA ZILIVYO — usiziandike upya, usiongeze, usipunguze:
+Kufikia mwisho wa kipindi, mwanafunzi aweze:
+${lettered(slice.learningOutcomes)}
+Kazi yako: buni shughuli za ujifunzaji, tathmini na nyenzo zinazomwezesha mwanafunzi kufikia shabaha hizi HASA.`
+    : `LEARNING OUTCOMES — FROM THE KICD CURRICULUM DESIGN (${slice.entryTitle}, lesson ${slice.part} of ${slice.parts}).
+They are used EXACTLY as written — do not rewrite, add or drop any:
+By the end of the lesson, the learner should be able to:
+${lettered(slice.learningOutcomes)}
+Your job: design the learning experiences, assessment and resources that let learners achieve exactly these outcomes.`
+}
+
+function groundedExperienceBlock(slice: KicdLessonSlice, isKiswahili: boolean, classroomRule: string): string {
+  const suggested = slice.learningExperiences.map(e => `- ${e}`).join('\n')
+  if (isKiswahili) {
+    return `SHUGHULI ZA UJIFUNZAJI — KICD inapendekeza kwa kipindi hiki:
+${suggested || '- (tumia shabaha zilizo hapo juu)'}
+Andika shughuli TATU zinazotekelezeka darasani zinazofuata mapendekezo haya — si shughuli za aina nyingine.
+${classroomRule}`
+  }
+  return `LEARNING EXPERIENCES — KICD suggests for this lesson:
+${suggested || '- (derive them from the outcomes above)'}
+Write THREE classroom-feasible experiences that follow these suggestions — not activities of another kind.
+${classroomRule}`
+}
+
+function groundedQuestionBlock(slice: KicdLessonSlice, isKiswahili: boolean): string {
+  const questions = slice.keyInquiryQuestions.map(q => `- ${q}`).join('\n')
+  return isKiswahili
+    ? `MASWALI DADISI — ya KICD, yatumike KAMA YALIVYO:\n${questions}`
+    : `KEY INQUIRY QUESTIONS — from KICD, used EXACTLY as written:\n${questions}`
+}
+
 // ─── Prompt builder ──────────────────────────────────────────────────────────
 
 function buildLessonPrompt({
@@ -245,15 +290,6 @@ function buildLessonPrompt({
   const gradeNum = grade.replace(/^(?:Grade|Form)\s+/i, '')
 
 
-  // KICD grounding — the slice of the matched sub-strand THIS lesson teaches
-  // (lib/sow/kicdGrounding.ts), never the strand's first sub-strand.
-  const kicdSection = kicdSlice
-    ? `\nOFFICIAL KICD CONTENT — ${kicdSlice.entryTitle} (lesson ${kicdSlice.part} of ${kicdSlice.parts}):\n${JSON.stringify({
-        learning_outcomes:    kicdSlice.learningOutcomes,
-        learning_experiences: kicdSlice.learningExperiences,
-        key_inquiry_questions: kicdSlice.keyInquiryQuestions,
-      }, null, 2)}\n`
-    : ''
 
   // Curriculum-mode descriptors
   const curriculumContext = isCBC
@@ -340,6 +376,8 @@ ${verbAvoidLine}
 `
   }
 
+  if (kicdSlice) outcomeBlock = groundedOutcomeBlock(kicdSlice, isKiswahili)
+
   // ── Experience instruction ──────────────────────────────────────────────────
   const classroomRule = isKiswahili
     ? `MUHIMU: Shughuli ZOTE zifanyike NDANI ya darasa pekee.
@@ -394,6 +432,14 @@ Use THESE specific starters (adapt to topic):
     : isKiswahili
       ? `Andika maswali matatu ya uchunguzi yenye mianzo TOFAUTI. Zungusha kati ya: Kwa nini / Vipi / Ni nini kingetokea kama / Kwa njia gani / Je / Kwa kiwango gani...`
       : `Write 3 inquiry questions using DIFFERENT starters. Rotate: Why / How / What if / In what ways / Which / How might / Where / Can you...`
+
+  const experienceBlock = kicdSlice
+    ? groundedExperienceBlock(kicdSlice, isKiswahili, classroomRule)
+    : experienceInstruction
+  const officialQuestions = !!kicdSlice && kicdSlice.keyInquiryQuestions.length > 0
+  const questionBlock = officialQuestions
+    ? groundedQuestionBlock(kicdSlice, isKiswahili)
+    : questionInstruction
 
   // ── Assessment instruction ──────────────────────────────────────────────────
   const assessmentInstruction = seed
@@ -525,17 +571,13 @@ ${substrand.split(/[\s\-:,/()]+/).filter(w => w.length >= 4).slice(0, 3).join(',
 
   const importantNotes = isKiswahili
     ? `MUHIMU:
-- Matokeo matatu ya kujifunza: mpangilio wa utambuzi Kiwango 1 → Kiwango 2 → Kiwango 3
-- Kila matokeo lianze MOJA KWA MOJA na kitenzi cha kutenda — USIANDIKE "Kufikia mwisho wa somo" au "Mwanafunzi aweze" kama utangulizi
-- Tumia istilahi za ${isCBC ? 'CBC Kenya' : 'KCSE 8-4-4 Kenya'} kwa Kiswahili sanifu
+${kicdSlice ? '- Shabaha za KICD zirudishwe kama zilivyotolewa hapo juu\n' : `- Matokeo matatu ya kujifunza: mpangilio wa utambuzi Kiwango 1 → Kiwango 2 → Kiwango 3\n- Kila matokeo lianze MOJA KWA MOJA na kitenzi cha kutenda — USIANDIKE "Kufikia mwisho wa somo" au "Mwanafunzi aweze" kama utangulizi\n`}- Tumia istilahi za ${isCBC ? 'CBC Kenya' : 'KCSE 8-4-4 Kenya'} kwa Kiswahili sanifu
 - Mifano yote lazima itaje sehemu, mazao, desturi, au jamii halisi za Kenya
 - Andika maudhui YOTE (matokeo, uzoefu, maswali, tathmini, nyenzo, maadili, uwezo wa msingi) kwa Kiswahili Sanifu — majina ya sehemu za JSON pekee ndiyo yanabaki kwa Kiingereza
 - Toa JSON SAHIHI PEKEE — bila maandishi mengine
 ${retryNote}`
     : `IMPORTANT:
-- 3 learning outcomes: Level 1 → Level 2 → Level 3 cognitive order
-- Each outcome starts DIRECTLY with the action verb — do NOT write "By the end of the lesson" or "The learner should be able to" as a prefix
-- Use ${isCBC ? 'CBC Kenya' : 'KCSE 8-4-4 Kenya'} terminology throughout
+${kicdSlice ? '- Return the KICD outcomes exactly as given above\n' : `- 3 learning outcomes: Level 1 → Level 2 → Level 3 cognitive order\n- Each outcome starts DIRECTLY with the action verb — do NOT write "By the end of the lesson" or "The learner should be able to" as a prefix\n`}- Use ${isCBC ? 'CBC Kenya' : 'KCSE 8-4-4 Kenya'} terminology throughout
 - All examples must reference real Kenyan places, crops, practices, or communities
 - Output VALID JSON ONLY — no extra text
 ${retryNote}`
@@ -551,9 +593,9 @@ Lesson: ${lessonNumber} of ${totalLessons}
 
 ${outcomeBlock}
 
-${experienceInstruction}
+${experienceBlock}
 
-${questionInstruction}
+${questionBlock}
 
 ${assessmentInstruction}
 
@@ -561,26 +603,17 @@ ${resourcesLabel}
 
 ${keywordRequirement}
 
-${kicdSection}
 ${seed?.contextBlock ? `\nPER-LESSON DIVERSITY CONTEXT:\n${seed.contextBlock}` : ''}
 
 ${outputHeader}
 {
-  "learning_outcomes": [
-    "${learningOutcomeEx[0]}",
-    "${learningOutcomeEx[1]}",
-    "${learningOutcomeEx[2]}"
-  ],
+  "learning_outcomes": ${JSON.stringify(kicdSlice ? kicdSlice.learningOutcomes : learningOutcomeEx)},
   "learning_experiences": [
     "${experienceEx[0]}",
     "${experienceEx[1]}",
     "${experienceEx[2]}"
   ],
-  "key_inquiry_questions": [
-    "${inquiryQuestionEx[0]}",
-    "${inquiryQuestionEx[1]}",
-    "${inquiryQuestionEx[2]}"
-  ],
+  "key_inquiry_questions": ${JSON.stringify(officialQuestions ? kicdSlice.keyInquiryQuestions : inquiryQuestionEx)},
   "assessment_methods": [
     "${assessmentMethodsEx[0]}",
     "${assessmentMethodsEx[1]}",
@@ -703,7 +736,18 @@ ${isMathsRetry && lastError.includes('progress') ? 'MATHS REMINDER: a)=recall/id
       continue
     }
 
-    const validation = validateLesson(lesson, context.substrand, context.subjectType ?? 'default')
+    // Official KICD text is set from the slice, never taken from the model's
+    // echo of it — the model may silently reword or drop an outcome.
+    const slice = context.kicdSlice
+    if (slice) {
+      lesson.learning_outcomes = slice.learningOutcomes
+      if (slice.keyInquiryQuestions.length) lesson.key_inquiry_questions = slice.keyInquiryQuestions
+    }
+
+    const validation = validateLesson(lesson, context.substrand, context.subjectType ?? 'default', {
+      outcomesFromKicd: !!slice,
+      inquiryFromKicd:  !!slice && slice.keyInquiryQuestions.length > 0,
+    })
 
     if (validation.isValid) {
       return {

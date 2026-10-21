@@ -69,6 +69,7 @@
     "lib/compass/prompt.test.ts",
     "lib/curriculum/kicdEntries.test.ts",
     "lib/sow/kicdGrounding.test.ts",
+    "lib/sow/aiLessonGenerator.grounded.test.ts",
     "lib/config/attendanceOperatingMode.test.ts",
     "lib/config/kjseaRules.test.ts",
     "lib/config/teacherWorkspaceMemory.test.ts",

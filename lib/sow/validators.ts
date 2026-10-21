@@ -192,17 +192,39 @@ function validateSubstrandAlignment(
   return { valid: true }
 }
 
+function validatePresent(items: unknown, what: string): { valid: boolean; reason?: string } {
+  return Array.isArray(items) && items.length > 0
+    ? { valid: true }
+    : { valid: false, reason: `${what} missing` }
+}
+
+// Content copied verbatim from the KICD curriculum design is not held to the
+// generator's style heuristics: KICD outcomes are written in the infinitive
+// ("kueleza…", "kutambua…") that the verb-level pools do not list, and many
+// KICD inquiry questions ("Mawaidha hushirikisha kina nani?") use none of
+// the "higher-order starters". Failing them would make the generator retry
+// until it rewrote the official wording — exactly what grounding prevents.
+export type ValidateLessonOptions = {
+  outcomesFromKicd?: boolean
+  inquiryFromKicd?: boolean
+}
+
 // ================= MAIN EXPORT =================
 export function validateLesson(
   lesson: Record<string, unknown>,
   substrandTitle = '',
-  subjectType = 'default'
+  subjectType = 'default',
+  options: ValidateLessonOptions = {},
 ): { isValid: boolean; issues: string[] } {
   const verbOrder = VERB_ORDERS[subjectType] ?? VERB_ORDERS.default
   const checks = [
-    validateLearningOutcomes(lesson.learning_outcomes as string[], verbOrder, subjectType),
+    options.outcomesFromKicd
+      ? validatePresent(lesson.learning_outcomes, 'Learning outcomes')
+      : validateLearningOutcomes(lesson.learning_outcomes as string[], verbOrder, subjectType),
     validateLearningExperiences(lesson.learning_experiences as string[], subjectType),
-    validateInquiryQuestions(lesson.key_inquiry_questions as string[], subjectType),
+    options.inquiryFromKicd
+      ? validatePresent(lesson.key_inquiry_questions, 'Inquiry questions')
+      : validateInquiryQuestions(lesson.key_inquiry_questions as string[], subjectType),
     validateAssessmentMethods(lesson.assessment_methods as string[]),
     validateLearningResources(lesson.learning_resources as string[]),
     validateSubstrandAlignment(lesson, substrandTitle),
