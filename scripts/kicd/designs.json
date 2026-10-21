@@ -1,0 +1,712 @@
+[
+  {
+    "file": "data/kicd-pdfs/jss/english-grade7.pdf",
+    "grades": [
+      "Grade 7",
+      "Grade 7 (JSS)"
+    ],
+    "areas": [
+      "English"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/integrated-science-grade7.pdf",
+    "grades": [
+      "Grade 7",
+      "Grade 7 (JSS)"
+    ],
+    "areas": [
+      "Integrated Science"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/mathematics-grade7.pdf",
+    "grades": [
+      "Grade 7",
+      "Grade 7 (JSS)"
+    ],
+    "areas": [
+      "Mathematics"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/social-studies-grade7.pdf",
+    "grades": [
+      "Grade 7",
+      "Grade 7 (JSS)"
+    ],
+    "areas": [
+      "Social Studies"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/pre-technical-studies-grade7.pdf",
+    "grades": [
+      "Grade 7",
+      "Grade 7 (JSS)"
+    ],
+    "areas": [
+      "Pre-Technical Studies"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/agriculture-nutrition-grade7.pdf",
+    "grades": [
+      "Grade 7",
+      "Grade 7 (JSS)"
+    ],
+    "areas": [
+      "Agriculture and Nutrition"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/cre-grade7.pdf",
+    "grades": [
+      "Grade 7",
+      "Grade 7 (JSS)"
+    ],
+    "areas": [
+      "Christian Religious Education",
+      "Christian Religious Education (CRE)"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/ire-grade7.pdf",
+    "grades": [
+      "Grade 7",
+      "Grade 7 (JSS)"
+    ],
+    "areas": [
+      "Islamic Religious Education",
+      "Islamic Religious Education (IRE)"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/creative-arts-sports-grade7.pdf",
+    "grades": [
+      "Grade 7",
+      "Grade 7 (JSS)"
+    ],
+    "areas": [
+      "Creative Arts and Sports"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/kiswahili-grade7.pdf",
+    "grades": [
+      "Grade 7",
+      "Grade 7 (JSS)"
+    ],
+    "areas": [
+      "Kiswahili"
+    ],
+    "mode": "merge-attributes"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/english-grade8.pdf",
+    "grades": [
+      "Grade 8",
+      "Grade 8 (JSS)"
+    ],
+    "areas": [
+      "English"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/integrated-science-grade8.pdf",
+    "grades": [
+      "Grade 8",
+      "Grade 8 (JSS)"
+    ],
+    "areas": [
+      "Integrated Science"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/mathematics-grade8.pdf",
+    "grades": [
+      "Grade 8",
+      "Grade 8 (JSS)"
+    ],
+    "areas": [
+      "Mathematics"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/social-studies-grade8.pdf",
+    "grades": [
+      "Grade 8",
+      "Grade 8 (JSS)"
+    ],
+    "areas": [
+      "Social Studies"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/pre-technical-studies-grade8.pdf",
+    "grades": [
+      "Grade 8",
+      "Grade 8 (JSS)"
+    ],
+    "areas": [
+      "Pre-Technical Studies"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/agriculture-nutrition-grade8.pdf",
+    "grades": [
+      "Grade 8",
+      "Grade 8 (JSS)"
+    ],
+    "areas": [
+      "Agriculture and Nutrition"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/cre-grade8.pdf",
+    "grades": [
+      "Grade 8",
+      "Grade 8 (JSS)"
+    ],
+    "areas": [
+      "Christian Religious Education",
+      "Christian Religious Education (CRE)"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/ire-grade8.pdf",
+    "grades": [
+      "Grade 8",
+      "Grade 8 (JSS)"
+    ],
+    "areas": [
+      "Islamic Religious Education",
+      "Islamic Religious Education (IRE)"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/creative-arts-sports-grade8.pdf",
+    "grades": [
+      "Grade 8",
+      "Grade 8 (JSS)"
+    ],
+    "areas": [
+      "Creative Arts and Sports"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/kiswahili-grade8.pdf",
+    "grades": [
+      "Grade 8",
+      "Grade 8 (JSS)"
+    ],
+    "areas": [
+      "Kiswahili"
+    ],
+    "mode": "merge-attributes"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/english-grade9.pdf",
+    "grades": [
+      "Grade 9",
+      "Grade 9 (JSS)"
+    ],
+    "areas": [
+      "English"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/integrated-science-grade9.pdf",
+    "grades": [
+      "Grade 9",
+      "Grade 9 (JSS)"
+    ],
+    "areas": [
+      "Integrated Science"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/mathematics-grade9.pdf",
+    "grades": [
+      "Grade 9",
+      "Grade 9 (JSS)"
+    ],
+    "areas": [
+      "Mathematics"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/social-studies-grade9.pdf",
+    "grades": [
+      "Grade 9",
+      "Grade 9 (JSS)"
+    ],
+    "areas": [
+      "Social Studies"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/pre-technical-studies-grade9.pdf",
+    "grades": [
+      "Grade 9",
+      "Grade 9 (JSS)"
+    ],
+    "areas": [
+      "Pre-Technical Studies"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/agriculture-nutrition-grade9.pdf",
+    "grades": [
+      "Grade 9",
+      "Grade 9 (JSS)"
+    ],
+    "areas": [
+      "Agriculture and Nutrition"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/cre-grade9.pdf",
+    "grades": [
+      "Grade 9",
+      "Grade 9 (JSS)"
+    ],
+    "areas": [
+      "Christian Religious Education",
+      "Christian Religious Education (CRE)"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/ire-grade9.pdf",
+    "grades": [
+      "Grade 9",
+      "Grade 9 (JSS)"
+    ],
+    "areas": [
+      "Islamic Religious Education",
+      "Islamic Religious Education (IRE)"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/jss/creative-arts-sports-grade9.pdf",
+    "grades": [
+      "Grade 9",
+      "Grade 9 (JSS)"
+    ],
+    "areas": [
+      "Creative Arts and Sports"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/kiswahili-grade9.pdf",
+    "grades": [
+      "Grade 9",
+      "Grade 9 (JSS)"
+    ],
+    "areas": [
+      "Kiswahili"
+    ],
+    "mode": "merge-attributes"
+  },
+  {
+    "file": "data/kicd-pdfs/agriculture.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Agriculture"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/arabic.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Arabic Language"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/aviation.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Aviation"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/biology.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Biology"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/building-construction.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Building Construction"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/business-studies.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Business Studies"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/chemistry.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Chemistry"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/computer-studies.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Computer Studies"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/cre.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Christian Religious Education"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/electricity.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Electricity"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/english.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "English"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/fine-arts.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Fine Arts"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/french.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "French Language"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/general-science.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "General Science"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/geography.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Geography"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/german.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "German Language"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/history.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "History and Citizenship"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/home-science.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Home Science"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/hre.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Hindu Religious Education"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/ict.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "ICT"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/indigenous-languages.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Indigenous Languages"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/ire.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Islamic Religious Education"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/literature-in-english.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Literature in English"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/mandarin.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Mandarin Language"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/mathematics.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Core Mathematics"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/metalwork.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Metalwork"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/music-dance.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Music and Dance"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/physical-education.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Physical Education"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/physics.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Physics"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/sports-recreation.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Sports and Recreation"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/theatre-film.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Theatre and Film"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/woodwork.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Woodwork"
+    ],
+    "mode": "replace"
+  },
+  {
+    "file": "data/kicd-pdfs/kiswahili-lugha.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Kiswahili Lugha"
+    ],
+    "mode": "merge-attributes"
+  },
+  {
+    "file": "data/kicd-pdfs/kiswahili-fasihi.pdf",
+    "grades": [
+      "Grade 10",
+      "Grade 10 (CBE)"
+    ],
+    "areas": [
+      "Kiswahili Fasihi"
+    ],
+    "mode": "merge-attributes"
+  }
+]

@@ -96,3 +96,6 @@ blender-validation/
 # book build pipeline — isolated node project + generated PDF, not source
 scripts/book-build/node_modules/
 docs/manuscript/engineering-educational-intelligence/dist/
+
+# KICD loader backups (scripts/kicd/load-kicd-data.ts --apply) — regenerable, kept out of git
+scripts/kicd/backups/
