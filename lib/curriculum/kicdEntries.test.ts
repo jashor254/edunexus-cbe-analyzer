@@ -149,8 +149,8 @@ test('content pass: a fine-grained seeded row is matched through the sub-strand\
 test('content pass refuses ambiguous or weak evidence', () => {
   assert.equal(matchKicdEntry('Properties of solids and gases', SCIENCE), null, '"solids" alone is under two thirds of the row')
   assert.equal(matchKicdEntry('Importance of science', SCIENCE), null)
-  assert.equal(matchKicdEntry('Importance of controlling fires', SCIENCE), null,
-    'no stemming beyond plural -s ("controlling" ≠ "control") — an honest miss, not a guess')
+  assert.equal(matchKicdEntry('Importance of controlling fires', SCIENCE), 1,
+    'light stemming: "controlling" ≈ "control", "fires" ≈ "fire"')
 })
 
 test('strict mode keeps only title evidence (used to decide which KICD strand a DB strand is)', () => {

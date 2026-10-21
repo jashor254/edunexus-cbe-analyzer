@@ -122,6 +122,7 @@ const CONTENT_STOP = new Set([
   'comparing', 'illustrating', 'structure', 'functions', 'function', 'practical', 'activity', 'activities',
   'umuhimu', 'maana', 'aina', 'sifa', 'matumizi',
 ])
+const CONTENT_STOP_STEMS = new Set([...CONTENT_STOP].map(stem))
 
 // Skill → the position KICD language designs number it at (x.1.1 listening,
 // x.2.1 reading, x.3.1 writing, x.4.1 grammar). A row labelled with a skill
@@ -146,6 +147,20 @@ const GENRE_POSITIONS: Array<[RegExp, number]> = [
   [/^\s*bunilizi/i, 3],
 ]
 
+// Light English stemming, applied identically to row and entry tokens
+// ("controlling" ≈ "control", "classes" ≈ "class", "fires" ≈ "fire").
+// Kiswahili words end in vowels, so none of these suffixes touch them.
+function stem(token: string): string {
+  let t = token
+  if (t.length > 5 && t.endsWith('ing')) t = t.slice(0, -3)
+  else if (t.length > 4 && t.endsWith('ed')) t = t.slice(0, -2)
+  else if (t.length > 4 && t.endsWith('es')) t = t.slice(0, -2)
+  else if (t.length > 3 && t.endsWith('s') && !t.endsWith('ss')) t = t.slice(0, -1)
+  // controll(ing) → control, plann(ed) → plan
+  if (/([bcdfgklmnprstvz])\1$/.test(t) && t !== token) t = t.slice(0, -1)
+  return t
+}
+
 function contentTokens(text: string): Set<string> {
   const tokens = text
     .toLowerCase()
@@ -154,6 +169,7 @@ function contentTokens(text: string): Set<string> {
     .split(/[^a-z0-9']+/)
     .map(t => t.replace(/'/g, ''))
     .filter(t => t.length >= 3 && !GENERIC_WORDS.has(t))
+    .map(stem)
   return new Set(tokens)
 }
 
@@ -226,11 +242,11 @@ export function matchKicdEntry(substrandTitle: string, entries: KicdEntry[], opt
   // bullet points. At least two thirds of the row's distinctive words must
   // appear in one entry's title + content, and that entry must be the clear
   // winner — a tie means the row is ambiguous and stays ungrounded.
-  const distinctive = [...rowTokens].filter(t => !CONTENT_STOP.has(t))
+  const distinctive = [...rowTokens].filter(t => !CONTENT_STOP.has(t) && !CONTENT_STOP_STEMS.has(t))
   if (distinctive.length === 0) return null
   const scored = candidates.map(({ e, i }) => {
     const pool = contentTokens(`${e.title} ${e.content.join(' ')}`)
-    const shared = distinctive.filter(t => pool.has(t) || (t.endsWith('s') && pool.has(t.slice(0, -1)))).length
+    const shared = distinctive.filter(t => pool.has(t)).length
     return { i, shared }
   }).sort((a, b) => b.shared - a.shared)
   const [first, second] = scored
