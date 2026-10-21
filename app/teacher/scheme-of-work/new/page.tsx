@@ -285,33 +285,17 @@ export default function SchemeOfWorkPage() {
 
     setGenerating(true)
     setPaywall(null)
-    setProgress('Looking up official KICD content for this subject…')
+    setProgress('Starting generation…')
     setGenCounts(null)
     setResult(null)
     setResultJobId(null)
     setSavedSchemeId(null)
 
-    // Real curriculum grounding, not free generation — same lookup the
-    // Step5Preview flow already uses. When this comes back empty (no KICD
-    // data indexed for this subject yet), generation still proceeds, but
-    // the result carries `groundedInKicd: false` and Step 5 shows an
-    // explicit notice rather than silently presenting AI-only content as
-    // official CBC-aligned material.
-    let kicdContext: SOWContext['kicdContext']
-    try {
-      const kicdRes = await fetch(`/api/sow/kicd-context?subject=${encodeURIComponent(learningAreaName || learningArea)}&grade=${encodeURIComponent(grade)}`)
-      if (kicdRes.ok) {
-        const kicdJson = await kicdRes.json() as { data?: { kicdArea?: { kicd_subject_data?: unknown }; kicdStrands?: Array<{ title: string; kicd_data?: unknown }> } }
-        kicdContext = {
-          subjectData: (kicdJson.data?.kicdArea?.kicd_subject_data ?? {}) as Record<string, Record<string, unknown>>,
-          strandData:  (kicdJson.data?.kicdStrands ?? []) as { title: string; kicd_data: Record<string, unknown>[] }[],
-        }
-      }
-    } catch {
-      // Non-fatal — generation proceeds ungrounded and says so on Step 5.
-    }
-
-    const context: SOWContext = { school, grade, gradeName: grade, learningArea, learningAreaName, term, year, curriculumMode, textbook, kicdContext }
+    // KICD grounding is loaded server-side from the selected strand ids
+    // (lib/sow/kicdGrounding.ts). Lessons with no matching KICD sub-strand
+    // are counted in `summary.grounded`, and Step 5 says so explicitly rather
+    // than presenting AI-only content as official CBC-aligned material.
+    const context: SOWContext = { school, grade, gradeName: grade, learningArea, learningAreaName, term, year, curriculumMode, textbook }
     const rawSubstrands: SelectedSubstrand[] = selections.map((s, i) => ({
       strandId: s.strandId, strandTitle: s.strandTitle, substrandId: s.substrandId,
       substrandTitle: s.substrandTitle, lessonsRequired: s.lessonsRequired, orderIndex: i,
@@ -1147,8 +1131,16 @@ export default function SchemeOfWorkPage() {
               <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3.5">
                 <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                 <div className="text-sm text-amber-800">
-                  <strong>No official KICD content was found for this subject</strong> — these lessons were generated from the subject, grade, and strand names only, not from indexed KICD curriculum data.
-                  Please review learning outcomes against your own scheme guide before teaching from this.
+                  {(result.summary?.grounded ?? 0) > 0 ? (
+                    <>
+                      <strong>Official KICD content was found for {result.summary.grounded} of {result.summary.generated} lessons</strong> — the other {result.summary.generated - result.summary.grounded} were generated from the sub-strand names only.
+                    </>
+                  ) : (
+                    <>
+                      <strong>No official KICD content was found for this subject</strong> — these lessons were generated from the subject, grade, and strand names only, not from indexed KICD curriculum data.
+                    </>
+                  )}
+                  {' '}Please review learning outcomes against your own scheme guide before teaching from this.
                 </div>
               </div>
             )}

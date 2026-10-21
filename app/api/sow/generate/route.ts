@@ -34,7 +34,8 @@ const FEATURE: FeatureKey = 'sow_generate'
 // `learningArea`/`grade` are kept required for compatibility: both production
 // callers send the full SOWContext, and this route is not the place to prune
 // fields. `.passthrough()` still carries the genuinely optional rest
-// (school, term, year, textbook, kicdContext).
+// (school, term, year, textbook). A `kicdContext` sent by an older client is
+// dropped below — KICD grounding is loaded server-side by strand id.
 const GenerateSOWSchema = z.object({
   context: z.object({
     learningArea:     z.string().min(1),
@@ -55,6 +56,7 @@ const GenerateSOWSchema = z.object({
 import { buildTermSchedule } from '@/lib/sow/termSchedule'
 import { applyBreaksToSchedule } from '@/lib/sow/breakEngine'
 import { generateSchemePipeline } from '@/lib/sow/lessonPipeline'
+import { loadKicdEntriesByStrandId } from '@/lib/sow/kicdGrounding'
 import type {
   SOWContext,
   LessonStructure,
@@ -129,7 +131,11 @@ export async function POST(req: Request) {
     // down. Omitting costContext is a documented no-op per lib/ai/deepseek.ts's
     // contract ("optional and additive"). Per-school cost attribution, if it is
     // ever wanted, belongs on the live school domain, not the absent one.
-    const context: SOWContext = { ...parsedContext }
+    // Client-supplied curriculum content is never trusted as "official KICD":
+    // an older client still sends `kicdContext`, so it is stripped here.
+    const { kicdContext: _clientKicd, ...contextFields } = parsedContext as SOWContext & { kicdContext?: unknown }
+    void _clientKicd
+    const context: SOWContext = { ...contextFields }
 
     // ── Build or use pre-built timeline ───────────────────────────────────────
     let timeline: TimelineSlot[]
@@ -194,8 +200,11 @@ export async function POST(req: Request) {
 
     after(async () => {
       try {
+        const kicdEntriesByStrandId = await loadKicdEntriesByStrandId(
+          selectedSubstrands.map(s => s.strandId),
+        )
         const result = await generateSchemePipeline(
-          { timeline, selectedSubstrands, context },
+          { timeline, selectedSubstrands, context, kicdEntriesByStrandId },
           async progress => {
             await repos.jobs.updateProgress(job.id, {
               result: { total: progress.total, completed: progress.completed, failed: progress.failed },

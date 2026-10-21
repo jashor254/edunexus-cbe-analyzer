@@ -21,11 +21,9 @@ export interface SOWContext {
   year: number
   curriculumMode: CurriculumMode
   textbook?: string
-  kicdContext?: {
-    subjectData: Record<string, Record<string, unknown>>
-    strandData: Array<{ title: string; kicd_data: Record<string, unknown>[] }>
-    subtopicMap?: Record<string, string[]>
-  }
+  // KICD grounding is NOT part of the context: it is loaded server-side from
+  // the selected strand ids (lib/sow/kicdGrounding.ts). A client-supplied
+  // `kicdContext` used to be trusted here as "official KICD content".
   // Optional — when the caller resolved an organization for this teacher,
   // every AI call in the pipeline records its real token cost against it.
   // Omitted entirely for teachers with no resolvable organization (no
@@ -82,6 +80,9 @@ export interface AllocatedLesson {
   // this mirrors every other producer's null-safe contract rather than
   // assuming it can never happen).
   substrandId: string | null
+  // The selected strand's id, carried the same way — the key KICD grounding
+  // is looked up by (lib/sow/kicdGrounding.ts).
+  strandId: string | null
   lessonInSubstrand: number
 }
 
@@ -104,6 +105,10 @@ export interface GeneratedLesson {
   values: string
   pciLinks: string
   reflection: string
+  // The KICD sub-strand this lesson's outcomes were taken from, e.g.
+  // "11.4.1 Mnyambuliko wa Vitenzi" — absent on ungrounded lessons and on
+  // schemes saved before grounding existed.
+  kicdEntryTitle?: string
   _validated: boolean
   _confidence: number
   isBreak?:      boolean
@@ -117,6 +122,8 @@ export interface SOWGenerationResult {
     totalSlots: number
     generated: number
     failed: number
+    // Generated lessons whose outcomes came from a matched KICD sub-strand.
+    grounded: number
   }
   lessons: GeneratedLesson[]
   failures: Array<{
@@ -126,11 +133,12 @@ export interface SOWGenerationResult {
     substrand: string
     error: string
   }>
-  // False when no real KICD strand data was attached to the prompt for this
-  // subject — the content was generated from subject/grade/strand names
-  // alone. CBC/CBE trust audit requirement: curriculum grounding gaps must
-  // be surfaced explicitly to the teacher, never silently presented as
-  // official KICD-aligned content. See app/teacher/scheme-of-work/new/page.tsx.
+  // True only when EVERY generated lesson was grounded in a matched KICD
+  // sub-strand (summary.grounded === summary.generated > 0). It used to be
+  // true whenever strand rows existed — including every subject whose
+  // kicd_data is an empty array. CBC/CBE trust audit requirement: grounding
+  // gaps are surfaced to the teacher, never presented as KICD-aligned.
+  // See app/teacher/scheme-of-work/new/page.tsx.
   groundedInKicd: boolean
 }
 

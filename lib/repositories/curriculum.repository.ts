@@ -473,6 +473,21 @@ export class CurriculumRepository extends BaseRepository {
     return (data ?? []) as Array<{ id: string; learning_area_id: string; title: string }>
   }
 
+  // Raw KICD design entries (`sow_strands.kicd_data`) for exactly the strands
+  // a scheme of work covers — the server-side grounding source for SOW
+  // generation. Keyed by id, never by title, and never taken from the client.
+  async findKicdDataByStrandIds(
+    strandIds: string[],
+  ): Promise<Array<{ id: string; kicd_data: unknown }>> {
+    if (strandIds.length === 0) return []
+    const { data, error } = await this.db
+      .from('sow_strands')
+      .select('id, kicd_data')
+      .in('id', strandIds)
+    if (error) throw new Error(`Failed to load KICD data for strands: ${error.message}`)
+    return (data ?? []) as Array<{ id: string; kicd_data: unknown }>
+  }
+
   // ── SOW generator tree lookups (grades/learning-areas/strands/kicd-context routes) ──
 
   async findPrimaryLevelId(curriculumType: string): Promise<{ id: string } | null> {

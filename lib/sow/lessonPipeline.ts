@@ -7,6 +7,7 @@ import { allocateLessons } from './lessonAllocator'
 import { generateValidatedLesson } from './aiLessonGenerator'
 import { VerbRotationEngine } from './verbRotationEngine'
 import { DiversityEngine, auditDiversity } from './diversityEngine'
+import { groundAllocatedLessons, type KicdEntriesByStrandId } from './kicdGrounding'
 import { isKiswahiliSubject } from '@/lib/curriculum/subjectUtils'
 import type {
   SOWContext,
@@ -20,6 +21,9 @@ export interface PipelineInput {
   timeline: TimelineSlot[]
   selectedSubstrands: SelectedSubstrand[]
   context: SOWContext
+  // Server-loaded KICD design entries for the selected strands
+  // (loadKicdEntriesByStrandId). Absent/empty → every lesson is ungrounded.
+  kicdEntriesByStrandId?: KicdEntriesByStrandId
 }
 
 function detectSubjectType(name: string, curriculumMode: string): string {
@@ -121,7 +125,7 @@ export async function generateSchemePipeline(
   input: PipelineInput,
   onProgress?: (event: SOWGenerationProgress) => void | Promise<void>,
 ): Promise<SOWGenerationResult> {
-  const { timeline, selectedSubstrands, context } = input
+  const { timeline, selectedSubstrands, context, kicdEntriesByStrandId = {} } = input
 
   if (!timeline || !selectedSubstrands?.length) {
     throw new Error('Timeline and substrands are required')
@@ -133,7 +137,7 @@ export async function generateSchemePipeline(
   if (teachingSlots <= 0) {
     return {
       status: 'failed',
-      summary: { totalSlots: 0, generated: 0, failed: 0 },
+      summary: { totalSlots: 0, generated: 0, failed: 0, grounded: 0 },
       lessons: [],
       failures: [],
       groundedInKicd: false,
@@ -147,6 +151,8 @@ export async function generateSchemePipeline(
     timeline,
     selectedSubstrands: scaledSubstrands,
   })
+  // Same order as allocatedLessons; null = no credible KICD entry.
+  const kicdSlices = groundAllocatedLessons(allocatedLessons, kicdEntriesByStrandId)
 
   const lessons: GeneratedLesson[] = []
   const failures: SOWGenerationResult['failures'] = []
@@ -185,13 +191,13 @@ export async function generateSchemePipeline(
           previousVerbs,
           diversitySeed,
           textbook:       context.textbook ?? 'Class textbook',
-          kicdContext:    context.kicdContext,
+          kicdSlice:      kicdSlices[i + batchIdx] ?? undefined,
           costContext:    context.costContext,
-        }).then(result => ({ slot, result }))
+        }).then(result => ({ slot, result, kicdSlice: kicdSlices[i + batchIdx] }))
       })
     )
 
-    for (const { slot, result } of batchResults) {
+    for (const { slot, result, kicdSlice } of batchResults) {
       const { week, lesson, strand, substrand, substrandId } = slot
       if (result._validated) {
         const outcomes = result.learning_outcomes || []
@@ -216,6 +222,7 @@ export async function generateSchemePipeline(
           values: result.values || '',
           pciLinks: result.pci_links || '',
           reflection: '',
+          ...(kicdSlice ? { kicdEntryTitle: kicdSlice.entryTitle } : {}),
           _validated: true,
           _confidence: result._confidence,
         })
@@ -243,6 +250,7 @@ export async function generateSchemePipeline(
   }
 
   // STEP 4: Return preview-safe structure
+  const grounded = lessons.filter(l => l.kicdEntryTitle).length
   return {
     status:
       failures.length === 0
@@ -254,9 +262,10 @@ export async function generateSchemePipeline(
       totalSlots: teachingSlots,
       generated: lessons.length,
       failed: failures.length,
+      grounded,
     },
     lessons,
     failures,
-    groundedInKicd: !!context.kicdContext?.strandData?.length,
+    groundedInKicd: lessons.length > 0 && grounded === lessons.length,
   }
 }

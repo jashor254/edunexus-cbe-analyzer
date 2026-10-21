@@ -7,6 +7,7 @@ import { isKiswahiliSubject } from '@/lib/curriculum/subjectUtils'
 import { callDeepSeek as callAI, type AICostContext } from '@/lib/ai/deepseek'
 import type { CurriculumMode } from './types'
 import type { DiversitySeed } from './diversityEngine'
+import type { KicdLessonSlice } from '@/lib/curriculum/kicdEntries'
 
 const MAX_RETRIES   = 5
 const MAX_CONFIDENCE = 0.92
@@ -220,7 +221,7 @@ function buildLessonPrompt({
   subjectType = 'default',
   previousVerbs,
   diversitySeed,
-  kicdContext,
+  kicdSlice,
   textbook,
 }: {
   learningArea:   string
@@ -234,11 +235,7 @@ function buildLessonPrompt({
   previousVerbs?: string[]
   diversitySeed?: DiversitySeed
   textbook?:      string
-  kicdContext?: {
-    subjectData:  Record<string, Record<string, unknown>>
-    strandData:   Array<{ title: string; kicd_data: Record<string, unknown>[] }>
-    subtopicMap?: Record<string, string[]>
-  }
+  kicdSlice?:    KicdLessonSlice
 }, retryNote = ''): string {
 
   const isCBC       = curriculumMode.startsWith('cbc')
@@ -248,16 +245,14 @@ function buildLessonPrompt({
   const gradeNum = grade.replace(/^(?:Grade|Form)\s+/i, '')
 
 
-  // KICD context sections
-  const subtopics = kicdContext?.subtopicMap?.[strand]
-  const subtopicsSection = subtopics?.length
-    ? `\nSYLLABUS CONTENT (distribute across ${totalLessons} lessons):\n${subtopics.join(' | ')}\nLesson ${lessonNumber} covers points ${lessonNumber}–${Math.min(lessonNumber + 1, subtopics.length)}.\n`
-    : ''
-
-  const kicdStrand = kicdContext?.strandData
-    ?.find(s => s.title.toLowerCase().includes(strand.toLowerCase().slice(0, 10)))
-  const kicdSection = kicdStrand?.kicd_data?.length
-    ? `\nOFFICIAL KICD CONTENT (use as base, adapt language):\n${JSON.stringify(kicdStrand.kicd_data[0], null, 2)}\n`
+  // KICD grounding — the slice of the matched sub-strand THIS lesson teaches
+  // (lib/sow/kicdGrounding.ts), never the strand's first sub-strand.
+  const kicdSection = kicdSlice
+    ? `\nOFFICIAL KICD CONTENT — ${kicdSlice.entryTitle} (lesson ${kicdSlice.part} of ${kicdSlice.parts}):\n${JSON.stringify({
+        learning_outcomes:    kicdSlice.learningOutcomes,
+        learning_experiences: kicdSlice.learningExperiences,
+        key_inquiry_questions: kicdSlice.keyInquiryQuestions,
+      }, null, 2)}\n`
     : ''
 
   // Curriculum-mode descriptors
@@ -566,7 +561,7 @@ ${resourcesLabel}
 
 ${keywordRequirement}
 
-${kicdSection}${subtopicsSection}
+${kicdSection}
 ${seed?.contextBlock ? `\nPER-LESSON DIVERSITY CONTEXT:\n${seed.contextBlock}` : ''}
 
 ${outputHeader}
@@ -618,11 +613,7 @@ export interface LessonGenerationContext {
   previousVerbs?: string[]
   diversitySeed?: DiversitySeed
   textbook?:      string
-  kicdContext?: {
-    subjectData:  Record<string, Record<string, unknown>>
-    strandData:   Array<{ title: string; kicd_data: Record<string, unknown>[] }>
-    subtopicMap?: Record<string, string[]>
-  }
+  kicdSlice?:    KicdLessonSlice
   costContext?: AICostContext
 }
 
