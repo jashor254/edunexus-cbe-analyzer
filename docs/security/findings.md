@@ -2,6 +2,14 @@
 
 One row per finding, newest first. IDs are `SEC-<date>-<n>`. A finding stays **Open** until a founder action or code change closes it. Accepted risks live in [accepted-risks.json](accepted-risks.json), and the system is described in [README.md](README.md).
 
+## 2026-10-26: refresh audit
+
+| ID | Severity | Finding | Status |
+|---|---|---|---|
+| SEC-2026-10-26-01 | Critical | **Nightly Security gate red since 2026-10-23, unanswered (issue #7).** Five production advisories published 2026-10-01 to 10-23: next GHSA-2464-fhr4-w9xw (image-optimizer RCE) and GHSA-673q-mjm6-r5xr (`use cache` RCE), next GHSA-p3m5-59mp-jv5r (Server Actions DoS), undici GHSA-xjj6-f33q-929c, zod GHSA-mrhx-c7xc-m3w5. Exposure was low in practice: sharp was already 0.35.5 (the stated workaround), and the app has no `use cache` and no Server Actions. The zod one is reachable on any route whose array schema has no `.max()`. | **Fixed:** next 16.4.3, zod 4.6.7, undici 6.29.1. Gate, tsc, lint, architecture, route-auth, tests 1692/0 and `next build` 279/279 pass. Close issue #7 once deployed. |
+| SEC-2026-10-26-02 | Low | The leaked-password protection acceptance (SEC-2026-10-12-09) expires today, and Supabase still reports the feature off. | **Open: founder action.** Enable it, or re-accept with a new date and reason. |
+| SEC-2026-10-26-03 | Process | The nightly database advisor check has never run: the `SUPABASE_ACCESS_TOKEN` secret is still missing (the only repo secret is `CRON_SECRET`). `main` has no branch protection, so Security and CodeQL are not required checks. GitHub secret-scanning alerts #1 to #3 (2× Supabase service key, Google key) are still open. | **Open: founder action.** Same items as on 2026-10-13. |
+
 ## 2026-10-13: first push, first CodeQL scan
 
 | ID | Severity | Finding | Status |
