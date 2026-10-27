@@ -1,16 +1,21 @@
 import chromium from '@sparticuz/chromium'
 import { chromium as playwrightChromium } from 'playwright-core'
 import type { Browser, BrowserContext, Page } from 'playwright-core'
+import { PROGRESS_REPORT_SECTIONS } from './progressReport'
 
 export const BLUEPRINT_EXPORT_QUERY_KEY = 'export'
 export const BLUEPRINT_EXPORT_QUERY_VALUE = 'pdf'
 export const BLUEPRINT_PDF_READY_SELECTOR = '[data-blueprint-ready="true"]'
-export const BLUEPRINT_PDF_HEADINGS = [
-  'Where We Stand Today',
-  'What the Evidence Suggests',
-  'How We Help Next',
-  'What May Be Emerging',
-] as const
+/**
+ * The report sections the export waits for before printing, selected by the
+ * stable `data-blueprint-section` hook BlueprintView puts on each page — not
+ * by visible heading text, so rewording a question (or reviewing its Kiswahili
+ * line) can never silently break every export. One list, shared with the
+ * renderer via progressReport.ts.
+ */
+export const BLUEPRINT_PDF_SECTION_SELECTORS = PROGRESS_REPORT_SECTIONS.map(
+  id => `[data-blueprint-section="${id}"]`,
+)
 
 type PdfBrowserContext = Pick<BrowserContext, 'addCookies' | 'close'> & {
   newPage(): Promise<PdfBrowserPage>
@@ -29,10 +34,6 @@ type PdfBrowserPage = Pick<Page, 'emulateMedia' | 'evaluate' | 'close'> & {
     selector: string,
     options: { state: 'visible'; timeout: number },
   ): Promise<unknown>
-  getByRole(
-    role: 'heading',
-    options: { name: string },
-  ): { waitFor(options: { state: 'visible'; timeout: number }): Promise<unknown> }
   pdf(options: {
     format: 'A4'
     printBackground: boolean
@@ -123,8 +124,8 @@ export async function renderBlueprintPdf(
       await document.fonts.ready
     })
 
-    for (const heading of BLUEPRINT_PDF_HEADINGS) {
-      await page.getByRole('heading', { name: heading }).waitFor({
+    for (const selector of BLUEPRINT_PDF_SECTION_SELECTORS) {
+      await page.waitForSelector(selector, {
         state: 'visible',
         timeout: BLUEPRINT_PDF_TIMEOUT_MS,
       })

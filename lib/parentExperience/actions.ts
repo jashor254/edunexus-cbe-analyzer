@@ -34,6 +34,7 @@
 import type { BlueprintSection, LearningCompassData, TeacherReflectionData, AttendanceData, CareerData } from '@/lib/learnerBlueprint/types'
 import { ATTENDANCE_ATTENTION_THRESHOLD_PERCENT } from '@/lib/learnerBlueprint/composeParentSummary'
 import type { BlueprintSnapshotRow } from '@/lib/repositories/blueprintSnapshot.repository'
+import { isSeniorBand, type BlueprintGradeBand } from '@/lib/learnerBlueprint/gradeBand'
 
 // ── Phase 3: Canonical Action Model ─────────────────────────────────────────
 
@@ -135,9 +136,26 @@ type ComposeParentActionsInput = {
   career: BlueprintSection<CareerData>
   /** The learner's most recently taken Blueprint Snapshot, or null — read once by the caller (`composeBlueprint()`), never re-fetched here. */
   latestSnapshot: BlueprintSnapshotRow | null
+  /**
+   * The learner's stage, as composeBlueprint() already resolved it. Decides
+   * only how the career action is worded: a junior (Grade 7–9, or unknown)
+   * reader is pointed at Senior School pathways and never shown a career
+   * field. Defaults to 'unknown' — the conservative, junior-safe wording.
+   */
+  gradeBand?: BlueprintGradeBand
 }
 
-const NO_ACTION_COPY = 'Your learner is progressing well. There are no recommended actions at this time.'
+/**
+ * The empty state. It used to read "Your learner is progressing well" — but
+ * this list is empty whenever none of the six signals below exists (no
+ * Compass programme, no published reflection, no attendance record, no
+ * snapshot milestone, no career signal). That is an absence of information,
+ * not evidence of progress, so it must not be worded as either good or bad
+ * news. (lib/learnerBlueprint/coherence/rules/frictionDetection.ts flagged
+ * the old sentence for exactly this reason.)
+ */
+export const NO_ACTION_TITLE = 'No home step suggested yet'
+export const NO_ACTION_COPY = 'No specific next step has been suggested for home yet. This doesn’t mean anything is wrong, or that everything is fine — it means no teacher plan or other recorded signal has pointed to one so far.'
 
 /**
  * Phase 4: pure, synchronous, no DB access, no calculation beyond selecting
@@ -231,10 +249,15 @@ export function composeParentActions(input: ComposeParentActionsInput): ParentAc
   }
 
   // ── Explore Career Journey (owner: Career Intelligence) ───────────────────
+  // Never "your child is showing interest in X": the cluster is derived from
+  // recorded performance, not from anything the learner said they enjoy.
   if (input.career.status === 'available' && input.career.data?.careerCluster) {
+    const senior = isSeniorBand(input.gradeBand ?? 'unknown')
     candidates.push({
-      title: 'Explore Career Journey',
-      description: `Your child is showing interest in ${input.career.data.careerCluster} — explore this together.`,
+      title: senior ? 'Explore Career Journey' : 'Explore Senior School Pathways',
+      description: senior
+        ? `${input.career.data.careerCluster} is one direction your child's record currently points toward — explore it together.`
+        : 'Look at the Senior School pathways together and talk about which subjects your child enjoys and does well in.',
       actionType: 'explore_career_journey',
       priority: 'suggested',
       sourceDomain: 'Career Intelligence',
@@ -267,7 +290,7 @@ export function composeParentActions(input: ComposeParentActionsInput): ParentAc
   if (candidates.length === 0) {
     return {
       actions: [{
-        title: 'No Action Needed',
+        title: NO_ACTION_TITLE,
         description: NO_ACTION_COPY,
         actionType: 'no_action_needed',
         priority: 'completed',

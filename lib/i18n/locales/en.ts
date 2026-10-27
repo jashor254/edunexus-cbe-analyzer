@@ -172,6 +172,19 @@ const en = {
     aiUnavailable:      'AI generation is temporarily unavailable. Please try again.',
     invalidInput:       'Please check your input and try again.',
   },
+
+  // ── Learner Progress Report ──────────────────────────────────────────────────
+  // The four questions every audience's report is organised around
+  // (lib/learnerBlueprint/progressReport.ts). Rendered in English with the
+  // sw-KE wording beneath — see sw.ts for the review status of that wording.
+  progressReport: {
+    questions: {
+      whereNow:   'Where are we now?',
+      goingWell:  'What\'s going well, and what needs help?',
+      nextSteps:  'What do we do next?',
+      leading:    'Where is this leading?',
+    },
+  },
 }
 
 export type Messages = typeof en

@@ -165,6 +165,20 @@ const sw: Messages = {
     aiUnavailable:      'Utengenezaji wa AI haupatikani kwa muda. Tafadhali jaribu tena.',
     invalidInput:       'Tafadhali angalia maingizo yako na ujaribu tena.',
   },
+
+  // ── Learner Progress Report ──────────────────────────────────────────────────
+  // WORKING WORDING — NOT YET REVIEWED. These four headings must be reviewed
+  // by a competent Kiswahili teacher before public release, and corrected
+  // here (this is the only place they live). Only these fixed headings are
+  // translated: teacher-authored observations are never machine-translated.
+  progressReport: {
+    questions: {
+      whereNow:   'Tuko wapi kwa sasa?',
+      goingWell:  'Ni mambo gani yanaendelea vizuri, na ni yapi yanahitaji msaada?',
+      nextSteps:  'Hatua zinazofuata ni zipi?',
+      leading:    'Hii inaelekea wapi?',
+    },
+  },
 }
 
 export default sw

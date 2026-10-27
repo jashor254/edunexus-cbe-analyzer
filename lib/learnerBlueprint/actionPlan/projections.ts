@@ -21,6 +21,7 @@
 
 import { repos } from '@/lib/repositories'
 import { toBlueprintActionItem, type BlueprintActionItem } from './types'
+import type { ApprovedPlanStep } from '../types'
 
 export type ParentSafeActionView = {
   id: string
@@ -102,6 +103,45 @@ export async function listApprovedParentActionsForLearner(coreLearnerId: string,
 export async function listApprovedLearnerActionsForLearner(coreLearnerId: string, schoolId: string): Promise<LearnerSafeActionView[]> {
   const rows = await repos.blueprintActionItems.listApprovedForLearner(coreLearnerId, schoolId)
   return rows.map(toBlueprintActionItem).map(toLearnerView).filter((v): v is LearnerSafeActionView => v !== null)
+}
+
+/**
+ * One report-safe plan step, built ONLY from the two stakeholder projections
+ * above — so the visibility rule is decided in exactly one place (here, via
+ * `toParentView`/`toLearnerView`) and `teacherNotes`/`evidenceBasis` can never
+ * be carried. Null when neither audience may see the item (`teacher_only`, or
+ * not approved).
+ */
+export function toApprovedPlanStep(item: BlueprintActionItem): ApprovedPlanStep | null {
+  const learner = toLearnerView(item)
+  const parent = toParentView(item)
+  if (!learner && !parent) return null
+  return {
+    id: item.id,
+    title: item.title,
+    context: item.context,
+    reviewDate: item.reviewDate,
+    successIndicator: item.successIndicator,
+    learnerView: learner ? { nextGoal: learner.nextGoal, assignedActivity: learner.assignedActivity, whyItMatters: learner.whyItMatters } : null,
+    parentView: parent ? { observation: parent.observation, whatTheSchoolWillDo: parent.whatTheSchoolWillDo, homeSupport: parent.homeSupport } : null,
+  }
+}
+
+/**
+ * Approved, stakeholder-visible plan steps that are still active — i.e. not
+ * already reviewed by a teacher as `complete`. A review never moves an item
+ * out of `approved` (actionPlan/review.ts), so without this filter a finished
+ * action would keep presenting itself as the learner's next step. Two reads,
+ * neither in a loop: the approved items, then their latest review decisions
+ * in one batched query. Same authorization note as the functions above — the
+ * caller has already authorized composing this learner's report.
+ */
+export async function listActiveApprovedPlanForLearner(coreLearnerId: string, schoolId: string): Promise<ApprovedPlanStep[]> {
+  const rows = await repos.blueprintActionItems.listApprovedForLearner(coreLearnerId, schoolId)
+  const steps = rows.map(toBlueprintActionItem).map(toApprovedPlanStep).filter((s): s is ApprovedPlanStep => s !== null)
+  if (steps.length === 0) return []
+  const latest = await repos.blueprintActionReviews.findLatestDecisionsForActionItems(steps.map(s => s.id))
+  return steps.filter(s => latest[s.id] !== 'complete')
 }
 
 /** Convenience wrapper over the two functions above, for callers that receive `stakeholder` as a runtime value (e.g. a route param) rather than knowing it at the call site. */

@@ -67,13 +67,13 @@ export type ComposeBlueprintResult = {
  * Never mutates `blueprint` — diagnosis only, per this phase's own rule.
  *
  * Deliberately NOT part of `composeBlueprint()`'s own result: the engine
- * costs an extra `listApprovedForLearner` query plus seven rule passes,
- * and only two callers in the platform actually read the report (the
- * learner Blueprint page's publication gate and `approveBlueprintAction`'s
- * enforcement boundary). Every other caller — both Parent pages, snapshot
- * capture — used to pay that cost and discard the result. Callers that
- * need the diagnosis ask for it explicitly via
- * `composeBlueprintWithCoherence()`; nothing else pays.
+ * costs an extra `listApprovedForLearner` query plus seven rule passes, and
+ * only callers that enforce on it should pay: every page that publishes the
+ * report to a reader (the learner/teacher report, the parent's full report
+ * and the parent Home teaser — one publication rule for every audience) and
+ * `approveBlueprintAction`'s enforcement boundary. Snapshot capture does not
+ * pay. Callers that need the diagnosis ask for it explicitly via
+ * `composeBlueprintWithCoherence()`.
  */
 export type ComposeBlueprintWithCoherenceResult = ComposeBlueprintResult & {
   coherence: CoherenceReport
@@ -152,7 +152,7 @@ export async function composeBlueprint(ids: BlueprintIdentifiers): Promise<Compo
       : null,
   })
   const recommendedNextSteps = await composeRecommendedNextSteps(
-    ids.coreLearnerId, ids.schoolId, learningCompass, teacherReflection, attendance, career
+    ids.coreLearnerId, ids.schoolId, learningCompass, teacherReflection, attendance, career, gradeBand
   )
 
   const sections = {

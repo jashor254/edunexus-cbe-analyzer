@@ -9,7 +9,7 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { composeParentActions, isActionDestinationValidForViewer, isSafeInternalDestination, type ParentActionType } from './actions'
+import { composeParentActions, isActionDestinationValidForViewer, isSafeInternalDestination, NO_ACTION_COPY, NO_ACTION_TITLE, type ParentActionType } from './actions'
 import type { BlueprintSection, LearningCompassData, TeacherReflectionData, AttendanceData, CareerData } from '@/lib/learnerBlueprint/types'
 import type { BlueprintSnapshotRow, BlueprintSnapshotType } from '@/lib/repositories/blueprintSnapshot.repository'
 
@@ -87,11 +87,37 @@ function baseInput(overrides: Partial<Parameters<typeof composeParentActions>[0]
   }
 }
 
-test('an empty learner (every domain missing) produces exactly one "No Action Needed," with the frozen empty-state copy', () => {
+test('an empty learner (every domain missing) produces exactly one empty-state entry that claims neither progress nor concern', () => {
   const { actions } = composeParentActions(baseInput())
   assert.equal(actions.length, 1)
   assert.equal(actions[0].actionType, 'no_action_needed')
-  assert.equal(actions[0].description, 'Your learner is progressing well. There are no recommended actions at this time.')
+  assert.equal(actions[0].title, NO_ACTION_TITLE)
+  assert.equal(actions[0].description, NO_ACTION_COPY)
+  // No signal at all is an absence of information, not evidence of progress.
+  assert.doesNotMatch(actions[0].description, /progressing well/i)
+  assert.doesNotMatch(actions[0].title, /no action needed/i)
+  assert.match(actions[0].description, /doesn’t mean anything is wrong, or that everything is fine/)
+})
+
+test('career action never claims "interest", and a junior (or unknown-grade) learner is never shown a career field', () => {
+  const withCareer = { status: 'available' as const, owner: 'test', freshness: 'live' as const, data: { careerCluster: 'Health Sciences' } as never }
+
+  const junior = composeParentActions(baseInput({ career: withCareer, gradeBand: 'grade_7_8' }))
+  const juniorCareer = junior.actions.find(a => a.actionType === 'explore_career_journey')
+  assert.ok(juniorCareer)
+  assert.doesNotMatch(`${juniorCareer.title} ${juniorCareer.description}`, /Health Sciences/)
+  assert.match(juniorCareer.title, /Senior School Pathways/)
+
+  const unknown = composeParentActions(baseInput({ career: withCareer }))
+  assert.doesNotMatch(unknown.actions.map(a => a.description).join(' '), /Health Sciences/)
+
+  const senior = composeParentActions(baseInput({ career: withCareer, gradeBand: 'grade_11_12' }))
+  const seniorCareer = senior.actions.find(a => a.actionType === 'explore_career_journey')
+  assert.ok(seniorCareer)
+  assert.match(seniorCareer.description, /Health Sciences is one direction your child's record currently points toward/)
+  for (const result of [junior, unknown, senior]) {
+    assert.doesNotMatch(result.actions.map(a => a.description).join(' '), /showing interest/i)
+  }
 })
 
 test('missing Compass produces no "Continue Holiday Learning" action', () => {

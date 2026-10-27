@@ -29,6 +29,7 @@ test('renderBlueprintPdf closes context and browser after success (context.close
   // BrowserContext.addCookies Cookie type — cookiesForOrigin() always sets
   // it in practice, the assertion below still checks that.
   const addedCookies: Array<{ name: string; value: string; url?: string }> = []
+  const waitedFor: string[] = []
   const pdf = await renderBlueprintPdf(
     {
       origin: 'https://app.example.com',
@@ -45,8 +46,7 @@ test('renderBlueprintPdf closes context and browser after success (context.close
               assert.equal(url, 'https://app.example.com/student/blueprint/learner-1?export=pdf')
               return { ok: () => true, status: () => 200 }
             },
-            waitForSelector: async (selector) => { assert.match(selector, /data-blueprint-ready/) },
-            getByRole: () => ({ waitFor: async () => {} }),
+            waitForSelector: async (selector) => { waitedFor.push(selector) },
             evaluate: async () => undefined,
             pdf: async () => new Uint8Array([1, 2, 3]),
             close: async () => { closed.push('page') },
@@ -60,6 +60,17 @@ test('renderBlueprintPdf closes context and browser after success (context.close
 
   assert.deepEqual(Array.from(pdf), [1, 2, 3])
   assert.deepEqual(addedCookies, [{ name: 'sb-auth', value: 'token', url: 'https://app.example.com' }])
+  // Ready hook first, then every report section by its stable
+  // data-blueprint-section hook — never by visible heading text, so
+  // rewording a question cannot break the export.
+  assert.deepEqual(waitedFor, [
+    '[data-blueprint-ready="true"]',
+    '[data-blueprint-section="where-now"]',
+    '[data-blueprint-section="going-well"]',
+    '[data-blueprint-section="next-steps"]',
+    '[data-blueprint-section="leading"]',
+    '[data-blueprint-section="agreement"]',
+  ])
   // No explicit page.close() — Playwright's browserContext.close() already
   // closes every page belonging to it, so calling both is redundant and,
   // worse, a page.close() failure would previously skip context/browser
@@ -85,8 +96,7 @@ test('renderBlueprintPdf closes context and browser when page rendering fails', 
               emulateMedia: async () => {},
               goto: async () => ({ ok: () => false, status: () => 500 }),
               waitForSelector: async () => {},
-              getByRole: () => ({ waitFor: async () => {} }),
-              evaluate: async () => undefined,
+                evaluate: async () => undefined,
               pdf: async () => new Uint8Array([1]),
               close: async () => { closed.push('page') },
             }),
@@ -129,7 +139,6 @@ test('renderBlueprintPdf awaits page.pdf() before closing resources (regression:
             emulateMedia: async () => {},
             goto: async () => ({ ok: () => true, status: () => 200 }),
             waitForSelector: async () => {},
-            getByRole: () => ({ waitFor: async () => {} }),
             evaluate: async () => undefined,
             pdf: async () => {
               // Simulate real rendering work still in flight when close()

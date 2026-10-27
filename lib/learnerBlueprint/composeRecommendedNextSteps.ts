@@ -21,8 +21,9 @@
 // two paths never compete for the same learner at the same time.
 
 import { composeParentActions } from '@/lib/parentExperience/actions'
-import { listApprovedParentActionsForLearner } from './actionPlan/projections'
+import { listActiveApprovedPlanForLearner } from './actionPlan/projections'
 import { getLatestBlueprintSnapshot } from './snapshot'
+import type { BlueprintGradeBand } from './gradeBand'
 import type {
   BlueprintSection,
   RecommendedNextStepsData,
@@ -42,17 +43,25 @@ export async function composeRecommendedNextSteps(
   learningCompass: BlueprintSection<LearningCompassData>,
   teacherReflection: BlueprintSection<TeacherReflectionData>,
   attendance: BlueprintSection<AttendanceData>,
-  career: BlueprintSection<CareerData>
+  career: BlueprintSection<CareerData>,
+  gradeBand: BlueprintGradeBand = 'unknown'
 ): Promise<BlueprintSection<RecommendedNextStepsData>> {
   try {
     // Canonical path, checked first — never merged with the legacy
-    // selector's output.
-    const canonicalActions = await listApprovedParentActionsForLearner(coreLearnerId, schoolId)
+    // selector's output. `plan` is the same active, approved set the parent
+    // actions below are derived from, carried through the action plan's own
+    // stakeholder projections so the Learner Progress Report can show each
+    // audience its own role-specific step (learner / teacher / home) without
+    // a second query or a second visibility rule. A step a teacher has
+    // already reviewed as `complete` is no longer active and appears in
+    // neither.
+    const plan = await listActiveApprovedPlanForLearner(coreLearnerId, schoolId)
+    const canonicalActions = plan.filter(step => step.parentView !== null)
     if (canonicalActions.length > 0) {
       const generatedAt = new Date().toISOString()
-      const actions: ParentAction[] = canonicalActions.map(view => ({
-        title: view.title,
-        description: view.observation,
+      const actions: ParentAction[] = canonicalActions.map(step => ({
+        title: step.title,
+        description: step.parentView?.observation ?? step.title,
         actionType: 'canonical_action_item',
         // `ParentSafeActionView` deliberately doesn't carry the item's raw
         // priority (Phase 4's stakeholder-language design owns how/whether
@@ -68,7 +77,7 @@ export async function composeRecommendedNextSteps(
         reasonUnavailable: null,
         generatedAt,
       }))
-      return { status: 'available', owner: OWNER, freshness: 'live', data: { actions } }
+      return { status: 'available', owner: OWNER, freshness: 'live', data: { actions, plan } }
     }
 
     // Compatibility fallback — unchanged legacy behavior, used only when
@@ -82,9 +91,12 @@ export async function composeRecommendedNextSteps(
       attendance,
       career,
       latestSnapshot,
+      gradeBand,
     })
 
-    return { status: 'available', owner: OWNER, freshness: 'live', data: { actions } }
+    // `plan` may still hold learner-only steps here (no parent-visible step
+    // exists, so the parent cutover above did not fire).
+    return { status: 'available', owner: OWNER, freshness: 'live', data: { actions, plan } }
   } catch (error) {
     return {
       status: 'unavailable',

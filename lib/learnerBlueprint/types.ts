@@ -24,6 +24,7 @@ import type { EvidenceCoverage, Trend, RiskValue as ProjectionRiskValue, Capabil
 import type { BlueprintGradeBand } from './gradeBand'
 import type { CareerKnowledgeState } from '@/lib/career/knowledgeLifecycle'
 import type { LearnerId } from '@/lib/core/identityTypes'
+import type { BlueprintActionContext } from '@/lib/repositories/blueprintActionItem.repository'
 
 export type BlueprintSectionStatus = 'available' | 'unavailable' | 'not_implemented'
 
@@ -520,8 +521,33 @@ export type LearningStoryInputs = {
 // the latest Blueprint Snapshot. No educational summary, no duplicated
 // reasoning — only the action list itself.
 
+/**
+ * One teacher-approved, still-active Blueprint action item, carried into the
+ * report only through the action plan's own stakeholder projections
+ * (`actionPlan/projections.ts` `toLearnerView` / `toParentView`) — never the
+ * raw row, so `teacherNotes`/`evidenceBasis` cannot reach this shape. A view
+ * is null when the item's `visibility` does not grant that audience; the
+ * report adapter (progressReport.ts) shows each audience only its own view.
+ * `teacher_only` items never appear here at all (both views would be null).
+ */
+export type ApprovedPlanStep = {
+  id: string
+  title: string
+  context: BlueprintActionContext
+  reviewDate: string | null
+  successIndicator: string
+  learnerView: { nextGoal: string; assignedActivity: string | null; whyItMatters: string } | null
+  parentView: { observation: string; whatTheSchoolWillDo: string | null; homeSupport: string | null } | null
+}
+
 export type RecommendedNextStepsData = {
   actions: ParentAction[]
+  /**
+   * Active approved plan steps, newest first. Optional: Blueprint Snapshots
+   * stored before this field existed have no `plan` key, and must keep
+   * rendering exactly as they were composed.
+   */
+  plan?: ApprovedPlanStep[]
 }
 
 // ── Metadata (Blueprint lifecycle helper — no persistence) ───────────────────

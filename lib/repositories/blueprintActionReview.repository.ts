@@ -68,4 +68,28 @@ export class BlueprintActionReviewRepository extends BaseRepository {
     if (error) throw new Error(`listBlueprintActionReviewsForActionItem: ${error.message}`)
     return (data ?? []) as unknown as BlueprintActionReviewRow[]
   }
+
+  /**
+   * The most recent teacher review decision per action item, for many items
+   * in one query (never one query per item). Items with no review are simply
+   * absent from the result. Read-only; used by the Learner Progress Report
+   * to stop showing an action a teacher has already reviewed as complete —
+   * a review never changes the item's own `status` (it stays `approved`,
+   * see actionPlan/review.ts), so this is the only place that fact lives.
+   */
+  async findLatestDecisionsForActionItems(actionItemIds: string[]): Promise<Record<string, BlueprintActionReviewDecision>> {
+    if (actionItemIds.length === 0) return {}
+    const { data, error } = await this.db
+      .from('blueprint_action_reviews')
+      .select('blueprint_action_item_id, decision, created_at')
+      .in('blueprint_action_item_id', actionItemIds)
+      .order('created_at', { ascending: false })
+    if (error) throw new Error(`findLatestBlueprintActionReviewDecisions: ${error.message}`)
+
+    const latest: Record<string, BlueprintActionReviewDecision> = {}
+    for (const row of (data ?? []) as Array<{ blueprint_action_item_id: string; decision: BlueprintActionReviewDecision }>) {
+      if (!(row.blueprint_action_item_id in latest)) latest[row.blueprint_action_item_id] = row.decision
+    }
+    return latest
+  }
 }
