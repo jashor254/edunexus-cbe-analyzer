@@ -3,6 +3,7 @@
 
 import { BaseRepository } from './base'
 import type { AICallLog } from '@/lib/ai/logger'
+import { shouldLogAIContent } from '@/lib/ai/logPolicy'
 import type { AuditLogEntry } from '@/lib/iam/audit'
 import type { MetricsSnapshot } from '@/lib/monitoring/metrics'
 import type { RecordUsageParams } from '@/lib/infrastructure/analytics'
@@ -50,22 +51,40 @@ export type AppMetricsInsert = {
   notes: string | null
 }
 
+/**
+ * Builds the ai_call_logs insert row from an AI call log, applying the
+ * content-logging privacy gate. Learner content (prompt/response) is NOT
+ * persisted by default — essays, tutoring chat and reflections must not sit at
+ * rest in ai_call_logs. Only the operational metadata the rate-limiter and cost
+ * monitoring actually read is stored. Content is captured only when
+ * AI_LOG_CONTENT=true in a trusted debug environment. Pure and exported so the
+ * privacy guarantee is unit-tested without a DB client. See lib/ai/logPolicy.ts.
+ */
+export function buildAICallLogRow(log: AICallLog): {
+  feature: string; model: string; prompt: string | null; response: string | null
+  latency_ms: number; token_count: number | undefined; success: boolean
+  error: string | undefined; user_id: string | undefined; created_at: string
+} {
+  const logContent = shouldLogAIContent()
+  return {
+    feature:     log.feature,
+    model:       log.model,
+    prompt:      logContent ? log.prompt.substring(0, 500) : null,
+    response:    logContent ? log.response?.substring(0, 500) ?? null : null,
+    latency_ms:  log.latencyMs,
+    token_count: log.tokenCount,
+    success:     log.success,
+    error:       log.error,
+    user_id:     log.userId,
+    created_at:  new Date().toISOString(),
+  }
+}
+
 export class AnalyticsRepository extends BaseRepository {
   // ── AI call logs ────────────────────────────────────────────────────────────
 
   async insertAICallLog(log: AICallLog): Promise<void> {
-    const { error } = await this.db.from('ai_call_logs').insert({
-      feature:     log.feature,
-      model:       log.model,
-      prompt:      log.prompt.substring(0, 500),
-      response:    log.response?.substring(0, 500),
-      latency_ms:  log.latencyMs,
-      token_count: log.tokenCount,
-      success:     log.success,
-      error:       log.error,
-      user_id:     log.userId,
-      created_at:  new Date().toISOString(),
-    })
+    const { error } = await this.db.from('ai_call_logs').insert(buildAICallLogRow(log))
 
     if (error) throw new Error(`Failed to insert AI call log: ${error.message}`)
   }

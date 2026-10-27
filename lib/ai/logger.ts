@@ -1,5 +1,6 @@
 import { repos } from '@/lib/repositories'
 import { logger } from '@/lib/observability/logger'
+import { shouldLogAIContent } from '@/lib/ai/logPolicy'
 
 export interface AICallLog {
   feature: string    // 'sow' | 'lesson-plan' | 'compass' | etc.
@@ -15,13 +16,18 @@ export interface AICallLog {
 
 export async function logAICall(log: AICallLog): Promise<void> {
   if (process.env.NODE_ENV === 'development') {
+    // Content (prompt/response) is only printed when explicitly opted in via
+    // AI_LOG_CONTENT=true — otherwise even the dev console sees metadata only,
+    // so learner text never lands in local logs by accident. See logPolicy.ts.
+    const content = shouldLogAIContent()
+      ? { prompt: log.prompt.substring(0, 200), response: log.response?.substring(0, 200) }
+      : {}
     logger.debug('[AI_LOG]', {
       feature: log.feature,
       model: log.model,
       success: log.success,
       latencyMs: log.latencyMs,
-      prompt: log.prompt.substring(0, 200),
-      response: log.response?.substring(0, 200),
+      ...content,
       error: log.error,
     })
     return
