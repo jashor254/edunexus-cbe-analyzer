@@ -3809,6 +3809,120 @@ Audit (READY WITH CONDITIONS) → approved vertical slice. Mode-gated to plannin
 
 ---
 
+### 2026-10-17 — Privacy Remediation Stage B1: stop persisting raw learner content to ai_call_logs
+
+Part of the learner-data privacy remediation (see `docs/audits/learner-data-privacy-remediation-plan.md`). Addresses audit findings #12 and N1 — `ai_call_logs` was storing raw prompt/response (first 500 chars: essays, tutoring chat, reflections) in production for 90 days.
+
+- `lib/ai/logPolicy.ts` (new): single gate `shouldLogAIContent()` → `process.env.AI_LOG_CONTENT === 'true'` (default false). Own module to avoid a cycle (logger.ts imports repositories; analytics.repository needs the gate too).
+- `lib/repositories/analytics.repository.ts`: extracted pure exported `buildAICallLogRow(log)` applying the gate — prompt/response are `null` unless `AI_LOG_CONTENT=true`; all operational metadata (feature, model, latency, tokens, success, user_id) always kept. `insertAICallLog` now delegates to it.
+- `lib/ai/logger.ts`: dev-console path prints prompt/response only when the gate is on; metadata always.
+
+**Architectural documents referenced**: CLAUDE.md (AI/DeepSeek + Security rules, data minimization), privacy audit + remediation plan. No canonical domain touched (observability/cost-monitoring infra).
+
+**ADR**: none. No schema change (columns kept, written NULL by default), no identity/ownership/write-path/auth change. Fully reversible.
+
+**Tests**: `lib/repositories/analytics.aiCallLog.privacy.test.ts` (new, STANDARD — 4 pure tests on `buildAICallLogRow`: default NULLs content, keeps metadata, `AI_LOG_CONTENT=true` captures truncated content, only exact `"true"` enables). Added to `scripts/standard-tests.json`. Manifest rot-guard OK (192 files). Full standard suite 1664 → 1668, green. `tsc --noEmit` 0 errors. `rateLimit.ts` unaffected (reads success/user_id/feature/created_at only).
+
+**Residual**: existing <90-day rows still hold content until the retention cron ages them out; a one-time NULL-out of existing content is proposed but is a production write awaiting explicit authorization. **Not pushed / not committed**: held in working tree.
+
+---
+
+### 2026-10-17 — Privacy Remediation Stage B2: pseudonymize the Learning Compass
+
+Addresses audit finding #7 — Compass sent the learner's real first name (plus grade/level/pathway + raw messages) to Gemini (primary) / DeepSeek (China fallback).
+
+- `lib/compass/namePseudonym.ts` (new, pure): `scrubLearnerName(text, firstName)` (whole-word, case-insensitive → LEARNER_NAME_TOKEN; no-op for ''/'there') and `makeNameRestorer(firstName)` — a split-safe stream restorer that holds back any trailing fragment that is a proper prefix of `{{LEARNER}}` so a token split across SSE chunks is never emitted half-restored.
+- `app/api/learn/route.ts`: prompt now carries `LEARNER_NAME_TOKEN` (not the real name); outgoing `message` + `history` scrubbed before `streamDeepSeek`; the two stream enqueue points route through the shared restorer; trailing fragment flushed at stream end; persisted assistant message (`compass_messages`) and `one_line_summary` restored to the real name via `restoreLearnerName`. Raw learner message still stored verbatim in our own DB.
+
+**Architectural documents referenced**: CLAUDE.md (data minimization, learner-record actor-not-owner), privacy audit + remediation plan, existing `lib/ai/learnerPseudonym.ts` scheme (career/holiday precedent).
+
+**ADR**: none. Data-minimization on an outbound prompt; no canonical identity/ownership/write-path/permission change; no evidence-repo reads added. Reversible per file.
+
+**Tests**: `lib/compass/namePseudonym.test.ts` (new, STANDARD — 9 pure tests incl. token split across two chunks and char-by-char, no half-restored leak, lone-brace passthrough, multiple tokens). Added to manifest. Suite 1668 → 1677, green. tsc 0 errors. `next build` pending (batched before commit).
+
+**Residual**: grade/level/pathway/topic names still sent (pedagogically required — pseudonymized, not anonymous). Scrub is exact-first-name only; richer free-text de-identification is Stage C. **Not pushed / not committed.**
+
+---
+
+### 2026-10-17 — Privacy Remediation Stage B3: guard insha / academy / teaching-intelligence free-text
+
+Independent verification refined audit finding #9. Result: **none of these wrappers add a direct learner identifier.**
+- Academy `aiJudge.ts` evaluates **teacher** professional-development reflections (not children's data); wrapper adds no learner name.
+- Teaching-intelligence (`weeklyGenerator`/`rootCauseClassifier`/`quickCheckGenerator`) sends **aggregate** sub-strand health / misconception / struggle-count context — no learner names.
+- Insha (`inshaEvaluator.ts`) adds only grade + insha type to the essay.
+- Their `prompt.substring(0,500)` fields are all `logAICall` args, already gated to NULL-by-default in B1.
+
+Code fix: `lib/kiswahili/inshaEvaluator.ts` parse-failure log no longer dumps the full raw model output (`raw`, which echoes essay content) to stdout/Vercel logs — now logs only `raw.length` + the error message.
+
+**Decision (documented, not coded):** insha essays are NOT destructively scrubbed for names — per the remediation brief's explicit caution, that would damage ngeli/grammar marking fairness and over-redact legitimate content. The residual cross-border essay/reflection exposure is a provider + consent matter → handled by the school-level external-AI gate (Stage B4-adjacent), consent (Phase 5), and vendor/policy work (Stage E), not by code scrubbing.
+
+**ADR**: none. **Tests**: existing insha/academy/teaching-intelligence suites green (1677, unchanged count — the fix is a log-string change). tsc 0 errors. **Not pushed / not committed.**
+
+---
+
+### 2026-10-17 — Privacy Remediation Stage B4: contain Paper Intelligence script images
+
+Addresses audit finding #6. Verified first (brief forbids claiming unverified protection):
+- Storage path is UUID-only — `paper-intelligence/{assignmentId}/{submissionId}/pN-{ts}.{ext}` — NO learner name/admission number in filenames. Private bucket; access by short-lived signed URL; downloads by trusted stored path (no client-supplied path).
+- Capture path (`clientImage.ts`) re-encodes via `<canvas>.toDataURL('image/jpeg')`, which already drops EXIF — but the server trusted whatever base64 the client POSTed (an alternate client could store/send EXIF).
+
+Code fix:
+- `lib/paperIntelligence/imageMetadata.ts` (new, pure, dependency-free): `stripImageMetadata(bytes, mimeType)` — removes JPEG APP1–APP15 + COM segments and PNG ancillary chunks (eXIf/tEXt/zTXt/iTXt/tIME). Pixel data untouched (marking accuracy unaffected). FAIL-OPEN: unparseable bytes return unchanged (never corrupt a learner's script). WebP + unknown pass through (documented residual).
+- `lib/paperIntelligence/scriptPages.ts`: `saveScriptPage` strips metadata before upload, so both stored bytes and what is later sent to the vision model are clean. Sharpness check still runs on the original bytes (metadata strip does not change pixels).
+
+**ADR**: none. No new dependency, no schema/identity/ownership/write-path change. Reversible.
+
+**Tests**: `lib/paperIntelligence/imageMetadata.test.ts` (new, STANDARD — 7 tests on synthetic JPEG/PNG byte fixtures: EXIF/comment removed, structure+pixels preserved, malformed fails open, PNG text/eXIf removed, critical chunks preserved, webp passthrough). Added to manifest (194 files). Suite 1677 → 1683, green. tsc 0 errors, eslint clean on touched files, `next build` succeeds.
+
+**Residual (documented, NOT solved by code):** (1) a learner's NAME handwritten inside the script still reaches the vision model — cannot be redacted without risking the mark; (2) WebP metadata not stripped (rare direct-upload path; capture is always JPEG). The real control for both is a school-level external-AI gate + disclosure + consent (Phase 5) — recommended before onboarding a school that has not accepted Paper Intelligence. **Not pushed / not committed.**
+
+---
+
+### 2026-10-17 — Privacy Remediation Option 1: DeepSeek provider is now EU-switchable (env-driven)
+
+Lets DeepSeek be served from an EU/US host that keeps learner data out of mainland China — the region the privacy policy ("Together AI, United States") was always written for. Addresses the core cross-border-to-China exposure for the free-text flows (insha, Compass fallback) that pseudonymization alone cannot fully protect.
+
+- `lib/config/api.ts` — `DEEPSEEK_CONFIG.baseURL` and `.model` are now getters reading `DEEPSEEK_BASE_URL` / `DEEPSEEK_MODEL`, defaulting to `https://api.deepseek.com/v1` + `deepseek-chat` (behaviour identical when unset). New `chatCompletionsUrl` getter centralises the endpoint. `isConfigured()` relaxed to presence-only (an EU host's key need not start with `sk-`; it was unused anyway).
+- `lib/ai/deepseek.ts` — all three fetch sites now use `DEEPSEEK_CONFIG.chatCompletionsUrl` instead of hardcoding `${baseURL}/v1/chat/completions`.
+
+**To activate (owner, no code/deploy of logic):** set in prod env — `DEEPSEEK_BASE_URL` = chosen host's OpenAI-compatible base incl. `/v1` (EU residency: Nebius `https://api.studio.nebius.com/v1`, or Scaleway; out-of-China-but-US: DeepInfra/Together), `DEEPSEEK_MODEL` = that host's model id (e.g. `deepseek-ai/DeepSeek-V3`), `DEEPSEEK_AI_API_KEY` = that host's key. Confirm the host offers a no-training term + DPA + the expected region before switching.
+
+**ADR**: none. Config/infra; no canonical domain, identity, schema, or auth change. Default behaviour unchanged; reversible by clearing the env vars.
+
+**Tests**: `lib/config/api.deepseekProvider.test.ts` (new, STANDARD — defaults unchanged, EU override honoured, trailing-slash path safe). Suite 1683 → 1686, green. tsc 0, eslint clean on touched files, `next build` compiled successfully. Contract test (`deepseekWrapperContract.test.ts`) still green (doesn't assert exact URL). **Not pushed / not committed.**
+
+
+---
+
+### 2026-10-21 — Privacy re-audit: close Stage B2 bypasses + Compass provider routing
+
+Re-audit of the uncommitted Stage B work against the deployed revision (`372bb56`, verified via Vercel + GitHub Deployments). Stage B2 as written had bypasses; fixed here:
+
+- **Session summary loop-back.** `one_line_summary` is persisted with the real name restored and was re-sent as `Last session:` in the next prompt. New `lib/compass/providerPayload.ts` is now the single builder of the provider-bound payload: it removes the learner's name parts from the message, history and an explicit list of learner-derived/client-supplied prompt fields (summary, holiday focus, knowledge context, subject/subtopic, teacher text, risk factors, pedagogy concept) *before* `buildCompassPrompt`; instruction text is never scrubbed. The route calls it; an architecture test pins that.
+- **Name matching.** `\b` is ASCII-only, so names ending ũ/ĩ never matched. Matcher is now Unicode-letter-bounded, accent-insensitive, apostrophe-tolerant (Ng'ang'a / Ng’ang’a / Nganga) and also removes the stored surname/middle names (→ `[name]`). Guarantee: removes the learner's *own* stored name parts only — pseudonymisation, not anonymisation.
+- **Provider routing (pre-existing prod bug).** `history.slice(-20)` began with an assistant turn once a session passed ~10 learner messages; the Gemini SDK rejects that, so every later turn silently fell back to DeepSeek's own API. `trimHistoryForProvider` starts on a user turn.
+- **Log hygiene.** The route logged raw `JSON.parse` errors for the model's eval block; V8 quotes the start of the input. Now logs error type + length only.
+
+**ADR**: none. No schema, identity, auth or canonical-domain change; no migration.
+
+**Tests**: `providerPayload.test.ts` (11, final payload), `streamDeepSeek.privacy.test.ts` (7 — real Gemini SDK wire body, DeepSeek fallback, retry, HTTP error, logs, long-session routing), `compassProviderBoundary.architecture.test.ts` (4), `namePseudonym.test.ts` (+12). Each fix mutation-checked (reverting it fails a test). Full report: `docs/audits/compass-privacy-reaudit-2026-10-21.md` (local; the audit docs are deliberately not committed to this public repo).
+
+---
+
+### 2026-10-22 — Compass provider gate: fail-closed, no silent fallback
+
+Provider eligibility for a learner-facing (under-18) tutor is unresolved: the Gemini API Additional Terms and the Google Cloud Generative AI terms both prohibit use in a service "directed towards or … likely to be accessed by individuals under the age of 18", and DeepSeek's API terms are silent on retention/training. Compass therefore may only call providers that are explicitly approved.
+
+- `lib/config/compassProviders.ts`: `COMPASS_AI_PROVIDERS` (comma list, order = primary then fallback). Unset/empty/unknown → **no provider** → `/api/learn` returns 503 with a learner-facing "paused" message, after auth/ownership and before any session write, prompt build or provider call. Other AI features are untouched.
+- `lib/ai/deepseek.ts` `streamDeepSeek`: `providers` is now a required option; only listed providers are contacted, in order; empty list throws before any network call. A failing primary no longer falls back to a provider that was not listed.
+- `/api/learn` fatal handler logs the error type only (messages can quote request/model text).
+- `app/learn/page.tsx`: a 503 shows the server's paused message instead of "Something went wrong".
+
+**Deploy effect:** with `COMPASS_AI_PROVIDERS` unset in production, deploying this pauses Compass. Re-enabling is a production config change, to be made only once a provider is approved for under-18 use.
+
+**Tests**: `compassProviders.test.ts` (3), `streamDeepSeek.privacy.test.ts` (+3 routing: empty list → zero requests; gemini-only never contacts DeepSeek; deepseek-only never contacts Gemini), `compassProviderBoundary.architecture.test.ts` (+3: gate precedes session write/prompt/provider; providers passed; no raw fatal log). Gate removal and silent-fallback reinstatement were each mutation-checked.
+---
+
 ### 2026-10-19 — Mark Papers: mark first, file after (+ bulk scan S1)
 
 Founder decision: Paper Intelligence must not write to the gradebook as each script is reviewed. The teacher marks the whole paper, then uploads the marks to ONE place — a topical assignment (gradebook) or a termly assessment (Opener, CAT, Mid-Term, End-Term, Exam, KJSEA SBA → report cards). Adaptive assignments are excluded until they are finalised. Capture is the teacher's choice: phone (existing) or one scanned class PDF. Plan: `docs/engineering/mark-papers-flow-plan.md`.
@@ -3845,3 +3959,21 @@ Commits: `8ab92f6` KICD matcher + lesson slicer · `0a9e05e` server-side groundi
 **Tests**: kicdEntries (14), kicdVocabulary (3), kicdGrounding (6), aiLessonGenerator.grounded (4), diversityEngine (6), promptSafety (5), sowPresentation (6) — standard; parser regression (6, python unittest). Standard 1,692/1,692 on a clean worktree of the commits; tsc, eslint (0 errors), architecture + manifest gates, `next build` pass. Real-model E2E: 4 previously-wrong Kiswahili lessons now correct; 3 Integrated Science lessons grounded 2/3 with the design's own competencies/values/PCIs, the third honestly flagged.
 
 **Before deploy / rollout order**: push the code FIRST, then run `scripts/kicd/load-kicd-data.ts --apply` against production — the deployed generator still reads `kicd_data[0]`, so loading data before the code ships would spread that bug to every subject. Rollback: the loader writes `scripts/kicd/backups/kicd_data-<time>.json`. Existing saved schemes are unchanged until regenerated. **Open**: rows that teach topics outside their design (e.g. Grade 7 matter under Grade 8 Integrated Science, Grade 10 Fasihi genre rows) need seed clean-up, not matching; Form 3/4 (8-4-4) have syllabus-level entries only and stay ungrounded.
+
+---
+
+### 2026-10-27 — AI token/cost usage is actually recorded (callDeepSeek → ai_call_logs)
+
+Audit of the live project (`lpxrfbmzncaztpmyqzkc`, which holds both the Kangai pilot and the Ridge test schools) found **every AI usage table empty or stale**: `ai_call_logs` / `ai_usage` / `ai_usage_logs` = 0 rows, `token_usage` last written 2026-08-08 — despite SOWs generated as recently as 2026-09-15. Two causes: (1) the cost path `insertAICostEvent()` writes to `usage_events`, which (with `organizations`) is the undeployed Phase-8 platform layer — every write throws "relation does not exist" and is swallowed; (2) the central `callDeepSeek()` helper logged only to the console, never calling `logAICall()`, so `ai_call_logs` was never populated by the busiest AI path (SOW, lesson plans, etc.). Only a few features (Academy judge, Teaching Intelligence, Career, Kiswahili insha) call `logAICall` directly, and those simply hadn't run in prod.
+
+Fix (routes around the undeployed billing layer to the table that exists): `callDeepSeek()` now persists one metadata row to `ai_call_logs` via the existing `logAICall()` on every outcome — success and both failure/fallback paths — with a feature label resolving explicit `feature` → `costContext.feature` → `deepseek:uncategorized`.
+
+- **`lib/ai/deepseek.ts`**: added optional `feature` to options; `recordUsage()` and a new `logFailure()` call `logAICall()`. `logAICall` never throws (internal try/catch); one extra lightweight insert per AI call.
+- **Privacy**: metadata-only by default. `buildAICallLogRow` strips prompt/response unless `AI_LOG_CONTENT=true` (never in prod). The 90-day `ai-log-retention` cron remains as defence-in-depth.
+- **Known gap left**: the streaming path (`streamDeepSeek`, used by Compass) still has no usage capture — can't tee a live SSE stream without disrupting the learner; already flagged in-code. Separate follow-up.
+
+**Architectural docs referenced**: CLAUDE.md (AI/DeepSeek rules — "Log token usage for cost monitoring"); `/assess` run, verdict ✅ Safe to Implement (no canonical domain, no ADR — AI call logging is not a canonical domain; reuses existing write path, repository, and privacy gate). **ADR**: none.
+
+**Tests**: new `lib/ai/deepseekUsageLogging.test.ts` (3: success logs one row with real token count + prompt forwarded; feature label resolves explicit > costContext > default; total failure logs one `success:false` row, never a fabricated success) + no-op `logAICall` mock added to `deepseekWrapperContract.test.ts`; registered in `scripts/standard-tests.json`. Standard 1800 → 1803 green; tsc 0, eslint clean.
+
+**Commit coupling note**: this fix is intentionally coupled to the in-flight learner-data privacy remediation (Stage B). Committing the logging change **alone** would start writing learner names/scores into `ai_call_logs` (on a tree without B1's `logPolicy.ts` gate, `buildAICallLogRow` persisted `prompt.substring(0,500)` unconditionally) — a regression against the NO-GO cross-border privacy audit. It therefore ships **with** the gating, as commit C of the Stage B–E series carved onto branch `privacy/stage-b-landing` (off `main` da8b34d; main left untouched). Rollback: revert the `deepseek.ts` logging block (and the two test changes); no schema change, no migration.
