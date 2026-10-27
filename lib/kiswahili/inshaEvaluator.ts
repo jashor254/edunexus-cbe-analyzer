@@ -279,7 +279,10 @@ export async function evaluateInsha({
     return parseRawResponse(parsed, inshaType, grade)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    console.error('[inshaEvaluator] JSON parse failed. Raw output:', raw, err)
+    // Do NOT log `raw` — the model's output echoes essay content. Log only its
+    // length so a parse failure is still diagnosable without putting learner
+    // content in stdout/Vercel logs. (Stage B3; see logPolicy.ts rationale.)
+    console.error(`[inshaEvaluator] JSON parse failed (raw length ${raw.length}):`, message)
     await logAICall({
       feature:   'kiswahili-insha-evaluator',
       model:     'deepseek',
