@@ -5,7 +5,10 @@ import { getOrCreateSession, readSession, writeSession, resolveSubject, recordEx
 import { resolveCompassLearnerIntelligence } from '@/lib/compass/learnerContext'
 import { bindDeliveryToSession } from '@/lib/compass/deliveryBinding'
 import { resolveCompassMutationAccess, resolveSessionOwnership } from '@/lib/compass/ownership'
-import { buildCompassPrompt, type CompassPromptParams, type KnowledgeContextBlock } from '@/lib/compass/prompt'
+import { type CompassPromptParams, type KnowledgeContextBlock } from '@/lib/compass/prompt'
+import { restoreLearnerName } from '@/lib/ai/learnerPseudonym'
+import { makeNameRestorer } from '@/lib/compass/namePseudonym'
+import { buildCompassProviderPayload, type CompassChatTurn } from '@/lib/compass/providerPayload'
 import { parsePedagogyBlock, stripPedagogyBlock, shouldBlockMasteryForPedagogy, buildUnresolvedPedagogyNote } from '@/lib/compass/pedagogy'
 import type { RootCauseResult } from '@/lib/knowledgeGraph/types'
 import { getGradeTopics } from '@/lib/compass/topics'
@@ -14,6 +17,7 @@ import { apiPaymentRequired } from '@/lib/payments/paywall'
 import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
 import { type FeatureKey } from '@/lib/payments/config'
 import { apiError } from '@/lib/api/response'
+import { resolveCompassProviders, COMPASS_PAUSED_MESSAGE } from '@/lib/config/compassProviders'
 import { repos } from '@/lib/repositories'
 import { logger } from '@/lib/observability/logger'
 import { asStudentId } from '@/lib/core/identityTypes'
@@ -202,6 +206,13 @@ export async function POST(req: Request) {
       const sessionOwned = await resolveSessionOwnership(sessionId, studentId)
       if (!sessionOwned) return apiError('Access denied', 403)
     }
+
+    // ── Provider gate (fail-closed) ───────────────────────────────────────────
+    // Compass only calls providers explicitly approved in COMPASS_AI_PROVIDERS.
+    // None approved → paused: return before any session write, prompt build or
+    // provider call. Placed after auth/ownership so callers still get 401/403.
+    const providers = resolveCompassProviders()
+    if (providers.length === 0) return apiError(COMPASS_PAUSED_MESSAGE, 503)
 
     // Session upsert — only runs once ownership is verified above, since this writes
     // to compass_sessions. Started immediately post-auth if subject is in the request.
@@ -415,8 +426,13 @@ export async function POST(req: Request) {
     const questionMode: 'mcq-and-structured' | 'structured-only'  = level <= 2 ? 'mcq-and-structured' : 'structured-only'
 
     // ── Build prompt ──────────────────────────────────────────────────────────
-    const promptParams: CompassPromptParams = {
-      firstName,
+    // Privacy (Stage B2): firstName is deliberately absent — the payload
+    // builder puts LEARNER_NAME_TOKEN in the prompt and scrubs the learner's
+    // name parts from every learner-derived field, the message and the
+    // history. The model echoes the token; we restore the real `firstName`
+    // locally in the stream (makeNameRestorer) and on anything persisted.
+    // See lib/compass/providerPayload.ts.
+    const promptParams: Omit<CompassPromptParams, 'firstName'> = {
       grade,
       level,
       levelSource: academicState.source,
@@ -439,11 +455,22 @@ export async function POST(req: Request) {
       questionMode,
     }
 
-    const systemPrompt = buildCompassPrompt(promptParams)
-
     const history = Array.isArray(conversationHistory)
-      ? (conversationHistory as { role: 'user' | 'assistant'; content: string }[])
+      ? (conversationHistory as CompassChatTurn[])
       : []
+
+    // Everything below is what leaves our infrastructure. The learner's raw
+    // message is still stored verbatim in our own compass_messages table.
+    const providerPayload = buildCompassProviderPayload({
+      promptParams,
+      identity: { firstName, fullName: (student?.name as string | null) ?? null },
+      message: message as string,
+      history,
+    })
+
+    // Restores LEARNER_NAME_TOKEN -> real firstName in the streamed output,
+    // safely across SSE chunk boundaries. Shared by the transform + flush below.
+    const nameRestorer = makeNameRestorer(firstName)
 
     // ── Stream from DeepSeek ──────────────────────────────────────────────────
     // Cost attribution is intentionally unset.
@@ -459,7 +486,7 @@ export async function POST(req: Request) {
     // and is a documented no-op per lib/ai/deepseek.ts's contract. Per-school
     // cost attribution, if ever wanted, belongs on the live school domain.
     const costContext: { organizationId: string; feature: FeatureKey } | undefined = undefined
-    const rawStream = await streamDeepSeek(systemPrompt, message as string, history, { temperature: 0.3, costContext })
+    const rawStream = await streamDeepSeek(providerPayload.systemPrompt, providerPayload.message, providerPayload.history, { providers, temperature: 0.3, costContext })
 
     type CompassEval = {
       genuine_progress: boolean
@@ -508,7 +535,8 @@ export async function POST(req: Request) {
                 deductOnce()
               }
               accumulated += content
-              controller.enqueue(encoder.encode(content))
+              const visible = nameRestorer.push(content)
+              if (visible) controller.enqueue(encoder.encode(visible))
             }
           } catch { /* malformed SSE line */ }
         }
@@ -534,6 +562,10 @@ export async function POST(req: Request) {
           }
         }
 
+        // Emit any trailing fragment the split-safe restorer was holding back.
+        const trailing = nameRestorer.flush()
+        if (trailing) controller.enqueue(encoder.encode(trailing))
+
         // Parse eval block if session is closing
         const evalStartIdx = accumulated.indexOf(EVAL_START)
         const evalEndIdx   = accumulated.indexOf(EVAL_END)
@@ -545,7 +577,11 @@ export async function POST(req: Request) {
               accumulated.slice(evalStartIdx + EVAL_START.length, evalEndIdx).trim()
             ) as CompassEval
           } catch (parseErr) {
-            console.error('[learn] eval parse failed:', parseErr)
+            // Log the error type and size only: V8's JSON.parse messages quote
+            // the start of the input, which here is model-written session text.
+            console.error(
+              `[learn] eval parse failed: ${parseErr instanceof Error ? parseErr.name : 'unknown error'} (eval block length ${evalEndIdx - evalStartIdx})`,
+            )
           }
         }
 
@@ -560,7 +596,9 @@ export async function POST(req: Request) {
         // unchanged, not reset to null.
         const turnPedagogy = parsePedagogyBlock(accumulated)
         const nextPedagogy = turnPedagogy ?? savedSession?.pedagogy ?? null
-        const visibleResponse = stripPedagogyBlock(visibleResponseWithEval)
+        // Restore the real name on what we persist/show (accumulated still
+        // carries LEARNER_NAME_TOKEN since it mirrors the raw model output).
+        const visibleResponse = restoreLearnerName(stripPedagogyBlock(visibleResponseWithEval), firstName)
 
         // Increment exchange count
         await recordExchange(activeSessionId)
@@ -594,7 +632,7 @@ export async function POST(req: Request) {
             // validated pedagogy state — never model-authored text, so this
             // can't be used to smuggle claims into the summary.
             const summaryWithPedagogyNote =
-              parsedEval.one_line_summary + buildUnresolvedPedagogyNote(nextPedagogy)
+              restoreLearnerName(parsedEval.one_line_summary, firstName) + buildUnresolvedPedagogyNote(nextPedagogy)
 
             await db.from('compass_sessions')
               .update({ one_line_summary: summaryWithPedagogyNote })
@@ -679,7 +717,12 @@ export async function POST(req: Request) {
     })
 
   } catch (error) {
-    console.error('[learn] FATAL:', error)
+    // Error type only: messages can quote request or model text (e.g. a
+    // JSON.parse SyntaxError on a malformed body quotes its start).
+    logger.error('Compass request failed', {
+      operation: 'learn.post',
+      errorName: error instanceof Error ? error.name : typeof error,
+    })
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }

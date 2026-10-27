@@ -515,13 +515,15 @@ function LearnContent() {
         // Phase P2 — a 403 here (e.g. a parent viewing on their child's
         // behalf, who may observe Compass but not drive a session) must not
         // read as a stuck spinner or silent nothing. Same visible-error
-        // pattern sendMessage() already uses below.
+        // pattern sendMessage() already uses below. A 503 means Compass is
+        // deliberately paused; show the server's explanation, not "try again".
+        const paused = res.status === 503 ? await compassPausedMessage(res) : null
         setMessages([{
           id:      `err-${Date.now()}`,
           role:    'compass',
-          content: res.status === 403
+          content: paused ?? (res.status === 403
             ? "This account can't start a Compass session for this learner. Compass sessions are for the learner themselves."
-            : 'Something went wrong. Please try again.',
+            : 'Something went wrong. Please try again.'),
         }])
         return
       }
@@ -639,10 +641,11 @@ function LearnContent() {
       })
 
       if (!res.ok) {
+        const paused = res.status === 503 ? await compassPausedMessage(res) : null
         setMessages(prev => [...prev, {
           id:      `err-${Date.now()}`,
           role:    'compass',
-          content: 'Something went wrong. Please try again.',
+          content: paused ?? 'Something went wrong. Please try again.',
         }])
         return
       }
@@ -1325,6 +1328,16 @@ function LearnContent() {
       </div>
     </div>
   )
+}
+
+/** The server's explanation when Compass is paused (503), or null if unreadable. */
+async function compassPausedMessage(res: Response): Promise<string | null> {
+  try {
+    const body = await res.json() as { error?: unknown }
+    return typeof body.error === 'string' && body.error.length > 0 ? body.error : null
+  } catch {
+    return null
+  }
 }
 
 // ── Page wrapper (required for useSearchParams) ────────────────────────────────

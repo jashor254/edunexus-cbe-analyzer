@@ -10,17 +10,36 @@
 
 export const AI_PROVIDER = 'deepseek' as const
 
+// Provider is env-driven so DeepSeek can be served from an EU/US host that
+// keeps learner data out of mainland China (privacy remediation Option 1 / the
+// region the privacy policy was always written for). Leave the env vars unset
+// and behaviour is identical to before (DeepSeek's own China API). To switch,
+// set DEEPSEEK_BASE_URL to the provider's OpenAI-compatible base INCLUDING the
+// /v1 segment (e.g. https://api.studio.nebius.com/v1) and DEEPSEEK_MODEL to
+// that provider's model id (e.g. deepseek-ai/DeepSeek-V3) — no code change.
+// Both DeepSeek-direct and these hosts speak the same /chat/completions API.
 export const DEEPSEEK_CONFIG = {
   // ✅ Getter ensures fresh value on every call
   get apiKey() {
     return process.env.DEEPSEEK_AI_API_KEY
   },
 
-  baseURL: 'https://api.deepseek.com',
-  model: 'deepseek-chat',
+  get baseURL() {
+    return process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1'
+  },
+
+  get model() {
+    return process.env.DEEPSEEK_MODEL || 'deepseek-chat'
+  },
+
+  /** Full OpenAI-compatible chat-completions endpoint for the configured host. */
+  get chatCompletionsUrl() {
+    return `${this.baseURL.replace(/\/+$/, '')}/chat/completions`
+  },
 
   isConfigured() {
-    return Boolean(this.apiKey && this.apiKey.startsWith('sk-'))
+    // Presence only — an EU/US host's key need not start with "sk-".
+    return Boolean(this.apiKey)
   },
 
   getKeyOrThrow() {
