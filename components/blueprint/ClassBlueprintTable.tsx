@@ -13,7 +13,7 @@
 
 import Link from 'next/link'
 import type { ClassBlueprint, ClassBlueprintRow, ClassAttentionReason } from '@/lib/learnerBlueprint/classBlueprint'
-import { subjectLabel } from './blueprintNarrative'
+import { subjectLabel } from '@/lib/learnerBlueprint/narrative'
 
 const CBC_LEVEL_LABEL: Record<1 | 2 | 3 | 4, string> = {
   4: 'Exceeding',

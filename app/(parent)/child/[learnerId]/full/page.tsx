@@ -1,18 +1,21 @@
 // app/(parent)/child/[learnerId]/full/page.tsx
 //
-// Full Blueprint view for the Parent audience (Sprint 12Q Phase 3).
-// Consumes `composeBlueprint()` directly — no transformations, no
-// recalculations, no parent-specific Blueprint. `ParentBlueprintView`
-// applies only the ADR-0010 Part 3 visibility matrix (which sections
-// render, never a different value for a section that does).
+// The parent's Learner Progress Report. Composes with the same coherence
+// gate as the learner/teacher report (app/student/blueprint/[learnerId]):
+// a report the Coherence Engine withholds there for a critical
+// contradiction is withheld here too, so a parent can never read a report
+// the school's own check has stopped. Warnings (PASS_WITH_WARNINGS) render
+// normally, exactly as on the learner page. `ParentBlueprintView` renders
+// the shared four-question report first, then supplementary detail.
 
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { requireAuthentication, requireParent } from '@/lib/core/permissions'
 import { UnauthorizedError, ResourceOwnershipError } from '@/lib/core/errors'
 import { repos } from '@/lib/repositories'
-import { composeBlueprint } from '@/lib/learnerBlueprint/composeBlueprint'
+import { composeBlueprintWithCoherence } from '@/lib/learnerBlueprint/composeBlueprint'
 import ParentBlueprintView from '@/components/parent/ParentBlueprintView'
+import BlueprintStateMessage from '@/components/blueprint/BlueprintStateMessage'
 import { asLearnerId } from '@/lib/core/identityTypes'
 
 export default async function ParentFullBlueprintPage({
@@ -48,9 +51,9 @@ export default async function ParentFullBlueprintPage({
     notFound()
   }
 
-  let blueprint
+  let blueprint, validation, coherence
   try {
-    ;({ blueprint } = await composeBlueprint({ actorUserId: userId, coreLearnerId: learnerId, schoolId }))
+    ;({ blueprint, validation, coherence } = await composeBlueprintWithCoherence({ actorUserId: userId, coreLearnerId: learnerId, schoolId }))
   } catch {
     return (
       <div className="max-w-md mx-auto py-12 px-4 text-center">
@@ -59,5 +62,9 @@ export default async function ParentFullBlueprintPage({
     )
   }
 
-  return <ParentBlueprintView blueprint={blueprint} learnerId={learnerId} />
+  if (coherence.result === 'FAIL') {
+    return <BlueprintStateMessage kind="coherence-failed" backHref={`/child/${learnerId}`} backLabel="← Back to Home" />
+  }
+
+  return <ParentBlueprintView blueprint={blueprint} validation={validation} learnerId={learnerId} />
 }

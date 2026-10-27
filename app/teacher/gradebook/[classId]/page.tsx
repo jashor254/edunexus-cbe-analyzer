@@ -98,7 +98,7 @@ export default function GradebookPage({ params }: { params: Promise<{ classId: s
                         href={`/teacher/reports/blueprint/${row.studentId}`}
                         className="flex items-center gap-1 text-teal-600 hover:text-teal-700 hover:underline"
                       >
-                        <Brain className="w-3 h-3" /> Blueprint
+                        <Brain className="w-3 h-3" /> Progress Report
                       </Link>
                       <Link
                         href={`/teacher/reports/career-intelligence/${row.studentId}`}

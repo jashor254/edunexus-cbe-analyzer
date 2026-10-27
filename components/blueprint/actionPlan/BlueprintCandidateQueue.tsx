@@ -124,7 +124,7 @@ export default function BlueprintCandidateQueue({
       setOpenDecision(null)
       setReasonDraft('')
       setAnnouncement(
-        kind === 'approve' ? 'Action approved — it can now be delivered from the Blueprint Action Plan below.'
+        kind === 'approve' ? 'Action approved — it can now be delivered from the action plan below.'
         : kind === 'reject' ? 'Action rejected.'
         : 'Action deferred — it will remain available to revisit.'
       )

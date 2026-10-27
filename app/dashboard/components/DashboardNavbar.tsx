@@ -28,7 +28,7 @@ const BOTTOM_NAV = [
 // route group into the canonical app/student/* tree — hrefs point directly
 // there rather than through the compatibility redirects in next.config.ts.
 const STUDENT_EXTRA_NAV_LINKS = [
-  { href: '/student/blueprint',          label: 'Blueprint',   color: 'hover:text-indigo-600'  },
+  { href: '/student/blueprint',          label: 'Progress Report',   color: 'hover:text-indigo-600'  },
   { href: '/student/holiday',            label: 'Holiday',     color: 'hover:text-orange-600'  },
   { href: '/student/progress',           label: 'Progress',    color: 'hover:text-emerald-600' },
   { href: '/student/resources',          label: 'Resources',   color: 'hover:text-teal-600'    },

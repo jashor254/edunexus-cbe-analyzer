@@ -1,122 +1,100 @@
 // components/parent/ParentBlueprintView.tsx
 //
-// Full Blueprint view for the Parent audience (Sprint 12Q, ADR-0010 Part 3
-// visibility matrix + Phase 3: "consume composeBlueprint() directly, no
-// transformations, no recalculations, no parent-specific Blueprint —
-// exactly the same Blueprint with the Parent visibility matrix"). Renders
-// `blueprint` — the exact object `composeBlueprint()` (Current) or a
-// stored Snapshot's `blueprint_payload` (Historical) already produced —
-// through the same per-section content renderers Teacher Blueprint uses
-// (components/blueprint/sections.tsx, unchanged, reused verbatim), so
-// there is exactly one place educational content is composed and exactly
-// one place each section's content is rendered.
+// The parent's Learner Progress Report. The four questions come first and are
+// the SAME BlueprintView every learner and teacher reads (viewer="parent"
+// only changes voice and parent-safe links) — so the parent never gets a
+// separate, differently-worded account of their child. Below it, a "More
+// detail" area holds the supporting records a parent may want to check.
 //
-// Sections shown, per ADR-0010 Part 3's Visibility Matrix: Identity,
-// Academic Record, Attendance (already summary-only), Learning Compass,
-// Career (already cluster-only, Sprint 12N), Portfolio, Achievements
-// (Sprint 6 — summary-only per ADR-0011 Phase 4 / ADR-0012 Phase 7's own
-// Parent Portal row, same discipline as every other section here), Teacher
-// Reflection, Parent Summary. Never shown: Educational Identity, Growth
-// Timeline (both `not_implemented` — Part 3's "Future: shows nothing until
-// the domain exists"), Evidence Trail (Part 3: "No").
+// "More detail" is deliberately supplementary: nothing that changes the
+// educational picture (levels, priorities, concerns, direction) lives only
+// here. Server-rendered <details> disclosures — no client component, no
+// render-function props crossing the server/client boundary (the previous
+// accordion passed functions into a 'use client' card), no JavaScript needed,
+// and they print.
+//
+// Not repeated here because the four questions already carry them: the
+// parent summary, recommended next steps, Learning Compass focus, career /
+// pathway direction.
 
-import Link from 'next/link'
-import type { LearnerBlueprint } from '@/lib/learnerBlueprint/types'
-import ParentSectionCard from './ParentSectionCard'
-import HistoricalBanner, { type HistoricalMeta } from '@/components/blueprint/HistoricalBanner'
+import type { ReactNode } from 'react'
+import type { BlueprintSection, LearnerBlueprint } from '@/lib/learnerBlueprint/types'
+import type { BlueprintValidationResult } from '@/lib/learnerBlueprint/validation'
+import BlueprintView from '@/components/blueprint/BlueprintView'
+import type { HistoricalMeta } from '@/components/blueprint/HistoricalBanner'
 import {
   IdentitySection,
   AcademicRecordSection,
   AttendanceSection,
-  LearningCompassSection,
-  CareerSection,
   PortfolioSection,
   AchievementSection,
   TeacherReflectionSection,
-  ParentSummarySection,
-  RecommendedNextStepsSection,
 } from '@/components/blueprint/sections'
-import { PathwayReadinessSection } from '@/components/blueprint/PathwayReadinessSection'
-import { readSection } from '@/lib/learnerBlueprint/readSection'
+
+function DetailCard<T>({ title, section, children }: { title: string; section: BlueprintSection<T>; children: (data: T) => ReactNode }) {
+  const ready = section.status === 'available' && section.data !== null
+  return (
+    <details className="group rounded-2xl border border-gray-100 bg-white" data-parent-detail={title}>
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-black text-gray-900 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500">
+        <span>{title}</span>
+        <span aria-hidden="true" className="text-gray-400 transition-transform group-open:rotate-180">▾</span>
+      </summary>
+      <div className="border-t border-gray-50 px-5 pb-5 pt-4">
+        {/* Never the composer's internal `unavailableReason` — it can name
+            architecture ("bridged", "Projection", ADR numbers). */}
+        {ready ? children(section.data as T) : <p className="text-sm text-gray-500">Nothing recorded here yet.</p>}
+      </div>
+    </details>
+  )
+}
 
 export default function ParentBlueprintView({
   blueprint,
+  validation,
   learnerId,
   historicalMeta,
 }: {
   blueprint: LearnerBlueprint
+  validation: BlueprintValidationResult
   learnerId: string
-  /** Present only when rendering a stored Blueprint Snapshot, never the Current Blueprint (ADR-0010 Phase 4: "Clear distinction between Current Blueprint and Historical Snapshot"). */
+  /** Present only when rendering a stored Blueprint Snapshot, never the current report. */
   historicalMeta?: HistoricalMeta
 }) {
+  const className = blueprint.identity.data?.currentClassName ?? null
+
   return (
-    <div className="max-w-2xl mx-auto space-y-3 py-6 px-4">
-      {historicalMeta && <HistoricalBanner meta={historicalMeta} />}
+    <div className="space-y-2 pb-8">
+      <BlueprintView
+        blueprint={blueprint}
+        validation={validation}
+        learnerId={learnerId}
+        historicalMeta={historicalMeta}
+        viewer="parent"
+        historyHref={`/child/${learnerId}/history`}
+      />
 
-      <div className="mb-2">
-        <h1 className="text-lg font-black text-gray-900">
-          {historicalMeta ? "A Moment in Their Journey" : "Your Child's Full Picture"}
-        </h1>
-        <nav aria-label="Parent Blueprint navigation" className="mt-1">
-          {historicalMeta ? (
-            <Link href={`/child/${learnerId}/history`} className="text-xs font-bold text-teal-700 hover:underline focus-visible:underline focus-visible:outline-none">
-              ← Back to Timeline
-            </Link>
-          ) : (
-            <Link href={`/child/${learnerId}`} className="text-xs font-bold text-teal-700 hover:underline focus-visible:underline focus-visible:outline-none">
-              ← Back to Home
-            </Link>
-          )}
-        </nav>
-      </div>
+      <section aria-labelledby="parent-more-detail" className="mx-auto max-w-4xl space-y-3 px-4">
+        <h2 id="parent-more-detail" className="text-sm font-black uppercase tracking-wide text-gray-500">More detail</h2>
 
-      <ParentSectionCard title="About Your Child" section={blueprint.identity} defaultOpen>
-        {data => <IdentitySection data={data} />}
-      </ParentSectionCard>
-
-      <ParentSectionCard title="Academic Progress" section={blueprint.academicRecord} defaultOpen>
-        {data => <AcademicRecordSection data={data} />}
-      </ParentSectionCard>
-
-      <ParentSectionCard title="Learning Time (Attendance)" section={blueprint.attendance}>
-        {data => <AttendanceSection data={data} />}
-      </ParentSectionCard>
-
-      <ParentSectionCard title="Learning Compass" section={blueprint.learningCompass}>
-        {data => <LearningCompassSection data={data} />}
-      </ParentSectionCard>
-
-      <ParentSectionCard title="Career Exploration" section={blueprint.career}>
-        {data => <CareerSection data={data} />}
-      </ParentSectionCard>
-
-      {/* Placed directly after Career Exploration: for a Grade 9 family this is
-          the most consequential thing in the whole document, and it answers the
-          question the career section deliberately does not ("which pathway?").
-          `readSection` guards snapshots stored before this section existed. */}
-      <ParentSectionCard title="Senior School Pathway" section={readSection(blueprint.pathwayReadiness, 'pathway readiness')}>
-        {data => <PathwayReadinessSection data={data} />}
-      </ParentSectionCard>
-
-      <ParentSectionCard title="Portfolio" section={blueprint.portfolio}>
-        {data => <PortfolioSection data={data} />}
-      </ParentSectionCard>
-
-      <ParentSectionCard title="Achievements" section={blueprint.achievement}>
-        {data => <AchievementSection data={data} />}
-      </ParentSectionCard>
-
-      <ParentSectionCard title="Teacher Reflection" section={blueprint.teacherReflection}>
-        {data => <TeacherReflectionSection data={data} />}
-      </ParentSectionCard>
-
-      <ParentSectionCard title="What This Means For You" section={blueprint.parentSummary} defaultOpen>
-        {data => <ParentSummarySection data={data} />}
-      </ParentSectionCard>
-
-      <ParentSectionCard title="Recommended Next Steps" section={blueprint.recommendedNextSteps} defaultOpen>
-        {data => <RecommendedNextStepsSection data={data} viewer="parent" />}
-      </ParentSectionCard>
+        <DetailCard title="About your child" section={blueprint.identity}>
+          {data => <IdentitySection data={data} />}
+        </DetailCard>
+        <DetailCard title="Subject by subject" section={blueprint.academicRecord}>
+          {data => <AcademicRecordSection data={data} className={className} />}
+        </DetailCard>
+        <DetailCard title="Learning time (attendance)" section={blueprint.attendance}>
+          {data => <AttendanceSection data={data} />}
+        </DetailCard>
+        <DetailCard title="The teacher’s full reflection" section={blueprint.teacherReflection}>
+          {data => <TeacherReflectionSection data={data} />}
+        </DetailCard>
+        <DetailCard title="Portfolio" section={blueprint.portfolio}>
+          {data => <PortfolioSection data={data} />}
+        </DetailCard>
+        <DetailCard title="Achievements" section={blueprint.achievement}>
+          {data => <AchievementSection data={data} />}
+        </DetailCard>
+      </section>
     </div>
   )
 }

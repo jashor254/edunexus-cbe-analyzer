@@ -2545,7 +2545,7 @@ function HolidayPlannerTab({
             </button>
           </div>
           <p className="text-xs text-gray-400">
-            Unpublished drafts are auto-published after 3 days so parents don&apos;t miss them if you forget — publishing now shares them immediately via the Learner Blueprint.
+            Unpublished drafts are auto-published after 3 days so parents don&apos;t miss them if you forget — publishing now shares them immediately via the Learner Progress Report.
           </p>
           {plans.map(plan => {
             const isPublished = publishedIds.has(plan.studentId)
@@ -3350,7 +3350,7 @@ na kuwasaidia vizuri zaidi darasani.
                                     onClick={e => e.stopPropagation()}
                                     className="flex items-center gap-1 text-teal-600 hover:text-teal-700 hover:underline"
                                   >
-                                    <Brain className="w-3 h-3" /> Blueprint
+                                    <Brain className="w-3 h-3" /> Progress Report
                                   </Link>
                                   <Link
                                     href={`/teacher/reports/career-intelligence/${s.id}`}

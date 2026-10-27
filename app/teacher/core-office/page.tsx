@@ -629,7 +629,7 @@ export default function CoreOfficePage() {
                         />
                       </label>
                       <span className="text-xs text-slate-300">·</span>
-                      <span className="text-xs text-slate-400">Shown on the Learner Blueprint cover and header</span>
+                      <span className="text-xs text-slate-400">Shown on the Learner Progress Report cover and header</span>
                     </div>
                   )}
                   {logoError && <p className="text-xs text-rose-600">{logoError}</p>}

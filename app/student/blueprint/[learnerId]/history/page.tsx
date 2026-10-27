@@ -61,19 +61,19 @@ export default async function BlueprintHistoryPage({
   try {
     snapshots = await listBlueprintSnapshots(learnerId, schoolId)
   } catch {
-    return <BlueprintStateMessage kind="unavailable" backHref={`/student/blueprint/${learnerId}`} backLabel="← Back to Blueprint" />
+    return <BlueprintStateMessage kind="unavailable" backHref={`/student/blueprint/${learnerId}`} backLabel="← Back to Progress Report" />
   }
 
   return (
     <div className="max-w-2xl mx-auto space-y-3 py-6 px-4">
       <div className="mb-4">
         <h1 className="text-lg font-black text-gray-900">Historical Snapshots</h1>
-        <p className="text-xs text-gray-400">Frozen Blueprint records — one per Report Card publication, End of Term, or Graduation.</p>
+        <p className="text-xs text-gray-400">Saved progress reports, kept exactly as they were — one per Report Card publication, End of Term, or Graduation.</p>
         <Link
           href={`/student/blueprint/${learnerId}`}
           className="text-xs font-bold text-teal-700 hover:underline focus-visible:underline focus-visible:outline-none mt-2 inline-block"
         >
-          ← Back to Current Blueprint
+          ← Back to Current Progress Report
         </Link>
       </div>
 
@@ -82,7 +82,7 @@ export default async function BlueprintHistoryPage({
           <p className="text-sm text-gray-400">No historical snapshots yet — one is created automatically the next time a report card is published, a term ends, or this learner graduates.</p>
         </div>
       ) : (
-        <ol aria-label="Blueprint snapshot timeline, newest first" className="space-y-2">
+        <ol aria-label="Saved progress reports, newest first" className="space-y-2">
           {snapshots.map((s, i) => (
             <li key={s.id}>
               <Link

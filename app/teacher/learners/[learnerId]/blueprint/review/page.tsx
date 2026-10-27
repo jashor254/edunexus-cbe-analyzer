@@ -92,9 +92,9 @@ export default async function BlueprintReviewWorkspacePage({
     <div className="max-w-5xl mx-auto py-6 px-4 space-y-4">
       <header className="bg-white rounded-2xl border border-gray-100 p-4 space-y-1">
         <h1 className="text-lg font-black text-gray-900">
-          {learner ? learnerDisplayName(learner) : 'Blueprint Action Review'}
+          {learner ? learnerDisplayName(learner) : 'Progress Report Action Review'}
         </h1>
-        <p className="text-xs text-gray-500">Teacher Review Workspace — Blueprint action plan</p>
+        <p className="text-xs text-gray-500">Teacher Review Workspace — Progress Report action plan</p>
         <div className="flex flex-wrap gap-3 pt-1 text-xs">
           <Link
             href={`/student/blueprint/${learnerId}`}

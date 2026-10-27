@@ -1,61 +1,39 @@
 // components/blueprint/BlueprintView.tsx
 //
-// Learner Blueprint renderer — a four-page document over the one canonical
-// Blueprint composition, passed in as a prop. Presentation only: no new
-// intelligence, no new queries, no duplicated reasoning, and it never
-// composes its own Blueprint data. Each page answers exactly one question
-// (Where does the learner stand? Why? What next? What's emerging?) and the
-// whole document reads as one continuous story about one learner — not as
-// separate outputs from Academic Record, Compass, Risk, Career and
-// Projection stitched together. See docs/architecture (Blueprint
-// presentation redesign) for the full design brief this implements.
+// Learner Progress Report renderer (internal name: Blueprint). Four
+// questions plus a printed School & Family Action Agreement, over the one
+// canonical Blueprint composition passed in as a prop:
 //
-// Non-negotiable rule this file follows throughout: one genuine assessment
-// is enough for an honest interpretation. `trend: "insufficient_data"`
-// never becomes "no data" — the level is known, only the direction of
-// change isn't yet. Confidence/evidence-maturity is communicated through
-// sentence wording (blueprintNarrative.ts), never a raw percentage, badge,
-// owner name, freshness label, or evidence ID.
+//   1. Where are we now?                       — data-blueprint-section="where-now"
+//   2. What's going well, and what needs help? — "going-well"
+//   3. What do we do next?                     — "next-steps"
+//   4. Where is this leading?                  — "leading"
+//   5. School & Family Action Agreement        — "agreement"
+//
+// Presentation only. What each question says — for this viewer's audience —
+// is decided once in lib/learnerBlueprint/progressReport.ts
+// (buildProgressReport); this file only lays it out. The same component
+// renders for the learner, the parent (ParentBlueprintView puts it first) and
+// the teacher, so all three read one educational account. It never composes
+// Blueprint data itself, never queries, and never exposes a raw percentage,
+// confidence score, owner, freshness label, enum value or evidence ID.
 
 import Link from 'next/link'
 import type { ReactNode } from 'react'
-import {
-  type ParentAction,
-  type BlueprintViewer,
-  isActionDestinationValidForViewer,
-  isSafeInternalDestination,
-} from '@/lib/parentExperience/actions'
-import type { LearnerBlueprint, BlueprintSection, AttendanceData } from '@/lib/learnerBlueprint/types'
-import { readSection } from '@/lib/learnerBlueprint/readSection'
+import type { BlueprintViewer } from '@/lib/parentExperience/actions'
+import type { LearnerBlueprint } from '@/lib/learnerBlueprint/types'
 import type { BlueprintValidationResult } from '@/lib/learnerBlueprint/validation'
+import { toDisplayName } from '@/lib/learnerBlueprint/narrative'
+import {
+  buildProgressReport,
+  questionHeading,
+  type LevelGroup,
+  type ProgressReportSectionId,
+  type ReportItem,
+} from '@/lib/learnerBlueprint/progressReport'
 import HistoricalBanner, { type HistoricalMeta } from './HistoricalBanner'
-import {
-  resolveGradeBand,
-  isSeniorBand,
-  gradeBandFraming,
-  futurePageTitle,
-  futurePageQuestion,
-} from '@/lib/learnerBlueprint/gradeBand'
-import { resolveCurriculumVoice, transitionNote } from '@/lib/learnerBlueprint/curriculumVoice'
-import {
-  firstName,
-  toDisplayName,
-  subjectLabel,
-  evidenceMaturityTier,
-  describeAcademicPicture,
-  describeVariation,
-  describeRiskForReader,
-  describeCareerDirection,
-  describeClosing,
-  describePriorityAction,
-  describeContinuedChallenge,
-  describeCareerAction,
-  describeExplorationSuggestions,
-  DOOR_LABEL,
-} from './blueprintNarrative'
 
-const TOTAL_PAGES = 4
-const ATTENDANCE_RESPONSE_THRESHOLD_PERCENT = 90
+const TOTAL_PAGES = 5
 
 /**
  * What this document calls itself to a reader.
@@ -68,12 +46,10 @@ const ATTENDANCE_RESPONSE_THRESHOLD_PERCENT = 90
  */
 const DOCUMENT_NAME = 'Learner Progress Report'
 
-/** `href` is present only when the destination is already known AND valid for the current viewer (Phase 2 — see isActionDestinationValidForViewer) — a null `href` renders as plain informational text, never a broken/misleading CTA. */
-type ActionItem = { title: string; detail: string; href: string | null }
-
 // Level accent colours are shared across curricula — only the WORDS differ,
-// and those come from `resolveCurriculumVoice()` so an 8-4-4 learner is never
-// described in CBC rubric language their school does not use.
+// and those come from `resolveCurriculumVoice()` (via progressReport.ts) so an
+// 8-4-4 learner is never described in CBC rubric language their school does
+// not use. The word is always printed; colour is never the only signal.
 const CBC_LEVEL_ACCENT: Record<1 | 2 | 3 | 4, string> = {
   4: 'bg-emerald-600 text-white',
   3: 'bg-sky-700 text-white',
@@ -99,26 +75,26 @@ function ReportHeader({
       data-blueprint-report-header="true"
       className="flex items-center justify-between border-b-4 border-amber-500 bg-[#0b1530] px-6 py-3 text-white print:px-8"
     >
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         {schoolLogoUrl && (
           // eslint-disable-next-line @next/next/no-img-element -- printed into a PDF via headless Chromium, not served through next/image's optimizer
           <img src={schoolLogoUrl} alt={`${schoolName ?? 'School'} crest`} className="h-8 w-8 rounded-md object-cover" />
         )}
-        <div>
+        <div className="min-w-0">
           <p className="text-[10px] font-black uppercase tracking-[0.28em] text-amber-400">
             {schoolName ? `${schoolName} · ${DOCUMENT_NAME}` : DOCUMENT_NAME}
           </p>
           <p className="mt-0.5 text-xs font-semibold text-white/70">{learnerName ?? DOCUMENT_NAME}</p>
         </div>
       </div>
-      <p className="text-xs font-bold text-white/60">Page {pageNumber} of {TOTAL_PAGES}</p>
+      <p className="shrink-0 text-xs font-bold text-white/60">Page {pageNumber} of {TOTAL_PAGES}</p>
     </div>
   )
 }
 
 function ReportFooter({ reportId, generatedAtLabel }: { reportId: string; generatedAtLabel: string }) {
   return (
-    <div className="flex items-center justify-between border-t border-slate-200 px-6 py-2 text-[10px] text-slate-400 print:px-8">
+    <div className="flex items-center justify-between gap-2 border-t border-slate-200 px-6 py-2 text-[10px] text-slate-400 print:px-8">
       <p>{DOCUMENT_NAME} · Prepared {generatedAtLabel}</p>
       <p>{reportId} · CONFIDENTIAL</p>
     </div>
@@ -127,7 +103,9 @@ function ReportFooter({ reportId, generatedAtLabel }: { reportId: string; genera
 
 function PageShell({
   pageNumber,
+  sectionId,
   title,
+  titleSw,
   question,
   children,
   transition,
@@ -138,10 +116,13 @@ function PageShell({
   schoolLogoUrl,
 }: {
   pageNumber: number
+  sectionId: ProgressReportSectionId
   title: string
+  /** Kiswahili wording of the question (lib/i18n/locales/sw.ts), shown beneath the English heading. */
+  titleSw?: string
   question: string
   children: ReactNode
-  transition: string
+  transition?: string
   learnerName: string | null
   reportId: string
   generatedAtLabel: string
@@ -151,22 +132,30 @@ function PageShell({
   return (
     <section
       data-blueprint-page-shell="true"
+      data-blueprint-section={sectionId}
       data-blueprint-print-break="before"
+      aria-labelledby={`blueprint-${sectionId}-title`}
       className="overflow-hidden rounded-3xl border border-gray-100 bg-white print:rounded-none print:border-0"
     >
       <ReportHeader pageNumber={pageNumber} learnerName={learnerName} schoolName={schoolName} schoolLogoUrl={schoolLogoUrl} />
 
-      <div className="space-y-5 px-5 py-6 sm:px-6 print:px-8">
-        <div className="space-y-1 border-b border-slate-100 pb-4">
-          <h2 className="text-lg font-black text-[#0b1530]">{title}</h2>
+      {/* print: variants tighten density on paper only, so each question fits one A4 page in the common case. */}
+      <div className="space-y-5 px-5 py-6 sm:px-6 print:space-y-3 print:px-8 print:py-4">
+        <div className="space-y-1 border-b border-slate-100 pb-4 print:pb-2">
+          <h2 id={`blueprint-${sectionId}-title`} className="text-lg font-black text-[#0b1530]">{title}</h2>
+          {titleSw && (
+            <p lang="sw" data-blueprint-heading-sw="true" className="text-sm font-semibold italic text-slate-500">{titleSw}</p>
+          )}
           <p className="text-sm font-medium text-slate-500">{question}</p>
         </div>
 
-        <div className="space-y-5 text-[15px] leading-7 text-slate-800">{children}</div>
+        <div className="space-y-5 text-[15px] leading-7 text-slate-800 print:space-y-3 print:text-[13px] print:leading-6">{children}</div>
 
-        <div className="border-t border-slate-100 pt-4">
-          <p className="text-sm italic text-slate-500">{transition}</p>
-        </div>
+        {transition && (
+          <div className="border-t border-slate-100 pt-4 print:pt-2">
+            <p className="text-sm italic text-slate-500">{transition}</p>
+          </div>
+        )}
       </div>
 
       <ReportFooter reportId={reportId} generatedAtLabel={generatedAtLabel} />
@@ -193,7 +182,7 @@ function EvidenceBox({
   title: string
   children: ReactNode
   tone?: 'default' | 'gold' | 'navy'
-  /** Page 4-only density reduction (moderately smaller padding/gap) — never applied elsewhere, so Pages 1-3 are unaffected. */
+  /** Page 4-only density reduction (moderately smaller padding/gap). */
   dense?: boolean
 }) {
   const toneClass =
@@ -204,14 +193,14 @@ function EvidenceBox({
         : 'border-slate-100 bg-slate-50'
 
   return (
-    <div className={`rounded-2xl border ${dense ? 'p-3' : 'p-4'} ${toneClass}`}>
+    <div className={`break-inside-avoid rounded-2xl border ${dense ? 'p-3' : 'p-4'} ${toneClass}`}>
       <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">{title}</p>
       <div className={`${dense ? 'mt-1 space-y-1' : 'mt-2 space-y-2'} text-sm text-slate-700`}>{children}</div>
     </div>
   )
 }
 
-function OrderedActions({ items, empty }: { items: ActionItem[]; empty: string }) {
+function OrderedActions({ items, empty }: { items: ReportItem[]; empty: string }) {
   if (items.length === 0) return <p className="text-sm text-slate-500">{empty}</p>
   return (
     <ol className="space-y-2">
@@ -232,66 +221,52 @@ function OrderedActions({ items, empty }: { items: ActionItem[]; empty: string }
   )
 }
 
-// ── Presentation helpers (selection only, no new computation) ───────────────
-
-function normalizeText(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+function SubjectList({ title, groups, tone }: { title: string; groups: LevelGroup[]; tone: 'good' | 'help' }) {
+  if (groups.length === 0) return null
+  return (
+    <div className={`break-inside-avoid rounded-2xl border px-4 py-3 ${tone === 'good' ? 'border-emerald-100 bg-emerald-50/50' : 'border-amber-100 bg-amber-50/60'}`}>
+      <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">{title}</p>
+      <dl className="mt-1 space-y-1 text-sm text-slate-700">
+        {groups.map(group => (
+          <div key={group.levelLabel}>
+            <dt className="inline font-semibold text-slate-900">{group.levelLabel}: </dt>
+            <dd className="inline">{group.subjects.join(', ')}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  )
 }
 
-function attendanceNeedsResponse(section: BlueprintSection<AttendanceData>): boolean {
-  return section.status === 'available'
-    && section.data?.attendancePercentage !== null
-    && section.data.attendancePercentage < ATTENDANCE_RESPONSE_THRESHOLD_PERCENT
+/** A printed write-in line. Visible on screen too, so a teacher printing from the browser gets the same page. */
+function WriteInLine({ label, proposed, lines = 2 }: { label: string; proposed?: string | null; lines?: 1 | 2 }) {
+  return (
+    <div className="break-inside-avoid">
+      <p className="text-sm font-semibold text-slate-800">{label}</p>
+      {proposed && (
+        <p className="text-xs italic text-slate-500">Proposed in the teacher’s plan, for discussion: {proposed}</p>
+      )}
+      {Array.from({ length: lines }, (_, i) => (
+        <div key={i} aria-hidden="true" className="h-6 border-b border-dashed border-slate-400" />
+      ))}
+    </div>
+  )
 }
 
-function pushUnique(bucket: ActionItem[], seen: Set<string>, item: Omit<ActionItem, 'href'> & { href?: string | null } | null) {
-  if (!item) return
-  const key = normalizeText(item.detail)
-  if (!key || seen.has(key)) return
-  seen.add(key)
-  bucket.push({ href: null, ...item })
-}
-
-/** `href` is populated only when `action.destination` is both a safe internal path and valid for `viewer` — see isActionDestinationValidForViewer (lib/parentExperience/actions.ts). */
-function actionFromParentAction(action: ParentAction, viewer: BlueprintViewer): ActionItem {
-  const href = isActionDestinationValidForViewer(action.actionType, viewer) && isSafeInternalDestination(action.destination)
-    ? action.destination
-    : null
-  return { title: action.title, detail: action.description, href }
-}
-
-function futureEvidenceItems(blueprint: LearnerBlueprint): ActionItem[] {
-  const items: ActionItem[] = []
-
-  if (blueprint.portfolio.status === 'available' && blueprint.portfolio.data) {
-    const { publishedCount, featuredItem, latestItem } = blueprint.portfolio.data
-    if (publishedCount > 0) {
-      items.push({
-        title: 'Portfolio',
-        detail: featuredItem
-          ? `${publishedCount} published portfolio item${publishedCount === 1 ? '' : 's'}, with ${featuredItem.title} currently standing out.`
-          : `${publishedCount} published portfolio item${publishedCount === 1 ? '' : 's'} already visible.`,
-        href: null,
-      })
-    } else if (latestItem) {
-      items.push({ title: 'Portfolio', detail: `${latestItem.title} is the latest portfolio signal so far.`, href: null })
-    }
-  }
-
-  if (blueprint.achievement.status === 'available' && blueprint.achievement.data) {
-    const { achievementCount, highestLevelAchievement } = blueprint.achievement.data
-    if (achievementCount > 0) {
-      items.push({
-        title: 'Achievement',
-        detail: highestLevelAchievement
-          ? `${achievementCount} verified achievement${achievementCount === 1 ? '' : 's'}, including ${highestLevelAchievement.title}.`
-          : `${achievementCount} verified achievement${achievementCount === 1 ? '' : 's'} so far.`,
-        href: null,
-      })
-    }
-  }
-
-  return items
+function Acknowledgement({ label }: { label: string }) {
+  return (
+    <div className="break-inside-avoid">
+      <p className="text-sm font-semibold text-slate-800">{label}</p>
+      <div className="grid grid-cols-3 gap-3">
+        {['Name', 'Signature', 'Date'].map(field => (
+          <div key={field}>
+            <div aria-hidden="true" className="h-6 border-b border-dashed border-slate-400" />
+            <p className="mt-0.5 text-[10px] uppercase tracking-wide text-slate-400">{field}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 // A stable, non-random report identifier built from real identifiers
@@ -311,10 +286,11 @@ export default function BlueprintView({
   historicalMeta,
   exportMode = 'screen',
   // Defaults to 'student' — the historical assumption every existing
-  // caller/test implicitly made before Phase 2 (Blueprint Actionability)
-  // introduced viewer-aware destinations. Callers that know their actual
-  // viewer (the page-level `primary` role) should pass it explicitly.
+  // caller/test implicitly made before viewer-aware destinations existed.
+  // Callers that know their actual viewer (the page-level `primary` role)
+  // pass it explicitly; it also decides the report's audience voice.
   viewer = 'student',
+  historyHref,
 }: {
   blueprint: LearnerBlueprint
   validation: BlueprintValidationResult
@@ -322,104 +298,29 @@ export default function BlueprintView({
   historicalMeta?: HistoricalMeta
   exportMode?: 'screen' | 'pdf'
   viewer?: BlueprintViewer
+  /** Where "View History" / "Back to History" points — the parent portal passes its own history route. */
+  historyHref?: string
 }) {
+  const report = buildProgressReport(blueprint, viewer)
   const generatedAt = blueprint.metadata.generatedAt
-  const generatedAtLabel = new Date(generatedAt).toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' })
+  const generatedAtLabel = new Date(generatedAt).toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Nairobi' })
   const reportId = buildReportId(learnerId, generatedAt)
   const learnerName = toDisplayName(blueprint.identity.data?.learnerName ?? null)
-  const name = firstName(learnerName)
-  // The band the composer resolved, not one re-derived here — so this render,
-  // the parent's render and a stored snapshot can never disagree about what
-  // stage the learner is at. `resolveGradeBand` falls back to the recorded
-  // class name only for snapshots taken before the field existed.
-  const gradeBand = resolveGradeBand(blueprint.metadata.gradeBand, blueprint.identity.data?.currentClassName ?? null)
-
-  // Snapshots stored before this section existed have no `pathwayReadiness`
-  // key at all — the payload is JSON cast to the current type, so the property
-  // is `undefined` at runtime while the type insists it is there. Reading
-  // `.status` off it directly is a TypeError, and 117 stored snapshots predate
-  // this section. Same class of problem `resolveGradeBand` handles above.
-  const pathwayReadiness = readSection(blueprint.pathwayReadiness, 'pathway readiness')
-
-  // Which vocabulary this learner's school actually uses. A Kenyan secondary
-  // school in 2026 holds Form 3/4 under 8-4-4 and Grade 10 under CBE on the
-  // same roll, so this is a per-learner fact read from the class name, never a
-  // school-wide setting.
-  const curriculumVoice = resolveCurriculumVoice(blueprint.identity.data?.currentClassName ?? null)
-  const transitionLine = transitionNote(curriculumVoice)
-  const seniorStage = isSeniorBand(gradeBand)
-  const attendanceAsConcern = attendanceNeedsResponse(blueprint.attendance)
-  const futureEvidence = futureEvidenceItems(blueprint)
-
-  const hasNoLegacyBridge = (reason?: string) => !!reason && reason.toLowerCase().includes('bridged')
-
-  const tier = blueprint.academicRecord.status === 'available' && blueprint.academicRecord.data
-    ? evidenceMaturityTier(blueprint.academicRecord.data.bySubject)
-    : 'first-snapshot'
-
-  // ── Page 3 action list, one canonical priority + ordered follow-ons ──────
-  const priorityAction = describePriorityAction(name, blueprint.learningCompass.data)
-  const followOns: ActionItem[] = []
-  const seen = new Set<string>()
-  if (priorityAction) seen.add(normalizeText(priorityAction))
-
-  const continuedChallenge = blueprint.academicRecord.status === 'available' && blueprint.academicRecord.data
-    ? describeContinuedChallenge(name, blueprint.academicRecord.data)
-    : null
-  pushUnique(followOns, seen, continuedChallenge ? { title: 'Continued challenge', detail: continuedChallenge } : null)
-
-  if (blueprint.teacherReflection.status === 'available' && blueprint.teacherReflection.data) {
-    pushUnique(followOns, seen, { title: 'Teacher support', detail: blueprint.teacherReflection.data.recommendedSupport })
-    if (blueprint.teacherReflection.data.holidayFocus) {
-      pushUnique(followOns, seen, { title: 'Holiday focus', detail: blueprint.teacherReflection.data.holidayFocus })
-    }
-  }
-
-  if (attendanceAsConcern && blueprint.attendance.status === 'available' && blueprint.attendance.data?.attendancePercentage !== null) {
-    pushUnique(followOns, seen, {
-      title: 'Attendance',
-      detail: `A little more consistency in attendance (currently ${blueprint.attendance.data.attendancePercentage}%) would help protect the progress already showing.`,
-    })
-  }
-
-  const careerActionText = blueprint.recommendedNextSteps.status === 'available' && blueprint.recommendedNextSteps.data
-    ? describeCareerAction(name, blueprint.career.data, blueprint.recommendedNextSteps.data.actions)
-    : describeCareerAction(name, blueprint.career.data, [])
-  pushUnique(followOns, seen, careerActionText ? { title: 'Career exploration', detail: careerActionText } : null)
-
-  // Fallback recommendations (only used when Compass has no current focus at all)
-  if (!priorityAction && blueprint.recommendedNextSteps.status === 'available' && blueprint.recommendedNextSteps.data) {
-    for (const action of blueprint.recommendedNextSteps.data.actions) {
-      if (action.actionType === 'explore_career_journey') continue
-      pushUnique(followOns, seen, actionFromParentAction(action, viewer))
-    }
-  }
-
-  const risk = describeRiskForReader(blueprint.risk.status === 'available' ? blueprint.risk.data : null, tier)
-
-  // Reuses the same already-real, context-correct destination Page 3's
-  // career follow-on is built from — never an invented URL. Gated by
-  // viewer (Phase 2): a teacher/admin viewing this Blueprint holds neither
-  // the parent link nor the learner's own auth identity, so /career-
-  // intelligence would 403/empty for them — see
-  // isActionDestinationValidForViewer (lib/parentExperience/actions.ts).
-  const careerAction = blueprint.recommendedNextSteps.status === 'available' && blueprint.recommendedNextSteps.data
-    ? blueprint.recommendedNextSteps.data.actions.find((a) => a.actionType === 'explore_career_journey')
-    : null
-  const careerJourneyLink = careerAction && isActionDestinationValidForViewer(careerAction.actionType, viewer) && isSafeInternalDestination(careerAction.destination)
-    ? careerAction.destination
-    : null
-
-  const futureFraming = gradeBandFraming(gradeBand)
+  const historyLink = historyHref ?? `/student/blueprint/${learnerId}/history`
 
   const shellProps = {
-    exportMode,
     learnerName,
     reportId,
     generatedAtLabel,
     schoolName: blueprint.identity.data?.schoolName ?? null,
     schoolLogoUrl: blueprint.identity.data?.schoolLogoUrl ?? null,
   }
+
+  const q1 = questionHeading('where-now')
+  const q2 = questionHeading('going-well')
+  const q3 = questionHeading('next-steps')
+  const q4 = questionHeading('leading')
+  const { whereNow, goingWell, nextSteps, leading, agreement } = report
 
   return (
     <div
@@ -448,12 +349,8 @@ export default function BlueprintView({
               : `Prepared ${generatedAtLabel}`}
           </p>
           {/* Structural validation failed — say so plainly and tell the reader
-              what to do. The individual errors are internal field/status
-              diagnostics ("identity is required and must be 'available', got
-              'unavailable'"); a parent or learner can act on none of them, and
-              BlueprintStateMessage's own copy already sets the house standard
-              of never exposing internals. The detail belongs in logs, not on
-              a parent's screen. */}
+              what to do. The individual errors are internal diagnostics a
+              parent or learner can act on none of; they belong in logs. */}
           {!validation.valid && (
             <div role="alert" className="mt-3 rounded-2xl border border-amber-100 bg-amber-50 p-3">
               <p className="text-xs font-bold text-amber-700">Some of this report could not be prepared</p>
@@ -463,151 +360,164 @@ export default function BlueprintView({
               </p>
             </div>
           )}
-          <nav aria-label="Blueprint history navigation" data-blueprint-nav="true" className="mt-3">
-            {historicalMeta ? (
-              <Link href={`/student/blueprint/${learnerId}/history`} className="text-xs font-bold text-teal-700 hover:underline focus-visible:underline focus-visible:outline-none">
-                ← Back to History
-              </Link>
-            ) : (
-              <Link href={`/student/blueprint/${learnerId}/history`} className="text-xs font-bold text-teal-700 hover:underline focus-visible:underline focus-visible:outline-none">
-                View History →
-              </Link>
-            )}
+          <nav aria-label="Report history navigation" data-blueprint-nav="true" className="mt-3">
+            <Link href={historyLink} className="text-xs font-bold text-teal-700 hover:underline focus-visible:underline focus-visible:outline-none">
+              {historicalMeta ? '← Back to History' : 'View History →'}
+            </Link>
           </nav>
         </div>
       )}
 
-      {/* PAGE 1 — Where We Stand Today */}
+      {/* 1 — Where are we now? */}
       <PageShell
         pageNumber={1}
-        title="Where We Stand Today"
-        question="A snapshot of where things stand right now."
-        transition="The next page looks at why this picture looks the way it does."
+        sectionId="where-now"
+        title={q1.en}
+        titleSw={q1.sw}
+        question={whereNow.intro}
+        transition="Next: what’s going well, and what needs help."
         {...shellProps}
       >
-        {blueprint.academicRecord.status === 'available' && blueprint.academicRecord.data && blueprint.academicRecord.data.bySubject.length > 0 ? (
-          <>
-            <Prose paragraphs={describeAcademicPicture(name, blueprint.academicRecord.data)} />
+        <Prose paragraphs={whereNow.paragraphs} />
 
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {blueprint.academicRecord.data.bySubject.map((subject) => (
-                <div key={subject.subject} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
-                  <p className="text-xs font-bold text-slate-900">{subjectLabel(subject.subject)}</p>
-                  <span className={`mt-1 inline-block rounded px-2 py-0.5 text-[10px] font-black ${CBC_LEVEL_ACCENT[subject.latestLevel]}`}>
-                    {curriculumVoice.levelLabel[subject.latestLevel]}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* An 8-4-4 learner is told what these bands are and what they are
-                not. A CBE learner sees nothing extra — the KICD rubric words
-                are already the vocabulary of their classroom. */}
-            {curriculumVoice.scaleNote && (
-              <p className="text-[11px] text-slate-500">{curriculumVoice.scaleNote}</p>
-            )}
-            {transitionLine && (
-              <p className="text-[11px] text-slate-500">{transitionLine}</p>
-            )}
-          </>
-        ) : hasNoLegacyBridge(blueprint.academicRecord.unavailableReason) ? (
-          <p className="text-sm text-slate-500">{`We don’t yet have enough set up to build ${name}'s academic picture.`}</p>
-        ) : (
-          <p className="text-sm text-slate-500">{`There isn’t yet enough recorded evidence to describe ${name}'s current academic picture — that will change as new assessments are added.`}</p>
+        {whereNow.subjects.length > 0 && (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {whereNow.subjects.map((subject) => (
+              <div key={subject.subject} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                <p className="text-xs font-bold text-slate-900">{subject.label}</p>
+                <span className={`mt-1 inline-block rounded px-2 py-0.5 text-[10px] font-black ${CBC_LEVEL_ACCENT[subject.level]}`}>
+                  {subject.levelLabel}
+                </span>
+              </div>
+            ))}
+          </div>
         )}
 
-        {blueprint.learningCompass.status === 'available' && blueprint.learningCompass.data?.currentLearningFocus && (
-          <p className="text-sm text-slate-600">
-            Right now, {name}'s active learning focus is <span className="font-semibold text-slate-900">{subjectLabel(blueprint.learningCompass.data.currentLearningFocus.subject)}</span>.
-          </p>
-        )}
+        {/* An 8-4-4 learner is told what these bands are and what they are
+            not. A CBE learner sees nothing extra — the KICD rubric words are
+            already the vocabulary of their classroom. */}
+        {whereNow.scaleNote && <p className="text-[11px] text-slate-500">{whereNow.scaleNote}</p>}
+        {whereNow.transitionLine && <p className="text-[11px] text-slate-500">{whereNow.transitionLine}</p>}
+        {whereNow.latestEvidenceLine && <p className="text-[11px] text-slate-500">{whereNow.latestEvidenceLine}</p>}
+        {whereNow.compassFocusLine && <p className="text-sm text-slate-600">{whereNow.compassFocusLine}</p>}
       </PageShell>
 
-      {/* PAGE 2 — What the Evidence Suggests */}
+      {/* 2 — What's going well, and what needs help? */}
       <PageShell
         pageNumber={2}
-        title="What the Evidence Suggests"
-        question="What this first record suggests — and what it doesn’t yet."
-        transition="The next page turns this into a clear next step."
+        sectionId="going-well"
+        title={q2.en}
+        titleSw={q2.sw}
+        question={goingWell.intro}
+        transition="Next: turning this into clear next steps."
         {...shellProps}
       >
-        {blueprint.academicRecord.status === 'available' && blueprint.academicRecord.data && blueprint.academicRecord.data.bySubject.length > 0 ? (
-          <Prose paragraphs={describeVariation(name, blueprint.academicRecord.data)} />
-        ) : (
-          <p className="text-sm text-slate-500">{`It’s too early to describe a pattern for ${name} yet — that becomes possible once assessment evidence starts to build up.`}</p>
+        <Prose paragraphs={goingWell.paragraphs} />
+
+        {(goingWell.goingWell.length > 0 || goingWell.needsHelp.length > 0) && (
+          <div className="space-y-2">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <SubjectList title="Going well" groups={goingWell.goingWell} tone="good" />
+              <SubjectList title="Needs help" groups={goingWell.needsHelp} tone="help" />
+            </div>
+            {goingWell.listCaveat && <p className="text-[11px] text-slate-500">{goingWell.listCaveat}</p>}
+          </div>
         )}
 
-        {blueprint.growthTimeline.status === 'available' && blueprint.growthTimeline.data && blueprint.growthTimeline.data.length > 0 && (
+        {goingWell.movement.length > 0 && (
           <EvidenceBox title="Movement over time">
-            {blueprint.growthTimeline.data.map((entry, index) => (
-              <p key={index}>{entry.trajectory}</p>
-            ))}
+            {goingWell.movement.map((line, index) => <p key={index}>{line}</p>)}
           </EvidenceBox>
         )}
 
-        {blueprint.teacherReflection.status === 'available' && blueprint.teacherReflection.data && (
-          <EvidenceBox title="What the teacher has noticed" tone="gold">
-            <p>{blueprint.teacherReflection.data.strengths}</p>
-            <p>{blueprint.teacherReflection.data.growthArea}</p>
+        <EvidenceBox title="What we're watching">
+          <p className="font-semibold text-slate-900">{goingWell.watching.headline}</p>
+          {goingWell.watching.details.map((line, index) => <p key={index}>{line}</p>)}
+        </EvidenceBox>
+
+        {goingWell.teacher && (
+          <EvidenceBox title={goingWell.teacher.title} tone="gold">
+            <p>{goingWell.teacher.strengths}</p>
+            <p>{goingWell.teacher.growthArea}</p>
+            <p className="text-[11px] text-slate-500">{goingWell.teacher.attribution}</p>
           </EvidenceBox>
         )}
       </PageShell>
 
-      {/* PAGE 3 — How We Help Next */}
+      {/* 3 — What do we do next? */}
       <PageShell
         pageNumber={3}
-        title="How We Help Next"
-        question="The next steps that matter most."
-        transition="The final page looks at where this journey could lead."
+        sectionId="next-steps"
+        title={q3.en}
+        titleSw={q3.sw}
+        question={nextSteps.intro}
+        transition="Next: where this journey could lead."
         {...shellProps}
       >
-        {priorityAction ? (
+        {nextSteps.priority ? (
           <EvidenceBox title="The one thing that matters most right now" tone="navy">
-            <p className="text-base font-semibold text-slate-900">{priorityAction}</p>
+            <p className="text-base font-semibold text-slate-900">{nextSteps.priority.text}</p>
+            {nextSteps.priority.detail && <p>{nextSteps.priority.detail}</p>}
+            <p className="text-[11px] text-slate-500">{nextSteps.priority.sourceLabel}</p>
+            {nextSteps.priority.reviewNote && <p className="text-[11px] text-slate-500">{nextSteps.priority.reviewNote}</p>}
           </EvidenceBox>
         ) : (
-          <p className="text-sm text-slate-500">There isn’t yet a specific next step identified — check back as more evidence arrives this term.</p>
+          <p className="text-sm text-slate-500">{nextSteps.priorityEmpty}</p>
         )}
 
         <div>
-          <p className="mb-2 text-[11px] font-black uppercase tracking-wide text-slate-500">Then, in order</p>
-          <OrderedActions items={followOns} empty="No further steps are clearly supported by evidence yet — this will grow as the term continues." />
+          <p className="mb-2 text-[11px] font-black uppercase tracking-wide text-slate-500">Who does what</p>
+          <dl className="grid gap-2 sm:grid-cols-3">
+            {nextSteps.roles.map(role => (
+              <div key={role.role} data-blueprint-role={role.role} className="break-inside-avoid rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <dt className="text-[11px] font-black uppercase tracking-wide text-slate-500">{role.label}</dt>
+                <dd className="mt-1 space-y-1 text-sm text-slate-700">
+                  {role.text ? (
+                    <>
+                      <p>{role.text}</p>
+                      {role.sourceLabel && <p className="text-[11px] text-slate-500">{role.sourceLabel}</p>}
+                    </>
+                  ) : (
+                    <p className="text-slate-500">{role.emptyText}</p>
+                  )}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </div>
 
-        <EvidenceBox title="What we're watching">
-          <p className="font-semibold text-slate-900">{risk.headline}</p>
-          {risk.details.map((line, index) => (
-            <p key={index}>{line}</p>
-          ))}
-        </EvidenceBox>
+        <div>
+          <p className="mb-2 text-[11px] font-black uppercase tracking-wide text-slate-500">Also worth doing</p>
+          <OrderedActions items={nextSteps.followOns} empty={nextSteps.followOnsEmpty} />
+        </div>
       </PageShell>
 
-      {/* PAGE 4 — forward-looking. Its whole framing inverts between stages:
-          for a junior learner the pathway is still open and the page is about
-          what may emerge; for a senior learner the pathway is already settled
-          and the page is about where the record now leads. */}
+      {/* 4 — Where is this leading? Its framing inverts between stages: for a
+          junior learner the pathway is still open and no career field is
+          named; for a senior learner the record already points somewhere. */}
       <PageShell
         pageNumber={4}
-        title={futurePageTitle(gradeBand)}
-        question={futurePageQuestion(gradeBand)}
-        transition={describeClosing(name, futureEvidence.length > 0, gradeBand)}
+        sectionId="leading"
+        title={q4.en}
+        titleSw={q4.sw}
+        question={leading.question}
+        transition={leading.closing}
         {...shellProps}
       >
-        <EvidenceBox title={seniorStage ? 'Where the record points' : 'An early direction'} tone="navy">
-          <p>{futureFraming}</p>
-          <Prose paragraphs={describeCareerDirection(name, blueprint.career.status === 'available' ? blueprint.career.data : null, gradeBand)} />
+        <p className="text-[11px] font-black uppercase tracking-wide text-slate-500" data-blueprint-stage-title="true">{leading.stageTitle}</p>
+
+        <EvidenceBox title={leading.directionTitle} tone="navy">
+          <p>{leading.framing}</p>
+          <Prose paragraphs={leading.direction} />
         </EvidenceBox>
 
-        {/* Tighter internal spacing than the page's default space-y-5 —
-            Page 4 only, so density stays high without touching Pages 1-3
-            or PageShell's shared layout. */}
         <div className="space-y-3">
-          {blueprint.career.status === 'available' && blueprint.career.data?.doorsPreview && (
+          {leading.doors.length > 0 && (
             <div>
-              <p className="mb-1.5 text-[11px] font-black uppercase tracking-wide text-slate-500">{seniorStage ? 'Four ways this could open after school' : 'Four ways this direction could open'}</p>
+              <p className="mb-1.5 text-[11px] font-black uppercase tracking-wide text-slate-500">{leading.doorsTitle}</p>
               <div className="grid gap-2 sm:grid-cols-2">
-                {blueprint.career.data.doorsPreview.map((door) => (
-                  <EvidenceBox key={door.type} title={DOOR_LABEL[door.type]} dense>
+                {leading.doors.map((door) => (
+                  <EvidenceBox key={door.label} title={door.label} dense>
                     <p>{door.summary}</p>
                   </EvidenceBox>
                 ))}
@@ -615,86 +525,109 @@ export default function BlueprintView({
             </div>
           )}
 
-          {blueprint.career.status === 'available' && blueprint.career.data?.aiChangeSummary && (
+          {leading.aiChange && (
             <EvidenceBox title="How this field is changing" tone="gold" dense>
-              <p>{blueprint.career.data.aiChangeSummary}</p>
+              <p>{leading.aiChange}</p>
             </EvidenceBox>
           )}
 
           {/* Pathway readiness — junior only, by construction (composePathwayReadiness
               returns unavailable for senior bands, where the decision is already made).
-              This is the most decision-useful block on the page for a Grade 9 family:
-              it names one subject and one level rather than "work harder". The
-              disclaimer is rendered unconditionally because the KJSEA rule set behind
-              these thresholds is provisional — see lib/config/kjseaRules.ts. */}
-          {pathwayReadiness.status === 'available' && pathwayReadiness.data && (
+              For a Grade 9 family it names one subject and one level rather than
+              "work harder". The disclaimer is always rendered because the KJSEA rule
+              set behind these thresholds is provisional — see lib/config/kjseaRules.ts. */}
+          {leading.pathwayReadiness && (
             <EvidenceBox title="Senior school pathway" tone="navy" dense>
-              <p>{pathwayReadiness.data.stageMessage}</p>
+              <p>{leading.pathwayReadiness.stageMessage}</p>
 
-              {pathwayReadiness.data.stage === 'decision_year' && (
+              {leading.pathwayReadiness.stage === 'decision_year' && (
                 <>
                   <p className="mt-2">
                     Current composite:{' '}
                     <span className="font-bold">
-                      {pathwayReadiness.data.isPartialComposite ? 'at least ' : ''}
-                      {pathwayReadiness.data.compositeScore}
+                      {leading.pathwayReadiness.isPartialComposite ? 'at least ' : ''}
+                      {leading.pathwayReadiness.compositeScore}
                     </span>{' '}
-                    of {pathwayReadiness.data.kjseaMaxScore}, from{' '}
-                    {pathwayReadiness.data.subjectsEntered} of{' '}
-                    {pathwayReadiness.data.subjectGroupsTotal} subject groups.
+                    of {leading.pathwayReadiness.kjseaMaxScore}, from{' '}
+                    {leading.pathwayReadiness.subjectsEntered} of{' '}
+                    {leading.pathwayReadiness.subjectGroupsTotal} subject groups.
                   </p>
 
-                  {pathwayReadiness.data.qualifiesFor.length > 0 && (
+                  {leading.pathwayReadiness.qualifiesFor.length > 0 && (
                     <p className="mt-1">
                       On the record so far, this reaches the threshold for:{' '}
-                      <span className="font-bold">{pathwayReadiness.data.qualifiesFor.join(', ')}</span>.
+                      <span className="font-bold">{leading.pathwayReadiness.qualifiesFor.join(', ')}</span>.
                     </p>
                   )}
 
-                  {pathwayReadiness.data.nextDoor && (
+                  {leading.pathwayReadiness.nextDoor && (
                     <p className="mt-2">
-                      <span className="font-bold">The one thing that would open {pathwayReadiness.data.nextDoor.pathway}:</span>{' '}
-                      moving {pathwayReadiness.data.nextDoor.keyLever.subject} from level{' '}
-                      {pathwayReadiness.data.nextDoor.keyLever.currentLevel} to level{' '}
-                      {pathwayReadiness.data.nextDoor.keyLever.targetLevel}
-                      {pathwayReadiness.data.nextDoor.keyLever.wouldUnlock
+                      <span className="font-bold">The one thing that would open {leading.pathwayReadiness.nextDoor.pathway}:</span>{' '}
+                      moving {leading.pathwayReadiness.nextDoor.keyLever.subject} from level{' '}
+                      {leading.pathwayReadiness.nextDoor.keyLever.currentLevel} to level{' '}
+                      {leading.pathwayReadiness.nextDoor.keyLever.targetLevel}
+                      {leading.pathwayReadiness.nextDoor.keyLever.wouldUnlock
                         ? ' would be enough on its own.'
-                        : ` would close ${pathwayReadiness.data.nextDoor.keyLever.pointsGained} of the ${pathwayReadiness.data.nextDoor.pointsShort} points still needed.`}
+                        : ` would close ${leading.pathwayReadiness.nextDoor.keyLever.pointsGained} of the ${leading.pathwayReadiness.nextDoor.pointsShort} points still needed.`}
                     </p>
                   )}
                 </>
               )}
 
-              {pathwayReadiness.data.notes.map((note, i) => (
+              {leading.pathwayReadiness.notes.map((note, i) => (
                 <p key={i} className="mt-1 text-[11px] text-slate-500">{note}</p>
               ))}
 
-              <p className="mt-2 text-[11px] text-slate-500">{pathwayReadiness.data.disclaimer}</p>
+              <p className="mt-2 text-[11px] text-slate-500">{leading.pathwayReadiness.disclaimer}</p>
             </EvidenceBox>
           )}
 
-          {blueprint.career.status === 'available' && describeExplorationSuggestions(blueprint.career.data?.explorationSuggestions ?? null) && (
-            <p className="text-sm text-slate-600">{describeExplorationSuggestions(blueprint.career.data?.explorationSuggestions ?? null)}</p>
-          )}
+          {leading.exploration && <p className="text-sm text-slate-600">{leading.exploration}</p>}
 
-          {careerJourneyLink && (
+          {leading.link && (
             <p className="text-sm">
-              <Link href={careerJourneyLink} className="font-semibold text-teal-700 hover:underline focus-visible:underline focus-visible:outline-none">
-                Explore career pathways and next steps →
+              <Link href={leading.link.href} className="font-semibold text-teal-700 hover:underline focus-visible:underline focus-visible:outline-none">
+                {leading.link.label}
               </Link>
             </p>
           )}
         </div>
 
-        {futureEvidence.length > 0 && (
+        {leading.futureEvidence.length > 0 && (
           <div className="grid gap-3 sm:grid-cols-2">
-            {futureEvidence.map((item, index) => (
+            {leading.futureEvidence.map((item, index) => (
               <EvidenceBox key={`${item.title}-${index}`} title={item.title} tone="gold">
                 <p>{item.detail}</p>
               </EvidenceBox>
             ))}
           </div>
         )}
+      </PageShell>
+
+      {/* 5 — Printed School & Family Action Agreement. A blank, write-in form:
+          no signature, date or commitment is stored or pre-filled as agreed. */}
+      <PageShell
+        pageNumber={5}
+        sectionId="agreement"
+        title="School & Family Action Agreement"
+        question="For use at a school–family meeting."
+        {...shellProps}
+      >
+        <p className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600" data-blueprint-agreement-notice="true">
+          {agreement.notice}
+        </p>
+
+        <WriteInLine label="Meeting date" lines={1} />
+        <WriteInLine label="Learner’s next step" proposed={agreement.proposedLearnerStep} />
+        <WriteInLine label="Teacher’s planned support" proposed={agreement.proposedTeacherSupport} />
+        <WriteInLine label="Parent/guardian’s support" proposed={agreement.proposedHomeSupport} />
+
+        <div className="space-y-3 pt-1">
+          <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">Acknowledgement — all optional</p>
+          <Acknowledgement label="Learner (optional)" />
+          <Acknowledgement label="Teacher" />
+          <Acknowledgement label="Parent/guardian" />
+        </div>
       </PageShell>
     </div>
   )

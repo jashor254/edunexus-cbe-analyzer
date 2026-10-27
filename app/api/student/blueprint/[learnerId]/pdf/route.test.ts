@@ -77,6 +77,6 @@ test('Blueprint PDF route returns 200 with private PDF headers and a safe attach
   assert.equal(res.headers.get('content-type'), 'application/pdf')
   assert.equal(res.headers.get('cache-control'), 'private, no-store, max-age=0')
   assert.equal(res.headers.get('pragma'), 'no-cache')
-  assert.equal(res.headers.get('content-disposition'), 'attachment; filename="Learner_Blueprint_BRIAN__MATTHIAS.pdf"')
+  assert.equal(res.headers.get('content-disposition'), 'attachment; filename="Learner_Progress_Report_BRIAN__MATTHIAS.pdf"')
   assert.equal(res.headers.get('content-length'), '4')
 })

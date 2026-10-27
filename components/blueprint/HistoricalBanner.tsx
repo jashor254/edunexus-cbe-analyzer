@@ -52,7 +52,7 @@ export default function HistoricalBanner({ meta }: { meta: HistoricalMeta }) {
         {SNAPSHOT_TYPE_LABEL[meta.snapshotType]}
       </p>
       <p className="text-[11px] text-amber-600 mt-1">
-        This is a frozen historical record — it never changes. It is not the learner&apos;s Current Blueprint.
+        This is a frozen historical record — it never changes. It is not the learner&apos;s current progress report.
       </p>
       <dl className="mt-2 pt-2 border-t border-amber-200/60 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-amber-700">
         <div className="flex gap-1">
@@ -64,7 +64,7 @@ export default function HistoricalBanner({ meta }: { meta: HistoricalMeta }) {
           <dd>{meta.schemaVersion}</dd>
         </div>
         <div className="flex gap-1">
-          <dt className="font-bold">Blueprint Version:</dt>
+          <dt className="font-bold">Report version:</dt>
           <dd>{meta.blueprintVersion}</dd>
         </div>
       </dl>

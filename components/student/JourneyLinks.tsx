@@ -14,7 +14,7 @@
 import Link from 'next/link'
 
 const JOURNEY_STEPS = [
-  { key: 'blueprint', label: 'Blueprint', href: '/student/blueprint' },
+  { key: 'blueprint', label: 'Progress Report', href: '/student/blueprint' },
   { key: 'progress', label: 'Progress', href: '/student/progress' },
   { key: 'career', label: 'Careers', href: '/student/career' },
   { key: 'holiday', label: 'Holiday Plan', href: '/student/holiday' },

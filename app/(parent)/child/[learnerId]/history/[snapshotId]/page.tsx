@@ -13,6 +13,7 @@ import { UnauthorizedError, ResourceOwnershipError } from '@/lib/core/errors'
 import { repos } from '@/lib/repositories'
 import { getBlueprintSnapshot } from '@/lib/learnerBlueprint/snapshot'
 import { listAcademicYears, listTerms } from '@/lib/core/school'
+import { validateBlueprint } from '@/lib/learnerBlueprint/validation'
 import ParentBlueprintView from '@/components/parent/ParentBlueprintView'
 import { asLearnerId } from '@/lib/core/identityTypes'
 
@@ -77,6 +78,7 @@ export default async function ParentHistoricalSnapshotPage({
   return (
     <ParentBlueprintView
       blueprint={snapshot.blueprint_payload}
+      validation={validateBlueprint(snapshot.blueprint_payload)}
       learnerId={learnerId}
       historicalMeta={{
         snapshotId: snapshot.id,

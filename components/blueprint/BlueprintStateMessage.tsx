@@ -32,15 +32,15 @@ const COPY: Record<BlueprintStateKind, { title: string; message: string }> = {
     message: 'This historical snapshot could not be found. It may have been removed from view, or the link may be incorrect.',
   },
   'permission-denied': {
-    title: 'You do not have access to this Blueprint',
-    message: 'Your account does not have permission to view this learner\'s Blueprint. Contact your school administrator if you believe this is an error.',
+    title: 'You do not have access to this report',
+    message: 'Your account does not have permission to view this learner\'s progress report. Contact your school administrator if you believe this is an error.',
   },
   unavailable: {
-    title: 'Blueprint temporarily unavailable',
-    message: 'We couldn\'t load this Blueprint right now. Please try again in a moment.',
+    title: 'Progress report temporarily unavailable',
+    message: 'We couldn\'t load this progress report right now. Please try again in a moment.',
   },
   'coherence-failed': {
-    title: 'This Blueprint needs review before it can be shown',
+    title: 'This report needs review before it can be shown',
     message: 'An automated check found a recommendation that does not match this learner\'s current evidence. It has been withheld until a teacher or school administrator reviews and corrects it.',
   },
 }

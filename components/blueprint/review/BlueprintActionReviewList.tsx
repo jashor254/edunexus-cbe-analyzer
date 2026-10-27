@@ -29,7 +29,7 @@ export default function BlueprintActionReviewList({
   }
 
   return (
-    <nav aria-label="Blueprint actions awaiting review">
+    <nav aria-label="Progress report actions awaiting review">
       <ul className="space-y-2">
         {items.map(item => (
           <BlueprintActionReviewCard

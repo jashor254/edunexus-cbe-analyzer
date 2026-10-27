@@ -283,11 +283,13 @@ function render(blueprint: LearnerBlueprint, exportMode: 'screen' | 'pdf' = 'scr
   )
 }
 
+// The four questions (lib/i18n/locales/en.ts), then the printed agreement.
 const PAGE_TITLES = [
-  'Where We Stand Today',
-  'What the Evidence Suggests',
-  'How We Help Next',
-  'What May Be Emerging',
+  'Where are we now?',
+  'What&#x27;s going well, and what needs help?',
+  'What do we do next?',
+  'Where is this leading?',
+  'School &amp; Family Action Agreement',
 ]
 
 const BANNED_PHRASES = [
@@ -303,11 +305,11 @@ const BANNED_PHRASES = [
   /composeBlueprint/i,
 ]
 
-test('BlueprintView renders exactly four report pages, in order', () => {
+test('BlueprintView renders the four questions and the agreement page, in order', () => {
   const html = render(createBlueprint())
 
   const pageShellCount = (html.match(/data-blueprint-page-shell="true"/g) ?? []).length
-  assert.equal(pageShellCount, 4)
+  assert.equal(pageShellCount, 5)
 
   let cursor = -1
   for (const title of PAGE_TITLES) {
@@ -453,7 +455,7 @@ test('Kevin: exploration suggestions come from the career’s real required subj
   assert.doesNotMatch(html, /Career Intelligence journey/i)
 })
 
-test('Junior/exploration-mode learner: doorsPreview is null by design — no four-door grid, no AI-change box, cluster-only framing, never a crash', () => {
+test('Junior learner: no career field is ever named in the report — pathway-first framing, no four-door grid, no AI-change box, never a crash', () => {
   const html = render(createKevinBlueprint({
     identity: section({
       learnerName: 'Amina Wafula', admissionNumber: 'X', schoolName: 'Test School', schoolLogoUrl: null,
@@ -474,7 +476,13 @@ test('Junior/exploration-mode learner: doorsPreview is null by design — no fou
     }),
   }))
 
-  assert.match(html, /current record suggests Engineering &amp; Technology as one direction worth exploring/)
+  // Grades 7–9 are guided toward a Senior School pathway, never a career
+  // field (agreed rule, 2026-10-06) — the cluster exists in the data but is
+  // not shown anywhere in the report, including Page 3's follow-ons.
+  assert.doesNotMatch(html, /Engineering &amp; Technology/)
+  assert.doesNotMatch(html, /Career exploration/)
+  assert.match(html, /STEM, Social Sciences and Arts &amp; Sports Science/)
+  assert.match(html, /It is an early signal, not a choice/)
   assert.doesNotMatch(html, /Four ways this could open after school/)
   assert.doesNotMatch(html, /How this field is changing/)
   assert.doesNotMatch(html, /Worth exploring next/)
@@ -611,9 +619,9 @@ function blueprintWithFallbackAction(actionOverrides: Partial<LearnerBlueprint['
   })
 }
 
-test('A. learner (student) viewer: a parent-only destination (continue_holiday_learning -> /child/{id}/full) renders as informational text, no CTA', () => {
+test('A. learner (student) viewer: parent-addressed actions are not shown to the learner at all — no parent copy, no parent-only CTA', () => {
   const html = render(blueprintWithFallbackAction(), 'screen', 'student')
-  assert.match(html, /A holiday learning programme is available/)
+  assert.doesNotMatch(html, /A holiday learning programme is available/)
   assert.doesNotMatch(html, /href="\/child\/learner-1\/full"/)
   assert.doesNotMatch(html, /Take this action/)
 })
@@ -643,10 +651,11 @@ test('E. invalid/unsafe destination (protocol-relative) never becomes a link, fo
   assert.doesNotMatch(html, /evil\.example\.com/)
 })
 
-test('F. existing teaser destination (explore_career_journey) is unchanged for the default/student viewer', () => {
+test('F. existing teaser destination (explore_career_journey) is kept for the student viewer — a junior is pointed at Senior School pathways', () => {
   const html = render(createBlueprint())
   assert.match(html, /href="\/career-intelligence"/)
-  assert.match(html, /Explore career pathways and next steps/)
+  assert.match(html, /Explore Senior School pathways/)
+  assert.doesNotMatch(html, /Explore career pathways and next steps/)
 })
 
 test('BlueprintView changes future framing by grade band and stays honest when future evidence is thin', () => {
@@ -740,7 +749,7 @@ test('BlueprintView preserves honest, interpretive handling when core sections a
   assert.match(html, /interests and strengths are still coming into focus/)
 })
 
-test('BlueprintView PDF export mode keeps all four pages, the branded report header, but no interactive navigation', () => {
+test('BlueprintView PDF export mode keeps all five pages, the branded report header, but no interactive navigation', () => {
   const html = render(createBlueprint(), 'pdf')
 
   for (const title of PAGE_TITLES) {
@@ -748,7 +757,7 @@ test('BlueprintView PDF export mode keeps all four pages, the branded report hea
   }
 
   const pageShellCount = (html.match(/data-blueprint-page-shell="true"/g) ?? []).length
-  assert.equal(pageShellCount, 4)
+  assert.equal(pageShellCount, 5)
 
   assert.match(html, /data-blueprint-ready="true"/)
   assert.match(html, /data-blueprint-print-break="before"/)

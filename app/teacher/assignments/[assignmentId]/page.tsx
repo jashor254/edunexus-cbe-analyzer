@@ -758,7 +758,7 @@ export default function AssignmentMarkingPage({ params }: { params: Promise<{ as
                               onClick={e => e.stopPropagation()}
                               className="flex items-center gap-1 text-teal-600 hover:text-teal-700 hover:underline"
                             >
-                              <Brain className="w-3 h-3" /> Blueprint
+                              <Brain className="w-3 h-3" /> Progress Report
                             </Link>
                             <Link
                               href={`/teacher/reports/career-intelligence/${sub.student_id}`}

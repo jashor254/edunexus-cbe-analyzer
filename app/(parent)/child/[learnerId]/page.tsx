@@ -13,7 +13,7 @@ import { createClient } from '@/utils/supabase/server'
 import { requireAuthentication, requireParent } from '@/lib/core/permissions'
 import { UnauthorizedError, ResourceOwnershipError } from '@/lib/core/errors'
 import { repos } from '@/lib/repositories'
-import { composeBlueprint } from '@/lib/learnerBlueprint/composeBlueprint'
+import { composeBlueprintWithCoherence } from '@/lib/learnerBlueprint/composeBlueprint'
 import { getLatestBlueprintSnapshot } from '@/lib/learnerBlueprint/snapshot'
 import { PARENT_STATUS_LABEL } from '@/lib/parentExperience/terminology'
 import { resolveLegacyStudentId } from '@/lib/core/identity'
@@ -74,9 +74,9 @@ export default async function ParentHomePage({
     notFound()
   }
 
-  let blueprint
+  let blueprint, coherence
   try {
-    ;({ blueprint } = await composeBlueprint({ actorUserId: userId, coreLearnerId: learnerId, schoolId }))
+    ;({ blueprint, coherence } = await composeBlueprintWithCoherence({ actorUserId: userId, coreLearnerId: learnerId, schoolId }))
   } catch {
     return (
       <div className="max-w-md mx-auto py-12 px-4 text-center">
@@ -95,7 +95,14 @@ export default async function ParentHomePage({
   const legacyStudentId = await resolveLegacyStudentId(learnerId).catch(() => null)
   const { summary: assignmentAttention, failed: assignmentCheckFailed } = await loadAssignmentAttention(legacyStudentId)
 
-  const recommendedActions = blueprint.recommendedNextSteps.status === 'available' && blueprint.recommendedNextSteps.data
+  // Same publication rule as the full report (child/[learnerId]/full): when
+  // the Coherence Engine withholds the report for a critical contradiction,
+  // the report-derived pieces of Home (the term headline and the report's
+  // recommended actions) are withheld too — a parent must not read here what
+  // the full report itself refuses to show.
+  const reportWithheld = coherence.result === 'FAIL'
+
+  const recommendedActions = !reportWithheld && blueprint.recommendedNextSteps.status === 'available' && blueprint.recommendedNextSteps.data
     ? blueprint.recommendedNextSteps.data.actions
     : []
 
@@ -136,7 +143,9 @@ export default async function ParentHomePage({
       >
         <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">This Term</p>
         <p className="text-sm text-gray-900 mt-1">
-          {blueprint.parentSummary.data?.headline ?? 'View your child\'s full learning picture →'}
+          {reportWithheld
+            ? 'This term’s report is being checked by the school before it is shown.'
+            : blueprint.parentSummary.data?.headline ?? 'View your child\'s full learning picture →'}
         </p>
       </Link>
 

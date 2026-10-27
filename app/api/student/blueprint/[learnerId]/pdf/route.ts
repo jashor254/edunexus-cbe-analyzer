@@ -3,7 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { requireAuthentication, requireLearnerAccess } from '@/lib/core/permissions'
 import { ResourceOwnershipError, UnauthorizedError } from '@/lib/core/errors'
 import { repos } from '@/lib/repositories'
-import { BLUEPRINT_PDF_HEADINGS, renderBlueprintPdf } from '@/lib/learnerBlueprint/pdfExport'
+import { BLUEPRINT_PDF_SECTION_SELECTORS, renderBlueprintPdf } from '@/lib/learnerBlueprint/pdfExport'
 
 type Params = {
   params: Promise<{ learnerId: string }>
@@ -43,7 +43,7 @@ function safeFileTag(value: string): string {
     .replace(/\s+/g, '_')
     .replace(/[^A-Za-z0-9_]/g, '')
 
-  return normalized.length > 0 ? normalized.toUpperCase() : 'LEARNER_BLUEPRINT'
+  return normalized.length > 0 ? normalized.toUpperCase() : 'LEARNER'
 }
 
 type RouteClient = Awaited<ReturnType<typeof createClient>>
@@ -95,7 +95,7 @@ export async function handleBlueprintPdfGetWithDeps<TClient>(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  let learnerName = 'Learner_Blueprint'
+  let learnerName = 'Learner'
   try {
     const learner = await deps.findLearnerById(learnerId, schoolId)
     learnerName = [learner.first_name, learner.middle_name, learner.last_name].filter(Boolean).join(' ') || learnerName
@@ -116,18 +116,19 @@ export async function handleBlueprintPdfGetWithDeps<TClient>(
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="Learner_Blueprint_${safeFileTag(learnerName)}.pdf"`,
+        'Content-Disposition': `attachment; filename="Learner_Progress_Report_${safeFileTag(learnerName)}.pdf"`,
         'Content-Length': pdf.byteLength.toString(),
         'Cache-Control': 'private, no-store, max-age=0',
         Pragma: 'no-cache',
-        'X-Blueprint-Headings-Verified': BLUEPRINT_PDF_HEADINGS.length.toString(),
+        // Header name kept for any existing consumer; it now counts the stable section hooks verified.
+        'X-Blueprint-Headings-Verified': BLUEPRINT_PDF_SECTION_SELECTORS.length.toString(),
         'X-Blueprint-Export-Source': `/student/blueprint/${learnerId}`,
       },
     })
   } catch (err) {
     console.error('[student/blueprint/pdf]', err)
     return NextResponse.json(
-      { error: 'Failed to generate learner blueprint PDF' },
+      { error: 'Failed to generate the learner progress report PDF' },
       { status: 500 },
     )
   }
