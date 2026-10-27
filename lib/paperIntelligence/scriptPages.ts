@@ -14,6 +14,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { UPLOAD_LIMITS } from '@/lib/config/uploads'
 import { PAPER_INTELLIGENCE_LIMITS } from '@/lib/config/paperIntelligence'
 import { assessSharpness, type SharpnessResult } from './sharpness'
+import { stripImageMetadata } from './imageMetadata'
 import type { ScriptPage } from './types'
 
 const BUCKET = 'assignment-submissions'
@@ -84,6 +85,13 @@ export async function saveScriptPage(input: SaveScriptPageInput): Promise<{ page
   const sharpness = await measurePageSharpness(bytes)
   if (!sharpness.acceptable) throw new BlurryPageError(sharpness)
 
+  // Privacy (Stage B4): strip EXIF/GPS/device metadata before the page is
+  // stored and later sent to the vision model. Pixel-preserving and fail-open
+  // (never corrupts a script). The sharpness check above ran on the original
+  // bytes; metadata stripping does not change pixels, so the stored/marked
+  // image is visually identical. See lib/paperIntelligence/imageMetadata.ts.
+  const storedBytes = stripImageMetadata(bytes, input.mimeType)
+
   const db = createServiceClient()
   const { data: existing, error: findErr } = await db
     .from('assignment_submission_pages')
@@ -94,7 +102,7 @@ export async function saveScriptPage(input: SaveScriptPageInput): Promise<{ page
   if (findErr) throw new Error(`saveScriptPage lookup: ${findErr.message}`)
 
   const filePath = `paper-intelligence/${input.assignmentId}/${input.submissionId}/p${input.pageNumber}-${Date.now()}.${EXTENSION[input.mimeType]}`
-  const { error: uploadErr } = await db.storage.from(BUCKET).upload(filePath, bytes, { contentType: input.mimeType, upsert: false })
+  const { error: uploadErr } = await db.storage.from(BUCKET).upload(filePath, storedBytes, { contentType: input.mimeType, upsert: false })
   if (uploadErr) throw new Error(`saveScriptPage upload: ${uploadErr.message}`)
 
   const { data: page, error: upsertErr } = await db
