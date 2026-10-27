@@ -14,6 +14,7 @@ import { computeLearnerProjection } from './engine'
 import type { LearnerIntelligenceProjection, Projection, ProjectorType } from './types'
 import type { UpsertProjectionInput } from '@/lib/repositories/projection.repository'
 import { asStudentId } from '@/lib/core/identityTypes'
+import { time } from '@/lib/observability'
 
 const PERSISTED_PROJECTOR_TYPES: ProjectorType[] = [
   'academic', 'capability', 'knowledge', 'behaviour', 'growth', 'risk', 'completeness',
@@ -57,6 +58,14 @@ function toUpsertInput(learnerId: string, type: ProjectorType, p: Projection<unk
  * reproducible value).
  */
 export async function recomputeLearnerProjection(learnerId: string): Promise<LearnerIntelligenceProjection> {
+  // Timed so we can one day answer, with data rather than a hunch, whether this
+  // hot path is CPU-bound (the pure engine compute) or I/O-bound (the evidence
+  // fetch + projection upserts). Recorded as the `projection.recompute`
+  // histogram in lib/observability/metrics (flushed to usage_events by cron).
+  return time('projection.recompute', () => recomputeLearnerProjectionImpl(learnerId))
+}
+
+async function recomputeLearnerProjectionImpl(learnerId: string): Promise<LearnerIntelligenceProjection> {
   const evidence = await repos.evidence.findConfirmedEvidenceForLearner(asStudentId(learnerId))
   const projection = computeLearnerProjection(learnerId, evidence)
 

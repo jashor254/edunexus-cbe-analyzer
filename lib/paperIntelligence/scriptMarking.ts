@@ -15,6 +15,7 @@
 
 import { GoogleGenerativeAI, SchemaType, type Part, type ResponseSchema } from '@google/generative-ai'
 import { GEMINI_SCRIPT_MARKING } from '@/lib/ai/models'
+import { time } from '@/lib/observability'
 import { isAllowedUploadType, UPLOAD_LIMITS } from '@/lib/config/uploads'
 import { PAPER_INTELLIGENCE_LIMITS } from '@/lib/config/paperIntelligence'
 import {
@@ -123,6 +124,13 @@ function assertValidInput(request: ScriptMarkingRequest): void {
  * and the rubric questions the model found no answer for.
  */
 export async function recognizeAndMarkScript(request: ScriptMarkingRequest, modelName: string = GEMINI_SCRIPT_MARKING): Promise<ScriptMarkingResult> {
+  // Timed as `paper.recognizeAndMarkScript` — isolates the vision-model call so
+  // we can prove (not assume) that script marking is I/O/network-bound. If this
+  // metric dominates `paper.markSubmission`, no amount of language speed helps.
+  return time('paper.recognizeAndMarkScript', () => recognizeAndMarkScriptImpl(request, modelName))
+}
+
+async function recognizeAndMarkScriptImpl(request: ScriptMarkingRequest, modelName: string = GEMINI_SCRIPT_MARKING): Promise<ScriptMarkingResult> {
   assertValidInput(request)
 
   const apiKey = process.env.GOOGLE_GEMINI_API_KEY

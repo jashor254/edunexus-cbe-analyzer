@@ -21,6 +21,7 @@ import { resolveEvidenceContext } from './evidenceContext'
 import { logPaperIntelligenceFailure } from './failureLog'
 import type { ScriptSubmission } from './auth'
 import type { MarkedPoint } from './types'
+import { time } from '@/lib/observability'
 
 export class ScriptAlreadyReviewedError extends Error {}
 export class ScriptNotReadyError extends Error {}
@@ -53,6 +54,18 @@ export type MarkScriptOutcome = {
 }
 
 export async function markSubmissionScript(input: {
+  assignmentId: string
+  submission: ScriptSubmission
+  teacherUserId: string
+}): Promise<MarkScriptOutcome> {
+  // Timed per learner. In a bulk run this is the whole per-script cost; compare
+  // it against the inner `paper.recognizeAndMarkScript` (the Gemini vision call)
+  // to see how much of the time is the AI wait vs. our own work — the data that
+  // tells us whether any part here is CPU-bound enough to be worth optimising.
+  return time('paper.markSubmission', () => markSubmissionScriptImpl(input))
+}
+
+async function markSubmissionScriptImpl(input: {
   assignmentId: string
   submission: ScriptSubmission
   teacherUserId: string
