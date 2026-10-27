@@ -70,6 +70,14 @@ mock.module('@/lib/repositories', {
   },
 })
 
+// callDeepSeek now persists a metadata row to ai_call_logs via logAICall on
+// every outcome. This file's charter is retry/timeout/fallback/usage-count,
+// not ai_call_logs persistence (covered by deepseekUsageLogging.test.ts), so
+// logAICall is a no-op here — same side-effect-boundary pattern as above.
+mock.module('@/lib/ai/logger', {
+  namedExports: { logAICall: async () => {} },
+})
+
 let callDeepSeek: typeof import('./deepseek').callDeepSeek
 
 before(async () => {

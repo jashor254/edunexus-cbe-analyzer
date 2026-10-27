@@ -6,7 +6,9 @@ import { DEEPSEEK_CONFIG } from '@/lib/config/api'
 import { GEMINI_PRIMARY } from '@/lib/ai/models'
 import { logger } from '@/lib/observability/logger'
 import { repos } from '@/lib/repositories'
+import { logAICall } from '@/lib/ai/logger'
 import { recordSuccess, recordError } from '@/lib/ai-orchestration/registry'
+import type { CompassProvider as StreamProvider } from '@/lib/config/compassProviders'
 
 export type AICostContext = {
   organizationId: string
@@ -42,7 +44,7 @@ async function callOnce(
   // try/finally keeps the abort armed until the call is genuinely done.
   let response: Response
   try {
-    response = await fetch(`${DEEPSEEK_CONFIG.baseURL}/v1/chat/completions`, {
+    response = await fetch(DEEPSEEK_CONFIG.chatCompletionsUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -146,6 +148,7 @@ export async function callDeepSeek(
     maxTokens?:  number
     history?:    { role: 'user' | 'assistant'; content: string }[]
     costContext?: AICostContext
+    feature?:    string
   }
 ): Promise<string> {
   const resolved = {
@@ -156,8 +159,36 @@ export async function callDeepSeek(
       'You are a helpful Kenyan CBC tutor. Always respond with valid JSON only — no markdown, no explanation, just the raw JSON.',
   }
 
+  // Feature label for ai_call_logs: an explicit `feature` wins, else the
+  // costContext's (set by SOW/lesson callers), else a safe default so every
+  // call is still counted. Call sites can be labelled incrementally later.
+  const logFeature = options?.feature ?? options?.costContext?.feature ?? 'deepseek:uncategorized'
+
+  // Persists one metadata-only row to ai_call_logs per call so AI token/cost
+  // usage is actually observable in prod. prompt/response content is stripped
+  // by buildAICallLogRow unless AI_LOG_CONTENT=true, so no learner text lands
+  // at rest. logAICall never throws (it catches internally).
+  async function logFailure(provider: string, err: unknown): Promise<void> {
+    await logAICall({
+      feature:   logFeature,
+      model:     provider === 'gemini' ? GEMINI_PRIMARY : DEEPSEEK_CONFIG.model,
+      prompt,
+      latencyMs: 0,
+      success:   false,
+      error:     (err as Error).message,
+    })
+  }
+
   async function recordUsage(usageTokens: number | null, provider: string, latencyMs?: number): Promise<void> {
     logger.info('AI call completed', { service: 'deepseek', provider, usage_tokens: usageTokens, latency_ms: latencyMs })
+    await logAICall({
+      feature:    logFeature,
+      model:      provider === 'gemini' ? GEMINI_PRIMARY : DEEPSEEK_CONFIG.model,
+      prompt,
+      latencyMs:  latencyMs ?? 0,
+      tokenCount: usageTokens ?? undefined,
+      success:    true,
+    })
     if (options?.costContext && usageTokens !== null) {
       try {
         await repos.developers.insertAICostEvent({
@@ -206,10 +237,12 @@ export async function callDeepSeek(
           return content
         } catch (geminiErr) {
           recordError('gemini', (geminiErr as Error).message)
+          await logFailure('gemini', geminiErr)
           throw geminiErr
         }
       }
     }
+    await logFailure('deepseek', err)
     throw err
   }
 }
@@ -244,7 +277,7 @@ async function fetchDeepSeekStream(
 
   let response: Response
   try {
-    response = await fetch(`${DEEPSEEK_CONFIG.baseURL}/v1/chat/completions`, {
+    response = await fetch(DEEPSEEK_CONFIG.chatCompletionsUrl, {
       method: 'POST', headers, body, signal: controller.signal,
     })
   } catch (err) {
@@ -258,7 +291,7 @@ async function fetchDeepSeekStream(
       const controller2 = new AbortController()
       const timer2 = setTimeout(() => controller2.abort(), TIMEOUT_MS)
       try {
-        response = await fetch(`${DEEPSEEK_CONFIG.baseURL}/v1/chat/completions`, {
+        response = await fetch(DEEPSEEK_CONFIG.chatCompletionsUrl, {
           method: 'POST', headers, body, signal: controller2.signal,
         })
       } catch (err2) {
@@ -384,32 +417,79 @@ async function streamGeminiFallback(
   })
 }
 
+/**
+ * Bounds history to MAX_HISTORY turns AND guarantees it starts with a user turn.
+ *
+ * Gemini's SDK rejects a chat history whose first entry is not 'user' ("First
+ * content should be with role 'user'"). Compass sends [user, assistant, …,
+ * user] — odd length — so a bare slice(-MAX_HISTORY) starts with an assistant
+ * turn once a session passes ~10 learner messages, and every later turn
+ * silently fell back from Gemini to DeepSeek's own API. Dropping the leading
+ * assistant turn(s) keeps the primary provider in use.
+ */
+export function trimHistoryForProvider(
+  history: { role: 'user' | 'assistant'; content: string }[],
+): { role: 'user' | 'assistant'; content: string }[] {
+  const recent = history.slice(-MAX_HISTORY)
+  const firstUser = recent.findIndex(turn => turn.role === 'user')
+  return firstUser === -1 ? [] : recent.slice(firstUser)
+}
+
+export class NoAllowedProviderError extends Error {
+  constructor() {
+    super('No AI provider is allowed for this stream')
+    this.name = 'NoAllowedProviderError'
+  }
+}
+
+/**
+ * Streams a chat completion from the providers the caller explicitly allows, in
+ * order (first = primary, later = fallback). `providers` is required and is
+ * never defaulted: a provider that is not listed is never contacted, so a
+ * failure of the primary cannot silently send learner text somewhere that was
+ * not approved. An empty list throws before any network call.
+ */
 export async function streamDeepSeek(
   systemPrompt: string,
   userMessage: string,
   history: { role: 'user' | 'assistant'; content: string }[],
-  options?: { temperature?: number; costContext?: AICostContext }
+  options: { providers: readonly StreamProvider[]; temperature?: number; costContext?: AICostContext }
 ): Promise<ReadableStream<Uint8Array>> {
-  const temperature = options?.temperature ?? 0.7
-  const trimmedHistory = history.slice(-MAX_HISTORY)
-  try {
-    logger.info('Attempting Gemini stream', { service: 'ai.stream' })
-    return await streamGeminiFallback(systemPrompt, userMessage, trimmedHistory, temperature, options?.costContext)
-  } catch (geminiErr) {
-    logger.warn('Gemini stream failed — falling back to DeepSeek', { service: 'ai.stream' }, geminiErr)
-    // KNOWN GAP: the DeepSeek fallback path does not yet capture usage —
-    // it passes the raw SSE stream straight through to the caller. Logged
-    // explicitly here (not silently dropped) so cost data has a visible,
-    // countable hole instead of an invisible one. Capturing it requires
-    // tee-ing a live stream without disrupting what reaches the client —
-    // real work, deliberately not rushed into this change.
-    if (options?.costContext) {
-      logger.warn('AI stream cost NOT recorded — DeepSeek fallback path has no usage capture yet', {
-        service: 'deepseek.stream',
-        organization_id: options.costContext.organizationId,
-        resource: options.costContext.feature,
-      })
+  const temperature = options.temperature ?? 0.7
+  const trimmedHistory = trimHistoryForProvider(history)
+  if (options.providers.length === 0) throw new NoAllowedProviderError()
+
+  let lastErr: unknown = null
+  for (const [i, provider] of options.providers.entries()) {
+    const isFallback = i > 0
+    try {
+      if (provider === 'gemini') {
+        logger.info(isFallback ? 'Attempting Gemini stream (fallback)' : 'Attempting Gemini stream', { service: 'ai.stream' })
+        return await streamGeminiFallback(systemPrompt, userMessage, trimmedHistory, temperature, options.costContext)
+      }
+      logger.info(isFallback ? 'Attempting DeepSeek stream (fallback)' : 'Attempting DeepSeek stream', { service: 'ai.stream' })
+      // KNOWN GAP: the DeepSeek stream path does not yet capture usage — it
+      // passes the raw SSE stream straight through to the caller. Logged
+      // explicitly (not silently dropped) so cost data has a visible,
+      // countable hole. Capturing it requires tee-ing a live stream without
+      // disrupting what reaches the client — deliberately not rushed.
+      if (options.costContext) {
+        logger.warn('AI stream cost NOT recorded — DeepSeek stream path has no usage capture yet', {
+          service: 'deepseek.stream',
+          organization_id: options.costContext.organizationId,
+          resource: options.costContext.feature,
+        })
+      }
+      return await fetchDeepSeekStream(systemPrompt, userMessage, trimmedHistory, options)
+    } catch (err) {
+      lastErr = err
+      const next = options.providers[i + 1]
+      logger.warn(
+        next ? `${provider} stream failed — trying ${next}` : `${provider} stream failed — no further provider allowed`,
+        { service: 'ai.stream' },
+        err,
+      )
     }
-    return fetchDeepSeekStream(systemPrompt, userMessage, trimmedHistory, options)
   }
+  throw lastErr
 }
