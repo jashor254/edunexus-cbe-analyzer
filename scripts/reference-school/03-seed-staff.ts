@@ -121,10 +121,22 @@ export async function seedStaff() {
       teacher_id: teacherBySubject[s.id],
     }))
   )
-  const { error: csErr } = await supabase
+  // Uniqueness is now the partial index class_subjects_current_assignment_uniq
+  // (class_id, subject_id) WHERE ended_at IS NULL (20260813120000), which
+  // PostgREST's onConflict cannot target — so insert only the pairs that have
+  // no current assignment yet, keeping re-runs idempotent.
+  const { data: currentRows, error: curErr } = await supabase
     .from('class_subjects')
-    .upsert(classSubjectRows, { onConflict: 'class_id,subject_id', ignoreDuplicates: true })
-  if (csErr) throw csErr
+    .select('class_id, subject_id')
+    .in('class_id', Object.values(classIds))
+    .is('ended_at', null)
+  if (curErr) throw curErr
+  const current = new Set((currentRows ?? []).map((r) => `${r.class_id}:${r.subject_id}`))
+  const missingRows = classSubjectRows.filter((r) => !current.has(`${r.class_id}:${r.subject_id}`))
+  if (missingRows.length > 0) {
+    const { error: csErr } = await supabase.from('class_subjects').insert(missingRows)
+    if (csErr) throw csErr
+  }
   console.log(`[class_subjects] ready: ${classSubjectRows.length} rows`)
 
   return { ...academics, teacherPoolIds, teacherBySubject }
