@@ -6,7 +6,7 @@ import { CompassChatMockup } from '../components/CompassChatMockup'
 export const metadata = {
   title: 'Learning Compass | EduNexus',
   description:
-    'How the EduNexus Learning Compass turns a Blueprint diagnosis into a targeted session — and why it isn\'t a generic AI chatbot.',
+    'How the EduNexus Learning Compass turns a Progress Report finding into a targeted session — and why it isn\'t a generic AI chatbot.',
 }
 
 export default function CompassPage() {
@@ -25,7 +25,7 @@ export default function CompassPage() {
             Knowing isn&apos;t enough.<br />Closing the gap is.
           </h1>
           <p className="text-white/60 text-lg leading-relaxed max-w-140 mx-auto">
-            Blueprint tells you exactly which strand is holding a learner back. Learning Compass is
+            The Progress Report tells you exactly which strand is holding a learner back. Learning Compass is
             what happens next — a session that starts from that exact gap, at the level the learner
             is actually at, instead of a generic review of the whole subject.
           </p>
@@ -46,7 +46,7 @@ export default function CompassPage() {
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {[
-              { step: 'Evidence', body: 'The learner\'s Blueprint — built from real classroom evidence — identifies the exact strand where they\'re stuck.' },
+              { step: 'Evidence', body: 'The learner\'s Progress Report — built from real classroom evidence — identifies the exact strand where they\'re stuck.' },
               { step: 'Reasoning', body: 'Compass reads that specific gap, not a generic topic list, and meets the learner at the level they\'re actually at.' },
               { step: 'Recommendation', body: 'The session that follows is one thing: closing that gap, explained in familiar Kenyan context, until mastery is genuinely shown.' },
             ].map((item, i) => (
@@ -84,7 +84,7 @@ export default function CompassPage() {
               </p>
               <ul className="space-y-3 mb-8">
                 {[
-                  'Starts from the exact strand the Blueprint identified',
+                  'Starts from the exact strand the Progress Report identified',
                   'Explains concepts in familiar Kenyan contexts',
                   'Tracks mastery concept by concept across terms',
                   'Visible to teachers and parents in real time',
@@ -135,7 +135,7 @@ export default function CompassPage() {
               {
                 icon: '👨‍🏫',
                 title: 'Teachers',
-                body: 'Compass extends practice time between lessons; it never decides what a specific learner needs on its own — that professional judgment stays with the teacher, informed by what Compass and Blueprint show.',
+                body: 'Compass extends practice time between lessons; it never decides what a specific learner needs on its own — that professional judgment stays with the teacher, informed by what Compass and the Progress Report show.',
               },
               {
                 icon: '👨‍👩‍👧',
@@ -161,7 +161,7 @@ export default function CompassPage() {
           </h2>
           <p className="text-white/55 leading-relaxed mb-8">
             Compass doesn&apos;t work in isolation. It starts from a gap identified in the{' '}
-            <Link href="/learner-blueprint" className={`text-amber-400 hover:text-amber-300 font-semibold rounded ${FOCUS_RING}`}>Learner Blueprint</Link>,
+            <Link href="/learner-blueprint" className={`text-amber-400 hover:text-amber-300 font-semibold rounded ${FOCUS_RING}`}>Learner Progress Report</Link>,
             which is itself built from evidence generated in the{' '}
             <Link href="/teachers" className={`text-amber-400 hover:text-amber-300 font-semibold rounded ${FOCUS_RING}`}>Teacher Workspace</Link>.
             Over time, the same mastery record feeds a learner&apos;s{' '}

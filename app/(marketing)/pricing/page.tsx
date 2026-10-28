@@ -61,7 +61,7 @@ const SCHOOL_PLANS = [
       'School Intelligence Dashboard',
       'Teacher tools for every teacher — automatic',
       'Learning Compass for every learner',
-      'Learner Blueprint every term',
+      'Learner Progress Report every term',
       'Career Intelligence built in',
       'Parent Pulse — weekly reports',
       'Strand Health & Intervention Tracking',
@@ -172,7 +172,7 @@ const FAMILY_PAY_PLANS: PayProduct[] = [
     highlight: true,
     features: [
       'Unlimited Learning Compass sessions\n(KES 0 per session — subscribers pay nothing per use)',
-      'Unlimited Learner Blueprint reports\n(career intelligence included)',
+      'Unlimited Learner Progress Reports\n(career intelligence included)',
       '1 child · all subjects · CBC + IGCSE + 8-4-4',
       'Weekly parent activity summary',
       'Teacher connection + instant alerts',
@@ -221,7 +221,7 @@ const FAQ_ITEMS: FAQItem[] = [
   },
   {
     q: 'Can parents use EduNexus even if their school hasn\'t joined?',
-    a: 'Yes. Parents subscribe independently using the Family plan and access the Learning Compass, Learner Blueprint, and Career Intelligence. When a school joins later, the learner\'s profile links automatically.',
+    a: 'Yes. Parents subscribe independently using the Family plan and access the Learning Compass, Learner Progress Report, and Career Intelligence. When a school joins later, the learner\'s profile links automatically.',
   },
   {
     q: 'What is the minimum school commitment?',
@@ -237,7 +237,7 @@ const FAQ_ITEMS: FAQItem[] = [
   },
   {
     q: 'Is career guidance extra?',
-    a: 'No. Career Intelligence is built into every Learner Blueprint at no extra cost — for families, for schools, and for every learner.',
+    a: 'No. Career Intelligence is built into every Learner Progress Report at no extra cost — for families, for schools, and for every learner.',
   },
 ]
 
@@ -389,7 +389,7 @@ function SchoolSection() {
               icon:  <Sparkles className="w-5 h-5" />,
               color: 'text-violet-400',
               bg:    'bg-violet-500/10',
-              title: 'Learner Blueprint — every term',
+              title: 'Learner Progress Report — every term',
               body:  'Strand-by-strand intelligence profile per learner. Visible to teacher, parent, and school.',
             },
             {
@@ -640,7 +640,7 @@ function FamilySection({
           Your child deserves<br />more than a mark.
         </h2>
         <p className="text-lg text-white/50 max-w-120 mx-auto leading-relaxed">
-          The Learner Blueprint shows exactly which strands are holding your child back.
+          The Learner Progress Report shows exactly which strands are holding your child back.
           The Learning Compass fills the gaps — anytime, any subject.
         </p>
       </div>

@@ -63,7 +63,7 @@ export default function TeachersPage() {
             <p className="text-white/60 leading-relaxed max-w-150 mx-auto">
               None of this works without the teacher. Every assessment marked, every scheme of work
               built, every lesson taught is the raw material behind a learner&apos;s{' '}
-              <Link href="/learner-blueprint" className={`text-amber-400 hover:text-amber-300 font-semibold rounded ${FOCUS_RING}`}>Blueprint</Link>{' '}
+              <Link href="/learner-blueprint" className={`text-amber-400 hover:text-amber-300 font-semibold rounded ${FOCUS_RING}`}>Progress Report</Link>{' '}
               and their{' '}
               <Link href="/compass" className={`text-amber-400 hover:text-amber-300 font-semibold rounded ${FOCUS_RING}`}>Learning Compass</Link>{' '}
               sessions. The documentation is handled for you — CBC-aligned
@@ -98,8 +98,8 @@ export default function TeachersPage() {
               { step: 'Lesson planning', body: 'A scheme of work and the week’s lesson plans are ready before the week starts — CBC-aligned, TSC-inspection formatted, generated from what you’ve already told the system about your term.' },
               { step: 'Teaching', body: 'You teach the lesson the way you always would. Nothing about the classroom itself changes.' },
               { step: 'Evidence collection', body: 'Assessments you mark become the evidence layer — the specific, strand-level record of what each learner actually understood, not just a score.' },
-              { step: 'Blueprint updates', body: 'That evidence updates each learner’s Blueprint automatically — the strand-by-strand picture parents and school leadership see too.' },
-              { step: 'Compass support', body: 'Where a learner’s Blueprint shows a specific gap, Learning Compass gives them a session that starts exactly there — not a generic review.' },
+              { step: 'Progress Report updates', body: 'That evidence updates each learner’s Progress Report automatically — the strand-by-strand picture parents and school leadership see too.' },
+              { step: 'Compass support', body: 'Where a learner’s Progress Report shows a specific gap, Learning Compass gives them a session that starts exactly there — not a generic review.' },
               { step: 'Parent communication', body: 'Parents see the same evidence you do, in plain language, without you having to write a separate update.' },
               { step: 'Reflection', body: 'Class Intelligence shows you, at a glance, who needs support before it becomes an end-of-term conversation.' },
             ].map((item, i) => (

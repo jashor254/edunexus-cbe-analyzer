@@ -96,7 +96,7 @@ export default function SchoolsPage() {
               {
                 icon: '🧭',
                 title: 'Learners',
-                body: 'Every learner’s Blueprint shows exactly which strand needs attention, and the Learning Compass meets them there — not a generic tutoring session, but a session that starts from their actual, diagnosed gap.',
+                body: 'Every learner’s Progress Report shows exactly which strand needs attention, and the Learning Compass meets them there — not a generic tutoring session, but a session that starts from their actual, diagnosed gap.',
               },
               {
                 icon: '👨‍👩‍👧',
@@ -165,7 +165,7 @@ export default function SchoolsPage() {
             Starter, Growth, and Institution scale by learner count and by how much implementation
             support your school wants — not by how much Educational Intelligence any single learner
             receives. We quote after a short consultation. Every learner at a subscribed school gets the full{' '}
-            <Link href="/learner-blueprint" className={`text-blue-400 hover:text-blue-300 font-semibold rounded ${FOCUS_RING}`}>Blueprint</Link>,{' '}
+            <Link href="/learner-blueprint" className={`text-blue-400 hover:text-blue-300 font-semibold rounded ${FOCUS_RING}`}>Progress Report</Link>,{' '}
             <Link href="/compass" className={`text-blue-400 hover:text-blue-300 font-semibold rounded ${FOCUS_RING}`}>Compass</Link>, and{' '}
             <Link href="/career-pathways" className={`text-blue-400 hover:text-blue-300 font-semibold rounded ${FOCUS_RING}`}>Career Intelligence</Link> experience regardless of plan.
           </p>

@@ -34,7 +34,7 @@ export default function AboutPage() {
             At the core is a{' '}
             <strong className="text-white">deterministic learner-intelligence engine</strong>: it
             turns teacher-entered evidence into a strand-by-strand profile of each learner — the
-            Learner Blueprint — without AI guesswork, so every insight traces back to a real
+            Learner Progress Report — without AI guesswork, so every insight traces back to a real
             observation.
           </p>
           <p>

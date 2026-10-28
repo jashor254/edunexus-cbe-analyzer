@@ -7,7 +7,7 @@ const WORKSPACE_CARDS = [
   {
     icon: '📋',
     title: 'Schemes of Work',
-    body: 'Your full term planned before it begins — CBC-aligned, TSC inspection ready. This is the structure the Blueprint reads against.',
+    body: 'Your full term planned before it begins — CBC-aligned, TSC inspection ready. This is the structure the Progress Report reads against.',
   },
   {
     icon: '📖',

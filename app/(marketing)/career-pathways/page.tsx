@@ -46,7 +46,7 @@ export default function CareerIntelligencePage() {
             </h2>
             <p className="text-white/60 leading-relaxed max-w-150 mx-auto">
               Career Intelligence doesn&apos;t tell a learner what to become. It surfaces patterns
-              in their own evidence — the same evidence behind their Blueprint and Compass sessions
+              in their own evidence — the same evidence behind their Progress Report and Compass sessions
               — early enough for a learner, a parent, and a teacher to explore them together.
             </p>
           </div>
@@ -109,7 +109,7 @@ export default function CareerIntelligencePage() {
             the{' '}
             <Link href="/teachers" className={`text-amber-400 hover:text-amber-300 font-semibold rounded ${FOCUS_RING}`}>Teacher Workspace</Link>,
             the strand-level picture in a learner&apos;s{' '}
-            <Link href="/learner-blueprint" className={`text-amber-400 hover:text-amber-300 font-semibold rounded ${FOCUS_RING}`}>Blueprint</Link>,
+            <Link href="/learner-blueprint" className={`text-amber-400 hover:text-amber-300 font-semibold rounded ${FOCUS_RING}`}>Progress Report</Link>,
             and the mastery record built through{' '}
             <Link href="/compass" className={`text-teal-400 hover:text-teal-300 font-semibold rounded ${FOCUS_RING}`}>Learning Compass</Link>{' '}
             sessions — carried forward, term after term, into a picture no single exam produces.
@@ -130,7 +130,7 @@ export default function CareerIntelligencePage() {
             See what the evidence already shows.
           </h2>
           <p className="text-white/55 text-lg mb-8 leading-relaxed max-w-120 mx-auto">
-            Career Intelligence is included in every Learner Blueprint — no separate subscription.
+            Career Intelligence is included in every Learner Progress Report — no separate subscription.
             Start with a free first report to see it for yourself.
           </p>
           <Link

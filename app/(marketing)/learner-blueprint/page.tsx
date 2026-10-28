@@ -26,19 +26,19 @@ export default function BlueprintPage() {
       <section className="py-20 md:py-28">
         <div className="max-w-170 mx-auto px-6 text-center">
           <span className="text-xs font-bold text-amber-400 uppercase tracking-widest mb-3 block">
-            Learner Blueprint
+            Learner Progress Report
           </span>
           <h1
             className="font-extrabold text-white leading-[1.1] tracking-[-0.02em] mb-6"
             style={{ fontSize: 'clamp(32px, 5.5vw, 56px)' }}
           >
-            A mark tells you what happened.<br />Blueprint tells you why.
+            A mark tells you what happened.<br />The Progress Report tells you why.
           </h1>
           <p className="text-white/60 text-lg leading-relaxed max-w-140 mx-auto">
             &ldquo;Mathematics: 58%&rdquo; doesn&apos;t tell a parent or a teacher what to actually
             do next. It doesn&apos;t say which concept is holding a learner back, whether they&apos;re
             improving or sliding, or what would close the gap. A mark is a snapshot after the fact.
-            Blueprint is the evidence underneath it — strand by strand, term by term.
+            The Progress Report is the evidence underneath it — strand by strand, term by term.
           </p>
         </div>
       </section>
@@ -50,7 +50,7 @@ export default function BlueprintPage() {
             Built from real classroom evidence.
           </h2>
           <p className="text-white/55 leading-relaxed">
-            Blueprint isn&apos;t generated from a single test. It&apos;s built from what a teacher
+            The Progress Report isn&apos;t generated from a single test. It&apos;s built from what a teacher
             already produces — assessments marked, schemes of work taught, lessons delivered —
             read strand by strand, term over term. That&apos;s why it can say something a single
             exam can&apos;t: not just where a learner is, but where they&apos;re heading.
@@ -69,7 +69,7 @@ export default function BlueprintPage() {
 
             <div className="order-1 md:order-2">
               <span className="text-xs font-bold text-amber-400 uppercase tracking-widest mb-3 block">
-                What A Blueprint Shows
+                What A Progress Report Shows
               </span>
               <h2 className="text-3xl md:text-4xl font-extrabold text-white leading-tight mb-5">
                 Discovered while there<br />was still time to fix it.
@@ -126,12 +126,12 @@ export default function BlueprintPage() {
       <section className="bg-white/3 py-16 md:py-20">
         <div className="max-w-140 mx-auto px-6 text-center">
           <h2 className="text-2xl md:text-3xl font-extrabold text-white leading-tight mb-5">
-            What Blueprint isn&apos;t.
+            What the Progress Report isn&apos;t.
           </h2>
           <p className="text-white/55 leading-relaxed">
-            Blueprint isn&apos;t a verdict, and it isn&apos;t a replacement for a teacher&apos;s
+            The Progress Report isn&apos;t a verdict, and it isn&apos;t a replacement for a teacher&apos;s
             judgment. It surfaces evidence — it doesn&apos;t decide what a specific child needs;
-            the teacher and parent do that, informed by what Blueprint shows them. It also isn&apos;t
+            the teacher and parent do that, informed by what the Progress Report shows them. It also isn&apos;t
             a one-time score: it&apos;s a living profile, rebuilt from real evidence every term, and
             it can be wrong or incomplete the way any evidence-based read can be — which is exactly
             why it stays visible to the people who know the learner best, not treated as final.
@@ -156,7 +156,7 @@ export default function BlueprintPage() {
               {
                 icon: '👨‍🏫',
                 title: 'Teachers',
-                body: 'Blueprint tells a teacher which strand a learner needs support on before it becomes a pattern across a whole class — informing, not replacing, their own professional read of that learner.',
+                body: 'The Progress Report tells a teacher which strand a learner needs support on before it becomes a pattern across a whole class — informing, not replacing, their own professional read of that learner.',
               },
               {
                 icon: '👨‍👩‍👧',
@@ -166,7 +166,7 @@ export default function BlueprintPage() {
               {
                 icon: '🏫',
                 title: 'School Leaders',
-                body: 'Aggregated across a school, the same Blueprints become the School Intelligence dashboard — which classes are on track, which strands need attention, before an exam confirms it.',
+                body: 'Aggregated across a school, the same Progress Reports become the School Intelligence dashboard — which classes are on track, which strands need attention, before an exam confirms it.',
               },
             ].map((card) => (
               <div key={card.title} className="bg-white/4 border border-white/10 rounded-2xl p-6">
@@ -186,7 +186,7 @@ export default function BlueprintPage() {
             One part of one system — not a standalone report.
           </h2>
           <p className="text-white/55 leading-relaxed mb-8">
-            Blueprint doesn&apos;t exist on its own. It&apos;s built from evidence generated in the{' '}
+            The Progress Report doesn&apos;t exist on its own. It&apos;s built from evidence generated in the{' '}
             <Link href="/teachers" className={`text-amber-400 hover:text-amber-300 font-semibold rounded ${FOCUS_RING}`}>Teacher Workspace</Link>,
             it&apos;s what a{' '}
             <Link href="/compass" className={`text-teal-400 hover:text-teal-300 font-semibold rounded ${FOCUS_RING}`}>Learning Compass</Link>{' '}
@@ -210,7 +210,7 @@ export default function BlueprintPage() {
             See exactly where your child stands.
           </h2>
           <p className="text-white/55 text-lg mb-8 leading-relaxed max-w-120 mx-auto">
-            The first Blueprint report is free — no card needed. See what it actually shows before
+            The first Progress Report is free — no card needed. See what it actually shows before
             deciding to continue.
           </p>
           <Link

@@ -24,7 +24,7 @@ export function CompassChatMockup() {
       </div>
       <div className="px-4 py-2 border-b border-white/10 bg-teal-500/5">
         <span className="text-[11px] text-teal-300/80 leading-snug">
-          Same learner as the Blueprint above — this session opens on his diagnosed
+          Same learner as the Progress Report above — this session opens on his diagnosed
           gap directly, not a generic topic menu.
         </span>
       </div>

@@ -117,7 +117,7 @@ export default function LandingPage() {
       line2:         'where your child truly stands.',
       gradientLine:  'Their real potential, not just a mark on a report.',
       lineClass:     'bg-linear-to-r from-teal-300 to-nexusteal-400 bg-clip-text text-transparent',
-      subtitle:      "The Learner Blueprint shows you exactly which strands are holding your child back — and a precise plan to close the gap before next term.",
+      subtitle:      "The Learner Progress Report shows you exactly which strands are holding your child back — and a precise plan to close the gap before next term.",
       ctaHref:       '/signup?role=parent',
       ctaLabel:      'Get Your Child\'s Free Report',
       trust:         '✓ Free first report  ·  ✓ M-PESA accepted  ·  ✓ Works on any phone',
@@ -162,7 +162,7 @@ export default function LandingPage() {
     : selectedRole === 'family' ? {
       kicker:   'Not just their marks. Their potential.',
       heading:  <>Ready to see what&apos;s really<br />holding your child back?</>,
-      subtitle: 'Get a free first Learner Blueprint report — no card needed.',
+      subtitle: 'Get a free first Learner Progress Report — no card needed.',
       label:    hero.ctaLabel,
       href:     hero.ctaHref,
       external: false,
@@ -274,7 +274,7 @@ export default function LandingPage() {
 
             </div>
 
-            {/* Real product visual — a live Learner Blueprint, not decoration */}
+            {/* Real product visual — a live Learner Progress Report, not decoration */}
             <div className="hidden lg:flex justify-end">
               <div className="relative">
                 <div
@@ -333,7 +333,7 @@ export default function LandingPage() {
               href="/learner-blueprint"
               className={`inline-flex items-center gap-2 bg-white/8 backdrop-blur-xl border border-brass-500/25 hover:bg-white/14 hover:border-brass-400/40 text-white px-7 py-3.5 rounded-full font-bold transition-all ${FOCUS_RING}`}
             >
-              Explore the Learner Blueprint
+              Explore the Learner Progress Report
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>

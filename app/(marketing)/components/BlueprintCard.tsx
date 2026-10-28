@@ -22,7 +22,7 @@ export function BlueprintCardMockup() {
         <div className="text-[10px] font-bold text-teal-400 tracking-[0.15em] uppercase mb-1">
           EDUNEXUS
         </div>
-        <div className="text-xl font-extrabold text-white mb-0.5">Learner Blueprint</div>
+        <div className="text-xl font-extrabold text-white mb-0.5">Learner Progress Report</div>
         <div className="text-xs text-white/60 mb-2">Living Learner Intelligence Profile</div>
         <div className="inline-block text-[10px] font-semibold text-white/45 bg-white/5 border border-white/10 rounded-full px-2 py-0.5 mb-3">
           Illustrative example
