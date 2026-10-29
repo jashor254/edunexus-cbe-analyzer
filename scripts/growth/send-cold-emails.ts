@@ -17,6 +17,7 @@
 import { Resend } from 'resend'
 import { parseCsvRecords, writeCsvTable } from './lib/csv'
 import { readFile, writeFile } from 'node:fs/promises'
+import { resolveOutreachReplyTo } from '../../lib/growth/messaging/replyTo'
 
 const API_KEY = process.env.RESEND_API_KEY
 const FROM = process.env.RESEND_FROM_EMAIL ? `EduNexus <${process.env.RESEND_FROM_EMAIL}>` : 'EduNexus <hello@edunexus.co.ke>'
@@ -90,6 +91,21 @@ async function main() {
     process.exit(1)
   }
 
+  // Fail closed: cold replies must have a monitored reply-to (the From: has no
+  // inbox). A real --send with no configured destination is refused outright; a
+  // dry run still proceeds, but warns that a real send would be blocked.
+  let replyTo: string | null = null
+  try {
+    replyTo = resolveOutreachReplyTo()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    if (send) {
+      console.error(`Cannot --send: ${message}`)
+      process.exit(1)
+    }
+    console.warn(`[dry-run] WARNING: ${message}\n            A real --send would be refused.`)
+  }
+
   const listText = await readFile(list, 'utf-8')
   const rows = parseCsvRecords(listText) as unknown as Row[]
   const alreadySent = await loadSentLog()
@@ -105,11 +121,11 @@ async function main() {
   for (const row of toProcess) {
     const { subject, html } = buildEmail(row.name)
     if (!send) {
-      console.log(`  [dry-run] would send to ${row.email} (${row.name}, ${row.county}) — subject: "${subject}"`)
+      console.log(`  [dry-run] would send to ${row.email} (${row.name}, ${row.county}) — subject: "${subject}"${replyTo ? ` — reply-to: ${replyTo}` : ' — reply-to: UNSET (send would be refused)'}`)
       continue
     }
     try {
-      const { data, error } = await resend!.emails.send({ from: FROM, to: row.email, subject, html })
+      const { data, error } = await resend!.emails.send({ from: FROM, replyTo: replyTo!, to: row.email, subject, html })
       const now = new Date().toISOString()
       if (error) {
         console.log(`  [fail] ${row.email} (${row.name}) — ${error.message}`)
