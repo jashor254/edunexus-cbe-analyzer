@@ -27,7 +27,7 @@ function isPlausibleSingleEmail(value: string): boolean {
  * Returns the configured, validated outreach reply-to address, or throws with a
  * descriptive message naming the env var to set. `env` is injectable for tests.
  */
-export function resolveOutreachReplyTo(env: NodeJS.ProcessEnv = process.env): string {
+export function resolveOutreachReplyTo(env: Record<string, string | undefined> = process.env): string {
   const raw = env[GROWTH_OUTREACH_REPLY_TO_ENV]
   const value = raw?.trim() ?? ''
 
