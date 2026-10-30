@@ -7,6 +7,8 @@ import { evaluateInsha } from '@/lib/kiswahili/inshaEvaluator'
 import { resolveInshaCharge, recordInshaEssay } from '@/lib/kiswahili/inshaBilling'
 import { apiPaymentRequired } from '@/lib/payments/paywall'
 import type { InshaType } from '@/lib/kiswahili/inshaEvaluator'
+import { checkDailyCallLimit, releaseDailyCall } from '@/lib/ai/rateLimit'
+import { AttemptLimiterUnavailableError } from '@/lib/security/attemptLimiter'
 
 const INSHA_TYPES: InshaType[] = ['masimulizi', 'hoja', 'maelezo', 'barua_rasmi', 'mazungumzo']
 
@@ -52,14 +54,25 @@ export async function POST(req: NextRequest) {
       return charge.reason === 'unauthenticated' ? apiUnauthorized() : apiError('Access denied', 403)
     }
 
+    // Daily cap (DAILY_CALL_LIMITS.kiswahili_insha_pack, defined for this
+    // route but never checked by it before the 2026-10-30 audit).
+    const quota = await checkDailyCallLimit(user.id, 'kiswahili_insha_pack')
+    if (quota.allowed === false) {
+      return apiError(`Kikomo cha leo cha insha ${quota.limit} kimefikiwa. Jaribu tena kesho.`, 429)
+    }
+
     const feedback = await evaluateInsha({ insha, inshaType, grade })
 
     // Recorded only for a genuine evaluation — a fallback placeholder (AI
-    // failed) never uses up an essay or opens a pack.
-    if (!feedback.isFallback) await recordInshaEssay(charge)
+    // failed) never uses up an essay or opens a pack, nor a daily slot.
+    if (feedback.isFallback) await releaseDailyCall(quota)
+    else await recordInshaEssay(charge)
 
     return apiSuccess({ feedback })
   } catch (err) {
+    if (err instanceof AttemptLimiterUnavailableError) {
+      return apiError('Tathmini haipatikani kwa sasa — tafadhali jaribu tena baadaye', 503)
+    }
     console.error('[kiswahili/insha-feedback]', err)
     return apiError('Tathmini imeshindwa — tafadhali jaribu tena')
   }

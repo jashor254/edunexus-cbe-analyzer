@@ -20,6 +20,8 @@ import {
   ScriptMarkingFailedError,
   type MarkScriptOutcome,
 } from '@/lib/paperIntelligence/markScript'
+import { checkDailyCallLimit, releaseDailyCall } from '@/lib/ai/rateLimit'
+import { AttemptLimiterUnavailableError } from '@/lib/security/attemptLimiter'
 
 // One vision call (~11s on the Phase 0 scripts) plus one retry on a malformed
 // response, with headroom for a slow provider.
@@ -49,10 +51,18 @@ export async function POST(
       throw err
     }
 
+    // Daily cap on vision calls, reserved before the script is sent.
+    const quota = await checkDailyCallLimit(access.teacherUserId, 'paper_script_marking')
+    if (quota.allowed === false) {
+      return apiError(`Daily limit of ${quota.limit} script markings reached. Resets at ${quota.resetAt}`, 429)
+    }
+
     try {
       const outcome = await markSubmissionScript({ assignmentId, submission: access.submission, teacherUserId: access.teacherUserId })
       return apiSuccess<MarkScriptOutcome>(outcome)
     } catch (err) {
+      // No marking was produced — refund the slot whatever the reason.
+      await releaseDailyCall(quota)
       if (err instanceof ScriptAlreadyReviewedError) return apiError(err.message, 409)
       if (err instanceof ScriptNotReadyError) return apiBadRequest(err.message)
       // Already logged durably in paper_intelligence_failure_log; no evidence written.
@@ -60,6 +70,7 @@ export async function POST(
       throw err
     }
   } catch (e: unknown) {
+    if (e instanceof AttemptLimiterUnavailableError) return apiError(e.message, 503)
     console.error('[paperIntelligence/mark-script POST]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')
   }

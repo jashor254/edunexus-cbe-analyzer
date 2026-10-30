@@ -1,0 +1,59 @@
+-- Close the shared_reports public read (security audit 2026-10-30, F-01).
+--
+-- PROVEN BEFORE THIS MIGRATION, on a local stack built from production's own
+-- recorded statement text (scripts/bootstrap-local-db/00-baseline/
+-- 01-shared-reports.sql ← production migration 20260327105501):
+--
+--   "Anyone can read shared reports"  FOR SELECT  USING (true)
+--
+-- grants every role, including `anon`, read access to EVERY row. The anon key
+-- ships in the browser bundle, so one request to /rest/v1/shared_reports
+-- returned every shared report's student_name, grade, student_id, user_id and
+-- full report_data (subject scores, strengths, priority areas, action plan) —
+-- expired rows included, since the policy never looked at expires_at.
+--
+--   "Users can create their own shared reports"  FOR INSERT
+--   WITH CHECK (auth.uid() = user_id)
+--
+-- let any signed-in user insert a row directly over PostgREST with ANY
+-- student_name and report_data, minting an official-looking EduNexus report
+-- page at /shared/<token> — skipping the ownership check in
+-- app/api/share/generate entirely.
+--
+-- WHAT REPLACES THEM: nothing. Every legitimate reader and writer already
+-- uses (or, after this change, uses) the service-role client, which bypasses
+-- RLS and is unaffected:
+--   lib/sharing/sharedReports.ts::getSharedReportByToken  — the public page,
+--     exact-token match, 5 rendered columns only, expired rows return no data
+--   app/api/share/generate            createServiceClient() insert
+--   app/api/admin/pilot/students      createServiceClient() read
+--
+-- DEPLOY ORDER: ship the application code that reads through
+-- getSharedReportByToken FIRST, then apply this migration. Applied before
+-- that code, the old page (user-scoped read) returns 404 for every link until
+-- the code ships — a temporary outage, not an exposure.
+--
+-- LEFT IN PLACE: "Users can delete their own shared reports". It grants no
+-- read, and no code calls it. Note it is INERT after this migration: a
+-- DELETE whose WHERE references a column also needs a passing SELECT policy,
+-- so an owner's `delete … where token = …` now matches 0 rows (verified on a
+-- local stack, 2026-10-30). It only ever worked through the always-true read
+-- policy dropped here. If owners should revoke links, add a server route.
+--
+-- EXISTING ROWS: untouched. Every link issued before this migration keeps
+-- working until its own expires_at.
+--
+-- ROLLBACK (only if the new read path must be reverted, and only together
+-- with that revert): recreate the dropped policies verbatim from the header
+-- above. Doing so re-opens the exposure.
+
+drop policy if exists "Anyone can read shared reports" on public.shared_reports;
+drop policy if exists "Users can create their own shared reports" on public.shared_reports;
+
+-- Defence in depth: with no SELECT/INSERT/UPDATE policy left, RLS already
+-- denies these to anon and authenticated. The anon role has no legitimate
+-- use of this table at all, so its table privileges go too — a future
+-- permissive policy added by mistake would then still not expose it to an
+-- unauthenticated caller. authenticated keeps its default privileges; with
+-- no SELECT/INSERT/UPDATE policy, RLS denies those regardless.
+revoke all on public.shared_reports from anon;

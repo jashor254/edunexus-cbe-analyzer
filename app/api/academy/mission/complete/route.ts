@@ -12,13 +12,21 @@ import {
 import { getMission, upsertMissionCompletion, recordXpEvent } from '@/lib/academy/missions'
 import { scoreMissionComparison } from '@/lib/academy/aiJudge'
 import type { MissionCompleteResponse } from '@/lib/academy/types'
+import { checkDailyCallLimit, releaseDailyCall } from '@/lib/ai/rateLimit'
+import { AttemptLimiterUnavailableError } from '@/lib/security/attemptLimiter'
+
+// Tool outputs are pasted results from other tools; the judge only sends the
+// first 800 characters of each (lib/academy/aiJudge.ts), but they are also
+// stored, so they are bounded. Comparison notes go to the judge verbatim.
+const TOOL_OUTPUT_MAX = 20_000
+const COMPARISON_NOTES_MAX = 4000
 
 const bodySchema = z.object({
   mission_id:       z.string().uuid(),
-  tool_a_output:    z.string().trim().default(''),
-  tool_b_output:    z.string().trim().default(''),
-  comparison_notes: z.string().trim().min(1, 'Please write your comparison notes.'),
-  self_scores:      z.record(z.string(), z.number().min(1).max(5)).default({}),
+  tool_a_output:    z.string().trim().max(TOOL_OUTPUT_MAX).default(''),
+  tool_b_output:    z.string().trim().max(TOOL_OUTPUT_MAX).default(''),
+  comparison_notes: z.string().trim().min(1, 'Please write your comparison notes.').max(COMPARISON_NOTES_MAX),
+  self_scores:      z.record(z.string().max(100), z.number().min(1).max(5)).default({}),
 })
 
 export async function POST(req: Request) {
@@ -47,6 +55,12 @@ export async function POST(req: Request) {
 
     const isFirstCompletion = missionWithCompletion.completion === null
 
+    // Reserved before the AI call; refunded when no genuine verdict was produced.
+    const quota = await checkDailyCallLimit(user.id, 'academy_mission_feedback')
+    if (quota.allowed === false) {
+      return apiError(`Daily limit of ${quota.limit} mission reviews reached. Resets at ${quota.resetAt}`, 429)
+    }
+
     const verdict = await scoreMissionComparison(
       {
         title:        missionWithCompletion.title,
@@ -56,6 +70,7 @@ export async function POST(req: Request) {
       { mission_id, tool_a_output, tool_b_output, comparison_notes, self_scores },
       user.id
     )
+    if (verdict.isFallback) await releaseDailyCall(quota)
 
     const completion = await upsertMissionCompletion(
       teacher.id,
@@ -84,6 +99,9 @@ export async function POST(req: Request) {
       xp_earned: xpEarned,
     })
   } catch (err: unknown) {
+    if (err instanceof AttemptLimiterUnavailableError) {
+      return apiError('Mission feedback is temporarily unavailable. Please try again shortly.', 503)
+    }
     return apiError(getErrorMessage(err), 500)
   }
 }

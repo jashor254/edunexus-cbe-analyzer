@@ -12,13 +12,16 @@ import { UnauthorizedError } from '@/lib/core/errors'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
 import { apiPaymentRequired } from '@/lib/payments/paywall'
 import { logger } from '@/lib/observability/logger'
+import { checkDailyCallLimit, releaseDailyCall } from '@/lib/ai/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
 export const CLASS_REPORTS_JOB_TYPE = 'ai.class_reports.generate'
 
 const BodySchema = z.object({
-  assessmentIds: z.array(z.string().uuid()).min(1),
+  // A term's assessments for one class — bounded, since every id widens each
+  // learner's report prompt.
+  assessmentIds: z.array(z.string().uuid()).min(1).max(30),
 })
 
 export async function POST(
@@ -72,6 +75,14 @@ export async function POST(
       return access.reason === 'unauthenticated' ? apiUnauthorized() : apiForbidden()
     }
 
+    // One class run per slot (DAILY_CALL_LIMITS.class_reports_generate — one
+    // DeepSeek call per learner follows). Defined for this route but never
+    // checked by it before the 2026-10-30 audit.
+    const quota = await checkDailyCallLimit(user.id, 'class_reports_generate')
+    if (quota.allowed === false) {
+      return apiError(`Daily limit of ${quota.limit} class report runs reached. Resets at ${quota.resetAt}`, 429)
+    }
+
     // Same pattern as Holiday Planner (see app/api/holiday/generate/route.ts):
     // a full class of students, each needing its own DeepSeek call, does not
     // fit inside one request/response. Inserted already `processing` in a
@@ -90,7 +101,10 @@ export async function POST(
       })
       .select('id')
       .single()
-    if (jobErr || !job) return apiError('Could not start report generation')
+    if (jobErr || !job) {
+      await releaseDailyCall(quota)
+      return apiError('Could not start report generation')
+    }
 
     after(async () => {
       try {
@@ -99,6 +113,8 @@ export async function POST(
             result: { total: progress.total, completed: progress.completed, currentStudentName: progress.currentStudentName },
           })
         })
+        // A run that produced nothing does not use up the teacher's day.
+        if (result.success === 0) await releaseDailyCall(quota)
         // Charged after the run, and only when at least one report was
         // produced. The reports are already written by this point, so a failed
         // deduction (balance spent elsewhere meanwhile) is logged, not undone.
@@ -119,6 +135,7 @@ export async function POST(
         })
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
+        await releaseDailyCall(quota)
         await repos.jobs.updateProgress(job.id, { status: 'failed', result: { total, completed: 0, currentStudentName: null, errorMessage: message } })
       }
     })

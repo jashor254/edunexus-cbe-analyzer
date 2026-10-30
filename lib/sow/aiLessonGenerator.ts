@@ -737,8 +737,14 @@ ${lastError.includes('ethnic') ? 'REMINDER: do not name any ethnic community —
     try {
       aiResponse = await callSowAI(prompt, isKiswahiliCtx, context.costContext)
     } catch (err: unknown) {
+      // A provider failure is NOT retried here: callDeepSeek has already
+      // retried it once and fallen back to Gemini. Re-running that whole
+      // chain on each of MAX_RETRIES attempts multiplied one outage into up
+      // to 15 provider calls per lesson (security audit 2026-10-30, F-03).
+      // MAX_RETRIES remains the budget for re-asking after a REAL response
+      // that was unparseable or failed curriculum validation.
       lastError = `AI request failed: ${err instanceof Error ? err.message : String(err)}`
-      continue
+      break
     }
 
     let lesson: Record<string, any>

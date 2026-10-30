@@ -14,7 +14,7 @@ import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } fr
 import { requireClassTeacher } from '@/lib/core/permissions'
 import { resolveTeacher } from '@/lib/core/identity'
 import { UnauthorizedError, ResourceOwnershipError } from '@/lib/core/errors'
-import { UPLOAD_LIMITS, isAllowedUploadType } from '@/lib/config/uploads'
+import { UPLOAD_LIMITS, isAllowedUploadType, UPLOAD_EXTENSION_BY_MIME_TYPE, matchesFileSignature } from '@/lib/config/uploads'
 import { repos } from '@/lib/repositories'
 
 const BUCKET = 'class-resources'
@@ -71,10 +71,12 @@ export async function POST(
     }
     if (!isAllowedUploadType(file.type)) return apiBadRequest('Unsupported file type')
 
-    const db = createServiceClient()
-    const ext = file.name.split('.').pop() || 'bin'
-    const objectPath = `${classId}/${Date.now()}.${ext}`
     const bytes = new Uint8Array(await file.arrayBuffer())
+    if (!matchesFileSignature(bytes, file.type)) return apiBadRequest('Unsupported file type')
+
+    const db = createServiceClient()
+    const ext = UPLOAD_EXTENSION_BY_MIME_TYPE[file.type]
+    const objectPath = `${classId}/${Date.now()}.${ext}`
 
     const { error: uploadError } = await db.storage
       .from(BUCKET)

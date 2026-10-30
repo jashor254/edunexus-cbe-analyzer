@@ -9,14 +9,8 @@ import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } fr
 import { requireSchoolAdmin } from '@/lib/core/permissions'
 import { UnauthorizedError, PermissionDeniedError } from '@/lib/core/errors'
 import { uploadSchoolLogo } from '@/lib/core/school'
-import { SCHOOL_LOGO_LIMITS, isAllowedSchoolLogoType } from '@/lib/config/uploads'
+import { SCHOOL_LOGO_LIMITS, isAllowedSchoolLogoType, UPLOAD_EXTENSION_BY_MIME_TYPE, matchesFileSignature } from '@/lib/config/uploads'
 import { logger } from '@/lib/observability/logger'
-
-const EXTENSION_BY_MIME_TYPE: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
-}
 
 export async function POST(req: Request): Promise<Response> {
   try {
@@ -42,7 +36,8 @@ export async function POST(req: Request): Promise<Response> {
     if (!isAllowedSchoolLogoType(file.type)) return apiBadRequest('Logo must be JPEG, PNG, or WebP')
 
     const bytes = new Uint8Array(await file.arrayBuffer())
-    const school = await uploadSchoolLogo(schoolId, bytes, file.type, EXTENSION_BY_MIME_TYPE[file.type])
+    if (!matchesFileSignature(bytes, file.type)) return apiBadRequest('Logo must be JPEG, PNG, or WebP')
+    const school = await uploadSchoolLogo(schoolId, bytes, file.type, UPLOAD_EXTENSION_BY_MIME_TYPE[file.type])
 
     return apiSuccess({ school })
   } catch (e: unknown) {

@@ -94,6 +94,24 @@ export const TOKEN_COSTS = {
   // can bound its real LLM cost. Zero-cost entries already exist above
   // (lesson_plan_generate, row_generate) — this follows that precedent.
   career_knowledge_request: 0,
+
+  // Free teacher AI features that previously had NO usage control at all
+  // (security audit 2026-10-30, F-03): Academy reflection and mission
+  // feedback (lib/academy/aiJudge.ts) and post-lesson reflection suggestions
+  // (lib/lessonPlan/generator.ts). Never token-charged — zero-cost keys exist
+  // only so DAILY_CALL_LIMITS (lib/ai/rateLimit.ts) can bound their real LLM
+  // cost, the same precedent as career_knowledge_request above.
+  academy_reflection_feedback:   0,
+  academy_mission_feedback:      0,
+  lesson_reflection_suggestions: 0,
+
+  // Paper Intelligence vision calls (lib/paperIntelligence/) — the most
+  // expensive per call in the product (one call carries every page of a
+  // script, up to PAPER_INTELLIGENCE_LIMITS.maxPagesPerScript) and, until the
+  // same audit, uncapped. Not token-charged; zero-cost keys for the caps only.
+  paper_script_marking:    0,
+  paper_page_marking:      0,
+  paper_rubric_extraction: 0,
 } as const
 
 export type TokenFeature = keyof typeof TOKEN_COSTS
@@ -234,6 +252,12 @@ export const FEATURE_PAYWALL_PRODUCT: Record<TokenFeature, string | null> = {
   learning_compass:           SUBSCRIPTION_PLANS.TERMLY_SINGLE.id,
   career_intelligence_report: SUBSCRIPTION_PLANS.TERMLY_SINGLE.id,
   career_knowledge_request:   null,
+  academy_reflection_feedback:   null,
+  academy_mission_feedback:      null,
+  lesson_reflection_suggestions: null,
+  paper_script_marking:          null,
+  paper_page_marking:            null,
+  paper_rubric_extraction:       null,
 }
 
 // ===== FEATURE ACCESS MATRIX =====

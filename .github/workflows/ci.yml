@@ -255,7 +255,23 @@ jobs:
           # data-only backfill). Reviewed: only schema change; FAIL_COUNT=9
           # UNRECOVERED=0, unchanged. Computed on an isolated throwaway pifp
           # stack that first reproduced 3e9bb65d at HEAD.
-          EXPECTED="28ff24ca07243bcf18a41d69a21b42f9"
+          # 2026-10-30: 28ff24ca… → cf8d58ea… for the security-audit
+          # remediation migrations: 20261030120000_shared_reports_close_public_read
+          # (drops 2 policies, revokes anon), 20261030121000_rate_limit_attempts
+          # (new table + 2 service-role-only functions),
+          # 20261030122000_students_guard_server_fields (new trigger) and
+          # 20261030123000_insights_view_rpc_service_only (execute grants).
+          # Reviewed: the only schema changes; FAIL_COUNT=9 UNRECOVERED=0,
+          # unchanged. Computed on a freshly created throwaway stack that
+          # first reproduced 28ff24ca at the pre-change tree (main da8b34d).
+          # 2026-10-30 (audit): cf8d58ea… → 140c3768… for the one migration
+          # added during the independent pre-deployment audit,
+          # 20261030124000_student_guardians_close_self_insert (AUDIT-F15) and
+          # 20261030125000_growth_users_close_self_insert (AUDIT-F16) — both
+          # drop a self-insert policy and revoke insert/update/delete from
+          # anon/authenticated. Reviewed: only schema changes; FAIL_COUNT=9
+          # UNRECOVERED=0, unchanged; computed on a fresh throwaway stack.
+          EXPECTED="8c15e1a35af2db4f81029b7471d62e06"
           echo "expected: $EXPECTED"
           echo "actual:   $ACTUAL"
           if [ "$ACTUAL" != "$EXPECTED" ]; then
@@ -288,7 +304,7 @@ jobs:
       - name: DEEP_PR classification guard
         run: node scripts/check-deep-pr-classification.mjs
 
-      - name: DEEP_PR manifest (expect 22/22 files, 168 tests)
+      - name: DEEP_PR manifest (expect 33/33 files, 226 tests)
         run: node scripts/run-deep-pr.mjs
 
       - name: Cleanup gate — dry-run reaper, expect 0 residual

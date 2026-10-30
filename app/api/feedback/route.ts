@@ -1,10 +1,11 @@
 // app/api/feedback/route.ts
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { requireAuth } from '@/lib/api/middleware'
-import { ADMIN_CONFIG } from '@/lib/config/api'
-import { timingSafeEqualString } from '@/lib/api/secretCompare'
+import { requireGrowthUser } from '@/lib/growth/auth'
+import { UnauthorizedError, ForbiddenError } from '@/lib/core/errors'
 import { logger } from '@/lib/observability/logger'
 
 const FeedbackSchema = z.object({
@@ -59,11 +60,17 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET — admin-only feedback stats dashboard
-export async function GET(request: NextRequest) {
-  const adminSecret = request.headers.get('x-admin-secret')
-  if (!ADMIN_CONFIG.adminSecret || !timingSafeEqualString(adminSecret, ADMIN_CONFIG.adminSecret)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+// GET — founder-only feedback stats dashboard. Security audit 2026-10-30,
+// F-08: previously gated by a shared ADMIN_SECRET header (and invisible to
+// the route-auth gate, which only saw this file's guarded POST); now the
+// founder's own signed-in session (requireGrowthUser).
+export async function GET() {
+  try {
+    await requireGrowthUser(await createClient())
+  } catch (error) {
+    if (error instanceof UnauthorizedError) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (error instanceof ForbiddenError) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    throw error
   }
 
   try {

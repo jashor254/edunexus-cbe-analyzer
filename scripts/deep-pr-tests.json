@@ -1,6 +1,6 @@
 {
   "description": "DEEP_PR — critical in-process (D1) DEEP tests, proven 2x consecutive fresh-bootstrap clean (H1D-3/H1D-4/H1D-3B). Runs against local disposable Supabase only. No Next server required. Every reclassification of this set must go through scripts/check-deep-pr-classification.mjs, not a silent edit.",
-  "expectedTests": 168,
+  "expectedTests": 226,
   "files": [
     "lib/config/env.test.ts",
     "lib/core/schoolUsersRlsRegression.integration.test.ts",
@@ -23,6 +23,17 @@
     "lib/projection/eventConsumerDuplicateDelivery.integration.test.ts",
     "lib/testing/deleteAuthUserOrThrow.integration.test.ts",
     "lib/sow/schemeLessonsSubStrandId.integration.test.ts",
-    "lib/lessonPlan/lessonPlansSubStrandId.integration.test.ts"
+    "lib/lessonPlan/lessonPlansSubStrandId.integration.test.ts",
+    "lib/sharing/sharedReportsRls.test.ts",
+    "lib/alerts/teacherAlertsOwnership.test.ts",
+    "lib/security/attemptLimiter.integration.test.ts",
+    "lib/classes/classEnrollment.integration.test.ts",
+    "lib/classes/classInvite.integration.test.ts",
+    "lib/core/studentsBridgeIntegrity.integration.test.ts",
+    "app/api/academy/reflect/route.quota.integration.test.ts",
+    "app/api/admin/founderOnly.integration.test.ts",
+    "app/api/payments/callback/route.chargeAmount.integration.test.ts",
+    "lib/core/studentGuardiansEscalation.integration.test.ts",
+    "lib/growth/growthUsersEscalation.integration.test.ts"
   ]
 }

@@ -1030,11 +1030,18 @@ export class TeacherRepository extends BaseRepository {
     return data
   }
 
+  // Bridge rows are created by insertLegacyStudent with no user_id and never
+  // acquire one, so `user_id IS NULL` is part of the bridge identity: a
+  // user-owned row that merely carries a matching external_id (one a client
+  // planted before fn_guard_students_server_fields existed) must never be
+  // taken for a learner's bridge and receive their marks and Evidence
+  // (security audit 2026-10-30, F-04).
   async findLegacyStudentByExternalId(externalId: string): Promise<{ id: string } | null> {
     const { data } = await this.db
       .from('students')
       .select('id')
       .eq('external_id', externalId)
+      .is('user_id', null)
       .maybeSingle()
     return data
   }
@@ -1058,6 +1065,7 @@ export class TeacherRepository extends BaseRepository {
       .from('students')
       .select('id, external_id')
       .in('external_id', externalIds)
+      .is('user_id', null) // bridge identity — see findLegacyStudentByExternalId
     if (error) throw new Error(`findLegacyStudentsByExternalIds: ${error.message}`)
     return (data ?? []) as Array<{ id: string; external_id: string | null }>
   }

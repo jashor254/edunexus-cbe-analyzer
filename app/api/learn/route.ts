@@ -210,9 +210,15 @@ export async function POST(req: Request) {
       : null
 
     // ── Daily abuse-prevention cap ────────────────────────────────────────────
-    const rateLimit = await checkDailyCallLimit(access.userId, FEATURE)
-    if (rateLimit.allowed === false) {
-      return apiError(`Daily limit of ${rateLimit.limit} sessions reached. Resets at ${rateLimit.resetAt}`, 429)
+    // Counted per NEW session (no sessionId yet) — the unit this message has
+    // always named. Before the 2026-10-30 fix the cap never counted anything
+    // (lib/ai/rateLimit.ts header); counting every message instead would cut
+    // a learner off mid-lesson after 30 turns.
+    if (!sessionId) {
+      const rateLimit = await checkDailyCallLimit(access.userId, FEATURE)
+      if (rateLimit.allowed === false) {
+        return apiError(`Daily limit of ${rateLimit.limit} sessions reached. Resets at ${rateLimit.resetAt}`, 429)
+      }
     }
 
     // ── Keepalive: idle session check (no AI call needed) ─────────────────────

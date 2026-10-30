@@ -13,6 +13,8 @@ import {
 } from '@/lib/api/response'
 import { generateReflectionSuggestions } from '@/lib/lessonPlan/generator'
 import type { LessonPlanContext } from '@/lib/lessonPlan/types'
+import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
+import { AttemptLimiterUnavailableError } from '@/lib/security/attemptLimiter'
 
 const ReflectionSuggestionsSchema = z.object({
   planId: z.string().uuid(),
@@ -65,11 +67,22 @@ export async function POST(req: Request) {
       assessmentMethods: [],
     }
 
+    // Reserved before the AI call. Not refunded on failure: the generator
+    // never throws — it substitutes canned suggestions and does not report
+    // whether the AI succeeded — so the slot is kept (the conservative side).
+    const quota = await checkDailyCallLimit(user.id, 'lesson_reflection_suggestions')
+    if (quota.allowed === false) {
+      return apiError(`Daily limit of ${quota.limit} reflection suggestions reached. Resets at ${quota.resetAt}`, 429)
+    }
+
     const taughtDate = plan.taught_date || new Date().toISOString().split('T')[0]
     const suggestions = await generateReflectionSuggestions(ctx, taughtDate)
 
     return apiSuccess({ suggestions })
   } catch (err: unknown) {
+    if (err instanceof AttemptLimiterUnavailableError) {
+      return apiError('Suggestions are temporarily unavailable. Please try again shortly.', 503)
+    }
     console.error('[lesson-plans/reflection-suggestions]', err)
     return apiError(err instanceof Error ? err.message : 'Failed to generate suggestions')
   }

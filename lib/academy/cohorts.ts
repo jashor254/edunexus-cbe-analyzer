@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto'
 import { repos } from '@/lib/repositories'
 
 export type Cohort = {
@@ -24,10 +25,12 @@ export type CohortDetail = Cohort & {
   totalMembers: number
 }
 
-// Generate a readable 6-char join code (uppercase, no ambiguous chars)
+// Generate a readable 6-char join code (uppercase, no ambiguous chars).
+// crypto.randomInt, not Math.random (security audit 2026-10-30, P3): a join
+// code is a credential, and the 32-symbol alphabet keeps the draw unbiased.
 function generateJoinCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+  return Array.from({ length: 6 }, () => chars[randomInt(chars.length)]).join('')
 }
 
 export async function createCohort(

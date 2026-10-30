@@ -1781,6 +1781,135 @@
       "parallel": "SAFE"
     },
     {
+      "file": "lib/sharing/sharedReportsRls.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "parent"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/alerts/teacherAlertsOwnership.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "teacher",
+        "parent"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/security/attemptLimiter.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/classes/classEnrollment.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "teacher",
+        "parent"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/classes/classInvite.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "parent"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/studentsBridgeIntegrity.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "identity",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "app/api/academy/reflect/route.quota.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "academy",
+        "billing"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "app/api/admin/founderOnly.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "growth"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "app/api/payments/callback/route.chargeAmount.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "billing"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
       "file": "lib/projection/careerPropagation.integration.test.ts",
       "tier": "D1",
       "domain": [
@@ -2413,6 +2542,35 @@
       "auth": true,
       "storage": false,
       "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/core/studentGuardiansEscalation.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "identity",
+        "learner"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
+      "file": "lib/growth/growthUsersEscalation.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "security",
+        "growth"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
       "mutatesDb": true,
       "cleanup": "SELF_CLEANING",
       "parallel": "SAFE"

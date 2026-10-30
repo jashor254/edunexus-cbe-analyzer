@@ -7,6 +7,9 @@ const LESSON_PLAN_SYSTEM =
   'You are an experienced Kenyan CBC teacher. ' +
   'Return ONLY valid JSON. No markdown. No explanation. No code blocks. Pure JSON only.'
 
+/** One generation plus at most one re-ask after an unusable (but real) response. */
+const LESSON_PLAN_MAX_ATTEMPTS = 2
+
 const KENYAN_COUNTIES = [
   'Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Kisii', 'Machakos',
   'Nyeri', 'Garissa', 'Turkana', 'Kakamega', 'Meru', 'Embu', 'Kitale',
@@ -294,14 +297,20 @@ export async function generateLessonPlan(
 ): Promise<GeneratedLessonPlan> {
   const prompt = buildLessonPlanPrompt(ctx)
 
+  // Total budget for the whole operation: LESSON_PLAN_MAX_ATTEMPTS responses.
+  // A provider failure ends it at once — callDeepSeek has already retried
+  // once and fallen back to Gemini, and re-running that chain on every
+  // attempt turned one outage into up to 9 provider calls per lesson
+  // (security audit 2026-10-30, F-03). Only a real but unusable response
+  // (bad JSON, missing sections) earns a re-ask.
   let lastError = ''
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < LESSON_PLAN_MAX_ATTEMPTS; attempt++) {
     let raw: string
     try {
       raw = await callAI(prompt, LESSON_PLAN_SYSTEM, { temperature: 0.3, maxTokens: 2000, costContext: ctx.costContext })
     } catch (err: unknown) {
       lastError = err instanceof Error ? err.message : 'Unknown AI error'
-      continue
+      break
     }
 
     let parsed: Record<string, unknown>
@@ -344,7 +353,7 @@ export async function generateLessonPlan(
     lastError = 'Missing required fields in AI response'
   }
 
-  throw new Error(`Lesson plan generation failed after 3 attempts: ${lastError}`)
+  throw new Error(`Lesson plan generation failed: ${lastError}`)
 }
 
 // ─── Reflection suggestions ──────────────────────────────────────────────────

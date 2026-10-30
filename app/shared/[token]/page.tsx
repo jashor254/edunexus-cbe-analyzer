@@ -1,4 +1,4 @@
-import { createClient } from '@/utils/supabase/server'
+import { getSharedReportByToken } from '@/lib/sharing/sharedReports'
 import { notFound } from 'next/navigation'
 import { PrintButton } from './PrintButton'
 import { Sparkles } from 'lucide-react'
@@ -25,22 +25,15 @@ function getLevelBadgeColor(level: number): string {
     'bg-green-100 text-green-700 border-green-200', 'bg-purple-100 text-purple-700 border-purple-200'][level] || 'bg-gray-100 text-gray-700'
 }
 
-export default async function SharedReportPage({ params }: { params: { token: string } }) {
-  const db = await createClient()
+export default async function SharedReportPage({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params
+  const lookup = await getSharedReportByToken(token)
 
-  const { data: shared, error } = await db
-    .from('shared_reports')
-    .select('expires_at, report_data, created_at, student_name, grade')
-    .eq('token', params.token)
-    .single()
-
-  if (error || !shared) {
+  if (lookup.status === 'not_found') {
     notFound()
   }
 
-  const isExpired = new Date(shared.expires_at) < new Date()
-
-  if (isExpired) {
+  if (lookup.status === 'expired') {
     return (
       <div className="min-h-screen bg-[#0a0f1e] flex items-center justify-center p-6">
         <div className="max-w-sm w-full text-center">
@@ -62,11 +55,12 @@ export default async function SharedReportPage({ params }: { params: { token: st
     )
   }
 
-  const reportData = shared.report_data as SharedReportData
-  const generatedDate = new Date(shared.created_at).toLocaleDateString('en-KE', {
+  const shared = lookup.report
+  const reportData = shared.reportData as SharedReportData
+  const generatedDate = new Date(shared.createdAt).toLocaleDateString('en-KE', {
     day: 'numeric', month: 'long', year: 'numeric',
   })
-  const expiryDate = new Date(shared.expires_at).toLocaleDateString('en-KE', {
+  const expiryDate = new Date(shared.expiresAt).toLocaleDateString('en-KE', {
     day: 'numeric', month: 'long', year: 'numeric',
   })
 
@@ -115,7 +109,7 @@ export default async function SharedReportPage({ params }: { params: { token: st
           <div className="inline-block px-4 py-1.5 bg-amber-500/15 border border-amber-500/30 rounded-full text-amber-400 print:text-amber-700 text-xs font-bold uppercase tracking-widest mb-4">
             Shared Report — Confidential
           </div>
-          <h1 className="text-2xl font-black text-white print:text-black mb-1">{shared.student_name}</h1>
+          <h1 className="text-2xl font-black text-white print:text-black mb-1">{shared.studentName}</h1>
           <p className="text-white/60 print:text-gray-500 text-sm">Grade {shared.grade} · Generated {generatedDate}</p>
           <p className="text-white/40 print:text-gray-400 text-xs mt-1">Valid until {expiryDate}</p>
           <div className="flex items-center justify-center gap-2 text-xs text-slate-500 mt-2">

@@ -1,12 +1,13 @@
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
-import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
 import { requireAuthentication } from '@/lib/core/permissions'
 import { UnauthorizedError } from '@/lib/core/errors'
+import { redeemClassInvite } from '@/lib/classes/redeemClassInvite'
+import { AttemptLimiterUnavailableError } from '@/lib/security/attemptLimiter'
 
 const JoinSchema = z.object({
-  inviteCode: z.string().min(1, 'inviteCode is required'),
+  inviteCode: z.string().trim().min(1, 'inviteCode is required').max(64),
 })
 
 export async function POST(req: Request) {
@@ -24,86 +25,32 @@ export async function POST(req: Request) {
     if (!parsed.success) {
       return apiBadRequest(parsed.error.issues.map(i => i.message).join(', '))
     }
-    const { inviteCode } = parsed.data
 
-    const db = createServiceClient()
+    const result = await redeemClassInvite({ userId, inviteCode: parsed.data.inviteCode })
 
-    // Look up the invite
-    const { data: invite, error: inviteError } = await db
-      .from('class_invites')
-      .select('id, class_id, expires_at, used_count')
-      .eq('invite_code', inviteCode)
-      .maybeSingle()
-
-    if (inviteError || !invite) {
-      return apiError('Invite link not found or has expired', 404)
+    switch (result.status) {
+      case 'linked':
+        return apiSuccess({ className: result.className, grade: result.grade, linked: result.linked })
+      case 'no_matching_learner':
+        return apiError(
+          `No learner in ${result.className} is registered under your email address. ` +
+          "Ask your child's teacher to add this email to your child's record, then open the link again.",
+          409,
+        )
+      case 'email_unconfirmed':
+        return apiError('Please confirm your email address first, then open the invite link again.', 403)
+      case 'expired':
+        return apiError('This invite link has expired. Ask the teacher for a new one.', 410)
+      case 'not_found':
+        return apiError('Invite link not found or has expired', 404)
+      case 'rate_limited':
+        return apiError('Too many attempts. Please try again in an hour.', 429)
     }
-
-    if (new Date(invite.expires_at as string) < new Date()) {
-      return apiError('This invite link has expired. Ask the teacher for a new one.', 410)
-    }
-
-    // Get the class info
-    const { data: cls } = await db
-      .from('teacher_classes')
-      .select('id, name, grade')
-      .eq('id', invite.class_id)
-      .single()
-
-    if (!cls) return apiError('Class not found', 404)
-
-    // Update class_students: set parent_id for students in this class that don't have one yet
-    const { data: unlinked } = await db
-      .from('class_students')
-      .select('id, student_id')
-      .eq('class_id', invite.class_id)
-      .is('parent_id', null)
-
-    if (!unlinked || unlinked.length === 0) {
-      // All students already have parents — still allow but inform
-      return apiSuccess({
-        className: cls.name as string,
-        grade:     cls.grade as number,
-        linked:    0,
-        message:   'All students in this class are already connected to a parent.',
-      })
-    }
-
-    // Link this parent to all unlinked students in the class
-    const studentIds = unlinked.map((u) => u.student_id as string)
-
-    const { error: updateError } = await db
-      .from('class_students')
-      .update({ parent_id: userId })
-      .eq('class_id', invite.class_id)
-      .is('parent_id', null)
-
-    if (updateError) return apiError('Failed to connect to class')
-
-    // Increment used_count
-    await db
-      .from('class_invites')
-      .update({ used_count: (invite.used_count as number) + 1 })
-      .eq('id', invite.id)
-
-    // Also store parent_email on each student for notifications
-    const { data: authUser } = await db.auth.admin.getUserById(userId)
-    const parentEmail = authUser.user?.email
-
-    if (parentEmail && studentIds.length > 0) {
-      await db
-        .from('students')
-        .update({ parent_email: parentEmail })
-        .in('id', studentIds)
-        .is('parent_email', null)
-    }
-
-    return apiSuccess({
-      className: cls.name as string,
-      grade:     cls.grade as number,
-      linked:    studentIds.length,
-    })
   } catch (e: unknown) {
+    // The limiter logs its own failure detail; never join without it.
+    if (e instanceof AttemptLimiterUnavailableError) {
+      return apiError('Joining is temporarily unavailable. Please try again shortly.', 503)
+    }
     const message = e instanceof Error ? e.message : String(e)
     console.error('[class/join POST]', message)
     return apiError('Internal server error')

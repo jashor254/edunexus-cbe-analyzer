@@ -28,6 +28,8 @@ import { PaperVisionParseError } from '@/lib/paperIntelligence/validation'
 import { findRubricsForAssignment, toRubricForMarking } from '@/lib/paperIntelligence/rubrics'
 import { recordPaperIntelligenceEvidence } from '@/lib/paperIntelligence/evidence'
 import { logPaperIntelligenceFailure } from '@/lib/paperIntelligence/failureLog'
+import { checkDailyCallLimit, releaseDailyCall } from '@/lib/ai/rateLimit'
+import { AttemptLimiterUnavailableError } from '@/lib/security/attemptLimiter'
 
 const BUCKET = 'assignment-submissions'
 
@@ -110,6 +112,13 @@ export async function POST(
     }
     const imageBase64 = Buffer.from(await fileBlob.arrayBuffer()).toString('base64')
 
+    // Daily cap on vision calls — reserved after every cheap check, right
+    // before the one expensive call; refunded below if that call fails.
+    const quota = await checkDailyCallLimit(teacherUserId, 'paper_page_marking')
+    if (quota.allowed === false) {
+      return apiError(`Daily limit of ${quota.limit} page markings reached. Resets at ${quota.resetAt}`, 429)
+    }
+
     // ── 7/8. Vision call + validation (recognizeAndMarkPage already
     // validates internally — see lib/paperIntelligence/validation.ts). ──
     let visionResult: Awaited<ReturnType<typeof recognizeAndMarkPage>>
@@ -121,6 +130,7 @@ export async function POST(
         correlationId,
       })
     } catch (err) {
+      await releaseDailyCall(quota)
       const errorCategory = err instanceof PaperVisionInputError ? 'invalid_input'
         : err instanceof PaperVisionParseError ? 'model_response_invalid'
         : 'vision_provider_error'
@@ -174,6 +184,7 @@ export async function POST(
       metadata: visionResult.response.metadata,
     })
   } catch (e: unknown) {
+    if (e instanceof AttemptLimiterUnavailableError) return apiError(e.message, 503)
     console.error('[paperIntelligence/mark-page]', e instanceof Error ? e.message : String(e))
     return apiError('Internal server error')
   }

@@ -198,6 +198,15 @@
     "components/teacher/variantReviewTeacherOnly.architecture.test.ts",
     "lib/assignments/answerLeakage.test.ts",
     "lib/assignments/variantPrompt.test.ts",
-    "lib/assignments/variantVerification.test.ts"
+    "lib/assignments/variantVerification.test.ts",
+    "lib/sharing/sharedReports.test.ts",
+    "lib/alerts/teacherAlerts.test.ts",
+    "lib/classes/classCode.test.ts",
+    "lib/classes/joinClassByCode.test.ts",
+    "lib/security/attemptLimiter.test.ts",
+    "lib/ai/rateLimit.test.ts",
+    "lib/ai/generationRetryBudget.test.ts",
+    "lib/security/securityHeaders.test.ts",
+    "lib/payments/chargeVerification.test.ts"
   ]
 }
