@@ -268,7 +268,7 @@ test('6. a teacher-suggested objective survives into the actual Compass system p
 
   // The exact prompt the route builds for a teacher-directed session.
   const prompt = buildCompassPrompt({
-    firstName: 'Mary', grade: 8, level: 3, isJunior: true, pathway: null,
+    grade: 8, level: 3, isJunior: true, pathway: null,
     subject: 'mathematics', subtopic: next.subtopic!, gradeTopics: [],
     teacherRecommendation: STRAND, teacherSuggested: true,
     sessionsWithoutImprovement: 0,
@@ -431,7 +431,7 @@ test('P4-4. real risk-factor text flows unmodified into the actual Compass syste
     legacy: await legacyFromContext(),
   })
   const prompt = buildCompassPrompt({
-    firstName: 'Mary', grade: 8, level: 1, isJunior: true,
+    grade: 8, level: 1, isJunior: true,
     persistentIntelligence: persistent,
     subject: 'integrated_science', subtopic: 'integrated_science',
     gradeTopics: [], sessionsWithoutImprovement: 0,

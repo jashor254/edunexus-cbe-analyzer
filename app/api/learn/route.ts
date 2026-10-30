@@ -1,7 +1,8 @@
 // app/api/learn/route.ts
 import { createServiceClient } from '@/utils/supabase/service'
 import { streamDeepSeek } from '@/lib/ai/deepseek'
-import { getOrCreateSession, readSession, writeSession, resolveSubject, recordExchange } from '@/lib/compass/session'
+import { z } from 'zod'
+import { getOrCreateSession, readSession, writeSession, resolveSubject, recordExchange, readSessionHistory } from '@/lib/compass/session'
 import { resolveCompassLearnerIntelligence } from '@/lib/compass/learnerContext'
 import { bindDeliveryToSession } from '@/lib/compass/deliveryBinding'
 import { resolveCompassMutationAccess, resolveSessionOwnership } from '@/lib/compass/ownership'
@@ -11,7 +12,9 @@ import type { RootCauseResult } from '@/lib/knowledgeGraph/types'
 import { getGradeTopics } from '@/lib/compass/topics'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
 import { apiPaymentRequired } from '@/lib/payments/paywall'
-import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
+import { reserveDailyCall, dailyLimitMessage, type HeldReservation } from '@/lib/ai/rateLimit'
+import { createLearnerNameStreamRestorer, learnerFirstName, restoreLearnerName } from '@/lib/ai/learnerPseudonym'
+import { pseudonymiseCompassProviderText, pseudonymiseCompassSystemPrompt } from '@/lib/compass/providerPayload'
 import { type FeatureKey } from '@/lib/payments/config'
 import { apiError } from '@/lib/api/response'
 import { repos } from '@/lib/repositories'
@@ -21,6 +24,25 @@ import { asStudentId } from '@/lib/core/identityTypes'
 const FEATURE: FeatureKey = 'learning_compass'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+// The longest single learner message forwarded to a provider. Generous for a
+// typed question or a pasted paragraph; stops one request from carrying an
+// unbounded payload into every later turn's context.
+const MAX_MESSAGE_CHARS = 4000
+
+// `conversationHistory` is still accepted for older clients but deliberately
+// ignored: context now comes from the session's own stored messages
+// (readSessionHistory), never from the browser.
+const LearnBodySchema = z.object({
+  message:         z.string().trim().min(1, 'message is required').max(MAX_MESSAGE_CHARS, `message must be at most ${MAX_MESSAGE_CHARS} characters`),
+  sessionId:       z.string().nullish(),
+  learnerId:       z.string().nullish(),
+  lockedSubject:   z.string().nullish(),
+  lockedSubstrand: z.string().nullish(),
+  lockedGrade:     z.number().nullish(),
+  isRevision:      z.boolean().optional(),
+  subjectLevel:    z.number().nullish(),
+})
 
 // Kenya CBC term calendar
 // Term 1: Jan 1 – Apr 11 | Term 2: Apr 29 – Aug 1 | Term 3: Sep 1 – Oct 31
@@ -91,7 +113,12 @@ function normalisePathway(raw: string | null): ValidPathway | null {
 }
 
 export async function POST(req: Request) {
+  // Held from the moment a new conversation reserves a unit of today's cap
+  // until a stream exists — released if anything in between fails.
+  let quota: HeldReservation | null = null
   try {
+    const parsedBody = LearnBodySchema.safeParse(await req.json())
+    if (!parsedBody.success) return apiError(parsedBody.error.issues[0]?.message ?? 'Invalid request', 400)
     const {
       message,
       sessionId,
@@ -101,8 +128,7 @@ export async function POST(req: Request) {
       lockedGrade,
       isRevision = false,
       subjectLevel,
-      conversationHistory,
-    } = await req.json()
+    } = parsedBody.data
 
     if (!learnerId) return apiError('learnerId is required', 400)
     const db = createServiceClient()
@@ -118,7 +144,7 @@ export async function POST(req: Request) {
     const earlyGrade    = typeof lockedGrade === 'number' ? lockedGrade : null
 
     const CLOSING_WORDS = ['done', 'goodbye', 'bye', 'kwa heri', 'tutaonana', "that's all", 'stop', 'quit']
-    const isClosing = CLOSING_WORDS.some(w => (message as string).toLowerCase().includes(w))
+    const isClosing = CLOSING_WORDS.some(w => message.toLowerCase().includes(w))
 
     // ── Single parallel round: auth + all DB reads + topics ───────────────────
     // NOTE: getOrCreateSession() is intentionally NOT included here — it writes to
@@ -203,17 +229,23 @@ export async function POST(req: Request) {
       if (!sessionOwned) return apiError('Access denied', 403)
     }
 
+    // ── Daily abuse-prevention cap ────────────────────────────────────────────
+    // One unit per conversation START — a request with no sessionId. Turns
+    // inside a conversation are not counted (each is already charged a token
+    // for pay-as-you-go users). Reserved before any session row is written.
+    if (!sessionId) {
+      const reservation = await reserveDailyCall(access.userId, FEATURE)
+      if (reservation.allowed === false) {
+        return apiError(dailyLimitMessage(reservation, 'Compass sessions'), 429)
+      }
+      quota = reservation
+    }
+
     // Session upsert — only runs once ownership is verified above, since this writes
     // to compass_sessions. Started immediately post-auth if subject is in the request.
     const earlySession = earlySubject
       ? await getOrCreateSession(studentId, earlySubject, mode)
       : null
-
-    // ── Daily abuse-prevention cap ────────────────────────────────────────────
-    const rateLimit = await checkDailyCallLimit(access.userId, FEATURE)
-    if (rateLimit.allowed === false) {
-      return apiError(`Daily limit of ${rateLimit.limit} sessions reached. Resets at ${rateLimit.resetAt}`, 429)
-    }
 
     // ── Keepalive: idle session check (no AI call needed) ─────────────────────
     if (sessionId && !isClosing && keepaliveRow) {
@@ -246,7 +278,10 @@ export async function POST(req: Request) {
     const student = studentResult.data
     const ctx     = contextResult.data
 
-    const firstName = (student?.name as string | null)?.split(' ')[0] ?? 'there'
+    // Used ONLY locally — to restore LEARNER_NAME_TOKEN in the reply and to
+    // pseudonymise learner/history text. It never enters a provider payload.
+    const hasRealName = !!(student?.name as string | null)?.trim()
+    const firstName = hasRealName ? learnerFirstName(student?.name as string | null) : 'there'
     const grade     = (student?.grade as number | null) ?? 7
     const isJunior  = grade <= 9
 
@@ -414,9 +449,20 @@ export async function POST(req: Request) {
     const languageMode: 'mixed' | 'english-only'                  = level <= 2 ? 'mixed'              : 'english-only'
     const questionMode: 'mcq-and-structured' | 'structured-only'  = level <= 2 ? 'mcq-and-structured' : 'structured-only'
 
+    // Server-authoritative context: this session's own stored messages, read
+    // only when the request continues a session whose ownership was verified
+    // above. A conversation start carries no history (as the client did).
+    // Everything provider-bound is pseudonymised here, once, for whichever
+    // provider ends up answering (lib/compass/providerPayload.ts).
+    const nameForProvider = hasRealName ? firstName : null
+    const providerText = pseudonymiseCompassProviderText({
+      message,
+      history: sessionId ? await readSessionHistory(activeSessionId) : [],
+      lastSessionSummary: (lastSessionRow?.one_line_summary as string | null) ?? undefined,
+    }, nameForProvider)
+
     // ── Build prompt ──────────────────────────────────────────────────────────
     const promptParams: CompassPromptParams = {
-      firstName,
       grade,
       level,
       levelSource: academicState.source,
@@ -426,7 +472,9 @@ export async function POST(req: Request) {
       subject,
       subtopic,
       gradeTopics,
-      lastSessionSummary:         (lastSessionRow?.one_line_summary as string | null) ?? undefined,
+      // Stored summaries hold the restored first name (parents read them) —
+      // pseudonymised (below) before they re-enter a prompt.
+      lastSessionSummary: providerText.lastSessionSummary,
       teacherRecommendation,
       teacherSuggested,
       knowledgeContext,
@@ -439,11 +487,13 @@ export async function POST(req: Request) {
       questionMode,
     }
 
-    const systemPrompt = buildCompassPrompt(promptParams)
+    // Final provider boundary: buildCompassPrompt interpolates persisted
+    // learner-state fields (holidayFocus/session_goal, the knowledge block,
+    // guided topics, action steps, teacher recommendation, subtopic) that the
+    // class-report AI path can seed with the real first name. Pseudonymise the
+    // finished prompt so no field reaches Gemini or DeepSeek with a name (R-1).
+    const systemPrompt = pseudonymiseCompassSystemPrompt(buildCompassPrompt(promptParams), nameForProvider)
 
-    const history = Array.isArray(conversationHistory)
-      ? (conversationHistory as { role: 'user' | 'assistant'; content: string }[])
-      : []
 
     // ── Stream from DeepSeek ──────────────────────────────────────────────────
     // Cost attribution is intentionally unset.
@@ -459,7 +509,9 @@ export async function POST(req: Request) {
     // and is a documented no-op per lib/ai/deepseek.ts's contract. Per-school
     // cost attribution, if ever wanted, belongs on the live school domain.
     const costContext: { organizationId: string; feature: FeatureKey } | undefined = undefined
-    const rawStream = await streamDeepSeek(systemPrompt, message as string, history, { temperature: 0.3, costContext })
+    const rawStream = await streamDeepSeek(systemPrompt, providerText.message, providerText.history, { temperature: 0.3, costContext, feature: FEATURE })
+    // A stream exists — the conversation start is now a real, counted session.
+    quota = null
 
     type CompassEval = {
       genuine_progress: boolean
@@ -474,6 +526,10 @@ export async function POST(req: Request) {
     let accumulated  = ''
     let sseBuffer    = ''
     let firstToken   = false
+    // Restores LEARNER_NAME_TOKEN to the real first name in what the learner
+    // sees, including a token split across two SSE chunks. `accumulated`
+    // keeps the raw (token) form for eval/pedagogy parsing.
+    const nameRestorer = createLearnerNameStreamRestorer(firstName)
 
     // Token deduction is kicked off the moment the model produces its first
     // token — that is the point the AI response has succeeded, and it is the
@@ -508,7 +564,8 @@ export async function POST(req: Request) {
                 deductOnce()
               }
               accumulated += content
-              controller.enqueue(encoder.encode(content))
+              const visible = nameRestorer.push(content)
+              if (visible) controller.enqueue(encoder.encode(visible))
             }
           } catch { /* malformed SSE line */ }
         }
@@ -528,11 +585,15 @@ export async function POST(req: Request) {
                   deductOnce()
                 }
                 accumulated += content
-                controller.enqueue(encoder.encode(content))
+                const visible = nameRestorer.push(content)
+                if (visible) controller.enqueue(encoder.encode(visible))
               }
             } catch { /* malformed */ }
           }
         }
+
+        const heldBack = nameRestorer.flush()
+        if (heldBack) controller.enqueue(encoder.encode(heldBack))
 
         // Parse eval block if session is closing
         const evalStartIdx = accumulated.indexOf(EVAL_START)
@@ -560,7 +621,7 @@ export async function POST(req: Request) {
         // unchanged, not reset to null.
         const turnPedagogy = parsePedagogyBlock(accumulated)
         const nextPedagogy = turnPedagogy ?? savedSession?.pedagogy ?? null
-        const visibleResponse = stripPedagogyBlock(visibleResponseWithEval)
+        const visibleResponse = restoreLearnerName(stripPedagogyBlock(visibleResponseWithEval), firstName)
 
         // Increment exchange count
         await recordExchange(activeSessionId)
@@ -594,7 +655,7 @@ export async function POST(req: Request) {
             // validated pedagogy state — never model-authored text, so this
             // can't be used to smuggle claims into the summary.
             const summaryWithPedagogyNote =
-              parsedEval.one_line_summary + buildUnresolvedPedagogyNote(nextPedagogy)
+              restoreLearnerName(String(parsedEval.one_line_summary ?? ''), firstName) + buildUnresolvedPedagogyNote(nextPedagogy)
 
             await db.from('compass_sessions')
               .update({ one_line_summary: summaryWithPedagogyNote })
@@ -679,6 +740,9 @@ export async function POST(req: Request) {
     })
 
   } catch (error) {
+    // No stream was produced — a conversation start that never happened
+    // must not count against the learner's daily cap.
+    await quota?.release('Compass turn failed before streaming')
     console.error('[learn] FATAL:', error)
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),

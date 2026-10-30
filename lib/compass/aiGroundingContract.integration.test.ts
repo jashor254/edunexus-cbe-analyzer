@@ -71,7 +71,7 @@ async function seedMathEvidence(studentId: string, cbcLevel: LearnerEvidence['cb
   }], run.id)
 }
 
-function basePromptParams(overrides: Partial<CompassPromptParams> & Pick<CompassPromptParams, 'firstName' | 'level'>): CompassPromptParams {
+function basePromptParams(overrides: Partial<CompassPromptParams> & Pick<CompassPromptParams, 'level'>): CompassPromptParams {
   return {
     grade: 8, isJunior: true, subject: 'mathematics', subtopic: 'Fractions',
     gradeTopics: [], sessionsWithoutImprovement: 0, mode: 'school',
@@ -96,15 +96,15 @@ test('AI-CMP-001: two learners with opposing Mathematics evidence produce prompt
   assert.equal(stateA.level, 4)
   assert.equal(stateB.level, 1)
 
-  const promptA = buildCompassPrompt(basePromptParams({ firstName: 'LearnerAlpha', level: stateA.level, levelSource: stateA.source }))
-  const promptB = buildCompassPrompt(basePromptParams({ firstName: 'LearnerBeta', level: stateB.level, levelSource: stateB.source }))
+  const promptA = buildCompassPrompt(basePromptParams({ level: stateA.level, levelSource: stateA.source }))
+  const promptB = buildCompassPrompt(basePromptParams({ level: stateB.level, levelSource: stateB.source }))
 
-  assert.match(promptA, /LearnerAlpha \| Grade 8 \| Level 4\/4/)
-  assert.doesNotMatch(promptA, /LearnerBeta/, 'learner A\'s prompt must never mention learner B')
+  // The learner is named only by the pseudonym token — the prompt goes to
+  // third-party providers and carries no real name (see lib/compass/prompt.ts).
+  assert.match(promptA, /\{\{LEARNER\}\} \| Grade 8 \| Level 4\/4/)
   assert.doesNotMatch(promptA, /Level 1\/4/, 'learner A\'s prompt must never carry learner B\'s level')
 
-  assert.match(promptB, /LearnerBeta \| Grade 8 \| Level 1\/4/)
-  assert.doesNotMatch(promptB, /LearnerAlpha/, 'learner B\'s prompt must never mention learner A')
+  assert.match(promptB, /\{\{LEARNER\}\} \| Grade 8 \| Level 1\/4/)
   assert.doesNotMatch(promptB, /Level 4\/4/, 'learner B\'s prompt must never carry learner A\'s level')
 })
 
@@ -116,7 +116,7 @@ test('AI-CMP-002: a learner with zero admissible evidence gets an explicitly pro
   assert.equal(state.source, 'default', 'sanity: with zero evidence and no legacy fallback, the conservative default must be used')
   assert.equal(state.level, 2)
 
-  const prompt = buildCompassPrompt(basePromptParams({ firstName: 'NoEvidenceLearner', level: state.level, levelSource: state.source }))
+  const prompt = buildCompassPrompt(basePromptParams({ level: state.level, levelSource: state.source }))
 
   assert.match(prompt, /Level 2\/4.*provisional — no confirmed evidence yet/, 'the prompt must explicitly flag this level as unconfirmed, not present it as equivalent to real evidence')
 })
@@ -129,6 +129,6 @@ test('AI-CMP-002 sanity check: a learner WITH confirmed evidence gets no provisi
   const state = await resolveCompassAcademicLevelFor(studentId, 'mathematics', NO_LEGACY_FALLBACK)
   assert.equal(state.source, 'projection')
 
-  const prompt = buildCompassPrompt(basePromptParams({ firstName: 'RealEvidenceLearner', level: state.level, levelSource: state.source }))
+  const prompt = buildCompassPrompt(basePromptParams({ level: state.level, levelSource: state.source }))
   assert.doesNotMatch(prompt, /provisional/, 'a real, evidence-derived level must never carry the no-evidence caveat')
 })

@@ -21,7 +21,6 @@ import { buildCompassPrompt, type CompassPromptParams, type CompassPersistentCon
 
 function baseParams(overrides: Partial<CompassPromptParams> = {}): CompassPromptParams {
   return {
-    firstName: 'Amina',
     grade: 8,
     level: 3,
     isJunior: true,
