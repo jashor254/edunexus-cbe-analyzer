@@ -6,7 +6,7 @@ import { UnauthorizedError, ResourceOwnershipError } from '@/lib/core/errors'
 import { repos } from '@/lib/repositories'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
 import { apiPaymentRequired } from '@/lib/payments/paywall'
-import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
+import { reserveDailyCall, dailyLimitMessage } from '@/lib/ai/rateLimit'
 import { regenerateOneVariant } from '@/lib/assignments/variantGeneration'
 
 async function loadAssignment(variantId: string): Promise<{ classId: string; subject: string } | null> {
@@ -34,11 +34,6 @@ export async function POST(
       )
     }
 
-    const rateLimit = await checkDailyCallLimit(access.userId, 'adaptive_variant_generate')
-    if (rateLimit.allowed === false) {
-      return apiError(`Daily limit of ${rateLimit.limit} variant generations reached. Resets at ${rateLimit.resetAt}`, 429)
-    }
-
     const { variantId } = await params
     const assignment = await loadAssignment(variantId)
     if (!assignment) return apiNotFound('Variant not found')
@@ -57,8 +52,22 @@ export async function POST(
     const nameById = new Map(names.map(n => [n.id, n.name?.trim() || 'Student']))
     const learners = studentIds.map(sid => ({ learnerId: sid, learnerName: nameById.get(sid) ?? 'Student' }))
 
-    const result = await regenerateOneVariant({ variantId, learners, subject: assignment.subject })
-    if ('error' in result) return apiError(result.error, 422)
+    const quota = await reserveDailyCall(access.userId, 'adaptive_variant_generate')
+    if (quota.allowed === false) {
+      return apiError(dailyLimitMessage(quota, 'variant generations'), 429)
+    }
+
+    let result: Awaited<ReturnType<typeof regenerateOneVariant>>
+    try {
+      result = await regenerateOneVariant({ variantId, learners, subject: assignment.subject })
+    } catch (err) {
+      await quota.release('variant regeneration failed')
+      throw err
+    }
+    if ('error' in result) {
+      await quota.release('variant regeneration produced no variant')
+      return apiError(result.error, 422)
+    }
 
     if (access.deductTokens) {
       await deductFeatureTokens(access.userId, 'adaptive_variant_generate', access.cost)

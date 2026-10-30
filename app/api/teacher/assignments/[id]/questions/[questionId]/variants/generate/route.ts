@@ -8,7 +8,7 @@ import { requireClassTeacher } from '@/lib/core/permissions'
 import { UnauthorizedError, ResourceOwnershipError } from '@/lib/core/errors'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
 import { apiPaymentRequired } from '@/lib/payments/paywall'
-import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
+import { reserveDailyCall, dailyLimitMessage } from '@/lib/ai/rateLimit'
 import { loadAssignmentGenerationContext, generateVariantsForAssignmentQuestion } from '@/lib/assignments/variantOrchestration'
 
 export async function POST(
@@ -23,11 +23,6 @@ export async function POST(
         'Access denied',
         access.reason === 'unauthenticated' ? 401 : 403,
       )
-    }
-
-    const rateLimit = await checkDailyCallLimit(access.userId, 'adaptive_variant_generate')
-    if (rateLimit.allowed === false) {
-      return apiError(`Daily limit of ${rateLimit.limit} variant generations reached. Resets at ${rateLimit.resetAt}`, 429)
     }
 
     const { id: assignmentId, questionId } = await params
@@ -47,7 +42,21 @@ export async function POST(
     const { data: question } = await db.from('assignment_questions').select('id').eq('id', questionId).eq('assignment_id', assignmentId).maybeSingle()
     if (!question) return apiNotFound('Question not found on this assignment')
 
-    const result = await generateVariantsForAssignmentQuestion(assignmentId, questionId, ctx)
+    // One unit of today's cap per question generated — reserved after the
+    // ownership checks, released if the question produced no variant.
+    const quota = await reserveDailyCall(access.userId, 'adaptive_variant_generate')
+    if (quota.allowed === false) {
+      return apiError(dailyLimitMessage(quota, 'variant generations'), 429)
+    }
+
+    let result: Awaited<ReturnType<typeof generateVariantsForAssignmentQuestion>>
+    try {
+      result = await generateVariantsForAssignmentQuestion(assignmentId, questionId, ctx)
+    } catch (err) {
+      await quota.release('variant generation failed')
+      throw err
+    }
+    if (result.created.length === 0) await quota.release('no variant produced')
 
     // Charge only when a variant was actually produced — a request that
     // fails structural validation or independent verification is not a

@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { createServiceClient } from '@/utils/supabase/service'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
 import { apiPaymentRequired } from '@/lib/payments/paywall'
-import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
+import { reserveDailyCall, dailyLimitMessage } from '@/lib/ai/rateLimit'
 import { generateSlideContent } from '@/lib/slides/aiSlideGenerator'
 import { buildPptx } from '@/lib/slides/pptxBuilder'
 import { apiError, getErrorMessage } from '@/lib/api/response'
@@ -38,11 +38,6 @@ export async function POST(req: Request): Promise<Response> {
       )
     }
 
-    const rateLimit = await checkDailyCallLimit(access.userId, 'slides_generate')
-    if (rateLimit.allowed === false) {
-      return apiError(`Daily limit of ${rateLimit.limit} slide generations reached. Resets at ${rateLimit.resetAt}`, 429)
-    }
-
     // 3. Resolve teacher_id
     const db = createServiceClient()
     const { data: teacher } = await db
@@ -55,11 +50,23 @@ export async function POST(req: Request): Promise<Response> {
       return apiError('Teacher profile not found', 403)
     }
 
-    // 4. Generate slide content via AI
-    const slideData = await generateSlideContent(subject, grade, topic, slideCount)
+    // 4. Reserve one unit of today's cap, immediately before the AI work
+    const quota = await reserveDailyCall(access.userId, 'slides_generate')
+    if (quota.allowed === false) {
+      return apiError(dailyLimitMessage(quota, 'slide generations'), 429)
+    }
 
-    // 5. Build the PPTX buffer
-    const pptxBuffer = await buildPptx(slideData)
+    // 5. Generate slide content via AI, then build the PPTX buffer — a
+    // failure in either releases the reservation (nothing was delivered)
+    let slideData: Awaited<ReturnType<typeof generateSlideContent>>
+    let pptxBuffer: Awaited<ReturnType<typeof buildPptx>>
+    try {
+      slideData = await generateSlideContent(subject, grade, topic, slideCount)
+      pptxBuffer = await buildPptx(slideData)
+    } catch (err) {
+      await quota.release('slides generation failed')
+      throw err
+    }
 
     // 6. Deduct tokens AFTER successful generation
     if (access.deductTokens) {

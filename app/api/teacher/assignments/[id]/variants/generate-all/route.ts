@@ -20,7 +20,8 @@ import { requireClassTeacher } from '@/lib/core/permissions'
 import { UnauthorizedError, ResourceOwnershipError } from '@/lib/core/errors'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
 import { apiPaymentRequired } from '@/lib/payments/paywall'
-import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
+import { reserveDailyCall, dailyLimitMessage } from '@/lib/ai/rateLimit'
+import { BAND_TO_TIER } from '@/lib/assignments/variantGeneration'
 import { findQuestionsForTeacher } from '@/lib/quiz/quiz'
 import { findVariantsForQuestionIds } from '@/lib/assignments/variants'
 import { loadAssignmentGenerationContext, generateVariantsForAssignmentQuestion } from '@/lib/assignments/variantOrchestration'
@@ -37,11 +38,6 @@ export async function POST(
         'Access denied',
         access.reason === 'unauthenticated' ? 401 : 403,
       )
-    }
-
-    const rateLimit = await checkDailyCallLimit(access.userId, 'adaptive_variant_generate')
-    if (rateLimit.allowed === false) {
-      return apiError(`Daily limit of ${rateLimit.limit} variant generations reached. Resets at ${rateLimit.resetAt}`, 429)
     }
 
     const { id: assignmentId } = await params
@@ -80,17 +76,35 @@ export async function POST(
       set.add(v.variant_type)
       liveTypesByQuestion.set(v.question_id, set)
     }
-    const ALL_TIERS = 3
-    const targetQuestions = questions.filter(q => (liveTypesByQuestion.get(q.id)?.size ?? 0) < ALL_TIERS)
+    // Every tier the pipeline can produce (BAND_TO_TIER is the one
+    // band→tier map). This was a hard-coded `3` while there are four tiers,
+    // so a question holding any three — or three legacy-typed rows — was
+    // skipped even though a current tier was still missing.
+    const ALL_TIERS = [...new Set(Object.values(BAND_TO_TIER))]
+    const targetQuestions = questions.filter(q => {
+      const live = liveTypesByQuestion.get(q.id)
+      return ALL_TIERS.some(tier => !live?.has(tier))
+    })
 
     // Token-tier users are billed per question actually generated, deducted
     // immediately after each successful call — never before, and never for
     // questions that fail. If a token user's balance runs out mid-batch, the
     // batch stops there rather than generating further questions for free.
+    // One unit of today's cap per question, reserved just before that
+    // question's AI work (the cap is "variant generations", and a batch must
+    // not be a way around it). Exhausting the cap mid-batch stops the batch
+    // there and says so, rather than silently generating the rest.
     const perQuestion: Array<{ questionId: string; created: number; failed: number }> = []
+    let stoppedByDailyLimit: string | null = null
     for (const question of targetQuestions) {
+      const quota = await reserveDailyCall(access.userId, 'adaptive_variant_generate')
+      if (quota.allowed === false) {
+        stoppedByDailyLimit = dailyLimitMessage(quota, 'variant generations')
+        break
+      }
       try {
         const result = await generateVariantsForAssignmentQuestion(assignmentId, question.id, ctx)
+        if (result.created.length === 0) await quota.release('no variant produced')
         perQuestion.push({ questionId: question.id, created: result.created.length, failed: result.failed.length })
         // Charge only for questions that actually produced a variant. Stage
         // 7 made generation additive, so a question whose needed tiers all
@@ -100,6 +114,7 @@ export async function POST(
           await deductFeatureTokens(access.userId, 'adaptive_variant_generate', access.cost)
         }
       } catch (e: unknown) {
+        await quota.release('variant generation failed')
         console.error('[variants generate-all]', question.id, e instanceof Error ? e.message : String(e))
         perQuestion.push({ questionId: question.id, created: 0, failed: 1 })
         if (access.deductTokens && e instanceof Error && e.message.includes('Token deduction failed')) {
@@ -108,10 +123,15 @@ export async function POST(
       }
     }
 
+    if (stoppedByDailyLimit !== null && perQuestion.length === 0) {
+      return apiError(stoppedByDailyLimit, 429)
+    }
+
     return apiSuccess({
       processedCount: perQuestion.length,
       skippedCount: questions.length - targetQuestions.length,
       perQuestion,
+      ...(stoppedByDailyLimit !== null ? { stoppedByDailyLimit } : {}),
     })
   } catch (e: unknown) {
     console.error('[variants generate-all POST]', e instanceof Error ? e.message : String(e))

@@ -35,7 +35,7 @@
 // educational actions: the system may propose, a human decides.
 
 import { repos } from '@/lib/repositories'
-import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
+import { reserveDailyCall, type HeldReservation } from '@/lib/ai/rateLimit'
 import { logAICall } from '@/lib/ai/logger'
 import { generateCareerProfile, getCareerBySlug, slugify } from './careerEngine'
 import { buildProvisionalPreview } from './provisionalPreview'
@@ -104,11 +104,16 @@ export async function requestCareerKnowledge(
   // ungrounded path (Phase 9 §21/§22) — cap it per learner per day so a burst
   // of distinct unknown queries can't create unbounded spend. Canonical
   // search above this line is never affected.
+  //
+  // An unattributed (requestedBy = null) request has no user to count
+  // against; both production callers always pass the authenticated user.
+  let quota: HeldReservation | null = null
   if (requestedBy) {
-    const rateCheck = await checkDailyCallLimit(requestedBy, AI_GENERATION_FEATURE)
-    if (rateCheck.allowed === false) {
-      return { status: 'rate_limited', resetAt: rateCheck.resetAt }
+    const reservation = await reserveDailyCall(requestedBy, AI_GENERATION_FEATURE)
+    if (reservation.allowed === false) {
+      return { status: 'rate_limited', resetAt: reservation.resetAt }
     }
+    quota = reservation
   }
 
   // Generate a candidate for a human to review — never for the learner to be
@@ -118,6 +123,7 @@ export async function requestCareerKnowledge(
   try {
     generated = await generateCareerProfile(trimmed)
   } catch (err) {
+    await quota?.release('career profile generation failed')
     await logAICall({
       feature:   AI_GENERATION_FEATURE,
       model:     'deepseek-chat',

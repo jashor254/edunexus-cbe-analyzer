@@ -90,7 +90,7 @@ export const TOKEN_COSTS = {
   // Unknown-career research (lib/career/knowledgeRequests.ts) — free to the
   // learner (never token-charged; this is exploration, not a purchased
   // report), but still needs a TokenFeature key so the existing
-  // checkDailyCallLimit()/ai_call_logs abuse-cap mechanism (lib/ai/rateLimit.ts)
+  // reserveDailyCall()/ai_call_logs abuse-cap mechanism (lib/ai/rateLimit.ts)
   // can bound its real LLM cost. Zero-cost entries already exist above
   // (lesson_plan_generate, row_generate) — this follows that precedent.
   career_knowledge_request: 0,

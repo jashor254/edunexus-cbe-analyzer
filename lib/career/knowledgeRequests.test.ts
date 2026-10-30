@@ -65,11 +65,13 @@ mock.module('@/lib/repositories', {
   },
 })
 
+let releaseReasons: string[] = []
+
 mock.module('@/lib/ai/rateLimit', {
   namedExports: {
-    checkDailyCallLimit: async (_userId: string, _feature: string) =>
+    reserveDailyCall: async (_userId: string, _feature: string) =>
       rateLimitAllowed
-        ? { allowed: true, callsToday: 0, limit: 5 }
+        ? { allowed: true, callsToday: 1, limit: 5, release: async (reason: string) => { releaseReasons.push(reason) } }
         : { allowed: false, callsToday: 5, limit: 5, resetAt: '2026-01-01T00:00:00.000Z' },
   },
 })
@@ -95,6 +97,7 @@ function resetState() {
   incrementCalls = []
   rateLimitAllowed = true
   logCalls = []
+  releaseReasons = []
 }
 
 test('a known slug never calls generation, never rate-limits', async () => {
@@ -170,6 +173,16 @@ test('a generation failure is logged as a failed call and rethrown', async () =>
   )
   assert.equal(logCalls.length, 1)
   assert.equal(logCalls[0].success, false)
+  // The reserved daily-cap unit is handed back — a failed generation must
+  // not count against the learner's 5/day.
+  assert.equal(releaseReasons.length, 1)
+})
+
+test('a successful generation keeps its reserved daily-cap unit (it is never released)', async () => {
+  resetState()
+  await requestCareerKnowledge('a brand new career', 'user-1')
+  assert.equal(generateCalls, 1)
+  assert.equal(releaseReasons.length, 0)
 })
 
 test('an unattributed (null) requester skips the rate-limit check but still generates', async () => {
