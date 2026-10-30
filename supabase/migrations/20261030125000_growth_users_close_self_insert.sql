@@ -1,0 +1,45 @@
+-- Close the growth_users self-service founder escalation
+-- (independent pre-deployment audit, 2026-10-30; finding AUDIT-F16).
+--
+-- PROVEN on a local stack built from the committed migrations (rolled-back
+-- transaction, 2026-10-30): a signed-in user with no founder relationship
+-- could
+--
+--   insert into growth_users (id, full_name) values (auth.uid(), 'x');
+--
+-- because policy "growth_users_insert_own" WITH CHECK (id = auth.uid())
+-- checks only that the row names the caller. is_growth_user() then returns
+-- true, and it is the entire RLS predicate on every Growth OS table
+-- (growth_schools_all, growth_contacts, growth_activities, growth_follow_ups,
+-- growth_school_messages, …), all of which grant SELECT/ALL to the
+-- authenticated role. So any authenticated user could read and write the
+-- founder's whole sales CRM — discovered schools, contacts, outreach
+-- messages — directly over PostgREST, bypassing requireGrowthUser and the
+-- GROWTH_FOUNDER_EMAIL gate entirely.
+--
+-- This predates the 2026-10-30 remediation (policy from
+-- 20260723110000_growth_engine_sprint_c0.sql) — not a regression — but it is
+-- the same class as F-08 (founder-only access), found while auditing it.
+--
+-- WHAT REPLACES IT: nothing. The only writer of growth_users is
+-- lib/growth/repositories/growthUser.repository.ts (findById / ensure),
+-- which runs on the service-role client (BaseRepository -> createServiceClient)
+-- and bypasses RLS — so the legitimate founder self-registration on first
+-- authenticated Growth API call (requireGrowthUser -> ensure) is unaffected.
+-- The founder's identity is still asserted server-side by requireGrowthUser
+-- (GROWTH_FOUNDER_EMAIL); this migration removes only the client's ability to
+-- forge the backing row.
+--
+-- "growth_users_select_own" is left in place: it exposes only the caller's
+-- own row and grants no cross-tenant read.
+--
+-- ROLLBACK (reopens the exposure):
+--   create policy growth_users_insert_own on public.growth_users
+--     for insert with check (id = auth.uid());
+--   create policy growth_users_update_own on public.growth_users
+--     for update using (id = auth.uid());
+--   grant insert, update on public.growth_users to anon, authenticated;
+
+drop policy if exists growth_users_insert_own on public.growth_users;
+drop policy if exists growth_users_update_own on public.growth_users;
+revoke insert, update, delete on public.growth_users from anon, authenticated;

@@ -4,6 +4,7 @@ import { createServiceClient } from '@/utils/supabase/service'
 import { paystackClient } from '@/lib/payments/paystack'
 import { requireAuth } from '@/lib/api/middleware'
 import { fulfillPayment } from '@/lib/payments/fulfillment'
+import { chargeCoversPayment } from '@/lib/payments/chargeVerification'
 
 export const dynamic = 'force-dynamic'
 
@@ -93,9 +94,9 @@ export async function POST(request: NextRequest) {
 
     const paystackData = verifyResult.data
 
-    // 4. VALIDATE AMOUNT
-    const expectedKobo = paystackClient.toKobo(payment.amount)
-    if (paystackData.amount < expectedKobo) {
+    // 4. VALIDATE AMOUNT AND CURRENCY — the same rule the webhook/redirect
+    // callback applies (lib/payments/chargeVerification.ts).
+    if (!chargeCoversPayment(paystackData, { amount: payment.amount })) {
       await service
         .from('payments')
         .update({ status: 'failed', updated_at: new Date().toISOString() })

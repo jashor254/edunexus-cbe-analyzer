@@ -4,6 +4,7 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { publishEvent } from '@/lib/events'
 import { fulfillPayment } from '@/lib/payments/fulfillment'
 import { isValidPaymentReference } from '@/lib/payments/reference'
+import { chargeCoversPayment } from '@/lib/payments/chargeVerification'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL!
 
@@ -22,7 +23,7 @@ async function processPayment(
   // 1. Fetch payment record
   const { data: payment, error: fetchError } = await db
     .from('payments')
-    .select('id, status, user_id, product_id')
+    .select('id, status, user_id, product_id, amount')
     .eq('transaction_id', reference)
     .single()
 
@@ -60,6 +61,29 @@ async function processPayment(
       resource_id:     reference,
       actor_id:        payment.user_id,
       payload:         { reference, reason: 'verification_failed' },
+      idempotency_key: `billing.payment.failed:${reference}`,
+    }).catch(err => console.error('[events] billing.payment.failed:', err instanceof Error ? err.message : String(err)))
+
+    return 'failed'
+  }
+
+  // 3b. The verified charge must actually pay for THIS payment: KES, and at
+  //     least the server-side price recorded at initialisation (security
+  //     audit 2026-10-30, F-10). Never flips an already-successful payment.
+  if (!chargeCoversPayment(verification.data, { amount: payment.amount as number })) {
+    console.error('[callback] verified charge does not cover the payment:', reference)
+    await db
+      .from('payments')
+      .update({ status: 'failed' })
+      .eq('transaction_id', reference)
+      .neq('status', 'success')
+
+    void publishEvent({
+      event_type:      'billing.payment.failed',
+      resource_type:   'payment',
+      resource_id:     reference,
+      actor_id:        payment.user_id,
+      payload:         { reference, reason: 'amount_or_currency_mismatch' },
       idempotency_key: `billing.payment.failed:${reference}`,
     }).catch(err => console.error('[events] billing.payment.failed:', err instanceof Error ? err.message : String(err)))
 

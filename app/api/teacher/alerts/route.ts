@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
-import { notifyAlertCreated } from '@/lib/notifications/notify'
+import { createTeacherAlert, TEACHER_ALERT_TYPES } from '@/lib/alerts/teacherAlerts'
 import { requireAuthentication } from '@/lib/core/permissions'
 import { resolveTeacher } from '@/lib/core/identity'
 import { UnauthorizedError } from '@/lib/core/errors'
@@ -11,8 +11,9 @@ const AlertActionSchema = z.union([
   z.object({
     action:    z.literal('create'),
     studentId: z.string().uuid(),
-    alertType: z.string().min(1),
-    message:   z.string().min(1),
+    alertType: z.enum(TEACHER_ALERT_TYPES),
+    // Bounded: this text is delivered to the parent by email/WhatsApp.
+    message:   z.string().min(1).max(1000),
   }),
   z.object({
     action:  z.literal('resolve'),
@@ -89,24 +90,10 @@ export async function POST(req: Request) {
     if (parsed.data.action === 'create') {
       const { studentId, alertType, message } = parsed.data
 
-      const { data: alert, error } = await db
-        .from('student_alerts')
-        .insert({
-          student_id: studentId,
-          teacher_id: teacher.id,
-          alert_type: alertType,
-          message,
-          is_resolved: false,
-        })
-        .select('id')
-        .single()
+      const result = await createTeacherAlert({ userId, teacherId: teacher.id, studentId, alertType, message })
+      if (result.status === 'forbidden') return apiForbidden()
 
-      if (error || !alert) return apiError('Failed to create alert')
-
-      notifyAlertCreated(alert.id)
-        .catch(err => console.error('[notify] alert:', err))
-
-      return apiSuccess({ alert })
+      return apiSuccess({ alert: { id: result.alertId } })
     }
 
     const { error } = await db

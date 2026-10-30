@@ -6,13 +6,7 @@ import { resolveTeacher } from '@/lib/core/identity'
 import { resolveExistingOwningSchool } from '@/lib/core/institutionOwnership'
 import { UnauthorizedError } from '@/lib/core/errors'
 import { getTeacherClassListProjection } from '@/lib/teacherWorkspace/classListProjection'
-
-function generateClassCode(subject: string, grade: number, year: string): string {
-  const prefix = subject.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase()
-  const yearSuffix = year.slice(-2)
-  const rand = Math.random().toString(36).substring(2, 4).toUpperCase()
-  return `${prefix}${grade}${yearSuffix}${rand}`
-}
+import { generateClassCode } from '@/lib/classes/classCode'
 
 export async function GET() {
   try {

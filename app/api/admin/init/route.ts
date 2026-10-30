@@ -1,20 +1,31 @@
 // app/api/admin/init/route.ts
-// One-time admin account initialisation — requires ADMIN_SECRET header
-import { NextRequest } from 'next/server'
+// Admin account initialisation (re-runnable recovery path: tokens + long
+// premium subscription for ADMIN_CONFIG.adminEmail).
+//
+// Security audit 2026-10-30, F-08: previously gated by a shared ADMIN_SECRET
+// bearer token with no attempt limit. Kept — it is the documented way to
+// restore the admin account's entitlements after a reset — but it now
+// requires the founder's own signed-in session (requireGrowthUser), like
+// every other founder surface.
+import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
-import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
+import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
 import { ADMIN_CONFIG } from '@/lib/config/api'
-import { timingSafeEqualString } from '@/lib/api/secretCompare'
+import { requireGrowthUser } from '@/lib/growth/auth'
+import { UnauthorizedError, ForbiddenError } from '@/lib/core/errors'
 import { logger } from '@/lib/observability/logger'
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
-    const authHeader = request.headers.get('authorization')
-    const secret = ADMIN_CONFIG.adminSecret
-
-    if (!secret || !timingSafeEqualString(authHeader, `Bearer ${secret}`)) {
-      return apiUnauthorized()
+    let founderId: string
+    try {
+      founderId = (await requireGrowthUser(await createClient())).id
+    } catch (error) {
+      if (error instanceof UnauthorizedError) return apiUnauthorized()
+      if (error instanceof ForbiddenError) return apiForbidden()
+      throw error
     }
+    logger.info('Admin account initialisation requested', { operation: 'admin.init', actor_id: founderId })
 
     const service = createServiceClient()
 

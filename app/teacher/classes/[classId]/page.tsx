@@ -3043,6 +3043,8 @@ export default function ClassDetailPage({ params }: { params: Promise<{ classId:
   const [expandedStudentId, setExpandedStudentId]     = useState<string | null>(null)
   const [showFormative, setShowFormative]             = useState(false)
   const [showTopical, setShowTopical]                 = useState(false)
+  const [removingStudentId, setRemovingStudentId]     = useState<string | null>(null)
+  const [rosterError, setRosterError]                 = useState('')
 
   useEffect(() => {
     Promise.all([
@@ -3097,6 +3099,25 @@ export default function ClassDetailPage({ params }: { params: Promise<{ classId:
       if (res.ok) setProcessedIds(prev => new Set([...prev, studentId]))
     } finally {
       setProcessingId(null)
+    }
+  }
+
+  // Class membership is what grants a learner this class's materials, files,
+  // announcements and assignments — and anyone holding the class code can
+  // join — so the teacher must be able to remove someone they don't recognise.
+  async function removeStudent(studentId: string, studentName: string) {
+    if (!confirm(`Remove ${studentName} from this class? Their marks and records are kept, but they will no longer see this class's materials.`)) return
+    setRosterError('')
+    setRemovingStudentId(studentId)
+    try {
+      const res  = await fetch(`/api/teacher/classes/${classId}/students/${studentId}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (!res.ok || !json.success) throw new Error(json.error ?? 'Could not remove this learner')
+      setData(prev => prev ? { ...prev, students: (prev.students ?? []).filter(s => s.id !== studentId) } : prev)
+    } catch (e) {
+      setRosterError(e instanceof Error ? e.message : 'Could not remove this learner')
+    } finally {
+      setRemovingStudentId(null)
     }
   }
 
@@ -3293,6 +3314,10 @@ na kuwasaidia vizuri zaidi darasani.
             </div>
           </div>
 
+          {rosterError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">{rosterError}</div>
+          )}
+
           <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -3359,6 +3384,14 @@ na kuwasaidia vizuri zaidi darasani.
                                   >
                                     <Compass className="w-3 h-3" /> Career
                                   </Link>
+                                  <button
+                                    type="button"
+                                    onClick={e => { e.stopPropagation(); removeStudent(s.id, s.name) }}
+                                    disabled={removingStudentId === s.id}
+                                    className="text-gray-400 hover:text-red-600 hover:underline disabled:opacity-50"
+                                  >
+                                    {removingStudentId === s.id ? 'Removing…' : 'Remove'}
+                                  </button>
                                 </div>
                               </div>
                             </div>

@@ -1,14 +1,24 @@
 // app/api/admin/cleanup-stats/route.ts
-import { NextRequest, NextResponse } from 'next/server';
+//
+// Founder-only account-cleanup statistics (includes user emails). Security
+// audit 2026-10-30, F-08: previously gated by a shared ADMIN_SECRET bearer
+// token; now requires the founder's own signed-in session
+// (requireGrowthUser), which the /admin/cleanup dashboard already sends.
+import { NextResponse } from 'next/server';
+import { createClient } from '@/utils/supabase/server';
 import { createServiceClient } from '@/utils/supabase/service';
-import { apiUnauthorized } from '@/lib/api/response';
-import { ADMIN_CONFIG } from '@/lib/config/api';
-import { timingSafeEqualString } from '@/lib/api/secretCompare';
+import { apiUnauthorized, apiForbidden } from '@/lib/api/response';
+import { requireGrowthUser } from '@/lib/growth/auth';
+import { UnauthorizedError, ForbiddenError } from '@/lib/core/errors';
 
-export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  const secret = ADMIN_CONFIG.adminSecret;
-  if (!secret || !timingSafeEqualString(authHeader, `Bearer ${secret}`)) return apiUnauthorized();
+export async function GET() {
+  try {
+    await requireGrowthUser(await createClient());
+  } catch (error) {
+    if (error instanceof UnauthorizedError) return apiUnauthorized();
+    if (error instanceof ForbiddenError) return apiForbidden();
+    throw error;
+  }
 
   const supabase = createServiceClient();
 

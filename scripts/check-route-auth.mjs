@@ -34,8 +34,11 @@ const routes = walk(API_DIR).map(file => ({
   source: readFileSync(file, 'utf8'),
 }))
 const registry = JSON.parse(readFileSync(REGISTRY_PATH, 'utf8')).routes
+// Reviewed learner-ownership exceptions (rule: learner-ownership-unreviewed).
+const OWNERSHIP_REGISTRY_PATH = join(ROOT, 'scripts', 'security', 'route-ownership-registry.json')
+const ownershipRegistry = JSON.parse(readFileSync(OWNERSHIP_REGISTRY_PATH, 'utf8')).routes
 
-const { violations, warnings } = checkRouteAuth({ routes, registry })
+const { violations, warnings } = checkRouteAuth({ routes, registry, ownershipRegistry })
 
 console.log('\nEduNexus Route Auth Check\n' + '─'.repeat(70))
 console.log(`${routes.length} routes scanned, ${Object.keys(registry).length} registered exceptions`)

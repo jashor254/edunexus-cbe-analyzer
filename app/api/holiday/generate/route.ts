@@ -9,6 +9,7 @@ import { repos } from '@/lib/repositories'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
 import { apiPaymentRequired } from '@/lib/payments/paywall'
 import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
+import { resolveTeacherOwnership } from '@/lib/compass/ownership'
 
 export const HOLIDAY_BATCH_JOB_TYPE = 'ai.holiday_plan.generate'
 
@@ -192,6 +193,14 @@ export async function POST(req: Request): Promise<Response> {
     // Single student generation
     const parsed = SingleSchema.safeParse(body)
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
+
+    // The plan is built from this learner's name, Projection (weakest
+    // subjects) and career-intelligence match, and returned to the caller —
+    // so the caller must actually teach the learner. Same canonical check as
+    // holiday/return (security audit 2026-10-30, F-14: this path previously
+    // accepted any studentId from any teacher account).
+    const ownership = await resolveTeacherOwnership(user.id, parsed.data.studentId)
+    if (!ownership.allowed) return apiForbidden()
 
     const plan = await generateHolidayPlan({
       studentId:     parsed.data.studentId,

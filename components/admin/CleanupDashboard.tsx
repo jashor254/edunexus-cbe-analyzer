@@ -36,13 +36,9 @@ export default function CleanupDashboard() {
   const fetchStats = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/admin/cleanup-stats', {
-        headers: {
-          // ✅ Admin secret from server-side only
-          // This component should only render on admin pages
-          // which are protected by layout auth check
-        }
-      });
+      // Authorized by the founder's own session cookie (requireGrowthUser) —
+      // no secret is ever sent from the browser.
+      const response = await fetch('/api/admin/cleanup-stats');
 
       if (!response.ok) {
         throw new Error(`Failed: ${response.status}`);
@@ -66,9 +62,8 @@ export default function CleanupDashboard() {
     try {
       setIsRunning(true);
 
-      // ✅ Call admin trigger endpoint (server handles the cron secret internally)
-      // Admin route is protected by middleware x-admin-secret
-      // The SERVER then calls cron with the secret - client never sees it
+      // Founder-session-authorized trigger; the server then calls the cron
+      // with CRON_SECRET — the client never sees any secret.
       const response = await fetch('/api/admin/trigger-cleanup', {
         method: 'POST',
       });

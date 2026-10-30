@@ -3,15 +3,19 @@
 // Pure string fixtures — no filesystem, network, or credentials.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { checkRouteAuth, hasDirectGuard, callsAny, reexportTarget } from './route-auth-rules.mjs'
+import { checkRouteAuth, hasDirectGuard, callsAny, reexportTarget, SERVICE_CLIENT_FACTORY } from './route-auth-rules.mjs'
+
+// Fixtures name the RLS-bypassing client factory through the rule's own
+// config — these are text fixtures; nothing here ever constructs a client.
+const SVC = SERVICE_CLIENT_FACTORY
 
 type Route = { key: string; source: string }
 
 const GUARDED = `export async function GET() { const user = await requireAuthentication(supabase); return ok(user) }`
 const UNGUARDED = `export async function GET() { return ok(await listEverything()) }`
 
-function run(routes: Route[], registry: Record<string, object> = {}) {
-  return checkRouteAuth({ routes, registry })
+function run(routes: Route[], registry: Record<string, object> = {}, ownershipRegistry: Record<string, object> = {}) {
+  return checkRouteAuth({ routes, registry, ownershipRegistry })
 }
 const rules = (r: ReturnType<typeof run>) => r.violations.map(v => v.rule)
 
@@ -165,4 +169,125 @@ test('test-* and debug routes fail even when guarded', () => {
 
 test('a route merely containing "test" in a longer segment is not a debug route', () => {
   assert.deepEqual(rules(run([{ key: 'assessments/testimonials', source: GUARDED }])), [])
+})
+
+// ── unguarded-handler (security audit 2026-10-30, F-11) ────────────────────────
+// Guard detection is per HANDLER: a guarded POST no longer hides an unguarded
+// GET in the same file (how GET /api/feedback's ADMIN_SECRET gate went unseen).
+
+const MIXED = `
+export async function POST() { const user = await requireAuthentication(supabase); return ok(user) }
+
+export async function GET() { return ok(await listEverything()) }
+`
+
+test('a guarded handler does not protect an unguarded sibling handler', () => {
+  const r = run([{ key: 'feedback', source: MIXED }])
+  assert.deepEqual(rules(r), ['unguarded-handler'])
+  assert.match(r.violations[0].message, /^GET handler/)
+})
+
+test('a handler that delegates to the guarded handler in the same file passes', () => {
+  const src = `
+export async function POST(req) { const auth = await requireAuth(); return verify(auth) }
+
+export async function GET(req) { return POST(rebuild(req)) }
+`
+  assert.deepEqual(rules(run([{ key: 'payments/verify', source: src }])), [])
+})
+
+test('a handler that calls a guarded same-file helper passes', () => {
+  const src = `
+async function loadForCaller() { return requireAuthentication(supabase) }
+
+export async function GET() { const u = await loadForCaller(); return ok(u) }
+`
+  assert.deepEqual(rules(run([{ key: 'teacher/things', source: src }])), [])
+})
+
+test('a guarded helper the handler never calls does not count', () => {
+  const src = `
+export async function GET() { return ok(await listEverything()) }
+
+async function unusedGuard() { return requireAuthentication(supabase) }
+`
+  assert.deepEqual(rules(run([{ key: 'teacher/things', source: src }])), ['unguarded-handler'])
+})
+
+test('delegated entries vouch per handler through their guards list', () => {
+  const src = `
+export async function GET() { await requireClassTeacher(supabase, id); return ok() }
+
+export async function PATCH() { return ok(await editRouteContent(supabase, id)) }
+`
+  const entry = { kind: 'delegated', guards: ['editRouteContent'], reason: 'r', reviewed: '2026-10-30' }
+  assert.deepEqual(rules(run([{ key: 'print-runs', source: src }], { 'print-runs': entry })), [])
+  // …and a delegated entry whose listed guard is no longer called fails.
+  const missing = { ...entry, guards: ['editRouteContent', 'overrideLearnerRoute'] }
+  assert.ok(rules(run([{ key: 'print-runs', source: src }], { 'print-runs': missing })).includes('delegate-missing'))
+})
+
+// ── unregistered-shared-secret (F-08) ──────────────────────────────────────────
+
+test('an admin shared-secret gate fails unless registered as one', () => {
+  const src = `export async function GET(req) {
+    if (!timingSafeEqualString(req.headers.get('x-admin-secret'), process.env.ADMIN_SECRET)) return unauthorized()
+    const user = await requireAuthentication(supabase); return ok(user) }`
+  assert.ok(rules(run([{ key: 'feedback', source: src }])).includes('unregistered-shared-secret'))
+})
+
+// ── learner-ownership-unreviewed (F-11: authentication is not authorization) ──
+
+// The pre-fix F-05 route (POST /api/teacher/alerts), reduced to its shape: it
+// authenticated, resolved a teacher, took ANY studentId, and wrote with the
+// service client. An unrelated teacher_id filter elsewhere in the file (the
+// GET listing) is exactly what a naive "looks owner-scoped" heuristic would
+// have mistaken for authorization — the gate must not.
+const F05_PRE_FIX = `
+const Schema = z.object({ studentId: z.string().uuid(), message: z.string() })
+export async function GET() {
+  const userId = (await requireAuthentication(supabase)).id
+  const teacher = await resolveTeacher(userId)
+  const db = ${SVC}()
+  return ok(await db.from('student_alerts').select('id').eq('teacher_id', teacher.id))
+}
+export async function POST(req) {
+  const userId = (await requireAuthentication(supabase)).id
+  const teacher = await resolveTeacher(userId)
+  const db = ${SVC}()
+  const { studentId, message } = Schema.parse(await req.json())
+  await db.from('student_alerts').insert({ student_id: studentId, teacher_id: teacher.id, message })
+  return ok()
+}
+`
+
+test('detects the F-05 class: an authenticated learner-id route with no ownership check fails', () => {
+  assert.deepEqual(rules(run([{ key: 'teacher/alerts', source: F05_PRE_FIX }])), ['learner-ownership-unreviewed'])
+})
+
+test('the same route passes once it calls a recognised ownership check', () => {
+  const fixed = F05_PRE_FIX.replace(
+    "await db.from('student_alerts').insert({ student_id: studentId, teacher_id: teacher.id, message })",
+    'await createTeacherAlert({ userId, teacherId: teacher.id, studentId, message })',
+  )
+  assert.deepEqual(rules(run([{ key: 'teacher/alerts', source: fixed }])), [])
+})
+
+test('a reviewed ownership entry accepts the route; a stale or incomplete one fails', () => {
+  const route = [{ key: 'teacher/alerts', source: F05_PRE_FIX }]
+  assert.deepEqual(rules(run(route, {}, { 'teacher/alerts': { via: 'inline', reason: 'r', reviewed: '2026-10-30' } })), [])
+  assert.deepEqual(rules(run(route, {}, { 'teacher/alerts': { via: 'checkThing', reason: 'r', reviewed: '2026-10-30' } })), ['ownership-registry-stale'])
+  assert.deepEqual(rules(run(route, {}, { 'teacher/alerts': { via: 'inline' } })), ['ownership-registry-invalid'])
+})
+
+test('an ownership entry for a route that no longer needs one is flagged as redundant', () => {
+  const r = run([{ key: 'teacher/classes', source: GUARDED }], {}, { 'teacher/classes': { via: 'inline', reason: 'r', reviewed: '2026-10-30' } })
+  assert.deepEqual(rules(r), [])
+  assert.deepEqual(r.warnings.map(w => w.rule), ['redundant-ownership-registry'])
+})
+
+test('routes without a learner id, or without the service client, are not ownership-checked', () => {
+  const noLearner = `export async function GET() { await requireAuthentication(s); const db = ${SVC}(); return ok() }`
+  const userScoped = `export async function GET() { await requireAuthentication(s); return ok(await s.from('x').select('id').eq('student_id', studentId)) }`
+  assert.deepEqual(rules(run([{ key: 'a', source: noLearner }, { key: 'b', source: userScoped }])), [])
 })

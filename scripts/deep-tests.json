@@ -1,5 +1,5 @@
 {
-  "description": "DEEP test manifest \u2014 Phase H1S-FIX. Every file listed here imports createTestServiceClient() (utils/supabase/test-service.ts), which refuses to construct a client without an explicit, verified, non-production TEST_SUPABASE_* target. Run by npm run test:deep, gated by scripts/check-test-target.ts. CAVEAT: for the *.http.integration.test.ts subset, this manifest only protects test-side fixture setup \u2014 the actual HTTP assertions hit a separately-running Next.js server whose own process environment (NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY) is unchanged by this phase. That server must independently be started against a non-production target before those files are fully safe to automate \u2014 see Phase H1S-FIX closeout, deferred to a future DEEP-infrastructure phase.",
+  "description": "DEEP test manifest — Phase H1S-FIX. Every file listed here imports createTestServiceClient() (utils/supabase/test-service.ts), which refuses to construct a client without an explicit, verified, non-production TEST_SUPABASE_* target. Run by npm run test:deep, gated by scripts/check-test-target.ts. CAVEAT: for the *.http.integration.test.ts subset, this manifest only protects test-side fixture setup — the actual HTTP assertions hit a separately-running Next.js server whose own process environment (NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY) is unchanged by this phase. That server must independently be started against a non-production target before those files are fully safe to automate — see Phase H1S-FIX closeout, deferred to a future DEEP-infrastructure phase.",
   "files": [
     "app/api/cron/cronAuthBoundary.integration.test.ts",
     "app/api/cron/quotaAlertsIdempotency.integration.test.ts",
@@ -132,6 +132,15 @@
     "lib/parentExperience/parentPortal.integration.test.ts",
     "lib/payments/fulfillment.test.ts",
     "lib/payments/subscriptionSelfGrant.test.ts",
+    "lib/sharing/sharedReportsRls.test.ts",
+    "lib/alerts/teacherAlertsOwnership.test.ts",
+    "lib/security/attemptLimiter.integration.test.ts",
+    "lib/classes/classEnrollment.integration.test.ts",
+    "lib/classes/classInvite.integration.test.ts",
+    "lib/core/studentsBridgeIntegrity.integration.test.ts",
+    "app/api/academy/reflect/route.quota.integration.test.ts",
+    "app/api/admin/founderOnly.integration.test.ts",
+    "app/api/payments/callback/route.chargeAmount.integration.test.ts",
     "lib/projection/careerPropagation.integration.test.ts",
     "lib/projection/curriculumAware.integration.test.ts",
     "lib/projection/equivalenceHarness.integration.test.ts",
@@ -179,6 +188,8 @@
     "lib/testing/teacherActivation.http.integration.test.ts",
     "lib/testing/teacherAttentionDestination.integration.test.ts",
     "lib/testing/teacherSelfJoin.http.integration.test.ts",
-    "lib/whatsapp/client.test.ts"
+    "lib/whatsapp/client.test.ts",
+    "lib/core/studentGuardiansEscalation.integration.test.ts",
+    "lib/growth/growthUsersEscalation.integration.test.ts"
   ]
 }

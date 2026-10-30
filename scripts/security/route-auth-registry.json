@@ -62,8 +62,33 @@
     "teacher/blueprint/actions": {
       "kind": "delegated",
       "guard": "listBlueprintActionsForLearner",
+      "guards": ["proposeBlueprintAction"],
       "reason": "GET -> listBlueprintActionsForLearner (requireManageAccess); POST -> proposeBlueprintAction (requireAuthentication + requireManageAccess), lib/learnerBlueprint/actionPlan/lifecycle.ts.",
-      "reviewed": "2026-10-12"
+      "reviewed": "2026-10-30"
+    },
+    "teacher/blueprint/actions/[actionItemId]/review": {
+      "kind": "delegated",
+      "guards": ["getBlueprintActionReviewSnapshot", "reviewBlueprintAction"],
+      "reason": "GET -> getBlueprintActionReviewSnapshot -> requireManageAccess -> canManageLearnerRecordCore (requireAuthentication first in both branches); POST -> reviewBlueprintAction (requireAuthentication, then the same snapshot check). lib/learnerBlueprint/actionPlan/review.ts.",
+      "reviewed": "2026-10-30"
+    },
+    "teacher/assignments": {
+      "kind": "delegated",
+      "guards": ["createAssignment"],
+      "reason": "GET is guarded directly. POST -> lib/assignments/create.ts::createAssignment -> resolveSoloTarget (requireAuthentication + resolveTeacher + requireClassTeacher) or resolveInstitutionalTarget (requireInstitutionalAssignmentAuthority).",
+      "reviewed": "2026-10-30"
+    },
+    "teacher/assignments/[id]/print-routes": {
+      "kind": "delegated",
+      "guards": ["generatePrintRun"],
+      "reason": "GET is guarded directly (requireClassTeacher). POST -> lib/assignments/printRoutes.ts::generatePrintRun: requireAuthentication + resolveTeacher + assignment ownership before any write.",
+      "reviewed": "2026-10-30"
+    },
+    "teacher/assignments/[id]/print-routes/[printRunId]": {
+      "kind": "delegated",
+      "guards": ["editRouteContent", "overrideLearnerRoute"],
+      "reason": "GET is guarded directly. PATCH -> lib/assignments/printRoutes.ts::editRouteContent / overrideLearnerRoute, both loadOwnedAssignment -> requireClassTeacher before reading the run.",
+      "reviewed": "2026-10-30"
     },
     "teacher/blueprint/actions/[actionItemId]/approve": {
       "kind": "delegated",
@@ -93,24 +118,6 @@
       "kind": "delegated",
       "guard": "deliverBlueprintActionToCompass",
       "reason": "lib/learnerBlueprint/actionPlan/delivery/compass.ts: requireAuthentication first.",
-      "reviewed": "2026-10-12"
-    },
-    "admin/init": {
-      "kind": "shared-secret",
-      "secret": "ADMIN_CONFIG.adminSecret",
-      "reason": "One-time admin bootstrap; Bearer ADMIN_SECRET compared with timingSafeEqualString before the service client is built.",
-      "reviewed": "2026-10-12"
-    },
-    "admin/trigger-cleanup": {
-      "kind": "shared-secret",
-      "secret": "ADMIN_CONFIG.adminSecret",
-      "reason": "Manual trigger for cron/cleanup-users; Bearer ADMIN_SECRET compared with timingSafeEqualString.",
-      "reviewed": "2026-10-12"
-    },
-    "admin/cleanup-stats": {
-      "kind": "shared-secret",
-      "secret": "ADMIN_CONFIG.adminSecret",
-      "reason": "Cleanup statistics (includes user emails); Bearer ADMIN_SECRET compared with timingSafeEqualString before any query.",
       "reviewed": "2026-10-12"
     },
     "learner-accounts/claim": {

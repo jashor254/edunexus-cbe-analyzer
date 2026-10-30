@@ -10,7 +10,7 @@ import { apiSuccess, apiError, apiUnauthorized, apiNotFound, apiBadRequest, apiF
 import { publishEvent } from '@/lib/events'
 import { requireAuthentication, requireStudent, requireClassMembership } from '@/lib/core/permissions'
 import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
-import { UPLOAD_LIMITS, isAllowedUploadType } from '@/lib/config/uploads'
+import { UPLOAD_LIMITS, isAllowedUploadType, UPLOAD_EXTENSION_BY_MIME_TYPE, matchesFileSignature } from '@/lib/config/uploads'
 import { resolveInstitutionalAssignmentReadAccess } from '@/lib/core/assignmentDiscovery'
 
 const BUCKET = 'assignment-submissions'
@@ -105,9 +105,12 @@ export async function POST(req: Request) {
     // re-derived from a separate, unscoped class_students lookup.
     const classId = assignment.class_id
 
-    const ext = file.name.split('.').pop() || 'bin'
-    const objectPath = `${assignmentId}/${studentId}/${Date.now()}.${ext}`
     const bytes = new Uint8Array(await file.arrayBuffer())
+    if (!matchesFileSignature(bytes, file.type)) {
+      return apiBadRequest('Unsupported file type — use a photo or PDF')
+    }
+    const ext = UPLOAD_EXTENSION_BY_MIME_TYPE[file.type]
+    const objectPath = `${assignmentId}/${studentId}/${Date.now()}.${ext}`
 
     const { error: uploadError } = await db.storage
       .from(BUCKET)

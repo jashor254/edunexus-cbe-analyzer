@@ -1,0 +1,115 @@
+{
+  "description": "Routes that take a learner/student id and use the service-role client WITHOUT calling a recognised ownership check (scripts/security/route-auth-rules.mjs OWNERSHIP_GUARD_CALLS). Each was read and its caller-to-learner authorization recorded here (security audit 2026-10-30, F-11). 'via' names the function that authorizes — the gate fails if the route stops calling it — or 'inline' for an explicit owner-scoped query/comparison in the route itself. A new route that matches the rule fails CI until it either calls a recognised check or is reviewed and added here. This is a manual-review requirement, not a proof: the gate cannot verify inline logic.",
+  "routes": {
+    "admin/pilot/add": {
+      "via": "isAdmin",
+      "reason": "Platform-admin surface by design: lib/auth/isAdmin.ts (hardcoded founder email or profiles.role = 'admin'; clients cannot set role — trg_guard_profile_role).",
+      "reviewed": "2026-10-30"
+    },
+    "admin/pilot/students": {
+      "via": "isAdmin",
+      "reason": "Platform-admin surface by design: lib/auth/isAdmin.ts.",
+      "reviewed": "2026-10-30"
+    },
+    "admin/pilot/tracking": {
+      "via": "isAdmin",
+      "reason": "Platform-admin surface by design: lib/auth/isAdmin.ts.",
+      "reviewed": "2026-10-30"
+    },
+    "assessments/history": {
+      "via": "inline",
+      "reason": "Loads only students with user_id = caller, then reads assessments .in() that owned set; the optional student_id filter narrows within it.",
+      "reviewed": "2026-10-30"
+    },
+    "career/clinic-report": {
+      "via": "inline",
+      "reason": "Requires a students row with id = studentId AND user_id = caller (read through the caller's own session client) before any service-role read; 403 otherwise.",
+      "reviewed": "2026-10-30"
+    },
+    "career/intelligence-report": {
+      "via": "inline",
+      "reason": "Reads the student and requires student.user_id or student.parent_user_id to equal the caller before any report work; 403 otherwise.",
+      "reviewed": "2026-10-30"
+    },
+    "dashboard/stats": {
+      "via": "inline",
+      "reason": "Every query is scoped to the caller (user_id / learner_id = user.id, the caller's own students, the caller's own teacher row).",
+      "reviewed": "2026-10-30"
+    },
+    "formative/signal": {
+      "via": "inline",
+      "reason": "Requires teacher_classes.teacher_id = caller's teacher for the class, then rejects any submitted student not on that class's roster.",
+      "reviewed": "2026-10-30"
+    },
+    "groups/challenge": {
+      "via": "inline",
+      "reason": "Acts only as the caller's own student (students.user_id = caller) and their own membership row in the group.",
+      "reviewed": "2026-10-30"
+    },
+    "groups/create": {
+      "via": "inline",
+      "reason": "Creates a group for the caller's own student (students.user_id = caller) only.",
+      "reviewed": "2026-10-30"
+    },
+    "groups/join": {
+      "via": "inline",
+      "reason": "Joins as the caller's own student (students.user_id = caller) only.",
+      "reviewed": "2026-10-30"
+    },
+    "holiday/publish": {
+      "via": "inline",
+      "reason": "Class path requires teacher_classes.teacher_id = caller's teacher; per-student path publishes only plans whose teacher_id is the caller's teacher (learner-intelligence repository publishHolidayPlans).",
+      "reviewed": "2026-10-30"
+    },
+    "parent/alerts": {
+      "via": "inline",
+      "reason": "Reads alerts only for roster rows with class_students.parent_id = caller. That link is now set only by email-matched invite redemption (lib/classes/redeemClassInvite.ts, F-12).",
+      "reviewed": "2026-10-30"
+    },
+    "parent/compass-activity": {
+      "via": "findOwnedStudents",
+      "reason": "repos.compass.findOwnedStudents(caller) — the caller's own and parent-linked students — then reads sessions .in() that set only.",
+      "reviewed": "2026-10-30"
+    },
+    "parent/link-student": {
+      "via": "inline",
+      "reason": "Authority is a single-use, expiring student_invites token bound to this student_id; refuses a student already linked to a different parent.",
+      "reviewed": "2026-10-30"
+    },
+    "reports/clinic/[reportId]/url": {
+      "via": "inline",
+      "reason": "Explicit branches before signing: the learner's owner, a parent linked via class_students.parent_id, the report's teacher, or a platform admin; 403 otherwise.",
+      "reviewed": "2026-10-30"
+    },
+    "share/generate": {
+      "via": "inline",
+      "reason": "Requires a students row with id = studentId AND user_id = caller before creating a share link.",
+      "reviewed": "2026-10-30"
+    },
+    "students/[studentId]": {
+      "via": "inline",
+      "reason": "DELETE requires student.user_id = caller; PATCH (unlink) requires student.parent_user_id = caller and a teacher-managed record.",
+      "reviewed": "2026-10-30"
+    },
+    "teacher/assessments/[assessmentId]/marks": {
+      "via": "getAssessmentById",
+      "reason": "GET and POST both load the assessment by (assessmentId, caller's teacher id) — 404 otherwise — and resolve learners only from that assessment's own class roster.",
+      "reviewed": "2026-10-30"
+    },
+    "teacher/assignments/[id]/mark": {
+      "via": "inline",
+      "reason": "Requires assignments.teacher_id = caller's teacher; the mark target must be a submission of that assignment (lib/assignments/markSubmission.ts).",
+      "reviewed": "2026-10-30"
+    },
+    "teacher/assignments/[id]": {
+      "via": "isCurrentTenureHolderForAssignmentClass",
+      "reason": "GET allows only the assignment's creator or the current teaching-tenure holder of its class; PATCH updates only where teacher_id = caller's teacher.",
+      "reviewed": "2026-10-30"
+    },
+    "teacher/students/[studentId]/timeline": {
+      "via": "inline",
+      "reason": "Requires a class_students row for the learner joined to teacher_classes.teacher_id = caller's teacher before reading the timeline.",
+      "reviewed": "2026-10-30"
+    }
+  }
+}

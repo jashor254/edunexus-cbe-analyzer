@@ -1,5 +1,16 @@
+import { buildSecurityHeaders } from './lib/security/securityHeaders'
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Browser security headers on every response — see lib/security/securityHeaders.ts.
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: buildSecurityHeaders({ supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL }),
+      },
+    ]
+  },
   serverExternalPackages: ['@react-pdf/renderer', '@sparticuz/chromium', 'playwright-core'],
   images: {
     remotePatterns: [

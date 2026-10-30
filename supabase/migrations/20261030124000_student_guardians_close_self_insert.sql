@@ -1,0 +1,48 @@
+-- Close the student_guardians self-service guardian escalation
+-- (independent pre-deployment audit, 2026-10-30; finding AUDIT-F15).
+--
+-- PROVEN on a local stack built from the committed migrations (rolled-back
+-- transaction, 2026-10-30): a signed-in user with no relationship to a
+-- learner could
+--
+--   insert into student_guardians (student_id, guardian_id, relationship)
+--   values ('<any learner>', auth.uid(), 'mother');
+--
+-- because the only INSERT policy was
+--   "student_guardians: guardian insert"  WITH CHECK (guardian_id = auth.uid())
+-- which checks only that the row names the CALLER as guardian — never that
+-- the caller is actually that learner's guardian. The helper
+-- auth_is_guardian_of(student_id) then returns true, and it gates the SELECT
+-- policy ("... or guardian") on six learner-report tables:
+--   clinic_reports, academic_reports, compass_progress,
+--   learning_compass_configs, learning_compass_state, struggle_patterns.
+-- So any authenticated user could read any learner's clinic/academic reports
+-- (names, grades, pathway and career analysis) straight from PostgREST.
+--
+-- This predates the 2026-10-30 remediation (the policy comes from
+-- 20260525_rls_policies.sql) — it is not a regression — but it is the same
+-- class of learner-data exposure as F-01, found while auditing that work.
+--
+-- WHAT REPLACES IT: nothing. student_guardians is not read or written by any
+-- application code, and auth_is_guardian_of is not called anywhere in the
+-- codebase (grep, 2026-10-30). The live guardian model is the separate
+-- learner_guardians table (lib/core/guardianInvites.ts, identity.ts,
+-- permissions.ts), which this migration does not touch. With the client
+-- INSERT policy gone, RLS denies every anon/authenticated insert (no
+-- permissive policy = deny); the privileges are revoked too as defence in
+-- depth. Any future legitimate writer must use the service role, which
+-- bypasses RLS and is unaffected.
+--
+-- The "own read" SELECT policy is left in place: it exposes a row only to a
+-- caller who already owns the student or already appears as its guardian, so
+-- with inserts closed it grants nothing new. auth_is_guardian_of therefore
+-- becomes effectively unsatisfiable for an untrusted caller, which is the
+-- intended state until a real student_guardians writer exists.
+--
+-- ROLLBACK (reopens the exposure):
+--   create policy "student_guardians: guardian insert" on public.student_guardians
+--     for insert with check (guardian_id = auth.uid());
+--   grant insert on public.student_guardians to anon, authenticated;
+
+drop policy if exists "student_guardians: guardian insert" on public.student_guardians;
+revoke insert, update, delete on public.student_guardians from anon, authenticated;

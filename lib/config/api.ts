@@ -157,9 +157,9 @@ export const RESEND_CONFIG = {
 export const ADMIN_CONFIG = {
   adminEmail: 'kariukidennis092@gmail.com',
 
-  get adminSecret() {
-    return process.env.ADMIN_SECRET
-  },
+  // No adminSecret: the shared ADMIN_SECRET bearer gate was retired in the
+  // 2026-10-30 security audit (F-08). Founder-only endpoints authenticate the
+  // founder's own session with requireGrowthUser (lib/growth/auth.ts).
 
   adminEmails: [
     'kariukidennis092@gmail.com',

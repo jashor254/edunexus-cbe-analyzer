@@ -10,6 +10,7 @@ import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound } from
 import { requireAuthentication } from '@/lib/core/permissions'
 import { UnauthorizedError } from '@/lib/core/errors'
 import { repos } from '@/lib/repositories'
+import { canAccessClassResource } from '@/lib/classResources/resourceAccess'
 
 const BUCKET = 'class-resources'
 const SIGNED_URL_TTL_SECONDS = 60 * 5
@@ -32,47 +33,10 @@ export async function GET(
     const resource = await repos.classResources.findResourceById(id)
     if (!resource) return apiNotFound('Resource not found')
 
+    // Teacher who owns the resource, or a parent/learner currently in its class
+    if (!(await canAccessClassResource(userId, resource))) return apiForbidden()
+
     const db = createServiceClient()
-
-    // Teacher who owns the resource
-    const { data: teacher } = await db
-      .from('teachers')
-      .select('id')
-      .eq('id', resource.teacher_id)
-      .eq('user_id', userId)
-      .maybeSingle()
-
-    // Student or parent currently in the resource's class
-    let membership = null as { id: string } | null
-    if (!teacher) {
-      const { data: parentLink } = await db
-        .from('class_students')
-        .select('id')
-        .eq('class_id', resource.class_id)
-        .eq('parent_id', userId)
-        .maybeSingle()
-      membership = parentLink
-
-      if (!membership) {
-        const { data: student } = await db
-          .from('students')
-          .select('id')
-          .eq('user_id', userId)
-          .maybeSingle()
-        if (student) {
-          const { data: studentLink } = await db
-            .from('class_students')
-            .select('id')
-            .eq('class_id', resource.class_id)
-            .eq('student_id', student.id)
-            .maybeSingle()
-          membership = studentLink
-        }
-      }
-    }
-
-    if (!teacher && !membership) return apiForbidden()
-
     const { data: signed, error: signError } = await db.storage
       .from(BUCKET)
       .createSignedUrl(resource.file_path, SIGNED_URL_TTL_SECONDS)
