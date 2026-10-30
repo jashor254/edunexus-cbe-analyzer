@@ -733,4 +733,38 @@ export class CareerRepository extends BaseRepository {
       .upsert(row, { onConflict: 'student_id,assessment_id' })
     if (error) throw new Error(`Failed to upsert clinic report: ${error.message}`)
   }
+
+  // ── Career Intelligence narrative reuse (lib/career/careerIntelligenceEngine.ts) ─
+
+  /** The stored (pseudonymised) narrative for one learner + input fingerprint, or null. Throws on a DB error. */
+  async findCareerNarrative(
+    studentId: string,
+    inputFingerprint: string,
+  ): Promise<{ narrative: Record<string, unknown>; created_at: string } | null> {
+    const { data, error } = await this.db
+      .from('career_intelligence_narratives')
+      .select('narrative, created_at')
+      .eq('student_id', studentId)
+      .eq('input_fingerprint', inputFingerprint)
+      .maybeSingle()
+
+    if (error) throw new Error(`Failed to read career narrative: ${error.message}`)
+    if (!data) return null
+    return { narrative: data.narrative as Record<string, unknown>, created_at: data.created_at as string }
+  }
+
+  /** Stores a narrative for one learner + input fingerprint (last writer wins on a concurrent race). Throws on a DB error. */
+  async upsertCareerNarrative(row: {
+    student_id: string
+    input_fingerprint: string
+    prompt_version: string
+    narrative: Record<string, unknown>
+    model: string | null
+  }): Promise<void> {
+    const { error } = await this.db
+      .from('career_intelligence_narratives')
+      .upsert(row, { onConflict: 'student_id,input_fingerprint' })
+
+    if (error) throw new Error(`Failed to store career narrative: ${error.message}`)
+  }
 }

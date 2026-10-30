@@ -687,6 +687,16 @@ export type CareerIntelligenceReport = {
   /** Career Principle gate — Junior (Grade 7-9) = exploration, Senior (10-12) = planning. */
   mode:         'exploration' | 'planning'
   generated_at: string
+  /**
+   * Where the AI narrative sections came from: 'generated' by a fresh model
+   * call for this view, or 'reused' from an earlier generation with
+   * identical inputs (lib/career/careerIntelligenceEngine.ts). The
+   * deterministic sections are always computed live. Optional so stored or
+   * fixture reports from before this field still type-check.
+   */
+  narrative_source?:       'generated' | 'reused'
+  /** When the narrative was generated (equals generated_at when fresh). */
+  narrative_generated_at?: string
 
   // S1: Career Readiness Snapshot
   readiness_score:      number
