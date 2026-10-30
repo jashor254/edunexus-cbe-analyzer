@@ -224,7 +224,9 @@ export default function PaperIntelligencePage() {
       body: JSON.stringify({ submissionId }),
     })
       .then(async res => {
-        if (!res.ok) throw new Error(String(res.status))
+        // 409: this script is already being marked by an earlier request —
+        // not a failure; the roster reload shows its result when it lands.
+        if (!res.ok && res.status !== 409) throw new Error(String(res.status))
         setMarking(prev => { const next = { ...prev }; delete next[submissionId]; return next })
         await loadRoster()
       })

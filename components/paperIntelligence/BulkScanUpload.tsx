@@ -99,7 +99,11 @@ export function BulkScanUpload({ base, learners, maxPagesPerScript, onClose }: {
       inFlight++
       set(id, { status: 'marking' })
       const job = fetch(`${base}/mark-script`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ submissionId: id }) })
-        .then(res => set(id, res.ok ? { status: 'done' } : { status: 'failed', message: 'Uploaded, but marking failed — mark it again from the class list.' }))
+        .then(res => set(id, res.ok
+          ? { status: 'done' }
+          : res.status === 409
+            ? { status: 'failed', message: 'Already being marked from another request — check the class list in a moment.' }
+            : { status: 'failed', message: 'Uploaded, but marking failed — mark it again from the class list.' }))
         .catch(() => set(id, { status: 'failed', message: 'Uploaded, but marking failed — mark it again from the class list.' }))
         .finally(() => { inFlight-- })
       marking.push(job)

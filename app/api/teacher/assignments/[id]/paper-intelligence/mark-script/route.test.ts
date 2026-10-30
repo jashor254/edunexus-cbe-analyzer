@@ -3,7 +3,8 @@
 // Unit test of the whole-script marking route. Auth + markSubmissionScript are
 // mocked. Proves: authorization runs before any marking work, each domain
 // failure maps to its status (409 reviewed, 400 not ready, 502 unreadable),
-// and the happy path returns the proposals.
+// the happy path returns the proposals, and a concurrent duplicate pass is
+// refused before any AI work (markingClaim.ts).
 //
 // NOT in scripts/standard-tests.json — the [id] segment defeats the standard
 // runner's path glob (see extract-rubric/route.test.ts). Run:
@@ -22,6 +23,8 @@ let authThrow: Error | null = null
 let markThrow: Error | null = null
 let markCalls = 0
 let markedSubmission: unknown = null
+let claimHeld = false
+let releases: string[] = []
 
 mock.module('@/lib/core/errors', { namedExports: { UnauthorizedError: FakeUnauthorizedError } })
 mock.module('@/utils/supabase/server', { namedExports: { createClient: async () => ({}) } })
@@ -49,11 +52,19 @@ mock.module('@/lib/paperIntelligence/markScript', {
   },
 })
 
+mock.module('@/lib/paperIntelligence/markingClaim', {
+  namedExports: {
+    claimScriptMarking: async () => claimHeld
+      ? { claimed: false }
+      : { claimed: true, release: async (outcome: string) => { releases.push(outcome) } },
+  },
+})
+
 const SUB = '22222222-2222-4222-8222-222222222222'
 let POST: (req: Request, ctx: { params: Promise<{ id: string }> }) => Promise<Response>
 
 before(async () => { ({ POST } = await import('./route')) })
-beforeEach(() => { authThrow = null; markThrow = null; markCalls = 0; markedSubmission = null })
+beforeEach(() => { authThrow = null; markThrow = null; markCalls = 0; markedSubmission = null; claimHeld = false; releases = [] })
 
 const ctx = { params: Promise.resolve({ id: 'a1' }) }
 const req = (body: unknown) => new Request('http://t/mark-script', { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json' } })
@@ -98,4 +109,25 @@ test('happy path returns the proposals', async () => {
   const body = await res.json()
   assert.equal(body.data.proposedTotal, 23)
   assert.equal(body.data.plausibleTotal, 38)
+})
+
+test('a script already being marked → 409 and NO second marking pass (no AI call)', async () => {
+  claimHeld = true
+  const res = await POST(req({ submissionId: SUB }), ctx)
+  assert.equal(res.status, 409)
+  assert.match((await res.json()).error, /already being marked/)
+  assert.equal(markCalls, 0)
+})
+
+test('the marking claim is released on success and on failure', async () => {
+  await POST(req({ submissionId: SUB }), ctx)
+  markThrow = new FakeMarkingFailed('unreadable')
+  await POST(req({ submissionId: SUB }), ctx)
+  assert.deepEqual(releases, ['completed', 'failed'])
+})
+
+test('auth failure never takes a marking claim', async () => {
+  authThrow = new FakeScriptAccessError()
+  await POST(req({ submissionId: SUB }), ctx)
+  assert.deepEqual(releases, [])
 })
