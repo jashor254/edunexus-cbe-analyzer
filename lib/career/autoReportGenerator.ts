@@ -256,7 +256,7 @@ Return ONLY valid JSON in this exact shape:
 
 Include top 3 subjects in subjectPriorities. Keep parentWhatsAppMessage under 50 words. Be encouraging, not alarming.`
 
-    const raw = await callDeepSeek(prompt, 'You are a Kenyan education AI. Return ONLY valid JSON. No markdown.')
+    const raw = await callDeepSeek(prompt, 'You are a Kenyan education AI. Return ONLY valid JSON. No markdown.', { feature: 'class_reports_generate', callSite: 'compass_bridge' })
     const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
     const bridge = restoreLearnerName(JSON.parse(cleaned) as CompassBridge, learnerFirstName(student.name as string))
 
@@ -272,6 +272,29 @@ Include top 3 subjects in subjectPriorities. Keep parentWhatsAppMessage under 50
   } catch (err) {
     console.error('[autoReportGenerator] compass_bridge generation failed:', err)
     return null
+  }
+}
+
+/**
+ * The session_goal / guided_topics a class-report run may write.
+ *
+ * When the assessment pipeline has already derived them from the knowledge
+ * graph (knowledge_root_causes present — lib/academicClinic/assessmentPipeline.ts),
+ * those values are grounded in the learner's actual prerequisite chain and
+ * are kept. The LLM briefing only reasons from subject-level averages, so it
+ * must not overwrite them (docs/audits/ai-call-efficiency-deep-audit.md
+ * D-1/F-03). Without graph data the briefing's goal and topics are the best
+ * targets available and are written as before.
+ */
+export function reportOwnedTargets(
+  bridge: Pick<CompassBridge, 'sessionGoal' | 'weeklyMilestones'>,
+  knowledgeRootCauses: unknown,
+): { session_goal?: string; guided_topics?: string[] } {
+  const graphGrounded = Array.isArray(knowledgeRootCauses) && knowledgeRootCauses.length > 0
+  if (graphGrounded) return {}
+  return {
+    session_goal:  bridge.sessionGoal,
+    guided_topics: bridge.weeklyMilestones.map(m => m.checkConcept),
   }
 }
 
@@ -330,36 +353,41 @@ export async function generateClassReports(
 
       // 2. Generate specific compass_bridge via DeepSeek
       const bridge = await generateCompassBridge(studentId, db)
-      if (bridge) {
-        // Never clobber a teacher-queued Blueprint intervention. This path
-        // used to write `compass_bridge: bridge` wholesale, which silently
-        // destroyed teacherSuggested / subStrandId / deliveryId — see
-        // mergeBridgePreservingTeacherIntent for the full reasoning.
-        const { data: contextRow } = await db
-          .from('student_learning_context')
-          .select('compass_bridge')
-          .eq('student_id', studentId)
-          .maybeSingle()
-
-        const mergedBridge = mergeBridgePreservingTeacherIntent(
-          (contextRow?.compass_bridge as Record<string, unknown> | null) ?? {},
-          bridge,
-        )
-
-        await db
-          .from('student_learning_context')
-          .update({
-            compass_bridge: mergedBridge,
-            // Report-owned columns, unchanged. `first_subject` follows the
-            // MERGED bridge rather than the freshly generated one, so the
-            // column can never disagree with the subject Compass will
-            // actually steer to.
-            first_subject: mergedBridge.firstSubject ?? bridge.firstSubject,
-            session_goal: bridge.sessionGoal,
-            guided_topics: bridge.weeklyMilestones.map(m => m.checkConcept),
-          })
-          .eq('student_id', studentId)
+      if (!bridge) {
+        // The Compass briefing is half of this report. A run whose AI step
+        // failed used to be counted 'ok' (and charged); it is now reported as
+        // the failure it is, and the learner's existing context is untouched.
+        results.push({ student_id: studentId, student_name: studentName, status: 'error', error: 'Compass briefing could not be generated' })
+        completed++
+        continue
       }
+
+      // Never clobber a teacher-queued Blueprint intervention. This path
+      // used to write `compass_bridge: bridge` wholesale, which silently
+      // destroyed teacherSuggested / subStrandId / deliveryId — see
+      // mergeBridgePreservingTeacherIntent for the full reasoning.
+      const { data: contextRow } = await db
+        .from('student_learning_context')
+        .select('compass_bridge, knowledge_root_causes')
+        .eq('student_id', studentId)
+        .maybeSingle()
+
+      const mergedBridge = mergeBridgePreservingTeacherIntent(
+        (contextRow?.compass_bridge as Record<string, unknown> | null) ?? {},
+        bridge,
+      )
+
+      await db
+        .from('student_learning_context')
+        .update({
+          compass_bridge: mergedBridge,
+          // `first_subject` follows the MERGED bridge rather than the freshly
+          // generated one, so the column can never disagree with the subject
+          // Compass will actually steer to.
+          first_subject: mergedBridge.firstSubject ?? bridge.firstSubject,
+          ...reportOwnedTargets(bridge, contextRow?.knowledge_root_causes),
+        })
+        .eq('student_id', studentId)
 
       // 3. Mark student with last report generation time
       await db
@@ -370,7 +398,7 @@ export async function generateClassReports(
       results.push({ student_id: studentId, student_name: studentName, status: 'ok' })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      console.error(`[autoReportGenerator] failed for ${studentName}:`, msg)
+      console.error(`[autoReportGenerator] failed for student ${studentId}:`, msg)
       results.push({ student_id: studentId, student_name: studentName, status: 'error', error: msg })
     }
     completed++
