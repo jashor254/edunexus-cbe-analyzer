@@ -9,6 +9,7 @@
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError } from '@/lib/api/response'
 import { generateWeeklyPlans } from '@/lib/lessonPlan/weeklyGenerator'
+import { findSchemesInUse, runScheduledLessonPlanGeneration } from '@/lib/lessonPlan/scheduledGeneration'
 import { classifyRootCause } from '@/lib/teachingIntelligence/rootCauseClassifier'
 import { runTIEForSOW } from '@/lib/teachingIntelligence/weeklyGenerator'
 import type { SubstrandHealthRow } from '@/lib/teachingIntelligence/types'
@@ -43,7 +44,7 @@ export async function GET(req: Request) {
 
     const { data: activeSows, error } = await db
       .from('schemes_of_work')
-      .select('id, teacher_id, learning_area, grade, term, year, status')
+      .select('id, teacher_id, learning_area, grade, term, year, status, created_at')
       .eq('year', currentYear)
       .eq('term', String(currentTerm))
       .in('status', ['active', 'saved'])
@@ -70,10 +71,6 @@ export async function GET(req: Request) {
       const cur = latestWeekBySow[plan.sow_id] ?? 0
       if (plan.week_number > cur) latestWeekBySow[plan.sow_id] = plan.week_number
     }
-
-    const lpResults:  Array<{ sowId: string; result: Awaited<ReturnType<typeof generateWeeklyPlans>> }> = []
-    const lpErrors:   Array<{ sowId: string; error: string }> = []
-    const lpSkipped:  Array<{ sowId: string; reason: string }> = []
 
     // R2 — `schemes_of_work.teacher_id` is a `teachers.id`, but
     // `lesson_plans.teacher_id` and `generation_jobs.teacher_id` are both
@@ -102,54 +99,35 @@ export async function GET(req: Request) {
     const tieResults: Array<{ sowId: string; result: Awaited<ReturnType<typeof runTIEForSOW>> }> = []
     const tieErrors:  Array<{ sowId: string; error: string }> = []
 
-    for (const sow of activeSows || []) {
+    // ── 1. Lesson plan generation — only for schemes a teacher is actually
+    // using (lib/lessonPlan/scheduledGeneration.ts defines eligibility). An
+    // unused scheme costs no identity lookup, no AI call and no job row.
+    const schemesWithTimeline = (activeSows || []).filter(sow => (timelineBySow[sow.id] || []).length > 0)
+    const inUse = await findSchemesInUse(
+      schemesWithTimeline.map(sow => ({ id: sow.id, created_at: (sow.created_at as string | null) ?? null })),
+      Date.now(),
+    )
+    const lp = await runScheduledLessonPlanGeneration(
+      schemesWithTimeline.map(sow => ({ id: sow.id, teacherId: sow.teacher_id, latestWeek: latestWeekBySow[sow.id] ?? 0 })),
+      { inUse, authUserFor, generateWeeklyPlans, recordJob },
+    )
+    for (const skip of lp.skipped.filter(sk => sk.reason === 'unresolved_teacher_identity')) {
+      console.error('[cron/friday-generation] skipped scheme — no auth user for its teacher', skip.sowId)
+    }
 
-      // ── 1. Lesson plan generation (unchanged logic) ─────────────────────
+    for (const sow of activeSows || []) {
       const timeline = timelineBySow[sow.id] || []
       if (!timeline.length) continue
 
-      const latestWeek    = latestWeekBySow[sow.id] ?? 0
-      const sowCurrentWeek = latestWeek > 0 ? latestWeek : 0
-
+      // TIE (no AI calls) still runs for every current scheme; it only acts
+      // on lesson plans a teacher has evaluated. Its rows need the teacher's
+      // auth id — the lookup is cached from the LP step above.
       const authUserId = await authUserFor(sow.teacher_id)
-      if (!authUserId) {
-        // Fail closed. Without a resolvable owner there is no valid
-        // teacher_id for the generated plans, and substituting any other
-        // identity would attribute this teacher's work to someone else.
-        const message = `no auth user for teachers.id ${sow.teacher_id}`
-        lpSkipped.push({ sowId: sow.id, reason: 'unresolved_teacher_identity' })
-        console.error('[cron/friday-generation] skipped scheme', sow.id, message)
-        continue
-      }
-
-      try {
-        const result = await generateWeeklyPlans(sow.id, authUserId, sowCurrentWeek)
-        lpResults.push({ sowId: sow.id, result })
-        await recordJob({
-          teacher_id:  authUserId,
-          sow_id:      sow.id,
-          week_number: sowCurrentWeek + 1,
-          job_type:    'weekly_lp',
-          status:      'done',
-          error_message: result.generated === 0 ? `skipped: ${result.reason ?? 'unknown'}` : null,
-          completed_at: new Date().toISOString(),
-        })
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err)
-        lpErrors.push({ sowId: sow.id, error: message })
-        await recordJob({
-          teacher_id:  authUserId,
-          sow_id:      sow.id,
-          week_number: sowCurrentWeek + 1,
-          job_type:    'weekly_lp',
-          status:      'failed',
-          error_message: message,
-          completed_at: new Date().toISOString(),
-        })
-      }
+      if (!authUserId) continue
 
       // ── 2a. Root cause backfill ─────────────────────────────────────────
-      // Rule-based first (free). AI fallback only for ambiguous rows.
+      // Deterministic: rule-based heuristics, UNKNOWN when the counters
+      // cannot tell (no AI call — see rootCauseClassifier.ts).
       // Only processes rows with struggle_count >= 1 AND root_cause IS NULL.
       try {
         const { data: pendingRows } = await db
@@ -161,10 +139,7 @@ export async function GET(req: Request) {
 
         const rootCauseUpdates: { id: string; root_cause: string; updated_at: string }[] = []
         for (const row of (pendingRows ?? []) as SubstrandHealthRow[]) {
-          const code = await classifyRootCause(row, {
-            grade: sow.grade,
-            learningArea: sow.learning_area,
-          })
+          const code = classifyRootCause(row)
           rootCauseUpdates.push({ id: row.id, root_cause: code, updated_at: new Date().toISOString() })
         }
 
@@ -223,10 +198,15 @@ export async function GET(req: Request) {
       term: currentTerm,
       week: currentWeek,
       processed: (activeSows || []).length,
-      lp: { generated: lpResults.length, errors: lpErrors.length, skipped: lpSkipped.length },
+      lp: {
+        generated:  lp.results.length,
+        errors:     lp.errors.length,
+        skipped:    lp.skipped.length,
+        not_in_use: lp.skipped.filter(sk => sk.reason === 'not_in_use').length,
+      },
       tie: { processed: tieResults.filter(r => r.result.processed).length, errors: tieErrors.length },
-      details: lpResults.map(r => ({ sowId: r.sowId, ...r.result })),
-      skipped: lpSkipped,
+      details: lp.results.map(r => ({ sowId: r.sowId, ...r.result })),
+      skipped: lp.skipped,
     })
   } catch (err: unknown) {
     console.error('[cron/friday-generation]', err)

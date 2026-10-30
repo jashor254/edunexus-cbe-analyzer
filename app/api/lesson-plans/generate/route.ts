@@ -4,7 +4,7 @@
 import { z } from 'zod'
 import { createServiceClient } from '@/utils/supabase/service'
 import { checkFeatureAccess } from '@/lib/payments/access'
-import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
+import { reserveDailyCallOrThrow, DailyLimitExceededError, dailyLimitMessage, type HeldReservation } from '@/lib/ai/rateLimit'
 import { type FeatureKey } from '@/lib/payments/config'
 import {
   apiSuccess,
@@ -29,11 +29,6 @@ export async function POST(req: Request) {
     if (access.allowed === false) {
       const status = access.reason === 'unauthenticated' ? 401 : 403
       return apiError(access.reason, status)
-    }
-
-    const rateLimit = await checkDailyCallLimit(access.userId, FEATURE)
-    if (rateLimit.allowed === false) {
-      return apiError(`Daily limit of ${rateLimit.limit} lesson plan generations reached. Resets at ${rateLimit.resetAt}`, 429)
     }
 
     const db = createServiceClient()
@@ -100,7 +95,22 @@ export async function POST(req: Request) {
     // for the full reasoning. `organization_members` does not exist in
     // production; this lookup threw PGRST205 and 500'd the route after the
     // access check had passed. Omitting it is a documented no-op.
-    const result = await generateSpecificWeekPlans(sowId, access.userId, weekNumber, undefined)
+    // One unit of today's cap per week actually generated — reserved by the
+    // generator's hook only when lessons are still missing a plan.
+    const held: { quota?: HeldReservation } = {}
+    let result: Awaited<ReturnType<typeof generateSpecificWeekPlans>>
+    try {
+      result = await generateSpecificWeekPlans(sowId, access.userId, weekNumber, undefined, {
+        beforeGenerate: async () => { held.quota = await reserveDailyCallOrThrow(access.userId, FEATURE) },
+      })
+      if (result.generated === 0) await held.quota?.release('no lesson plan generated')
+    } catch (err) {
+      if (err instanceof DailyLimitExceededError) {
+        return apiError(dailyLimitMessage(err, 'lesson plan generations'), 429)
+      }
+      await held.quota?.release('lesson plan generation failed')
+      throw err
+    }
 
     const { data: plans } = await db
       .from('lesson_plans')

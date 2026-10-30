@@ -85,7 +85,17 @@ export interface WeeklyGenerationResult {
    *                              Phase 0). Previously reported as
    *                              `break_week`, which made a broken scheme
    *                              indistinguishable from a legitimate one.
+   *   already_generated        — every lesson this week already has a plan
+   *                              (including one saved by a concurrent
+   *                              request); no AI call was made.
    */
-  reason?: 'break_week' | 'invalid_scheme_structure'
+  reason?: 'break_week' | 'invalid_scheme_structure' | 'already_generated'
+  /**
+   * Lessons whose generation failed while others in the same week
+   * succeeded. The successful plans are saved; these are not. Absent when
+   * every attempted lesson succeeded.
+   */
+  failed?: number
+  failedLessons?: Array<{ lessonNumber: number; error: string }>
   nextTeachingWeek?: number
 }
