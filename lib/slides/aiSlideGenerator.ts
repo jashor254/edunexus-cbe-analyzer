@@ -85,7 +85,7 @@ Return this exact JSON structure:
   ]
 }`
 
-  const raw = await callDeepSeek(prompt, SYSTEM_PROMPT, { temperature: TEMPERATURE, maxTokens: MAX_TOKENS })
+  const raw = await callDeepSeek(prompt, SYSTEM_PROMPT, { temperature: TEMPERATURE, maxTokens: MAX_TOKENS, feature: 'slides_generate' })
   if (!raw) throw new Error('Empty response from AI')
 
   // Strip any accidental markdown code fences

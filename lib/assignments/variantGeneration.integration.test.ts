@@ -53,11 +53,11 @@ function fakeAI(behavior: 'success' | 'invalid-structure' | 'verification-fails'
   return async (request) => {
     if (behavior === 'router-down') throw new Error('All AI providers failed. Last error: timeout')
 
-    if (request.feature === 'adaptive_variant.generate') {
+    if (request.call_site === 'generate') {
       if (behavior === 'invalid-structure') return aiResponse('this is not valid JSON {{{')
       return aiResponse(VALID_GENERATED)
     }
-    // adaptive_variant.verify — the P0-2 structured contract (variantVerification.ts)
+    // call_site 'verify' — the P0-2 structured contract (variantVerification.ts)
     const clean = { keyCorrect: true, sameConcept: true, singleQuestion: true, answerGiveaway: 'none', giveawayEvidence: '', factualError: 'none', factualEvidence: '', reason: 'single unambiguous correct answer, same learning outcome' }
     if (behavior === 'verification-fails') return aiResponse(JSON.stringify({ ...clean, keyCorrect: false, reason: 'choices[1] could also be defended as correct' }))
     return aiResponse(JSON.stringify(clean))

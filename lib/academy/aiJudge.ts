@@ -82,6 +82,7 @@ export async function scoreReflection(
 
   try {
     raw = await callDeepSeek(prompt, SYSTEM_PROMPT, {
+      feature: 'academy_reflection_judge',
       temperature: 0.3,
       maxTokens: 400,
     })
@@ -248,6 +249,7 @@ export async function scoreMissionComparison(
 
   try {
     raw = await callDeepSeek(prompt, MISSION_SYSTEM_PROMPT, {
+      feature: 'academy_mission_judge',
       temperature: 0.3,
       maxTokens: 400,
     })

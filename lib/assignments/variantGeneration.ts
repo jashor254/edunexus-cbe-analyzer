@@ -153,7 +153,7 @@ async function generateOneTier(
       maxAttempts: ADAPTIVE_VARIANT_MAX_GENERATION_ATTEMPTS,
       generate: async (feedback) => {
         const { system, prompt } = buildGenerationPrompt(canonical, curriculum, tier, context, feedback)
-        const generation = await callAI({ prompt, system, mode: 'quality', max_tokens: 700, temperature: 0.4, feature: 'adaptive_variant.generate' })
+        const generation = await callAI({ prompt, system, mode: 'quality', max_tokens: 700, temperature: 0.4, feature: 'adaptive_variant_generate', call_site: 'generate' })
         const parsed = parseJsonResponse<ParsedVariant>(generation.text)
         const structuralError = validateStructure(parsed)
         return structuralError ? { structuralError } : { draft: parsed! }
@@ -165,7 +165,7 @@ async function generateOneTier(
           tier,
           variant: draft,
         })
-        const verification = await callAI({ prompt, system, mode: 'quality', max_tokens: 500, temperature: 0, feature: 'adaptive_variant.verify' })
+        const verification = await callAI({ prompt, system, mode: 'quality', max_tokens: 500, temperature: 0, feature: 'adaptive_variant_generate', call_site: 'verify' })
         return verifyResponse(verification.text)
       },
     })

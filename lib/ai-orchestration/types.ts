@@ -17,7 +17,9 @@ export type AIRequest = {
   // Cost tracking
   organization_id?: string
   user_id?: string
-  feature?: string            // 'sow.generate', 'lesson.generate', etc.
+  feature?: string            // logical feature, e.g. a TokenFeature key ('remedial_planner')
+  call_site?: string          // step within the feature ('enrich', 'generate', 'verify')
+  correlation_id?: string     // workflow id threaded into usage telemetry
 }
 
 export type AIResponse = {
@@ -27,9 +29,13 @@ export type AIResponse = {
   prompt_tokens: number
   completion_tokens: number
   total_tokens: number
+  /** 'provider' = reported by the provider; 'estimated' = chars/4 fallback. Absent on hand-built test fixtures. */
+  usage_source?: 'provider' | 'estimated'
   latency_ms: number
   cost_units: number          // normalized cost units for billing
   fallback_used: boolean
+  /** Provider requests this logical call actually made (retries + fallback included). */
+  provider_requests?: number
 }
 
 export type ProviderConfig = {

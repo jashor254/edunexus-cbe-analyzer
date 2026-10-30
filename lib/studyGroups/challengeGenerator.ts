@@ -37,7 +37,7 @@ Rules:
 - No multiple choice — open-ended short-answer only
 - No LaTeX — write math in plain text (e.g. "2 + 3 =" not "$2 + 3 =$")`
 
-  const raw = await callGeminiJSON(prompt)
+  const raw = await callGeminiJSON(prompt, { feature: 'study_group_challenge' })
 
   let parsed: GeneratedChallenge
   try {
