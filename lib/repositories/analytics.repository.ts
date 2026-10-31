@@ -218,16 +218,57 @@ export class AnalyticsRepository extends BaseRepository {
     }
   }
 
-  async countAICallsByFeature(userId: string, feature: string, since: string): Promise<number> {
+  // ── Daily AI quota (lib/ai/rateLimit.ts) ────────────────────────────────────
+  //
+  // Quota rows live in ai_call_logs alongside telemetry rows, told apart by
+  // `model = AI_QUOTA_MODEL_MARKER`. Only quota rows are counted, so a
+  // feature's cap measures logical operations (one SOW, one essay, one
+  // Compass session) — never provider requests, retries or telemetry. The
+  // prompt/response columns stay null: a quota row carries no content.
+
+  /** Counts this user's live (success = true) quota rows for one feature since `since`. Throws on a DB error. */
+  async countQuotaReservations(userId: string, feature: string, since: string): Promise<number> {
     const { count, error } = await this.db
       .from('ai_call_logs')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
       .eq('feature', feature)
+      .eq('model', AI_QUOTA_MODEL_MARKER)
       .eq('success', true)
       .gte('created_at', since)
 
-    if (error) return 0
+    if (error) throw new Error(`Failed to count AI quota reservations: ${error.message}`)
     return count ?? 0
   }
+
+  /** Inserts one live quota row and returns its id. Throws on a DB error. */
+  async insertQuotaReservation(userId: string, feature: string): Promise<string> {
+    const { data, error } = await this.db
+      .from('ai_call_logs')
+      .insert({
+        user_id:    userId,
+        feature,
+        model:      AI_QUOTA_MODEL_MARKER,
+        success:    true,
+        created_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single()
+
+    if (error || !data) throw new Error(`Failed to reserve AI quota: ${error?.message ?? 'no row returned'}`)
+    return data.id as string
+  }
+
+  /** Releases a quota row (success = false) so a failed or refused operation is not counted. */
+  async releaseQuotaReservation(id: string, reason: string): Promise<void> {
+    const { error } = await this.db
+      .from('ai_call_logs')
+      .update({ success: false, error: reason.slice(0, 200) })
+      .eq('id', id)
+
+    if (error) throw new Error(`Failed to release AI quota reservation: ${error.message}`)
+  }
 }
+
+/** `ai_call_logs.model` value that marks a row as a daily-quota reservation, not a provider call. */
+export const AI_QUOTA_MODEL_MARKER = 'quota'

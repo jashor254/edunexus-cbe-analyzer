@@ -478,7 +478,7 @@ test('8. the teacher\'s objective reaches the real Compass system prompt', async
   const strandName = (ctx?.compass_bridge ?? {}).strandName as string | null
 
   const prompt = buildCompassPrompt({
-    firstName: 'Mary', grade: 8, level: 1, isJunior: true, pathway: null,
+    grade: 8, level: 1, isJunior: true, pathway: null,
     subject: 'mathematics', subtopic: next.subtopic!, gradeTopics: [],
     teacherRecommendation: strandName ?? undefined, teacherSuggested: true,
     sessionsWithoutImprovement: 0,
@@ -844,7 +844,7 @@ function ringAiResponse(text: string): AIResponse {
 
 /** Deterministic, tier-labelled generation + an always-passing verification. */
 const ringAI: RoutedCompletionFn = async request => {
-  if (request.feature === 'adaptive_variant.generate') {
+  if (request.call_site === 'generate') {
     const tier = /Target instructional tier: (\w+)/.exec(request.prompt)?.[1] ?? 'unknown'
     return ringAiResponse(JSON.stringify({
       questionText: `[${tier}] What is 3/8 + 2/8?`,
@@ -857,7 +857,17 @@ const ringAI: RoutedCompletionFn = async request => {
       learnerExplanation: 'The bottom number stays the same.',
     }))
   }
-  return ringAiResponse(JSON.stringify({ valid: true, reason: 'single unambiguous correct answer' }))
+  // call_site 'verify' — the strict P0-2 verdict contract
+  // (lib/assignments/variantVerification.ts parseVerifierVerdict). This used
+  // to return the pre-P0-2 `{ valid, reason }` shape, which the strict parser
+  // rejects as `verifier_output_invalid` — so no variant was ever created and
+  // AR2–AR7 failed (reproduced identically at 00f5dd8, before the AI-call
+  // remediation). Still an always-clean verification, as the doc says.
+  return ringAiResponse(JSON.stringify({
+    keyCorrect: true, sameConcept: true, singleQuestion: true,
+    answerGiveaway: 'none', giveawayEvidence: '', factualError: 'none', factualEvidence: '',
+    reason: 'single unambiguous correct answer',
+  }))
 }
 
 async function createRingQuiz(title: string, subStrandId: string): Promise<{ assignmentId: string; questionId: string }> {

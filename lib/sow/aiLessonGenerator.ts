@@ -207,6 +207,7 @@ function callSowAI(prompt: string, isKiswahili = false, costContext?: AICostCont
     temperature: TEMPERATURE,
     maxTokens:   1200,
     costContext,
+    feature:     'sow_generate',
   })
 }
 
@@ -584,15 +585,33 @@ ${substrand.split(/[\s\-:,/()]+/).filter(w => w.length >= 4).slice(0, 3).join(',
         '[question using third starter from the frame above]',
       ]
 
+  // Fields the server sets from the official KICD slice (kicdOfficialFields)
+  // are left OUT of the template: asking the model to echo official text it
+  // must not change only spent output tokens on text that was then
+  // overwritten — or, for competencies/values/PCIs, kept whatever paraphrase
+  // the model returned.
+  const official = kicdOfficialFields(kicdSlice)
+  const templateFields: string[] = [
+    ...(official.learning_outcomes ? [] : [`  "learning_outcomes": ${JSON.stringify(learningOutcomeEx)}`]),
+    `  "learning_experiences": [\n    "${experienceEx[0]}",\n    "${experienceEx[1]}",\n    "${experienceEx[2]}"\n  ]`,
+    ...(official.key_inquiry_questions ? [] : [`  "key_inquiry_questions": ${JSON.stringify(inquiryQuestionEx)}`]),
+    `  "assessment_methods": [\n    "${assessmentMethodsEx[0]}",\n    "${assessmentMethodsEx[1]}",\n    "${assessmentMethodsEx[2]}"\n  ]`,
+    `  "learning_resources": [\n    "${learningResourcesEx[0]}",\n    "${learningResourcesEx[1]}",\n    "${learningResourcesEx[2]}"\n  ]`,
+    ...(official.core_competencies ? [] : [`  "core_competencies": "${competenciesStr}"`]),
+    ...(official.values ? [] : [`  "values": "${valuesStr}"`]),
+    ...(official.pci_links ? [] : [`  "pci_links": "${pciLinksStr}"`]),
+  ]
+  const jsonTemplate = `{\n${templateFields.join(',\n')}\n}`
+
   const importantNotes = isKiswahili
     ? `MUHIMU:
-${kicdSlice ? '- Shabaha za KICD zirudishwe kama zilivyotolewa hapo juu\n' : `- Matokeo matatu ya kujifunza: mpangilio wa utambuzi Kiwango 1 → Kiwango 2 → Kiwango 3\n- Kila matokeo lianze MOJA KWA MOJA na kitenzi cha kutenda — USIANDIKE "Kufikia mwisho wa somo" au "Mwanafunzi aweze" kama utangulizi\n`}- Tumia istilahi za ${isCBC ? 'CBC Kenya' : 'KCSE 8-4-4 Kenya'} kwa Kiswahili sanifu
+${kicdSlice ? '- USIRUDISHE shabaha za KICD wala maswali dadisi rasmi kwenye JSON — maandishi rasmi yanajazwa kiotomatiki\n' : `- Matokeo matatu ya kujifunza: mpangilio wa utambuzi Kiwango 1 → Kiwango 2 → Kiwango 3\n- Kila matokeo lianze MOJA KWA MOJA na kitenzi cha kutenda — USIANDIKE "Kufikia mwisho wa somo" au "Mwanafunzi aweze" kama utangulizi\n`}- Tumia istilahi za ${isCBC ? 'CBC Kenya' : 'KCSE 8-4-4 Kenya'} kwa Kiswahili sanifu
 - Usitaje kabila au jamii ya kikabila (isipokuwa mada ndogo inaihusu); usihusishe tabia hasi na eneo au jamii yoyote
 - Andika maudhui YOTE (matokeo, uzoefu, maswali, tathmini, nyenzo, maadili, uwezo wa msingi) kwa Kiswahili Sanifu — majina ya sehemu za JSON pekee ndiyo yanabaki kwa Kiingereza
 - Toa JSON SAHIHI PEKEE — bila maandishi mengine
 ${retryNote}`
     : `IMPORTANT:
-${kicdSlice ? '- Return the KICD outcomes exactly as given above\n' : `- 3 learning outcomes: Level 1 → Level 2 → Level 3 cognitive order\n- Each outcome starts DIRECTLY with the action verb — do NOT write "By the end of the lesson" or "The learner should be able to" as a prefix\n`}- Use ${isCBC ? 'CBC Kenya' : 'KCSE 8-4-4 Kenya'} terminology throughout
+${kicdSlice ? '- Do NOT repeat the official KICD outcomes or key inquiry questions in your JSON — the official text is filled in automatically\n' : `- 3 learning outcomes: Level 1 → Level 2 → Level 3 cognitive order\n- Each outcome starts DIRECTLY with the action verb — do NOT write "By the end of the lesson" or "The learner should be able to" as a prefix\n`}- Use ${isCBC ? 'CBC Kenya' : 'KCSE 8-4-4 Kenya'} terminology throughout
 - Never name an ethnic community unless the sub-strand is about it; never associate negative behaviour with any region or community
 - Output VALID JSON ONLY — no extra text
 ${retryNote}`
@@ -621,30 +640,34 @@ ${keywordRequirement}
 ${seed?.contextBlock && !kicdSlice ? `\nPER-LESSON DIVERSITY CONTEXT:\n${seed.contextBlock}` : ''}
 
 ${outputHeader}
-{
-  "learning_outcomes": ${JSON.stringify(kicdSlice ? kicdSlice.learningOutcomes : learningOutcomeEx)},
-  "learning_experiences": [
-    "${experienceEx[0]}",
-    "${experienceEx[1]}",
-    "${experienceEx[2]}"
-  ],
-  "key_inquiry_questions": ${JSON.stringify(officialQuestions ? kicdSlice.keyInquiryQuestions : inquiryQuestionEx)},
-  "assessment_methods": [
-    "${assessmentMethodsEx[0]}",
-    "${assessmentMethodsEx[1]}",
-    "${assessmentMethodsEx[2]}"
-  ],
-  "learning_resources": [
-    "${learningResourcesEx[0]}",
-    "${learningResourcesEx[1]}",
-    "${learningResourcesEx[2]}"
-  ],
-  "core_competencies": "${competenciesStr}",
-  "values": "${valuesStr}",
-  "pci_links": "${pciLinksStr}"
-}
+${jsonTemplate}
 
 ${importantNotes}`
+}
+
+// ─── Official KICD fields ─────────────────────────────────────────────────────
+
+/**
+ * The lesson fields that come verbatim from the official KICD slice when one
+ * matched. These are authoritative: the server sets them after the model
+ * replies, and the prompt does not ask the model to produce them. A field
+ * whose official list is empty is absent here and stays model-written.
+ */
+export function kicdOfficialFields(slice: KicdLessonSlice | undefined): {
+  learning_outcomes?:     string[]
+  key_inquiry_questions?: string[]
+  core_competencies?:     string
+  values?:                string
+  pci_links?:             string
+} {
+  if (!slice) return {}
+  return {
+    learning_outcomes: slice.learningOutcomes,
+    ...(slice.keyInquiryQuestions.length ? { key_inquiry_questions: slice.keyInquiryQuestions } : {}),
+    ...(slice.coreCompetencies.length ? { core_competencies: slice.coreCompetencies.join(', ') } : {}),
+    ...(slice.values.length ? { values: slice.values.join(', ') } : {}),
+    ...(slice.pcis.length ? { pci_links: slice.pcis.join(', ') } : {}),
+  }
 }
 
 // ─── Context interface ────────────────────────────────────────────────────────
@@ -737,8 +760,12 @@ ${lastError.includes('ethnic') ? 'REMINDER: do not name any ethnic community —
     try {
       aiResponse = await callSowAI(prompt, isKiswahiliCtx, context.costContext)
     } catch (err: unknown) {
+      // callDeepSeek has already retried and fallen back across providers
+      // by the time it throws — another loop iteration would only repeat
+      // that whole chain (up to MAX_RETRIES × 3 requests per lesson while a
+      // provider is down). Validation failures below still retry.
       lastError = `AI request failed: ${err instanceof Error ? err.message : String(err)}`
-      continue
+      break
     }
 
     let lesson: Record<string, any>
@@ -757,10 +784,7 @@ ${lastError.includes('ethnic') ? 'REMINDER: do not name any ethnic community —
     // Official KICD text is set from the slice, never taken from the model's
     // echo of it — the model may silently reword or drop an outcome.
     const slice = context.kicdSlice
-    if (slice) {
-      lesson.learning_outcomes = slice.learningOutcomes
-      if (slice.keyInquiryQuestions.length) lesson.key_inquiry_questions = slice.keyInquiryQuestions
-    }
+    Object.assign(lesson, kicdOfficialFields(slice))
 
     const validation = validateLesson(lesson, context.substrand, context.subjectType ?? 'default', {
       outcomesFromKicd: !!slice,

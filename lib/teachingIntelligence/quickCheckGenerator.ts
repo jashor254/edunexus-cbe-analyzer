@@ -67,7 +67,7 @@ Respond ONLY with valid JSON, exactly this shape:
   let rawResponse = ''
 
   try {
-    rawResponse = await callGeminiJSON(prompt)
+    rawResponse = await callGeminiJSON(prompt, { feature: 'teaching_quick_check' })
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err)
     await logAICall({

@@ -208,6 +208,9 @@ export default function LessonPlansPage() {
       if (d.success) {
         await loadPlans(selectedSowId)
         setSelectedWeek(weekNumber)
+        if ((d.data?.failed ?? 0) > 0) {
+          setError(`${d.data.failed} lesson plan${d.data.failed === 1 ? '' : 's'} for week ${weekNumber} could not be generated — generate the week again to fill the gaps.`)
+        }
       } else {
         setError(d.error || 'Generation failed')
       }

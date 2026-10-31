@@ -12,6 +12,7 @@ import { UnauthorizedError } from '@/lib/core/errors'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
 import { apiPaymentRequired } from '@/lib/payments/paywall'
 import { logger } from '@/lib/observability/logger'
+import { reserveDailyCall, dailyLimitMessage } from '@/lib/ai/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -72,6 +73,14 @@ export async function POST(
       return access.reason === 'unauthenticated' ? apiUnauthorized() : apiForbidden()
     }
 
+    // DAILY_CALL_LIMITS.class_reports_generate was configured but never
+    // checked here. One unit per class run, released if the run produces no
+    // complete report.
+    const quota = await reserveDailyCall(user.id, 'class_reports_generate')
+    if (quota.allowed === false) {
+      return apiError(dailyLimitMessage(quota, 'class report runs'), 429)
+    }
+
     // Same pattern as Holiday Planner (see app/api/holiday/generate/route.ts):
     // a full class of students, each needing its own DeepSeek call, does not
     // fit inside one request/response. Inserted already `processing` in a
@@ -90,7 +99,10 @@ export async function POST(
       })
       .select('id')
       .single()
-    if (jobErr || !job) return apiError('Could not start report generation')
+    if (jobErr || !job) {
+      await quota.release('class reports job could not be created')
+      return apiError('Could not start report generation')
+    }
 
     after(async () => {
       try {
@@ -99,6 +111,7 @@ export async function POST(
             result: { total: progress.total, completed: progress.completed, currentStudentName: progress.currentStudentName },
           })
         })
+        if (result.success === 0) await quota.release('class report run produced no complete report')
         // Charged after the run, and only when at least one report was
         // produced. The reports are already written by this point, so a failed
         // deduction (balance spent elsewhere meanwhile) is logged, not undone.
@@ -119,6 +132,7 @@ export async function POST(
         })
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
+        await quota.release('class report run failed')
         await repos.jobs.updateProgress(job.id, { status: 'failed', result: { total, completed: 0, currentStudentName: null, errorMessage: message } })
       }
     })

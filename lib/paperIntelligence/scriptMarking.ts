@@ -15,6 +15,8 @@
 
 import { GoogleGenerativeAI, SchemaType, type Part, type ResponseSchema } from '@google/generative-ai'
 import { GEMINI_SCRIPT_MARKING } from '@/lib/ai/models'
+import { generateGeminiWithTimeout } from '@/lib/ai/gemini'
+import { startLogicalCall } from '@/lib/ai/usageTelemetry'
 import { isAllowedUploadType, UPLOAD_LIMITS } from '@/lib/config/uploads'
 import { PAPER_INTELLIGENCE_LIMITS } from '@/lib/config/paperIntelligence'
 import {
@@ -52,6 +54,12 @@ export type ScriptMarkingResult = {
 const MAX_OUTPUT_TOKENS = 24576
 /** One retry on a malformed response; a second failure is reported, not looped. */
 const MAX_ATTEMPTS = 2
+/**
+ * Per-attempt abort. The mark-script route allows 120s (maxDuration), so two
+ * attempts × 50s still leave room to persist the result. ~11s is typical
+ * (models.ts); a request still running at 50s is abandoned, not awaited.
+ */
+const SCRIPT_MARKING_TIMEOUT_MS = 50_000
 
 /**
  * Structured output: the API itself enforces this shape, so a classification
@@ -152,8 +160,11 @@ export async function recognizeAndMarkScript(request: ScriptMarkingRequest, mode
   let promptTokens = 0
   let completionTokens = 0
   let totalTokens = 0
+  // One logical call shared by the parse-retry, so telemetry shows it as a
+  // retry (attempt 2) — each attempt resends every page image.
+  const call = startLogicalCall({ feature: 'paper_intelligence_mark_script', correlationId: request.correlationId })
   for (let attempt = 1; parsed === null; attempt++) {
-    const result = await model.generateContent(content)
+    const result = await generateGeminiWithTimeout(model, content, { timeoutMs: SCRIPT_MARKING_TIMEOUT_MS, modelName, call })
     const usage = result.response.usageMetadata
     promptTokens += usage?.promptTokenCount ?? 0
     completionTokens += usage?.candidatesTokenCount ?? 0

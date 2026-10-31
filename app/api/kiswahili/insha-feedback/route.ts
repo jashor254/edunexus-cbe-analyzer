@@ -6,6 +6,7 @@ import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
 import { evaluateInsha } from '@/lib/kiswahili/inshaEvaluator'
 import { resolveInshaCharge, recordInshaEssay } from '@/lib/kiswahili/inshaBilling'
 import { apiPaymentRequired } from '@/lib/payments/paywall'
+import { reserveDailyCall, dailyLimitMessage } from '@/lib/ai/rateLimit'
 import type { InshaType } from '@/lib/kiswahili/inshaEvaluator'
 
 const INSHA_TYPES: InshaType[] = ['masimulizi', 'hoja', 'maelezo', 'barua_rasmi', 'mazungumzo']
@@ -52,11 +53,20 @@ export async function POST(req: NextRequest) {
       return charge.reason === 'unauthenticated' ? apiUnauthorized() : apiError('Access denied', 403)
     }
 
+    // DAILY_CALL_LIMITS.kiswahili_insha_pack (per essay) was configured but
+    // never checked. Released when the evaluation falls back, matching the
+    // pack billing rule below: a failed evaluation costs the teacher nothing.
+    const quota = await reserveDailyCall(user.id, 'kiswahili_insha_pack')
+    if (quota.allowed === false) {
+      return apiError(dailyLimitMessage(quota, 'insha evaluations'), 429)
+    }
+
     const feedback = await evaluateInsha({ insha, inshaType, grade })
 
     // Recorded only for a genuine evaluation — a fallback placeholder (AI
     // failed) never uses up an essay or opens a pack.
     if (!feedback.isFallback) await recordInshaEssay(charge)
+    else await quota.release('insha evaluation fell back')
 
     return apiSuccess({ feedback })
   } catch (err) {

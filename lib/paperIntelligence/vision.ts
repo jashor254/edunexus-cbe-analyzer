@@ -14,6 +14,12 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { GEMINI_PRIMARY } from '@/lib/ai/models'
+import { generateGeminiWithTimeout } from '@/lib/ai/gemini'
+import { startLogicalCall } from '@/lib/ai/usageTelemetry'
+
+// A multimodal request that has not answered in this long is abandoned (and
+// the HTTP request aborted) rather than holding the route open indefinitely.
+const PAPER_VISION_TIMEOUT_MS = 45_000
 import { isAllowedUploadType, UPLOAD_LIMITS } from '@/lib/config/uploads'
 import { parsePaperVisionResponse, validateAgainstRubrics, type QuestionValidationResult } from './validation'
 import type { PaperVisionRequest, PaperVisionResponse, RubricForMarking } from './types'
@@ -88,10 +94,14 @@ export async function recognizeAndMarkPage(request: PaperVisionRequest): Promise
   })
 
   const startedAt = Date.now()
-  const result = await model.generateContent([
+  const result = await generateGeminiWithTimeout(model, [
     { text: buildPrompt(request.rubrics) },
     { inlineData: { mimeType: request.mimeType, data: request.imageBase64 } },
-  ])
+  ], {
+    timeoutMs: PAPER_VISION_TIMEOUT_MS,
+    modelName: GEMINI_PRIMARY,
+    call: startLogicalCall({ feature: 'paper_intelligence_mark_page' }),
+  })
   const latencyMs = Date.now() - startedAt
 
   const usage = result.response.usageMetadata

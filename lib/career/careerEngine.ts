@@ -116,7 +116,7 @@ Return ONLY this JSON (all fields required):
 
 Rules for capability weights: all 6 weights must sum to exactly 1.0. Minimum values: 0.10–0.75. Ideal values: 0.30–0.95. Weight the 2 most important dimensions heaviest.`
 
-  const raw = await callDeepSeek(prompt, systemPrompt, { temperature: 0.4, maxTokens: 3500 })
+  const raw = await callDeepSeek(prompt, systemPrompt, { temperature: 0.4, maxTokens: 3500, feature: 'career_knowledge_request', callSite: 'profile_draft' })
   const jsonMatch = raw.match(/\{[\s\S]*\}/)
   if (!jsonMatch) throw new Error('Career generation returned no JSON')
   const ai = JSON.parse(jsonMatch[0]) as Record<string, unknown>

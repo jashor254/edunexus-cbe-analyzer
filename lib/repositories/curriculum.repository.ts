@@ -688,4 +688,38 @@ export class CurriculumRepository extends BaseRepository {
       .limit(10)
     return (data ?? []) as Array<{ id: string; title: string; subject: string; grade: number; strand: string; sub_strand: string }>
   }
+
+  // ── Scheduled (Friday) lesson-plan eligibility — lib/lessonPlan/scheduledGeneration.ts ─
+
+  /** Lesson plans of these schemes that a teacher marked taught on/after `sinceDate` (YYYY-MM-DD). */
+  async findTaughtPlansSince(sowIds: string[], sinceDate: string): Promise<Array<{ sow_id: string; taught_date: string }>> {
+    if (sowIds.length === 0) return []
+    const { data, error } = await this.db
+      .from('lesson_plans')
+      .select('sow_id, taught_date')
+      .in('sow_id', sowIds)
+      .gte('taught_date', sinceDate)
+
+    if (error) throw new Error(`Failed to read taught lesson plans: ${error.message}`)
+    return (data ?? []) as Array<{ sow_id: string; taught_date: string }>
+  }
+
+  /**
+   * Teacher-triggered lesson-plan generations for these schemes since `since`.
+   * Manual generations (app/api/lesson-plans/generate-week) insert
+   * generation_jobs with no job_type; the Friday cron always writes
+   * 'weekly_lp' — so a NULL job_type is a teacher's own action.
+   */
+  async findManualGenerationsSince(sowIds: string[], since: string): Promise<Array<{ sow_id: string; created_at: string }>> {
+    if (sowIds.length === 0) return []
+    const { data, error } = await this.db
+      .from('generation_jobs')
+      .select('sow_id, created_at')
+      .in('sow_id', sowIds)
+      .is('job_type', null)
+      .gte('created_at', since)
+
+    if (error) throw new Error(`Failed to read manual lesson-plan generations: ${error.message}`)
+    return (data ?? []) as Array<{ sow_id: string; created_at: string }>
+  }
 }

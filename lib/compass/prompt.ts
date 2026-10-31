@@ -1,6 +1,14 @@
 // lib/compass/prompt.ts
 
 import type { CompassPedagogyState } from './pedagogy'
+import { LEARNER_NAME_TOKEN } from '@/lib/ai/learnerPseudonym'
+
+// The learner is only ever named by LEARNER_NAME_TOKEN in this prompt. There
+// is deliberately no name parameter: the prompt goes to third-party providers
+// (Gemini, then DeepSeek on fallback), so the builder cannot carry a real name
+// even by mistake. app/api/learn/route.ts restores the first name locally in
+// the streamed reply (createLearnerNameStreamRestorer).
+const LEARNER = LEARNER_NAME_TOKEN
 
 // Knowledge graph context injected when student_learning_context has root cause data.
 // All fields are AI-internal — never quoted verbatim to the student.
@@ -33,7 +41,6 @@ export type CompassPersistentContext = {
 
 export interface CompassPromptParams {
   // Student
-  firstName: string
   grade: number
   level: 1 | 2 | 3 | 4
   isJunior: boolean
@@ -225,7 +232,8 @@ Never report genuine_progress for a concept with an unresolved re-check (see STR
 
 ## LEARNER
 
-${p.firstName} | Grade ${p.grade} | Level ${p.level}/4 (${['BE','AE','ME','EE'][p.level - 1]})${!p.isJunior && p.pathway ? ` | Pathway: ${p.pathway}` : ''}${p.levelSource && p.levelSource !== 'projection' ? ` (provisional — no confirmed evidence yet, treat as a starting point only)` : ''}
+${LEARNER} | Grade ${p.grade} | Level ${p.level}/4 (${['BE','AE','ME','EE'][p.level - 1]})${!p.isJunior && p.pathway ? ` | Pathway: ${p.pathway}` : ''}${p.levelSource && p.levelSource !== 'projection' ? ` (provisional — no confirmed evidence yet, treat as a starting point only)` : ''}
+(${LEARNER} is a placeholder for the learner's first name — whenever you address them by name, write it exactly as given, braces included.)
 ${p.lastSessionSummary ? `Last session: ${p.lastSessionSummary}` : 'First session.'}${p.sessionsWithoutImprovement >= 2 ? `\nNote: ${p.sessionsWithoutImprovement} sessions without improvement — try a different approach.` : ''}
 ${buildPersistentContextBlock(p.persistentIntelligence)}${buildPedagogyContextBlock(p.activePedagogy)}
 ---
@@ -252,7 +260,7 @@ Give one warm, honest, specific sentence of feedback. No generic praise.
 
 Then output EXACTLY (no markdown, no backticks, no additional text):
 COMPASS_EVAL_START
-{"genuine_progress":false,"recommend_subject_rest":false,"sessions_without_improvement":${p.sessionsWithoutImprovement},"one_line_summary":"${p.firstName} [honest one-line summary of today's session]"}
+{"genuine_progress":false,"recommend_subject_rest":false,"sessions_without_improvement":${p.sessionsWithoutImprovement},"one_line_summary":"${LEARNER} [honest one-line summary of today's session]"}
 COMPASS_EVAL_END`.trim()
 }
 
@@ -338,11 +346,11 @@ function buildOpenerInstruction(p: CompassPromptParams): string {
   const ctx = p.knowledgeContext
 
   if (ctx?.graphOpener && ctx.rootCauseTopic && ctx.failingTopic) {
-    return `Open with: "Hey ${p.firstName}! Let's start with ${ctx.rootCauseTopic} today — that's the foundation for ${ctx.failingTopic}. What do you already know about ${ctx.rootCauseTopic}?"`
+    return `Open with: "Hey ${LEARNER}! Let's start with ${ctx.rootCauseTopic} today — that's the foundation for ${ctx.failingTopic}. What do you already know about ${ctx.rootCauseTopic}?"`
   }
 
   if (p.teacherSuggested) {
-    return `Open with: "Hey ${p.firstName}! Your teacher arranged this session — how have you been finding ${p.subtopic}?"`
+    return `Open with: "Hey ${LEARNER}! Your teacher arranged this session — how have you been finding ${p.subtopic}?"`
   }
 
   return `Ask the learner what they need help with. Do not open with a content question.`

@@ -2,7 +2,7 @@
 import { z } from 'zod'
 import { createServiceClient } from '@/utils/supabase/service'
 import { checkFeatureAccess } from '@/lib/payments/access'
-import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
+import { reserveDailyCallOrThrow, DailyLimitExceededError, dailyLimitMessage, type HeldReservation } from '@/lib/ai/rateLimit'
 import { type FeatureKey } from '@/lib/payments/config'
 import {
   apiSuccess,
@@ -26,11 +26,6 @@ export async function POST(req: Request) {
     if (access.allowed === false) {
       const status = access.reason === 'unauthenticated' ? 401 : 403
       return apiError(access.reason, status)
-    }
-
-    const rateLimit = await checkDailyCallLimit(access.userId, FEATURE)
-    if (rateLimit.allowed === false) {
-      return apiError(`Daily limit of ${rateLimit.limit} lesson plan generations reached. Resets at ${rateLimit.resetAt}`, 429)
     }
 
     const db = createServiceClient()
@@ -62,14 +57,33 @@ export async function POST(req: Request) {
       status: 'processing',
     }).select('id').single()
 
+    // One unit of today's cap per week actually generated. Reserved by the
+    // generator's hook, i.e. only once it has confirmed there are lessons
+    // still missing a plan — a repeated request for a finished week makes no
+    // AI call and consumes no quota.
+    const held: { quota?: HeldReservation } = {}
     let result
     try {
       // Cost attribution intentionally unset — see app/api/sow/generate/route.ts.
       // `organization_members` does not exist in production; this lookup threw
       // PGRST205, which the surrounding catch turned into a silently failed
       // generation job rather than a visible error.
-      result = await generateSpecificWeekPlans(sowId, access.userId, weekNumber, undefined)
+      result = await generateSpecificWeekPlans(sowId, access.userId, weekNumber, undefined, {
+        beforeGenerate: async () => { held.quota = await reserveDailyCallOrThrow(access.userId, FEATURE) },
+      })
+      if (result.generated === 0) await held.quota?.release('no lesson plan generated')
     } catch (err: unknown) {
+      if (err instanceof DailyLimitExceededError) {
+        if (job) {
+          await db.from('generation_jobs').update({
+            status: 'failed',
+            error_message: 'daily limit reached',
+            completed_at: new Date().toISOString(),
+          }).eq('id', job.id)
+        }
+        return apiError(dailyLimitMessage(err, 'lesson plan generations'), 429)
+      }
+      await held.quota?.release('lesson plan generation failed')
       const message = err instanceof Error ? err.message : 'Generation failed'
       console.error('[lesson-plans/generate-week]', message)
       if (job) {

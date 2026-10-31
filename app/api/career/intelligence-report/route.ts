@@ -1,6 +1,9 @@
 // app/api/career/intelligence-report/route.ts
 // Generates the full 13-section Career Intelligence Report for a student.
-// One DeepSeek call for narrative sections + deterministic sections from COS pipeline.
+// Deterministic sections are computed live on every view; the one AI call
+// (narrative sections) runs only when no narrative exists for the learner's
+// current inputs. Re-opening a report whose evidence has not changed reuses
+// the stored narrative — no model call, no daily-cap unit, no charge.
 
 import { NextRequest } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
@@ -8,8 +11,8 @@ import { createServiceClient } from '@/utils/supabase/service'
 import {
   apiSuccess, apiError, apiUnauthorized, apiBadRequest, apiForbidden,
 } from '@/lib/api/response'
-import { buildCareerIntelligenceReport } from '@/lib/career/careerIntelligenceEngine'
-import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
+import { buildCareerIntelligenceReport, NarrativeNotAvailableError } from '@/lib/career/careerIntelligenceEngine'
+import { reserveDailyCallOrThrow, DailyLimitExceededError, dailyLimitMessage, type HeldReservation } from '@/lib/ai/rateLimit'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
 import { apiPaymentRequired } from '@/lib/payments/paywall'
 
@@ -39,27 +42,36 @@ export async function GET(req: NextRequest) {
     if (!isOwner && !isParent) return apiForbidden()
 
     // Priced at TOKEN_COSTS.career_intelligence_report, free on a Term Plan.
-    // This route previously ran the paid report for anyone with no charge.
+    // A parent without tokens may still re-open a report whose narrative
+    // already exists for the current evidence (they paid for it) — only a
+    // NEW generation needs access.
     const access = await checkFeatureAccess('career_intelligence_report')
-    if (access.allowed === false) {
-      if (access.reason === 'insufficient_tokens') return apiPaymentRequired('career_intelligence_report')
+    if (access.allowed === false && access.reason !== 'insufficient_tokens') {
       return access.reason === 'unauthenticated' ? apiUnauthorized() : apiForbidden()
     }
 
-    // Rate limit check — 2 intelligence reports per user per day
-    const rateCheck = await checkDailyCallLimit(user.id, 'career_intelligence_report')
-    if (!rateCheck.allowed) {
-      return apiError(
-        `Daily limit reached (${rateCheck.limit} career intelligence reports per day). Resets at midnight UTC.`,
-        429
-      )
+    const db = createServiceClient()
+    // Rate limit — 2 intelligence report GENERATIONS per user per day,
+    // reserved by the engine's hook only when a fresh model call is needed.
+    const held: { quota?: HeldReservation } = {}
+    let report: Awaited<ReturnType<typeof buildCareerIntelligenceReport>>
+    try {
+      report = await buildCareerIntelligenceReport(studentId, db, {
+        allowGeneration: access.allowed,
+        beforeGenerate: async () => { held.quota = await reserveDailyCallOrThrow(user.id, 'career_intelligence_report') },
+      })
+    } catch (err) {
+      if (err instanceof NarrativeNotAvailableError) return apiPaymentRequired('career_intelligence_report')
+      if (err instanceof DailyLimitExceededError) {
+        return apiError(dailyLimitMessage(err, 'career intelligence reports'), 429)
+      }
+      await held.quota?.release('career intelligence report generation failed')
+      throw err
     }
 
-    const db = createServiceClient()
-    const report = await buildCareerIntelligenceReport(studentId, db)
-
-    // Charged only after the report was built — never for a failed run.
-    if (access.deductTokens) {
+    // Charged only for a fresh generation that succeeded — never for a
+    // failed run, and never for re-opening an unchanged report.
+    if (report.narrative_source === 'generated' && access.allowed && access.deductTokens) {
       await deductFeatureTokens(access.userId, 'career_intelligence_report', access.cost)
     }
 

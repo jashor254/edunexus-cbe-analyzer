@@ -273,6 +273,25 @@ export async function endSession(
 
 // ── Legacy: used by app/api/learn/route.ts ────────────────────────────────────
 
+/** Turns of context a tutoring call may carry (10 exchanges). */
+export const COMPASS_HISTORY_MESSAGES = 20
+/** Per-message character bound on context history — a long paste can't balloon every later turn. */
+export const COMPASS_HISTORY_MESSAGE_CHARS = 4000
+
+/**
+ * Server-authoritative conversation context for one Compass turn: the
+ * session's own stored messages, never the browser's copy. The route used
+ * to forward a client-supplied `conversationHistory` array straight to the
+ * provider, so a caller could fabricate earlier "assistant" turns or send an
+ * unbounded transcript. Callers must have verified session ownership.
+ */
+export async function readSessionHistory(
+  sessionId: string,
+): Promise<Array<{ role: 'user' | 'assistant'; content: string }>> {
+  const messages = await repos.compass.findRecentSessionMessages(sessionId, COMPASS_HISTORY_MESSAGES)
+  return messages.map(m => ({ role: m.role, content: m.content.slice(0, COMPASS_HISTORY_MESSAGE_CHARS) }))
+}
+
 export async function readSession(
   sessionId: string,
   userId:    string

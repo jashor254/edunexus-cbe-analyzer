@@ -255,7 +255,13 @@ jobs:
           # data-only backfill). Reviewed: only schema change; FAIL_COUNT=9
           # UNRECOVERED=0, unchanged. Computed on an isolated throwaway pifp
           # stack that first reproduced 3e9bb65d at HEAD.
-          EXPECTED="28ff24ca07243bcf18a41d69a21b42f9"
+          # 2026-10-30: 28ff24ca… → 0b8f67ee… for migration
+          # 20261030120000_career_intelligence_narratives.sql (adds table
+          # career_intelligence_narratives + its updated_at trigger function,
+          # RLS service-role only, additive). Reviewed: only schema change;
+          # FAIL_COUNT=9 UNRECOVERED=0, unchanged. Computed on an isolated
+          # throwaway pifp stack that first reproduced 28ff24ca at HEAD.
+          EXPECTED="0b8f67ee08e04e3f3e485ba49ba9be38"
           echo "expected: $EXPECTED"
           echo "actual:   $ACTUAL"
           if [ "$ACTUAL" != "$EXPECTED" ]; then

@@ -54,7 +54,7 @@ mock.module('@/lib/repositories', {
   },
 })
 
-mock.module('@/lib/ai/rateLimit', { namedExports: { checkDailyCallLimit: async () => ({ allowed: true }) } })
+mock.module('@/lib/ai/rateLimit', { namedExports: { reserveDailyCall: async () => ({ allowed: true, callsToday: 1, limit: 5, release: async () => {} }) } })
 mock.module('@/lib/ai/logger', { namedExports: { logAICall: async () => undefined } })
 
 let publishReviewedCareer: typeof import('./knowledgeRequests').publishReviewedCareer

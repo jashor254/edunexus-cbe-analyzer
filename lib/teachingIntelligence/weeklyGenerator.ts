@@ -1,7 +1,4 @@
 import { repos } from '@/lib/repositories'
-import { callGemini } from '@/lib/ai/gemini'
-import { logAICall } from '@/lib/ai/logger'
-import { GEMINI_PRIMARY } from '@/lib/ai/models'
 import type {
   EvaluatedPlan,
   FollowUp,
@@ -49,64 +46,58 @@ function lessonHealthScore(
   return Math.round(raw * staleness * 100)
 }
 
-// ─── Teacher note (Prompt C) ──────────────────────────────────────────────────
-// Inputs: structured data only — no raw reflection text re-analysis.
-// Output: 2–3 sentences the teacher sees in their ROW.
+// ─── Teacher note ─────────────────────────────────────────────────────────────
+// Inputs: structured data only. Output: 2–3 sentences the teacher sees in
+// their ROW.
+//
+// Deterministic. This was a Gemini call whose prompt already spelled out the
+// whole rule — "solid week" above 70, "mixed week" 50–70, "challenging week"
+// below 50, name new flags, acknowledge resolved ones — over inputs that are
+// all structured data. The template applies that same rule exactly, every
+// time, with no provider call (docs/audits/ai-call-efficiency-deep-audit.md
+// AI-17). The wording deliberately avoids "gap", "failing" and "weak", like
+// the quick-check prompt.
 
-async function generateTeacherNote(
-  data: {
-    learningArea: string
-    grade: string
-    weekNumber: number
-    healthScore: number
-    lessonsAnalyzed: number
-    newFlags: SubstrandHealthRow[]
-    persistentFlags: SubstrandHealthRow[]
-    resolvedFlags: SubstrandHealthRow[]
+function listSubStrands(rows: SubstrandHealthRow[]): string {
+  const names = [...new Set(rows.map(r => r.sub_strand))]
+  if (names.length <= 1) return names[0] ?? ''
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
+export function buildTeacherNote(data: {
+  learningArea: string
+  grade: string
+  weekNumber: number
+  healthScore: number
+  lessonsAnalyzed: number
+  newFlags: SubstrandHealthRow[]
+  persistentFlags: SubstrandHealthRow[]
+  resolvedFlags: SubstrandHealthRow[]
+}): string {
+  const lessons = `${data.lessonsAnalyzed} evaluated lesson${data.lessonsAnalyzed === 1 ? '' : 's'}`
+  const tone = data.healthScore > 70 ? 'A solid week'
+    : data.healthScore >= 50 ? 'A mixed week'
+    : 'A challenging week'
+
+  const sentences = [
+    `${tone} in ${data.learningArea} (${data.grade}), week ${data.weekNumber} — a health score of ${data.healthScore}/100 across ${lessons}.`,
+  ]
+
+  if (data.newFlags.length > 0) {
+    sentences.push(`Learners asked for more support with ${listSubStrands(data.newFlags)} this week, so a short revisit there is worthwhile.`)
   }
-): Promise<string> {
-  const newFlagList = data.newFlags.map(f => f.sub_strand).join(', ') || 'none'
-  const persistentList = data.persistentFlags.map(f => f.sub_strand).join(', ') || 'none'
-  const resolvedList = data.resolvedFlags.map(f => f.sub_strand).join(', ') || 'none'
-
-  const prompt = `You are a supportive teaching coach writing a brief weekly note for a Kenyan CBC teacher.
-
-Subject: ${data.learningArea} | Grade: ${data.grade} | Week ${data.weekNumber}
-Health score: ${data.healthScore}/100 (based on ${data.lessonsAnalyzed} evaluated lessons)
-New follow-up flags this week: ${newFlagList}
-Ongoing concerns: ${persistentList}
-Resolved this week: ${resolvedList}
-
-Write 2–3 concise, encouraging sentences summarising this week's teaching intelligence.
-- Mention the health score naturally (e.g. "solid week" for >70, "mixed week" for 50–70, "challenging week" for <50)
-- If there are new flags, name the specific sub-strands
-- If something was resolved, acknowledge it
-- Tone: professional but warm, not robotic
-- Do NOT use bullet points. Plain prose only.`
-
-  const start = Date.now()
-  let note = `Week ${data.weekNumber} teaching completed across ${data.lessonsAnalyzed} lesson${data.lessonsAnalyzed !== 1 ? 's' : ''}.`
-  let success = true
-  let errMsg: string | undefined
-
-  try {
-    note = (await callGemini(prompt)).trim()
-  } catch (err) {
-    success = false
-    errMsg = err instanceof Error ? err.message : String(err)
+  if (data.persistentFlags.length > 0) {
+    sentences.push(`${listSubStrands(data.persistentFlags)} still needs attention from earlier weeks.`)
+  }
+  if (data.newFlags.length === 0 && data.persistentFlags.length === 0) {
+    sentences.push('No follow-ups are outstanding this week.')
   }
 
-  await logAICall({
-    feature: 'tie_weekly_note',
-    model: GEMINI_PRIMARY,
-    prompt: prompt.substring(0, 500),
-    response: note.substring(0, 200),
-    latencyMs: Date.now() - start,
-    success,
-    error: errMsg,
-  })
+  if (data.resolvedFlags.length > 0) {
+    sentences.push(`Well done resolving ${listSubStrands(data.resolvedFlags)}.`)
+  }
 
-  return note
+  return sentences.join(' ')
 }
 
 // ─── Main export ─────────────────────────────────────────────────────────────
@@ -183,7 +174,7 @@ export async function runTIEForSOW(
     .sort((a, b) => b.struggle_count - a.struggle_count)
 
   // ── Step 5: generate teacher note ────────────────────────────────────────
-  const teacherNote = await generateTeacherNote({
+  const teacherNote = buildTeacherNote({
     learningArea: context.learningArea,
     grade: context.grade,
     weekNumber,

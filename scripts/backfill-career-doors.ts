@@ -68,7 +68,7 @@ async function main() {
 
   for (const career of thin) {
     try {
-      const raw = await callDeepSeek(buildPrompt(career as Pick<Career, 'title' | 'description' | 'category'>), SYSTEM_PROMPT, { temperature: 0.5, maxTokens: 1500 })
+      const raw = await callDeepSeek(buildPrompt(career as Pick<Career, 'title' | 'description' | 'category'>), SYSTEM_PROMPT, { temperature: 0.5, maxTokens: 1500, feature: 'career_doors_backfill' })
       const jsonMatch = raw.match(/\{[\s\S]*\}/)
       if (!jsonMatch) throw new Error('No JSON in response')
       const generated = JSON.parse(jsonMatch[0]) as {

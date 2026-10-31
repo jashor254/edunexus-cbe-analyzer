@@ -5,7 +5,7 @@ import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } fr
 import { generateRemedialPlan } from '@/lib/remedial/planner'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
 import { apiPaymentRequired } from '@/lib/payments/paywall'
-import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
+import { reserveDailyCall, dailyLimitMessage } from '@/lib/ai/rateLimit'
 
 const Schema = z.object({
   sowId:          z.string().uuid(),
@@ -28,11 +28,6 @@ export async function POST(req: Request): Promise<Response> {
         'Access denied',
         access.reason === 'unauthenticated' ? 401 : 403,
       )
-    }
-
-    const rateLimit = await checkDailyCallLimit(access.userId, 'remedial_planner')
-    if (rateLimit.allowed === false) {
-      return apiError(`Daily limit of ${rateLimit.limit} remedial plan generations reached. Resets at ${rateLimit.resetAt}`, 429)
     }
 
     const supabase = await createClient()
@@ -71,18 +66,31 @@ export async function POST(req: Request): Promise<Response> {
       .maybeSingle()
     if (!cls) return apiForbidden()
 
-    const plan = await generateRemedialPlan({
-      sowId:          parsed.data.sowId,
-      teacherId:      teacher.id,
-      classId:        parsed.data.classId,
-      strand:         parsed.data.strand,
-      subStrand:      parsed.data.subStrand,
-      subject:        parsed.data.subject,
-      term:           parsed.data.term,
-      year:           parsed.data.year,
-      currentWeek:    parsed.data.currentWeek,
-      weeksRemaining: parsed.data.weeksRemaining,
-    })
+    // One unit of today's cap per plan, reserved after every ownership check
+    // so a forbidden request never consumes quota.
+    const quota = await reserveDailyCall(access.userId, 'remedial_planner')
+    if (quota.allowed === false) {
+      return apiError(dailyLimitMessage(quota, 'remedial plan generations'), 429)
+    }
+
+    let plan: Awaited<ReturnType<typeof generateRemedialPlan>>
+    try {
+      plan = await generateRemedialPlan({
+        sowId:          parsed.data.sowId,
+        teacherId:      teacher.id,
+        classId:        parsed.data.classId,
+        strand:         parsed.data.strand,
+        subStrand:      parsed.data.subStrand,
+        subject:        parsed.data.subject,
+        term:           parsed.data.term,
+        year:           parsed.data.year,
+        currentWeek:    parsed.data.currentWeek,
+        weeksRemaining: parsed.data.weeksRemaining,
+      })
+    } catch (err) {
+      await quota.release('remedial plan generation failed')
+      throw err
+    }
 
     // Charged only after a successful plan (never before, per lib/payments/access.ts).
     if (access.deductTokens) {

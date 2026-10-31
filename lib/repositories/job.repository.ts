@@ -226,6 +226,48 @@ export class JobRepository extends BaseRepository {
    * free-first-scheme rule reads (lib/sow/generationJob.ts). A teacher has a
    * handful of these at most, so no pagination.
    */
+  /**
+   * Inserts a `processing` claim row for work that runs inside the request
+   * (not via the queue). Inserted already `processing` so the cron job
+   * processor never claims it (no handler is registered for these types).
+   */
+  async insertProcessingClaim(input: { type: string; userId: string; payload: Record<string, unknown> }): Promise<{ id: string; created_at: string }> {
+    const { data, error } = await this.db
+      .from('jobs')
+      .insert({
+        queue_name: 'ai.generation',
+        type:       input.type,
+        user_id:    input.userId,
+        status:     'processing',
+        started_at: new Date().toISOString(),
+        payload:    input.payload,
+      })
+      .select('id, created_at')
+      .single()
+
+    if (error || !data) throw new Error(`Failed to insert processing claim: ${error?.message ?? 'no row returned'}`)
+    return data as { id: string; created_at: string }
+  }
+
+  /** Processing jobs of one type whose payload[key] equals value, created since `since` — across all users. */
+  async listProcessingJobsForResource(
+    type: string,
+    payloadKey: string,
+    value: string,
+    since: string,
+  ): Promise<Array<{ id: string; status: string; created_at: string; started_at: string | null; payload: Record<string, unknown> | null }>> {
+    const { data, error } = await this.db
+      .from('jobs')
+      .select('id, status, created_at, started_at, payload')
+      .eq('type', type)
+      .eq('status', 'processing')
+      .eq(`payload->>${payloadKey}`, value)
+      .gte('created_at', since)
+
+    if (error) throw new Error(`Failed to list processing jobs: ${error.message}`)
+    return (data ?? []) as Array<{ id: string; status: string; created_at: string; started_at: string | null; payload: Record<string, unknown> | null }>
+  }
+
   async listJobsForUser(
     userId: string,
     type: string

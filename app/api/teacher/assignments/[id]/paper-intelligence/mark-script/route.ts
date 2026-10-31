@@ -20,6 +20,7 @@ import {
   ScriptMarkingFailedError,
   type MarkScriptOutcome,
 } from '@/lib/paperIntelligence/markScript'
+import { claimScriptMarking } from '@/lib/paperIntelligence/markingClaim'
 
 // One vision call (~11s on the Phase 0 scripts) plus one retry on a malformed
 // response, with headroom for a slow provider.
@@ -49,10 +50,17 @@ export async function POST(
       throw err
     }
 
+    // One marking pass per submission at a time — a concurrent duplicate
+    // (double tap, re-run bulk scan) makes no AI call. See markingClaim.ts.
+    const claim = await claimScriptMarking(access.submission.id, access.teacherUserId)
+    if (!claim.claimed) return apiError('This script is already being marked — wait for it to finish.', 409)
+
     try {
       const outcome = await markSubmissionScript({ assignmentId, submission: access.submission, teacherUserId: access.teacherUserId })
+      await claim.release('completed')
       return apiSuccess<MarkScriptOutcome>(outcome)
     } catch (err) {
+      await claim.release('failed')
       if (err instanceof ScriptAlreadyReviewedError) return apiError(err.message, 409)
       if (err instanceof ScriptNotReadyError) return apiBadRequest(err.message)
       // Already logged durably in paper_intelligence_failure_log; no evidence written.

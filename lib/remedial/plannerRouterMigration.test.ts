@@ -86,7 +86,7 @@ test('enrichWithAI: a too-short/malformed response (parses to <2 lines) falls ba
   assert.equal(result, null)
 })
 
-test('enrichWithAI: calls routedCompletion with mode "quality" and no system prompt — matches the pre-migration call exactly', async () => {
+test('enrichWithAI: calls routedCompletion with mode "quality" and an explicit plain-text system prompt (never the wrapper\'s JSON-only default)', async () => {
   routerBehavior = 'success-plain-list'
   capturedRequest = null
   await enrichWithAI(fixtureGroups(), fixtureAllocation(), {
@@ -96,9 +96,12 @@ test('enrichWithAI: calls routedCompletion with mode "quality" and no system pro
 
   assert.ok(capturedRequest)
   assert.equal(capturedRequest!.mode, 'quality')
-  assert.equal(capturedRequest!.system, undefined)
+  assert.ok(capturedRequest!.system, 'a system prompt must be set — undefined fell back to a JSON-only default that contradicts the list format')
+  assert.doesNotMatch(capturedRequest!.system as string, /valid JSON only/i)
+  assert.match(capturedRequest!.system as string, /numbered list/i)
   assert.equal(capturedRequest!.max_tokens, 400)
   assert.equal(capturedRequest!.temperature, 0.3)
-  assert.equal(capturedRequest!.feature, 'remedial.enrich')
+  assert.equal(capturedRequest!.feature, 'remedial_planner')
+  assert.equal(capturedRequest!.call_site, 'enrich')
   assert.match(capturedRequest!.prompt as string, /Kenyan CBC teacher/)
 })

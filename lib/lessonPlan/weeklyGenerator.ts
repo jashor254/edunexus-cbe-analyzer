@@ -73,6 +73,94 @@ async function savePlans(
   await repos.curriculum.insertLessonPlans(rows)
 }
 
+/** Runs once, immediately before the first AI call of a week — never for a no-op week. */
+export type BeforeWeekGeneration = () => Promise<void>
+
+const UNIQUE_VIOLATION = /duplicate key value violates unique constraint/i
+
+/**
+ * Generates and saves plans for exactly the lessons in `sowLessons` that do
+ * not already have a plan for this week, then reports partial failure
+ * honestly. Shared by the Friday cron and the teacher-triggered routes.
+ *
+ *  - Lessons already planned are skipped BEFORE any AI call (a repeated
+ *    request used to regenerate the whole week, then lose all of it to the
+ *    lesson_plans (sow_id, week_number, lesson_number) unique constraint).
+ *  - Each lesson is independent: one failure no longer discards the plans
+ *    that succeeded (Promise.all rejected the whole week). Successes are
+ *    saved; failures are returned in `failedLessons`.
+ *  - If EVERY attempted lesson fails, this throws, as before — callers keep
+ *    treating total failure as an error.
+ */
+async function generateMissingWeekPlans(
+  sow: SavedSOW,
+  sowLessons: GeneratedLesson[],
+  teacherId: string,
+  weekNumber: number,
+  costContext: AICostContext | undefined,
+  beforeGenerate: BeforeWeekGeneration | undefined,
+): Promise<{ generated: number; reason?: 'already_generated'; failedLessons: Array<{ lessonNumber: number; error: string }> }> {
+  const existing = await repos.curriculum.findLessonPlansByWeek(sow.id, weekNumber)
+  const planned = new Set(existing.map(p => p.lesson_number))
+  const missing = sowLessons.filter(l => !planned.has(l.lesson))
+
+  if (missing.length === 0) {
+    return { generated: 0, reason: 'already_generated', failedLessons: [] }
+  }
+
+  await beforeGenerate?.()
+
+  const settled = await Promise.allSettled(
+    missing.map(async lesson => {
+      const ctx: LessonPlanContext = {
+        teacherName: sow.teacher_name || '',
+        tscNumber: sow.tsc_number || '',
+        school: sow.school,
+        learningArea: sow.learning_area,
+        grade: sow.grade,
+        term: Number(sow.term),
+        year: sow.year,
+        weekNumber: lesson.week,
+        lessonNumber: lesson.lesson,
+        strand: lesson.strand,
+        subStrand: lesson.substrand,
+        learningOutcomes: lesson.learningOutcomes,
+        learningExperiences: lesson.learningExperiences ?? [],
+        keyInquiryQuestions: lesson.keyInquiryQuestions,
+        learningResources: lesson.learningResources,
+        assessmentMethods: lesson.assessmentMethods,
+        costContext,
+      }
+      const plan = await generateLessonPlan(ctx)
+      return { plan, lesson }
+    })
+  )
+
+  const succeeded: Array<{ plan: Awaited<ReturnType<typeof generateLessonPlan>>; lesson: GeneratedLesson }> = []
+  const failedLessons: Array<{ lessonNumber: number; error: string }> = []
+  settled.forEach((r, i) => {
+    if (r.status === 'fulfilled') succeeded.push(r.value)
+    else failedLessons.push({ lessonNumber: missing[i].lesson, error: r.reason instanceof Error ? r.reason.message : String(r.reason) })
+  })
+
+  if (succeeded.length === 0) {
+    throw new Error(`Lesson plan generation failed for all ${missing.length} lesson(s): ${failedLessons[0]?.error ?? 'unknown error'}`)
+  }
+
+  try {
+    await savePlans(succeeded, sow.id, teacherId, weekNumber, sow)
+  } catch (err) {
+    // A concurrent request for the same week saved first. Its plans stand;
+    // this request's duplicates are dropped rather than reported as a failure.
+    if (err instanceof Error && UNIQUE_VIOLATION.test(err.message)) {
+      return { generated: 0, reason: 'already_generated', failedLessons: [] }
+    }
+    throw err
+  }
+
+  return { generated: succeeded.length, failedLessons }
+}
+
 export async function generateWeeklyPlans(
   sowId: string,
   teacherId: string,
@@ -105,32 +193,10 @@ export async function generateWeeklyPlans(
     return { generated: 0, reason: 'invalid_scheme_structure', nextTeachingWeek: nextWeek + 1 }
   }
 
-  const results = await Promise.all(
-    sowLessons.map(async lesson => {
-      const ctx: LessonPlanContext = {
-        teacherName: sow.teacher_name || '',
-        tscNumber: sow.tsc_number || '',
-        school: sow.school,
-        learningArea: sow.learning_area,
-        grade: sow.grade,
-        term: Number(sow.term),
-        year: sow.year,
-        weekNumber: lesson.week,
-        lessonNumber: lesson.lesson,
-        strand: lesson.strand,
-        subStrand: lesson.substrand,
-        learningOutcomes: lesson.learningOutcomes,
-        learningExperiences: lesson.learningExperiences ?? [],
-        keyInquiryQuestions: lesson.keyInquiryQuestions,
-        learningResources: lesson.learningResources,
-        assessmentMethods: lesson.assessmentMethods,
-      }
-      const plan = await generateLessonPlan(ctx)
-      return { plan, lesson }
-    })
-  )
-
-  await savePlans(results, sowId, teacherId, nextWeek, sow)
+  const outcome = await generateMissingWeekPlans(sow, sowLessons, teacherId, nextWeek, undefined, undefined)
+  if (outcome.generated === 0) {
+    return { generated: 0, week: nextWeek, subject: sow.learning_area, reason: outcome.reason }
+  }
 
   void publishEvent({
     event_type:      'teacher.lesson_plan.generated',
@@ -142,15 +208,16 @@ export async function generateWeeklyPlans(
       subject:     sow.learning_area,
       grade:       sow.grade,
       week_number: nextWeek,
-      count:       results.length,
+      count:       outcome.generated,
     },
     idempotency_key: `teacher.lesson_plan.generated:${sowId}:week:${nextWeek}`,
   }).catch(err => console.error('[events] teacher.lesson_plan.generated:', err instanceof Error ? err.message : String(err)))
 
   return {
-    generated: results.length,
+    generated: outcome.generated,
     week: nextWeek,
     subject: sow.learning_area,
+    ...(outcome.failedLessons.length > 0 ? { failed: outcome.failedLessons.length, failedLessons: outcome.failedLessons } : {}),
   }
 }
 
@@ -158,7 +225,8 @@ export async function generateSpecificWeekPlans(
   sowId: string,
   teacherId: string,
   weekNumber: number,
-  costContext?: AICostContext
+  costContext?: AICostContext,
+  options?: { beforeGenerate?: BeforeWeekGeneration },
 ): Promise<WeeklyGenerationResult> {
   const sow = await repos.curriculum.findSOWWithTimeline(sowId) as unknown as SavedSOW
 
@@ -172,33 +240,10 @@ export async function generateSpecificWeekPlans(
     return { generated: 0, reason: isBreak ? 'break_week' : 'invalid_scheme_structure' }
   }
 
-  const results = await Promise.all(
-    sowLessons.map(async lesson => {
-      const ctx: LessonPlanContext = {
-        teacherName: sow.teacher_name || '',
-        tscNumber: sow.tsc_number || '',
-        school: sow.school,
-        learningArea: sow.learning_area,
-        grade: sow.grade,
-        term: Number(sow.term),
-        year: sow.year,
-        weekNumber: lesson.week,
-        lessonNumber: lesson.lesson,
-        strand: lesson.strand,
-        subStrand: lesson.substrand,
-        learningOutcomes: lesson.learningOutcomes,
-        learningExperiences: lesson.learningExperiences ?? [],
-        keyInquiryQuestions: lesson.keyInquiryQuestions,
-        learningResources: lesson.learningResources,
-        assessmentMethods: lesson.assessmentMethods,
-        costContext,
-      }
-      const plan = await generateLessonPlan(ctx)
-      return { plan, lesson }
-    })
-  )
-
-  await savePlans(results, sowId, teacherId, weekNumber, sow)
+  const outcome = await generateMissingWeekPlans(sow, sowLessons, teacherId, weekNumber, costContext, options?.beforeGenerate)
+  if (outcome.generated === 0) {
+    return { generated: 0, week: weekNumber, subject: sow.learning_area, reason: outcome.reason }
+  }
 
   void publishEvent({
     event_type:      'teacher.lesson_plan.generated',
@@ -210,14 +255,15 @@ export async function generateSpecificWeekPlans(
       subject:     sow.learning_area,
       grade:       sow.grade,
       week_number: weekNumber,
-      count:       results.length,
+      count:       outcome.generated,
     },
     idempotency_key: `teacher.lesson_plan.generated:${sowId}:week:${weekNumber}`,
   }).catch(err => console.error('[events] teacher.lesson_plan.generated:', err instanceof Error ? err.message : String(err)))
 
   return {
-    generated: results.length,
+    generated: outcome.generated,
     week: weekNumber,
     subject: sow.learning_area,
+    ...(outcome.failedLessons.length > 0 ? { failed: outcome.failedLessons.length, failedLessons: outcome.failedLessons } : {}),
   }
 }

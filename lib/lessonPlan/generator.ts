@@ -1,7 +1,6 @@
 import type { LessonPlanContext, GeneratedLessonPlan } from './types'
 import { isKiswahiliSubject, isPlaceBasedSubject, getSubjectContextHint } from '@/lib/curriculum/subjectUtils'
 import { callDeepSeek as callAI } from '@/lib/ai/deepseek'
-import { logger } from '@/lib/observability/logger'
 
 const LESSON_PLAN_SYSTEM =
   'You are an experienced Kenyan CBC teacher. ' +
@@ -298,10 +297,13 @@ export async function generateLessonPlan(
   for (let attempt = 0; attempt < 3; attempt++) {
     let raw: string
     try {
-      raw = await callAI(prompt, LESSON_PLAN_SYSTEM, { temperature: 0.3, maxTokens: 2000, costContext: ctx.costContext })
+      raw = await callAI(prompt, LESSON_PLAN_SYSTEM, { temperature: 0.3, maxTokens: 2000, costContext: ctx.costContext, feature: 'lesson_plan_generate' })
     } catch (err: unknown) {
+      // Provider failure: callDeepSeek already retried and fell back — a
+      // further attempt would repeat that whole chain. Malformed or
+      // incomplete responses below still get their retries.
       lastError = err instanceof Error ? err.message : 'Unknown AI error'
-      continue
+      break
     }
 
     let parsed: Record<string, unknown>
@@ -344,7 +346,7 @@ export async function generateLessonPlan(
     lastError = 'Missing required fields in AI response'
   }
 
-  throw new Error(`Lesson plan generation failed after 3 attempts: ${lastError}`)
+  throw new Error(`Lesson plan generation failed: ${lastError}`)
 }
 
 // ─── Reflection suggestions ──────────────────────────────────────────────────
@@ -391,98 +393,26 @@ function generateFallbackReflection(ctx: LessonPlanContext, variant: number): st
   return variants[subjectKey][variant - 1] || variants[subjectKey][0]
 }
 
+/**
+ * Three reflection starters for the "mark as taught" form.
+ *
+ * Deterministic. This was a DeepSeek call (one per form opening, with no
+ * feature gate, no daily cap and nothing cached), but its only inputs were
+ * the learning area, sub-strand and outcomes — exactly what the
+ * subject-specific templates below already use. The model knew nothing about
+ * what actually happened in the lesson, so its "learner responses" were
+ * invented observations headed for a TSC record. A teacher edits a starter
+ * into the real account; TIE already weights an unedited suggestion low
+ * (lib/teachingIntelligence/weeklyGenerator.ts).
+ * See docs/audits/ai-call-efficiency-deep-audit.md AI-07.
+ */
 export async function generateReflectionSuggestions(
   context: LessonPlanContext,
-  taughtDate: string
+  _taughtDate: string
 ): Promise<string[]> {
-  const fallback = [
+  return [
     generateFallbackReflection(context, 1),
     generateFallbackReflection(context, 2),
     generateFallbackReflection(context, 3),
   ]
-
-  const reflectionLanguage = isKiswahiliSubject(context.learningArea)
-    ? 'Write all 3 reflection options in Kiswahili (Kiswahili sanifu).'
-    : 'Write all 3 reflection options in English.'
-
-  const prompt = `
-You are a Kenyan CBC teacher writing lesson reflection notes for a TSC inspection.
-
-LESSON TAUGHT:
-Learning Area: ${context.learningArea}
-Grade: ${context.grade}
-Strand: ${context.strand}
-Sub-strand: ${context.subStrand}
-Learning Outcomes:
-  a) ${context.learningOutcomes[0] || ''}
-  b) ${context.learningOutcomes[1] || ''}
-  c) ${context.learningOutcomes[2] || ''}
-
-${reflectionLanguage}
-
-Generate 3 DIFFERENT reflection options.
-Each should be 2-3 sentences.
-Each must be DIFFERENT in tone and content.
-All must be subject-specific to ${context.learningArea}.
-
-REFLECTION TYPES:
-Option 1 — Mostly successful with minor gap:
-  Mention what went well + one area needing follow-up
-
-Option 2 — Objective achieved, practice needed:
-  Lesson completed + recommend more practice on specific concept
-
-Option 3 — Engaged learners, mixed outcomes:
-  Learner engagement + some struggled + remediation plan
-
-RULES:
-- Never say just "Done" or "Lesson completed"
-- Use subject-specific language:
-  Agriculture → crops, practical, farm, soil, pests
-  Mathematics → calculations, problem-solving, equations
-  English → comprehension, expression, vocabulary
-  Biology → organisms, experiments, specimens
-  Chemistry → reactions, experiments, lab work
-  Physics → experiments, measurements, practical
-  History → events, analysis, discussion
-  Geography → mapping, fieldwork, environment
-  Kiswahili → mazungumzo, uandishi, usomaji
-- Mention specific learning outcomes achieved
-- Mention learner responses/challenges
-- Sound like a real teacher — not AI generated
-- Each option MUST be different from the others
-
-Return JSON only:
-{
-  "suggestions": [
-    "Option 1 text here...",
-    "Option 2 text here...",
-    "Option 3 text here..."
-  ]
-}
-`
-
-  let raw: string
-  try {
-    raw = await callAI(prompt, LESSON_PLAN_SYSTEM, { temperature: 0.3, maxTokens: 2000, costContext: context.costContext })
-  } catch (err) {
-    // Fallback is an intentional user-resilience mechanism (a teacher always
-    // gets 3 reflection options, even if DeepSeek is down) — logged so a
-    // provider outage is diagnosable, without logging the prompt itself.
-    logger.warn('Reflection suggestion AI call failed, using fallback', { operation: 'lessonPlan.generateReflectionSuggestions', learningArea: context.learningArea, grade: context.grade }, err)
-    return fallback
-  }
-
-  try {
-    const parsed = parseDeepSeekJSON(raw)
-    const suggestions = parsed.suggestions
-    if (Array.isArray(suggestions) && suggestions.length === 3) {
-      return suggestions as string[]
-    }
-    logger.warn('Reflection suggestion AI response malformed, using fallback', { operation: 'lessonPlan.generateReflectionSuggestions', learningArea: context.learningArea, grade: context.grade })
-  } catch (err) {
-    logger.warn('Reflection suggestion AI response failed to parse, using fallback', { operation: 'lessonPlan.generateReflectionSuggestions', learningArea: context.learningArea, grade: context.grade }, err)
-  }
-
-  return fallback
 }

@@ -254,6 +254,7 @@ export async function evaluateInsha({
   let raw: string
   try {
     raw = await callDeepSeek(prompt, systemPrompt, {
+      feature:     'kiswahili_insha_pack',
       temperature: 0.2,    // low temp for consistent structured output
       maxTokens:   1200,   // ~900 tokens of JSON + buffer
     })
@@ -279,7 +280,8 @@ export async function evaluateInsha({
     return parseRawResponse(parsed, inshaType, grade)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    console.error('[inshaEvaluator] JSON parse failed. Raw output:', raw, err)
+    // The raw model output is feedback on a learner's essay — not logged.
+    console.error('[inshaEvaluator] JSON parse failed:', message)
     await logAICall({
       feature:   'kiswahili-insha-evaluator',
       model:     'deepseek',

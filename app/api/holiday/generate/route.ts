@@ -8,7 +8,7 @@ import { KE_CBC } from '@/lib/curriculum/regional/ke-cbc'
 import { repos } from '@/lib/repositories'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
 import { apiPaymentRequired } from '@/lib/payments/paywall'
-import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
+import { reserveDailyCall, dailyLimitMessage } from '@/lib/ai/rateLimit'
 
 export const HOLIDAY_BATCH_JOB_TYPE = 'ai.holiday_plan.generate'
 
@@ -42,11 +42,6 @@ export async function POST(req: Request): Promise<Response> {
         'Access denied',
         access.reason === 'unauthenticated' ? 401 : 403,
       )
-    }
-
-    const rateLimit = await checkDailyCallLimit(access.userId, 'holiday_plan')
-    if (rateLimit.allowed === false) {
-      return apiError(`Daily limit of ${rateLimit.limit} holiday plan generations reached. Resets at ${rateLimit.resetAt}`, 429)
     }
 
     const supabase = await createClient()
@@ -95,6 +90,14 @@ export async function POST(req: Request): Promise<Response> {
         return apiSuccess({ term, year, generated: 0, failed: 0, total: 0, results: [] })
       }
 
+      // One unit of today's cap per generation request (a class run counts
+      // once, like a single learner) — reserved after ownership checks, and
+      // released below if the run produces no plan at all.
+      const quota = await reserveDailyCall(access.userId, 'holiday_plan')
+      if (quota.allowed === false) {
+        return apiError(dailyLimitMessage(quota, 'holiday plan generations'), 429)
+      }
+
       // A batch this size (up to a full 45-student roster, each student a
       // multi-second AI call) does not fit inside one request/response —
       // create a trackable job immediately and hand the actual work to
@@ -126,7 +129,10 @@ export async function POST(req: Request): Promise<Response> {
         })
         .select('id')
         .single()
-      if (jobErr || !job) return apiError('Could not start holiday plan generation')
+      if (jobErr || !job) {
+        await quota.release('holiday job could not be created')
+        return apiError('Could not start holiday plan generation')
+      }
 
       after(async () => {
         try {
@@ -156,6 +162,7 @@ export async function POST(req: Request): Promise<Response> {
           )
 
           const generatedCount = results.filter(r => r.plan !== null).length
+          if (generatedCount === 0) await quota.release('holiday class run produced no plan')
 
           // Charged per plan actually generated, only for token-tier users,
           // only after success — never for students whose generation failed.
@@ -182,6 +189,7 @@ export async function POST(req: Request): Promise<Response> {
           // job through. A flat 'failed' status is what the status endpoint
           // and UI actually check for.
           const message = e instanceof Error ? e.message : String(e)
+          await quota.release('holiday class run failed')
           await repos.jobs.updateProgress(job.id, { status: 'failed', result: { total, completed: 0, generated: 0, failed: total, currentStudentName: null, failedStudents: [], errorMessage: message } })
         }
       })
@@ -193,15 +201,26 @@ export async function POST(req: Request): Promise<Response> {
     const parsed = SingleSchema.safeParse(body)
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')
 
-    const plan = await generateHolidayPlan({
-      studentId:     parsed.data.studentId,
-      teacherId:     teacher.id,
-      term,
-      year,
-      holidayPeriod: parsed.data.holidayPeriod,
-      holidayDays:   parsed.data.holidayDays,
-      schoolId:      parsed.data.schoolId,
-    })
+    const quota = await reserveDailyCall(access.userId, 'holiday_plan')
+    if (quota.allowed === false) {
+      return apiError(dailyLimitMessage(quota, 'holiday plan generations'), 429)
+    }
+
+    let plan: Awaited<ReturnType<typeof generateHolidayPlan>>
+    try {
+      plan = await generateHolidayPlan({
+        studentId:     parsed.data.studentId,
+        teacherId:     teacher.id,
+        term,
+        year,
+        holidayPeriod: parsed.data.holidayPeriod,
+        holidayDays:   parsed.data.holidayDays,
+        schoolId:      parsed.data.schoolId,
+      })
+    } catch (err) {
+      await quota.release('holiday plan generation failed')
+      throw err
+    }
 
     if (access.deductTokens) {
       await deductFeatureTokens(access.userId, 'holiday_plan', access.cost)

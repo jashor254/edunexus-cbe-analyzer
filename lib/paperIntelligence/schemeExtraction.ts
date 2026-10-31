@@ -12,6 +12,12 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { GEMINI_PRIMARY } from '@/lib/ai/models'
+import { generateGeminiWithTimeout } from '@/lib/ai/gemini'
+import { startLogicalCall } from '@/lib/ai/usageTelemetry'
+
+// A multimodal request that has not answered in this long is abandoned (and
+// the HTTP request aborted) rather than holding the route open indefinitely.
+const PAPER_VISION_TIMEOUT_MS = 45_000
 import { isAllowedUploadType, UPLOAD_LIMITS } from '@/lib/config/uploads'
 import {
   parseSchemeExtractionResponse,
@@ -85,10 +91,14 @@ export async function extractRubricsFromScheme(images: SchemeImage[]): Promise<{
   })
 
   const startedAt = Date.now()
-  const result = await model.generateContent([
+  const result = await generateGeminiWithTimeout(model, [
     { text: buildPrompt() },
     ...images.map(img => ({ inlineData: { mimeType: img.mimeType, data: img.imageBase64 } })),
-  ])
+  ], {
+    timeoutMs: PAPER_VISION_TIMEOUT_MS,
+    modelName: GEMINI_PRIMARY,
+    call: startLogicalCall({ feature: 'paper_intelligence_extract_rubric' }),
+  })
   const latencyMs = Date.now() - startedAt
 
   const usage = result.response.usageMetadata

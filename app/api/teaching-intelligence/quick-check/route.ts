@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
 import { generateQuickCheck } from '@/lib/teachingIntelligence/quickCheckGenerator'
+import { reserveDailyCall, dailyLimitMessage } from '@/lib/ai/rateLimit'
 
 const BodySchema = z.object({
   substrandHealthId: z.string().uuid(),
@@ -46,18 +47,31 @@ export async function POST(req: Request) {
       .single()
     if (!sow) return apiForbidden()
 
-    const quickCheck = await generateQuickCheck({
-      substrandHealthId: body.substrandHealthId,
-      sowId:             body.sowId,
-      teachersId:        teacher.id,
-      authUserId:        user.id,
-      strand:            body.strand,
-      subStrand:         body.subStrand,
-      grade:             body.grade,
-      learningArea:      body.learningArea,
-      struggleCount:     body.struggleCount,
-      rootCause:         body.rootCause,
-    })
+    // DAILY_CALL_LIMITS.teaching_quick_check was configured but never
+    // checked. Reserved after ownership is verified; released on failure.
+    const quota = await reserveDailyCall(user.id, 'teaching_quick_check')
+    if (quota.allowed === false) {
+      return apiError(dailyLimitMessage(quota, 'quick checks'), 429)
+    }
+
+    let quickCheck: Awaited<ReturnType<typeof generateQuickCheck>>
+    try {
+      quickCheck = await generateQuickCheck({
+        substrandHealthId: body.substrandHealthId,
+        sowId:             body.sowId,
+        teachersId:        teacher.id,
+        authUserId:        user.id,
+        strand:            body.strand,
+        subStrand:         body.subStrand,
+        grade:             body.grade,
+        learningArea:      body.learningArea,
+        struggleCount:     body.struggleCount,
+        rootCause:         body.rootCause,
+      })
+    } catch (err) {
+      await quota.release('quick check generation failed')
+      throw err
+    }
 
     return apiSuccess({ quickCheck })
   } catch (err: unknown) {

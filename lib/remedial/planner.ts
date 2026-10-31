@@ -297,20 +297,17 @@ export async function generateRemedialPlan(input: PlannerInput): Promise<Remedia
 // best-effort (any failure — from either provider — falls back to the
 // structured plan with no AI narrative, exactly as before).
 //
-// mode: 'quality' (chain ['deepseek', 'gemini']) is deliberate, not
-// arbitrary: routedCompletion's callProviderCompletion() calls callDeepSeek()
-// for BOTH 'gemini' and 'deepseek' chain entries today (callDeepSeek has its
-// own fixed internal DeepSeek-first-then-Gemini-fallback ordering that the
-// router's chain currently cannot override — a real, verified router
-// limitation, not a redesign this sprint attempts to fix). 'quality' mode's
-// first attempt therefore produces the EXACT SAME call sequence this
-// function made directly before this migration (DeepSeek, with its own
-// internal retry-once and Gemini fallback, all still intact underneath).
-// 'fast' mode would be misleading here — its distinguishing "try Gemini
-// first" intent doesn't actually happen — so it's deliberately not used
-// until that router limitation is fixed in its own, separate sprint.
+// mode: 'quality' (chain ['deepseek', 'gemini']): DeepSeek first (one
+// transport retry), then one Gemini request — at most 3 provider requests.
+// Each chain entry is now a single provider (lib/ai-orchestration/router.ts);
+// it used to call the full DeepSeek-then-Gemini wrapper per entry, so this
+// enrichment could reach 6 requests.
 // Exported for direct testability (mocking routedCompletion) — not called
 // externally; generateRemedialPlan is still the module's real public entry point.
+export const REMEDIAL_PLAN_SYSTEM_PROMPT =
+  'You write short, practical remedial teaching plans for Kenyan CBC teachers. ' +
+  'Reply with a plain numbered list only — one line per week. No JSON, no markdown headers, no bullet sub-points.'
+
 export async function enrichWithAI(
   groups:       RemedialGroup[],
   allocation:   TeacherAllocation,
@@ -339,17 +336,18 @@ Each week: one clear sentence telling the teacher exactly what to do and with wh
 Week ${allocation.check_in_week}: always ends with a re-assessment of all groups.
 Use plain English. No bullet sub-points. No markdown headers. Keep each sentence under 120 characters.`
 
-    // system left unset — matches the pre-migration call exactly (undefined
-    // systemPrompt), which lets callDeepSeek apply its own default. Not
-    // "fixed" here even though that default (a JSON-only instruction) is in
-    // tension with this prompt's own plain-English request — this sprint
-    // activates the router, it does not improve prompt quality.
+    // An explicit plain-text system prompt. This used to be left unset, which
+    // made the provider wrapper apply its default "Always respond with valid
+    // JSON only" instruction — directly contradicting the numbered-list format
+    // asked for above, a source of malformed (null) enrichments.
     const response = await routedCompletion({
       prompt,
+      system:     REMEDIAL_PLAN_SYSTEM_PROMPT,
       mode:       'quality',
       max_tokens: 400,
       temperature: 0.3,
-      feature:    'remedial.enrich',
+      feature:    'remedial_planner',
+      call_site:  'enrich',
     })
 
     const lines = response.text

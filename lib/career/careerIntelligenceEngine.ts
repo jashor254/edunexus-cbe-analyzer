@@ -4,7 +4,10 @@
 // to produce the complete Career Intelligence Report — including the
 // "If Learning Continues Like This..." narrative.
 
+import { createHash } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { repos } from '@/lib/repositories'
+import { logger } from '@/lib/observability/logger'
 import { callDeepSeek } from '@/lib/ai/deepseek'
 import { LEARNER_NAME_TOKEN, learnerFirstName, restoreLearnerName } from '@/lib/ai/learnerPseudonym'
 import { buildClinicReport } from './clinicReportBuilder'
@@ -462,23 +465,54 @@ type NarrativeSections = {
   if_learning_continues: string
 }
 
-async function generateNarrativeSections(
-  studentName:    string,
-  grade:          number,
-  age:            number,
-  pathway:        string | null,
-  dominantCluster: string[],
-  emergingCluster: string[],
-  topSubjects:    string[],
-  weakSubjects:   string[],
-  readinessScore: number,
-  readinessLabel: string,
-  topMatchTitles: string[],
-  dreamCareer:    string | null,
-  assessmentCount: number,
-  confidenceLevel: ConfidenceLevel,
-  mode:           'exploration' | 'planning',
-): Promise<NarrativeSections> {
+/**
+ * Every value the narrative prompt is built from — and therefore the exact
+ * reuse key for a stored narrative. The learner's name is NOT here: the
+ * prompt only ever carries LEARNER_NAME_TOKEN, restored at assembly time.
+ */
+export type NarrativeInputs = {
+  grade:           number
+  age:             number
+  pathway:         string | null
+  dominantCluster: string[]
+  emergingCluster: string[]
+  topSubjects:     string[]
+  weakSubjects:    string[]
+  readinessScore:  number
+  readinessLabel:  string
+  topMatchTitles:  string[]
+  dreamCareer:     string | null
+  assessmentCount: number
+  confidenceLevel: ConfidenceLevel
+  mode:            'exploration' | 'planning'
+}
+
+/** Bump whenever the narrative prompt below changes, so stored narratives regenerate. */
+export const CAREER_NARRATIVE_PROMPT_VERSION = 'cie-narrative-2026-10-30'
+
+/** Stable reuse key for a narrative: same version + same inputs → same fingerprint. */
+export function narrativeFingerprint(inputs: NarrativeInputs): string {
+  const ordered: NarrativeInputs = {
+    grade: inputs.grade, age: inputs.age, pathway: inputs.pathway,
+    dominantCluster: inputs.dominantCluster, emergingCluster: inputs.emergingCluster,
+    topSubjects: inputs.topSubjects, weakSubjects: inputs.weakSubjects,
+    readinessScore: inputs.readinessScore, readinessLabel: inputs.readinessLabel,
+    topMatchTitles: inputs.topMatchTitles, dreamCareer: inputs.dreamCareer,
+    assessmentCount: inputs.assessmentCount, confidenceLevel: inputs.confidenceLevel,
+    mode: inputs.mode,
+  }
+  return createHash('sha256')
+    .update(JSON.stringify({ v: CAREER_NARRATIVE_PROMPT_VERSION, inputs: ordered }))
+    .digest('hex')
+}
+
+/** Returns the narrative in pseudonymised (LEARNER_NAME_TOKEN) form. */
+async function generateNarrativeSections(input: NarrativeInputs): Promise<NarrativeSections> {
+  const {
+    grade, age, pathway, dominantCluster, emergingCluster, topSubjects, weakSubjects,
+    readinessScore, readinessLabel, topMatchTitles, dreamCareer, assessmentCount,
+    confidenceLevel, mode,
+  } = input
   // The prompt carries a placeholder, never the learner's name — the real
   // first name is restored locally after the response (lib/ai/learnerPseudonym.ts).
   const firstName = LEARNER_NAME_TOKEN
@@ -549,22 +583,98 @@ Return ONLY valid JSON. No markdown. No explanation. Just JSON.`
   const raw = await callDeepSeek(
     prompt,
     'You are a Kenyan education AI. Return ONLY valid JSON. No markdown, no explanation, no extra text.',
-    { maxTokens: 2500, temperature: 0.75 }
+    { maxTokens: 2500, temperature: 0.75, feature: 'career_intelligence_report', callSite: 'narrative' }
   )
 
   try {
     const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-    return restoreLearnerName(JSON.parse(cleaned) as NarrativeSections, learnerFirstName(studentName))
+    return JSON.parse(cleaned) as NarrativeSections
   } catch {
     throw new Error('Career Intelligence Engine: AI returned invalid JSON. Please retry.')
   }
+}
+
+// ── Narrative reuse ──────────────────────────────────────────────────────────
+//
+// The narrative is the only AI-generated part of this report. It is reused
+// while its inputs are unchanged (narrativeFingerprint), so opening the same
+// report again neither calls the model nor charges again
+// (docs/audits/ai-call-efficiency-deep-audit.md F-10).
+
+export type CareerNarrativeStore = {
+  find(studentId: string, fingerprint: string): Promise<{ sections: NarrativeSections; generatedAt: string } | null>
+  save(studentId: string, fingerprint: string, sections: NarrativeSections): Promise<void>
+}
+
+/** Thrown when generation is not allowed (e.g. no tokens) and no reusable narrative exists. */
+export class NarrativeNotAvailableError extends Error {
+  constructor() {
+    super('No reusable Career Intelligence narrative exists for the current evidence, and generation is not allowed')
+    this.name = 'NarrativeNotAvailableError'
+  }
+}
+
+export type CareerIntelligenceBuildOptions = {
+  /** Defaults to the career_intelligence_narratives table. */
+  narrativeStore?: CareerNarrativeStore
+  /** false → reuse only; throws NarrativeNotAvailableError on a miss. Default true. */
+  allowGeneration?: boolean
+  /** Runs immediately before a fresh model call (never on reuse) — e.g. reserve a daily-cap unit. May throw. */
+  beforeGenerate?: () => Promise<void>
+}
+
+// A store failure (including the table not existing yet) degrades to
+// "nothing cached" — reuse is an optimisation, never a reason to fail a report.
+const tableNarrativeStore: CareerNarrativeStore = {
+  async find(studentId, fingerprint) {
+    try {
+      const row = await repos.careers.findCareerNarrative(studentId, fingerprint)
+      return row ? { sections: row.narrative as unknown as NarrativeSections, generatedAt: row.created_at } : null
+    } catch (err) {
+      logger.warn('Career narrative reuse lookup failed — generating fresh', { operation: 'career.narrative.find' }, err)
+      return null
+    }
+  },
+  async save(studentId, fingerprint, sections) {
+    try {
+      await repos.careers.upsertCareerNarrative({
+        student_id:        studentId,
+        input_fingerprint: fingerprint,
+        prompt_version:    CAREER_NARRATIVE_PROMPT_VERSION,
+        narrative:         sections as unknown as Record<string, unknown>,
+        model:             null,
+      })
+    } catch (err) {
+      logger.warn('Career narrative could not be stored for reuse', { operation: 'career.narrative.save' }, err)
+    }
+  },
+}
+
+export async function resolveCareerNarrative(
+  studentId: string,
+  inputs: NarrativeInputs,
+  options: CareerIntelligenceBuildOptions,
+): Promise<{ sections: NarrativeSections; source: 'generated' | 'reused'; generatedAt: string }> {
+  const store = options.narrativeStore ?? tableNarrativeStore
+  const fingerprint = narrativeFingerprint(inputs)
+
+  const existing = await store.find(studentId, fingerprint)
+  if (existing) return { sections: existing.sections, source: 'reused', generatedAt: existing.generatedAt }
+
+  if (options.allowGeneration === false) throw new NarrativeNotAvailableError()
+
+  await options.beforeGenerate?.()
+  const sections = await generateNarrativeSections(inputs)
+  await store.save(studentId, fingerprint, sections)
+  return { sections, source: 'generated', generatedAt: new Date().toISOString() }
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export async function buildCareerIntelligenceReport(
   studentId: string,
-  db: SupabaseClient
+  db: SupabaseClient,
+  options: CareerIntelligenceBuildOptions = {},
 ): Promise<CareerIntelligenceReport> {
 
   // 1. Clinic report — the deterministic data backbone
@@ -650,23 +760,24 @@ export async function buildCareerIntelligenceReport(
   const assessmentCount = profile?.assessment_count ?? 0
   const confidenceLevel = confidenceFromAssessmentCount(assessmentCount)
 
-  const narratives = await generateNarrativeSections(
-    clinicReport.student_name,
-    clinicReport.grade,
-    clinicReport.age,
-    clinicReport.recommended_pathway,
-    profile?.dominant_cluster ?? [],
-    profile?.emerging_cluster ?? [],
-    clinicReport.top_subjects.map(s => s.display_name),
-    clinicReport.weak_subjects.map(s => s.display_name),
+  const narrativeInputs: NarrativeInputs = {
+    grade:           clinicReport.grade,
+    age:             clinicReport.age,
+    pathway:         clinicReport.recommended_pathway,
+    dominantCluster: profile?.dominant_cluster ?? [],
+    emergingCluster: profile?.emerging_cluster ?? [],
+    topSubjects:     clinicReport.top_subjects.map(s => s.display_name),
+    weakSubjects:    clinicReport.weak_subjects.map(s => s.display_name),
     readinessScore,
     readinessLabel,
     topMatchTitles,
-    clinicReport.dream_career,
+    dreamCareer:     clinicReport.dream_career,
     assessmentCount,
     confidenceLevel,
     mode,
-  )
+  }
+  const narrative = await resolveCareerNarrative(studentId, narrativeInputs, options)
+  const narratives = restoreLearnerName(narrative.sections, learnerFirstName(clinicReport.student_name))
 
   // Junior → Senior continuity. Senior (planning) only — a Junior report
   // stays exploration-only and unchanged. Reads the canonical longitudinal
@@ -690,6 +801,8 @@ export async function buildCareerIntelligenceReport(
     dream_career: clinicReport.dream_career,
     mode,
     generated_at: new Date().toISOString(),
+    narrative_source:       narrative.source,
+    narrative_generated_at: narrative.generatedAt,
 
     readiness_score:      readinessScore,
     readiness_label:      readinessLabel,

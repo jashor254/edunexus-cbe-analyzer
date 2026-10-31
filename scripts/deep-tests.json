@@ -179,6 +179,7 @@
     "lib/testing/teacherActivation.http.integration.test.ts",
     "lib/testing/teacherAttentionDestination.integration.test.ts",
     "lib/testing/teacherSelfJoin.http.integration.test.ts",
-    "lib/whatsapp/client.test.ts"
+    "lib/whatsapp/client.test.ts",
+    "lib/career/careerNarrativeStore.integration.test.ts"
   ]
 }

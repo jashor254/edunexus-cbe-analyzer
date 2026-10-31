@@ -404,6 +404,10 @@ See you in Term 3! 🇰🇪
 
 // ── AI enrichment ─────────────────────────────────────────────────────────────
 
+const HOLIDAY_MESSAGE_SYSTEM_PROMPT =
+  'You write warm, plain-text WhatsApp messages to Kenyan parents. ' +
+  'Reply in exactly the WHATSAPP: / SUMMARY: format requested — plain text, never JSON or markdown.'
+
 async function enrichPlanWithAI(
   plan:        HolidayPlanData,
   dreamCareer: string | null,
@@ -431,9 +435,14 @@ WHATSAPP:
 SUMMARY:
 [2 sentences here]`
 
-    const text = await callDeepSeek(prompt, undefined, {
+    // Explicit plain-text system prompt: leaving it undefined applied the
+    // wrapper's "Always respond with valid JSON only" default, contradicting
+    // the WHATSAPP:/SUMMARY: format this prompt asks for.
+    const text = await callDeepSeek(prompt, HOLIDAY_MESSAGE_SYSTEM_PROMPT, {
       maxTokens:   500,
       temperature: 0.7,
+      feature:     'holiday_plan',
+      callSite:    'parent_message',
     })
     const waMatch = text.match(/WHATSAPP:\n([\s\S]+?)(?=SUMMARY:|$)/)
     const sumMatch = text.match(/SUMMARY:\n([\s\S]+?)$/)
@@ -447,7 +456,7 @@ SUMMARY:
     // but that fallback was previously indistinguishable from "AI enrichment
     // was never attempted." Log which plan it was so a spike is traceable.
     console.error('[holiday/planner] enrichPlanWithAI failed, falling back to template message', {
-      studentName: plan.student_name,
+      grade: plan.grade,
       holidayPeriod: plan.holiday_period,
       message: err instanceof Error ? err.message : String(err),
     })

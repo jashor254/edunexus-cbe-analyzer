@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { after } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
-import { checkDailyCallLimit } from '@/lib/ai/rateLimit'
+import { reserveDailyCall, dailyLimitMessage } from '@/lib/ai/rateLimit'
 import { type FeatureKey } from '@/lib/payments/config'
 import { repos } from '@/lib/repositories'
 import { apiPaymentRequired } from '@/lib/payments/paywall'
@@ -75,11 +75,6 @@ export async function POST(req: Request) {
       if (access.reason === 'insufficient_tokens') return apiPaymentRequired(FEATURE)
       const status = access.reason === 'unauthenticated' ? 401 : 403
       return apiError(access.reason, status)
-    }
-
-    const rateLimit = await checkDailyCallLimit(access.userId, FEATURE)
-    if (rateLimit.allowed === false) {
-      return apiError(`Daily limit of ${rateLimit.limit} SOW generations reached. Resets at ${rateLimit.resetAt}`, 429)
     }
 
     // This generation is the teacher's one free scheme of work.
@@ -173,6 +168,13 @@ export async function POST(req: Request) {
     // handler for.
     const total = timeline.filter(s => !s.isBreak).length
 
+    // One unit of today's cap per scheme of work, reserved once the request
+    // is fully validated and released below if the run generates nothing.
+    const quota = await reserveDailyCall(access.userId, FEATURE)
+    if (quota.allowed === false) {
+      return apiError(dailyLimitMessage(quota, 'SOW generations'), 429)
+    }
+
     const { data: job, error: jobErr } = await db
       .from('jobs')
       .insert({
@@ -188,9 +190,13 @@ export async function POST(req: Request) {
       })
       .select('id')
       .single()
-    if (jobErr || !job) return apiError('Could not start scheme of work generation')
+    if (jobErr || !job) {
+      await quota.release('SOW job could not be created')
+      return apiError('Could not start scheme of work generation')
+    }
 
     if (isFreeTrial && !(await confirmFreeTrialJob(access.userId, job.id))) {
+      await quota.release('duplicate free-trial SOW request')
       await repos.jobs.updateProgress(job.id, {
         status: 'failed',
         result: { total, completed: 0, failed: 0, errorMessage: 'Your free scheme of work is already being generated.' },
@@ -224,6 +230,7 @@ export async function POST(req: Request) {
         const generated = result.summary.generated
 
         if (result.status === 'failed') {
+          await quota.release('SOW run generated no lessons')
           await repos.jobs.updateProgress(job.id, {
             status: 'failed',
             result: {
@@ -257,6 +264,7 @@ export async function POST(req: Request) {
         await repos.jobs.markComplete(job.id, { total, completed: generated, failed: result.summary.failed, result })
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
+        await quota.release('SOW run failed')
         await repos.jobs.updateProgress(job.id, { status: 'failed', result: { total, completed: 0, failed: total, errorMessage: message } })
       }
     })

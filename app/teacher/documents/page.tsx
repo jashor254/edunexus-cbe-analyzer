@@ -875,9 +875,17 @@ export default function TeacherDocumentsPage() {
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Generation failed')
-      showToast(`Week ${nextWeek} lesson plans generated!`, 'ok')
+      const generated: number = json.data?.generated ?? 0
+      const failed: number = json.data?.failed ?? 0
+      if (failed > 0) {
+        showToast(`Week ${nextWeek}: ${generated} lesson plan${generated === 1 ? '' : 's'} generated, ${failed} failed — generate again to fill the gaps.`, 'err')
+      } else if (json.data?.reason === 'already_generated') {
+        showToast(`Week ${nextWeek} lesson plans already exist.`, 'ok')
+      } else {
+        showToast(`Week ${nextWeek} lesson plans generated!`, 'ok')
+      }
       setSchemes(prev => prev.map(s => s.id === scheme.id
-        ? { ...s, lesson_plans_count: s.lesson_plans_count + (scheme.lessons_per_week ?? 4), latest_lp_week: nextWeek }
+        ? { ...s, lesson_plans_count: s.lesson_plans_count + generated, latest_lp_week: nextWeek }
         : s
       ))
     } catch (err) {

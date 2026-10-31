@@ -91,6 +91,7 @@
     "lib/growth/messaging/generate.test.ts",
     "lib/growth/messaging/links.test.ts",
     "lib/growth/messaging/render.test.ts",
+    "lib/growth/messaging/replyTo.test.ts",
     "lib/growth/messaging/strategy.test.ts",
     "lib/growth/messaging/templates.test.ts",
     "lib/growth/quickActions.test.ts",
@@ -198,6 +199,19 @@
     "components/teacher/variantReviewTeacherOnly.architecture.test.ts",
     "lib/assignments/answerLeakage.test.ts",
     "lib/assignments/variantPrompt.test.ts",
-    "lib/assignments/variantVerification.test.ts"
+    "lib/assignments/variantVerification.test.ts",
+    "lib/ai/rateLimit.test.ts",
+    "lib/ai/requestBudget.test.ts",
+    "lib/ai/aiCallGovernance.architecture.test.ts",
+    "lib/compass/compassPrivacy.test.ts",
+    "lib/compass/compassNameLeak.test.ts",
+    "lib/teachingIntelligence/deterministicIntelligence.test.ts",
+    "lib/lessonPlan/weekGeneration.test.ts",
+    "lib/sow/aiGenerationRemediation.test.ts",
+    "lib/career/aiReuseAndTargets.test.ts",
+    "lib/career/classReportHonesty.test.ts",
+    "lib/paperIntelligence/markingClaim.test.ts",
+    "lib/compass/compassTurnBounds.test.ts",
+    "lib/lessonPlan/scheduledGeneration.test.ts"
   ]
 }

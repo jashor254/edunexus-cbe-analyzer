@@ -191,6 +191,28 @@ export class CompassRepository extends BaseRepository {
     return (data?.learner_id as string | null) ?? null
   }
 
+  /**
+   * The most recent `limit` user/assistant messages of one session, oldest
+   * first. Callers must have verified session ownership first.
+   */
+  async findRecentSessionMessages(
+    sessionId: string,
+    limit: number,
+  ): Promise<Array<{ role: 'user' | 'assistant'; content: string }>> {
+    const { data, error } = await this.db
+      .from('compass_messages')
+      .select('role, content, created_at')
+      .eq('session_id', sessionId)
+      .in('role', ['user', 'assistant'])
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (error) throw new Error(`Failed to read session messages: ${error.message}`)
+    return (data ?? [])
+      .reverse()
+      .map(m => ({ role: m.role as 'user' | 'assistant', content: (m.content as string | null) ?? '' }))
+  }
+
   // ── Session — read state ────────────────────────────────────────────────────
 
   async findSessionState(
