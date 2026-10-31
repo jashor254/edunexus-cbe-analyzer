@@ -56,7 +56,7 @@ beforeEach(() => {
   registry.recordSuccess('gemini', 1)
 })
 
-const isGemini = (url: unknown): boolean => String(url).includes('generativelanguage.googleapis.com')
+const isGemini = (url: unknown): boolean => new URL(String(url)).hostname === 'generativelanguage.googleapis.com'
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })

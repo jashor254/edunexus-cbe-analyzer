@@ -36,7 +36,7 @@ before(async () => {
 const originalFetch = globalThis.fetch
 after(() => { globalThis.fetch = originalFetch })
 
-const isGemini = (url: unknown): boolean => String(url).includes('generativelanguage.googleapis.com')
+const isGemini = (url: unknown): boolean => new URL(String(url)).hostname === 'generativelanguage.googleapis.com'
 const geminiSse = (text: string) => new Response(
   `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text }], role: 'model' }, finishReason: 'STOP', index: 0 }], usageMetadata: { totalTokenCount: 9 } })}\r\n\r\n`,
   { status: 200, headers: { 'Content-Type': 'text/event-stream' } },

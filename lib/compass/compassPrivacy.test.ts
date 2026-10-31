@@ -107,7 +107,7 @@ test('fallback provider receives the identical pseudonymised payload — no name
   const bodies: { provider: string; body: string }[] = []
   globalThis.fetch = (async (url: string, opts?: RequestInit) => {
     const body = String(opts?.body ?? '')
-    if (String(url).includes('generativelanguage.googleapis.com')) {
+    if (new URL(String(url)).hostname === 'generativelanguage.googleapis.com') {
       bodies.push({ provider: 'gemini', body })
       return new Response(JSON.stringify({ error: { message: 'unavailable' } }), { status: 503 })
     }
