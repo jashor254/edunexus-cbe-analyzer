@@ -22,9 +22,9 @@ export const RULES: EnvRule[] = [
     validate:    v => URL_REGEX.test(v) ? null : 'Must be a valid HTTPS URL',
   },
   {
-    key:         'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+    key:         'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
     required:    true,
-    description: 'Supabase anonymous (public) key',
+    description: 'Supabase publishable key (or legacy NEXT_PUBLIC_SUPABASE_ANON_KEY)',
     // Opaque credential, not decoded anywhere in this codebase — every real
     // client factory (utils/supabase/client.ts, server.ts, middleware.ts,
     // authAnon.ts) and lib/config/env.ts's own zod schema only require
@@ -36,9 +36,9 @@ export const RULES: EnvRule[] = [
     validate:    v => v.trim().length > 0 ? null : 'Must not be blank',
   },
   {
-    key:         'SUPABASE_SERVICE_ROLE_KEY',
+    key:         'SUPABASE_SECRET_KEY',
     required:    true,
-    description: 'Supabase service role key — bypasses RLS (server-only)',
+    description: 'Supabase secret key — bypasses RLS (server-only, or legacy SUPABASE_SERVICE_ROLE_KEY)',
     validate:    v => v.trim().length > 0 ? null : 'Must not be blank',
   },
 

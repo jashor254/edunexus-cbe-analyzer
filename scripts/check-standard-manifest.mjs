@@ -28,7 +28,7 @@ const ALWAYS_SIGNALS = [
   /createServiceClient/,
   /createTestServiceClient/,
   /@supabase\//,
-  /SUPABASE_SERVICE_ROLE_KEY/,
+  /SUPABASE_SECRET_KEY|SUPABASE_SERVICE_ROLE_KEY/,
   /TEST_SUPABASE/,
   /signInWithPassword/,
   /auth\.admin/,

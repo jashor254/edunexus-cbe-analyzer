@@ -7,9 +7,13 @@ export async function updateSession(request: NextRequest) {
   // request headers (including updated cookies) to the route handler.
   let supabaseResponse = NextResponse.next({ request })
 
+  const publishableKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    publishableKey,
     {
       cookies: {
         // getAll/setAll is required for @supabase/ssr v0.5+ which chunks large

@@ -35,8 +35,8 @@ env:
   # next build touches these at import time in a few config modules even
   # when the routes that actually use them are never invoked during build.
   NEXT_PUBLIC_SUPABASE_URL: 'https://placeholder.supabase.co'
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: 'placeholder-anon-key'
-  SUPABASE_SERVICE_ROLE_KEY: 'placeholder-service-key'
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'placeholder-publishable-key'
+  SUPABASE_SECRET_KEY: 'placeholder-secret-key'
   DEEPSEEK_AI_API_KEY: 'placeholder-deepseek-key'
   # lib/resend-client.ts throws at MODULE IMPORT TIME when unset, which fails
   # `next build` page-data collection for any route that transitively imports
@@ -123,7 +123,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NEXT_PUBLIC_SUPABASE_URL: ''
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ''
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ''
+      SUPABASE_SECRET_KEY: ''
       SUPABASE_SERVICE_ROLE_KEY: ''
       DEEPSEEK_AI_API_KEY: ''
     steps:
@@ -281,11 +283,14 @@ jobs:
             const s = JSON.parse(require('child_process').execSync('supabase status -o json').toString());
             const fs = require('fs');
             const key = s.SERVICE_ROLE_KEY || s.service_role_key;
+            const anon = s.ANON_KEY || s.anon_key;
             fs.appendFileSync(process.env.GITHUB_ENV,
               'TEST_SUPABASE_SERVICE_ROLE_KEY=' + key + '\n' +
+              'SUPABASE_SECRET_KEY=' + key + '\n' +
               'SUPABASE_SERVICE_ROLE_KEY=' + key + '\n' +
               'NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321\n' +
-              'NEXT_PUBLIC_SUPABASE_ANON_KEY=' + (s.ANON_KEY || s.anon_key) + '\n');
+              'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=' + anon + '\n' +
+              'NEXT_PUBLIC_SUPABASE_ANON_KEY=' + anon + '\n');
           "
 
       - name: Preflight — verify local, non-production target
@@ -365,8 +370,8 @@ jobs:
         run: |
           env -i PATH="$PATH" HOME="$HOME" \
             NEXT_PUBLIC_SUPABASE_URL="http://127.0.0.1:54321" \
-            NEXT_PUBLIC_SUPABASE_ANON_KEY="$LOCAL_ANON_KEY" \
-            SUPABASE_SERVICE_ROLE_KEY="$LOCAL_SERVICE_ROLE_KEY" \
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$LOCAL_ANON_KEY" \
+            SUPABASE_SECRET_KEY="$LOCAL_SERVICE_ROLE_KEY" \
             RESEND_API_KEY="ci-unset" \
             npx next build
 
@@ -374,8 +379,8 @@ jobs:
         run: |
           env -i PATH="$PATH" HOME="$HOME" \
             NEXT_PUBLIC_SUPABASE_URL="http://127.0.0.1:54321" \
-            NEXT_PUBLIC_SUPABASE_ANON_KEY="$LOCAL_ANON_KEY" \
-            SUPABASE_SERVICE_ROLE_KEY="$LOCAL_SERVICE_ROLE_KEY" \
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$LOCAL_ANON_KEY" \
+            SUPABASE_SECRET_KEY="$LOCAL_SERVICE_ROLE_KEY" \
             RESEND_API_KEY="ci-unset" \
             npx next start -p 3100 &
           for i in $(seq 1 20); do
@@ -389,7 +394,7 @@ jobs:
           TEST_SUPABASE_PROJECT_REF: 'local-docker'
           TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
           NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321'
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.LOCAL_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ env.LOCAL_ANON_KEY }}
           TEST_BASE_URL: 'http://localhost:3100'
         run: npx tsx scripts/check-http-auth-sentinel.ts
 
@@ -412,14 +417,8 @@ jobs:
           TEST_SUPABASE_PROJECT_REF: 'local-docker'
           TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
           NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321'
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.LOCAL_ANON_KEY }}
-          # lib/repositories/assessment.repository.ts eagerly constructs a
-          # real Supabase client via createServiceClient() (the
-          # production-named factory) at MODULE IMPORT TIME — the same
-          # known architecture wart the DEEP_PR job works around. This
-          # test-side process (not the already-isolated Next server) needs
-          # it populated too, still only ever the local instance's own key.
-          SUPABASE_SERVICE_ROLE_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ env.LOCAL_ANON_KEY }}
+          SUPABASE_SECRET_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
           RESEND_API_KEY: 'ci-unset'
           TEST_BASE_URL: 'http://localhost:3100'
         run: node scripts/run-http-pr.mjs
@@ -494,8 +493,8 @@ jobs:
         run: |
           env -i PATH="$PATH" HOME="$HOME" \
             NEXT_PUBLIC_SUPABASE_URL="http://127.0.0.1:54321" \
-            NEXT_PUBLIC_SUPABASE_ANON_KEY="$LOCAL_ANON_KEY" \
-            SUPABASE_SERVICE_ROLE_KEY="$LOCAL_SERVICE_ROLE_KEY" \
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$LOCAL_ANON_KEY" \
+            SUPABASE_SECRET_KEY="$LOCAL_SERVICE_ROLE_KEY" \
             RESEND_API_KEY="ci-unset" \
             npx next build
 
@@ -503,8 +502,8 @@ jobs:
         run: |
           env -i PATH="$PATH" HOME="$HOME" \
             NEXT_PUBLIC_SUPABASE_URL="http://127.0.0.1:54321" \
-            NEXT_PUBLIC_SUPABASE_ANON_KEY="$LOCAL_ANON_KEY" \
-            SUPABASE_SERVICE_ROLE_KEY="$LOCAL_SERVICE_ROLE_KEY" \
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$LOCAL_ANON_KEY" \
+            SUPABASE_SECRET_KEY="$LOCAL_SERVICE_ROLE_KEY" \
             RESEND_API_KEY="ci-unset" \
             npx next start -p 3100 &
           for i in $(seq 1 20); do
@@ -518,7 +517,7 @@ jobs:
           TEST_SUPABASE_PROJECT_REF: 'local-docker'
           TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
           NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321'
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.LOCAL_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ env.LOCAL_ANON_KEY }}
           TEST_BASE_URL: 'http://localhost:3100'
         run: npx tsx scripts/check-http-auth-sentinel.ts
 
@@ -541,13 +540,8 @@ jobs:
           TEST_SUPABASE_PROJECT_REF: 'local-docker'
           TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
           NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321'
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.LOCAL_ANON_KEY }}
-          # Same reason as HTTP_PR: several files call lib/ functions in-process
-          # (createSchool, resolveSchoolCoverage), which build a client via the
-          # production-named createServiceClient(). Without this they inherit the
-          # workflow-level 'placeholder-service-key' and fail with "Expected 3
-          # parts in JWT". Still only ever this job's own local instance key.
-          SUPABASE_SERVICE_ROLE_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ env.LOCAL_ANON_KEY }}
+          SUPABASE_SECRET_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
           TEST_BASE_URL: 'http://localhost:3100'
         run: node scripts/run-http-main.mjs
 
@@ -582,7 +576,9 @@ jobs:
       TEST_SUPABASE_URL: 'http://127.0.0.1:54321'
       TEST_SUPABASE_PROJECT_REF: 'local-docker'
       NEXT_PUBLIC_SUPABASE_URL: ''
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ''
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ''
+      SUPABASE_SECRET_KEY: ''
       SUPABASE_SERVICE_ROLE_KEY: ''
       DEEPSEEK_AI_API_KEY: ''
     steps:

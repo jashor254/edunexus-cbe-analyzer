@@ -20,10 +20,12 @@ import { KNOWN_PRODUCTION_PROJECT_REF, extractProjectRef } from './productionRef
 
 export function createAnonAuthClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const anonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !anonKey) {
-    throw new Error('createAnonAuthClient: Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY')
+    throw new Error('createAnonAuthClient: Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY')
   }
 
   // Same fail-closed test/production guard as createServiceClient() (Phase
