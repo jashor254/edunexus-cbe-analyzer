@@ -29,16 +29,16 @@ export async function POST(req: Request): Promise<Response> {
       if (!pulse.parent_phone) { failed++; continue }
 
       try {
-        await sendWhatsApp(pulse.parent_phone, pulse.message)
+        const waResult = await sendWhatsApp(pulse.parent_phone, pulse.message)
 
-        // Log the notification
         await db.from('notification_log').insert({
-          user_id:      pulse.student_id,
-          type:         'parent_weekly_pulse',
-          reference_id: pulse.student_id,
-          channel:      'whatsapp',
-          phone_number: pulse.parent_phone,
-          success:      true,
+          user_id:             pulse.student_id,
+          type:                'parent_weekly_pulse',
+          reference_id:        pulse.student_id,
+          channel:             'whatsapp',
+          phone_number:        pulse.parent_phone,
+          whatsapp_message_id: waResult.messageId ?? null,
+          success:             true,
         })
 
         void publishEvent({

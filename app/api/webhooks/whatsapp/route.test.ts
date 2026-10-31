@@ -25,11 +25,14 @@ type PipelineResult = { processed: boolean; outcome?: 'demonstrated' | 'struggle
 
 let pipelineResult: PipelineResult = { processed: false }
 let pipelineShouldThrow = false
-let capturedInbound: { fromPhone: string; rawBody: string } | null = null
+let capturedInbound: { fromPhone: string; rawBody: string; metaMessageId?: string } | null = null
+let optOutCalls: string[] = []
+let deliveryStatusCalls: Array<{ messageId: string; status: string }> = []
+let sendWhatsAppCalls: Array<{ phone: string; message: string }> = []
 
 mock.module('@/lib/parentPulse/observationPipeline', {
   namedExports: {
-    processInboundReply: async (inbound: { fromPhone: string; rawBody: string }) => {
+    processInboundReply: async (inbound: { fromPhone: string; rawBody: string; metaMessageId?: string }) => {
       capturedInbound = inbound
       if (pipelineShouldThrow) throw new Error('boom')
       return pipelineResult
@@ -40,7 +43,26 @@ mock.module('@/lib/parentPulse/observationPipeline', {
 
 mock.module('@/lib/whatsapp/sender', {
   namedExports: {
-    sendWhatsApp: async () => ({ success: true }),
+    sendWhatsApp: async (phone: string, message: string) => {
+      sendWhatsAppCalls.push({ phone, message })
+      return { success: true }
+    },
+  },
+})
+
+mock.module('@/lib/repositories', {
+  namedExports: {
+    repos: {
+      notifications: {
+        optOutByPhone: async (phone: string) => {
+          optOutCalls.push(phone)
+          return { studentIds: ['student-1'] }
+        },
+        updateDeliveryStatus: async (event: { messageId: string; status: string }) => {
+          deliveryStatusCalls.push(event)
+        },
+      },
+    },
   },
 })
 
@@ -222,4 +244,99 @@ test('POST returns 200 even when the pipeline throws — never causes a Meta ret
   } finally {
     pipelineShouldThrow = false
   }
+})
+
+// ── STOP / opt-out handling ────────────────────────────────────────────────
+
+test('POST processes STOP keyword — calls optOutByPhone, sends ack, returns opted_out', async () => {
+  optOutCalls = []
+  sendWhatsAppCalls = []
+  capturedInbound = null
+  await withEnv({ WHATSAPP_APP_SECRET: APP_SECRET }, async () => {
+    const body = JSON.stringify({
+      object: 'whatsapp_business_account',
+      entry: [{ changes: [{ value: { messages: [{ from: '254712345678', text: { body: 'STOP' } }] } }] }],
+    })
+    const res = await POST(postReq(body, sign(body, APP_SECRET)))
+    assert.equal(res.status, 200)
+    const json = await res.json()
+    assert.equal(json.outcome, 'opted_out')
+    assert.equal(optOutCalls.length, 1)
+    assert.equal(optOutCalls[0], '254712345678')
+    assert.equal(sendWhatsAppCalls.length, 1, 'should send unsubscribe confirmation')
+    assert.equal(capturedInbound, null, 'STOP should NOT reach the pipeline')
+  })
+})
+
+test('POST processes "unsubscribe" keyword case-insensitively', async () => {
+  optOutCalls = []
+  await withEnv({ WHATSAPP_APP_SECRET: APP_SECRET }, async () => {
+    const body = JSON.stringify({
+      object: 'whatsapp_business_account',
+      entry: [{ changes: [{ value: { messages: [{ from: '254712345678', text: { body: '  Unsubscribe  ' } }] } }] }],
+    })
+    const res = await POST(postReq(body, sign(body, APP_SECRET)))
+    assert.equal(res.status, 200)
+    assert.equal((await res.json()).outcome, 'opted_out')
+    assert.equal(optOutCalls.length, 1)
+  })
+})
+
+test('POST does NOT treat "I did not stop" as a STOP keyword', async () => {
+  optOutCalls = []
+  pipelineResult = { processed: true, outcome: 'free_form' }
+  await withEnv({ WHATSAPP_APP_SECRET: APP_SECRET }, async () => {
+    const body = JSON.stringify({
+      object: 'whatsapp_business_account',
+      entry: [{ changes: [{ value: { messages: [{ from: '254712345678', text: { body: 'I did not stop by the school' } }] } }] }],
+    })
+    const res = await POST(postReq(body, sign(body, APP_SECRET)))
+    assert.equal(res.status, 200)
+    assert.equal(optOutCalls.length, 0, 'substring match must not trigger opt-out')
+  })
+})
+
+// ── Delivery-status callback ────────────────────────────────────────────────
+
+test('POST recognises a Meta delivery-status callback and calls updateDeliveryStatus', async () => {
+  deliveryStatusCalls = []
+  capturedInbound = null
+  await withEnv({ WHATSAPP_APP_SECRET: APP_SECRET }, async () => {
+    const body = JSON.stringify({
+      object: 'whatsapp_business_account',
+      entry: [{
+        changes: [{
+          value: {
+            statuses: [{
+              id: 'wamid.ABC',
+              status: 'delivered',
+              timestamp: '1698765432',
+            }],
+          },
+        }],
+      }],
+    })
+    const res = await POST(postReq(body, sign(body, APP_SECRET)))
+    assert.equal(res.status, 200)
+    assert.equal(deliveryStatusCalls.length, 1)
+    assert.equal(deliveryStatusCalls[0].messageId, 'wamid.ABC')
+    assert.equal(deliveryStatusCalls[0].status, 'delivered')
+    assert.equal(capturedInbound, null, 'status events must not reach the message pipeline')
+  })
+})
+
+// ── Meta message ID passthrough ──────────────────────────────────────────────
+
+test('POST passes msg.id as metaMessageId to the pipeline', async () => {
+  pipelineResult = { processed: true, outcome: 'free_form' }
+  capturedInbound = null
+  await withEnv({ WHATSAPP_APP_SECRET: APP_SECRET }, async () => {
+    const body = JSON.stringify({
+      object: 'whatsapp_business_account',
+      entry: [{ changes: [{ value: { messages: [{ id: 'wamid.XYZ', from: '254712345678', text: { body: 'hello' } }] } }] }],
+    })
+    const res = await POST(postReq(body, sign(body, APP_SECRET)))
+    assert.equal(res.status, 200)
+    assert.equal(capturedInbound?.metaMessageId, 'wamid.XYZ')
+  })
 })

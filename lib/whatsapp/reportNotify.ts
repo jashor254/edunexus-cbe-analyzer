@@ -60,13 +60,14 @@ export async function sendReportWhatsApp(params: ReportWhatsAppParams): Promise<
     })
 
     await repos.notifications.insertNotificationLog({
-      user_id:       params.userId ?? null,
-      type:          'report_ready',
-      reference_id:  dedupKey,
-      channel:       'whatsapp',
-      phone_number:  params.parentPhone,
-      success:       result.success,
-      error_message: result.error ?? null,
+      user_id:             params.userId ?? null,
+      type:                'report_ready',
+      reference_id:        dedupKey,
+      channel:             'whatsapp',
+      phone_number:        params.parentPhone,
+      whatsapp_message_id: result.messageId ?? null,
+      success:             result.success,
+      error_message:       result.error ?? null,
     })
 
     return result

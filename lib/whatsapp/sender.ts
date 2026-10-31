@@ -67,15 +67,17 @@ async function logAttempt(params: {
   phoneNumber: string
   success:     boolean
   errorMessage?: string
+  whatsappMessageId?: string
 }): Promise<void> {
   await repos.notifications.insertNotificationLog({
-    user_id:       params.userId,
-    type:          params.type,
-    reference_id:  params.referenceId,
-    channel:       'whatsapp',
-    phone_number:  params.phoneNumber,
-    success:       params.success,
-    error_message: params.errorMessage ?? null,
+    user_id:             params.userId,
+    type:                params.type,
+    reference_id:        params.referenceId,
+    channel:             'whatsapp',
+    phone_number:        params.phoneNumber,
+    whatsapp_message_id: params.whatsappMessageId ?? null,
+    success:             params.success,
+    error_message:       params.errorMessage ?? null,
   })
 }
 
@@ -141,24 +143,19 @@ export async function sendAssignmentMarkedWhatsApp(
     })
 
     await logAttempt({
-      userId:       params.userId ?? null,
-      type:         'assignment_marked',
-      referenceId:  params.submissionId,
-      phoneNumber:  params.parentPhone,
-      success:      result.success,
-      errorMessage: result.error,
+      userId:             params.userId ?? null,
+      type:               'assignment_marked',
+      referenceId:        params.submissionId,
+      phoneNumber:        params.parentPhone,
+      whatsappMessageId:  result.messageId,
+      success:            result.success,
+      errorMessage:       result.error,
     })
 
     return result
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[sendAssignmentMarkedWhatsApp]', message)
-    // H4A / OPS-WA-001 — a thrown transport error (network failure/timeout,
-    // sendWhatsAppTemplate has no internal try/catch of its own) previously
-    // left no notification_log row at all, unlike a failure the provider
-    // itself reports via a 4xx/5xx response — a real observability gap
-    // where the platform's own delivery record couldn't distinguish
-    // "never attempted" from "attempted and failed at the network level."
     await logAttempt({
       userId:       params.userId ?? null,
       type:         'assignment_marked',
@@ -220,12 +217,13 @@ export async function sendAlertCreatedWhatsApp(
     })
 
     await logAttempt({
-      userId:       params.userId ?? null,
-      type:         'alert_created',
-      referenceId:  params.alertId,
-      phoneNumber:  params.parentPhone,
-      success:      result.success,
-      errorMessage: result.error,
+      userId:             params.userId ?? null,
+      type:               'alert_created',
+      referenceId:        params.alertId,
+      phoneNumber:        params.parentPhone,
+      whatsappMessageId:  result.messageId,
+      success:            result.success,
+      errorMessage:       result.error,
     })
 
     return result
@@ -422,12 +420,13 @@ export async function sendAcademyReflectionNudge(
     })
 
     await logAttempt({
-      userId:      params.userId ?? null,
-      type:        'academy_reflection_nudge',
+      userId:             params.userId ?? null,
+      type:               'academy_reflection_nudge',
       referenceId,
-      phoneNumber: params.phone,
-      success:     result.success,
-      errorMessage: result.error,
+      phoneNumber:        params.phone,
+      whatsappMessageId:  result.messageId,
+      success:            result.success,
+      errorMessage:       result.error,
     })
 
     return result

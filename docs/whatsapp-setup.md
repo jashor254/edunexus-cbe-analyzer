@@ -227,6 +227,62 @@ Used by: `app/api/growth/schools/[id]/messages/send/route.ts` via
 
 ---
 
+### Template 4: `edunexus_parent_update` (generic single-variable wrapper)
+
+**Category:** `UTILITY`
+**Language:** `en`
+
+**Body (exact text to paste into Meta Business Manager):**
+
+```
+{{1}}
+```
+
+**Variable mapping:**
+
+| Variable | Value |
+|----------|-------|
+| `{{1}}` | The full message body (max 1024 chars, truncated by sender.ts) |
+
+This is the catch-all template used by `sendWhatsApp()` in `lib/whatsapp/sender.ts`
+for free-form utility messages: STOP confirmations, Parent Pulse acknowledgements,
+and any other outbound text that does not have its own dedicated template.
+
+Used by: `lib/whatsapp/sender.ts` → `sendWhatsApp()`, called from the webhook
+route for acknowledgements and from `lib/holiday/notify.ts` for holiday return
+reminders.
+
+---
+
+### Template 5: `edunexus_academy_reflect` (Academy reflection nudge)
+
+**Category:** `UTILITY`
+**Language:** `en`
+
+**Body (exact text to paste into Meta Business Manager):**
+
+```
+Hello Mwalimu {{1}}! 👋
+You completed a lesson in the EduNexus AI Academy but haven't reflected yet.
+Module: *{{2}}*
+Take 2 minutes to reflect on what you tried in class and unlock your next XP bonus.
+Reflect here: {{3}}
+Keep growing — EduNexus AI Academy 🎓
+```
+
+**Variable mapping:**
+
+| Variable | Value |
+|----------|-------|
+| `{{1}}` | Teacher first name |
+| `{{2}}` | Module title |
+| `{{3}}` | Module URL (deep link to `/teacher/academy/module/<slug>`) |
+
+Used by: `lib/whatsapp/sender.ts` → `sendAcademyReflectionNudge()`, triggered
+when a teacher completes an Academy lesson but has not yet submitted a reflection.
+
+---
+
 ### How to submit templates for approval
 
 1. Go to **WhatsApp → Message Templates → Create Template**

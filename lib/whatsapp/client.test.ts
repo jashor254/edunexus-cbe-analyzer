@@ -67,9 +67,18 @@ test('OPS-WA-001: a 500 (Meta outage) with a non-JSON-parseable-as-expected body
   assert.match(result.error ?? '', /HTTP 500/)
 })
 
-test('OPS-WA-001 FINDING: a real network failure (fetch throws) is NOT caught inside sendWhatsAppTemplate — it propagates to the caller', async () => {
+test('a real network failure (fetch throws) is caught and returned as {success: false}', async () => {
   globalThis.fetch = (async () => { throw new Error('fetch failed') }) as typeof fetch
-  await assert.rejects(() => sendWhatsAppTemplate(baseOpts), /fetch failed/, 'pins the actual current contract: unlike the DeepSeek AI wrapper, this send function has no internal try/catch around its own transport call — every caller must handle a thrown network error itself. See the H4A closeout report.')
+  const result = await sendWhatsAppTemplate(baseOpts)
+  assert.equal(result.success, false)
+  assert.equal(result.error, 'fetch failed')
+})
+
+test('a non-JSON response body is caught and returned as {success: false}', async () => {
+  globalThis.fetch = (async () => new Response('Internal Server Error', { status: 500 })) as typeof fetch
+  const result = await sendWhatsAppTemplate(baseOpts)
+  assert.equal(result.success, false)
+  assert.match(result.error ?? '', /non-JSON/)
 })
 
 test('missing WhatsApp credentials fails closed with a clear error, no attempted network call', async () => {

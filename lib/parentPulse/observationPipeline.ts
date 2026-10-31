@@ -16,9 +16,10 @@ import type { ParentObservationOutcome } from '@/lib/learnerModel/types'
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type InboundReply = {
-  fromPhone:  string
-  rawBody:    string
-  receivedAt: string
+  fromPhone:      string
+  rawBody:        string
+  receivedAt:     string
+  metaMessageId?: string
 }
 
 export type ReplyOutcome = ParentObservationOutcome | 'free_form'
@@ -101,7 +102,10 @@ export function parseReplyBody(rawBody: string): ReplyOutcome {
 export async function resolveParentFromPhone(
   phone: string
 ): Promise<PhoneContext | null> {
-  // 1. Find the opt-in record for this phone
+  // 1. Find the opt-in record for this phone.
+  //    getOptInByPhone returns null when zero OR multiple children are
+  //    linked — a shared family phone must not silently attach an
+  //    observation to an arbitrary learner.
   const optIn = await repos.notifications.getOptInByPhone(phone)
 
   if (!optIn) return null
@@ -179,19 +183,26 @@ export async function processInboundReply(
   inbound: InboundReply
 ): Promise<ProcessResult> {
   try {
+    if (inbound.metaMessageId) {
+      const alreadySeen = await repos.notifications.isInboundDuplicate(inbound.metaMessageId)
+      if (alreadySeen) {
+        return { processed: true, outcome: 'free_form' }
+      }
+    }
+
     const outcome = parseReplyBody(inbound.rawBody)
 
     const context = await resolveParentFromPhone(inbound.fromPhone)
 
     if (!context) {
-      // Unknown phone — log and exit cleanly
       await logInbound({
-        phone:        inbound.fromPhone,
-        rawBody:      inbound.rawBody,
-        receivedAt:   inbound.receivedAt,
-        parsedReply:  outcome,
-        processed:    false,
-        errorMessage: 'No opt-in found for phone',
+        phone:         inbound.fromPhone,
+        rawBody:       inbound.rawBody,
+        receivedAt:    inbound.receivedAt,
+        metaMessageId: inbound.metaMessageId,
+        parsedReply:   outcome,
+        processed:     false,
+        errorMessage:  'No opt-in found for phone',
       })
       return { processed: false, error: 'No opt-in found for phone' }
     }
@@ -201,13 +212,14 @@ export async function processInboundReply(
     // Free-form replies — log and skip model update (needs human review)
     if (outcome === 'free_form') {
       await logInbound({
-        phone:       inbound.fromPhone,
-        rawBody:     inbound.rawBody,
-        receivedAt:  inbound.receivedAt,
-        parsedReply: 'free_form',
-        studentId:   context.studentId,
-        parentId:    context.parentId,
-        processed:   true,
+        phone:         inbound.fromPhone,
+        rawBody:       inbound.rawBody,
+        receivedAt:    inbound.receivedAt,
+        metaMessageId: inbound.metaMessageId,
+        parsedReply:   'free_form',
+        studentId:     context.studentId,
+        parentId:      context.parentId,
+        processed:     true,
       })
       return { processed: true, outcome: 'free_form' }
     }
@@ -251,13 +263,14 @@ export async function processInboundReply(
     }
 
     await logInbound({
-      phone:       inbound.fromPhone,
-      rawBody:     inbound.rawBody,
-      receivedAt:  inbound.receivedAt,
-      parsedReply: outcome,
-      studentId:   context.studentId,
-      parentId:    context.parentId,
-      processed:   true,
+      phone:         inbound.fromPhone,
+      rawBody:       inbound.rawBody,
+      receivedAt:    inbound.receivedAt,
+      metaMessageId: inbound.metaMessageId,
+      parsedReply:   outcome,
+      studentId:     context.studentId,
+      parentId:      context.parentId,
+      processed:     true,
     })
 
     void publishEvent({
@@ -281,12 +294,13 @@ export async function processInboundReply(
     // Best-effort log — don't let a log failure surface as a processing error
     try {
       await logInbound({
-        phone:        inbound.fromPhone,
-        rawBody:      inbound.rawBody,
-        receivedAt:   inbound.receivedAt,
-        parsedReply:  'free_form',
-        processed:    false,
-        errorMessage: message,
+        phone:         inbound.fromPhone,
+        rawBody:       inbound.rawBody,
+        receivedAt:    inbound.receivedAt,
+        metaMessageId: inbound.metaMessageId,
+        parsedReply:   'free_form',
+        processed:     false,
+        errorMessage:  message,
       })
     } catch {
       // Non-fatal — log failure doesn't change the pipeline outcome
@@ -336,26 +350,28 @@ export function buildAcknowledgement(
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 type InboundLogParams = {
-  phone:        string
-  rawBody:      string
-  receivedAt:   string
-  parsedReply:  ReplyOutcome
-  studentId?:   string
-  parentId?:    string
-  processed:    boolean
-  errorMessage?: string
+  phone:          string
+  rawBody:        string
+  receivedAt:     string
+  metaMessageId?: string
+  parsedReply:    ReplyOutcome
+  studentId?:     string
+  parentId?:      string
+  processed:      boolean
+  errorMessage?:  string
 }
 
 async function logInbound(params: InboundLogParams): Promise<void> {
   await repos.notifications.insertWhatsAppInboundLog({
-    phone:         params.phone,
-    raw_body:      params.rawBody,
-    received_at:   params.receivedAt,
-    parsed_reply:  params.parsedReply,
-    student_id:    params.studentId    ?? null,
-    parent_id:     params.parentId     ?? null,
-    processed:     params.processed,
-    error_message: params.errorMessage ?? null,
+    phone:            params.phone,
+    raw_body:         params.rawBody,
+    received_at:      params.receivedAt,
+    meta_message_id:  params.metaMessageId ?? null,
+    parsed_reply:     params.parsedReply,
+    student_id:       params.studentId    ?? null,
+    parent_id:        params.parentId     ?? null,
+    processed:        params.processed,
+    error_message:    params.errorMessage ?? null,
   })
 }
 

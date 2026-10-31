@@ -19,7 +19,11 @@ import { processInboundReply, buildAcknowledgement } from '@/lib/parentPulse/obs
 import { sendWhatsApp } from '@/lib/whatsapp/sender'
 import { createServiceClient } from '@/utils/supabase/service'
 import { getLearnerProfile } from '@/lib/learnerModel/queries'
+import { repos } from '@/lib/repositories'
+import type { DeliveryStatusEvent } from '@/lib/repositories/notification.repository'
 import { logger } from '@/lib/observability/logger'
+
+const OPT_OUT_KEYWORDS = new Set(['stop', 'unsubscribe', 'cancel'])
 
 export const runtime = 'nodejs'
 
@@ -69,16 +73,43 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // makes Meta retry delivery indefinitely. Business-logic failures below
   // are logged and swallowed instead.
   try {
-    const extracted = isRecord(payload) ? extractMessage(payload) : null
-    if (!extracted) {
-      // Not a message event (could be a status update or delivery receipt)
+    const statusEvent = isRecord(payload) ? extractStatusEvent(payload) : null
+    if (statusEvent) {
+      try {
+        await repos.notifications.updateDeliveryStatus(statusEvent)
+      } catch (err) {
+        console.error('[webhooks/whatsapp] status update failed', { message: err instanceof Error ? err.message : String(err) })
+      }
       return NextResponse.json({ ok: true }, { status: 200 })
     }
 
-    const { fromPhone, messageBody } = extracted
+    const extracted = isRecord(payload) ? extractMessage(payload) : null
+    if (!extracted) {
+      return NextResponse.json({ ok: true }, { status: 200 })
+    }
+
+    const { fromPhone, messageBody, metaMessageId } = extracted
     const receivedAt = new Date().toISOString()
 
-    const result = await processInboundReply({ fromPhone, rawBody: messageBody, receivedAt })
+    if (isOptOutKeyword(messageBody)) {
+      try {
+        const { studentIds } = await repos.notifications.optOutByPhone(fromPhone)
+        logger.info('[webhooks/whatsapp] STOP processed', { fromPhone, studentCount: studentIds.length })
+
+        if (studentIds.length > 0) {
+          try {
+            await sendWhatsApp(fromPhone, 'You have been unsubscribed from EduNexus WhatsApp notifications. To re-subscribe, visit your dashboard at edunexus.co.ke/settings.')
+          } catch (ackErr) {
+            console.error('[webhooks/whatsapp] STOP ack send failed', { fromPhone, message: ackErr instanceof Error ? ackErr.message : String(ackErr) })
+          }
+        }
+      } catch (err) {
+        console.error('[webhooks/whatsapp] STOP processing failed', { fromPhone, message: err instanceof Error ? err.message : String(err) })
+      }
+      return NextResponse.json({ ok: true, outcome: 'opted_out' }, { status: 200 })
+    }
+
+    const result = await processInboundReply({ fromPhone, rawBody: messageBody, receivedAt, metaMessageId })
 
     if (result.processed && result.outcome && result.outcome !== 'free_form') {
       const ack = await buildAcknowledgementForPhone(
@@ -123,6 +154,10 @@ function isValidSignature(
   return timingSafeEqual(receivedBuffer, expectedBuffer)
 }
 
+function isOptOutKeyword(body: string): boolean {
+  return OPT_OUT_KEYWORDS.has(body.trim().toLowerCase())
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
@@ -130,8 +165,32 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // ── Message extraction ───────────────────────────────────────────────────────
 
 type ExtractedMessage = {
-  fromPhone:   string
-  messageBody: string
+  fromPhone:    string
+  messageBody:  string
+  metaMessageId?: string
+}
+
+function extractStatusEvent(payload: Record<string, unknown>): DeliveryStatusEvent | null {
+  try {
+    const entry   = (payload.entry   as Array<Record<string, unknown>> | undefined)?.[0]
+    const change  = (entry?.changes  as Array<Record<string, unknown>> | undefined)?.[0]
+    const value   = change?.value as Record<string, unknown> | undefined
+    const statuses = value?.statuses as Array<Record<string, unknown>> | undefined
+    const status  = statuses?.[0]
+
+    if (status && typeof status.id === 'string' && typeof status.status === 'string') {
+      const errors = status.errors as Array<Record<string, unknown>> | undefined
+      return {
+        messageId:  status.id,
+        status:     status.status,
+        timestamp:  typeof status.timestamp === 'string' ? new Date(Number(status.timestamp) * 1000).toISOString() : new Date().toISOString(),
+        errorCode:  errors?.[0]?.code != null ? String(errors[0].code) : undefined,
+      }
+    }
+  } catch {
+    // Not a status event
+  }
+  return null
 }
 
 /**
@@ -155,7 +214,8 @@ function extractMessage(
       const textObj = msg.text as { body?: string } | undefined
       const body    = textObj?.body
       if (body && typeof body === 'string') {
-        return { fromPhone: msg.from, messageBody: body }
+        const metaMessageId = typeof msg.id === 'string' ? msg.id : undefined
+        return { fromPhone: msg.from, messageBody: body, metaMessageId }
       }
     }
   } catch {
@@ -188,8 +248,8 @@ async function buildAcknowledgementForPhone(
     const { data: optIn } = await db
       .from('whatsapp_opt_ins')
       .select('student_id, students(parent_user_id, profiles(first_name))')
-      .eq('phone', phone)
-      .eq('active', true)
+      .eq('parent_phone', phone)
+      .is('opted_out_at', null)
       .limit(1)
       .maybeSingle()
 

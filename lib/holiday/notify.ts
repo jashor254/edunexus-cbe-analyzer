@@ -40,25 +40,26 @@ export async function notifyParentOfHolidayReturn(input: HolidayReturnNotifyInpu
     const db = createServiceClient()
     const { data: student } = await db
       .from('students')
-      .select('name, parent_phone')
+      .select('name, parent_phone, notification_whatsapp, whatsapp_opted_in')
       .eq('id', input.studentId)
       .maybeSingle()
 
     const phone = (student?.parent_phone as string | null) ?? null
-    if (!phone) return
+    if (!phone || !student?.notification_whatsapp || !student?.whatsapp_opted_in) return
 
     const firstName = ((student?.name as string | null) ?? 'Your child').split(' ')[0]
     const message = buildParentMessage(firstName, input)
 
-    await sendWhatsApp(phone, message)
+    const waResult = await sendWhatsApp(phone, message)
 
     await db.from('notification_log').insert({
-      user_id:      input.studentId,
-      type:         'holiday_return_processed',
-      reference_id: input.studentId,
-      channel:      'whatsapp',
-      phone_number: phone,
-      success:      true,
+      user_id:             input.studentId,
+      type:                'holiday_return_processed',
+      reference_id:        input.studentId,
+      channel:             'whatsapp',
+      phone_number:        phone,
+      whatsapp_message_id: waResult.messageId ?? null,
+      success:             true,
     })
 
     void publishEvent({

@@ -49,16 +49,26 @@ export async function sendWhatsAppTemplate(
     },
   }
 
-  const res = await fetch(`${BASE_URL}/${phoneNumberId}/messages`, {
-    method:  'POST',
-    headers: {
-      Authorization:  `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  })
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}/${phoneNumberId}/messages`, {
+      method:  'POST',
+      headers: {
+        Authorization:  `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    })
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Network error' }
+  }
 
-  const data = (await res.json()) as MetaApiResponse
+  let data: MetaApiResponse
+  try {
+    data = (await res.json()) as MetaApiResponse
+  } catch {
+    return { success: false, error: `HTTP ${res.status} (non-JSON response)` }
+  }
 
   if (!res.ok || data.error) {
     return { success: false, error: data.error?.message ?? `HTTP ${res.status}` }
