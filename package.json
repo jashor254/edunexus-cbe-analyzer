@@ -70,7 +70,8 @@
     "node": ">=20.9.0"
   },
   "overrides": {
-    "postcss": ">=8.5.10"
+    "postcss": ">=8.5.10",
+    "postcss-selector-parser": "^6.1.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
