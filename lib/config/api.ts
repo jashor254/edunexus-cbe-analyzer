@@ -17,7 +17,7 @@ export const DEEPSEEK_CONFIG = {
   },
 
   baseURL: 'https://api.deepseek.com',
-  model: 'deepseek-chat',
+  model: process.env.DEEPSEEK_MODEL ?? 'deepseek-chat',
 
   isConfigured() {
     return Boolean(this.apiKey && this.apiKey.startsWith('sk-'))
