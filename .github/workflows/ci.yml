@@ -276,7 +276,15 @@ jobs:
           # uses all five columns). FAIL_COUNT=9 UNRECOVERED=0, unchanged.
           # Computed on an isolated throwaway pifp stack that first reproduced
           # 0b8f67ee at the pre-WhatsApp tree and e3cfda63 at origin/main.
-          EXPECTED="e3cfda630f274cd6be0563c9e7288c33"
+          # 2026-11-04: e3cfda63… → e87bff46… for migration
+          # 20261104120000_shared_reports_token_boundary.sql (DSA-01: function
+          # get_shared_report_by_token, shared_reports.revoked_at/provenance,
+          # 4 CHECKs, policy swap, grant narrowing; no table added). Reviewed
+          # via an isolated-stack pg_dump diff: that is the ONLY schema change
+          # against origin/main. FAIL_COUNT=9 UNRECOVERED=0, unchanged.
+          # (The bootstrap replays the July hardening sweeps after migrations,
+          # so the function's search_path reads 'public' in this fingerprint.)
+          EXPECTED="e87bff468609a29b5552458b6ba6309d"
           echo "expected: $EXPECTED"
           echo "actual:   $ACTUAL"
           if [ "$ACTUAL" != "$EXPECTED" ]; then
