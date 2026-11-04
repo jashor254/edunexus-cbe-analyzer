@@ -121,7 +121,9 @@ test('report-specific clinical/diagnosis authority language does not return in d
 })
 
 test('the share-link view branding matches the canonical name, not stale Clinic/Blueprint branding', () => {
-  const source = read('app/shared/[token]/page.tsx')
+  // The page renders its labels from lib/sharedReports/presentation.ts (origin-aware copy),
+  // so the canonical name is asserted across both files that make up the view.
+  const source = read('app/shared/[token]/page.tsx') + '\n' + read('lib/sharedReports/presentation.ts')
   assert.match(source, /Learner Intelligence Report/)
   assert.doesNotMatch(source, /Academic Clinic/)
 })
