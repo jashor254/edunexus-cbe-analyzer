@@ -9,6 +9,23 @@ const nextConfig = {
       },
     ],
   },
+  // Bearer-credential URLs (/shared/<token>) and their API: never stored by a
+  // browser or a shared cache (CDN/proxy), never indexed, never leaked via Referer.
+  // Scoped to these paths only — site-wide security headers are DSA-09.
+  async headers() {
+    const noStore = [
+      { key: 'Cache-Control', value: 'private, no-store, max-age=0, must-revalidate' },
+      { key: 'CDN-Cache-Control', value: 'no-store' },
+      { key: 'Vercel-CDN-Cache-Control', value: 'no-store' },
+      { key: 'Referrer-Policy', value: 'no-referrer' },
+      { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' },
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+    ]
+    return [
+      { source: '/shared/:path*', headers: [...noStore, { key: 'X-Frame-Options', value: 'DENY' }] },
+      { source: '/api/share/:path*', headers: noStore },
+    ]
+  },
   async redirects() {
     return [
       {
