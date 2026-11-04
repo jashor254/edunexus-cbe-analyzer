@@ -4,8 +4,8 @@
 // integration tests against DISPOSABLE LOCAL DOCKER SUPABASE ONLY (Phase
 // 2D Step 23 — no production migration, no production mutation, ever).
 //
-// This file must be run with NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY
-// / NEXT_PUBLIC_SUPABASE_ANON_KEY pointed at local Docker (NOT .env.local,
+// This file must be run with NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SECRET_KEY
+// / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY pointed at local Docker (NOT .env.local,
 // which is production) — the Phase 2C Step 0 guard in
 // utils/supabase/service.ts refuses to construct a service client under
 // `node --test` (NODE_TEST_CONTEXT) if the URL resolves to the known
@@ -14,8 +14,8 @@
 //
 // Run (example, local Supabase CLI default ports):
 //   NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 \
-//   SUPABASE_SERVICE_ROLE_KEY=<local service role key> \
-//   NEXT_PUBLIC_SUPABASE_ANON_KEY=<local anon/publishable key> \
+//   SUPABASE_SECRET_KEY=<local service role key> \
+//   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<local anon/publishable key> \
 //   npx tsx --experimental-test-module-mocks --test lib/core/learnerIdentityConvergence.integration.test.ts
 
 import { test, before, after } from 'node:test'
@@ -65,7 +65,7 @@ async function mkSchoolWithAdmin(label: string): Promise<{ schoolId: string; adm
 }
 
 function anonClient(): SupabaseClient {
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!)
 }
 
 async function signInAs(email: string): Promise<SupabaseClient> {

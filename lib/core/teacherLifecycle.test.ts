@@ -348,7 +348,7 @@ test('17+18. only an admin of THIS school may end employment here', async () => 
   const { requireSchoolAdmin } = await import('@/lib/core/permissions')
   const { createClient } = await import('@supabase/supabase-js')
   const signIn = async (email: string) => {
-    const c = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+    const c = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!)
     const { error } = await c.auth.signInWithPassword({ email, password: PASSWORD })
     if (error) throw error
     return c

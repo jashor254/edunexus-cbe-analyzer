@@ -317,7 +317,7 @@ test('C2 (RLS): a real session can read only its own Record of Work rows', async
   await seedRecordOfWorkEntries(rowId, schemeId)
 
   async function sessionClient(t: SyntheticTeacher) {
-    const c = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+    const c = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!)
     await retryAsync(async () => {
       const { error } = await c.auth.signInWithPassword({ email: t.email, password: t.password })
       if (error) throw error

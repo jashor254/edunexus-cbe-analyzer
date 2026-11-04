@@ -1,4 +1,4 @@
-// Run: NEXT_PUBLIC_SUPABASE_URL=x SUPABASE_SERVICE_ROLE_KEY=x npx tsx --test lib/growth/services/csvImport.test.ts
+// Run: NEXT_PUBLIC_SUPABASE_URL=x SUPABASE_SECRET_KEY=x npx tsx --test lib/growth/services/csvImport.test.ts
 // (dummy env vars needed only because this module also exports runImport(),
 // which pulls in growthRepos — computeImportReadiness() itself is pure)
 

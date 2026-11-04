@@ -20,7 +20,7 @@ const db = createServiceClient()
 const PASSWORD = `Test!${Math.random().toString(36).slice(2, 12)}`
 
 async function signInAs(email: string): Promise<SupabaseClient> {
-  const client = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  const client = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!)
   const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD })
   if (error) throw error
   return client
@@ -79,7 +79,7 @@ test('requireStudent throws ResourceOwnershipError when a student tries to acces
 })
 
 test('requireStudent throws UnauthorizedError for no session', async () => {
-  const anon = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  const anon = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!)
   await assert.rejects(() => requireStudent(anon, studentAId), UnauthorizedError)
 })
 

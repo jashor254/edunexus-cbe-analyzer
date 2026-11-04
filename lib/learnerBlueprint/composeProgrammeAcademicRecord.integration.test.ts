@@ -4,11 +4,11 @@
 // Same convention as lib/curriculum/seniorProgramme.integration.test.ts and
 // lib/core/learnerIdentityConvergence.integration.test.ts — this file calls
 // functions built on createServiceClient() (NEXT_PUBLIC_SUPABASE_URL /
-// SUPABASE_SERVICE_ROLE_KEY), not createTestServiceClient().
+// SUPABASE_SECRET_KEY), not createTestServiceClient().
 //
 // Run (example, local Supabase CLI default ports):
 //   NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 \
-//   SUPABASE_SERVICE_ROLE_KEY=<local service role key> \
+//   SUPABASE_SECRET_KEY=<local service role key> \
 //   npx tsx --experimental-test-module-mocks --test lib/learnerBlueprint/composeProgrammeAcademicRecord.integration.test.ts
 //
 // Proves the Phase 2 mandatory acceptance case: a real Grade 10 learner with

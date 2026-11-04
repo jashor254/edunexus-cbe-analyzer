@@ -57,7 +57,7 @@ export function resolveTestTarget(env: TestTargetEnv): TestTargetResult {
 
 /**
  * DEEP-test-only Supabase client. Reads TEST_SUPABASE_* variables — never
- * NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY, which are the
+ * NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SECRET_KEY, which are the
  * production credentials .env.local also carries. Throws before
  * constructing any client if the target is missing, ambiguous, or resolves
  * to production. See docs/architecture — Phase H1S / H1S-FIX.

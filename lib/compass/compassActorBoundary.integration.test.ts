@@ -24,7 +24,7 @@
 //
 // Run:
 //   TEST_SUPABASE_URL=... TEST_SUPABASE_SERVICE_ROLE_KEY=... TEST_SUPABASE_PROJECT_REF=local-docker \
-//   SUPABASE_SERVICE_ROLE_KEY=... NEXT_PUBLIC_SUPABASE_URL=... NEXT_PUBLIC_SUPABASE_ANON_KEY=... \
+//   SUPABASE_SECRET_KEY=... NEXT_PUBLIC_SUPABASE_URL=... NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=... \
 //   npx tsx --experimental-test-module-mocks --test lib/compass/compassActorBoundary.integration.test.ts
 
 import { test, before, after } from 'node:test'

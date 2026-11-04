@@ -7,7 +7,7 @@
 // NOT createTestServiceClient() from utils/supabase/test-service.ts — so
 // this file follows the same convention as
 // lib/core/learnerIdentityConvergence.integration.test.ts: point
-// NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY at local Docker
+// NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SECRET_KEY at local Docker
 // directly (NOT .env.local, which is production). The Phase 2C Step 0 guard
 // inside createServiceClient() refuses to construct a client under
 // `node --test` (NODE_TEST_CONTEXT) if the URL resolves to the known
@@ -17,7 +17,7 @@
 //
 // Run (example, local Supabase CLI default ports):
 //   NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 \
-//   SUPABASE_SERVICE_ROLE_KEY=<local service role key> \
+//   SUPABASE_SECRET_KEY=<local service role key> \
 //   npx tsx --experimental-test-module-mocks --test lib/curriculum/seniorProgramme.integration.test.ts
 //
 // Proves the Phase 1 Senior School Programme Truth foundation: canonical

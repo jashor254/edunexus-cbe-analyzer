@@ -12,8 +12,8 @@
 // (Step 17), Solo/guardian/missing/suspended-account regression (Step 18/
 // 19/22), and evidence-integrity (Step 26).
 //
-// This file must be run with NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY
-// / NEXT_PUBLIC_SUPABASE_ANON_KEY pointed at local Docker (never
+// This file must be run with NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SECRET_KEY
+// / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY pointed at local Docker (never
 // .env.local/production) — same Phase 2C Step 0 guard as every other
 // integration test in this family.
 //
@@ -55,7 +55,7 @@ async function mkUser(label: string): Promise<{ id: string; email: string }> {
 }
 
 async function signInAs(email: string): Promise<SupabaseClient> {
-  const client = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  const client = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!)
   const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD })
   if (error) throw error
   return client

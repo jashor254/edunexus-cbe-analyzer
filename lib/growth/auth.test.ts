@@ -18,7 +18,7 @@ import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
 const MARKER = 'SYNTHETIC_PR2_GROWTH_AUTH_TEST'
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
 const db = createServiceClient()
 
 const originalFounderEmail = process.env.GROWTH_FOUNDER_EMAIL

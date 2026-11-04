@@ -18,7 +18,7 @@ const MARION_ID = 'c6efbdd5-0e0b-4cee-b668-8b07c18759a5'
 async function testMarion() {
   const db = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-    process.env.SUPABASE_SERVICE_ROLE_KEY as string,
+    process.env.SUPABASE_SECRET_KEY as string,
     {
       auth: { autoRefreshToken: false, persistSession: false },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

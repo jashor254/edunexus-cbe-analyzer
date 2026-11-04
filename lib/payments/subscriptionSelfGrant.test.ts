@@ -20,7 +20,7 @@ import { fulfillPayment, creditSubscription } from '@/lib/payments/fulfillment'
 const MARKER = 'SYNTHETIC_SUBS_SELFGRANT'
 const db = createServiceClient()
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const ANON_KEY     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const ANON_KEY     = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
 const FAR_FUTURE   = new Date(Date.now() + 10 * 365 * 24 * 3600 * 1000).toISOString()
 
 const createdUsers: string[] = []

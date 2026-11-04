@@ -18,7 +18,7 @@ const STUDENT_ID = 'b6c05ebe-2a02-4ca1-bbdc-be10b5b1ff64'
 async function testGracita() {
   const db = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-    process.env.SUPABASE_SERVICE_ROLE_KEY as string,
+    process.env.SUPABASE_SECRET_KEY as string,
     {
       auth: { autoRefreshToken: false, persistSession: false },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

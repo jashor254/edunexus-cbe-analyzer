@@ -114,7 +114,7 @@ async function main() {
 
     console.log('▸ Signing in as the teacher (real session, not service-role)…')
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
     const teacherClient = createSupabaseJsClient(url, anonKey)
     const { error: signInErr } = await teacherClient.auth.signInWithPassword({ email, password })
     if (signInErr) throw signInErr

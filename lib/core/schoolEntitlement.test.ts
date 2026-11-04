@@ -23,7 +23,7 @@ const MARKER = 'SYNTHETIC_ENTITLEMENT_TEST'
 const db = createServiceClient()
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const ANON_KEY     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const ANON_KEY     = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
 
 // Schools
 let entitledSchool: string      // active, no expiry

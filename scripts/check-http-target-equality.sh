@@ -39,7 +39,7 @@ if [ ! -r "/proc/$SERVER_PID/environ" ]; then
 fi
 
 SERVER_URL=$(tr '\0' '\n' < "/proc/$SERVER_PID/environ" | grep "^NEXT_PUBLIC_SUPABASE_URL=" | cut -d= -f2- | tr -d '\n')
-SERVER_KEY_HASH=$(tr '\0' '\n' < "/proc/$SERVER_PID/environ" | grep "^SUPABASE_SERVICE_ROLE_KEY=" | cut -d= -f2- | tr -d '\n' | md5sum | cut -d' ' -f1)
+SERVER_KEY_HASH=$(tr '\0' '\n' < "/proc/$SERVER_PID/environ" | grep "^SUPABASE_SECRET_KEY=" | cut -d= -f2- | tr -d '\n' | md5sum | cut -d' ' -f1)
 TEST_KEY_HASH=$(printf '%s' "$TEST_SUPABASE_SERVICE_ROLE_KEY" | md5sum | cut -d' ' -f1)
 
 if [ -z "$SERVER_URL" ]; then

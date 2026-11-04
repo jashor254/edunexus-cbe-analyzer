@@ -9,12 +9,12 @@
 // backfill scripts in this directory — that file points at the PRODUCTION
 // Supabase project (NEXT_PUBLIC_SUPABASE_URL=https://lpxrfbmzncaztpmyqzkc...).
 // This script's target is controlled entirely by whatever
-// NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are already set in
+// NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SECRET_KEY are already set in
 // the invoking shell — for Phase 2D that must be the local Docker Supabase
 // instance, passed explicitly on the command line, e.g.:
 //
 //   NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 \
-//   SUPABASE_SERVICE_ROLE_KEY=<local service role key> \
+//   SUPABASE_SECRET_KEY=<local service role key> \
 //   npx tsx scripts/backfillLearnerIdentities.ts
 //
 // Production backfill is explicitly OUT OF SCOPE for Phase 2D (spec Step

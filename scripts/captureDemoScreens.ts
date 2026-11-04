@@ -127,7 +127,7 @@ async function fixtureSessionCookies(userId: string) {
   if (linkErr || !hashedToken) throw new Error(`[capture] generateLink failed for ${email}: ${linkErr?.message}`)
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
   const client = createSupabaseJsClient(url, anonKey)
   const { data: verified, error: verifyErr } = await client.auth.verifyOtp({ token_hash: hashedToken, type: 'magiclink' })
   if (verifyErr || !verified.session) throw new Error(`[capture] verifyOtp failed: ${verifyErr?.message}`)

@@ -49,7 +49,7 @@ async function mkAuthUser(label: string): Promise<{ id: string; email: string }>
 }
 
 async function signInAs(email: string): Promise<SupabaseClient> {
-  const client = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  const client = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!)
   const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD })
   if (error) throw error
   return client

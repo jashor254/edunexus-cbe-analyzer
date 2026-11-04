@@ -5,8 +5,8 @@ import { createClient } from '@supabase/supabase-js'
 dotenv.config({ path: path.resolve(__dirname, '../.env.local') })
 
 const URL  = process.env.NEXT_PUBLIC_SUPABASE_URL as string
-const SVC  = process.env.SUPABASE_SERVICE_ROLE_KEY as string
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
+const SVC  = process.env.SUPABASE_SECRET_KEY as string
+const ANON = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY as string
 
 const sb   = createClient(URL, SVC)
 const anon = createClient(URL, ANON)

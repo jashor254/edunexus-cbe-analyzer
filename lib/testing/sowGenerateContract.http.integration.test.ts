@@ -202,12 +202,12 @@ test('6. a school-covered teacher generates lessons and is charged nothing', asy
   // Session without touching the account's password.
   const { data: link } = await db.auth.admin.generateLink({ type: 'magiclink', email })
   const { createClient } = await import('@supabase/supabase-js')
-  const anon = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } })
+  const anon = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, { auth: { persistSession: false } })
   const { data: verified } = await anon.auth.verifyOtp({ token_hash: link.properties!.hashed_token!, type: 'magiclink' })
 
   const { createServerClient } = await import('@supabase/ssr')
   const jar: Array<{ name: string; value: string }> = []
-  const server = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+  const server = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
     cookies: { getAll: () => [], setAll: cs => { for (const c of cs) jar.push({ name: c.name, value: c.value }) } },
   })
   await server.auth.setSession({

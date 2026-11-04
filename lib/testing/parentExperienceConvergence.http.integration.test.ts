@@ -59,7 +59,7 @@ async function createUser(label: string): Promise<{ authId: string; session: Syn
 
 /** A real, signed-in SupabaseClient (not just a cookie header) — needed to call requireParent() directly. */
 async function signInClient(email: string) {
-  const client = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  const client = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!)
   const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD })
   if (error) throw error
   return client

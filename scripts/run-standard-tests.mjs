@@ -36,7 +36,7 @@ const manifest = JSON.parse(readFileSync(join(__dirname, 'standard-tests.json'),
 // safety-validation tests for createTestServiceClient() and the Phase 2C
 // Step 0 production guard inside createServiceClient() itself, so they
 // legitimately contain the exact strings (TEST_SUPABASE_*,
-// createTestServiceClient, createServiceClient, SUPABASE_SERVICE_ROLE_KEY)
+// createTestServiceClient, createServiceClient, SUPABASE_SECRET_KEY)
 // the manifest rot-guard treats as privileged-infrastructure signals
 // everywhere else. Both are still fully STANDARD-safe — pure env-var
 // manipulation plus client construction that makes no network call — so
