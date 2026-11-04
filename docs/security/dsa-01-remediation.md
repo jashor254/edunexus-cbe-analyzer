@@ -1,6 +1,8 @@
 # DSA-01 — shared reports behind a service-only token boundary
 
 **Status (2026-11-04):** implemented, verified locally, PR open. **NOT applied to production, NOT deployed, NOT merged.**
+
+> **Update — production-boundary stabilization (same day).** (1) `POST /api/share/generate` is now **disabled (HTTP 410)** behind a code-pinned kill switch (`lib/sharedReports/generationGate.ts`): auth still runs first (401 for anonymous callers), then the gate, before any body read or database work; no record can be created. The creation controls in §3 remain as defence in depth for a future server-side generator. (2) The public page is **origin-aware**: client-supplied content reads "Shared via EduNexus · not verified by EduNexus" and the report date is the creation date; only `server_generated` rows keep the EduNexus-authorship wording (the RPC now returns `provenance`; unknown values are treated as the least authoritative). The expired notice no longer implies a parent-facing generator. (3) HTTP suite is now 22 tests (generation assertions became 410/no-record assertions; fixtures are written with the service client). (4) Supabase key names follow `docs/engineering/supabase-api-keys.md`. R13 (client-supplied content presented as EduNexus-generated) is **closed**.
 Production project `lpxrfbmzncaztpmyqzkc` was only read (catalog + aggregate counts) and never modified.
 Finding source: deep security audit 2026-11-04 (DSA-01) · Decision record: [ADR-0035](../architecture/adr-0035-shared-reports-token-boundary.md).
 
@@ -40,7 +42,7 @@ Headers are scoped to the two share paths; site-wide hardening remains DSA-09.
 | Check | Result |
 |---|---|
 | Role-based SQL regression (anon / authenticated / service_role) — dev DB and freshly bootstrapped DB | pass; negative control (open policy reintroduced) fails |
-| HTTP integration, production build, CI-identical isolated env, port 3100 | **23/23, twice consecutively**, 0 residue |
+| HTTP integration, production build, CI-identical isolated env, port 3100 | **22/22, twice consecutively** (updated suite), 0 residue |
 | Manual failure injection (`scripts/security/shared-reports-failure-injection.ts`) | generic 5xx / 500, no SQL, function, stack or token detail; privileges restored |
 | Standard suite | 1,877 / 1,877 |
 | tsc · eslint · route-auth · architecture · standard/tier/base-URL manifests · deep-PR classification | pass |
@@ -53,13 +55,13 @@ Method validated by reproducing the existing CI pin exactly on an isolated stack
 | Tree | Fingerprint |
 |---|---|
 | `origin/main` (as committed) | `e3cfda630f274cd6be0563c9e7288c33` — **≠ CI pin `0b8f67ee…`, so main's CI gate is already red** |
-| `origin/main` + DSA-01 migration | **`e87bff468609a29b5552458b6ba6309d`** |
-The `main` drift is exactly the two WhatsApp migrations of 2026-10-31 (reviewed independently below) and is fixed in a **separate** PR (`e3cfda63…`). This PR then moves the pin `e3cfda63… → e87bff46…`; its schema delta is exactly: the lookup function, `revoked_at` + `provenance` columns, three NOT VALID CHECKs + one provenance CHECK, the policy swap, and the grant change.
+| `origin/main` + DSA-01 migration | **`f2c4cc569eee123190ae248db98424f3`** |
+The `main` drift is exactly the two WhatsApp migrations of 2026-10-31 (reviewed independently below) and is fixed in a **separate** PR (`e3cfda63…`). This PR then moves the pin `e3cfda63… → f2c4cc56…`; its schema delta is exactly: the lookup function, `revoked_at` + `provenance` columns, three NOT VALID CHECKs + one provenance CHECK, the policy swap, and the grant change.
 **WhatsApp migrations review:** both additive and idempotent (`ADD COLUMN IF NOT EXISTS`, nullable, partial indexes), no policy/grant/RLS change: `whatsapp_inbound_log.meta_message_id` + unique partial index (webhook dedup); `notification_log.delivery_status`, `delivery_status_at`, `provider_error_code` + partial index on `whatsapp_message_id`. The schema diff measured equals these statements exactly (4 columns, 2 indexes). Committed code on `main` uses all five columns (`notification.repository.ts`, `observationPipeline.ts`). **Finding: production has neither migration applied** (no columns, no indexes, no migration rows as of 2026-11-04) — deploying `main`'s WhatsApp code before applying them would make delivery-status writes fail. Separate from DSA-01; not applied here.
 
 ## 7. Release sequence
 1. Merge the WhatsApp pin PR (CI fingerprint gate returns to green on `main`).
-2. Retarget this PR to `main`; CI must be green (fingerprint `e87bff46…`).
+2. Retarget this PR to `main`; CI must be green (fingerprint `f2c4cc56…`).
 3. Pre-deploy, read-only: re-count `shared_reports` rows (expect 0), confirm `20260610105350` and the July hardening migrations are present.
 4. Apply `20261104120000` immediately before promoting the Vercel deployment (one transaction; the self-check aborts it if the boundary is missing). Old reader + new migration breaks share links; new reader + old DB breaks them too — they ship together.
 5. Smoke test with a synthetic account: generate → open in a private window → revoke → open (404); anon Data API list returns empty/denied; check the response headers.
@@ -82,14 +84,14 @@ The `main` drift is exactly the two WhatsApp migrations of 2026-10-31 (reviewed 
 | R10 | Bootstrap baseline still creates the open policy; bootstrap rewrites function `search_path` to `public` | Info | Documented; migration applies after baseline |
 | R11 | HTTP suite classification | — | **Closed:** `http-main-tests.json`, `deep-tests.json`, classification (D2) |
 | R12 | Dev server runs Next 16.2.6 vs 16.4.3 in package.json | Info | Restart it |
-| R13 | Report content is client-supplied and the orphan route has no UI caller | Med | Open — provenance recorded; derive server-side or remove the route |
+| R13 | Report content was client-supplied and presented as EduNexus-generated | Med | **Closed** — route disabled (410) and page copy is provenance-aware; derive content server-side before ever re-enabling |
 | R14 | Malformed `Next-Router-State-Tree` header makes any Next page 500 (framework behaviour, not this change) | Info | Noted |
 | R15 | WhatsApp migrations unapplied in production | Med | Separate; do not deploy WhatsApp code first |
 | R16 | Failure-injection checks are manual (they mutate shared-DB privileges) | Info | By design |
 
 ## 9. Deployment checklist
 - [ ] WhatsApp pin PR merged; `main` CI green
-- [ ] This PR retargeted to `main`; CI green (fingerprint `e87bff468609a29b5552458b6ba6309d`)
+- [ ] This PR retargeted to `main`; CI green (fingerprint `f2c4cc569eee123190ae248db98424f3`)
 - [ ] Row count re-checked (read-only); July hardening + `20260610105350` present
 - [ ] Migration applied → Vercel promoted (in that order, minutes apart)
 - [ ] Smoke test + header check on production
