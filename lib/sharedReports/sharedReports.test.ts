@@ -256,10 +256,10 @@ test('generation is DISABLED in code — flipping it is a reviewed change that m
 
 test('generate route: auth first, then the gate, before any body read, validation or database work', () => {
   const route = read('app/api/share/generate/route.ts')
-  const at = (needle: string) => route.indexOf(needle)
+  const at = (needle: string | RegExp) => (typeof needle === 'string' ? route.indexOf(needle) : route.search(needle))
   const gateAt = at('if (!SHARE_GENERATION_ENABLED)')
   assert.ok(gateAt > 0 && at('auth.getUser()') < gateAt, 'auth must precede the gate (401 for anonymous callers)')
-  for (const later of ['req.text()', 'JSON.parse', 'ShareGenerateSchema.safeParse', 'createServiceClient()', '.insert(']) {
+  for (const later of ['req.text()', 'JSON.parse', 'ShareGenerateSchema.safeParse', /createService\w+\(\)/, '.insert('] as Array<string | RegExp>) {
     assert.ok(gateAt < at(later), `gate must come before ${later}`)
   }
   assert.match(route, /apiError\(SHARE_GENERATION_DISABLED_MESSAGE, 410\)/)
