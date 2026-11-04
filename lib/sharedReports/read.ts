@@ -10,6 +10,14 @@ export type SharedReportData = {
   overallLabel: string
 }
 
+// Where the report content came from. Anything unrecognised is treated as the
+// least authoritative origin: the page must never claim more than is known.
+export type SharedReportProvenance = 'client_supplied' | 'server_generated'
+
+function toProvenance(value: string | null): SharedReportProvenance {
+  return value === 'server_generated' ? 'server_generated' : 'client_supplied'
+}
+
 export type SharedReportLookup =
   | { status: 'not_found' }
   | { status: 'expired' }
@@ -19,6 +27,7 @@ export type SharedReportLookup =
       grade: string
       createdAt: string
       expiresAt: string
+      provenance: SharedReportProvenance
       reportData: SharedReportData
     }
 
@@ -40,6 +49,7 @@ function toLookup(row: SharedReportRpcRow | null): SharedReportLookup {
     grade: row.grade,
     createdAt: row.created_at,
     expiresAt: row.expires_at,
+    provenance: toProvenance(row.provenance),
     reportData: normaliseReportData(row.report_data),
   }
 }

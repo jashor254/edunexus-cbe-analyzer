@@ -12,6 +12,7 @@ export type SharedReportRpcRow = {
   report_data: unknown
   created_at: string | null
   expires_at: string | null
+  provenance: string | null
 }
 
 export class SharedReportRepository extends BaseRepository {
