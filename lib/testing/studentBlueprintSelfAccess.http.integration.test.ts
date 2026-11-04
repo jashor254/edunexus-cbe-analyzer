@@ -24,6 +24,7 @@
 // Run: TEST_BASE_URL=http://localhost:3100 npx tsx --test lib/testing/studentBlueprintSelfAccess.http.integration.test.ts
 // (requires `next dev -p 3939 &` already running)
 
+import { getSupabasePublishableKey } from '@/utils/supabase/publishableKey'
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createClient } from '@supabase/supabase-js'
@@ -69,7 +70,7 @@ async function createUser(label: string, profileRole?: 'student' | 'teacher'): P
 }
 
 async function signInClient(email: string) {
-  const client = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  const client = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, getSupabasePublishableKey())
   const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD })
   if (error) throw error
   return client

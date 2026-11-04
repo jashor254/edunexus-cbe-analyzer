@@ -93,8 +93,8 @@ async function impersonateExistingUser(userId: string): Promise<{ client: Supaba
   if (!hashedToken) throw new Error(`[blueprint-demo] generateLink returned no hashed_token for ${email}`)
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!url || !anonKey) throw new Error('[blueprint-demo] NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY must be set (see .env.local)')
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  if (!url || !anonKey) throw new Error('[blueprint-demo] NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY must be set (see .env.local)')
 
   const client = createSupabaseJsClient(url, anonKey)
   const { data: verified, error: verifyErr } = await client.auth.verifyOtp({ token_hash: hashedToken, type: 'magiclink' })

@@ -15,7 +15,7 @@
  *
  * Usage:
  *   npm run growth:import-schools -- scripts/growth/output/kirinyaga-schools-2026-07-22-import-ready.csv
- *   (reads NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY from .env.local via --env-file)
+ *   (reads NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SECRET_KEY from .env.local via --env-file)
  */
 
 import { readImportCsv, runImport } from '@/lib/growth/services/csvImport'

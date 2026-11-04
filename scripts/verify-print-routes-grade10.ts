@@ -101,7 +101,7 @@ async function main() {
     cleanup.push(async () => { await db.from('assignments').delete().eq('id', assignment.id) })
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
     const teacherClient = createSupabaseJsClient(url, anonKey)
     const { error: signInErr } = await teacherClient.auth.signInWithPassword({ email, password })
     if (signInErr) throw signInErr

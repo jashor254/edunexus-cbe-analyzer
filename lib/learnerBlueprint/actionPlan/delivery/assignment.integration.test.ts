@@ -38,7 +38,7 @@ async function retryAsync<T>(fn: () => Promise<T>, attempts = 6): Promise<T> {
 }
 
 async function signInAs(email: string): Promise<SupabaseClient> {
-  const client = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  const client = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!)
   await retryAsync(async () => {
     const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD })
     if (error) throw error
@@ -47,7 +47,7 @@ async function signInAs(email: string): Promise<SupabaseClient> {
 }
 
 function anonClient(): SupabaseClient {
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!)
 }
 
 let schoolId: string, otherSchoolId: string

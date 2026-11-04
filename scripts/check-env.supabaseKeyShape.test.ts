@@ -24,7 +24,7 @@ function ruleFor(key: string) {
   return rule
 }
 
-const SUPABASE_KEY_VARS = ['NEXT_PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY']
+const SUPABASE_KEY_VARS = ['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'SUPABASE_SECRET_KEY']
 
 for (const key of SUPABASE_KEY_VARS) {
   test(`${key}: still required`, () => {
@@ -57,11 +57,11 @@ for (const key of SUPABASE_KEY_VARS) {
   })
 }
 
-test('no fallback between NEXT_PUBLIC_SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY is introduced — each remains its own independent, required rule', () => {
-  const anon = ruleFor('NEXT_PUBLIC_SUPABASE_ANON_KEY')
-  const service = ruleFor('SUPABASE_SERVICE_ROLE_KEY')
-  assert.equal(anon.key, 'NEXT_PUBLIC_SUPABASE_ANON_KEY')
-  assert.equal(service.key, 'SUPABASE_SERVICE_ROLE_KEY')
+test('no fallback between NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY and SUPABASE_SECRET_KEY is introduced — each remains its own independent, required rule', () => {
+  const anon = ruleFor('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY')
+  const service = ruleFor('SUPABASE_SECRET_KEY')
+  assert.equal(anon.key, 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY')
+  assert.equal(service.key, 'SUPABASE_SECRET_KEY')
   assert.notEqual(anon.key, service.key)
   assert.equal(anon.required, true)
   assert.equal(service.required, true)

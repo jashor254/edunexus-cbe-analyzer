@@ -34,7 +34,7 @@
 // Run (after `supabase start` and a webpack `next dev` pointed at the same
 // TEST_SUPABASE_* target):
 //   TEST_SUPABASE_URL=... TEST_SUPABASE_SERVICE_ROLE_KEY=... TEST_SUPABASE_PROJECT_REF=local-docker \
-//   NEXT_PUBLIC_SUPABASE_URL=... NEXT_PUBLIC_SUPABASE_ANON_KEY=... \
+//   NEXT_PUBLIC_SUPABASE_URL=... NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=... \
 //   TEST_BASE_URL=http://localhost:3211 npx tsx --experimental-test-module-mocks --test lib/testing/parentPortalP1Convergence.http.integration.test.ts
 
 import { test, before, after } from 'node:test'

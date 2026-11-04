@@ -110,7 +110,7 @@ test('new evidence (changed inputs) stores a separate narrative instead of servi
 
 test('RLS: an anonymous client cannot read stored narratives', async () => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
   assert.ok(url && anonKey, 'anon credentials for the isolated test stack')
   const anon = createClient(url!, anonKey!, { auth: { persistSession: false } })
   const { data } = await anon.from('career_intelligence_narratives').select('student_id').eq('student_id', studentId)

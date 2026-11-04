@@ -63,7 +63,7 @@ async function retryDb<T>(fn: () => PromiseLike<{ data: T; error: { message: str
   return retryAsync(async () => { const r = await fn(); if (r.error) throw r.error; return r as { data: T } })
 }
 async function signIn(email: string): Promise<SupabaseClient> {
-  const c = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  const c = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!)
   await retryAsync(async () => {
     const { error } = await c.auth.signInWithPassword({ email, password: PASSWORD })
     if (error) throw error

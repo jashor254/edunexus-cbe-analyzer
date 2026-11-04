@@ -13,7 +13,7 @@ const TREVOR_STUDENT_ID = '494c21c4-18ff-46c1-b364-5c19e6c7509f'
 
 const db = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-  process.env.SUPABASE_SERVICE_ROLE_KEY as string,
+  process.env.SUPABASE_SECRET_KEY as string,
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 

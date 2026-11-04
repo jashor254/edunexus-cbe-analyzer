@@ -355,7 +355,7 @@ test('composeBlueprint surfaces a published Teacher Reflection, and only once it
     return { id: data.user.id, email }
   }
   async function signInAs(email: string): Promise<SupabaseClient> {
-    const client = createAnonClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+    const client = createAnonClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!)
     const { error } = await client.auth.signInWithPassword({ email, password: REFLECTION_PASSWORD })
     if (error) throw error
     return client

@@ -19,7 +19,7 @@ import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 const MARKER = 'SYNTHETIC_ADMIN_ESCALATION'
 const db = createServiceClient()
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const ANON_KEY     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const ANON_KEY     = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
 
 const createdUsers: string[] = []
 const createdSchools: string[] = []

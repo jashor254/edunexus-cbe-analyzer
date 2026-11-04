@@ -19,7 +19,7 @@
 // (never .env.local's production-shaped NEXT_PUBLIC_SUPABASE_URL):
 //
 //   NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 \
-//   SUPABASE_SERVICE_ROLE_KEY=<local service_role key> \
+//   SUPABASE_SECRET_KEY=<local service_role key> \
 //   TEST_SUPABASE_URL=http://127.0.0.1:54321 \
 //   TEST_SUPABASE_SERVICE_ROLE_KEY=<local service_role key> \
 //   TEST_SUPABASE_PROJECT_REF=local-docker \
@@ -29,7 +29,7 @@
 // yet — it needs both credential pairs pointed at a disposable target
 // simultaneously, which today's `npm run test:deep` harness does not set up
 // (it only exports TEST_SUPABASE_* to the test process's own client, not to
-// the ordinary NEXT_PUBLIC_SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY pair that
+// the ordinary NEXT_PUBLIC_SUPABASE_URL/SUPABASE_SECRET_KEY pair that
 // repos.* actually reads). Run manually as shown above until that's true.
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'

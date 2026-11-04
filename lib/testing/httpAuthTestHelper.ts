@@ -17,6 +17,7 @@
 
 import { createServerClient } from '@supabase/ssr'
 import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
+import { getSupabasePublishableKey } from '@/utils/supabase/publishableKey'
 
 export type SyntheticSession = {
   cookieHeader: string
@@ -31,7 +32,7 @@ export type SyntheticSession = {
  */
 export async function signInForHttpTest(email: string, password: string): Promise<SyntheticSession> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  const anonKey = getSupabasePublishableKey()
 
   const anon = createSupabaseJsClient(url, anonKey)
   const { data: signIn, error } = await anon.auth.signInWithPassword({ email, password })

@@ -12,6 +12,7 @@
 // row is created, read, or modified, and no financial or learner PII appears in
 // assertions or output.
 
+import { getSupabasePublishableKey } from '@/utils/supabase/publishableKey'
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
@@ -23,7 +24,7 @@ const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:3100'
 const MARKER = 'SYNTHETIC_SCHOOL_PAYMENT'
 const db = createServiceClient()
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const ANON_KEY     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const ANON_KEY     = getSupabasePublishableKey()
 
 const createdUsers: string[] = []
 const createdSchools: string[] = []

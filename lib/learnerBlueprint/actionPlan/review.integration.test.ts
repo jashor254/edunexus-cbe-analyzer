@@ -48,7 +48,7 @@ async function retryAsync<T>(fn: () => Promise<T>, attempts = 6): Promise<T> {
 }
 
 async function signInAs(email: string): Promise<SupabaseClient> {
-  const client = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  const client = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!)
   await retryAsync(async () => {
     const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD })
     if (error) throw error
@@ -215,7 +215,7 @@ test('an undelivered action item cannot be reviewed', async () => {
 })
 
 test('unauthenticated caller cannot read a review snapshot', async () => {
-  const anon = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  const anon = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!)
   await assert.rejects(() => reviewBlueprintAction(anon, actionId, { decision: 'complete' }), UnauthorizedError)
 })
 
