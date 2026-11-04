@@ -1,12 +1,8 @@
-import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
+import { generateShareToken } from '@/lib/sharedReports/token'
+import { ShareGenerateSchema, SHARE_TTL_DAYS, SHARE_MAX_BODY_BYTES } from '@/lib/sharedReports/reportSchema'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
-
-const ShareGenerateSchema = z.object({
-  studentId:  z.string().uuid(),
-  reportData: z.record(z.string(), z.unknown()),
-})
 
 export async function POST(req: Request) {
   try {
@@ -16,7 +12,18 @@ export async function POST(req: Request) {
       return apiUnauthorized()
     }
 
-    const parsed = ShareGenerateSchema.safeParse(await req.json())
+    // Bound the body before parsing it (a missing/forged Content-Length is not trusted).
+    const raw = await req.text()
+    if (Buffer.byteLength(raw, 'utf8') > SHARE_MAX_BODY_BYTES) {
+      return apiError('Report is too large to share', 413)
+    }
+    let json: unknown
+    try {
+      json = JSON.parse(raw)
+    } catch {
+      return apiBadRequest('Body must be valid JSON')
+    }
+    const parsed = ShareGenerateSchema.safeParse(json)
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Missing studentId or reportData')
     const { studentId, reportData } = parsed.data
 
@@ -34,11 +41,11 @@ export async function POST(req: Request) {
       return apiForbidden()
     }
 
-    // Generate unique 12-char token
-    const token = crypto.randomUUID().replace(/-/g, '').substring(0, 12).toUpperCase()
+    // 192-bit CSPRNG bearer token (DSA-01); legacy 12-char tokens are retired
+    const token = generateShareToken()
 
     const expiresAt = new Date()
-    expiresAt.setDate(expiresAt.getDate() + 30)
+    expiresAt.setDate(expiresAt.getDate() + SHARE_TTL_DAYS)
 
     const { error: insertError } = await db.from('shared_reports').insert({
       token,
@@ -47,11 +54,15 @@ export async function POST(req: Request) {
       student_name: student.name,
       grade:        student.grade,
       report_data:  reportData,
+      // Content is supplied by the caller, not derived server-side from learner
+      // evidence — recorded so it is never mistaken for an EduNexus-generated report.
+      provenance:   'client_supplied',
       expires_at:   expiresAt.toISOString(),
     })
 
     if (insertError) {
-      console.error('[share/generate] insert error:', insertError)
+      // code only: the raw error's details can echo the row (incl. the bearer token)
+      console.error('[share/generate] insert error:', insertError.code)
       return apiError('Failed to save share link')
     }
 
