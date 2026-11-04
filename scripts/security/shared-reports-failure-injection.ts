@@ -63,16 +63,22 @@ test('lookup failure on the share page → generic 5xx with no server-side detai
   }
 })
 
-test('insert failure on generate → generic 500 JSON, no SQL detail', async () => {
-  sql('REVOKE INSERT ON public.shared_reports FROM service_role')
+test('update failure on revoke → generic 500 JSON, no SQL detail', async () => {
+  const token = generateShareToken()
+  const ins = await db.from('shared_reports').insert({
+    token, student_id: studentId, user_id: userId, student_name: 'SYNTHETIC_SHARED_FAIL', grade: '8',
+    report_data: REPORT, expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+  })
+  assert.ifError(ins.error)
+  sql('REVOKE UPDATE ON public.shared_reports FROM service_role')
   try {
-    const res = await fetch(`${BASE_URL}/api/share/generate`, {
+    const res = await fetch(`${BASE_URL}/api/share/revoke`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: session.cookieHeader },
-      body: JSON.stringify({ studentId, reportData: REPORT }),
+      body: JSON.stringify({ token }),
     })
     assert.equal(res.status, 500)
     assert.ok(!/permission denied|shared_reports|PGRST|\b42501\b/i.test(JSON.stringify(await res.json())))
   } finally {
-    sql('GRANT INSERT ON public.shared_reports TO service_role')
+    sql('GRANT UPDATE ON public.shared_reports TO service_role')
   }
 })
