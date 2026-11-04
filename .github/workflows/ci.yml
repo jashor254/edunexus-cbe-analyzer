@@ -263,7 +263,20 @@ jobs:
           # RLS service-role only, additive). Reviewed: only schema change;
           # FAIL_COUNT=9 UNRECOVERED=0, unchanged. Computed on an isolated
           # throwaway pifp stack that first reproduced 28ff24ca at HEAD.
-          EXPECTED="0b8f67ee08e04e3f3e485ba49ba9be38"
+          # 2026-11-04: 0b8f67ee… → e3cfda63… for migrations
+          # 20261031120000_whatsapp_inbound_idempotency.sql (adds nullable
+          # whatsapp_inbound_log.meta_message_id + unique partial index) and
+          # 20261031120001_whatsapp_delivery_status.sql (adds nullable
+          # notification_log.delivery_status/delivery_status_at/
+          # provider_error_code + partial index on whatsapp_message_id), both
+          # additive/idempotent, no policy or grant change. These landed on main
+          # in e752fe1 WITHOUT a pin update, so this gate was red on main. The
+          # schema diff between the previous pin's tree and main is exactly those
+          # 4 columns + 2 indexes (reviewed statement by statement; code on main
+          # uses all five columns). FAIL_COUNT=9 UNRECOVERED=0, unchanged.
+          # Computed on an isolated throwaway pifp stack that first reproduced
+          # 0b8f67ee at the pre-WhatsApp tree and e3cfda63 at origin/main.
+          EXPECTED="e3cfda630f274cd6be0563c9e7288c33"
           echo "expected: $EXPECTED"
           echo "actual:   $ACTUAL"
           if [ "$ACTUAL" != "$EXPECTED" ]; then
