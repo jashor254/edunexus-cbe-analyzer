@@ -48,7 +48,7 @@ export const GEMINI_CONFIG = {
 export const SUPABASE_SERVER_CONFIG = {
   // ✅ Server-only - NEVER expose to client
   get serviceRoleKey() {
-    return process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY
+    return process.env.SUPABASE_SECRET_KEY
   },
 
   // ✅ These are safe for server use

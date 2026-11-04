@@ -1,19 +1,16 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { ADMIN_CONFIG } from '@/lib/config/api'
+import { getSupabasePublishableKey } from './publishableKey'
 
 export async function updateSession(request: NextRequest) {
   // Must use NextResponse.next({ request }) so Next.js forwards the mutated
   // request headers (including updated cookies) to the route handler.
   let supabaseResponse = NextResponse.next({ request })
 
-  const publishableKey =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    publishableKey,
+    getSupabasePublishableKey(),
     {
       cookies: {
         // getAll/setAll is required for @supabase/ssr v0.5+ which chunks large
