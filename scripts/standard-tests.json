@@ -68,6 +68,8 @@
     "lib/compass/pedagogy.test.ts",
     "lib/compass/prompt.test.ts",
     "lib/curriculum/kicdEntries.test.ts",
+    "components/layout/RedactedAnalytics.test.ts",
+    "lib/sharedReports/sharedReports.test.ts",
     "lib/sow/kicdGrounding.test.ts",
     "lib/sow/aiLessonGenerator.grounded.test.ts",
     "lib/curriculum/kicdVocabulary.test.ts",
