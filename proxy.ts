@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/utils/supabase/middleware'
+import { getSupabasePublishableKey } from '@/utils/supabase/publishableKey'
 import { generateTraceId } from '@/lib/observability/tracing'
 import { SUPPORTED_LOCALES, DEFAULT_LOCALE } from '@/lib/i18n/config'
 import { getUserRoles, getSchoolAdminMembership, getRoleRedirect } from '@/lib/auth/getRole'
@@ -111,7 +112,7 @@ export async function proxy(request: NextRequest) {
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    getSupabasePublishableKey(),
     {
       cookies: {
         getAll() {

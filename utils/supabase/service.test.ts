@@ -8,6 +8,7 @@ const LOCAL_DOCKER_URL = 'http://127.0.0.1:54321'
 type SavedEnv = {
   url: string | undefined
   key: string | undefined
+  secretKey: string | undefined
   testContext: string | undefined
 }
 
@@ -15,6 +16,7 @@ function saveEnv(): SavedEnv {
   return {
     url: process.env.NEXT_PUBLIC_SUPABASE_URL,
     key: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    secretKey: process.env.SUPABASE_SECRET_KEY,
     testContext: process.env.NODE_TEST_CONTEXT,
   }
 }
@@ -24,6 +26,8 @@ function restoreEnv(saved: SavedEnv): void {
   else process.env.NEXT_PUBLIC_SUPABASE_URL = saved.url
   if (saved.key === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY
   else process.env.SUPABASE_SERVICE_ROLE_KEY = saved.key
+  if (saved.secretKey === undefined) delete process.env.SUPABASE_SECRET_KEY
+  else process.env.SUPABASE_SECRET_KEY = saved.secretKey
   if (saved.testContext === undefined) delete process.env.NODE_TEST_CONTEXT
   else process.env.NODE_TEST_CONTEXT = saved.testContext
 }
@@ -42,7 +46,8 @@ describe('createServiceClient — fail-closed test/production guard (Phase 2C St
     const saved = saveEnv()
     try {
       process.env.NEXT_PUBLIC_SUPABASE_URL = PRODUCTION_URL
-      process.env.SUPABASE_SERVICE_ROLE_KEY = 'fake-service-role-key'
+      process.env.SUPABASE_SECRET_KEY = 'fake-secret-key'
+      delete process.env.SUPABASE_SERVICE_ROLE_KEY
       // NODE_TEST_CONTEXT is already set by the test runner itself — this
       // assertion is here so the test fails loudly (not silently no-ops)
       // if that runtime invariant ever stops holding.
@@ -62,7 +67,8 @@ describe('createServiceClient — fail-closed test/production guard (Phase 2C St
     const saved = saveEnv()
     try {
       process.env.NEXT_PUBLIC_SUPABASE_URL = LOCAL_DOCKER_URL
-      process.env.SUPABASE_SERVICE_ROLE_KEY = 'fake-service-role-key'
+      process.env.SUPABASE_SECRET_KEY = 'fake-secret-key'
+      delete process.env.SUPABASE_SERVICE_ROLE_KEY
       assert.ok(process.env.NODE_TEST_CONTEXT, 'expected NODE_TEST_CONTEXT to be set by the test runner')
 
       assert.doesNotThrow(() => createServiceClient())
@@ -75,7 +81,8 @@ describe('createServiceClient — fail-closed test/production guard (Phase 2C St
     const saved = saveEnv()
     try {
       process.env.NEXT_PUBLIC_SUPABASE_URL = PRODUCTION_URL
-      process.env.SUPABASE_SERVICE_ROLE_KEY = 'fake-service-role-key'
+      process.env.SUPABASE_SECRET_KEY = 'fake-secret-key'
+      delete process.env.SUPABASE_SERVICE_ROLE_KEY
       delete process.env.NODE_TEST_CONTEXT
 
       // This is exactly what real production runtime looks like: a
@@ -91,9 +98,33 @@ describe('createServiceClient — fail-closed test/production guard (Phase 2C St
     const saved = saveEnv()
     try {
       delete process.env.NEXT_PUBLIC_SUPABASE_URL
+      delete process.env.SUPABASE_SECRET_KEY
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
 
       assert.throws(() => createServiceClient(), /Missing NEXT_PUBLIC_SUPABASE_URL/)
+    } finally {
+      restoreEnv(saved)
+    }
+  })
+
+  test('the RETIRED SUPABASE_SERVICE_ROLE_KEY is not read — a lone legacy key fails closed', () => {
+    const saved = saveEnv()
+    try {
+      process.env.NEXT_PUBLIC_SUPABASE_URL = LOCAL_DOCKER_URL
+      delete process.env.SUPABASE_SECRET_KEY
+      process.env.SUPABASE_SERVICE_ROLE_KEY = 'retired-legacy-key'
+      assert.throws(() => createServiceClient(), /Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SECRET_KEY/)
+    } finally {
+      restoreEnv(saved)
+    }
+  })
+
+  test('an empty SUPABASE_SECRET_KEY (as CI exports it) fails closed rather than constructing a keyless client', () => {
+    const saved = saveEnv()
+    try {
+      process.env.NEXT_PUBLIC_SUPABASE_URL = LOCAL_DOCKER_URL
+      process.env.SUPABASE_SECRET_KEY = ''
+      assert.throws(() => createServiceClient(), /Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SECRET_KEY/)
     } finally {
       restoreEnv(saved)
     }
