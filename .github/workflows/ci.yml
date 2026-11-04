@@ -101,6 +101,11 @@ jobs:
       - name: Architecture check
         run: node scripts/check-architecture.mjs
 
+      # Supabase disabled the legacy anon/service_role keys on 2026-05-25. Fails if any
+      # tracked source reads or sets a retired key name (the 2dd5c85 half-migration).
+      - name: Supabase key names (no retired anon/service_role)
+        run: node scripts/check-supabase-key-names.mjs
+
       # Every app/api route is guarded or a reviewed exception in
       # scripts/security/route-auth-registry.json; crons use CRON_SECRET only;
       # webhooks verify signatures; no test/debug routes.
@@ -124,9 +129,7 @@ jobs:
     env:
       NEXT_PUBLIC_SUPABASE_URL: ''
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ''
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ''
       SUPABASE_SECRET_KEY: ''
-      SUPABASE_SERVICE_ROLE_KEY: ''
       DEEPSEEK_AI_API_KEY: ''
     steps:
       - uses: actions/checkout@v4
@@ -165,7 +168,7 @@ jobs:
     env:
       TEST_SUPABASE_URL: 'http://127.0.0.1:54321'
       TEST_SUPABASE_PROJECT_REF: 'local-docker'
-      # NEXT_PUBLIC_SUPABASE_URL/ANON_KEY and SUPABASE_SERVICE_ROLE_KEY are
+      # NEXT_PUBLIC_SUPABASE_URL/PUBLISHABLE_KEY and SUPABASE_SECRET_KEY are
       # resolved to the LOCAL Supabase instance below (never left blank) —
       # some DEEP_PR files prove real RLS/authorization behaviour with a
       # genuine anon-client sign-in (e.g. subscriptionSelfGrant.test.ts), and
@@ -300,10 +303,8 @@ jobs:
             fs.appendFileSync(process.env.GITHUB_ENV,
               'TEST_SUPABASE_SERVICE_ROLE_KEY=' + key + '\n' +
               'SUPABASE_SECRET_KEY=' + key + '\n' +
-              'SUPABASE_SERVICE_ROLE_KEY=' + key + '\n' +
               'NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321\n' +
-              'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=' + anon + '\n' +
-              'NEXT_PUBLIC_SUPABASE_ANON_KEY=' + anon + '\n');
+              'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=' + anon + '\n');
           "
 
       - name: Preflight — verify local, non-production target
@@ -590,9 +591,7 @@ jobs:
       TEST_SUPABASE_PROJECT_REF: 'local-docker'
       NEXT_PUBLIC_SUPABASE_URL: ''
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ''
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ''
       SUPABASE_SECRET_KEY: ''
-      SUPABASE_SERVICE_ROLE_KEY: ''
       DEEPSEEK_AI_API_KEY: ''
     steps:
       - uses: actions/checkout@v4
