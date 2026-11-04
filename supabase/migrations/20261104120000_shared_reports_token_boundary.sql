@@ -112,14 +112,19 @@ REVOKE ALL ON public.shared_reports FROM authenticated;
 GRANT SELECT, DELETE ON public.shared_reports TO authenticated;
 
 -- ── Token lookup (service role only) ────────────────────────────────────────
-CREATE OR REPLACE FUNCTION public.get_shared_report_by_token(p_token text)
+-- Return type changed during review (provenance added) before first apply; the
+-- DROP keeps repeated local applies idempotent. Grants are re-asserted below.
+DROP FUNCTION IF EXISTS public.get_shared_report_by_token(text);
+
+CREATE FUNCTION public.get_shared_report_by_token(p_token text)
 RETURNS TABLE (
   status       text,
   student_name text,
   grade        text,
   report_data  jsonb,
   created_at   timestamptz,
-  expires_at   timestamptz
+  expires_at   timestamptz,
+  provenance   text
 )
 LANGUAGE sql
 STABLE
@@ -139,7 +144,8 @@ AS $$
       'overallLabel',  r.report_data -> 'overallLabel'
     ) END,
     CASE WHEN r.expires_at <= now() THEN NULL ELSE r.created_at END,
-    CASE WHEN r.expires_at <= now() THEN NULL ELSE r.expires_at END
+    CASE WHEN r.expires_at <= now() THEN NULL ELSE r.expires_at END,
+    CASE WHEN r.expires_at <= now() THEN NULL ELSE r.provenance END
   FROM public.shared_reports r
   WHERE p_token ~ '^[A-Za-z0-9_-]{32}$'
     AND r.token = p_token

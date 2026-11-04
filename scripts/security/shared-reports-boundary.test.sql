@@ -59,7 +59,7 @@ BEGIN
     RAISE EXCEPTION 'FAIL: service_role cannot execute token lookup';
   END IF;
   IF (SELECT proargnames FROM pg_proc WHERE oid=fn) IS DISTINCT FROM
-     ARRAY['p_token','status','student_name','grade','report_data','created_at','expires_at'] THEN
+     ARRAY['p_token','status','student_name','grade','report_data','created_at','expires_at','provenance'] THEN
     RAISE EXCEPTION 'FAIL: DTO columns changed (must not expose id/token/student_id/user_id): %',
       (SELECT proargnames FROM pg_proc WHERE oid=fn);
   END IF;
@@ -147,6 +147,9 @@ BEGIN
   IF r.status IS DISTINCT FROM 'ok' OR r.student_name IS DISTINCT FROM 'SYNTHETIC_DSA01' THEN
     RESET ROLE; RAISE EXCEPTION 'FAIL: valid token did not resolve: %', r;
   END IF;
+  IF r.provenance IS DISTINCT FROM 'client_supplied' THEN
+    RESET ROLE; RAISE EXCEPTION 'FAIL: default provenance is not client_supplied: %', r.provenance;
+  END IF;
   IF (SELECT array_agg(k ORDER BY k) FROM jsonb_object_keys(r.report_data) k)
      IS DISTINCT FROM ARRAY['actionPlan','overallLabel','overallLevel','priorityAreas','strengths','subjectScores'] THEN
     RESET ROLE; RAISE EXCEPTION 'FAIL: report_data DTO has unexpected keys: %', r.report_data;
@@ -157,7 +160,7 @@ BEGIN
 
   SELECT * INTO r FROM public.get_shared_report_by_token('EXPIREDtokenEXPIREDtokenEXPIRE_1');
   IF r.status IS DISTINCT FROM 'expired' OR r.student_name IS NOT NULL OR r.grade IS NOT NULL
-     OR r.report_data IS NOT NULL OR r.created_at IS NOT NULL OR r.expires_at IS NOT NULL THEN
+     OR r.report_data IS NOT NULL OR r.created_at IS NOT NULL OR r.expires_at IS NOT NULL OR r.provenance IS NOT NULL THEN
     RESET ROLE; RAISE EXCEPTION 'FAIL: expired token returned data: %', r;
   END IF;
 
@@ -181,6 +184,20 @@ BEGIN
   END LOOP;
   RESET ROLE;
   RAISE NOTICE 'PASS service_role: valid ok w/ whitelisted DTO; expired returns no data; revoked/unknown/malformed/wildcard/NULL return nothing; 300 random guesses miss';
+END $$;
+
+-- ── 4b. provenance is exposed so the reader can state a report's true origin ─
+INSERT INTO public.shared_reports (token, student_id, user_id, student_name, grade, expires_at, provenance)
+VALUES ('SERVERGENtokenSERVERGENtokenSE_1', 'f0040000-0000-4000-8000-0000000000c3', 'f0040000-0000-4000-8000-0000000000a1',
+        'SYNTHETIC_DSA01', '8', now() + interval '5 days', 'server_generated');
+DO $$
+DECLARE r record;
+BEGIN
+  SET LOCAL ROLE service_role;
+  SELECT * INTO r FROM public.get_shared_report_by_token('SERVERGENtokenSERVERGENtokenSE_1');
+  RESET ROLE;
+  IF r.provenance IS DISTINCT FROM 'server_generated' THEN RAISE EXCEPTION 'FAIL: server_generated provenance not returned: %', r.provenance; END IF;
+  RAISE NOTICE 'PASS provenance: client_supplied by default, server_generated when set';
 END $$;
 
 -- ── 5. legacy 12-char tokens are RETIRED ───────────────────────────────────
