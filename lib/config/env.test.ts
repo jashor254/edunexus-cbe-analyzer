@@ -15,8 +15,8 @@ import { validateEnv, validateEnvOrThrow } from './env'
 const VALID_VARS = {
   DEEPSEEK_AI_API_KEY: 'sk-fixture',
   NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: 'anon-fixture',
-  SUPABASE_SERVICE_ROLE_KEY: 'service-role-fixture',
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'pub-fixture',
+  SUPABASE_SECRET_KEY: 'secret-fixture',
   NODE_ENV: 'production',
 }
 
@@ -41,9 +41,44 @@ test('OPS-ENV-001: a structurally invalid Supabase URL (not a URL at all) fails 
 })
 
 test('OPS-ENV-001: a missing service role key fails closed', () => {
-  const { SUPABASE_SERVICE_ROLE_KEY: _omit, ...rest } = VALID_VARS
+  const { SUPABASE_SECRET_KEY: _omit, ...rest } = VALID_VARS
   const result = validateEnv(rest)
   assert.equal(result.ok, false)
+})
+
+test('OPS-ENV-001: with NO Supabase secret key, validation fails closed and names the field (regression: 2dd5c85)', () => {
+  const { SUPABASE_SECRET_KEY: _s, ...rest } = VALID_VARS
+  const result = validateEnv(rest)
+  assert.equal(result.ok, false)
+  if (result.ok) return
+  assert.match(result.message, /SUPABASE_SECRET_KEY/)
+})
+
+test('OPS-ENV-001: with NO Supabase publishable key, validation fails closed and names the field', () => {
+  const { NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: _p, ...rest } = VALID_VARS
+  const result = validateEnv(rest)
+  assert.equal(result.ok, false)
+  if (result.ok) return
+  assert.match(result.message, /NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY/)
+})
+
+test('OPS-ENV-001: the RETIRED key names do not satisfy the requirement, and the error says they are retired', () => {
+  const { SUPABASE_SECRET_KEY: _s, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: _p, ...rest } = VALID_VARS
+  const result = validateEnv({ ...rest, SUPABASE_SERVICE_ROLE_KEY: 'legacy-service', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'legacy-anon' })
+  assert.equal(result.ok, false)
+  if (result.ok) return
+  assert.match(result.message, /SUPABASE_SERVICE_ROLE_KEY is RETIRED/)
+  assert.match(result.message, /NEXT_PUBLIC_SUPABASE_ANON_KEY is RETIRED/)
+})
+
+test('OPS-ENV-001: retired names present ALONGSIDE the valid ones are ignored, not an error', () => {
+  const result = validateEnv({ ...VALID_VARS, SUPABASE_SERVICE_ROLE_KEY: 'legacy-service', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'legacy-anon' })
+  assert.equal(result.ok, true)
+})
+
+test('OPS-ENV-001: an empty key does not satisfy the requirement', () => {
+  assert.equal(validateEnv({ ...VALID_VARS, SUPABASE_SECRET_KEY: '' }).ok, false)
+  assert.equal(validateEnv({ ...VALID_VARS, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: '' }).ok, false)
 })
 
 test('OPS-ENV-001: optional Paystack keys being absent does not fail validation — only the derived critical set is required', () => {

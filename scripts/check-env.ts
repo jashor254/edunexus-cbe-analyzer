@@ -24,7 +24,7 @@ export const RULES: EnvRule[] = [
   {
     key:         'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
     required:    true,
-    description: 'Supabase publishable key (or legacy NEXT_PUBLIC_SUPABASE_ANON_KEY)',
+    description: 'Supabase publishable key (sb_publishable_…)',
     // Opaque credential, not decoded anywhere in this codebase — every real
     // client factory (utils/supabase/client.ts, server.ts, middleware.ts,
     // authAnon.ts) and lib/config/env.ts's own zod schema only require
@@ -38,7 +38,7 @@ export const RULES: EnvRule[] = [
   {
     key:         'SUPABASE_SECRET_KEY',
     required:    true,
-    description: 'Supabase secret key — bypasses RLS (server-only, or legacy SUPABASE_SERVICE_ROLE_KEY)',
+    description: 'Supabase secret key (sb_secret_…) — bypasses RLS, server-only',
     validate:    v => v.trim().length > 0 ? null : 'Must not be blank',
   },
 
