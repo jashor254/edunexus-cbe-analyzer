@@ -86,6 +86,7 @@ utils/supabase/   → Supabase client factories (server, service, client)
 - The service role client bypasses RLS — use it only for cron jobs and webhooks
 - NEVER expose the service role key to client components
 - Webhook endpoints must verify the provider signature before processing
+- Supabase keys: the ONLY valid names are `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (read via `getSupabasePublishableKey()`) and `SUPABASE_SECRET_KEY` (server only). The legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` were disabled by Supabase on 2026-05-25 — never read, set or document them as usable; `scripts/check-supabase-key-names.mjs` enforces this. See `docs/engineering/supabase-api-keys.md`.
 
 ---
 
