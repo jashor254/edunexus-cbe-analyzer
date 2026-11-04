@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { generateShareToken } from '@/lib/sharedReports/token'
+import { SHARE_GENERATION_ENABLED, SHARE_GENERATION_DISABLED_MESSAGE } from '@/lib/sharedReports/generationGate'
 import { ShareGenerateSchema, SHARE_TTL_DAYS, SHARE_MAX_BODY_BYTES } from '@/lib/sharedReports/reportSchema'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
 
@@ -10,6 +11,12 @@ export async function POST(req: Request) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return apiUnauthorized()
+    }
+
+    // Fail closed: no body is read and no record is created while disabled.
+    // 410 (not 403/404): the capability is intentionally withdrawn, not hidden.
+    if (!SHARE_GENERATION_ENABLED) {
+      return apiError(SHARE_GENERATION_DISABLED_MESSAGE, 410)
     }
 
     // Bound the body before parsing it (a missing/forged Content-Length is not trusted).
