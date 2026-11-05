@@ -1,7 +1,7 @@
 // lib/email/reportEmail.ts
 // Sends parent report email with PDF attachment via Resend.
 
-import { resend, getEmailFrom, EMAIL_REPLY_TO } from '@/lib/resend-client'
+import { getResend, getEmailFrom, EMAIL_REPLY_TO } from '@/lib/resend-client'
 import { repos } from '@/lib/repositories'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://edunexus.co.ke'
@@ -34,7 +34,7 @@ export async function sendReportEmail(params: ReportEmailParams): Promise<SendRe
       ? `${APP_URL}/parent-join?student=${params.studentId}&token=${params.signupToken}`
       : `${APP_URL}/dashboard`
 
-    const { error } = await resend.emails.send({
+    const { error } = await getResend().emails.send({
       from:    getEmailFrom(),
       to:      params.parentEmail,
       replyTo: EMAIL_REPLY_TO,

@@ -3882,3 +3882,14 @@ Inbound parent WhatsApp replies could update the legacy learner profile, write p
 - **Rollout order**: deploy this code (flag unset) BEFORE applying the two pending WhatsApp migrations; enabling effects needs separate authorization.
 - **Known limitation (documented)**: while the gate is OFF and `whatsapp_inbound_log.meta_message_id` does not exist (migration `20261031120000` unapplied), the metadata insert fails and is swallowed with a `warn` log — no inbound record is kept and held replies cannot be reconciled. Nothing educational happens either way (fail-closed); applying the migration restores the metadata trail.
 - **Rollback**: unset the variable (default OFF) or revert the commit; no schema change.
+
+### 2026-11-05 — Build no longer needs privileged runtime credentials (lazy repository + email clients) (PR open, NOT merged)
+
+`next build` imports every route module while collecting page data. `lib/repositories/index.ts` builds a singleton of 46 repositories at import and each `BaseRepository` constructor created the service-role client, and `lib/resend-client.ts` threw at import without `RESEND_API_KEY` — so a build in any environment without those secrets (e.g. an isolated Preview) failed although a build makes no database or email call.
+
+- **Changed**: `lib/repositories/base.ts` (`db` is a lazy, memoised getter — the client is created on first use), `lib/resend-client.ts` (`getResend()` replaces the eager constant), call sites in `lib/email/sender.ts` and `lib/email/reportEmail.ts`.
+- **Not weakened**: `createServiceClient()` and `getResend()` throw the same errors at the first database/email operation; there is no fallback credential; `/api/health` still exercises the client. No client component imports these server modules (one type-only import).
+- **Tests added**: `lib/repositories/lazyClient.test.ts` (6): import without credentials; first DB operation fails closed with the original error; email client lazy / fail-closed / memoised; an email send without credentials fails before any network request; concurrent first uses share one client per repository. Registered in `scripts/standard-tests.json`.
+- **Evidence**: `next build` with an empty environment exits 0 (was exit 1); the built app run with no credentials fails explicitly and early; run against the local Docker stack only it reports `database: ok`.
+- **ADR**: none (initialisation timing only; no ownership, identity or boundary change). **Rollback**: revert the PR.
+
