@@ -3883,3 +3883,15 @@ Payment confirmation had three divergent code paths, status was flipped to succe
 - **Deep tests**: `lib/payments/atomicFulfillment.integration.test.ts` (12, registered in DEEP_PR) — privilege denial for anon/authenticated, 12-way and 6-way concurrent settlement, 10 concurrent distinct payments for one user, concurrent subscriptions, failure/recovery, amount/currency/reference rejection — plus the existing payment deep tests (27) all pass on a throwaway stack with both migrations. CI schema pin updated to `d1b343e8…` (method validated: `main` reproduces `e3cfda63…`).
 - **Deployment sequence**: (1) apply both migrations, (2) deploy, (3) set Paystack Live callback/webhook URL to `<app origin>/api/payments/callback`. `NEXT_PUBLIC_APP_URL` must be the public https origin.
 - **ADR**: none (payments domain consolidation; no identity/ownership change).
+
+### 2026-11-05 — WhatsApp recovery Phase 2A: parent-reply effects gate (local only, NOT deployed)
+
+Inbound parent WhatsApp replies could update the legacy learner profile, write pending parent evidence, raise teacher alerts, publish a domain event and send an educational acknowledgement, while reply attribution and interpretation are not yet verified. Added a fail-closed, default-OFF switch so none of that happens until it is explicitly authorized.
+
+- **Code**: `lib/config/whatsappReplyEffects.ts` (`isParentReplyEffectsEnabled`, exact value `enabled` only); gate at the top of `processInboundReply` (`lib/parentPulse/observationPipeline.ts`) returning `{ processed:false, skipped:'effects_disabled' }` after a best-effort metadata-only inbound log (phone, Meta id, time, fixed reason; message text withheld). Route unchanged: HMAC and STOP precede the pipeline; no outcome ⇒ no acknowledgement.
+- **Not changed (by instruction)**: reply attribution, parser semantics, idempotency ordering.
+- **Tests added**: `lib/parentPulse/observationPipeline.gate.test.ts` (9, registered in `scripts/standard-tests.json`) + 3 gate cases in `app/api/webhooks/whatsapp/route.test.ts`. Standard suite 1,889/1,889; `tsc` and ESLint clean on touched files.
+- **ADR**: none (config gate on an existing pipeline; no identity/schema/auth change). Referenced: Constitution, CLAUDE.md Security Rules.
+- **Rollout order**: deploy this code (flag unset) BEFORE applying the two pending WhatsApp migrations; enabling effects needs separate authorization.
+- **Known limitation (documented)**: while the gate is OFF and `whatsapp_inbound_log.meta_message_id` does not exist (migration `20261031120000` unapplied), the metadata insert fails and is swallowed with a `warn` log — no inbound record is kept and held replies cannot be reconciled. Nothing educational happens either way (fail-closed); applying the migration restores the metadata trail.
+- **Rollback**: unset the variable (default OFF) or revert the commit; no schema change.
