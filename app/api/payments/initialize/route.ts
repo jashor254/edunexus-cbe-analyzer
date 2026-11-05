@@ -1,7 +1,9 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
-import { PURCHASABLE_PRODUCTS } from '@/lib/payments/config'
+import { PURCHASABLE_PRODUCTS, PAYMENT_CURRENCY } from '@/lib/payments/config'
+import { getSiteUrl } from '@/lib/payments/siteUrl'
+import { toMinorUnits } from '@/lib/payments/verification'
 import { z } from 'zod'
 
 const InitializeSchema = z.object({
@@ -46,6 +48,17 @@ export async function POST(req: Request) {
       return apiBadRequest('Invalid M-PESA number. Use format: 0712345678')
     }
 
+    // 🌐 Resolve the public base URL BEFORE creating any payment row, so a
+    //    misconfiguration fails closed instead of leaving an orphaned pending
+    //    payment and an "undefined/api/…" callback URL.
+    let siteUrl: string
+    try {
+      siteUrl = getSiteUrl()
+    } catch (configError: unknown) {
+      console.error('[initialize] site URL not configured:', configError instanceof Error ? configError.message : String(configError))
+      return apiError('Payment provider not configured')
+    }
+
     // 🆔 4. Unique reference
     const reference = `EDU-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
 
@@ -71,8 +84,6 @@ export async function POST(req: Request) {
       return apiError('Could not save transaction. Try again.')
     }
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
-
     // 🌍 6. Initialize Paystack
     const paystackRes = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
@@ -82,8 +93,8 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         email:        user.email,
-        amount:       product.price * 100, // kobo
-        currency:     'KES',
+        amount:       toMinorUnits(product.price),
+        currency:     PAYMENT_CURRENCY,
         reference,
         callback_url: `${siteUrl}/api/payments/callback?plan=${productId}`,
         metadata: {

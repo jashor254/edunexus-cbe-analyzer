@@ -6,7 +6,9 @@ import { NextRequest } from 'next/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiBadRequest } from '@/lib/api/response'
 import { requireAuth } from '@/lib/api/middleware'
-import { PURCHASABLE_PRODUCTS } from '@/lib/payments/config'
+import { PURCHASABLE_PRODUCTS, PAYMENT_CURRENCY } from '@/lib/payments/config'
+import { getSiteUrl } from '@/lib/payments/siteUrl'
+import { toMinorUnits } from '@/lib/payments/verification'
 
 const MobileInitSchema = z.object({
   phone:     z.string().min(1),
@@ -29,6 +31,13 @@ export async function POST(req: NextRequest) {
     if (!product) return apiBadRequest('Invalid product selected')
 
     if (!process.env.PAYSTACK_SECRET_KEY) {
+      return apiError('Payment provider not configured')
+    }
+
+    let siteUrl: string
+    try {
+      siteUrl = getSiteUrl()
+    } catch {
       return apiError('Payment provider not configured')
     }
 
@@ -60,12 +69,12 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         email:       auth.user.email,
-        amount:      product.price * 100, // kobo
-        currency:    'KES',
+        amount:      toMinorUnits(product.price),
+        currency:    PAYMENT_CURRENCY,
         reference,
         channels:    ['mpesa', 'card', 'bank', 'ussd', 'qr'],
         metadata:    { productId, phone_number: phone, user_id: auth.user.id },
-        callback_url: `${process.env.NEXT_PUBLIC_SITE_URL}/payment/success`,
+        callback_url: `${siteUrl}/payment/success`,
       }),
     })
 

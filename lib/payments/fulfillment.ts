@@ -11,7 +11,7 @@
 // the webhook and browser-redirect payment paths).
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { TOKEN_PACK, TOKEN_GRANTS } from '@/lib/payments/config'
+import { TOKEN_PACK, TOKEN_GRANTS, SUBSCRIPTION_TERM_MONTHS } from '@/lib/payments/config'
 
 export type FulfillmentResult = 'fulfilled' | 'already_processed'
 
@@ -24,43 +24,45 @@ type PaymentForFulfillment = {
 }
 
 /**
- * Atomically transitions a payment row from 'pending' to 'success' and, only
- * if this call is the one that won that transition, credits the resource
- * (tokens or subscription).
+ * Fulfils a verified payment: marks it 'success' AND credits the entitlement
+ * (tokens or subscription) as ONE database transaction.
  *
- * The conditional update (`.eq('status', 'pending')`) is the idempotency
- * guard: if two callers race for the same payment (e.g. Paystack's webhook
- * and the browser redirect both arrive for the same reference — which
- * Paystack's retry behavior makes a real, not hypothetical, scenario), only
- * one UPDATE can match a still-'pending' row. The other observes zero
- * affected rows and safely returns 'already_processed' without crediting
- * anything a second time.
+ * The work is done by public.fulfill_payment_atomic() (migration
+ * 20261105120000_payments_atomic_fulfillment.sql), which locks the payment row,
+ * credits, and flips the status in a single transaction. That is what removes
+ * the old failure mode where the row was marked 'success' first and a crediting
+ * error afterwards left a paid customer with no access and no retry (DSA-04):
+ * now either everything commits or nothing does, and a thrown error leaves the
+ * payment 'pending' so the webhook retry / reconciliation completes it.
+ *
+ * Idempotency: a second caller blocks on the row lock, sees 'success', and gets
+ * 'already_processed' without crediting again — this covers the webhook and the
+ * browser redirect racing for the same reference.
+ *
+ * A 'failed' row may still be fulfilled here: settlePayment() only calls this
+ * after Paystack has confirmed success for the exact amount and currency, and
+ * a 'failed' status can have been written by an earlier non-final check.
  */
 export async function fulfillPayment(
   db: SupabaseClient,
   payment: PaymentForFulfillment
 ): Promise<FulfillmentResult> {
-  const { data: updated, error: updateError } = await db
-    .from('payments')
-    .update({ status: 'success', updated_at: new Date().toISOString() })
-    .eq('id', payment.id)
-    .eq('status', 'pending')
-    .select('id')
+  const isSubscription = SUBSCRIPTION_PRODUCTS.has(payment.product_id)
 
-  if (updateError) {
-    throw new Error(`Failed to mark payment success: ${updateError.message}`)
-  }
-  if (!updated || updated.length === 0) {
-    return 'already_processed'
-  }
+  const { data, error } = await db.rpc('fulfill_payment_atomic', {
+    p_payment_id:   payment.id,
+    p_token_grant:  isSubscription ? null : resolveTokenGrant(payment.product_id),
+    p_plan:         isSubscription ? payment.product_id : null,
+    p_months:       SUBSCRIPTION_TERM_MONTHS,
+  })
 
-  if (SUBSCRIPTION_PRODUCTS.has(payment.product_id)) {
-    await creditSubscription(db, payment.user_id, payment.product_id, payment.id)
-  } else {
-    await creditTokens(db, payment.user_id, resolveTokenGrant(payment.product_id))
+  if (error) {
+    throw new Error(`Failed to fulfil payment ${payment.id}: ${error.message}`)
   }
-
-  return 'fulfilled'
+  if (data !== 'fulfilled' && data !== 'already_processed') {
+    throw new Error(`Unexpected fulfilment result for payment ${payment.id}`)
+  }
+  return data
 }
 
 /**
@@ -112,9 +114,9 @@ export async function creditSubscription(
     // Extend from current expiry — not from today — so a renewal never
     // shortens time a family already paid for.
     const newExpiry = new Date(existingSub.expires_at)
-    newExpiry.setMonth(newExpiry.getMonth() + 3)
+    newExpiry.setMonth(newExpiry.getMonth() + SUBSCRIPTION_TERM_MONTHS)
 
-    await db
+    const { error } = await db
       .from('subscriptions')
       .update({
         plan:       productId,
@@ -123,11 +125,12 @@ export async function creditSubscription(
         payment_id: paymentId,
       })
       .eq('id', existingSub.id)
+    if (error) throw new Error(`Failed to extend subscription: ${error.message}`)
   } else {
     const expiry = new Date()
-    expiry.setMonth(expiry.getMonth() + 3)
+    expiry.setMonth(expiry.getMonth() + SUBSCRIPTION_TERM_MONTHS)
 
-    await db.from('subscriptions').insert({
+    const { error } = await db.from('subscriptions').insert({
       user_id:    userId,
       payment_id: paymentId,
       plan:       productId,
@@ -135,6 +138,7 @@ export async function creditSubscription(
       started_at: new Date().toISOString(),
       expires_at: expiry.toISOString(),
     })
+    if (error) throw new Error(`Failed to create subscription: ${error.message}`)
   }
 }
 
@@ -151,16 +155,18 @@ export async function creditTokens(db: SupabaseClient, userId: string, tokensToA
     .maybeSingle()
 
   if (existing) {
-    await db
+    const { error } = await db
       .from('token_balances')
       .update({
         balance:    existing.balance    + tokensToAdd,
         total_ever: existing.total_ever + tokensToAdd,
       })
       .eq('user_id', userId)
+    if (error) throw new Error(`Failed to credit tokens: ${error.message}`)
   } else {
-    await db
+    const { error } = await db
       .from('token_balances')
       .insert({ user_id: userId, balance: tokensToAdd, total_ever: tokensToAdd })
+    if (error) throw new Error(`Failed to credit tokens: ${error.message}`)
   }
 }

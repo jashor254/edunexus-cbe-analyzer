@@ -279,7 +279,7 @@ jobs:
           # uses all five columns). FAIL_COUNT=9 UNRECOVERED=0, unchanged.
           # Computed on an isolated throwaway pifp stack that first reproduced
           # 0b8f67ee at the pre-WhatsApp tree and e3cfda63 at origin/main.
-          EXPECTED="e3cfda630f274cd6be0563c9e7288c33"
+          EXPECTED="d1b343e834a283e8e480dbf295d1e3a1"
           echo "expected: $EXPECTED"
           echo "actual:   $ACTUAL"
           if [ "$ACTUAL" != "$EXPECTED" ]; then

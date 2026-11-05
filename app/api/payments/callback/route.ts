@@ -1,133 +1,99 @@
 import { NextResponse } from 'next/server'
-import { createServiceClient } from '@/utils/supabase/service'
 import { createHmac, timingSafeEqual } from 'crypto'
 import { publishEvent } from '@/lib/events'
-import { fulfillPayment } from '@/lib/payments/fulfillment'
-import { isValidPaymentReference } from '@/lib/payments/reference'
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL!
+import { settlePayment, type SettlementResult } from '@/lib/payments/settlement'
+import { createServicePaymentStore, verifyWithPaystack } from '@/lib/payments/paymentStore'
+import { getSiteUrl } from '@/lib/payments/siteUrl'
+import { PAYMENT_CURRENCY } from '@/lib/payments/config'
+import { toMinorUnits } from '@/lib/payments/verification'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Core payment processor — idempotent, called by both GET and POST
+// Paystack callback (browser redirect, GET) and webhook (server, POST).
+// Both call the single settlement path in lib/payments/settlement.ts: the
+// amount, currency, product and owner come from OUR payments row, the status
+// from Paystack's verify API. Nothing in the query string (including `plan`)
+// or the webhook body other than the reference is trusted.
 // ─────────────────────────────────────────────────────────────────────────────
-async function processPayment(
-  reference: string
-): Promise<'success' | 'failed' | 'already_processed' | 'not_found'> {
-  // Caller-supplied (GET query / webhook body) — never let it reach the DB
-  // query or the Paystack URL path unless it has the shape we issue.
-  if (!isValidPaymentReference(reference)) return 'not_found'
 
-  const db = createServiceClient()
-
-  // 1. Fetch payment record
-  const { data: payment, error: fetchError } = await db
-    .from('payments')
-    .select('id, status, user_id, product_id')
-    .eq('transaction_id', reference)
-    .single()
-
-  if (fetchError || !payment) {
-    console.error('[callback] payment not found:', reference)
-    return 'not_found'
-  }
-
-  // 2. Fast-path idempotency check — avoids an unnecessary Paystack call for
-  //    the common case. The real guard against a race between this GET and
-  //    the webhook POST arriving concurrently is the atomic conditional
-  //    update inside fulfillPayment() below, not this check.
-  if (payment.status === 'success') {
-    return 'already_processed'
-  }
-
-  // 3. Verify with Paystack
-  const verifyRes = await fetch(
-    `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
-    { headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` } }
+function settle(reference: string): Promise<SettlementResult> {
+  return settlePayment(
+    { store: createServicePaymentStore(), verify: verifyWithPaystack },
+    reference,
   )
+}
 
-  const verification = await verifyRes.json()
-
-  if (!verification.status || verification.data?.status !== 'success') {
-    console.error('[callback] verification failed for:', reference)
-    await db
-      .from('payments')
-      .update({ status: 'failed' })
-      .eq('transaction_id', reference)
-
+function emitBillingEvent(reference: string, result: SettlementResult): void {
+  if (result.status === 'fulfilled') {
+    void publishEvent({
+      event_type:      'billing.payment.succeeded',
+      resource_type:   'payment',
+      resource_id:     reference,
+      actor_id:        result.payment.user_id,
+      payload: {
+        reference,
+        amount_kobo: toMinorUnits(result.payment.amount),
+        currency:    PAYMENT_CURRENCY,
+        plan:        result.payment.product_id,
+      },
+      idempotency_key: `billing.payment.succeeded:${reference}`,
+    }).catch(err => console.error('[events] billing.payment.succeeded:', err instanceof Error ? err.message : String(err)))
+    return
+  }
+  if (result.status === 'failed' || result.status === 'rejected') {
     void publishEvent({
       event_type:      'billing.payment.failed',
       resource_type:   'payment',
       resource_id:     reference,
-      actor_id:        payment.user_id,
-      payload:         { reference, reason: 'verification_failed' },
+      actor_id:        result.payment.user_id,
+      payload:         { reference, reason: result.status === 'rejected' ? `mismatch_${result.reason}` : `provider_${result.providerStatus}` },
       idempotency_key: `billing.payment.failed:${reference}`,
     }).catch(err => console.error('[events] billing.payment.failed:', err instanceof Error ? err.message : String(err)))
-
-    return 'failed'
   }
-
-  // 4. Atomically mark success and credit tokens/subscription — this is the
-  //    step that must not run twice. fulfillPayment()'s conditional update
-  //    means only one of a racing GET+POST pair actually credits anything.
-  const userId    = payment.user_id
-  const productId = payment.product_id
-  const result    = await fulfillPayment(db, { id: payment.id, user_id: userId, product_id: productId })
-
-  if (result === 'already_processed') {
-    return 'already_processed'
-  }
-
-  // Emit billing event — fire and forget, never block the redirect
-  const verifiedData = verification.data
-  void publishEvent({
-    event_type:      'billing.payment.succeeded',
-    resource_type:   'payment',
-    resource_id:     reference,
-    actor_id:        userId,
-    payload: {
-      reference,
-      amount_kobo: verifiedData?.amount ?? 0,
-      currency:    verifiedData?.currency ?? 'NGN',
-      plan:        productId,
-    },
-    idempotency_key: `billing.payment.succeeded:${reference}`,
-  }).catch(err => console.error('[events] billing.payment.succeeded:', err instanceof Error ? err.message : String(err)))
-
-  return 'success'
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET — Browser redirect after Paystack checkout
 // ─────────────────────────────────────────────────────────────────────────────
 export async function GET(req: Request) {
+  let siteUrl: string
+  try {
+    siteUrl = getSiteUrl()
+  } catch (error: unknown) {
+    console.error('[callback GET] site URL not configured:', error instanceof Error ? error.message : String(error))
+    return NextResponse.json({ error: 'Payment redirect is not configured' }, { status: 500 })
+  }
+
   const url       = new URL(req.url)
   const reference = url.searchParams.get('reference') || url.searchParams.get('trxref')
-  const plan      = url.searchParams.get('plan') || ''
 
   if (!reference) {
-    return NextResponse.redirect(`${SITE_URL}/pricing?error=missing_ref`)
+    return NextResponse.redirect(`${siteUrl}/pricing?error=missing_ref`)
   }
 
   try {
-    const result = await processPayment(reference)
+    const result = await settle(reference)
+    emitBillingEvent(reference, result)
 
-    if (result === 'success' || result === 'already_processed') {
-      return NextResponse.redirect(
-        `${SITE_URL}/payment/success?plan=${encodeURIComponent(plan)}&reference=${encodeURIComponent(reference)}`
-      )
+    switch (result.status) {
+      case 'fulfilled':
+      case 'already_processed':
+        // `plan` is for display only and comes from the stored payment, never the URL.
+        return NextResponse.redirect(
+          `${siteUrl}/payment/success?plan=${encodeURIComponent(result.payment.product_id)}&reference=${encodeURIComponent(reference)}`
+        )
+      case 'failed':
+      case 'rejected':
+        return NextResponse.redirect(`${siteUrl}/payment/failed?reference=${encodeURIComponent(reference)}`)
+      case 'pending':
+      case 'provider_unavailable':
+        // Not final: the webhook or a retry will still settle it.
+        return NextResponse.redirect(`${siteUrl}/pricing?error=payment_pending&reference=${encodeURIComponent(reference)}`)
+      default:
+        return NextResponse.redirect(`${siteUrl}/pricing?error=not_found`)
     }
-
-    if (result === 'failed') {
-      return NextResponse.redirect(
-        `${SITE_URL}/payment/failed?reference=${encodeURIComponent(reference)}`
-      )
-    }
-
-    return NextResponse.redirect(`${SITE_URL}/pricing?error=not_found`)
-
   } catch (error: unknown) {
     console.error('[callback GET] error:', error instanceof Error ? error.message : String(error))
-    return NextResponse.redirect(`${SITE_URL}/payment/failed`)
+    return NextResponse.redirect(`${siteUrl}/payment/failed`)
   }
 }
 
@@ -163,14 +129,24 @@ export async function POST(req: Request) {
     }
 
     const reference = event.data?.reference
-    if (!reference) {
+    if (!reference || typeof reference !== 'string') {
       return NextResponse.json({ error: 'No reference' }, { status: 400 })
     }
 
-    await processPayment(reference)
+    const result = await settle(reference)
+    emitBillingEvent(reference, result)
+
+    // A signed charge.success that we could not settle YET must be retried by
+    // Paystack: answer 5xx so it re-delivers. Terminal outcomes are 200.
+    if (result.status === 'pending' || result.status === 'provider_unavailable') {
+      return NextResponse.json({ error: 'Payment not yet confirmable' }, { status: 503 })
+    }
+
     return NextResponse.json({ received: true })
 
   } catch (error: unknown) {
+    // Includes a failed atomic fulfilment: the payment is still 'pending', so
+    // the 500 makes Paystack retry and the retry completes it.
     console.error('[webhook POST] error:', error instanceof Error ? error.message : String(error))
     return NextResponse.json(
       { error: 'Webhook processing failed' },
