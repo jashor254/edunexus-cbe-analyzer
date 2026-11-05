@@ -306,3 +306,14 @@ export function isSubscriptionActive(sub: SubscriptionRecord | null | undefined)
   if (sub.status !== 'active') return false
   return new Date(sub.end_date) > new Date()
 }
+
+// ===== PAYMENT SETTLEMENT CONSTANTS =====
+// Single source for values that the initialize routes (what we ask Paystack to
+// charge) and settlement (what we accept as proof of payment) must agree on.
+// Paystack amounts are integers in the currency's minor unit.
+export const PAYMENT_CURRENCY = 'KES'
+export const PAYMENT_MINOR_UNITS = 100
+
+// Length of one paid subscription period. creditSubscription() and the atomic
+// fulfilment function both extend by this many months.
+export const SUBSCRIPTION_TERM_MONTHS = 3

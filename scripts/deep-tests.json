@@ -132,6 +132,7 @@
     "lib/parentExperience/parentPortal.integration.test.ts",
     "lib/payments/fulfillment.test.ts",
     "lib/payments/subscriptionSelfGrant.test.ts",
+    "lib/payments/atomicFulfillment.integration.test.ts",
     "lib/projection/careerPropagation.integration.test.ts",
     "lib/projection/curriculumAware.integration.test.ts",
     "lib/projection/equivalenceHarness.integration.test.ts",

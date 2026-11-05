@@ -1753,6 +1753,19 @@
       "parallel": "SAFE"
     },
     {
+      "file": "lib/payments/atomicFulfillment.integration.test.ts",
+      "tier": "D1",
+      "domain": [
+        "billing"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": false,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
       "file": "lib/payments/fulfillment.test.ts",
       "tier": "D1",
       "domain": [
