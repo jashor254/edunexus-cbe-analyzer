@@ -3870,3 +3870,15 @@ Supabase disabled the legacy anon/service_role keys on **2026-05-25** (productio
 - **Verified**: server with ONLY the two valid names — protected routes 307→login (was 500); sentinel, SAFE-009, HTTP_PR 14/14, HTTP_MAIN 55/55 pass; standard suite 1,825/1,825; guard negative-controlled. Original failing tests reproduced under CI's env first.
 - **Production-side steps NOT done** (need approval; order matters — see `docs/engineering/supabase-api-keys.md`): deploy this, smoke test, only then remove the legacy-named hosting variables.
 - **ADR**: none (no canonical identity/boundary change; narrows config). **Rollback**: revert the PR; the app then needs the legacy-named variable again.
+
+### 2026-11-05 — WhatsApp recovery Phase 2A: parent-reply effects gate (local only, NOT deployed)
+
+Inbound parent WhatsApp replies could update the legacy learner profile, write pending parent evidence, raise teacher alerts, publish a domain event and send an educational acknowledgement, while reply attribution and interpretation are not yet verified. Added a fail-closed, default-OFF switch so none of that happens until it is explicitly authorized.
+
+- **Code**: `lib/config/whatsappReplyEffects.ts` (`isParentReplyEffectsEnabled`, exact value `enabled` only); gate at the top of `processInboundReply` (`lib/parentPulse/observationPipeline.ts`) returning `{ processed:false, skipped:'effects_disabled' }` after a best-effort metadata-only inbound log (phone, Meta id, time, fixed reason; message text withheld). Route unchanged: HMAC and STOP precede the pipeline; no outcome ⇒ no acknowledgement.
+- **Not changed (by instruction)**: reply attribution, parser semantics, idempotency ordering.
+- **Tests added**: `lib/parentPulse/observationPipeline.gate.test.ts` (9, registered in `scripts/standard-tests.json`) + 3 gate cases in `app/api/webhooks/whatsapp/route.test.ts`. Standard suite 1,889/1,889; `tsc` and ESLint clean on touched files.
+- **ADR**: none (config gate on an existing pipeline; no identity/schema/auth change). Referenced: Constitution, CLAUDE.md Security Rules.
+- **Rollout order**: deploy this code (flag unset) BEFORE applying the two pending WhatsApp migrations; enabling effects needs separate authorization.
+- **Known limitation (documented)**: while the gate is OFF and `whatsapp_inbound_log.meta_message_id` does not exist (migration `20261031120000` unapplied), the metadata insert fails and is swallowed with a `warn` log — no inbound record is kept and held replies cannot be reconciled. Nothing educational happens either way (fail-closed); applying the migration restores the metadata trail.
+- **Rollback**: unset the variable (default OFF) or revert the commit; no schema change.

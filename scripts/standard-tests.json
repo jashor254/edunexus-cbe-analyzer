@@ -4,6 +4,7 @@
     "app/api/student/blueprint/[learnerId]/pdf/route.test.ts",
     "app/api/teacher/monday-panel/buildAction.test.ts",
     "app/api/webhooks/whatsapp/route.test.ts",
+    "lib/parentPulse/observationPipeline.gate.test.ts",
     "app/(auth)/signup/buildAuthCallbackUrl.test.ts",
     "app/school-concepts/[schoolSlug]/homepageStructure.test.tsx",
     "components/blueprint/actionPlan/actionCardPresentation.test.ts",
