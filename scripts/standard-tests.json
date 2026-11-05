@@ -198,6 +198,7 @@
     "lib/payments/verification.test.ts",
     "lib/payments/settlement.test.ts",
     "app/api/payments/callback/route.settlement.test.ts",
+    "lib/repositories/lazyClient.test.ts",
     "lib/validation/sanitizeInput.test.ts",
     "scripts/security/route-auth-rules.test.ts",
     "scripts/security/audit-rules.test.ts",

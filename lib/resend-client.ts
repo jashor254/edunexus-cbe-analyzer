@@ -2,11 +2,21 @@
 
 import { Resend } from 'resend';
 
-if (!process.env.RESEND_API_KEY) {
-  throw new Error('RESEND_API_KEY is not set');
-}
+// Created on first use, NOT at import. Importing this module happens during
+// `next build` (page-data collection) in environments that deliberately hold no
+// email credential (isolated Preview). Sending still fails closed: with no
+// RESEND_API_KEY, getResend() throws before any request is made, and there is no
+// fallback key.
+let client: Resend | undefined;
 
-export const resend = new Resend(process.env.RESEND_API_KEY);
+export function getResend(): Resend {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) {
+    throw new Error('RESEND_API_KEY is not set');
+  }
+  client ??= new Resend(key);
+  return client;
+}
 
 // Email sender configuration
 export const EMAIL_FROM = 'EduNexus <hello@edunexus.co.ke>';
