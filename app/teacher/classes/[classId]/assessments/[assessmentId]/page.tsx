@@ -517,9 +517,9 @@ export default function MarksheetPage({
                 '1. Download the CSV template above',
                 '2. Fill marks in Excel or Google Sheets',
                 '3. Save as .csv and upload here',
-                '4. System calculates totals, means &amp; rankings',
+                '4. System calculates totals, means & rankings',
               ].map((step) => (
-                <p key={step} className="text-xs text-gray-500" dangerouslySetInnerHTML={{ __html: step }} />
+                <p key={step} className="text-xs text-gray-500">{step}</p>
               ))}
             </div>
           </div>

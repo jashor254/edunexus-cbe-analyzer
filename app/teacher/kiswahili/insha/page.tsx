@@ -161,6 +161,14 @@ function FeedbackResults({
         </button>
       </div>
 
+      {feedback.flaggedForReview && (
+        <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <strong>Soma insha hii mwenyewe kabla ya kuamini kiwango.</strong>{' '}
+          Maandishi ya mwanafunzi yana maagizo yanayolenga mfumo wa AI (mfano, kuomba alama kamili).
+          Yalitathminiwa kama maandishi ya kawaida, lakini kiwango kinahitaji ukaguzi wako.
+        </div>
+      )}
+
       {/* Overall jumla */}
       <div className={`rounded-2xl p-5 flex items-center gap-4 text-white ${levelBig(feedback.jumla)}`}>
         <div className="flex flex-col">

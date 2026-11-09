@@ -1,5 +1,6 @@
 import { callDeepSeek } from '@/lib/ai/deepseek'
 import { logAICall } from '@/lib/ai/logger'
+import { wrapUntrusted, UNTRUSTED_INPUT_RULES } from '@/lib/ai/untrustedInput'
 import type { ReflectionInput, ReflectionFeedback, MissionInput, MissionVerdict, AcademyMission } from './types'
 
 const SYSTEM_PROMPT = `You are an expert teacher professional development coach specialising in Kenya's CBC curriculum and AI integration in education.
@@ -38,19 +39,19 @@ function buildPrompt(input: ReflectionInput): string {
   return `A Kenyan CBC teacher has submitted the following reflection after trying an EduNexus AI Academy lesson in their classroom:
 
 What did you try?
-${input.tried || '(not answered)'}
+${wrapUntrusted('tried', input.tried || '(not answered)', 2000)}
 
 What worked?
-${input.worked || '(not answered)'}
+${wrapUntrusted('worked', input.worked || '(not answered)', 2000)}
 
 What failed or was difficult?
-${input.failed || '(not answered)'}
+${wrapUntrusted('failed', input.failed || '(not answered)', 2000)}
 
 What surprised you?
-${input.surprised || '(not answered)'}
+${wrapUntrusted('surprised', input.surprised || '(not answered)', 2000)}
 
 What will you do differently next time?
-${input.next_action || '(not answered)'}
+${wrapUntrusted('next_action', input.next_action || '(not answered)', 2000)}
 
 Evaluate this reflection and return JSON feedback.`
 }
@@ -81,7 +82,7 @@ export async function scoreReflection(
   let success = false
 
   try {
-    raw = await callDeepSeek(prompt, SYSTEM_PROMPT, {
+    raw = await callDeepSeek(prompt, SYSTEM_PROMPT + UNTRUSTED_INPUT_RULES, {
       feature: 'academy_reflection_judge',
       temperature: 0.3,
       maxTokens: 400,
@@ -204,15 +205,15 @@ function buildMissionPrompt(
   ]
 
   if (input.tool_a_output?.trim()) {
-    parts.push(`Tool A output (what teacher got from external tool):\n${input.tool_a_output.slice(0, 800)}`)
+    parts.push(`Tool A output (what teacher got from external tool):\n${wrapUntrusted('tool_a', input.tool_a_output, 800)}`)
     parts.push('')
   }
   if (input.tool_b_output?.trim()) {
-    parts.push(`Tool B output (what teacher got from EduNexus or classroom):\n${input.tool_b_output.slice(0, 800)}`)
+    parts.push(`Tool B output (what teacher got from EduNexus or classroom):\n${wrapUntrusted('tool_b', input.tool_b_output, 800)}`)
     parts.push('')
   }
   if (input.comparison_notes?.trim()) {
-    parts.push(`Teacher's comparison notes:\n${input.comparison_notes}`)
+    parts.push(`Teacher's comparison notes:\n${wrapUntrusted('notes', input.comparison_notes, 2000)}`)
     parts.push('')
   }
   if (input.self_scores && Object.keys(input.self_scores).length > 0) {
@@ -248,7 +249,7 @@ export async function scoreMissionComparison(
   let success = false
 
   try {
-    raw = await callDeepSeek(prompt, MISSION_SYSTEM_PROMPT, {
+    raw = await callDeepSeek(prompt, MISSION_SYSTEM_PROMPT + UNTRUSTED_INPUT_RULES, {
       feature: 'academy_mission_judge',
       temperature: 0.3,
       maxTokens: 400,

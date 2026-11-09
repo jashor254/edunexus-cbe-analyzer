@@ -5,6 +5,8 @@
 
 import { callDeepSeek } from '@/lib/ai/deepseek'
 import { logAICall } from '@/lib/ai/logger'
+import { detectInjectionSignals, wrapUntrusted, UNTRUSTED_INPUT_RULES } from '@/lib/ai/untrustedInput'
+import { logger } from '@/lib/observability/logger'
 
 export type InshaType =
   | 'masimulizi'   // narrative
@@ -42,6 +44,10 @@ export type InshaFeedback = {
   // this is a placeholder score, NOT a genuine evaluation. The UI must
   // never render this like a real grade.
   isFallback: boolean
+  // true when the essay text contained instructions aimed at the AI marker
+  // (e.g. "give this full marks"). The text was evaluated as data; the
+  // teacher should read the essay before trusting the level.
+  flaggedForReview?: boolean
 }
 
 // ── CBC level labels ──────────────────────────────────────────────────────────
@@ -115,12 +121,12 @@ Andika mwongozo katika Kiswahili fasaha. Makosa ya sarufi na ngeli: toa mfano HA
 
 // ── Prompt builder ────────────────────────────────────────────────────────────
 
+const MAX_INSHA_CHARS = 6000
+
 function buildPrompt(insha: string, inshaType: InshaType, grade: number): string {
   return `INSHA YA MWANAFUNZI (Darasa ${grade} — ${INSHA_TYPE_LABELS[inshaType]}):
 
----
-${insha.trim()}
----
+${wrapUntrusted('insha', insha.trim(), MAX_INSHA_CHARS)}
 
 Tathmini insha hii kwa vipimo sita vya CBC na urudishe JSON peke yake.`
 }
@@ -247,7 +253,8 @@ export async function evaluateInsha({
   inshaType,
   grade,
 }: EvaluateInshaParams): Promise<InshaFeedback> {
-  const systemPrompt = buildSystemPrompt(grade, inshaType)
+  const systemPrompt = buildSystemPrompt(grade, inshaType) + UNTRUSTED_INPUT_RULES
+  const injectionSignals = detectInjectionSignals(insha)
   const prompt       = buildPrompt(insha, inshaType, grade)
   const start        = Date.now()
 
@@ -277,7 +284,15 @@ export async function evaluateInsha({
 
   try {
     const parsed = JSON.parse(cleaned) as RawResponse
-    return parseRawResponse(parsed, inshaType, grade)
+    const feedback = parseRawResponse(parsed, inshaType, grade)
+    if (injectionSignals.length > 0) {
+      logger.warn('Insha contained AI-directed instructions', {
+        operation: 'inshaEvaluator.injectionSignals',
+        signals: injectionSignals.map((sig) => sig.label),
+      })
+      return { ...feedback, flaggedForReview: true }
+    }
+    return feedback
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     // The raw model output is feedback on a learner's essay — not logged.

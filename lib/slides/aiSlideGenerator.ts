@@ -1,6 +1,7 @@
 // lib/slides/aiSlideGenerator.ts
 // Calls DeepSeek to generate structured slide content for a given lesson topic.
 import { callDeepSeek } from '@/lib/ai/deepseek'
+import { neutralizeUntrusted } from '@/lib/ai/untrustedInput'
 
 const TEMPERATURE = 0.7
 const MAX_TOKENS  = 4000
@@ -54,11 +55,17 @@ CONTENT QUALITY RULES:
 SPEAKER NOTES: Every slide must have detailed speaker notes (2–3 sentences) guiding the teacher.`
 
 export async function generateSlideContent(
-  subject: string,
-  grade: string,
-  topic: string,
+  rawSubject: string,
+  rawGrade: string,
+  rawTopic: string,
   slideCount: number,
 ): Promise<GeneratedSlides> {
+  // Teacher-typed values are interpolated into a JSON template, so they are
+  // neutralised (no fences, no quotes/newlines) rather than wrapped.
+  const clean = (v: string, max: number): string => neutralizeUntrusted(v, max).replace(/["\\\r\n]+/g, ' ').trim()
+  const subject = clean(rawSubject, 80)
+  const grade = clean(rawGrade, 40)
+  const topic = clean(rawTopic, 200)
   const contentSlideCount = Math.max(2, Math.min(slideCount - 5, 6))
 
   const prompt = `Generate a complete classroom presentation for:

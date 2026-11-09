@@ -213,6 +213,8 @@
     "lib/career/classReportHonesty.test.ts",
     "lib/paperIntelligence/markingClaim.test.ts",
     "lib/compass/compassTurnBounds.test.ts",
+    "lib/compass/safetyFilter.test.ts",
+    "lib/ai/untrustedInput.test.ts",
     "lib/lessonPlan/scheduledGeneration.test.ts"
   ]
 }
