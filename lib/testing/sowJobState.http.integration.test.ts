@@ -31,6 +31,11 @@ const db = createServiceClient()
 const ENDPOINT = `${BASE}/api/sow/generate`
 const JOB_TYPE = 'ai.sow.generate'
 
+// A syntactically valid, deliberately non-existent strand id. KICD grounding
+// loads strands by uuid, so a non-uuid id fails the job before generation; a
+// valid-but-absent uuid is the documented "strand has no KICD data" path.
+const SYNTHETIC_STRAND_ID = '00000000-0000-4000-8000-0000000000a1'
+
 const createdUsers: string[] = []
 let teacher: { id: string; cookie: string }
 
@@ -46,7 +51,7 @@ const baseContext = () => ({
 })
 
 const substrands = () => ([{
-  strandId: 'num-1', strandTitle: 'Numbers',
+  strandId: SYNTHETIC_STRAND_ID, strandTitle: 'Numbers',
   substrandId: 'num-1-1', substrandTitle: 'Real Numbers',
   lessonsRequired: 2, orderIndex: 1,
 }])

@@ -222,7 +222,7 @@ function savePayload(lessons: unknown[], overrides: Record<string, unknown> = {}
   return {
     schemeData: {
       meta: {
-        school: MARKER, grade: 8, learningArea: MARKER, term: 1, year: 2026,
+        school: MARKER, grade: '8', learningArea: MARKER, term: 1, year: 2026,
         totalLessons: lessons.length || 1, totalWeeks: 1, curriculumMode: 'cbc',
         lessonsPerWeek: 2, teacherName: MARKER, ...overrides,
       },
