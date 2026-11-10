@@ -227,6 +227,7 @@
     "lib/curriculum/bookletGradeLabel.test.ts",
     "lib/row/rowPrintLayout.test.ts",
     "lib/documents/bulkExportLayout.test.ts",
-    "lib/documents/bookletLayout.test.ts"
+    "lib/documents/bookletLayout.test.ts",
+    "scripts/standardRunnerSupport.test.ts"
   ]
 }
