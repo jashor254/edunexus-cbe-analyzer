@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { ChevronLeft, Copy, Printer, Check } from 'lucide-react'
+import { displaySchemeGrade, schemeGradeFieldLabel } from '@/lib/curriculum/displaySchemeGrade'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -148,7 +149,7 @@ export default function BookletClient({
             <ChevronLeft className="w-4 h-4" /> Back
           </Link>
           <span className="text-gray-900 font-semibold text-sm truncate">
-            {scheme.learning_area} · Grade {scheme.grade} · Term {scheme.term}
+            {scheme.learning_area} · {displaySchemeGrade(scheme.grade)} · Term {scheme.term}
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -178,7 +179,7 @@ export default function BookletClient({
           <div className="grid grid-cols-2 gap-x-10 gap-y-5">
             <Field label="School"   value={toTitleCase(scheme.school)} />
             <Field label="Subject"  value={scheme.learning_area} />
-            <Field label="Grade"    value={`Grade ${scheme.grade}`} />
+            <Field label={schemeGradeFieldLabel(scheme.grade)} value={displaySchemeGrade(scheme.grade)} />
             <Field label="Teacher"  value={toTitleCase(scheme.teacher_name)} />
             <Field label="TSC No."  value={scheme.tsc_number} />
             <Field label="Term"     value={`Term ${scheme.term}`} />

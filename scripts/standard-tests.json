@@ -222,6 +222,8 @@
     "lib/ai/workflowAttribution.test.ts",
     "lib/sow/promptGradeLabel.test.ts",
     "lib/lessonPlan/reflectionPrompt.test.ts",
-    "lib/documents/bulkExportPdf.test.ts"
+    "lib/documents/bulkExportPdf.test.ts",
+    "lib/curriculum/displaySchemeGrade.test.ts",
+    "lib/curriculum/bookletGradeLabel.test.ts"
   ]
 }
