@@ -297,7 +297,11 @@ export async function generateLessonPlan(
   for (let attempt = 0; attempt < 3; attempt++) {
     let raw: string
     try {
-      raw = await callAI(prompt, LESSON_PLAN_SYSTEM, { temperature: 0.3, maxTokens: 2000, costContext: ctx.costContext, feature: 'lesson_plan_generate' })
+      raw = await callAI(prompt, LESSON_PLAN_SYSTEM, {
+        temperature: 0.3, maxTokens: 2000, costContext: ctx.costContext, feature: 'lesson_plan_generate',
+        // Telemetry only: groups a week's plans and numbers malformed-output retries.
+        callSite: 'lesson_plan.lesson', correlationId: ctx.correlationId, workflowAttempt: attempt + 1,
+      })
     } catch (err: unknown) {
       // Provider failure: callDeepSeek already retried and fell back — a
       // further attempt would repeat that whole chain. Malformed or

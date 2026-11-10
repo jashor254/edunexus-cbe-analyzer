@@ -130,6 +130,7 @@ async function generateMissingWeekPlans(
         learningResources: lesson.learningResources,
         assessmentMethods: lesson.assessmentMethods,
         costContext,
+        correlationId: `${sow.id}:week:${weekNumber}`,
       }
       const plan = await generateLessonPlan(ctx)
       return { plan, lesson }
