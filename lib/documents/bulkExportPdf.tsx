@@ -103,7 +103,9 @@ const S = StyleSheet.create({
   colSub: { width: '18%' },
   colOut: { width: '30%' },
   colRes: { width: '22%' },
-  lpCard:  { border: 1, borderColor: C.border, borderRadius: 6, padding: 14, marginBottom: 12 },
+  // @react-pdf/renderer does not accept the CSS `border` shorthand with a bare number
+  // ("Invalid border style: 1"); width and style are given explicitly.
+  lpCard:  { borderWidth: 1, borderStyle: 'solid', borderColor: C.border, borderRadius: 6, padding: 14, marginBottom: 12 },
   lpMeta:      { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 },
   lpMetaItem:  { marginRight: 20, marginBottom: 4 },
   lpMetaLabel: { fontSize: 7, color: C.slate, fontWeight: 'bold' },
