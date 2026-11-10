@@ -1,6 +1,6 @@
 // lib/ai/usageTelemetry.test.ts
 //
-// Phase 3 (2026-11-10) — AI cost telemetry. Proves the usage log records the
+// AI cost telemetry. Proves the usage log records the
 // provider's own fields (cache hits, reasoning tokens, served model), keeps
 // "not reported" (null) distinct from zero, attributes calls to a workflow
 // and its retries, and never carries prompt/completion text or identifiers.

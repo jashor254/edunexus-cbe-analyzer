@@ -1,6 +1,6 @@
 // lib/ai/workflowAttribution.test.ts
 //
-// Phase 3 (2026-11-10): the Scheme of Work and lesson-plan generators attribute
+// The Scheme of Work and lesson-plan generators attribute
 // every AI request to its workflow (a job / scheme+week id), number their own
 // validation retries, and change NOTHING else about the request.
 //

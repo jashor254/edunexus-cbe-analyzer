@@ -1,6 +1,6 @@
 // lib/lessonPlan/reflectionPrompt.test.ts
 //
-// Phase 3 small optimisation A (2026-11-10): the lesson-plan reflection prompt
+// Small prompt optimisation: the lesson-plan reflection prompt
 // is fully determined by the lesson's outcomes, so the model is no longer asked
 // to echo it. These tests pin that (1) the stored text is byte-identical to
 // what the prompt used to demand, (2) every field that carries unique

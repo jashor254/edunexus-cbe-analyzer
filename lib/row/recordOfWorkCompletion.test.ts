@@ -1,8 +1,6 @@
 // lib/row/recordOfWorkCompletion.test.ts
 //
-// Regression tests for the Record of Work completion semantics
-// (docs/audits/teacher-workflow-cost-audit-2026-11-10 — Phase 2 defect R-1/R-2,
-// Phase 3 workstream 2).
+// Regression tests for the Record of Work completion semantics.
 //
 // The defect: the printed footer read "N of N lessons recorded" before any
 // lesson had been taught, because "recorded" was computed from the Work Done

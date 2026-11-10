@@ -18,7 +18,7 @@
 //   retry / fallback — `attempt > 1`; `provider` shows which one answered
 // A workflow-level id (e.g. a SOW job) can be threaded via `correlation_id`.
 //
-// Cost fields (Phase 3, 2026-11-10): cache-hit / cache-miss tokens and
+// Cost fields: cache-hit / cache-miss tokens and
 // reasoning tokens are recorded exactly as the provider reports them. Every
 // optional measurement is `null` when the provider did not report it — never
 // 0 — so "missing" and "zero" stay distinguishable. `cache_write_tokens` is
