@@ -55,7 +55,7 @@ test('ROW-C-001 all lessons only planned: footer must not claim any lesson is re
   const html = generateROWHTML(row([entry(1, null), entry(2, null), entry(3, null)]))
   const f = footer(html)
   assert.doesNotMatch(f, /3 of 3/)
-  assert.match(f, /No lessons taught and recorded yet — 3 planned/)
+  assert.match(f, /^No lessons recorded as taught yet\. 3 lessons planned\.$/)
 })
 
 test('ROW-C-002 no lesson taught: every Work Done cell is labelled Planned', () => {
@@ -67,7 +67,7 @@ test('ROW-C-002 no lesson taught: every Work Done cell is labelled Planned', () 
 
 test('ROW-C-003 partly taught: only teacher-dated lessons count and read as done', () => {
   const html = generateROWHTML(row([entry(1, '2026-02-03'), entry(2, null), entry(3, null)]))
-  assert.equal(footer(html), '1 of 3 lessons taught and recorded — the rest are planned')
+  assert.equal(footer(html), '1 of 3 lessons recorded as taught. 2 remaining lessons are planned.')
   const planned = html.match(/<span class="planned-tag">/g) ?? []
   assert.equal(planned.length, 2, 'the dated lesson is not labelled Planned')
   assert.match(html, /<td class="col-work">Plan step for lesson 1<\/td>/)
@@ -85,7 +85,7 @@ test('ROW-C-004 missing / blank dates never imply completion', () => {
 
 test('ROW-C-005 all lessons taught: footer states every lesson, no planned labels', () => {
   const html = generateROWHTML(row([entry(1, '2026-02-03'), entry(2, '2026-02-05')]))
-  assert.equal(footer(html), '2 of 2 lessons taught and recorded — the rest are planned')
+  assert.equal(footer(html), 'All 2 lessons recorded as taught.')
   assert.doesNotMatch(html, /<span class="planned-tag">/)
 })
 
@@ -95,12 +95,12 @@ test('ROW-C-006 existing records: a legacy "completed" status without a date is 
   // as taught.
   const legacy = { ...entry(1, null), status: 'completed' } as Entry
   const html = generateROWHTML(row([legacy]))
-  assert.match(footer(html), /No lessons taught and recorded yet — 1 planned/)
+  assert.match(footer(html), /^No lessons recorded as taught yet\. 1 lesson planned\.$/)
   assert.match(html, /<span class="planned-tag">/)
 })
 
 test('ROW-C-007 empty record and empty Work Done never print a bare "Planned:"', () => {
-  assert.equal(footer(generateROWHTML(row([]))), 'No lessons in this record yet')
+  assert.equal(footer(generateROWHTML(row([]))), 'No lessons in this record yet.')
   const html = generateROWHTML(row([entry(1, null, '   ')]))
   assert.doesNotMatch(html, /<span class="planned-tag">/)
   assert.deepEqual(describeWorkDone('', false, 'en'), { text: '', planned: false, prefix: '' })
@@ -114,9 +114,9 @@ test('ROW-C-008 planned text is HTML-escaped', () => {
 
 test('ROW-C-009 Kiswahili record uses Kiswahili wording', () => {
   const html = generateROWHTML(row([entry(1, null), entry(2, '2026-02-03')], 'Kiswahili'))
-  assert.match(footer(html), /Masomo 1 kati ya 2 yamefundishwa na kurekodiwa — mengine yamepangwa/)
+  assert.equal(footer(html), 'Kipindi 1 kati ya 2 kimerekodiwa kuwa kimefundishwa. Kipindi 1 kilichobaki kimepangwa.')
   assert.match(html, /Imepangwa: /)
-  assert.match(progressStatement('sw', 0, 5), /Hakuna somo lililorekodiwa bado — masomo 5 yamepangwa/)
+  assert.equal(progressStatement('sw', 0, 5), 'Hakuna kipindi kilichorekodiwa kuwa kimefundishwa bado. Vipindi 5 vimepangwa.')
 })
 
 test('ROW-C-010 export consistency: bulk-PDF cell follows the same rule as the single download', () => {
@@ -139,7 +139,63 @@ test('ROW-C-011 footer counts never exceed the total', () => {
     for (let done = 0; done <= total; done++) {
       const s = progressStatement('en', done, total)
       assert.ok(s.length > 0)
-      if (total > 0 && done === total) assert.match(s, new RegExp(`^${total} of ${total} lessons taught and recorded`))
+      if (total > 0 && done === total) assert.match(s, total === 1 ? /^1 lesson recorded as taught\.$/ : new RegExp(`^All ${total} lessons recorded as taught[.]$`))
     }
   }
+})
+
+test('ROW-C-012 footer wording: zero, one, several, one remaining, all (EN + SW)', () => {
+  const cases: Array<[number, number, string, string]> = [
+    [0, 0, 'No lessons in this record yet.', 'Hakuna vipindi kwenye rekodi hii bado.'],
+    [0, 24, 'No lessons recorded as taught yet. 24 lessons planned.', 'Hakuna kipindi kilichorekodiwa kuwa kimefundishwa bado. Vipindi 24 vimepangwa.'],
+    [1, 24, '1 of 24 lessons recorded as taught. 23 remaining lessons are planned.', 'Kipindi 1 kati ya 24 kimerekodiwa kuwa kimefundishwa. Vipindi 23 vilivyobaki vimepangwa.'],
+    [5, 24, '5 of 24 lessons recorded as taught. 19 remaining lessons are planned.', 'Vipindi 5 kati ya 24 vimerekodiwa kuwa vimefundishwa. Vipindi 19 vilivyobaki vimepangwa.'],
+    [23, 24, '23 of 24 lessons recorded as taught. 1 remaining lesson is planned.', 'Vipindi 23 kati ya 24 vimerekodiwa kuwa vimefundishwa. Kipindi 1 kilichobaki kimepangwa.'],
+    [24, 24, 'All 24 lessons recorded as taught.', 'Vipindi vyote 24 vimerekodiwa kuwa vimefundishwa.'],
+  ]
+  for (const [done, total, en, sw] of cases) {
+    assert.equal(progressStatement('en', done, total), en)
+    assert.equal(progressStatement('sw', done, total), sw)
+  }
+  // the first sentence matches the founder-approved strings exactly
+  assert.ok(progressStatement('sw', 1, 24).startsWith('Kipindi 1 kati ya 24 kimerekodiwa kuwa kimefundishwa.'))
+  assert.ok(progressStatement('sw', 5, 24).startsWith('Vipindi 5 kati ya 24 vimerekodiwa kuwa vimefundishwa.'))
+})
+
+test('ROW-C-013 no remaining-planned clause when nothing remains; no verification claims', () => {
+  for (const lang of ['en', 'sw'] as const) {
+    for (const total of [1, 2, 24]) {
+      const s = progressStatement(lang, total, total)
+      assert.doesNotMatch(s, /planned|remaining|zilizobaki|vilivyobaki|kilichobaki|vimepangwa|kimepangwa/i)
+    }
+    for (let done = 0; done <= 3; done++) {
+      assert.doesNotMatch(progressStatement(lang, done, 3), /verified|imethibitishwa|vimethibitishwa/i)
+    }
+  }
+})
+
+test('ROW-C-014 date rule: date without reflection counts, reflection without date does not', () => {
+  const dateOnly = { ...entry(1, '2026-02-03'), reflection: '' }
+  const reflectionOnly = { ...entry(2, null), reflection: 'Went well' }
+  assert.equal(countConfirmed([dateOnly, reflectionOnly]), 1)
+  const html = generateROWHTML(row([dateOnly, reflectionOnly]))
+  assert.equal(footer(html), '1 of 2 lessons recorded as taught. 1 remaining lesson is planned.')
+})
+
+test('ROW-C-015 editor print view and PDFs share one rule; unrelated labels unchanged', async () => {
+  const { readFileSync } = await import('node:fs')
+  const page = readFileSync('app/teacher/record-of-work/?id?/page.tsx'.replace('?id?', '[id]'), 'utf8')
+  assert.match(page, /countConfirmed\(entries\)/)
+  assert.match(page, /progressStatement\('sw', recorded, total\)/)
+  assert.match(page, /progressStatement\('en', recorded, total\)/)
+  // the print status no longer derives from reflections
+  assert.doesNotMatch(page, /status: `.*\$\{done\}/)
+  // on-screen counts remain explicitly labelled as reflection counts
+  assert.match(page, /lessons with reflections/)
+  const booklet = readFileSync('app/teacher/booklet/[scheme_id]/BookletClient.tsx', 'utf8')
+  assert.match(booklet, /progressStatement\('en', taughtLessons, totalLessons\)/)
+  // title and column labels are untouched
+  assert.match(page, /Rekodi ya Kazi Iliyofunzwa/)
+  assert.match(page, /Wiki \/ Somo/)
+  assert.match(generateROWHTML(row([entry(1, null)], 'Kiswahili')), /REKODI YA KAZI ILIYOFUNZWA/)
 })

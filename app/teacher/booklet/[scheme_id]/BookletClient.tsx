@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { ChevronLeft, Copy, Printer, Check } from 'lucide-react'
+import { progressStatement } from '@/lib/row/completion'
 import { displaySchemeGrade, schemeGradeFieldLabel } from '@/lib/curriculum/displaySchemeGrade'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -284,7 +285,7 @@ export default function BookletClient({
 
         {/* Footer */}
         <p className="text-xs text-gray-400 italic text-center mt-4 pt-3 border-t border-gray-100 mb-2">
-          Record continues as lessons are completed — {taughtLessons} of {totalLessons} lessons recorded this term
+          {progressStatement('en', taughtLessons, totalLessons)}
         </p>
       </div>
     </>

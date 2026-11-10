@@ -45,23 +45,44 @@ export function plannedPrefix(lang: RecordOfWorkLanguage): string {
 }
 
 /**
- * The footer sentence under a Record of Work. States only what is known:
- * how many lessons the teacher has confirmed, out of how many are planned.
- * (Kiswahili wording needs native-speaker review before relying on it.)
+ * The footer sentence under a Record of Work. States only what the teacher has
+ * recorded: how many lessons carry a date taught, out of how many are in the
+ * record — "recorded as taught", never "verified". A sentence about the lessons
+ * that remain is added only while some remain.
+ *
+ * Kiswahili uses kipindi/vipindi (noun classes 7/8) for a lesson session, so
+ * the verb agreement is ki-/vi-.
  */
 export function progressStatement(lang: RecordOfWorkLanguage, confirmed: number, total: number): string {
+  const remaining = Math.max(total - confirmed, 0)
   if (lang === 'sw') {
-    if (total === 0) return 'Hakuna masomo kwenye rekodi hii bado'
+    if (total === 0) return 'Hakuna vipindi kwenye rekodi hii bado.'
     if (confirmed === 0) {
-      return `Hakuna somo lililorekodiwa bado — masomo ${total} yamepangwa. Tarehe huandikwa masomo yanapofunzwa.`
+      const planned = total === 1 ? 'Kipindi 1 kimepangwa.' : `Vipindi ${total} vimepangwa.`
+      return `Hakuna kipindi kilichorekodiwa kuwa kimefundishwa bado. ${planned}`
     }
-    return `Masomo ${confirmed} kati ya ${total} yamefundishwa na kurekodiwa — mengine yamepangwa`
+    if (remaining === 0) {
+      return total === 1
+        ? 'Kipindi 1 kimerekodiwa kuwa kimefundishwa.'
+        : `Vipindi vyote ${total} vimerekodiwa kuwa vimefundishwa.`
+    }
+    const done = confirmed === 1
+      ? `Kipindi 1 kati ya ${total} kimerekodiwa kuwa kimefundishwa.`
+      : `Vipindi ${confirmed} kati ya ${total} vimerekodiwa kuwa vimefundishwa.`
+    const left = remaining === 1
+      ? 'Kipindi 1 kilichobaki kimepangwa.'
+      : `Vipindi ${remaining} vilivyobaki vimepangwa.`
+    return `${done} ${left}`
   }
-  if (total === 0) return 'No lessons in this record yet'
+  if (total === 0) return 'No lessons in this record yet.'
   if (confirmed === 0) {
-    return `No lessons taught and recorded yet — ${total} planned. Dates are filled in as lessons are taught.`
+    return `No lessons recorded as taught yet. ${total} ${total === 1 ? 'lesson' : 'lessons'} planned.`
   }
-  return `${confirmed} of ${total} lessons taught and recorded — the rest are planned`
+  if (remaining === 0) {
+    return total === 1 ? '1 lesson recorded as taught.' : `All ${total} lessons recorded as taught.`
+  }
+  const left = remaining === 1 ? '1 remaining lesson is planned.' : `${remaining} remaining lessons are planned.`
+  return `${confirmed} of ${total} lessons recorded as taught. ${left}`
 }
 
 /**
