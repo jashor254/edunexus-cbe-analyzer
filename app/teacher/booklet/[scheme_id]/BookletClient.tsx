@@ -204,7 +204,7 @@ export default function BookletClient({
 
         {/* SECTION 4 — Live table */}
         <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
-          <table className="booklet-table w-full border-collapse text-sm">
+          <table className="booklet-table w-full border-collapse text-sm" style={{ overflowWrap: 'anywhere' }}>
             <thead>
               <tr className="bg-gray-900 text-white">
                 <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wide border-r border-gray-700" style={{ width: '8%' }}>Date</th>
@@ -243,7 +243,8 @@ export default function BookletClient({
                       opacity: isTaught ? 1 : 0.6,
                     }}
                   >
-                    <td className="px-3 py-3 text-xs align-top border-r border-gray-100">
+                    {/* a date never breaks mid-number, even though text cells wrap anywhere */}
+                    <td className="px-3 py-3 text-xs align-top border-r border-gray-100" style={{ overflowWrap: 'normal', whiteSpace: 'nowrap' }}>
                       {isTaught && lesson.date_taught
                         ? <span className="font-medium">{formatDate(lesson.date_taught)}</span>
                         : <span className="text-gray-300 italic">dd/mm/yyyy</span>

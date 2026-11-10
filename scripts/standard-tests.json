@@ -224,6 +224,9 @@
     "lib/lessonPlan/reflectionPrompt.test.ts",
     "lib/documents/bulkExportPdf.test.ts",
     "lib/curriculum/displaySchemeGrade.test.ts",
-    "lib/curriculum/bookletGradeLabel.test.ts"
+    "lib/curriculum/bookletGradeLabel.test.ts",
+    "lib/row/rowPrintLayout.test.ts",
+    "lib/documents/bulkExportLayout.test.ts",
+    "lib/documents/bookletLayout.test.ts"
   ]
 }

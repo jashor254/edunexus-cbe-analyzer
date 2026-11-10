@@ -163,21 +163,28 @@ const CSS = `
 
   /* ── ROW table ── */
   .row-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .col-date   { width: 20mm; }
-  .col-strand { width: 32mm; }
-  .col-sub    { width: 32mm; }
-  .col-work   { width: 52mm; }
-  .col-ref    { width: 22mm; }
-  .col-sig    { width: 22mm; }
+  /* Percentages that total 100% so the table always fits the space it is given.
+     The previous fixed millimetres totalled 180mm inside a 150mm print area
+     (15mm page margin + 15mm wrapper padding on each side) and ran past the margin. */
+  .col-date   { width: 13%; }
+  .col-strand { width: 16%; }
+  .col-sub    { width: 16%; }
+  .col-work   { width: 30%; }
+  .col-ref    { width: 13%; }
+  .col-sig    { width: 12%; }
+  .page-wrap  { padding: 15mm; }
 
   thead tr { background: #1e293b; color: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   th {
-    padding: 7px 6px; text-align: left; font-size: 9pt; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid #334155;
+    padding: 7px 4px; text-align: left; font-size: 8.5pt; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.2px; border: 1px solid #334155;
+    overflow-wrap: anywhere;
   }
   td {
-    padding: 6px 6px; border: 1px solid #cbd5e1; vertical-align: top;
+    padding: 6px 5px; border: 1px solid #cbd5e1; vertical-align: top;
     font-size: 10pt; line-height: 1.45; min-height: 50px;
+    /* a long unbroken word wraps inside its own cell instead of running into the next column */
+    overflow-wrap: anywhere; word-break: break-word;
   }
   tr.alt td { background: #f8fafc; }
   .center { text-align: center; }
@@ -189,7 +196,7 @@ const CSS = `
   /* ── Status + Footer ── */
   .row-status {
     margin-top: 12px; padding-top: 8px; border-top: 1px solid #E5E7EB;
-    font-size: 8pt; color: #9CA3AF; font-style: italic; text-align: center;
+    font-size: 9pt; color: #4B5563; font-style: italic; text-align: center;
   }
   .footer { margin-top: 6px; font-size: 8pt; color: #94a3b8; text-align: right; }
 
@@ -198,6 +205,8 @@ const CSS = `
     .no-print { display: none !important; }
     @page { size: A4 portrait; margin: 15mm; }
     body { font-size: 10pt; }
+    /* @page already supplies the 15mm margin; the on-screen wrapper padding must not be added again */
+    .page-wrap { padding: 0; }
     thead tr { background: #1e293b !important; color: #fff !important;
                -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     tr { page-break-inside: avoid; }
@@ -224,7 +233,7 @@ export function generateROWHTML(row: RecordOfWork): string {
       Print / Save as PDF
     </button>
   </div>
-  <div style="padding:15mm;">
+  <div class="page-wrap">
     ${body}
   </div>
 </body>
