@@ -454,6 +454,128 @@ jobs:
         if: always()
         run: supabase stop
 
+  # ── TEACHER_WORKFLOW — Record of Work / SOW generation integration ───────────
+  # Runs the four suites that pin the teacher document and scheme-of-work
+  # workflow (scripts/integration/teacher-workflow-tests.json: 34 + 11 + 6 + 6
+  # = 57 cases) against a disposable local Supabase and an isolated Next
+  # server. Generation is answered by scripts/integration/deepseek-stub.mjs,
+  # preloaded into that server only: no paid request is made, any other
+  # outside destination is blocked, and the runner fails the job if the stub
+  # never answered, blocked something, or any case was skipped or miscounted.
+  # Separate job and Supabase instance from http-pr (no shared state).
+  teacher-workflow-integration:
+    name: TEACHER_WORKFLOW
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+
+      # Empty stack; db:bootstrap:test builds the schema (see http-pr).
+      - name: Start local Supabase
+        env:
+          SUPABASE_DB_MIGRATIONS_ENABLED: 'false'
+          SUPABASE_DB_SEED_ENABLED: 'false'
+        run: supabase start
+
+      - name: Deterministic local bootstrap
+        run: npm run db:bootstrap:test
+
+      - name: Resolve local anon/service-role keys
+        run: |
+          node -e "
+            const s = JSON.parse(require('child_process').execSync('supabase status -o json').toString());
+            const fs = require('fs');
+            fs.appendFileSync(process.env.GITHUB_ENV,
+              'LOCAL_ANON_KEY=' + (s.ANON_KEY || s.anon_key) + '\n' +
+              'LOCAL_SERVICE_ROLE_KEY=' + (s.SERVICE_ROLE_KEY || s.service_role_key) + '\n');
+          "
+
+      - name: Preflight — verify local, non-production target
+        env:
+          TEST_SUPABASE_URL: 'http://127.0.0.1:54321'
+          TEST_SUPABASE_PROJECT_REF: 'local-docker'
+          TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
+        run: npx tsx scripts/check-test-target.ts
+
+      - name: Build Next with isolated local env
+        run: |
+          env -i PATH="$PATH" HOME="$HOME" \
+            NEXT_PUBLIC_SUPABASE_URL="http://127.0.0.1:54321" \
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$LOCAL_ANON_KEY" \
+            SUPABASE_SECRET_KEY="$LOCAL_SERVICE_ROLE_KEY" \
+            RESEND_API_KEY="ci-unset" \
+            npx next build
+
+      # The server gets only local Supabase values, a fake provider key (the
+      # stub rejects any other) and the stub itself. No real secret exists in
+      # this job to leak into it.
+      - name: Start Next (isolated local env, DeepSeek stubbed)
+        run: |
+          env -i PATH="$PATH" HOME="$HOME" \
+            NEXT_PUBLIC_SUPABASE_URL="http://127.0.0.1:54321" \
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$LOCAL_ANON_KEY" \
+            SUPABASE_SECRET_KEY="$LOCAL_SERVICE_ROLE_KEY" \
+            RESEND_API_KEY="ci-unset" \
+            DEEPSEEK_AI_API_KEY="stub-not-a-real-key" \
+            NEXT_TELEMETRY_DISABLED="1" \
+            STUB_LOG="$RUNNER_TEMP/provider-stub.log" \
+            STUB_ALLOWED_PORTS="54321,3100" \
+            NODE_OPTIONS="--import $GITHUB_WORKSPACE/scripts/integration/deepseek-stub.mjs" \
+            npx next start -p 3100 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3100/api/health && break
+            sleep 1
+          done
+          curl -sf http://localhost:3100/api/health
+
+      - name: SAFE-009 — server/test target equality
+        env:
+          TEST_SUPABASE_URL: 'http://127.0.0.1:54321'
+          TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
+          TEST_BASE_URL: 'http://localhost:3100'
+        run: bash scripts/check-http-target-equality.sh
+
+      - name: TEACHER_WORKFLOW manifest (expect 57/57, 0 skipped)
+        env:
+          TEST_SUPABASE_URL: 'http://127.0.0.1:54321'
+          TEST_SUPABASE_PROJECT_REF: 'local-docker'
+          TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321'
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ env.LOCAL_ANON_KEY }}
+          SUPABASE_SECRET_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: 'ci-unset'
+          TEST_BASE_URL: 'http://localhost:3100'
+          STUB_LOG: ${{ runner.temp }}/provider-stub.log
+        run: node scripts/run-teacher-workflow-integration.mjs
+
+      - name: Cleanup gate — dry-run reaper, expect 0 residual
+        run: |
+          OUT=$(bash scripts/bootstrap-local-db/reap-synthetic-fixtures.sh)
+          echo "$OUT"
+          if echo "$OUT" | grep -qE '^[1-9][0-9]*$'; then
+            echo "::error::Residual synthetic rows detected after TEACHER_WORKFLOW — a test leaked state."
+            exit 1
+          fi
+
+      - name: Stop Next
+        if: always()
+        run: fuser -k 3100/tcp || true
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop
+
   # ── HTTP_MAIN — broader authenticated route coverage, main-branch cadence ────
   # Phase H1E-B. Same local-only model as http-pr — separate job/Supabase
   # instance, own bootstrap, own isolated Next server. Runs after merge
