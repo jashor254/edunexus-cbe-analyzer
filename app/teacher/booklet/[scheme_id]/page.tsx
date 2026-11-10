@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import BookletClient from './BookletClient'
 import type { BookletLesson, BookletScheme, BreakItem } from './BookletClient'
+import { isTeacherConfirmed } from '@/lib/row/completion'
 
 export default async function BookletPage({
   params,
@@ -74,7 +75,9 @@ export default async function BookletPage({
       date_taught:        entry?.date_taught ?? null,
       activities_summary: Array.isArray(entry?.activities_summary) ? entry.activities_summary : null,
       reflection:         entry?.reflection ?? null,
-      is_taught:          !!entry,
+      // Taught means the teacher recorded a date — a seeded row_entries row
+      // only means the lesson is PLANNED (lib/row/completion.ts).
+      is_taught:          isTeacherConfirmed(entry),
     }
   })
 

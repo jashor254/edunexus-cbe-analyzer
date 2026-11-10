@@ -6,6 +6,7 @@ import { esc } from '@/lib/pdf/utils'
 import { toTitleCase } from '@/lib/utils/formatters'
 import type { CurriculumMode } from '@/lib/sow/types'
 import { isKiswahiliSubject } from '@/lib/curriculum/subjectUtils'
+import { countConfirmed, describeWorkDone, isTeacherConfirmed, progressStatement } from './completion'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -49,6 +50,13 @@ function fmtTerm(term: number | string, isKiswahili: boolean): string {
   return s.toLowerCase().startsWith('term') ? s : `Term ${s}`
 }
 
+function workDoneCell(e: ROWEntry, lang: 'en' | 'sw'): string {
+  const w = describeWorkDone(e.work_done, isTeacherConfirmed(e), lang)
+  return w.planned
+    ? `<span class="planned"><span class="planned-tag">${esc(w.prefix)}</span>${esc(w.text)}</span>`
+    : esc(w.text)
+}
+
 // ─── HTML builder ─────────────────────────────────────────────────────────────
 
 function buildPage(row: RecordOfWork): string {
@@ -58,8 +66,11 @@ function buildPage(row: RecordOfWork): string {
   const term        = fmtTerm(row.term, sw)
   const is844       = row.curriculumMode === '844_form3' || row.curriculumMode === '844_form4'
 
-  const done  = row.entries.filter(e => e.work_done?.trim()).length
+  // "Recorded" means the TEACHER confirmed it was taught (a date_taught) —
+  // never that a plan exists. See lib/row/completion.ts.
+  const done  = countConfirmed(row.entries)
   const total = row.entries.length
+  const lang  = sw ? 'sw' : 'en'
 
   // TSC-standard Kiswahili terms, not literal translations — same
   // convention as getColumnConfig (lib/sow/pdfRenderer.ts) and the lesson
@@ -71,7 +82,7 @@ function buildPage(row: RecordOfWork): string {
         teacher: 'Mwalimu:', term: 'Muhula:', year: 'Mwaka:',
         date: 'Tarehe', strand: is844 ? 'Mada' : 'Mada Kuu', subStrand: is844 ? 'Mada Ndogo' : 'Mada Ndogo',
         workDone: 'Kazi Iliyofanywa', reflection: 'Maoni', signature: 'Sahihi',
-        status: (d: number, t: number) => `Rekodi inaendelea masomo yanapofunzwa — masomo ${d} kati ya ${t} yameandikwa`,
+        status: (d: number, t: number) => progressStatement('sw', d, t),
       }
     : {
         title: 'RECORD OF WORK COVERED',
@@ -79,7 +90,7 @@ function buildPage(row: RecordOfWork): string {
         teacher: 'Teacher:', term: 'Term:', year: 'Year:',
         date: 'Date', strand: is844 ? 'Topic' : 'Strand', subStrand: is844 ? 'Sub-Topic' : 'Sub-Strand',
         workDone: 'Work Done', reflection: 'Reflection', signature: 'Signature',
-        status: (d: number, t: number) => `Record continues as lessons are completed — ${d} of ${t} lessons recorded`,
+        status: (d: number, t: number) => progressStatement('en', d, t),
       }
 
   const bodyRows = row.entries.map((e, i) => `
@@ -87,7 +98,7 @@ function buildPage(row: RecordOfWork): string {
       <td class="col-date">${fmtDate(e.date_taught)}</td>
       <td class="col-strand">${esc(e.strand)}</td>
       <td class="col-sub">${esc(e.sub_strand)}</td>
-      <td class="col-work">${esc(e.work_done)}</td>
+      <td class="col-work">${workDoneCell(e, lang)}</td>
       <td class="col-ref">${esc(e.reflection)}</td>
       <td class="col-sig"></td>
     </tr>`
@@ -172,6 +183,8 @@ const CSS = `
   .center { text-align: center; }
   .sub { font-size: 8pt; color: #64748b; }
   .placeholder { color: #9CA3AF; font-style: italic; }
+  .planned { color: #6B7280; font-style: italic; }
+  .planned-tag { font-weight: 700; font-style: normal; }
 
   /* ── Status + Footer ── */
   .row-status {

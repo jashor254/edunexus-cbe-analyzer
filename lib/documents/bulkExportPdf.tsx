@@ -8,6 +8,7 @@ import {
 } from '@react-pdf/renderer'
 import type { LessonPlanRecord } from '@/lib/lessonPlan/types'
 import { workDoneFor, type StoredRecordOfWork } from '@/lib/row/recordOfWork'
+import { describeWorkDone, isTeacherConfirmed } from '@/lib/row/completion'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -328,6 +329,16 @@ function LPPages({ meta, plans }: { meta: SchemeMeta; plans: LessonPlanRecord[] 
   )
 }
 
+/**
+ * The Work Done cell text for one Record of Work entry. A lesson the teacher
+ * has not confirmed as taught shows its plan labelled "Planned:" — same rule
+ * as the single download (lib/row/pdfRenderer.ts), via lib/row/completion.ts.
+ */
+export function rowWorkDoneCell(e: StoredRecordOfWork['entries'][number]): string {
+  const w = describeWorkDone(workDoneFor(e).slice(0, 80), isTeacherConfirmed(e), 'en')
+  return w.text === '' ? '—' : `${w.prefix}${w.text}`
+}
+
 function ROWPage({ meta, row }: { meta: SchemeMeta; row: StoredRecordOfWork | null }) {
   if (!row || !row.entries.length) return null
 
@@ -371,7 +382,7 @@ function ROWPage({ meta, row }: { meta: SchemeMeta; row: StoredRecordOfWork | nu
             <Text style={[S.td, S.colStr]}>{e.strand}</Text>
             <Text style={[S.td, S.colSub]}>{e.substrand}</Text>
             <Text style={[S.td, { width: '24%' }]}>{joinBullets(e.learning_outcomes)}</Text>
-            <Text style={[S.td, { width: '16%' }]}>{workDoneFor(e).slice(0, 80) || '—'}</Text>
+            <Text style={[S.td, { width: '16%', ...(isTeacherConfirmed(e) ? {} : { color: C.muted }) }]}>{rowWorkDoneCell(e)}</Text>
             <Text style={[S.td, { width: '14%' }]}>{e.reflection}</Text>
           </View>
         ))}
