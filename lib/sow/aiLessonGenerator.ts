@@ -536,12 +536,12 @@ ${substrand.split(/[\s\-:,/()]+/).filter(w => w.length >= 4).slice(0, 3).join(',
   const learningResourcesEx = isKiswahili
     ? [
         textbook || `Kitabu cha ${learningArea} ${isCBC ? 'Gredi' : 'Kidato'} ${gradeNum}`,
-        `Mwongozo wa Mwalimu wa ${learningArea} ${isCBC ? 'Gredi' : 'Kidato'} ${grade}`,
+        `Mwongozo wa Mwalimu wa ${learningArea} ${isCBC ? 'Gredi' : 'Kidato'} ${gradeNum}`,
         '[chati / mchoro ubaoni / kipande cha gazeti / kifaa halisi]',
       ]
     : [
         textbook || `${learningArea} ${isCBC ? 'Grade' : 'Form'} ${gradeNum} Textbook`,
-        `Teacher's Guide for ${learningArea} ${isCBC ? 'Grade' : 'Form'} ${grade}`,
+        `Teacher's Guide for ${learningArea} ${isCBC ? 'Grade' : 'Form'} ${gradeNum}`,
         '[chart / blackboard diagram / newspaper cutout / real object]',
       ]
 
