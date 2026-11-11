@@ -7,16 +7,22 @@
 // run beside other suites or against anything but the disposable local stack.
 //
 //   source <env with TEST_SUPABASE_* + NEXT_PUBLIC_SUPABASE_* for the LOCAL stack>
-//   TEST_BASE_URL=http://127.0.0.1:3111 npx tsx --test scripts/security/shared-reports-failure-injection.ts
+//   DB_CONTAINER=supabase_db_pifp DISPOSABLE_TEST_DB=yes TEST_BASE_URL=http://127.0.0.1:3111 \
+//     npx tsx --test scripts/security/shared-reports-failure-injection.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createTestServiceClient } from '@/utils/supabase/test-service'
 import { signInForHttpTest, type SyntheticSession } from '@/lib/testing/httpAuthTestHelper'
 import { generateShareToken } from '@/lib/sharedReports/token'
+import { checkDisposableDb } from '@/lib/testing/disposableDbGuard'
 
 const BASE_URL = process.env.TEST_BASE_URL ?? 'http://127.0.0.1:3111'
-const CONTAINER = 'supabase_db_edunexus'
+// DESTRUCTIVE (REVOKE/GRANT): the target is never defaulted. DB_CONTAINER and
+// DISPOSABLE_TEST_DB=yes are required and checked by checkDisposableDb() before
+// anything runs; the development database is refused outside CI, and the API
+// URL the app uses must belong to the same stack as the container.
+const CONTAINER = process.env.DB_CONTAINER ?? ''
 const PASSWORD = `Test!${Math.random().toString(36).slice(2, 12)}`
 const db = createTestServiceClient()
 let userId = ''
@@ -28,7 +34,26 @@ function sql(statement: string) {
   execFileSync('docker', ['exec', '-i', CONTAINER, 'psql', '-U', 'postgres', '-d', 'postgres', '-X', '-v', 'ON_ERROR_STOP=1', '-c', statement], { stdio: 'pipe' })
 }
 
+function publishedApiPort(container: string): string | undefined {
+  try {
+    const stack = container.replace(/^supabase_db_/, '')
+    // e.g. "0.0.0.0:5521" — the host port serving this stack's API gateway.
+    const out = execFileSync('docker', ['port', `supabase_kong_${stack}`, '8000'], { encoding: 'utf8' })
+    return out.trim().split('\n')[0]?.split(':').pop()
+  } catch {
+    return undefined
+  }
+}
+
 before(async () => {
+  const guard = checkDisposableDb({
+    container: CONTAINER,
+    optIn: process.env.DISPOSABLE_TEST_DB,
+    ci: process.env.CI,
+    apiUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    stackApiPort: CONTAINER ? publishedApiPort(CONTAINER) : undefined,
+  })
+  if (guard.ok === false) throw new Error(`refusing to run destructive failure-injection: ${guard.reason}`)
   assert.match(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '', /127\.0\.0\.1|localhost/, 'local stack only')
   const email = `sharedfail-${Date.now()}@example.com`
   const { data, error } = await db.auth.admin.createUser({ email, password: PASSWORD, email_confirm: true })

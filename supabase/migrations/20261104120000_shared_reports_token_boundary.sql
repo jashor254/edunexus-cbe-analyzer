@@ -4,7 +4,6 @@
 -- PUBLIC SELECT policy "Anyone can read shared reports" USING (true), so any
 -- anonymous Data API caller could list every row — token, student_id, user_id,
 -- student_name, grade and the full report_data — without presenting a token.
--- Production was verified to carry the identical policy (0 rows at the time).
 --
 -- New boundary:
 --   * No table-level read for anon. Owners (authenticated) may read only their
@@ -25,8 +24,7 @@
 --
 -- Legacy tokens: the 12-hex-character (48-bit) format is RETIRED. The lookup
 -- accepts only the 32-character base64url format (192-bit, crypto.randomBytes(24));
--- any pre-existing row with another token length is revoked here (production had
--- 0 rows when verified) and a table CHECK stops any writer — including the
+-- any pre-existing row with another token length is revoked here (expected: none) and a table CHECK stops any writer — including the
 -- service role — from minting a weak token again.
 --
 -- Report-creation controls enforced by the database as well as the route:

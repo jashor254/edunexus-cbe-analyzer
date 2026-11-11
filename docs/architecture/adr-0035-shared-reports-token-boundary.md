@@ -6,7 +6,7 @@
 `public.shared_reports` carried `Anyone can read shared reports … USING (true)`. The
 unauthenticated share page (`/shared/[token]`) depended on it, so the table was
 enumerable by any anonymous Data API caller (names, grades, report payloads, tokens).
-Production verified identical (project `lpxrfbmzncaztpmyqzkc`, 0 rows).
+The deployed schema is expected to carry the same policy.
 
 ## Decision
 Bearer-token reads move off the table and behind a single database function,

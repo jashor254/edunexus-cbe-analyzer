@@ -3,11 +3,11 @@
 **Status (2026-11-04):** implemented, verified locally, PR open. **NOT applied to production, NOT deployed, NOT merged.**
 
 > **Update — production-boundary stabilization (same day).** (1) `POST /api/share/generate` is now **disabled (HTTP 410)** behind a code-pinned kill switch (`lib/sharedReports/generationGate.ts`): auth still runs first (401 for anonymous callers), then the gate, before any body read or database work; no record can be created. The creation controls in §3 remain as defence in depth for a future server-side generator. (2) The public page is **origin-aware**: client-supplied content reads "Shared via EduNexus · not verified by EduNexus" and the report date is the creation date; only `server_generated` rows keep the EduNexus-authorship wording (the RPC now returns `provenance`; unknown values are treated as the least authoritative). The expired notice no longer implies a parent-facing generator. (3) HTTP suite is now 22 tests (generation assertions became 410/no-record assertions; fixtures are written with the service client). (4) Supabase key names follow `docs/engineering/supabase-api-keys.md`. R13 (client-supplied content presented as EduNexus-generated) is **closed**.
-Production project `lpxrfbmzncaztpmyqzkc` was only read (catalog + aggregate counts) and never modified.
+No production system was modified while preparing this change.
 Finding source: deep security audit 2026-11-04 (DSA-01) · Decision record: [ADR-0035](../architecture/adr-0035-shared-reports-token-boundary.md).
 
 ## 1. The vulnerability and the boundary
-`public.shared_reports` carried a PUBLIC `SELECT … USING (true)` policy, so any anonymous Data API caller could list every report — token, student name, grade, full payload. Production had the identical policy (0 rows at verification).
+`public.shared_reports` carried a PUBLIC `SELECT … USING (true)` policy, so any anonymous Data API caller could list every report — token, student name, grade, full payload. The deployed schema is expected to carry the same policy.
 
 New boundary (one migration, `20261104120000_shared_reports_token_boundary.sql`):
 - `anon` has **no** privileges on the table; `authenticated` keeps owner-scoped `SELECT` and `DELETE` only (no direct INSERT/UPDATE/TRUNCATE).
@@ -20,7 +20,7 @@ Tokens are **32 base64url characters** from `crypto.randomBytes(24)` — **192 b
 
 Measured on 200,000 generated tokens: 200,000 unique; every token 32 chars; Shannon entropy **5.99999 bits/char**; worst per-position χ² 91.1 (df = 63; the 99.99th percentile is ≈103, so uniform); all 192 bits balanced; every token round-trips to exactly 24 bytes with canonical encoding. Enforced in CI by `lib/sharedReports/sharedReports.test.ts` (20,000-sample statistical test + a static check that only `randomBytes` is used).
 
-**Legacy 12-character (48-bit) tokens are retired.** Strict `^[A-Za-z0-9_-]{32}$` is enforced in four places that must change together: `lib/sharedReports/token.ts`, the lookup function, the `shared_reports_token_format` CHECK (stops any writer, service role included, from minting a weak token), and the revoke route. The migration also revokes any pre-existing non-32-char row (production: 0 rows, 0 legacy). Negative tests: unit, role-based SQL, and HTTP (legacy token cannot be stored; a legacy-format link is a 404).
+**Legacy 12-character (48-bit) tokens are retired.** Strict `^[A-Za-z0-9_-]{32}$` is enforced in four places that must change together: `lib/sharedReports/token.ts`, the lookup function, the `shared_reports_token_format` CHECK (stops any writer, service role included, from minting a weak token), and the revoke route. The migration also revokes any pre-existing non-32-char row (none expected). Negative tests: unit, role-based SQL, and HTTP (legacy token cannot be stored; a legacy-format link is a 404).
 
 ## 3. Report-creation controls (`POST /api/share/generate`)
 This route has **no first-party UI caller** (documented orphan in the Sprint 13 / Release Gate 1 audits), so its input is treated as untrusted.

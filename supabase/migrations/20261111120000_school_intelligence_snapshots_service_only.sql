@@ -2,12 +2,11 @@
 --
 -- Closes the public read on public.school_intelligence_snapshots.
 --
--- Observed production state (read-only catalog check, 2026-11-11): RLS enabled;
--- ONE policy "teachers_read_school_snapshots" FOR SELECT TO public USING (true);
--- anon and authenticated hold table-level privileges (Supabase defaults).
--- Any anonymous Data API caller could therefore list every school's weekly
--- aggregates (at-risk/critical counts, top struggling sub-strands, capability
--- averages) keyed by school_id. The table had 0 rows when verified.
+-- Deployed databases may carry a permissive SELECT policy for role public
+-- ("teachers_read_school_snapshots", USING (true)) while anon and authenticated
+-- hold table-level privileges (Supabase defaults). That would let any Data API
+-- caller list weekly school-level aggregates (at-risk/critical counts, top
+-- struggling sub-strands, capability averages) keyed by school_id.
 --
 -- POLICY DRIFT: no file in this repository creates "teachers_read_school_snapshots".
 -- The repository's own definition (20260628_eios_foundation.sql) is
@@ -32,8 +31,8 @@
 -- migration if any policy remains, if a browser role keeps a privilege, or if
 -- service_role lost access.
 --
--- Rollback (INSECURE — re-opens public read of school aggregates; use only to
--- restore the previous production state in an emergency, prefer fix-forward):
+-- Rollback (INSECURE — re-opens public read of school aggregates; prefer
+-- fix-forward and use only with explicit approval):
 --   CREATE POLICY "teachers_read_school_snapshots"
 --     ON public.school_intelligence_snapshots FOR SELECT USING (true);
 --   GRANT SELECT ON public.school_intelligence_snapshots TO anon, authenticated;

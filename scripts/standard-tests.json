@@ -72,6 +72,7 @@
     "utils/supabase/publishableKey.test.ts",
     "components/layout/RedactedAnalytics.test.ts",
     "lib/sharedReports/sharedReports.test.ts",
+    "lib/testing/disposableDbGuard.test.ts",
     "lib/sow/kicdGrounding.test.ts",
     "lib/sow/aiLessonGenerator.grounded.test.ts",
     "lib/curriculum/kicdVocabulary.test.ts",
