@@ -20,6 +20,8 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound, apiBadRequest } from '@/lib/api/response'
+import { isChildDataAIPaused } from '@/lib/ai/childDataPolicy'
+import { apiChildDataAIPaused } from '@/lib/api/childDataAIResponse'
 import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissions'
 import { ResourceOwnershipError, UnauthorizedError } from '@/lib/core/errors'
 import { isAllowedUploadType } from '@/lib/config/uploads'
@@ -52,6 +54,10 @@ export async function POST(
       if (err instanceof UnauthorizedError) return apiUnauthorized()
       throw err
     }
+
+    // Containment: photographed learner pages must not reach an AI provider while eligibility is
+    // unresolved. After authentication, before any storage read or provider request.
+    if (isChildDataAIPaused()) return apiChildDataAIPaused()
 
     const parsed = RequestSchema.safeParse(await req.json())
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')

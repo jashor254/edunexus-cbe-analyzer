@@ -28,6 +28,18 @@ let visionShouldThrow = false
 class FakeUnauthorizedError extends Error {}
 class FakeResourceOwnershipError extends Error {}
 
+let paused = false
+// Both states of the containment switch are exercised here. The real module is pinned OFF
+// (lib/ai/childDataPolicy.test.ts).
+mock.module('@/lib/ai/childDataPolicy', {
+  namedExports: {
+    isChildDataAIPaused: () => paused,
+    CHILD_DATA_AI_PAUSED_CODE: 'AI_FEATURE_PAUSED_FOR_REVIEW',
+    CHILD_DATA_AI_PAUSED_STATUS: 503,
+    CHILD_DATA_AI_PAUSED_MESSAGE: 'This AI feature is paused while we review our AI service providers\u2019 terms for use with learners. Your records and the rest of EduNexus are not affected.',
+  },
+})
+
 mock.module('@/lib/core/errors', {
   namedExports: {
     UnauthorizedError: FakeUnauthorizedError,
@@ -139,6 +151,7 @@ before(async () => {
 })
 
 function resetCounters() {
+  paused = false
   authShouldThrow = null
   classTeacherShouldThrow = null
   visionCallCount = 0
@@ -250,4 +263,29 @@ test('a Gemini/vision failure logs operation=vision_call durably and writes NO e
   assert.equal(failureLogCalls.length, 1)
   assert.equal(failureLogCalls[0].operation, 'vision_call')
   visionShouldThrow = false
+})
+
+test('paused: authenticated teacher gets 503 + stable code; NO image retrieval, NO Gemini call, NO evidence write', async () => {
+  resetCounters()
+  paused = true
+  submissionRow = { id: 'a1111111-1111-4111-8111-111111111111', assignment_id: 'a1', class_id: 'c1', student_id: 'stu1', file_path: 'x.jpg', file_type: 'image/jpeg' }
+
+  const res = await POST(req({ submissionId: 'a1111111-1111-4111-8111-111111111111' }), { params })
+  assert.equal(res.status, 503)
+  const body = await res.json()
+  assert.equal(body.code, 'AI_FEATURE_PAUSED_FOR_REVIEW')
+  assert.match(body.error, /review/i)
+  assert.doesNotMatch(body.error, /maintenance|technical/i)
+  assert.equal(storageDownloadCallCount, 0, 'the learner\u2019s photographed page must not even be read from storage')
+  assert.equal(visionCallCount, 0)
+  assert.equal(evidenceWriteCallCount, 0)
+})
+
+test('paused: an unauthenticated caller still gets 401, never the pause notice', async () => {
+  resetCounters()
+  paused = true
+  authShouldThrow = new FakeUnauthorizedError('no session')
+  const res = await POST(req({ submissionId: 'a1111111-1111-4111-8111-111111111111' }), { params })
+  assert.equal(res.status, 401)
+  assert.equal(visionCallCount, 0)
 })

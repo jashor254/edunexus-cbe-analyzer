@@ -14,6 +14,7 @@
 
 import { repos } from '@/lib/repositories'
 import { callDeepSeek } from '@/lib/ai/deepseek'
+import { isChildDataAIPausedError } from '@/lib/ai/childDataPolicy'
 import { LEARNER_NAME_TOKEN, learnerFirstName, restoreLearnerName } from '@/lib/ai/learnerPseudonym'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { buildAdaptiveTask } from '@/lib/adaptiveLearning/recommend'
@@ -452,6 +453,8 @@ SUMMARY:
       parentSummary:   sumMatch?.[1]?.trim(),
     }, learnerFirstName(plan.student_name))
   } catch (err) {
+    // Learner-data AI is paused (lib/ai/childDataPolicy.ts): no provider was called; use the template.
+    if (isChildDataAIPausedError(err)) return null
     // Falls back to the non-AI template message (see buildWhatsAppMessage) —
     // but that fallback was previously indistinguishable from "AI enrichment
     // was never attempted." Log which plan it was so a spike is traceable.

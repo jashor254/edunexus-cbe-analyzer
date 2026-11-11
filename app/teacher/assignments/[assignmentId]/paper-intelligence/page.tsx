@@ -226,6 +226,13 @@ export default function PaperIntelligencePage() {
       .then(async res => {
         // 409: this script is already being marked by an earlier request —
         // not a failure; the roster reload shows its result when it lands.
+        if (res.status === 503) {
+          // AI marking is paused for provider review; the capture is saved, nothing is lost.
+          const body = await res.json().catch(() => null) as { error?: string } | null
+          setError(body?.error ?? 'AI marking is paused while we review our AI service providers\u2019 terms for use with learners.')
+          setMarking(prev => { const next = { ...prev }; delete next[submissionId]; return next })
+          return
+        }
         if (!res.ok && res.status !== 409) throw new Error(String(res.status))
         setMarking(prev => { const next = { ...prev }; delete next[submissionId]; return next })
         await loadRoster()
