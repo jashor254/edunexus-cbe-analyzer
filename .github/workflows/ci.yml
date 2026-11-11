@@ -279,7 +279,16 @@ jobs:
           # uses all five columns). FAIL_COUNT=9 UNRECOVERED=0, unchanged.
           # Computed on an isolated throwaway pifp stack that first reproduced
           # 0b8f67ee at the pre-WhatsApp tree and e3cfda63 at origin/main.
-          EXPECTED="e3cfda630f274cd6be0563c9e7288c33"
+          # 2026-11-11: e3cfda63… → 291d53f8… for migrations
+          # 20261104120000_shared_reports_token_boundary.sql (DSA-01: lookup
+          # function, revoked_at/provenance columns, token/expiry/size/provenance
+          # CHECKs, policy swap, anon/authenticated grant revoke) and
+          # 20261111120000_school_intelligence_snapshots_service_only.sql (drops
+          # the permissive/legacy policies, revokes anon/authenticated). Reviewed:
+          # only schema changes; FAIL_COUNT=9 UNRECOVERED=0, unchanged. Computed
+          # on an isolated throwaway pifp stack that first reproduced e3cfda63
+          # at origin/main 41ac517.
+          EXPECTED="291d53f8661d9d5f0cace868edeb633a"
           echo "expected: $EXPECTED"
           echo "actual:   $ACTUAL"
           if [ "$ACTUAL" != "$EXPECTED" ]; then
