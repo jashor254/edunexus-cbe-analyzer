@@ -216,6 +216,18 @@
     "lib/career/classReportHonesty.test.ts",
     "lib/paperIntelligence/markingClaim.test.ts",
     "lib/compass/compassTurnBounds.test.ts",
-    "lib/lessonPlan/scheduledGeneration.test.ts"
+    "lib/lessonPlan/scheduledGeneration.test.ts",
+    "lib/row/recordOfWorkCompletion.test.ts",
+    "lib/ai/usageTelemetry.test.ts",
+    "lib/ai/workflowAttribution.test.ts",
+    "lib/sow/promptGradeLabel.test.ts",
+    "lib/lessonPlan/reflectionPrompt.test.ts",
+    "lib/documents/bulkExportPdf.test.ts",
+    "lib/curriculum/displaySchemeGrade.test.ts",
+    "lib/curriculum/bookletGradeLabel.test.ts",
+    "lib/row/rowPrintLayout.test.ts",
+    "lib/documents/bulkExportLayout.test.ts",
+    "lib/documents/bookletLayout.test.ts",
+    "scripts/standardRunnerSupport.test.ts"
   ]
 }

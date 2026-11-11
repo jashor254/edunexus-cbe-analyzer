@@ -24,6 +24,9 @@ export interface PipelineInput {
   // Server-loaded KICD design entries for the selected strands
   // (loadKicdEntriesByStrandId). Absent/empty → every lesson is ungrounded.
   kicdEntriesByStrandId?: KicdEntriesByStrandId
+  // Non-personal id (the generation job's uuid) threaded to AI usage
+  // telemetry so spend can be grouped per generation. Never affects output.
+  correlationId?: string
 }
 
 function detectSubjectType(name: string, curriculumMode: string): string {
@@ -125,7 +128,7 @@ export async function generateSchemePipeline(
   input: PipelineInput,
   onProgress?: (event: SOWGenerationProgress) => void | Promise<void>,
 ): Promise<SOWGenerationResult> {
-  const { timeline, selectedSubstrands, context, kicdEntriesByStrandId = {} } = input
+  const { timeline, selectedSubstrands, context, kicdEntriesByStrandId = {}, correlationId } = input
 
   if (!timeline || !selectedSubstrands?.length) {
     throw new Error('Timeline and substrands are required')
@@ -194,6 +197,7 @@ export async function generateSchemePipeline(
           textbook:       context.textbook?.replace(/\s+/g, ' ').trim() || 'Class textbook',
           kicdSlice:      kicdSlices[i + batchIdx] ?? undefined,
           costContext:    context.costContext,
+          correlationId,
         }).then(result => ({ slot, result, kicdSlice: kicdSlices[i + batchIdx] }))
       })
     )

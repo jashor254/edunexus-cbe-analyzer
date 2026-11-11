@@ -31,6 +31,8 @@ export interface LessonPlanContext {
   extendedActivities?: string
   reflection?: string
   costContext?: AICostContext
+  /** Non-personal id (scheme uuid + week) for AI usage telemetry only. */
+  correlationId?: string
 }
 
 export interface GeneratedLessonPlan {

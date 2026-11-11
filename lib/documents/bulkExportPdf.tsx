@@ -8,6 +8,7 @@ import {
 } from '@react-pdf/renderer'
 import type { LessonPlanRecord } from '@/lib/lessonPlan/types'
 import { workDoneFor, type StoredRecordOfWork } from '@/lib/row/recordOfWork'
+import { describeWorkDone, isTeacherConfirmed } from '@/lib/row/completion'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -102,7 +103,9 @@ const S = StyleSheet.create({
   colSub: { width: '18%' },
   colOut: { width: '30%' },
   colRes: { width: '22%' },
-  lpCard:  { border: 1, borderColor: C.border, borderRadius: 6, padding: 14, marginBottom: 12 },
+  // @react-pdf/renderer does not accept the CSS `border` shorthand with a bare number
+  // ("Invalid border style: 1"); width and style are given explicitly.
+  lpCard:  { borderWidth: 1, borderStyle: 'solid', borderColor: C.border, borderRadius: 6, padding: 14, marginBottom: 12 },
   lpMeta:      { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 },
   lpMetaItem:  { marginRight: 20, marginBottom: 4 },
   lpMetaLabel: { fontSize: 7, color: C.slate, fontWeight: 'bold' },
@@ -198,7 +201,7 @@ function SchemeDivider({ meta }: { meta: SchemeMeta }) {
   )
 }
 
-function SOWPage({ meta }: { meta: SchemeMeta }) {
+export function SOWPage({ meta }: { meta: SchemeMeta }) {
   type RawLesson = {
     week: number; lesson: number; strand: string; substrand: string;
     learningOutcomes?: string[]; learningResources?: string[]; isBreak?: boolean;
@@ -214,7 +217,7 @@ function SOWPage({ meta }: { meta: SchemeMeta }) {
       </View>
 
       <View style={S.table}>
-        <View style={S.tableHeader}>
+        <View style={S.tableHeader} fixed>
           <Text style={[S.th, S.colWk]}>Wk</Text>
           <Text style={[S.th, S.colLes]}>Les</Text>
           <Text style={[S.th, S.colStr]}>Strand</Text>
@@ -223,13 +226,13 @@ function SOWPage({ meta }: { meta: SchemeMeta }) {
           <Text style={[S.th, S.colRes]}>Resources</Text>
         </View>
         {lessons.map((l, i) => (
-          <View key={i} style={i % 2 === 0 ? S.tableRow : S.tableRowAlt}>
+          <View key={i} wrap={false} style={i % 2 === 0 ? S.tableRow : S.tableRowAlt}>
             <Text style={[S.td, S.colWk]}>{l.week}</Text>
             <Text style={[S.td, S.colLes]}>{l.lesson}</Text>
-            <Text style={[S.td, S.colStr]}>{l.strand ?? '—'}</Text>
-            <Text style={[S.td, S.colSub]}>{l.substrand ?? '—'}</Text>
-            <Text style={[S.td, S.colOut]}>{joinBullets(l.learningOutcomes)}</Text>
-            <Text style={[S.td, S.colRes]}>{joinBullets(l.learningResources)}</Text>
+            <Text style={[S.td, S.colStr]}>{softBreakLongTokens(l.strand ?? '—')}</Text>
+            <Text style={[S.td, S.colSub]}>{softBreakLongTokens(l.substrand ?? '—')}</Text>
+            <Text style={[S.td, S.colOut]}>{softBreakLongTokens(joinBullets(l.learningOutcomes))}</Text>
+            <Text style={[S.td, S.colRes]}>{softBreakLongTokens(joinBullets(l.learningResources))}</Text>
           </View>
         ))}
       </View>
@@ -328,7 +331,29 @@ function LPPages({ meta, plans }: { meta: SchemeMeta; plans: LessonPlanRecord[] 
   )
 }
 
-function ROWPage({ meta, row }: { meta: SchemeMeta; row: StoredRecordOfWork | null }) {
+/**
+ * Soft break opportunities (U+00AD) inside very long unbroken tokens, so a table
+ * cell wraps the token instead of letting it run across the neighbouring
+ * columns. Ordinary words are untouched; only runs longer than `maxRun`
+ * non-space characters get a break every `maxRun` characters.
+ */
+export function softBreakLongTokens(text: string, maxRun = 24): string {
+  const long = new RegExp(`\\S{${maxRun + 1},}`, 'g')
+  const chunk = new RegExp(`(\\S{${maxRun}})(?=\\S)`, 'g')
+  return text.replace(long, token => token.replace(chunk, '$1\u00AD'))
+}
+
+/**
+ * The Work Done cell text for one Record of Work entry. A lesson the teacher
+ * has not confirmed as taught shows its plan labelled "Planned:" — same rule
+ * as the single download (lib/row/pdfRenderer.ts), via lib/row/completion.ts.
+ */
+export function rowWorkDoneCell(e: StoredRecordOfWork['entries'][number]): string {
+  const w = describeWorkDone(workDoneFor(e).slice(0, 80), isTeacherConfirmed(e), 'en')
+  return w.text === '' ? '—' : `${w.prefix}${w.text}`
+}
+
+export function ROWPage({ meta, row }: { meta: SchemeMeta; row: StoredRecordOfWork | null }) {
   if (!row || !row.entries.length) return null
 
   // Phase 3 — every cell below reads the canonical stored Record of Work.
@@ -351,7 +376,7 @@ function ROWPage({ meta, row }: { meta: SchemeMeta; row: StoredRecordOfWork | nu
       </View>
 
       <View style={S.table}>
-        <View style={S.tableHeader}>
+        <View style={S.tableHeader} fixed>
           <Text style={[S.th, S.colWk]}>Wk</Text>
           <Text style={[S.th, S.colLes]}>Les</Text>
           <Text style={[S.th, { width: '10%' }]}>Date</Text>
@@ -362,17 +387,17 @@ function ROWPage({ meta, row }: { meta: SchemeMeta; row: StoredRecordOfWork | nu
           <Text style={[S.th, { width: '14%' }]}>Reflection</Text>
         </View>
         {row.entries.map((e, i) => (
-          <View key={`${e.week}:${e.lesson}`} style={i % 2 === 0 ? S.tableRow : S.tableRowAlt}>
+          <View key={`${e.week}:${e.lesson}`} wrap={false} style={i % 2 === 0 ? S.tableRow : S.tableRowAlt}>
             <Text style={[S.td, S.colWk]}>{e.week}</Text>
             <Text style={[S.td, S.colLes]}>{e.lesson}</Text>
             <Text style={[S.td, { width: '10%', color: e.date_taught ? C.green : C.muted }]}>
               {e.date_taught ?? '—'}
             </Text>
-            <Text style={[S.td, S.colStr]}>{e.strand}</Text>
-            <Text style={[S.td, S.colSub]}>{e.substrand}</Text>
-            <Text style={[S.td, { width: '24%' }]}>{joinBullets(e.learning_outcomes)}</Text>
-            <Text style={[S.td, { width: '16%' }]}>{workDoneFor(e).slice(0, 80) || '—'}</Text>
-            <Text style={[S.td, { width: '14%' }]}>{e.reflection}</Text>
+            <Text style={[S.td, S.colStr]}>{softBreakLongTokens(e.strand)}</Text>
+            <Text style={[S.td, S.colSub]}>{softBreakLongTokens(e.substrand)}</Text>
+            <Text style={[S.td, { width: '24%' }]}>{softBreakLongTokens(joinBullets(e.learning_outcomes))}</Text>
+            <Text style={[S.td, { width: '16%', ...(isTeacherConfirmed(e) ? {} : { color: C.muted }) }]}>{softBreakLongTokens(rowWorkDoneCell(e))}</Text>
+            <Text style={[S.td, { width: '14%' }]}>{softBreakLongTokens(e.reflection)}</Text>
           </View>
         ))}
       </View>
