@@ -11,6 +11,7 @@
 //     npx tsx --test scripts/security/shared-reports-failure-injection.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
+import { randomBytes } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { createTestServiceClient } from '@/utils/supabase/test-service'
 import { signInForHttpTest, type SyntheticSession } from '@/lib/testing/httpAuthTestHelper'
@@ -23,7 +24,7 @@ const BASE_URL = process.env.TEST_BASE_URL ?? 'http://127.0.0.1:3111'
 // anything runs; the development database is refused outside CI, and the API
 // URL the app uses must belong to the same stack as the container.
 const CONTAINER = process.env.DB_CONTAINER ?? ''
-const PASSWORD = `Test!${Math.random().toString(36).slice(2, 12)}`
+const PASSWORD = `Test!${randomBytes(9).toString('base64url')}`
 const db = createTestServiceClient()
 let userId = ''
 let session: SyntheticSession

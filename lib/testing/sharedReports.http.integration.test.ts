@@ -18,6 +18,7 @@
 //   npx tsx --test lib/testing/sharedReports.http.integration.test.ts
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
+import { randomBytes } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { createTestServiceClient } from '@/utils/supabase/test-service'
 import { generateShareToken } from '@/lib/sharedReports/token'
@@ -27,7 +28,7 @@ const BASE_URL = process.env.TEST_BASE_URL ?? process.env.LMS_TEST_BASE_URL ?? '
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
 const MARKER = 'SYNTHETIC_SHARED_REPORTS_HTTP'
-const PASSWORD = `Test!${Math.random().toString(36).slice(2, 12)}`
+const PASSWORD = `Test!${randomBytes(9).toString('base64url')}`
 
 const db = createTestServiceClient()
 const userIds: string[] = []
