@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Runs the DSA-01 role-based regression against a disposable LOCAL stack only.
+# Runs a role-based security regression (default: the DSA-01 shared_reports test;
+# pass another .sql path as $1, e.g. school-snapshots-boundary.test.sql) against a
+# disposable LOCAL stack only.
 # Default container is the dev stack; DB_CONTAINER may select the isolated
 # fingerprint stack. Anything else is refused — never a remote database.
 set -euo pipefail
@@ -10,4 +12,4 @@ case "$CONTAINER" in
 esac
 docker inspect "$CONTAINER" >/dev/null 2>&1 || { echo "refusing: $CONTAINER not found"; exit 2; }
 docker exec -i "$CONTAINER" psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 \
-  < "$(dirname "$0")/shared-reports-boundary.test.sql"
+  < "${1:-$(dirname "$0")/shared-reports-boundary.test.sql}"
