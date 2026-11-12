@@ -26,6 +26,18 @@ let markedSubmission: unknown = null
 let claimHeld = false
 let releases: string[] = []
 
+let paused = false
+// The containment switch is read through these two named exports only; the real module is pinned OFF
+// (lib/ai/childDataPolicy.test.ts). `paused` lets this file prove both states of the route.
+mock.module('@/lib/ai/childDataPolicy', {
+  namedExports: {
+    isChildDataAIPaused: () => paused,
+    CHILD_DATA_AI_PAUSED_CODE: 'AI_FEATURE_PAUSED_FOR_REVIEW',
+    CHILD_DATA_AI_PAUSED_STATUS: 503,
+    CHILD_DATA_AI_PAUSED_MESSAGE: 'This AI feature is paused while we review our AI service providers\u2019 terms for use with learners. Your records and the rest of EduNexus are not affected.',
+  },
+})
+
 mock.module('@/lib/core/errors', { namedExports: { UnauthorizedError: FakeUnauthorizedError } })
 mock.module('@/utils/supabase/server', { namedExports: { createClient: async () => ({}) } })
 mock.module('@/lib/paperIntelligence/auth', {
@@ -64,7 +76,7 @@ const SUB = '22222222-2222-4222-8222-222222222222'
 let POST: (req: Request, ctx: { params: Promise<{ id: string }> }) => Promise<Response>
 
 before(async () => { ({ POST } = await import('./route')) })
-beforeEach(() => { authThrow = null; markThrow = null; markCalls = 0; markedSubmission = null; claimHeld = false; releases = [] })
+beforeEach(() => { paused = false; authThrow = null; markThrow = null; markCalls = 0; markedSubmission = null; claimHeld = false; releases = [] })
 
 const ctx = { params: Promise.resolve({ id: 'a1' }) }
 const req = (body: unknown) => new Request('http://t/mark-script', { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json' } })
@@ -130,4 +142,29 @@ test('auth failure never takes a marking claim', async () => {
   authThrow = new FakeScriptAccessError()
   await POST(req({ submissionId: SUB }), ctx)
   assert.deepEqual(releases, [])
+})
+
+// ── Containment: learner-data AI paused ──────────────────────────────────────
+
+test('paused: 503 with a stable code and an honest message, no claim taken, zero marking passes', async () => {
+  paused = true
+  const res = await POST(req({ submissionId: SUB }), ctx)
+  assert.equal(res.status, 503)
+  const body = await res.json()
+  assert.equal(body.code, 'AI_FEATURE_PAUSED_FOR_REVIEW')
+  assert.equal(body.success, false)
+  assert.match(body.error, /review/i)
+  assert.doesNotMatch(body.error, /maintenance|technical/i)
+  assert.equal(res.headers.get('cache-control'), 'no-store')
+  assert.equal(markCalls, 0)
+  assert.deepEqual(releases, [], 'no marking claim may be taken (it would be left in "processing")')
+})
+
+test('paused: authorisation still runs first — an unauthorised caller gets 401/403/404, never the pause notice', async () => {
+  paused = true
+  for (const [err, status] of [[new FakeUnauthorizedError(), 401], [new FakeSubmissionNotFoundError(), 404], [new FakeScriptAccessError(), 403]] as const) {
+    authThrow = err
+    assert.equal((await POST(req({ submissionId: SUB }), ctx)).status, status)
+  }
+  assert.equal(markCalls, 0)
 })

@@ -194,12 +194,21 @@ test('TEL-010 two workflow attempts are two logical calls under one correlation 
   assert.deepEqual([a.context.workflow_attempt, b.context.workflow_attempt], [1, 2])
 })
 
-test('TEL-011 calls without attribution are still logged, as unattributed with null correlation', async () => {
+test('TEL-011 calls without attribution are refused by containment (default deny) before any provider request', async () => {
+  logCalls.length = 0
+  let providerRequests = 0
+  globalThis.fetch = (async () => { providerRequests++; return json({ choices: [{ message: { content: 'x' } }] }) }) as typeof fetch
+  await assert.rejects(() => callDeepSeek('p', 's'), (err: unknown) => (err as { code?: string }).code === 'AI_FEATURE_PAUSED_FOR_REVIEW')
+  assert.equal(providerRequests, 0, 'an unattributed call must never reach a provider')
+  assert.equal(providerLogs().length, 0, 'and writes no provider log line')
+})
+
+test('TEL-011b an attributed generic call without a correlation id logs null correlation and attempt', async () => {
   logCalls.length = 0
   globalThis.fetch = (async () => json({ choices: [{ message: { content: 'x' } }] })) as typeof fetch
-  await callDeepSeek('p', 's')
+  await callDeepSeek('p', 's', { feature: 'sow_generate' })
   const c = providerLogs()[0].context
-  assert.equal(c.feature, 'unattributed')
+  assert.equal(c.feature, 'sow_generate')
   assert.equal(c.correlation_id, null)
   assert.equal(c.workflow_attempt, null)
 })

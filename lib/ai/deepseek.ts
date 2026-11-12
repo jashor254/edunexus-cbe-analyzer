@@ -23,6 +23,7 @@
 import { GoogleGenerativeAI, type GenerationConfig } from '@google/generative-ai'
 import { DEEPSEEK_CONFIG } from '@/lib/config/api'
 import { GEMINI_PRIMARY } from '@/lib/ai/models'
+import { assertAIFeatureAllowed } from '@/lib/ai/childDataPolicy'
 import { logger } from '@/lib/observability/logger'
 import { repos } from '@/lib/repositories'
 import { recordSuccess, recordError } from '@/lib/ai-orchestration/registry'
@@ -117,6 +118,7 @@ async function deepSeekOnce(
   options: CompletionOptions,
   call: LogicalCall,
 ): Promise<ProviderCompletion> {
+  assertAIFeatureAllowed(call.feature)
   call.attempts++
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
@@ -204,6 +206,7 @@ export async function callGeminiProvider(
   options: CompletionOptions,
   call: LogicalCall,
 ): Promise<ProviderCompletion> {
+  assertAIFeatureAllowed(call.feature)
   const key = process.env.GOOGLE_GEMINI_API_KEY
   if (!key) throw new Error('Missing GOOGLE_GEMINI_API_KEY — cannot fall back to Gemini')
 
@@ -356,6 +359,7 @@ async function fetchDeepSeekStreamOnce(
   body: string,
   call: LogicalCall,
 ): Promise<ReadableStream<Uint8Array>> {
+  assertAIFeatureAllowed(call.feature)
   call.attempts++
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
@@ -461,6 +465,7 @@ async function streamGemini(
   call: LogicalCall,
   costContext?: AICostContext
 ): Promise<ReadableStream<Uint8Array>> {
+  assertAIFeatureAllowed(call.feature)
   const key = process.env.GOOGLE_GEMINI_API_KEY
   if (!key) throw new Error('Missing GOOGLE_GEMINI_API_KEY — cannot stream from Gemini')
 

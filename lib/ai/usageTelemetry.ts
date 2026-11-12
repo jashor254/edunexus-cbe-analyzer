@@ -29,6 +29,7 @@
 
 import { randomUUID } from 'node:crypto'
 import { logger } from '@/lib/observability/logger'
+import { assertAIFeatureAllowed } from '@/lib/ai/childDataPolicy'
 
 export type AIProviderName = 'deepseek' | 'gemini'
 
@@ -82,6 +83,9 @@ export type LogicalCall = {
 }
 
 export function startLogicalCall(attribution?: AIAttribution): LogicalCall {
+  // Containment: every provider request path begins here, so a blocked
+  // (learner-data) feature throws before any provider function can run.
+  assertAIFeatureAllowed(attribution?.feature)
   return {
     id:            randomUUID(),
     feature:       attribution?.feature ?? UNATTRIBUTED_FEATURE,

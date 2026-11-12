@@ -11,6 +11,8 @@
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiNotFound, apiBadRequest } from '@/lib/api/response'
+import { isChildDataAIPaused } from '@/lib/ai/childDataPolicy'
+import { apiChildDataAIPaused } from '@/lib/api/childDataAIResponse'
 import { UnauthorizedError } from '@/lib/core/errors'
 import { requireScriptAccess, ScriptAccessError, SubmissionNotFoundError } from '@/lib/paperIntelligence/auth'
 import {
@@ -49,6 +51,10 @@ export async function POST(
       if (err instanceof ScriptAccessError) return apiForbidden()
       throw err
     }
+
+    // Containment: photographed learner scripts must not reach an AI provider while eligibility is
+    // unresolved. After authorisation, before the marking claim so no submission is left 'processing'.
+    if (isChildDataAIPaused()) return apiChildDataAIPaused()
 
     // One marking pass per submission at a time — a concurrent duplicate
     // (double tap, re-run bulk scan) makes no AI call. See markingClaim.ts.

@@ -14,6 +14,8 @@ import {
 import { buildCareerIntelligenceReport, NarrativeNotAvailableError } from '@/lib/career/careerIntelligenceEngine'
 import { reserveDailyCallOrThrow, DailyLimitExceededError, dailyLimitMessage, type HeldReservation } from '@/lib/ai/rateLimit'
 import { checkFeatureAccess, deductFeatureTokens } from '@/lib/payments/access'
+import { isChildDataAIPaused } from '@/lib/ai/childDataPolicy'
+import { apiChildDataAIPaused } from '@/lib/api/childDataAIResponse'
 import { apiPaymentRequired } from '@/lib/payments/paywall'
 
 export const dynamic = 'force-dynamic'
@@ -57,11 +59,17 @@ export async function GET(req: NextRequest) {
     let report: Awaited<ReturnType<typeof buildCareerIntelligenceReport>>
     try {
       report = await buildCareerIntelligenceReport(studentId, db, {
-        allowGeneration: access.allowed,
+        // Containment: while learner-data AI is paused no NEW narrative is generated (the provider
+        // would receive the learner's profile); a stored narrative for unchanged evidence is still served.
+        allowGeneration: access.allowed && !isChildDataAIPaused(),
         beforeGenerate: async () => { held.quota = await reserveDailyCallOrThrow(user.id, 'career_intelligence_report') },
       })
     } catch (err) {
-      if (err instanceof NarrativeNotAvailableError) return apiPaymentRequired('career_intelligence_report')
+      if (err instanceof NarrativeNotAvailableError) {
+        // A miss caused by the pause is not a payment problem; say so honestly.
+        if (isChildDataAIPaused()) return apiChildDataAIPaused()
+        return apiPaymentRequired('career_intelligence_report')
+      }
       if (err instanceof DailyLimitExceededError) {
         return apiError(dailyLimitMessage(err, 'career intelligence reports'), 429)
       }
