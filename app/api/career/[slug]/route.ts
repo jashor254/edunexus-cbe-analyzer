@@ -16,7 +16,8 @@ import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiNotFound } from '@/lib/api/response'
 import { getCareerBySlugWithCOS } from '@/lib/career/careerEngine'
-import { requestCareerKnowledge } from '@/lib/career/knowledgeRequests'
+import { requestCareerKnowledge, MAX_CAREER_QUERY_CHARS } from '@/lib/career/knowledgeRequests'
+import { apiChildDataAIPaused } from '@/lib/api/childDataAIResponse'
 import { computeCapabilityMatches } from '@/lib/career/capabilityMatchEngine'
 import { careerModeForGrade } from '@/lib/learnerIntelligence/careerIntelligence'
 import { resolveFreshCapabilityProfile } from '@/lib/learnerIntelligence/careerIntelligenceOrchestration'
@@ -48,6 +49,9 @@ export async function GET(
     const { slug } = await params
     const { searchParams } = new URL(req.url)
     const source = resolveSource(searchParams.get('source'))
+    // No legitimate career slug is this long; reject before any lookup so an
+    // arbitrary path segment is never queried, logged or forwarded anywhere.
+    if (slug.length > MAX_CAREER_QUERY_CHARS) return apiNotFound('Career not found')
     const career = await getCareerBySlugWithCOS(slug)
 
     // No exact slug match. This used to generate a career inline and persist it,
@@ -67,13 +71,17 @@ export async function GET(
             readiness_report: null,
           })
         }
+        if (result.status === 'ai_paused') {
+          // Honest paused state — not a fabricated career, not a silent queue.
+          return apiChildDataAIPaused()
+        }
         if (result.status === 'rate_limited') {
-          return apiNotFound(`Career '${slug}' not found`)
+          return apiNotFound('Career not found')
         }
         return apiSuccess({ career: result.career, provisional: false, capability_match: null, readiness_report: null })
       } catch (genErr) {
         console.error('[career/slug] knowledge request failed', genErr)
-        return apiNotFound(`Career '${slug}' not found`)
+        return apiNotFound('Career not found')
       }
     }
 

@@ -61,6 +61,7 @@
     "lib/career/careerSignals.test.ts",
     "lib/career/knowledgeLifecycle.test.ts",
     "lib/career/knowledgeRequests.test.ts",
+    "lib/career/careerAiContainment.test.ts",
     "lib/career/reviewPublishGuards.architecture.test.ts",
     "lib/career/searchTelemetry.architecture.test.ts",
     "lib/career/provisionalPreview.test.ts",

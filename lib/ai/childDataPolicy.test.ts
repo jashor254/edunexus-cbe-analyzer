@@ -109,3 +109,9 @@ test('every provider-call feature in lib/ and app/ is explicitly classified (new
     assert.ok(found.has(f), `expected ${f} to be attributed in source`)
   }
 })
+
+test('career knowledge generation forwards learner-typed text, so it is a child-data feature', () => {
+  assert.ok((CHILD_DATA_AI_FEATURES as readonly string[]).includes('career_knowledge_request'))
+  assert.ok(!(GENERIC_CONTENT_AI_FEATURES as readonly string[]).includes('career_knowledge_request'))
+  assert.equal(isChildDataAIBlocked('career_knowledge_request'), true)
+})

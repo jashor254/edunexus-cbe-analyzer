@@ -35,6 +35,7 @@ export const CHILD_DATA_AI_FEATURES = [
   'career_intelligence_report',     // pseudonymised capability/interest profile
   'holiday_plan',                   // pseudonymised grade + weak topics
   'class_reports_generate',         // pseudonymised learner gap profile (Compass bridge)
+  'career_knowledge_request',       // learner-typed free text (search box / URL slug) forwarded verbatim to the provider
 ] as const
 
 /** Features that send only generic curriculum/instructional content or adult-authored content. */
@@ -46,7 +47,6 @@ export const GENERIC_CONTENT_AI_FEATURES = [
   'adaptive_variant_generate',      // tier label + question text only
   'teaching_quick_check',           // grade/sub-strand + aggregate count only
   'study_group_challenge',          // grade + subject only
-  'career_knowledge_request',       // career names only
   'academy_reflection_judge',       // teacher (adult) training reflections
   'academy_mission_judge',
   'paper_intelligence_extract_rubric', // teacher's marking-scheme pages (no learner content)
