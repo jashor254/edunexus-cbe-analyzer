@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "defaultPolicy": "deny",
+  "denyList": [],
+  "targets": [
+    {
+      "id": "my-app-repo",
+      "adapter": "edunexus",
+      "kind": "repository",
+      "path": "../..",
+      "environment": "development",
+      "allowedModes": ["passive"],
+      "authorisation": {
+        "approvedBy": "REPLACE with the human who authorises this target",
+        "approvedAt": "0000-00-00",
+        "expiresAt": "0000-00-00",
+        "scope": "REPLACE with what is permitted, e.g. read-only static checks of the working tree"
+      }
+    }
+  ]
+}

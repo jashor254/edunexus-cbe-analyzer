@@ -1,0 +1,27 @@
+{
+  "$id": "jashor-breaker/edunexus-adapter-config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["nodePolicy", "secretScan"],
+  "properties": {
+    "nodePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["line", "minimumPatch", "source"],
+      "properties": {
+        "line": { "type": "integer" },
+        "minimumPatch": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "source": { "type": "string", "description": "Official advisory URL the floor comes from (documentation only; never fetched)." }
+      }
+    },
+    "secretScan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ignorePrefixes", "maxFileBytes"],
+      "properties": {
+        "ignorePrefixes": { "type": "array", "items": { "type": "string" } },
+        "maxFileBytes": { "type": "integer" }
+      }
+    }
+  }
+}

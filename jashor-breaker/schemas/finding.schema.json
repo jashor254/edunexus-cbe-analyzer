@@ -1,0 +1,39 @@
+{
+  "$id": "jashor-breaker/finding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "checkId", "title", "severity", "classification", "rationale", "evidence", "reproduce", "remediationHint"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^JB-[0-9a-f]{10}$" },
+    "checkId": { "type": "string", "minLength": 3 },
+    "title": { "type": "string", "minLength": 3 },
+    "severity": { "type": "string", "enum": ["info", "low", "medium", "high", "critical"] },
+    "classification": { "type": "string", "enum": ["confirmed", "suspected", "unverified"] },
+    "rationale": { "type": "string", "minLength": 3 },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "location", "detail"],
+        "properties": {
+          "kind": { "type": "string", "enum": ["file-line", "file", "config", "runtime", "external-gap"] },
+          "location": { "type": "string" },
+          "detail": { "type": "string" }
+        }
+      }
+    },
+    "reproduce": { "type": "string", "minLength": 3 },
+    "remediationHint": { "type": "string", "description": "Advice text only. The engine never applies fixes." },
+    "triage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verdict", "reasons"],
+      "properties": {
+        "verdict": { "type": "string", "enum": ["likely-false-positive", "needs-review"] },
+        "reasons": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "cwe": { "type": "string", "pattern": "^CWE-[0-9]+$" }
+  }
+}

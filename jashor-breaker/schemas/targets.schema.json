@@ -1,0 +1,43 @@
+{
+  "$id": "jashor-breaker/targets",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "defaultPolicy", "targets"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "defaultPolicy": { "const": "deny" },
+    "denyList": {
+      "type": "array",
+      "description": "Substrings that must never appear in a target's path or id (e.g. production project refs). Checked by the guard.",
+      "items": { "type": "string", "minLength": 3 }
+    },
+    "targets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "adapter", "kind", "path", "environment", "allowedModes", "authorisation"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,40}$" },
+          "adapter": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+          "kind": { "type": "string", "enum": ["repository"] },
+          "path": { "type": "string", "minLength": 1, "description": "Local directory, relative to this config file. No URLs: v0 has no network capability." },
+          "environment": { "type": "string", "enum": ["development", "isolated-test"] },
+          "allowedModes": { "type": "array", "minItems": 1, "items": { "type": "string", "enum": ["passive"] } },
+          "authorisation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["approvedBy", "approvedAt", "expiresAt", "scope"],
+            "properties": {
+              "approvedBy": { "type": "string", "minLength": 2 },
+              "approvedAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+              "expiresAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+              "scope": { "type": "string", "minLength": 10 }
+            }
+          }
+        }
+      }
+    }
+  }
+}
