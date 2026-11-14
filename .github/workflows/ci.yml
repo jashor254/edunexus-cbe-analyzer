@@ -30,7 +30,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '22'
+  NODE_VERSION: '24'
   # Minimal env vars required for build — real secrets not needed for type-check.
   # next build touches these at import time in a few config modules even
   # when the routes that actually use them are never invoked during build.
