@@ -23,6 +23,7 @@ import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { signInForHttpTest } from '@/lib/testing/httpAuthTestHelper'
+import { setSchoolEntitlement } from '@/lib/core/schoolEntitlement'
 
 const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:3100'
 const MARKER = 'SYNTHETIC_SOWCONTRACT'
@@ -30,9 +31,14 @@ const db = createServiceClient()
 const ENDPOINT = `${BASE}/api/sow/generate`
 const JOB_TYPE = 'ai.sow.generate'
 
-const REFERENCE_SCHOOL_NAME = 'Mwatate Ridge Senior School'
+// A syntactically valid, deliberately non-existent strand id. KICD grounding
+// loads strands by uuid, so a non-uuid id fails the job before generation; a
+// valid-but-absent uuid is the documented "strand has no KICD data" path.
+const SYNTHETIC_STRAND_ID = '00000000-0000-4000-8000-0000000000a1'
 
 const createdUsers: string[] = []
+const createdSchools: string[] = []
+const createdSchemes: string[] = []
 let teacher: { id: string; cookie: string }
 
 /** A minimal, otherwise-valid request. Individual cases break exactly one field. */
@@ -49,7 +55,7 @@ const validBody = () => ({
   },
   lessonStructure: { lessonsPerWeek: 2, firstWeek: 1, firstLesson: 1, lastWeek: 1, lastLesson: 2 },
   selectedSubstrands: [{
-    strandId: 'num-1', strandTitle: 'Numbers',
+    strandId: SYNTHETIC_STRAND_ID, strandTitle: 'Numbers',
     substrandId: 'num-1-1', substrandTitle: 'Real Numbers',
     lessonsRequired: 2, orderIndex: 1,
   }],
@@ -93,12 +99,14 @@ before(async () => {
 })
 
 after(async () => {
+  for (const id of createdSchemes) await db.from('schemes_of_work').delete().eq('id', id)
   for (const id of createdUsers) {
     await db.from('jobs').delete().eq('user_id', id)
-    await db.from('schemes_of_work').delete().eq('teacher_id', id)
+    await db.from('school_users').delete().eq('user_id', id)
     await db.from('teachers').delete().eq('user_id', id)
     await db.auth.admin.deleteUser(id)
   }
+  for (const id of createdSchools) await db.from('schools').delete().eq('id', id)
 })
 
 // ── The contract gap ─────────────────────────────────────────────────────────
@@ -183,38 +191,48 @@ test('5. a complete context is accepted and a job IS created', async () => {
 })
 
 // ── The covered-teacher path, end to end ─────────────────────────────────────
+//
+// Self-contained: builds its own synthetic school, entitlement and teacher, so
+// it never depends on a seeded dataset and cannot silently skip. The covered
+// teacher has already saved a scheme, which consumes the first-scheme free
+// trial — a free price here can therefore only come from school coverage.
 
 test('6. a school-covered teacher generates lessons and is charged nothing', async () => {
-  const { data: ref } = await db.from('schools')
-    .select('id').eq('school_name', REFERENCE_SCHOOL_NAME).maybeSingle()
-  if (!ref) {
-    console.log('      [skip] Reference School not seeded in this environment')
-    return
-  }
+  const { data: school, error: schoolErr } = await db.from('schools')
+    .insert({ school_name: `${MARKER} Covered School ${Date.now()}` }).select('id').single()
+  if (schoolErr || !school) throw new Error(`school fixture: ${schoolErr?.message}`)
+  createdSchools.push(school.id as string)
+  await setSchoolEntitlement(school.id as string, 'active', null, 'http-test')
 
-  // An active teacher membership at the entitled school — coverage is
-  // inherited from the school, never granted here.
-  const { data: membership } = await db.from('school_users')
-    .select('user_id').eq('school_id', ref.id).eq('role', 'teacher').eq('is_active', true).limit(1).single()
-  const { data: authUser } = await db.auth.admin.getUserById(membership!.user_id)
-  const email = authUser.user!.email!
+  const email = `sowcovered-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@example.com`
+  const password = `Test!${Math.random().toString(36).slice(2, 12)}`
+  const { data: created, error: userErr } = await db.auth.admin.createUser({ email, password, email_confirm: true })
+  if (userErr || !created?.user) throw new Error(`createUser: ${userErr?.message}`)
+  const userId = created.user.id
+  createdUsers.push(userId)
 
-  // Session without touching the account's password.
-  const { data: link } = await db.auth.admin.generateLink({ type: 'magiclink', email })
-  const { createClient } = await import('@supabase/supabase-js')
-  const anon = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, { auth: { persistSession: false } })
-  const { data: verified } = await anon.auth.verifyOtp({ token_hash: link.properties!.hashed_token!, type: 'magiclink' })
+  await db.from('profiles').upsert({ id: userId, role: 'teacher', full_name: `${MARKER} Covered Teacher` })
+  const { data: teacherRow, error: teacherErr } = await db.from('teachers')
+    .insert({ user_id: userId, full_name: `${MARKER} Covered Teacher`, school: `${MARKER} Covered School` })
+    .select('id').single()
+  if (teacherErr || !teacherRow) throw new Error(`teacher fixture: ${teacherErr?.message}`)
 
-  const { createServerClient } = await import('@supabase/ssr')
-  const jar: Array<{ name: string; value: string }> = []
-  const server = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
-    cookies: { getAll: () => [], setAll: cs => { for (const c of cs) jar.push({ name: c.name, value: c.value }) } },
+  const { error: memberErr } = await db.from('school_users').insert({
+    school_id: school.id, user_id: userId, role: 'teacher', is_active: true,
+    joined_at: new Date().toISOString(),
   })
-  await server.auth.setSession({
-    access_token: verified.session!.access_token,
-    refresh_token: verified.session!.refresh_token,
-  })
-  const cookie = jar.map(c => `${c.name}=${c.value}`).join('; ')
+  if (memberErr) throw new Error(`membership fixture: ${memberErr.message}`)
+
+  const { data: prior, error: priorErr } = await db.from('schemes_of_work').insert({
+    teacher_id: teacherRow.id, learning_area: MARKER, year: 2026, curriculum_mode: 'cbc',
+    school: MARKER, grade: '8', term: 1, lessons_per_week: 2, total_weeks: 1,
+    total_lessons: 0, lessons: [], timeline: [],
+  }).select('id').single()
+  if (priorErr || !prior) throw new Error(`prior scheme fixture: ${priorErr?.message}`)
+  createdSchemes.push(prior.id as string)
+
+  const session = await signInForHttpTest(email, password)
+  const cookie = session.cookieHeader
 
   // Pricing first: covered, free, nothing to deduct.
   const priceRes = await fetch(`${BASE}/api/tokens/check`, {
@@ -226,7 +244,7 @@ test('6. a school-covered teacher generates lessons and is charged nothing', asy
   assert.equal(price.deductTokens, false)
   assert.equal(price.cost, 0)
 
-  const { data: balBefore } = await db.from('token_balances').select('balance').eq('user_id', membership!.user_id)
+  const { data: balBefore } = await db.from('token_balances').select('balance').eq('user_id', userId)
 
   const res = await call(cookie, validBody())
   assert.equal(res.status, 200, res.raw)
@@ -245,8 +263,6 @@ test('6. a school-covered teacher generates lessons and is charged nothing', asy
   assert.equal(result.result.status, 'complete')
   assert.ok(result.result.lessons.length > 0, 'a completed job produced no lessons')
 
-  const { data: balAfter } = await db.from('token_balances').select('balance').eq('user_id', membership!.user_id)
+  const { data: balAfter } = await db.from('token_balances').select('balance').eq('user_id', userId)
   assert.deepEqual(balAfter, balBefore, 'a school-covered teacher was charged for a scheme of work')
-
-  await db.from('jobs').delete().eq('id', jobId)
 })

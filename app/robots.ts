@@ -10,6 +10,7 @@ export default function robots(): MetadataRoute.Robots {
         '/dashboard/',     // Hizi hazitaonekana kwenye Google
         '/demo',           // Reviewer presentation — noindex until approved
         '/pitch',          // Google Africa pitch deck — shared by link, never indexed
+        '/shared/',        // Bearer-token report links — never crawled or indexed
         '/api/',
         '/admin/',
         '/_next/',         // Next.js internal files

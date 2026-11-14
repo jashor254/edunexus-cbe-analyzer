@@ -21,6 +21,10 @@
 import { test, before, after, mock } from 'node:test'
 import assert from 'node:assert/strict'
 
+// These tests exercise the provider transport / payload contracts as they behave when learner-data AI is
+// ALLOWED. Containment itself (the switch OFF) is proven separately in lib/ai/childDataContainment.test.ts.
+mock.module('@/lib/ai/childDataPolicy', { namedExports: { assertAIFeatureAllowed: () => {} } })
+
 mock.module('@/lib/observability/logger', {
   namedExports: { logger: { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} } },
 })

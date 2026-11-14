@@ -67,6 +67,14 @@ mock.module('@/lib/repositories', {
 
 let releaseReasons: string[] = []
 
+// These cases exercise the guarded-OFF branch (generation permitted). The
+// paused behaviour is proven against the REAL policy in
+// careerAiContainment.test.ts; here the switch is injected.
+let containmentPaused = false
+mock.module('@/lib/ai/childDataPolicy', {
+  namedExports: { isChildDataAIPaused: () => containmentPaused },
+})
+
 mock.module('@/lib/ai/rateLimit', {
   namedExports: {
     reserveDailyCall: async (_userId: string, _feature: string) =>
@@ -98,6 +106,7 @@ function resetState() {
   rateLimitAllowed = true
   logCalls = []
   releaseReasons = []
+  containmentPaused = false
 }
 
 test('a known slug never calls generation, never rate-limits', async () => {

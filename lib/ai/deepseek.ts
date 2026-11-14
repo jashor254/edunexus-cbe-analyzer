@@ -23,12 +23,14 @@
 import { GoogleGenerativeAI, type GenerationConfig } from '@google/generative-ai'
 import { DEEPSEEK_CONFIG } from '@/lib/config/api'
 import { GEMINI_PRIMARY } from '@/lib/ai/models'
+import { assertAIFeatureAllowed } from '@/lib/ai/childDataPolicy'
 import { logger } from '@/lib/observability/logger'
 import { repos } from '@/lib/repositories'
 import { recordSuccess, recordError } from '@/lib/ai-orchestration/registry'
 import {
   geminiUsage,
   openAIUsage,
+  type OpenAIUsageWire,
   recordProviderRequest,
   startLogicalCall,
   USAGE_UNAVAILABLE,
@@ -116,6 +118,7 @@ async function deepSeekOnce(
   options: CompletionOptions,
   call: LogicalCall,
 ): Promise<ProviderCompletion> {
+  assertAIFeatureAllowed(call.feature)
   call.attempts++
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
@@ -150,8 +153,9 @@ async function deepSeekOnce(
     }
 
     const data = await response.json() as {
+      model?: string
       choices?: { message?: { content?: string } }[]
-      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
+      usage?: OpenAIUsageWire
     }
     const content = data.choices?.[0]?.message?.content
     if (typeof content !== 'string') throw new TypeError('DeepSeek returned no completion')
@@ -159,7 +163,7 @@ async function deepSeekOnce(
     const usage = openAIUsage(data.usage)
     const latencyMs = Date.now() - start
     recordSuccess('deepseek', latencyMs)
-    recordProviderRequest(call, { provider: 'deepseek', model: DEEPSEEK_CONFIG.model, outcome: 'success', latencyMs, usage })
+    recordProviderRequest(call, { provider: 'deepseek', model: DEEPSEEK_CONFIG.model, servedModel: typeof data.model === 'string' ? data.model : null, outcome: 'success', latencyMs, usage })
     return { content, provider: 'deepseek', model: DEEPSEEK_CONFIG.model, usage }
   } catch (rawErr) {
     const err = (rawErr as Error)?.name === 'AbortError' ? new Error(DEEPSEEK_TIMEOUT_MESSAGE) : rawErr
@@ -202,6 +206,7 @@ export async function callGeminiProvider(
   options: CompletionOptions,
   call: LogicalCall,
 ): Promise<ProviderCompletion> {
+  assertAIFeatureAllowed(call.feature)
   const key = process.env.GOOGLE_GEMINI_API_KEY
   if (!key) throw new Error('Missing GOOGLE_GEMINI_API_KEY — cannot fall back to Gemini')
 
@@ -354,6 +359,7 @@ async function fetchDeepSeekStreamOnce(
   body: string,
   call: LogicalCall,
 ): Promise<ReadableStream<Uint8Array>> {
+  assertAIFeatureAllowed(call.feature)
   call.attempts++
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
@@ -459,6 +465,7 @@ async function streamGemini(
   call: LogicalCall,
   costContext?: AICostContext
 ): Promise<ReadableStream<Uint8Array>> {
+  assertAIFeatureAllowed(call.feature)
   const key = process.env.GOOGLE_GEMINI_API_KEY
   if (!key) throw new Error('Missing GOOGLE_GEMINI_API_KEY — cannot stream from Gemini')
 

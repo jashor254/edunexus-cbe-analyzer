@@ -202,12 +202,22 @@ NEVER invent page numbers — the teacher fills them in. No long descriptions af
 
 // ─── AI call — routes through shared lib/ai/deepseek.ts ─────────────────────
 
-function callSowAI(prompt: string, isKiswahili = false, costContext?: AICostContext): Promise<string> {
+function callSowAI(
+  prompt: string,
+  isKiswahili = false,
+  costContext?: AICostContext,
+  attribution: { correlationId?: string; workflowAttempt?: number } = {},
+): Promise<string> {
   return callAI(prompt, getDiversitySystemRules(isKiswahili), {
     temperature: TEMPERATURE,
     maxTokens:   1200,
     costContext,
     feature:     'sow_generate',
+    callSite:    'sow.lesson',
+    // Telemetry only (lib/ai/usageTelemetry.ts): lets spend and validation
+    // retries be grouped per generation job. Not part of the request.
+    correlationId:   attribution.correlationId,
+    workflowAttempt: attribution.workflowAttempt,
   })
 }
 
@@ -526,12 +536,12 @@ ${substrand.split(/[\s\-:,/()]+/).filter(w => w.length >= 4).slice(0, 3).join(',
   const learningResourcesEx = isKiswahili
     ? [
         textbook || `Kitabu cha ${learningArea} ${isCBC ? 'Gredi' : 'Kidato'} ${gradeNum}`,
-        `Mwongozo wa Mwalimu wa ${learningArea} ${isCBC ? 'Gredi' : 'Kidato'} ${grade}`,
+        `Mwongozo wa Mwalimu wa ${learningArea} ${isCBC ? 'Gredi' : 'Kidato'} ${gradeNum}`,
         '[chati / mchoro ubaoni / kipande cha gazeti / kifaa halisi]',
       ]
     : [
         textbook || `${learningArea} ${isCBC ? 'Grade' : 'Form'} ${gradeNum} Textbook`,
-        `Teacher's Guide for ${learningArea} ${isCBC ? 'Grade' : 'Form'} ${grade}`,
+        `Teacher's Guide for ${learningArea} ${isCBC ? 'Grade' : 'Form'} ${gradeNum}`,
         '[chart / blackboard diagram / newspaper cutout / real object]',
       ]
 
@@ -686,6 +696,8 @@ export interface LessonGenerationContext {
   textbook?:      string
   kicdSlice?:    KicdLessonSlice
   costContext?: AICostContext
+  /** Non-personal id (the generation job's uuid) for AI usage telemetry only. */
+  correlationId?: string
 }
 
 export interface ValidatedLessonResult {
@@ -758,7 +770,10 @@ ${lastError.includes('ethnic') ? 'REMINDER: do not name any ethnic community —
 
     let aiResponse: string
     try {
-      aiResponse = await callSowAI(prompt, isKiswahiliCtx, context.costContext)
+      aiResponse = await callSowAI(prompt, isKiswahiliCtx, context.costContext, {
+        correlationId:   context.correlationId,
+        workflowAttempt: attempt,
+      })
     } catch (err: unknown) {
       // callDeepSeek has already retried and fallen back across providers
       // by the time it throws — another loop iteration would only repeat

@@ -15,6 +15,8 @@ import { apiPaymentRequired } from '@/lib/payments/paywall'
 import { reserveDailyCall, dailyLimitMessage, type HeldReservation } from '@/lib/ai/rateLimit'
 import { createLearnerNameStreamRestorer, learnerFirstName, restoreLearnerName } from '@/lib/ai/learnerPseudonym'
 import { pseudonymiseCompassProviderText, pseudonymiseCompassSystemPrompt } from '@/lib/compass/providerPayload'
+import { isChildDataAIPaused } from '@/lib/ai/childDataPolicy'
+import { apiChildDataAIPaused } from '@/lib/api/childDataAIResponse'
 import { type FeatureKey } from '@/lib/payments/config'
 import { apiError } from '@/lib/api/response'
 import { repos } from '@/lib/repositories'
@@ -131,6 +133,12 @@ export async function POST(req: Request) {
     } = parsedBody.data
 
     if (!learnerId) return apiError('learnerId is required', 400)
+
+    // Containment (lib/ai/childDataPolicy.ts): a learner's messages and profile must not reach an
+    // AI provider while provider eligibility for learners is unresolved. Fails closed before any
+    // database work, session creation or quota reservation; the provider boundary re-checks.
+    if (isChildDataAIPaused()) return apiChildDataAIPaused()
+
     const db = createServiceClient()
     const studentId = learnerId as string
 

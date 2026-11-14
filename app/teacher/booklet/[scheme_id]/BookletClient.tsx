@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { ChevronLeft, Copy, Printer, Check } from 'lucide-react'
+import { progressStatement } from '@/lib/row/completion'
+import { displaySchemeGrade, schemeGradeFieldLabel } from '@/lib/curriculum/displaySchemeGrade'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -148,7 +150,7 @@ export default function BookletClient({
             <ChevronLeft className="w-4 h-4" /> Back
           </Link>
           <span className="text-gray-900 font-semibold text-sm truncate">
-            {scheme.learning_area} · Grade {scheme.grade} · Term {scheme.term}
+            {scheme.learning_area} · {displaySchemeGrade(scheme.grade)} · Term {scheme.term}
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -178,7 +180,7 @@ export default function BookletClient({
           <div className="grid grid-cols-2 gap-x-10 gap-y-5">
             <Field label="School"   value={toTitleCase(scheme.school)} />
             <Field label="Subject"  value={scheme.learning_area} />
-            <Field label="Grade"    value={`Grade ${scheme.grade}`} />
+            <Field label={schemeGradeFieldLabel(scheme.grade)} value={displaySchemeGrade(scheme.grade)} />
             <Field label="Teacher"  value={toTitleCase(scheme.teacher_name)} />
             <Field label="TSC No."  value={scheme.tsc_number} />
             <Field label="Term"     value={`Term ${scheme.term}`} />
@@ -203,7 +205,7 @@ export default function BookletClient({
 
         {/* SECTION 4 — Live table */}
         <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
-          <table className="booklet-table w-full border-collapse text-sm">
+          <table className="booklet-table w-full border-collapse text-sm" style={{ overflowWrap: 'anywhere' }}>
             <thead>
               <tr className="bg-gray-900 text-white">
                 <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wide border-r border-gray-700" style={{ width: '8%' }}>Date</th>
@@ -242,7 +244,8 @@ export default function BookletClient({
                       opacity: isTaught ? 1 : 0.6,
                     }}
                   >
-                    <td className="px-3 py-3 text-xs align-top border-r border-gray-100">
+                    {/* a date never breaks mid-number, even though text cells wrap anywhere */}
+                    <td className="px-3 py-3 text-xs align-top border-r border-gray-100" style={{ overflowWrap: 'normal', whiteSpace: 'nowrap' }}>
                       {isTaught && lesson.date_taught
                         ? <span className="font-medium">{formatDate(lesson.date_taught)}</span>
                         : <span className="text-gray-300 italic">dd/mm/yyyy</span>
@@ -282,7 +285,7 @@ export default function BookletClient({
 
         {/* Footer */}
         <p className="text-xs text-gray-400 italic text-center mt-4 pt-3 border-t border-gray-100 mb-2">
-          Record continues as lessons are completed — {taughtLessons} of {totalLessons} lessons recorded this term
+          {progressStatement('en', taughtLessons, totalLessons)}
         </p>
       </div>
     </>

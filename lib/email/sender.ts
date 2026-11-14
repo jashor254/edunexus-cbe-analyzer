@@ -2,7 +2,7 @@
 // Resend-backed email sender with deduplication via notification_log.
 // Never throws — always returns { success, error? }.
 
-import { resend, getEmailFrom, EMAIL_REPLY_TO } from '@/lib/resend-client'
+import { getResend, getEmailFrom, EMAIL_REPLY_TO } from '@/lib/resend-client'
 import { repos } from '@/lib/repositories'
 import {
   assignmentMarkedEmail,
@@ -109,7 +109,7 @@ export async function sendAssignmentMarkedEmail(
       deepLink,
     })
 
-    const { error } = await resend.emails.send({
+    const { error } = await getResend().emails.send({
       from:    getEmailFrom(),
       to:      params.parentEmail,
       replyTo: EMAIL_REPLY_TO,
@@ -180,7 +180,7 @@ export async function sendAlertCreatedEmail(
       deepLink,
     })
 
-    const { error } = await resend.emails.send({
+    const { error } = await getResend().emails.send({
       from:    getEmailFrom(),
       to:      params.parentEmail,
       replyTo: EMAIL_REPLY_TO,
@@ -249,7 +249,7 @@ export async function sendTeacherInviteEmail(input: TeacherInviteEmailInput): Pr
       isNewAccount:  input.isNewAccount,
     })
 
-    const { error } = await resend.emails.send({
+    const { error } = await getResend().emails.send({
       from:    getEmailFrom(),
       to:      input.toEmail,
       replyTo: EMAIL_REPLY_TO,

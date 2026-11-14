@@ -4,6 +4,8 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
+import { isChildDataAIPaused } from '@/lib/ai/childDataPolicy'
+import { apiChildDataAIPaused } from '@/lib/api/childDataAIResponse'
 import { generateClassReports, type ClassReportProgress } from '@/lib/career/autoReportGenerator'
 import { repos } from '@/lib/repositories'
 import { requireAuthentication, requireClassTeacher } from '@/lib/core/permissions'
@@ -49,6 +51,10 @@ export async function POST(
     } catch {
       return apiForbidden()
     }
+
+    // Containment: the Compass briefing step sends a learner gap profile to an AI provider while
+    // eligibility is unresolved. After authorisation, before payment, quota and job creation.
+    if (isChildDataAIPaused()) return apiChildDataAIPaused()
 
     const body = await req.json()
     const parsed = BodySchema.safeParse(body)

@@ -1,0 +1,9 @@
+# Exact-fingerprint allowlist (commit:file:rule:line). Each entry is a SYNTHETIC
+# fixture used only by the shared-reports security tests: a fixed placeholder
+# string passed as a `token` value to prove the database rejects/never resolves
+# malformed or legacy-format tokens. None is a credential. Fingerprints are
+# pinned to the commit that introduced the line, so they cannot hide any other
+# or future finding.
+da0704372333fc4ade3f28ca5d580d0293b58799:lib/testing/sharedReports.http.integration.test.ts:generic-api-key:219
+da0704372333fc4ade3f28ca5d580d0293b58799:lib/testing/sharedReports.http.integration.test.ts:generic-api-key:251
+7fd94a7e4e599eea1ea6cd6067f7cbfb4e5ea3dd:scripts/security/shared-reports-boundary.test.sql:generic-api-key:213

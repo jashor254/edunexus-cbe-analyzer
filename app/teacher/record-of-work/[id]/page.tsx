@@ -7,6 +7,7 @@ import {
   ClipboardList, Sparkles, AlertTriangle, Check,
 } from 'lucide-react'
 import { isKiswahiliSubject } from '@/lib/curriculum/subjectUtils'
+import { countConfirmed, progressStatement } from '@/lib/row/completion'
 
 interface ROWEntry {
   id:                  string
@@ -295,7 +296,7 @@ export default function RecordOfWorkEditorPage({ params }: { params: Promise<{ i
             {/* Footer */}
             <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
               <span className="text-xs text-gray-400">
-                {sw ? `Imehifadhiwa kiotomatiki · masomo ${total} kwa jumla · Maoni pekee ndiyo yanayoweza kuhaririwa` : `Auto-saved · ${total} lessons total · Only Reflection is editable`}
+                {sw ? `Imehifadhiwa kiotomatiki · vipindi ${total} kwa jumla · Tarehe na maoni vinaweza kuhaririwa` : `Auto-saved · ${total} lessons total · Date and reflection are editable`}
               </span>
               <div className="flex items-center gap-4 text-xs">
                 <span className="flex items-center gap-1.5 text-teal-600 font-bold">
@@ -335,7 +336,9 @@ function buildPrintHtml(row: ROWRecord, entries: ROWEntry[]): string {
   const school      = toTitleCase(row.school || '')
   const teacherName = toTitleCase(row.teacher_name || '')
   const term        = fmtTerm(row.term, sw)
-  const done        = entries.filter(e => e.reflection?.trim()).length
+  // Teaching completion = a recorded date taught, the same rule as the PDFs.
+  // (The on-screen counts above are reflection counts and are labelled as such.)
+  const recorded    = countConfirmed(entries)
   const total       = entries.length
 
   // TSC-standard Kiswahili terms — same convention as lib/row/pdfRenderer.ts.
@@ -344,14 +347,14 @@ function buildPrintHtml(row: ROWRecord, entries: ROWEntry[]): string {
         title: 'Rekodi ya Kazi Iliyofunzwa', school: 'Shule:', subject: 'Somo:', grade: 'Gredi:',
         teacher: 'Mwalimu:', term: 'Muhula:', year: 'Mwaka:',
         date: 'Tarehe', wkLesson: 'Wiki / Somo', workDone: 'Kazi Iliyofanywa', reflection: 'Maoni', signature: 'Sahihi',
-        status: `Rekodi inaendelea masomo yanapofunzwa — masomo ${done} kati ya ${total} yameandikwa`,
+        status: progressStatement('sw', recorded, total),
         printBtn: 'Chapisha / Hifadhi kama PDF',
       }
     : {
         title: 'Record of Work Covered', school: 'School:', subject: 'Subject:', grade: 'Grade:',
         teacher: 'Teacher:', term: 'Term:', year: 'Year:',
         date: 'Date', wkLesson: 'Wk / Lesson', workDone: 'Work Done', reflection: 'Reflection', signature: 'Signature',
-        status: `Record continues as lessons are completed — ${done} of ${total} lessons recorded`,
+        status: progressStatement('en', recorded, total),
         printBtn: 'Print / Save as PDF',
       }
 

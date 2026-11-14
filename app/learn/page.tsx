@@ -521,7 +521,7 @@ function LearnContent() {
           role:    'compass',
           content: res.status === 403
             ? "This account can't start a Compass session for this learner. Compass sessions are for the learner themselves."
-            : 'Something went wrong. Please try again.',
+            : (await pausedNoticeFrom(res)) ?? 'Something went wrong. Please try again.',
         }])
         return
       }
@@ -639,10 +639,11 @@ function LearnContent() {
       })
 
       if (!res.ok) {
+        const notice = await pausedNoticeFrom(res)
         setMessages(prev => [...prev, {
           id:      `err-${Date.now()}`,
           role:    'compass',
-          content: 'Something went wrong. Please try again.',
+          content: notice ?? 'Something went wrong. Please try again.',
         }])
         return
       }
@@ -1328,6 +1329,18 @@ function LearnContent() {
 }
 
 // ── Page wrapper (required for useSearchParams) ────────────────────────────────
+
+// Learner-data AI is paused for provider review (lib/ai/childDataPolicy.ts). The server says so with a
+// stable code; show its honest message rather than a generic "something went wrong".
+async function pausedNoticeFrom(res: Response): Promise<string | null> {
+  if (res.status !== 503) return null
+  try {
+    const body = await res.clone().json() as { code?: string; error?: string }
+    return body.code === 'AI_FEATURE_PAUSED_FOR_REVIEW' && body.error ? body.error : null
+  } catch {
+    return null
+  }
+}
 
 export default function LearnPage() {
   return (

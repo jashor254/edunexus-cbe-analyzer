@@ -3,6 +3,8 @@ import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized } from '@/lib/api/response'
+import { isChildDataAIPaused } from '@/lib/ai/childDataPolicy'
+import { apiChildDataAIPaused } from '@/lib/api/childDataAIResponse'
 import { evaluateInsha } from '@/lib/kiswahili/inshaEvaluator'
 import { resolveInshaCharge, recordInshaEssay } from '@/lib/kiswahili/inshaBilling'
 import { apiPaymentRequired } from '@/lib/payments/paywall'
@@ -25,6 +27,10 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) return apiUnauthorized()
+
+    // Containment: learner essays must not reach an AI provider while eligibility is unresolved.
+    // Before parsing, billing and quota so nothing is charged or reserved.
+    if (isChildDataAIPaused()) return apiChildDataAIPaused()
 
     const body: unknown = await req.json()
     const parsed = RequestSchema.safeParse(body)

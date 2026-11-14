@@ -2403,6 +2403,20 @@
       "parallel": "SAFE"
     },
     {
+      "file": "lib/testing/sharedReports.http.integration.test.ts",
+      "tier": "D2",
+      "domain": [
+        "security",
+        "parent"
+      ],
+      "auth": true,
+      "storage": false,
+      "http": true,
+      "mutatesDb": true,
+      "cleanup": "SELF_CLEANING",
+      "parallel": "SAFE"
+    },
+    {
       "file": "lib/testing/teacherSelfJoin.http.integration.test.ts",
       "tier": "D2",
       "domain": [
