@@ -9,7 +9,7 @@ export function toMarkdown(r) {
     '',
     `- Mode: **${r.target.mode}** (read-only; no network; no mutations)`,
     `- Tool: ${r.tool.name} ${r.tool.version} on Node ${r.tool.node}`,
-    `- Subject: git \`${r.subject.gitHead ?? 'unknown'}\`${r.subject.workingTreeDirty ? ' (working tree dirty)' : ''}`,
+    `- Subject: git \`${r.subject.gitHead ?? 'unknown'}\`${r.subject.workingTreeDirty === null ? ' (working tree state unknown)' : r.subject.workingTreeDirty ? ' (working tree dirty)' : ''}`,
     `- Checks run: ${r.checksRun.join(', ') || 'none'}`,
     `- Evidence digest: \`${r.evidenceDigest}\``,
     `- Findings: ${by('confirmed').length} confirmed, ${by('suspected').length} suspected, ${by('unverified').length} unverified (${r.findings.filter((f) => f.triage?.verdict === 'likely-false-positive').length} of them likely false positives)`,

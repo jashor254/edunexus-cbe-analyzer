@@ -30,6 +30,8 @@ Consequences:
 3. **Do not point it at an untrusted repository.** `git` is run with `core.fsmonitor` and hooks disabled, but git still parses the repository's configuration, and the scanner reads attacker-controlled file contents with regexes that have not been fuzzed for pathological input.
 4. Reports are only as trustworthy as the checks that produced them. `evidenceDigest` detects accidental or casual alteration of a report; it is an unkeyed hash, not a signature, and does not prove who produced it.
 
-**Update (Mission 005):** `--sandbox` now runs the passive checks inside a Bubblewrap + systemd-scope sandbox (see SANDBOX.md). That is isolation for FIRST-PARTY code only. The rule above still stands: third-party and AI-generated checks are not allowed, because the sandbox shares the host kernel and has no seccomp filter.
+**Update (Mission 005):** `--sandbox` now runs the passive checks inside a Bubblewrap + systemd-scope sandbox (see SANDBOX.md). That is isolation for FIRST-PARTY code only. The rule above still stands: third-party and AI-generated checks are not allowed, because the sandbox shares the host kernel and its seccomp policy is a denylist, not default-deny.
+
+**Update (Mission 007):** the host-side snapshot no longer uses `git archive`/`tar` (hostile-fixture tests, SANDBOX.md), a seccomp denylist is loaded into every sandboxed run, and each sandboxed run appends to a hash-chained audit log (AUDIT.md). Still: no untrusted third-party repositories and no third-party or AI-generated checks.
 
 Hold awareness: this directory lives on its own branch/worktree off `main`. It does not touch WhatsApp WIP, privacy-audit work, deployment settings or any production system.

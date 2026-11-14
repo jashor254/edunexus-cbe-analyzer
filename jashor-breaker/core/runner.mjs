@@ -82,7 +82,8 @@ export async function run({ adapters, configPath, targetId, only, mode = 'passiv
   const { findings, checkErrors, checksRun } = await executeChecks(ctx, checks)
 
   const head = (ctx.git(['rev-parse', 'HEAD']) ?? '').trim() || null
-  const dirty = (ctx.git(['status', '--porcelain']) ?? '').trim().length > 0
+  const status = ctx.git(['status', '--porcelain'])
+  const dirty = status === null ? null : status.trim().length > 0 // null = unknown (never silently "clean")
   return {
     tool: { name: 'jashor-breaker', version: '0.1.0', node: process.version },
     target: { id: target.id, adapter: target.adapter, environment: target.environment, mode },

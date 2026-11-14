@@ -1,10 +1,14 @@
 import { spawn, execFileSync } from 'node:child_process'
-import { accessSync, constants, mkdtempSync, realpathSync, rmSync, statSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { accessSync, closeSync, constants, mkdirSync, mkdtempSync, openSync, realpathSync, rmSync, statSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, relative, isAbsolute, sep } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { isAuthorised } from '../core/guard.mjs'
+import { GIT_HARDENING_ARGS as GIT_HARDENING, GIT_SAFE_ENV, FILTER_CONFIG_QUERY, filterNeutralisers } from '../core/gitsafe.mjs'
+import { buildSeccompProgram, seccompSupported, programDigest, SECCOMP_POLICY_VERSION } from './seccomp.mjs'
+import { digestOf } from './audit.mjs'
+import { planSnapshot, parseLsTree, blobIds, parseCatBatch, writePlan } from './snapshot.mjs'
 
 /**
  * Sandbox S1 — passive-only confinement of Jashor Breaker's OWN first-party scripts.
@@ -85,6 +89,7 @@ export function staticProbe(tools = DEFAULT_TOOLS) {
   let controllers = ''
   try { controllers = readFileSync(`/sys/fs/cgroup/user.slice/user-${uid}.slice/user@${uid}.service/cgroup.controllers`, 'utf8') } catch { /* absent */ }
   for (const c of ['cpu', 'memory', 'pids']) if (!controllers.split(/\s+/).includes(c)) missing.push(`cgroup-controller:${c}`)
+  if (!seccompSupported()) missing.push(`seccomp-policy:${process.arch}`)
   for (const d of ['/usr/lib', '/usr/lib64']) if (!existsSync(d)) missing.push(d)
   return { ok: missing.length === 0, missing }
 }
@@ -101,36 +106,46 @@ const REGISTRY = new WeakSet()
 /** Snapshots created by createSnapshot() only: a caller cannot mount an arbitrary host directory as the target. */
 export const isSnapshot = (x) => typeof x === 'object' && x !== null && REGISTRY.has(x)
 
-const MAX_SNAPSHOT_BYTES = 512 * 1024 * 1024
-const GIT_SAFE_ENV = { PATH: '/usr/bin:/bin', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', GIT_TERMINAL_PROMPT: '0' }
+/** true/false, or null (unknown) when repo-configured filters cannot be neutralised. Never runs a repo filter. */
+function workingTreeDirty(git) {
+  let configured = ''
+  try { configured = git(FILTER_CONFIG_QUERY, { encoding: 'utf8' }) } catch { /* exit 1 = no filters configured */ }
+  const neutral = filterNeutralisers(configured)
+  if (neutral === null) return null
+  return git([...neutral, 'status', '--porcelain'], { encoding: 'utf8' }).trim().length > 0
+}
 
 /**
- * Export the COMMITTED tree of an authorised target into a private temp dir (git archive of HEAD), plus a
- * manifest of tracked paths. Uncommitted and untracked files (.env.local, scratch work) are therefore never
- * present in the sandbox. Requires the result of authorise().
+ * Export the COMMITTED tree of an authorised target into a private temp dir, plus a manifest of its paths.
+ * Raw blobs are read with `git ls-tree` + `git cat-file --batch` (no archive, no tar, no attribute filters),
+ * every entry is validated before anything is written (sandbox/snapshot.mjs), and nothing is written outside
+ * the private temp dir. Uncommitted and untracked files (.env.local, scratch work) are never present.
+ * Requires the result of authorise().
  * @param {ReturnType<import('./guard.mjs').authorise>} authorised
  */
-export function createSnapshot(authorised, { maxBytes = MAX_SNAPSHOT_BYTES } = {}) {
+export function createSnapshot(authorised, { limits } = {}) {
   if (!isAuthorised(authorised)) throw new Error('Snapshot refused: not an authorise() result (explicit target authorisation is required)')
   const root = authorised.rootDir
   const base = mkdtempSync(join(tmpdir(), 'jb-snap-'))
   const treeDir = join(base, 'tree')
   const metaDir = join(base, 'meta')
   try {
-    execFileSync('/usr/bin/mkdir', [treeDir, metaDir])
-    const tarFile = join(base, 'tree.tar')
-    const git = (args, o = {}) => execFileSync('/usr/bin/git', ['-C', root, ...args], { env: GIT_SAFE_ENV, maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'], ...o })
+    mkdirSync(treeDir, { mode: 0o700 })
+    mkdirSync(metaDir, { mode: 0o700 })
+    const git = (args, o = {}) => execFileSync('/usr/bin/git', [...GIT_HARDENING, '-C', root, ...args], { env: GIT_SAFE_ENV, maxBuffer: 512 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'], ...o })
     const head = git(['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
-    git(['archive', '--format=tar', '-o', tarFile, 'HEAD'])
-    if (statSync(tarFile).size > maxBytes) throw new Error(`Snapshot exceeds ${maxBytes} bytes; refusing`)
-    // --no-same-owner/permissions: nothing in the archive can set ownership, setuid bits or absolute paths.
-    execFileSync('/usr/bin/tar', ['-xf', tarFile, '-C', treeDir, '--no-same-owner', '--no-same-permissions'], { stdio: 'ignore' })
-    rmSync(tarFile)
-    const tracked = git(['ls-files', '-z'], { encoding: 'utf8' })
-    writeFileSync(join(metaDir, 'files.txt'), tracked)
+    const plan = planSnapshot(parseLsTree(git(['ls-tree', '-r', '-z', '-l', '--full-tree', 'HEAD'], { encoding: 'utf8' })), limits)
+    const expected = new Map([...plan.files, ...plan.symlinkEntries].map((e) => [e.oid, e.size]))
+    const ids = blobIds(plan)
+    const contents = ids.length === 0 ? new Map() : parseCatBatch(git(['cat-file', '--batch'], { input: `${ids.join('\n')}\n`, stdio: ['pipe', 'pipe', 'ignore'] }), expected)
+    const written = writePlan(plan, contents, treeDir)
+    const droppedPaths = new Set(written.dropped.map((d) => d.path))
+    const manifest = [...plan.files, ...plan.symlinkEntries].map((e) => e.path).filter((p) => !droppedPaths.has(p)).join('\0')
+    writeFileSync(join(metaDir, 'files.txt'), manifest ? `${manifest}\0` : '')
     const handle = Object.freeze({
       treeDir, metaDir, gitHead: head,
-      dirty: (git(['status', '--porcelain'], { encoding: 'utf8' }) ?? '').trim().length > 0,
+      dirty: workingTreeDirty(git),
+      stats: Object.freeze({ files: written.files, symlinks: written.symlinks, dropped: written.dropped.length, bytes: plan.totalBytes }),
       cleanup: () => rmSync(base, { recursive: true, force: true }),
     })
     REGISTRY.add(handle)
@@ -174,6 +189,7 @@ export function buildArgv(spec) {
 
   const bw = [
     '--unshare-user', '--unshare-ipc', '--unshare-pid', '--unshare-net', '--unshare-uts', '--unshare-cgroup', '--die-with-parent', '--new-session', '--cap-drop', 'ALL', '--disable-userns',
+    '--seccomp', '3', // BPF program passed on fd 3 by runConfined (sandbox/seccomp.mjs)
     '--hostname', 'jb-sandbox',
     '--ro-bind', '/usr/lib', '/usr/lib', '--ro-bind', '/usr/lib64', '/usr/lib64',
     '--symlink', 'usr/lib', '/lib', '--symlink', 'usr/lib64', '/lib64',
@@ -205,6 +221,24 @@ export function buildArgv(spec) {
   return { cmd: tools.systemdRun, argv: [...sd, tools.bwrap, ...bw], limits }
 }
 
+/** Bump when ANY isolation property changes (flags, mounts, snapshot rules, seccomp policy). Recorded in every audit record. */
+export const SANDBOX_POLICY_VERSION = 's2.1'
+export const SECURITY_POLICY_VERSION = `jb-sandbox-${SANDBOX_POLICY_VERSION}/seccomp-${SECCOMP_POLICY_VERSION}/snapshot-1`
+
+/**
+ * Digest of the exact confinement configuration a run would use: bwrap/systemd flags (per-run names and snapshot
+ * paths replaced by tokens), the seccomp program, the node and bwrap versions, and the limits. Two runs with the
+ * same digest were isolated the same way.
+ */
+export function confinementDigest(spec) {
+  const tools = spec.tools ?? DEFAULT_TOOLS
+  const { argv, limits } = buildArgv({ ...spec, unit: 'jb-sandbox-digest' })
+  const norm = argv.map((a) => (a === 'jb-sandbox-digest' ? '<unit>' : spec.snapshot && a === spec.snapshot.treeDir ? '<target>' : spec.snapshot && a === spec.snapshot.metaDir ? '<meta>' : a))
+  let bwrapVersion = 'unknown'
+  try { bwrapVersion = execFileSync(tools.bwrap, ['--version'], { env: launcherEnv(), encoding: 'utf8', timeout: 5000 }).trim() } catch { /* recorded as unknown */ }
+  return digestOf({ policy: SECURITY_POLICY_VERSION, argv: norm, limits, seccompDigest: programDigest(buildSeccompProgram()), node: process.version, bwrap: bwrapVersion })
+}
+
 /**
  * Run a first-party script confined. Resolves (never throws) with the outcome so callers can assert on it.
  * @returns {Promise<{code:number|null, signal:string|null, stdout:string, stderr:string, timedOut:boolean, outputTruncated:boolean, durationMs:number}>}
@@ -213,10 +247,17 @@ export function runConfined(spec) {
   const unit = `jb-sandbox-${randomBytes(6).toString('hex')}`
   const tools = spec.tools ?? DEFAULT_TOOLS
   const { cmd, argv, limits } = buildArgv({ ...spec, unit })
+  // The seccomp program goes to bwrap on fd 3 via a private, immediately-unlinked file (0600 in a 0700 dir).
+  const secDir = mkdtempSync(join(tmpdir(), 'jb-seccomp-'))
+  const secFile = join(secDir, 'policy.bpf')
+  writeFileSync(secFile, buildSeccompProgram(), { mode: 0o600 })
+  const secFd = openSync(secFile, 'r')
+  rmSync(secDir, { recursive: true, force: true })
   return new Promise((resolve) => {
     const started = Date.now()
     // cwd = filesystem root-ish neutral dir; env built from scratch (nothing inherited).
-    const child = spawn(cmd, argv, { cwd: '/', env: launcherEnv(), stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(cmd, argv, { cwd: '/', env: launcherEnv(), stdio: ['ignore', 'pipe', 'pipe', secFd] })
+    closeSync(secFd)
     let stdout = ''
     let stderr = ''
     let truncated = false

@@ -21,5 +21,12 @@ try { writeFileSync('/usr/lib/jb-canary', 'x'); violations.push('/usr/lib is wri
 const pids = readdirSync('/proc').filter((n) => /^\d+$/.test(n))
 check(pids.length <= 5, `host processes visible in /proc (${pids.length})`)
 
+// The seccomp filter must be active (mode 2) and no privilege may be gainable (NoNewPrivs, no capabilities).
+const status = readFileSync('/proc/self/status', 'utf8')
+const field = (name) => (new RegExp(`^${name}:\\s*(.*)$`, 'm').exec(status) ?? [])[1]?.trim()
+check(field('Seccomp') === '2', `seccomp filter not active (Seccomp: ${field('Seccomp')})`)
+check(/^0+$/.test(field('CapEff') ?? 'x'), `effective capabilities not empty (CapEff: ${field('CapEff')})`)
+check(/^0+$/.test(field('CapBnd') ?? 'x'), `capability bounding set not empty (CapBnd: ${field('CapBnd')})`)
+
 console.log(JSON.stringify({ ok: violations.length === 0, violations, interfaces: ifaces }))
 process.exit(violations.length === 0 ? 0 : 1)

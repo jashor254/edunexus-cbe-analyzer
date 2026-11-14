@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process'
+import { GIT_HARDENING_ARGS, GIT_SAFE_ENV, FILTER_CONFIG_QUERY, filterNeutralisers } from './gitsafe.mjs'
 import { readFileSync, realpathSync, statSync } from 'node:fs'
 import { resolve, relative, isAbsolute, sep } from 'node:path'
 
@@ -61,9 +62,15 @@ export function createContext(rootDir, adapterConfig, opts = {}) {
     git(args) {
       if (!Array.isArray(args) || !GIT_READONLY.has(args[0])) throw new Error(`git subcommand not permitted: ${args?.[0]}`)
       if (typeof opts.git === 'function') return opts.git(args)
+      const runGit = (a) => execFileSync('git', [...GIT_HARDENING_ARGS, ...a], { cwd: root, env: GIT_SAFE_ENV, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] })
       try {
-        // Neutralise repo-configured command hooks that `git status` could otherwise execute (core.fsmonitor, hooks).
-        return execFileSync('git', ['-c', 'core.fsmonitor=false', '-c', 'core.hooksPath=/dev/null', ...args], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] })
+        if (args[0] !== 'status') return runGit(args)
+        // `status` can run a repo-configured filter.<name>.clean command. Blank every configured filter first;
+        // if that is not possible, report "unknown" (null) rather than run it.
+        let configured = ''
+        try { configured = runGit(FILTER_CONFIG_QUERY) } catch { /* exit 1 = no filters configured */ }
+        const neutral = filterNeutralisers(configured)
+        return neutral === null ? null : runGit([...neutral, ...args])
       } catch {
         return null
       }
