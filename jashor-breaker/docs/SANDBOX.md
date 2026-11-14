@@ -54,6 +54,31 @@ Finding fixed in this increment: in Mission 005 the snapshot called plain `git s
 * **Why a denylist.** An allowlist needs the complete Node syscall set per kernel and glibc; guessing it breaks Node or silently allows too much. The denylist was applied only after the whole existing suite (Node startup, `--permission`, worker, resource probes) ran under it. Path to an allowlist: record real syscalls with `strace -f -c` on the worker across hosts, review, then flip the default.
 * **Evidence.** The program is evaluated in JS for every denied call, allowed calls, flag and domain conditions; the same program is loaded into a real bubblewrap and 14 denied calls are issued from a first-party probe, each compared with an unfiltered control run; the in-sandbox canary requires `Seccomp: 2` and empty capability sets before any run proceeds. The program digest is pinned in the tests and recorded in every report and audit record.
 
+## File access, containment and platform support
+
+`core/safeopen.mjs` opens a file once and decides on the open descriptor (type, size, and that its real location is under the target root), so there is no stat-then-read gap.
+
+**Supported:** Linux only, with a usable procfs. Containment of the *open* file is read from `/proc/self/fd/N`, which names the inode actually held and cannot be raced. Tested on Ubuntu 26.04 (kernel 7.0), Node 22.23.5 and 24.22.3. The sandbox itself (bubblewrap, systemd user scope, seccomp) is Linux x86_64 only.
+
+**Requirements:** `/proc` mounted and readable by the process (hidepid does not affect `/proc/self`); any ordinary filesystem (ext4, overlayfs, bind mounts: paths are as seen in the process's mount namespace). A file deleted while open resolves to `... (deleted)`, which is outside the root and refused.
+
+**When the requirements are not met** (checked by actually resolving `/proc/self/fd` on this module's own file, not inferred from the platform name):
+
+| Situation | Behaviour |
+|---|---|
+| Non-Linux (macOS, Windows, BSD) | `createContext` **refuses to start** with "Descriptor-based containment is unavailable". |
+| Linux without `/proc` (some minimal containers) | Same refusal. Without it every read would return "unreadable" and checks would quietly report nothing. |
+| Operator explicitly passes `--allow-path-only-containment` (or `allowPathOnlyContainment`) | Starts in **path-only** mode: the earlier path/realpath symlink checks still apply, the descriptor guarantee does not. Recorded in the report as `subject.containment: "path-only"`. The flag has no effect where descriptor containment works. Combining it with `--sandbox` is **refused** (exit 3): path-only mode is for trusted, operator-owned checkouts only and is never available for untrusted or adversarial scans, which must use `--sandbox` (immutable snapshot). A run in path-only mode prints a warning on stderr. |
+| Sandbox worker | The target is a read-only bind-mounted snapshot (cannot be swapped; escaping symlinks already dropped), and Node's permission model cannot read `/proc`, so it runs `immutable-snapshot`. |
+
+Every report carries `subject.containment` (`descriptor`, `path-only`, or `immutable-snapshot` for sandbox runs).
+
+**Remaining filesystem race assumptions (not eliminated):**
+* Content can change between `open` and `read` (a concurrently modified file yields inconsistent content). Identity and location cannot be swapped; content can still be rewritten in place.
+* A hard link inside the target to a file outside it passes the containment check, because the descriptor's path is the in-root name. Creating one needs write access to the target repository and access to the outside file on the same filesystem.
+* `/proc` and the root directory's identity are trusted. If the root is replaced after the context is created, reads are refused (fail closed), not redirected.
+* Audit log: the open, `fstat` and identity checks protect the inode that is written; a writer with permissions on a parent directory can still move the log directory after the fact, which affects *where* the log lives, not what was written through the validated descriptor. A hash chain is tamper evidence only (see AUDIT.md).
+
 ## Audit log (S2)
 
 See `docs/AUDIT.md`.

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { readRegularFile, sizeOfRegularFile } from './safeopen.mjs'
+import { descriptorContainmentSupport, readRegularFile, sizeOfRegularFile } from './safeopen.mjs'
 import { GIT_HARDENING_ARGS, GIT_SAFE_ENV, FILTER_CONFIG_QUERY, filterNeutralisers } from './gitsafe.mjs'
 import { readFileSync, realpathSync, statSync } from 'node:fs'
 import { resolve, relative, isAbsolute, sep } from 'node:path'
@@ -47,9 +47,19 @@ export function createContext(rootDir, adapterConfig, opts = {}) {
   // Live targets: the open file's real location (from /proc/self/fd, race-free) must stay under the root.
   // `opts.immutableRoot` is set ONLY by the sandbox worker, whose root is a read-only bind-mounted snapshot that
   // cannot be swapped and whose escaping symlinks were already dropped; node --permission there cannot read /proc.
-  const fdOpts = opts.immutableRoot === true ? {} : { root: realRoot }
+  // Where that check cannot be made (not Linux, or no usable /proc) the context REFUSES to start rather than
+  // quietly reading with path checks only; `allowPathOnlyContainment` is an explicit, recorded opt-out.
+  let containment = 'immutable-snapshot'
+  if (opts.immutableRoot !== true) {
+    const support = descriptorContainmentSupport({ platform: opts.platformForTests })
+    if (support.supported) containment = 'descriptor'
+    else if (opts.allowPathOnlyContainment === true) containment = 'path-only'
+    else throw new Error(`Descriptor-based containment is unavailable: ${support.reason}. Refusing to read the target with path checks only; pass allowPathOnlyContainment to accept the weaker mode explicitly.`)
+  }
+  const fdOpts = containment === 'descriptor' ? { root: realRoot } : {}
   const api = {
     root,
+    containment,
     adapterConfig,
     exists: (rel) => safe(rel) !== null,
     /** @returns {number} size in bytes; 0 if missing or not a regular file */

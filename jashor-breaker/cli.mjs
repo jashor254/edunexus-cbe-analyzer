@@ -24,6 +24,7 @@ const { positionals, values } = parseArgs({
     'fail-on': { type: 'string' },
     json: { type: 'boolean', default: false },
     sandbox: { type: 'boolean', default: false },
+    'allow-path-only-containment': { type: 'boolean', default: false },
     'audit-log': { type: 'string' },
     'expect-head': { type: 'string' },
     'expect-count': { type: 'string' },
@@ -63,12 +64,19 @@ if (positionals[0] === 'audit-verify' && positionals[1]) {
 }
 
 if (positionals[0] !== 'run') {
-  console.error('usage: jashor-breaker run --config <targets.json> --target <id> [--check <id>]... [--out <dir>] [--json] [--fail-on <severity>] [--sandbox]\n       jashor-breaker sandbox-probe\n       jashor-breaker verify <report.json>\n       jashor-breaker audit-verify <audit.jsonl> [--expect-head <hash>] [--expect-count <n>]')
+  console.error('usage: jashor-breaker run --config <targets.json> --target <id> [--check <id>]... [--out <dir>] [--json] [--fail-on <severity>] [--sandbox] [--allow-path-only-containment]\n       jashor-breaker sandbox-probe\n       jashor-breaker verify <report.json>\n       jashor-breaker audit-verify <audit.jsonl> [--expect-head <hash>] [--expect-count <n>]')
   process.exit(2)
 }
 if (values['fail-on'] && !SEVERITIES.includes(values['fail-on'])) {
   console.error(`ERROR: --fail-on must be one of ${SEVERITIES.join(', ')}`)
   process.exit(2)
+}
+
+if (values.sandbox && values['allow-path-only-containment']) {
+  // Sandbox runs are the mode for untrusted or adversarial targets; they read an immutable snapshot and never
+  // weaken containment. Refuse the combination instead of silently ignoring the flag.
+  console.error('REFUSED: --allow-path-only-containment cannot be combined with --sandbox. Path-only mode is for trusted, operator-owned checkouts only.')
+  process.exit(3)
 }
 
 try {
@@ -78,6 +86,7 @@ try {
     targetId: values.target,
     only: values.check,
     mode: values.mode,
+    ...(values.sandbox ? {} : { allowPathOnlyContainment: values['allow-path-only-containment'] }),
     ...(values.sandbox ? { auditLog: resolve(values['audit-log'] ?? join(homedir(), '.local', 'state', 'jashor-breaker', 'audit.jsonl')) } : {}),
   })
   if (values.out) {
@@ -86,6 +95,7 @@ try {
     writeFileSync(resolve(dir, 'report.json'), `${JSON.stringify(result, null, 2)}\n`)
     writeFileSync(resolve(dir, 'report.md'), `${toMarkdown(result)}\n`)
   }
+  if (result.subject?.containment === 'path-only') console.error('WARNING: running in path-only containment mode (weaker than descriptor containment). Use only on a trusted, operator-owned checkout; never on untrusted or adversarial content.')
   console.log(values.json ? JSON.stringify(result, null, 2) : toMarkdown(result))
   if (result.audit) console.error(`audit: record ${result.audit.seq}, hash ${result.audit.recordHash} (keep this checkpoint OUTSIDE the log; see docs/AUDIT.md)`)
   if (result.checkErrors.length) process.exit(2)

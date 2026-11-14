@@ -5,6 +5,7 @@
 // Read-only. No writes, no network, no environment access.
 import { closeSync, constants, fstatSync, openSync, readFileSync, realpathSync } from 'node:fs'
 import { sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 // O_NONBLOCK: opening a FIFO must not hang. It has no effect on regular files.
 const READ_FLAGS = constants.O_RDONLY | constants.O_NONBLOCK
@@ -31,7 +32,7 @@ export function openRegularFile(abs, opts = {}) {
     const st = fstatSync(fd)
     if (!st.isFile()) { closeSync(fd); return { ok: false, reason: 'not-regular' } }
     if (opts.maxBytes !== undefined && st.size > opts.maxBytes) { closeSync(fd); return { ok: false, reason: 'too-large' } }
-    if (opts.root !== undefined && process.platform === 'linux') {
+    if (opts.root !== undefined) {
       let real
       try { real = realpathSync(`/proc/self/fd/${fd}`) } catch { closeSync(fd); return { ok: false, reason: 'unreadable' } }
       if (real !== opts.root && !real.startsWith(opts.root + sep)) { closeSync(fd); return { ok: false, reason: 'outside-root' } }
@@ -56,4 +57,28 @@ export function sizeOfRegularFile(abs, opts = {}) {
   if (!o.ok) return null
   closeSync(o.fd)
   return o.size
+}
+
+let cachedSupport
+/**
+ * Can this host enforce descriptor-based containment? It needs Linux and a usable procfs: /proc/self/fd/N must
+ * resolve to the real location of the file we hold. Probed by DOING it once on this module's own file, not
+ * assumed from the platform name. Callers must not treat "unsupported" as "fine": see createContext.
+ * @param {{platform?:string}} [o] platform override for tests (bypasses the cache)
+ * @returns {{supported:true} | {supported:false, reason:string}}
+ */
+export function descriptorContainmentSupport(o = {}) {
+  const platform = o.platform ?? process.platform
+  if (platform !== 'linux') return { supported: false, reason: `descriptor containment needs Linux /proc/self/fd (platform: ${platform})` }
+  if (o.platform === undefined && cachedSupport) return cachedSupport
+  let result
+  try {
+    const self = fileURLToPath(import.meta.url)
+    const fd = openSync(self, READ_FLAGS)
+    try { result = realpathSync(`/proc/self/fd/${fd}`) === realpathSync(self) ? { supported: true } : { supported: false, reason: '/proc/self/fd did not resolve to the opened file' } } finally { closeSync(fd) }
+  } catch {
+    result = { supported: false, reason: '/proc is not mounted or not readable (descriptor containment unavailable)' }
+  }
+  if (o.platform === undefined) cachedSupport = result
+  return result
 }

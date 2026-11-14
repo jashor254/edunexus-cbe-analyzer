@@ -73,7 +73,7 @@ export async function runSandboxed({ adapters, configPath, targetId, only, mode 
     const report = {
       tool: { name: 'jashor-breaker', version: '0.1.0', node: process.version },
       target: { id: target.id, adapter: target.adapter, environment: target.environment, mode },
-      subject: { gitHead: snapshot.gitHead, workingTreeDirty: snapshot.dirty, snapshotOf: 'HEAD (committed files only)', snapshot: snapshot.stats },
+      subject: { gitHead: snapshot.gitHead, workingTreeDirty: snapshot.dirty, snapshotOf: 'HEAD (committed files only)', snapshot: snapshot.stats, containment: 'immutable-snapshot' },
       isolation: {
         mechanism: 'bubblewrap + systemd user scope + seccomp',
         namespaces: ['user', 'pid', 'net', 'ipc', 'uts', 'cgroup'],

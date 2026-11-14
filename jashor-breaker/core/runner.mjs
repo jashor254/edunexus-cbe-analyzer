@@ -73,12 +73,12 @@ export async function executeChecks(ctx, checks) {
 }
 
 /** @param {{adapters:Record<string, any>, configPath:string, targetId?:string, only?:string[], mode?:string, now?:Date}} opts */
-export async function run({ adapters, configPath, targetId, only, mode = 'passive', now }) {
+export async function run({ adapters, configPath, targetId, only, mode = 'passive', now, allowPathOnlyContainment = false }) {
   const { target, rootDir } = authorise({ configPath, targetId, mode, now })
   const { adapterConfig, checks } = prepareAdapter({ adapters, adapterId: target.adapter, rootDir, only })
 
   const clock = now ?? new Date()
-  const ctx = createContext(rootDir, freeze(structuredClone(adapterConfig)), { now: clock })
+  const ctx = createContext(rootDir, freeze(structuredClone(adapterConfig)), { now: clock, allowPathOnlyContainment })
   const { findings, checkErrors, checksRun } = await executeChecks(ctx, checks)
 
   const head = (ctx.git(['rev-parse', 'HEAD']) ?? '').trim() || null
@@ -87,7 +87,7 @@ export async function run({ adapters, configPath, targetId, only, mode = 'passiv
   return {
     tool: { name: 'jashor-breaker', version: '0.1.0', node: process.version },
     target: { id: target.id, adapter: target.adapter, environment: target.environment, mode },
-    subject: { gitHead: head, workingTreeDirty: dirty },
+    subject: { gitHead: head, workingTreeDirty: dirty, containment: ctx.containment },
     generatedAt: clock.toISOString(),
     checksRun,
     checkErrors,
