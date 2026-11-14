@@ -11,8 +11,11 @@ const GIT_READONLY = new Set(['ls-files', 'rev-parse', 'status'])
  * well-behaved check can do by accident; it is NOT a sandbox (see docs/SAFETY.md).
  * @param {string} rootDir
  * @param {Record<string, any>} adapterConfig
+ * @param {{ now?: Date, git?: (args:string[]) => string|null }} [opts]
+ *   now: the run's clock (checks must not call Date.now(), so reports stay reproducible).
+ *   git: replaces the host git binary (used inside the sandbox, where there is no git and no .git).
  */
-export function createContext(rootDir, adapterConfig) {
+export function createContext(rootDir, adapterConfig, opts = {}) {
   const root = resolve(rootDir)
   const realRoot = realpathSync(root)
 
@@ -54,8 +57,10 @@ export function createContext(rootDir, adapterConfig) {
       if (!abs || !statSync(abs).isFile()) return null
       return readFileSync(abs, 'utf8')
     },
+    now: opts.now ?? new Date(),
     git(args) {
       if (!Array.isArray(args) || !GIT_READONLY.has(args[0])) throw new Error(`git subcommand not permitted: ${args?.[0]}`)
+      if (typeof opts.git === 'function') return opts.git(args)
       try {
         // Neutralise repo-configured command hooks that `git status` could otherwise execute (core.fsmonitor, hooks).
         return execFileSync('git', ['-c', 'core.fsmonitor=false', '-c', 'core.hooksPath=/dev/null', ...args], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] })

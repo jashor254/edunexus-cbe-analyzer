@@ -25,7 +25,7 @@ export const lockfileSources = {
     const sample = (arr) => `${arr.length} total; first: ${arr.slice(0, 8).join(', ')}`
     if (offRegistry.length) {
       findings.push(makeFinding({
-        key: 'off-registry', checkId: CHECK, severity: 'medium', classification: 'confirmed',
+        key: 'off-registry', checkId: CHECK, kind: 'control-failure', severity: 'medium', classification: 'confirmed',
         title: 'Lockfile contains packages resolved outside the public npm registry',
         rationale: 'Git, tarball-URL or alternate-registry sources bypass registry provenance and are mutable more easily.',
         evidence: [{ kind: 'file', location: 'package-lock.json', detail: sample(offRegistry) }],
@@ -34,7 +34,7 @@ export const lockfileSources = {
     }
     if (noIntegrity.length) {
       findings.push(makeFinding({
-        key: 'no-integrity', checkId: CHECK, severity: 'low', classification: 'confirmed',
+        key: 'no-integrity', checkId: CHECK, kind: 'control-failure', severity: 'low', classification: 'confirmed',
         title: 'Lockfile entries lack integrity hashes',
         rationale: 'Without an integrity field npm cannot verify the downloaded tarball.',
         evidence: [{ kind: 'file', location: 'package-lock.json', detail: sample(noIntegrity) }],

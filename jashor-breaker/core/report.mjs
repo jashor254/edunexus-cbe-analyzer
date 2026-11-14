@@ -1,4 +1,5 @@
 import { SEVERITIES } from './finding.mjs'
+import { CATEGORIES, CATEGORY_LABEL, categorise, countByCategory } from './categories.mjs'
 
 /** @param {any} r run result */
 export function toMarkdown(r) {
@@ -12,6 +13,7 @@ export function toMarkdown(r) {
     `- Checks run: ${r.checksRun.join(', ') || 'none'}`,
     `- Evidence digest: \`${r.evidenceDigest}\``,
     `- Findings: ${by('confirmed').length} confirmed, ${by('suspected').length} suspected, ${by('unverified').length} unverified (${r.findings.filter((f) => f.triage?.verdict === 'likely-false-positive').length} of them likely false positives)`,
+    `- Categories: ${CATEGORIES.map((c) => `${countByCategory(r.findings)[c]} ${CATEGORY_LABEL[c].toLowerCase()}`).join(' · ')}`,
     '',
     'Evidence is redacted. Secret-shaped values appear only as `[REDACTED:<pattern>:<fingerprint>]`.',
     '',
@@ -20,12 +22,12 @@ export function toMarkdown(r) {
     lines.push('## Check errors', '', ...r.checkErrors.map((e) => `- **${e.checkId}**: ${e.message}`), '')
   }
   const fp = r.findings.filter((f) => f.triage?.verdict === 'likely-false-positive')
-  for (const cls of ['confirmed', 'suspected', 'unverified']) {
-    const list = by(cls).filter((f) => !fp.includes(f)).sort((a, b) => SEVERITIES.indexOf(b.severity) - SEVERITIES.indexOf(a.severity))
+  for (const cat of CATEGORIES) {
+    const list = r.findings.filter((f) => categorise(f) === cat && !fp.includes(f)).sort((x, y) => SEVERITIES.indexOf(y.severity) - SEVERITIES.indexOf(x.severity) || x.id.localeCompare(y.id))
     if (!list.length) continue
-    lines.push(`## ${cls[0].toUpperCase()}${cls.slice(1)}`, '')
+    lines.push(`## ${CATEGORY_LABEL[cat]} (${list.length})`, '')
     for (const f of list) {
-      lines.push(`### ${f.id} — ${f.title}`, '', `Severity: **${f.severity}** · Check: \`${f.checkId}\``, '', f.rationale, '')
+      lines.push(`### ${f.id} — ${f.title}`, '', `Severity: **${f.severity}** · Classification: ${f.classification} · Check: \`${f.checkId}\``, '', f.rationale, '')
       for (const e of f.evidence) lines.push(`- \`${e.location}\` (${e.kind}): ${e.detail}`)
       lines.push('', `Reproduce: \`${f.reproduce}\``, `Hint (advice only): ${f.remediationHint}`, '')
     }

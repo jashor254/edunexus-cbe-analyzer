@@ -2,7 +2,7 @@
   "$id": "jashor-breaker/edunexus-adapter-config",
   "type": "object",
   "additionalProperties": false,
-  "required": ["nodePolicy", "secretScan"],
+  "required": ["nodePolicy", "secretScan", "acceptedRisks"],
   "properties": {
     "nodePolicy": {
       "type": "object",
@@ -12,6 +12,17 @@
         "line": { "type": "integer" },
         "minimumPatch": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
         "source": { "type": "string", "description": "Official advisory URL the floor comes from (documentation only; never fetched)." }
+      }
+    },
+    "acceptedRisks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["registerPath", "warnWithinDays", "requireOwner", "requireReviewDate"],
+      "properties": {
+        "registerPath": { "type": "string", "minLength": 1 },
+        "warnWithinDays": { "type": "integer", "minimum": 0, "maximum": 365 },
+        "requireOwner": { "type": "boolean" },
+        "requireReviewDate": { "type": "boolean" }
       }
     },
     "secretScan": {

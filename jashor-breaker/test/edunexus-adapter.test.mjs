@@ -34,7 +34,7 @@ test('edunexus adapter finds the seeded issues with correct classification', asy
   const dir = fixture()
   const r = await run({ adapters, configPath: writeConfig(dir), targetId: 'fixture' })
   assert.deepEqual(r.checkErrors, [])
-  assert.equal(r.checksRun.length, 5)
+  assert.equal(r.checksRun.length, 6) // five original checks + accepted-risks (no register in this fixture, so it reports nothing)
   assert.ok(has(r, 'node-runtime', 'confirmed', 'low'), 'floating .nvmrc')
   assert.ok(has(r, 'node-runtime', 'confirmed', 'medium'), 'exact below floor')
   assert.ok(has(r, 'node-runtime', 'unverified'), 'platform runtime gap is unverified, not confirmed')

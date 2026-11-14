@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -49,3 +49,15 @@ export const FAKE_TAILS = Object.values(FAKE).map((v) => v.slice(-12))
 
 /** Build `NAME = "value"` at runtime so no assignment-shaped literal sits in source (keeps repo secret scanners quiet). */
 export const assign = (name, value) => [name, ' = ', JSON.stringify(value)].join('')
+
+/** Like makeRepo, but commits (the sandbox snapshots HEAD) and can add symlinks and untracked files. */
+export function makeCommittedRepo(files, { symlinks = {}, untracked = {} } = {}) {
+  const dir = makeRepo(files)
+  for (const [rel, target] of Object.entries(symlinks)) {
+    symlinkSync(target, join(dir, rel))
+  }
+  execFileSync('git', ['add', '-A'], { cwd: dir })
+  execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.invalid', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', 'commit', '-q', '-m', 'fixture'], { cwd: dir })
+  for (const [rel, content] of Object.entries(untracked)) writeFileSync(join(dir, rel), content)
+  return dir
+}

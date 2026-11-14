@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { authorise } from './guard.mjs'
 import { createContext } from './context.mjs'
 import { evidenceDigest } from './finding.mjs'
+import { countByCategory } from './categories.mjs'
 import { redactLine } from './redactor.mjs'
 import { validate } from './schema.mjs'
 
@@ -27,12 +28,14 @@ function freeze(o) {
   return o
 }
 
-/** @param {{adapters:Record<string, any>, configPath:string, targetId?:string, only?:string[], mode?:string, now?:Date}} opts */
-export async function run({ adapters, configPath, targetId, only, mode = 'passive', now }) {
-  const { target, rootDir } = authorise({ configPath, targetId, mode, now })
+/**
+ * Resolve and validate an adapter and its selected checks BEFORE anything runs.
+ * Shared by the in-process runner, the sandbox host and the sandbox worker so all three apply identical rules.
+ */
+export function prepareAdapter({ adapters, adapterId, rootDir, only }) {
   // hasOwn: an adapter name like "constructor" must not resolve to Object.prototype members.
-  if (!Object.hasOwn(adapters, target.adapter)) throw new Error(`No adapter registered for "${target.adapter}"`)
-  const adapter = adapters[target.adapter]
+  if (!Object.hasOwn(adapters, adapterId)) throw new Error(`No adapter registered for "${adapterId}"`)
+  const adapter = adapters[adapterId]
 
   // Validate EVERY check the adapter declares (not just the selected ones), before anything runs.
   for (const c of adapter.checks) {
@@ -48,10 +51,12 @@ export async function run({ adapters, configPath, targetId, only, mode = 'passiv
   const adapterConfig = adapter.loadConfig(rootDir)
   const cfgErrors = validate(adapterConfig, JSON.parse(readFileSync(adapter.configSchemaPath, 'utf8')))
   if (cfgErrors.length) throw new Error(`Adapter config invalid: ${cfgErrors.join('; ')}`)
-
-  const ctx = createContext(rootDir, freeze(structuredClone(adapterConfig)))
   const checks = adapter.checks.filter((c) => !only?.length || only.includes(c.id))
+  return { adapter, adapterConfig, checks }
+}
 
+/** Run checks against a context. Shared by the in-process runner and the sandbox worker. */
+export async function executeChecks(ctx, checks) {
   const findings = []
   const checkErrors = []
   const checksRun = []
@@ -64,6 +69,17 @@ export async function run({ adapters, configPath, targetId, only, mode = 'passiv
       checkErrors.push({ checkId: c.id, message: safeMessage(err) })
     }
   }
+  return { findings, checkErrors, checksRun }
+}
+
+/** @param {{adapters:Record<string, any>, configPath:string, targetId?:string, only?:string[], mode?:string, now?:Date}} opts */
+export async function run({ adapters, configPath, targetId, only, mode = 'passive', now }) {
+  const { target, rootDir } = authorise({ configPath, targetId, mode, now })
+  const { adapterConfig, checks } = prepareAdapter({ adapters, adapterId: target.adapter, rootDir, only })
+
+  const clock = now ?? new Date()
+  const ctx = createContext(rootDir, freeze(structuredClone(adapterConfig)), { now: clock })
+  const { findings, checkErrors, checksRun } = await executeChecks(ctx, checks)
 
   const head = (ctx.git(['rev-parse', 'HEAD']) ?? '').trim() || null
   const dirty = (ctx.git(['status', '--porcelain']) ?? '').trim().length > 0
@@ -71,9 +87,10 @@ export async function run({ adapters, configPath, targetId, only, mode = 'passiv
     tool: { name: 'jashor-breaker', version: '0.1.0', node: process.version },
     target: { id: target.id, adapter: target.adapter, environment: target.environment, mode },
     subject: { gitHead: head, workingTreeDirty: dirty },
-    generatedAt: (now ?? new Date()).toISOString(),
+    generatedAt: clock.toISOString(),
     checksRun,
     checkErrors,
+    summary: { categories: countByCategory(findings) },
     findings: findings.sort((a, b) => a.id.localeCompare(b.id)),
     evidenceDigest: evidenceDigest(findings),
   }

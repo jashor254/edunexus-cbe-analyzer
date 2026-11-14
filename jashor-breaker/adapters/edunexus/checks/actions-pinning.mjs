@@ -15,7 +15,7 @@ export const actionsPinning = {
       const lines = text.split('\n')
       if (!/^permissions\s*:/m.test(text)) {
         findings.push(makeFinding({
-          key: `no-permissions:${file}`, checkId: CHECK, severity: 'low', classification: 'suspected',
+          key: `no-permissions:${file}`, checkId: CHECK, kind: 'control-failure', severity: 'low', classification: 'suspected',
           title: 'Workflow has no top-level permissions block',
           rationale: 'GITHUB_TOKEN then inherits the repository default, which may be broader than needed. Job-level blocks or the repo setting could still restrict it, so impact is unconfirmed.',
           evidence: [{ kind: 'file', location: file, detail: 'no top-level "permissions:" key' }],
@@ -30,7 +30,7 @@ export const actionsPinning = {
         if (/@[0-9a-f]{40}$/.test(ref)) return
         const firstParty = ref.startsWith('actions/') || ref.startsWith('github/')
         findings.push(makeFinding({
-          key: `unpinned:${file}:${ref}`, checkId: CHECK, severity: firstParty ? 'low' : 'medium', classification: 'confirmed',
+          key: `unpinned:${file}:${ref}`, checkId: CHECK, kind: 'control-failure', severity: firstParty ? 'low' : 'medium', classification: 'confirmed',
           title: `${firstParty ? 'First-party' : 'Third-party'} action not pinned to a commit SHA`,
           rationale: 'A mutable tag or branch can be re-pointed, so the code that runs in CI can change without a repo change.',
           evidence: [{ kind: 'file-line', location: `${file}:${i + 1}`, detail: `uses: ${ref}` }],

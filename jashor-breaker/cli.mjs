@@ -6,9 +6,9 @@ import { run, safeMessage } from './core/runner.mjs'
 import { toMarkdown } from './core/report.mjs'
 import { GuardRefusal } from './core/guard.mjs'
 import { SEVERITIES, verifyDigest } from './core/finding.mjs'
-import { edunexus } from './adapters/edunexus/index.mjs'
-
-const ADAPTERS = { edunexus }
+import { ADAPTERS } from './adapters/registry.mjs'
+import { runSandboxed } from './sandbox/run.mjs'
+import { probeSandbox, SandboxUnavailable } from './sandbox/sandbox.mjs'
 
 const { positionals, values } = parseArgs({
   allowPositionals: true,
@@ -20,6 +20,7 @@ const { positionals, values } = parseArgs({
     out: { type: 'string' },
     'fail-on': { type: 'string' },
     json: { type: 'boolean', default: false },
+    sandbox: { type: 'boolean', default: false },
   },
 })
 
@@ -35,8 +36,19 @@ if (positionals[0] === 'verify' && positionals[1]) {
   }
 }
 
+if (positionals[0] === 'sandbox-probe') {
+  // Dynamic proof that isolation works on this host. Exit 3 (refusal) if it does not: fail closed.
+  try {
+    console.log(JSON.stringify(await probeSandbox(), null, 2))
+    process.exit(0)
+  } catch (err) {
+    console.error(`REFUSED: ${err.message}`)
+    process.exit(err instanceof SandboxUnavailable ? 3 : 2)
+  }
+}
+
 if (positionals[0] !== 'run') {
-  console.error('usage: jashor-breaker run --config <targets.json> --target <id> [--check <id>]... [--out <dir>] [--json] [--fail-on <severity>]\n       jashor-breaker verify <report.json>')
+  console.error('usage: jashor-breaker run --config <targets.json> --target <id> [--check <id>]... [--out <dir>] [--json] [--fail-on <severity>] [--sandbox]\n       jashor-breaker sandbox-probe\n       jashor-breaker verify <report.json>')
   process.exit(2)
 }
 if (values['fail-on'] && !SEVERITIES.includes(values['fail-on'])) {
@@ -45,7 +57,7 @@ if (values['fail-on'] && !SEVERITIES.includes(values['fail-on'])) {
 }
 
 try {
-  const result = await run({
+  const result = await (values.sandbox ? runSandboxed : run)({
     adapters: ADAPTERS,
     configPath: values.config ? resolve(values.config) : '',
     targetId: values.target,
@@ -63,7 +75,7 @@ try {
   const floor = values['fail-on']
   if (floor && result.findings.some((f) => f.classification !== 'unverified' && SEVERITIES.indexOf(f.severity) >= SEVERITIES.indexOf(floor))) process.exit(1)
 } catch (err) {
-  if (err instanceof GuardRefusal) {
+  if (err instanceof GuardRefusal || err instanceof SandboxUnavailable) {
     console.error(`REFUSED: ${err.message}`)
     process.exit(3)
   }

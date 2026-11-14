@@ -4,6 +4,12 @@
     "minimumPatch": "22.23.5",
     "source": "https://nodejs.org/en/blog/vulnerability/november-2026-security-releases"
   },
+  "acceptedRisks": {
+    "registerPath": "docs/security/accepted-risks.json",
+    "warnWithinDays": 30,
+    "requireOwner": true,
+    "requireReviewDate": true
+  },
   "secretScan": {
     "ignorePrefixes": ["jashor-breaker/", "node_modules/", ".next/", "package-lock.json", "public/", "_frozen/"],
     "maxFileBytes": 1000000

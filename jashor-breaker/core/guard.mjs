@@ -4,6 +4,10 @@ import { validate } from './schema.mjs'
 
 const targetsSchema = JSON.parse(readFileSync(new URL('../schemas/targets.schema.json', import.meta.url), 'utf8'))
 
+/** Results handed out by authorise(). Sandbox entry points accept only these: no authorisation, no snapshot. */
+const AUTHORISED = new WeakSet()
+export const isAuthorised = (x) => typeof x === 'object' && x !== null && AUTHORISED.has(x)
+
 export class GuardRefusal extends Error {
   constructor(message) {
     super(message)
@@ -60,5 +64,7 @@ export function authorise({ configPath, targetId, mode, now = new Date() }) {
   const configDir = dirname(resolve(configPath))
   const rootDir = resolve(configDir, target.path)
   if (!existsSync(rootDir) || !statSync(rootDir).isDirectory()) throw new GuardRefusal(`Target path does not exist: ${target.path}`)
-  return { target, rootDir, configDir }
+  const result = Object.freeze({ target, rootDir, configDir })
+  AUTHORISED.add(result)
+  return result
 }

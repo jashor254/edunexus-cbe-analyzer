@@ -34,6 +34,7 @@
         "reasons": { "type": "array", "items": { "type": "string" } }
       }
     },
+    "kind": { "type": "string", "enum": ["vulnerability", "control-failure", "accepted-risk", "expired-acceptance"], "description": "What sort of fact this is. Absent means vulnerability. Combined with classification to form the report category." },
     "cwe": { "type": "string", "pattern": "^CWE-[0-9]+$" }
   }
 }
