@@ -1,6 +1,7 @@
 // TEST-ONLY first-party probe. Runs inside the sandbox and reports what it can and cannot do, as JSON.
 // It is mounted only when a test passes extraMounts: ['test/probes']; it is never part of a normal run.
-import { readFileSync, readdirSync, writeFileSync, statSync, existsSync, openSync, writeSync } from 'node:fs'
+import { readFileSync, readdirSync, writeFileSync, statSync, existsSync, openSync, writeSync, mkdtempSync } from 'node:fs'
+import { join } from 'node:path'
 import net from 'node:net'
 import dns from 'node:dns'
 import { spawn } from 'node:child_process'
@@ -17,11 +18,14 @@ if (mode === 'env') {
   out({ root: readdirSync('/'), results: Object.fromEntries(paths.map((p) => [p, code(() => readFileSync(p))])) })
 } else if (mode === 'exists') {
   out(Object.fromEntries(JSON.parse(arg).map((p) => [p, existsSync(p)])))
+} else if (mode === 'tmp-entries') {
+  out(readdirSync('/tmp'))
 } else if (mode === 'fs-write') {
   const targets = ['/x', '/opt/x', '/dev/x', '/target/x', '/meta/x', '/breaker/core/x', '/usr/lib/x', '/opt/node/x', '/lib/x', '/proc/x']
   const results = Object.fromEntries(targets.map((p) => [p, code(() => writeFileSync(p, 'x'))]))
   results['/scratch/ok'] = code(() => writeFileSync('/scratch/ok', 'x'))
-  results['/tmp/ok'] = code(() => writeFileSync('/tmp/ok', 'x'))
+  // Private directory with an unpredictable name, exclusive create, owner-only mode: the safe temp-file pattern.
+  results['/tmp/ok'] = code(() => { writeFileSync(join(mkdtempSync('/tmp/jb-probe-'), 'ok'), 'x', { flag: 'wx', mode: 0o600 }) })
   out(results)
 } else if (mode === 'scratch-full') {
   let written = 0

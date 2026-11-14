@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
+import { readRegularFile } from './safeopen.mjs'
 import { dirname, resolve } from 'node:path'
 import { validate } from './schema.mjs'
 
@@ -27,13 +28,16 @@ const BUILTIN_DENY = [/\bprod(uction)?\b/i, /\.env(\.|$)/, /service[_-]?role/i, 
  * @returns {{target:any, rootDir:string, configDir:string}}
  */
 export function authorise({ configPath, targetId, mode, now = new Date() }) {
-  if (!configPath || !existsSync(configPath)) {
+  // One open, validated on the descriptor (no stat-then-read gap). The path is explicit operator input, so a
+  // symlinked config is allowed; what is read is exactly the regular file that was opened.
+  const opened = configPath ? readRegularFile(configPath) : { ok: false, reason: 'missing' }
+  if (!opened.ok && opened.reason === 'missing') {
     throw new GuardRefusal('No target config found. Default policy is deny; supply --config with an explicit, authorised target.')
   }
   let config
   try {
-    if (!statSync(configPath).isFile()) throw new Error('not a regular file')
-    config = JSON.parse(readFileSync(configPath, 'utf8'))
+    if (!opened.ok) throw new Error('not a readable regular file')
+    config = JSON.parse(opened.text)
   } catch {
     // Deliberately no parser message: it can echo file content into logs.
     throw new GuardRefusal('Target config is unreadable or not valid JSON.')

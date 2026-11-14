@@ -16,6 +16,6 @@ const manifest = readFileSync('/meta/files.txt', 'utf8')
 const git = (args) => (args[0] === 'ls-files' ? manifest : null)
 
 const { adapterConfig, checks } = prepareAdapter({ adapters: ADAPTERS, adapterId: values.adapter, rootDir: '/target', only: values.check })
-const ctx = createContext('/target', Object.freeze(structuredClone(adapterConfig)), { now, git })
+const ctx = createContext('/target', Object.freeze(structuredClone(adapterConfig)), { now, git, immutableRoot: true })
 const out = await executeChecks(ctx, checks)
 process.stdout.write(JSON.stringify(out))

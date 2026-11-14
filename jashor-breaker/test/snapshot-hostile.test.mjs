@@ -19,6 +19,9 @@ import { makeCommittedRepo, writeConfig } from './helpers.mjs'
 const NOW = new Date('2026-11-13T00:00:00Z')
 const OID = (n) => String(n).padStart(40, '0')
 const blob = (path, extra = {}) => ({ mode: '100644', type: 'blob', oid: OID(1), size: 1, path, ...extra })
+// Each test file runs in its own process, in parallel. Give this one a private temp root so directory counts
+// (snapshot leak checks) are not disturbed by other files.
+process.env.TMPDIR = mkdtempSync(join(os.tmpdir(), 'jb-test-hostile-'))
 const snapDirs = () => readdirSync(os.tmpdir()).filter((n) => n.startsWith('jb-snap-')).length
 const git = (dir, ...args) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.invalid', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
 const auth = (dir) => authorise({ configPath: writeConfig(dir), targetId: 'fixture', mode: 'passive', now: NOW })

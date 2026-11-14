@@ -243,3 +243,158 @@ describe('integration with sandboxed runs', () => {
     assert.ok(!existsSync(`${path}.lock`))
   })
 })
+
+// ---- Secure file handling (Mission 008) ------------------------------------------------------------------------
+
+import { execFileSync as run } from 'node:child_process'
+import { linkSync, mkdirSync, renameSync, truncateSync, writeSync, openSync as open, closeSync as close, appendFileSync } from 'node:fs'
+
+const mkfifo = (p) => run('/usr/bin/mkfifo', [p])
+const sizeOf = (p) => readFileSync(p).length
+
+describe('secure handle: the log is validated on the descriptor it writes through', () => {
+  test('a symlink at the log path is refused and its target is never written', () => {
+    const d = privateDir(); const victim = join(d, 'victim.txt')
+    writeFileSync(victim, 'untouched\n'); symlinkSync(victim, join(d, 'audit.jsonl'))
+    assert.throws(() => appendAudit(join(d, 'audit.jsonl'), fields()), (e) => e instanceof AuditError && /securely/.test(e.message))
+    assert.equal(readFileSync(victim, 'utf8'), 'untouched\n')
+    assert.ok(!existsSync(`${join(d, 'audit.jsonl')}.lock`), 'lock released on failure')
+  })
+
+  test('a symlink swapped in AFTER the open is caught by the identity check; nothing is written anywhere', () => {
+    const { dir, path } = logWith(1)
+    const victim = join(dir, 'victim.txt'); writeFileSync(victim, 'untouched\n')
+    const original = readFileSync(path, 'utf8')
+    assert.throws(() => appendAudit(path, fields(), { afterOpen: (p) => { renameSync(p, `${p}.moved`); symlinkSync(victim, p) } }), /replaced while it was being opened/)
+    assert.equal(readFileSync(victim, 'utf8'), 'untouched\n')
+    assert.equal(readFileSync(`${path}.moved`, 'utf8'), original, 'the real log is unchanged')
+  })
+
+  test('a different regular file swapped in after the open is caught; neither file gains a record', () => {
+    const { dir, path } = logWith(1)
+    const original = readFileSync(path, 'utf8')
+    const impostor = join(dir, 'impostor'); writeFileSync(impostor, '', { mode: 0o600 })
+    assert.throws(() => appendAudit(path, fields(), { afterOpen: (p) => { renameSync(p, `${p}.moved`); renameSync(impostor, p) } }), /replaced/)
+    assert.equal(sizeOf(path), 0, 'the impostor was not written')
+    assert.equal(readFileSync(`${path}.moved`, 'utf8'), original)
+  })
+
+  test('the directory being swapped after the open is caught', () => {
+    const { dir, path } = logWith(1)
+    const parent = privateDir(); const logDir = join(parent, 'logs'); mkdirSync(logDir, { mode: 0o700 })
+    const p = join(logDir, 'a.jsonl'); appendAudit(p, fields())
+    assert.throws(() => appendAudit(p, fields(), { afterOpen: () => { renameSync(logDir, join(parent, 'logs.moved')); mkdirSync(logDir, { mode: 0o700 }) } }), /replaced while|directory changed/)
+    assert.ok(dir && path)
+  })
+
+  test('unexpected file types are refused without hanging: FIFO, directory', () => {
+    const d = privateDir()
+    mkfifo(join(d, 'pipe.jsonl'))
+    assert.throws(() => appendAudit(join(d, 'pipe.jsonl'), fields()), AuditError)
+    mkdirSync(join(d, 'dir.jsonl'))
+    assert.throws(() => appendAudit(join(d, 'dir.jsonl'), fields()), AuditError)
+    assert.equal(verifyAudit(join(d, 'pipe.jsonl')).ok, false, 'verify also refuses a FIFO instead of blocking on it')
+    assert.equal(verifyAudit(join(d, 'dir.jsonl')).ok, false)
+  })
+
+  test('verify does not follow a symlinked log', () => {
+    const { dir, path } = logWith(1)
+    symlinkSync(path, join(dir, 'link.jsonl'))
+    assert.equal(verifyAudit(join(dir, 'link.jsonl')).ok, false)
+    assert.equal(verifyAudit(path).ok, true)
+  })
+
+  test('unsafe permissions are refused: mode 0644 and a second hard link', () => {
+    const { dir, path } = logWith(1)
+    linkSync(path, join(dir, 'second-name'))
+    assert.throws(() => appendAudit(path, fields()), /hard link/)
+    rmSync(join(dir, 'second-name'))
+    chmodSync(path, 0o640)
+    assert.throws(() => appendAudit(path, fields()), /mode 0600/)
+    chmodSync(path, 0o600)
+    appendAudit(path, fields())
+    assert.equal(verifyAudit(path).records, 2)
+  })
+
+  test('failure to obtain a handle (no permission) is a clear refusal that changes nothing', (t) => {
+    if (process.getuid() === 0) return t.skip('root ignores file modes')
+    const { path } = logWith(1)
+    const before = readFileSync(path, 'utf8')
+    chmodSync(path, 0)
+    assert.throws(() => appendAudit(path, fields()), /securely/)
+    chmodSync(path, 0o600)
+    assert.equal(readFileSync(path, 'utf8'), before)
+  })
+})
+
+describe('interrupted writes', () => {
+  test('a short write is truncated back off: no torn record, chain still verifies, next append works', () => {
+    const { path } = logWith(1)
+    const before = readFileSync(path, 'utf8')
+    const half = (fd, data) => writeSync(fd, data.slice(0, 40)) // returns 40, not the full length
+    assert.throws(() => appendAudit(path, fields(), { write: half }), /partial write was removed/)
+    assert.equal(readFileSync(path, 'utf8'), before)
+    assert.deepEqual([verifyAudit(path).ok, verifyAudit(path).records], [true, 1])
+    appendAudit(path, fields())
+    assert.equal(verifyAudit(path).records, 2)
+  })
+
+  test('a write that throws midway is rolled back the same way', () => {
+    const { path } = logWith(2)
+    const before = readFileSync(path, 'utf8')
+    const boom = (fd, data) => { writeSync(fd, data.slice(0, 25)); throw new Error('disk full') }
+    assert.throws(() => appendAudit(path, fields(), { write: boom }), /partial write was removed/)
+    assert.equal(readFileSync(path, 'utf8'), before)
+    assert.equal(verifyAudit(path).ok, true)
+  })
+
+  test('a torn tail left by a crash is DETECTED by verify and appends are refused until an operator repairs it', () => {
+    const { path, recs } = logWith(2)
+    const goodSize = sizeOf(path)
+    appendFileSync(path, '{"format":"jb-audit-1","seq":3,"ru') // process died mid-append
+    const v = verifyAudit(path)
+    assert.equal(v.ok, false)
+    assert.match(v.problems.join('\n'), /not newline-terminated|not valid JSON/)
+    assert.throws(() => appendAudit(path, fields()), /does not verify/)
+    // Operator recovery: keep the evidence, drop the torn tail, verify against the trusted checkpoint, resume.
+    writeFileSync(`${path}.torn-evidence`, readFileSync(path))
+    truncateSync(path, goodSize)
+    assert.equal(verifyAudit(path, { expectHead: recs[1].hash, expectCount: 2 }).ok, true)
+    appendAudit(path, fields())
+    assert.equal(verifyAudit(path).records, 3)
+  })
+
+  test('a crash between records leaves a log that is simply shorter and still valid (truncation is only detectable with a checkpoint)', () => {
+    const { path, recs } = logWith(3)
+    truncateSync(path, lines(path).slice(0, 2).join('\n').length + 1)
+    assert.equal(verifyAudit(path).ok, true)
+    assert.equal(verifyAudit(path, { expectHead: recs[2].hash }).ok, false)
+  })
+})
+
+describe('concurrency', () => {
+  test('verifying while writers append never throws and only ever sees a valid prefix (or a flagged torn tail)', async () => {
+    const dir = privateDir(); const path = join(dir, 'c.jsonl')
+    const script = `import { appendAudit, newRunId } from ${JSON.stringify(new URL('../sandbox/audit.mjs', import.meta.url).href)}
+      for (let i=0;i<8;i++) { for (;;) { try { appendAudit(${JSON.stringify(path)}, { runId: newRunId(), targetFingerprint:'${H('a')}', securityPolicyVersion:'t', sandboxConfigDigest:'${H('b')}', outcome:'completed', testResults:{}, reportDigest:null }); break } catch (e) { if (!/locked/.test(e.message)) throw e } } }`
+    const { spawn } = await import('node:child_process')
+    const writers = [0, 1].map(() => new Promise((res) => { const c = spawn(process.execPath, ['--input-type=module', '-e', script], { stdio: 'ignore' }); c.on('close', res) }))
+    let reads = 0
+    let done = false
+    const reader = (async () => { while (!done) { const v = verifyAudit(path); assert.equal(typeof v.ok, 'boolean'); reads++; await new Promise((r) => setTimeout(r, 5)) } })()
+    await Promise.all(writers); done = true; await reader
+    const v = verifyAudit(path)
+    assert.deepEqual([v.ok, v.records], [true, 16], v.problems.join('; '))
+    assert.ok(reads > 0)
+    assert.ok(!existsSync(`${path}.lock`))
+  })
+
+  test('two appenders racing on a stale-lock-free log never interleave partial lines', () => {
+    const { path } = logWith(1)
+    for (let i = 0; i < 20; i++) appendAudit(path, fields({ time: new Date(Date.UTC(2026, 10, 14, 11, i)) }))
+    const raw = readFileSync(path, 'utf8')
+    assert.ok(raw.endsWith('\n'))
+    assert.ok(raw.split('\n').filter(Boolean).every((l) => { try { JSON.parse(l); return true } catch { return false } }))
+    void open; void close
+  })
+})

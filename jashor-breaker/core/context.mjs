@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process'
+import { readRegularFile, sizeOfRegularFile } from './safeopen.mjs'
 import { GIT_HARDENING_ARGS, GIT_SAFE_ENV, FILTER_CONFIG_QUERY, filterNeutralisers } from './gitsafe.mjs'
 import { readFileSync, realpathSync, statSync } from 'node:fs'
 import { resolve, relative, isAbsolute, sep } from 'node:path'
@@ -43,6 +44,10 @@ export function createContext(rootDir, adapterConfig, opts = {}) {
     return real
   }
 
+  // Live targets: the open file's real location (from /proc/self/fd, race-free) must stay under the root.
+  // `opts.immutableRoot` is set ONLY by the sandbox worker, whose root is a read-only bind-mounted snapshot that
+  // cannot be swapped and whose escaping symlinks were already dropped; node --permission there cannot read /proc.
+  const fdOpts = opts.immutableRoot === true ? {} : { root: realRoot }
   const api = {
     root,
     adapterConfig,
@@ -50,13 +55,14 @@ export function createContext(rootDir, adapterConfig, opts = {}) {
     /** @returns {number} size in bytes; 0 if missing or not a regular file */
     size(rel) {
       const abs = safe(rel)
-      return abs && statSync(abs).isFile() ? statSync(abs).size : 0
+      return abs ? sizeOfRegularFile(abs, fdOpts) ?? 0 : 0
     },
     /** @returns {string|null} null when missing or not a regular file (e.g. directory/submodule) */
     read(rel) {
       const abs = safe(rel)
-      if (!abs || !statSync(abs).isFile()) return null
-      return readFileSync(abs, 'utf8')
+      if (!abs) return null
+      const r = readRegularFile(abs, fdOpts)
+      return r.ok ? r.text : null
     },
     now: opts.now ?? new Date(),
     git(args) {

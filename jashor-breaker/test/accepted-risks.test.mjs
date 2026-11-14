@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync, statSync } from 'node:fs'
+import { closeSync, fstatSync, openSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { run } from '../core/runner.mjs'
 import { toMarkdown } from '../core/report.mjs'
@@ -110,10 +110,13 @@ test('it never modifies the register (bytes and mtime unchanged) and never suppr
   }
   const { dir, r: withReg } = await runOn(files)
   const p = join(dir, REGISTER_PATH)
-  const before = { bytes: readFileSync(p, 'utf8'), mtime: statSync(p).mtimeMs }
+  // One descriptor for both the content and the metadata (no stat-then-read gap).
+  const snapshotOf = () => { const fd = openSync(p, 'r'); try { return { bytes: readFileSync(fd, 'utf8'), mtime: fstatSync(fd).mtimeMs } } finally { closeSync(fd) } }
+  const before = snapshotOf()
   const again = await run({ adapters: ADAPTERS, configPath: writeConfig(dir), targetId: 'fixture', now: TODAY })
-  assert.equal(readFileSync(p, 'utf8'), before.bytes)
-  assert.equal(statSync(p).mtimeMs, before.mtime)
+  const after = snapshotOf()
+  assert.equal(after.bytes, before.bytes)
+  assert.equal(after.mtime, before.mtime)
   // Same repo without the register: every non-register finding is byte-identical, even ones that mention "accepted" things.
   const { r: noReg } = await runOn({ ...files, [REGISTER_PATH]: '{}' })
   const strip = (x) => JSON.stringify(x.findings.filter((f) => f.checkId !== 'accepted-risks'))

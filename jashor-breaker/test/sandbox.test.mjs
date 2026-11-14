@@ -14,6 +14,9 @@ import { ADAPTERS } from '../adapters/registry.mjs'
 import { makeCommittedRepo, writeConfig, FAKE, FAKE_TAILS, assign } from './helpers.mjs'
 
 const PROBE = { script: 'test/probes/isolation-probe.mjs', extraMounts: ['test/probes'] }
+// Each test file runs in its own process, in parallel. Give this one a private temp root so directory counts
+// (snapshot leak checks) are not disturbed by other files.
+process.env.TMPDIR = mkdtempSync(join(os.tmpdir(), 'jb-test-sandbox-'))
 const snapDirs = () => readdirSync(os.tmpdir()).filter((n) => n.startsWith('jb-snap-')).length
 const NOW = new Date('2026-11-13T00:00:00Z')
 
@@ -249,8 +252,9 @@ describe('isolation proofs (each runs a real confined process)', () => {
       for (const p of ['/x', '/opt/x', '/target/x', '/meta/x', '/breaker/core/x', '/usr/lib/x', '/opt/node/x', '/lib/x']) assert.equal(json[p], 'EROFS', p)
       assert.equal(json['/scratch/ok'], 'ALLOWED')
       assert.equal(json['/tmp/ok'], 'ALLOWED')
-      const again = await probe('exists', JSON.stringify(['/scratch/ok', '/tmp/ok', '/scratch/big']), { snapshot })
-      assert.deepEqual(again.json, { '/scratch/ok': false, '/tmp/ok': false, '/scratch/big': false }, 'scratch must not persist between runs')
+      const again = await probe('exists', JSON.stringify(['/scratch/ok', '/scratch/big']), { snapshot })
+      assert.deepEqual(again.json, { '/scratch/ok': false, '/scratch/big': false }, 'scratch must not persist between runs')
+      assert.deepEqual((await probe('tmp-entries', '', { snapshot })).json, [], '/tmp must not persist between runs')
     } finally {
       snapshot.cleanup()
     }

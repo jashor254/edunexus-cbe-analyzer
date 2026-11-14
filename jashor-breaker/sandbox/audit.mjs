@@ -12,7 +12,7 @@
 // (printed at the end of each run; pass them back with --expect-head / --expect-count to detect tail truncation
 // and wholesale rewrites). See docs/AUDIT.md.
 import { createHash, randomBytes } from 'node:crypto'
-import { closeSync, constants, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, unlinkSync, writeSync } from 'node:fs'
+import { closeSync, constants, fstatSync, fsyncSync, ftruncateSync, lstatSync, mkdirSync, openSync, readFileSync, unlinkSync, writeSync } from 'node:fs'
 import { dirname, isAbsolute, resolve } from 'node:path'
 
 export const AUDIT_FORMAT = 'jb-audit-1'
@@ -72,14 +72,33 @@ function validateRecord(rec) {
 }
 
 /**
+ * Read a log through ONE descriptor: opened without following a final symlink and without blocking on a FIFO,
+ * then validated with fstat on that descriptor (no stat-then-read gap).
+ * @returns {{ok:true, text:string} | {ok:false, reason:string}}
+ */
+function readLogText(path) {
+  let fd
+  try { fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK) } catch (err) { return { ok: false, reason: err?.code === 'ENOENT' ? 'log unreadable or missing' : 'log cannot be opened (not a plain file, or not readable)' } }
+  try {
+    if (!fstatSync(fd).isFile()) return { ok: false, reason: 'log is not a regular file' }
+    return { ok: true, text: readFileSync(fd, 'utf8') }
+  } catch { return { ok: false, reason: 'log unreadable or missing' } } finally { closeSync(fd) }
+}
+
+/**
  * Verify an audit log. Never throws on a damaged log; it reports every problem it can find.
  * @param {string} path
  * @param {{expectHead?:string, expectCount?:number}} [trusted] checkpoint kept somewhere the log's writer cannot edit
  */
 export function verifyAudit(path, trusted = {}) {
+  const read = readLogText(resolve(path))
+  if (!read.ok) return { ok: false, records: 0, head: null, problems: [read.reason] }
+  return verifyText(read.text, trusted)
+}
+
+/** Pure chain verification of log text. */
+export function verifyText(text, trusted = {}) {
   const problems = []
-  let text
-  try { text = readFileSync(resolve(path), 'utf8') } catch { return { ok: false, records: 0, head: null, problems: ['log unreadable or missing'] } }
   const lines = text.split('\n')
   if (lines.at(-1) === '') lines.pop()
   else problems.push('last line is not newline-terminated (possible truncated write)')
@@ -109,52 +128,84 @@ export function verifyAudit(path, trusted = {}) {
   return { ok: problems.length === 0, records: lines.length, head, problems, checkpointed: trusted.expectHead !== undefined || trusted.expectCount !== undefined }
 }
 
-/** The log must be a private regular file we own, in a private directory: refuse anything else (symlinks, shared files). */
-function checkLocation(path) {
-  if (typeof path !== 'string' || !isAbsolute(path) || path.includes('\0')) throw new AuditError('audit log path must be an absolute path')
-  const dir = dirname(path)
+const unsafe = (m) => new AuditError(m)
+
+/**
+ * Validate the log's directory through a DESCRIPTOR (not a path check followed by a later open). The descriptor is
+ * kept so the directory's identity can be re-checked after the log file is opened.
+ */
+function openLogDir(dir) {
   mkdirSync(dir, { recursive: true, mode: 0o700 })
-  const uid = process.getuid()
-  const d = lstatSync(dir)
-  if (!d.isDirectory() || d.isSymbolicLink()) throw new AuditError('audit log directory is not a plain directory')
-  if (d.uid !== uid || (d.mode & 0o022) !== 0) throw new AuditError('audit log directory must be owned by the current user and not group/world writable')
-  try {
-    const s = lstatSync(path)
-    if (!s.isFile() || s.isSymbolicLink()) throw new AuditError('audit log is not a regular file')
-    if (s.uid !== uid || (s.mode & 0o077) !== 0) throw new AuditError('audit log must be owned by the current user with mode 0600')
-  } catch (err) { if (err instanceof AuditError) throw err }
+  let fd
+  try { fd = openSync(dir, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW) } catch { throw unsafe('audit log directory is not a plain directory') }
+  const st = fstatSync(fd)
+  if (st.uid !== process.getuid() || (st.mode & 0o022) !== 0) { closeSync(fd); throw unsafe('audit log directory must be owned by the current user and not group/world writable') }
+  return { fd, dev: st.dev, ino: st.ino }
 }
 
 /**
- * Append one record. Refuses to extend a log that does not verify (a broken chain must be looked at, not buried).
- * A lock file serialises concurrent writers; a stale lock fails closed with a clear message.
+ * Append one record. Everything is decided on ONE open descriptor of the log:
+ *   * O_NOFOLLOW: a symlink at the final component is refused (ELOOP), never followed;
+ *   * O_NONBLOCK: a FIFO cannot hang the run;
+ *   * fstat on the descriptor: regular file, owned by us, mode 0600, a single hard link;
+ *   * after opening, the path must still name the same inode (dev+ino) and the directory must be unchanged, which
+ *     catches a replacement between creating the descriptor and using it;
+ *   * the existing chain is read from, and the new record written to, that same descriptor;
+ *   * a failed or short write is truncated back off so an interrupted append never leaves a torn record behind.
+ * Refuses to extend a log that does not verify (a broken chain must be looked at, not buried).
+ * A lock file serialises cooperating writers; a stale lock fails closed with a clear message.
+ * @param {string} path absolute path
+ * @param {object} fields record fields
+ * @param {{afterOpen?:(path:string)=>void, write?:(fd:number, data:string)=>number}} [hooks] test seams only
  * @returns {{seq:number, hash:string, runId:string}}
  */
-export function appendAudit(path, fields) {
-  checkLocation(path)
+export function appendAudit(path, fields, hooks = {}) {
+  if (typeof path !== 'string' || !isAbsolute(path) || path.includes('\0')) throw unsafe('audit log path must be an absolute path')
+  const dir = openLogDir(dirname(path))
   const lock = `${path}.lock`
   let lockFd
-  try { lockFd = openSync(lock, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600) } catch { throw new AuditError(`audit log is locked (${lock}); if no run is active, remove the stale lock after checking the log`) }
+  try { lockFd = openSync(lock, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600) } catch { closeSync(dir.fd); throw unsafe(`audit log is locked (${lock}); if no run is active, remove the stale lock after checking the log`) }
+  let fd
   try {
-    let exists = true
-    try { lstatSync(path) } catch (err) { if (err?.code === 'ENOENT') exists = false; else throw new AuditError('audit log cannot be inspected') }
-    const before = exists ? verifyAudit(path) : { ok: true, records: 0, head: null, problems: [] }
-    if (exists && !before.ok) throw new AuditError(`refusing to append: existing audit log does not verify (${before.problems[0]})`)
-    const prevHash = exists ? before.head ?? GENESIS_HASH : GENESIS_HASH
+    try { fd = openSync(path, constants.O_RDWR | constants.O_CREAT | constants.O_APPEND | constants.O_NOFOLLOW | constants.O_NONBLOCK, 0o600) } catch { throw unsafe('audit log cannot be opened securely (symlink, directory, special file or no permission)') }
+    hooks.afterOpen?.(path)
+    const st = fstatSync(fd)
+    if (!st.isFile()) throw unsafe('audit log is not a regular file')
+    if (st.uid !== process.getuid() || (st.mode & 0o077) !== 0) throw unsafe('audit log must be owned by the current user with mode 0600')
+    if (st.nlink !== 1) throw unsafe('audit log has more than one hard link')
+    let now
+    try { now = lstatSync(path) } catch { throw unsafe('audit log was replaced while it was being opened') }
+    if (now.isSymbolicLink() || now.dev !== st.dev || now.ino !== st.ino) throw unsafe('audit log was replaced while it was being opened')
+    let dirNow
+    try { dirNow = lstatSync(dirname(path)) } catch { throw unsafe('audit log directory changed while it was being opened') }
+    if (dirNow.isSymbolicLink() || dirNow.dev !== dir.dev || dirNow.ino !== dir.ino) throw unsafe('audit log directory changed while it was being opened')
+
+    const text = readFileSync(fd, 'utf8') // same descriptor: position 0 after open
+    const before = text.length === 0 ? { ok: true, records: 0, head: null, problems: [] } : verifyText(text)
+    if (!before.ok) throw unsafe(`refusing to append: existing audit log does not verify (${before.problems[0]})`)
     const rec = {
-      format: AUDIT_FORMAT, seq: (exists ? before.records : 0) + 1, runId: fields.runId, time: (fields.time ?? new Date()).toISOString(),
+      format: AUDIT_FORMAT, seq: before.records + 1, runId: fields.runId, time: (fields.time ?? new Date()).toISOString(),
       targetFingerprint: fields.targetFingerprint, securityPolicyVersion: fields.securityPolicyVersion, sandboxConfigDigest: fields.sandboxConfigDigest,
-      outcome: fields.outcome, testResults: fields.testResults, reportDigest: fields.reportDigest ?? null, prevHash,
+      outcome: fields.outcome, testResults: fields.testResults, reportDigest: fields.reportDigest ?? null, prevHash: before.head ?? GENESIS_HASH,
     }
     const full = { ...rec, hash: recordHash(rec) }
     const bad = validateRecord(full)
-    if (bad) throw new AuditError(`audit record invalid: ${bad}`)
+    if (bad) throw unsafe(`audit record invalid: ${bad}`)
     const line = `${canonical(full)}\n`
-    if (Buffer.byteLength(line) > MAX_RECORD_BYTES) throw new AuditError('audit record too large')
-    const fd = openSync(path, constants.O_CREAT | constants.O_APPEND | constants.O_WRONLY | constants.O_NOFOLLOW, 0o600)
-    try { writeSync(fd, line); fsyncSync(fd) } finally { closeSync(fd) }
+    if (Buffer.byteLength(line) > MAX_RECORD_BYTES) throw unsafe('audit record too large')
+    const size0 = st.size
+    try {
+      const written = (hooks.write ?? ((f, d) => writeSync(f, d)))(fd, line)
+      if (written !== Buffer.byteLength(line)) throw new Error('short write')
+      fsyncSync(fd)
+    } catch {
+      try { ftruncateSync(fd, size0) } catch { /* verify will flag a torn tail */ }
+      throw unsafe('audit record could not be written completely; the partial write was removed')
+    }
     return { seq: full.seq, hash: full.hash, runId: full.runId }
   } finally {
+    if (fd !== undefined) try { closeSync(fd) } catch { /* closed */ }
+    closeSync(dir.fd)
     closeSync(lockFd)
     try { unlinkSync(lock) } catch { /* already gone */ }
   }
