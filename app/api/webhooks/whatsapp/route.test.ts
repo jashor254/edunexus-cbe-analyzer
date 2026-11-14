@@ -21,7 +21,7 @@ import { NextRequest } from 'next/server'
 const VERIFY_TOKEN = 'test-verify-token'
 const APP_SECRET = 'test-app-secret'
 
-type PipelineResult = { processed: boolean; outcome?: 'demonstrated' | 'struggled' | 'not_attempted' | 'free_form'; teacherNotified?: boolean }
+type PipelineResult = { processed: boolean; skipped?: 'effects_disabled'; outcome?: 'demonstrated' | 'struggled' | 'not_attempted' | 'free_form'; teacherNotified?: boolean }
 
 let pipelineResult: PipelineResult = { processed: false }
 let pipelineShouldThrow = false
@@ -338,5 +338,51 @@ test('POST passes msg.id as metaMessageId to the pipeline', async () => {
     const res = await POST(postReq(body, sign(body, APP_SECRET)))
     assert.equal(res.status, 200)
     assert.equal(capturedInbound?.metaMessageId, 'wamid.XYZ')
+  })
+})
+
+// ── Reply-effects gate (WHATSAPP_PARENT_REPLY_EFFECTS) ──────────────────────
+// The gate lives in the pipeline; the route must keep STOP, signature checks
+// and the "no outcome => no acknowledgement" behaviour intact when it is OFF.
+
+test('gate OFF: STOP still opts the phone out and never reaches the pipeline', async () => {
+  for (const gate of [undefined, '', 'true', 'ENABLED']) {
+    optOutCalls = []
+    sendWhatsAppCalls = []
+    capturedInbound = null
+    await withEnv({ WHATSAPP_APP_SECRET: APP_SECRET, WHATSAPP_PARENT_REPLY_EFFECTS: gate }, async () => {
+      const body = JSON.stringify({
+        object: 'whatsapp_business_account',
+        entry: [{ changes: [{ value: { messages: [{ id: 'wamid.STOP1', from: '254712345678', text: { body: 'STOP' } }] } }] }],
+      })
+      const res = await POST(postReq(body, sign(body, APP_SECRET)))
+      assert.equal(res.status, 200)
+      assert.equal((await res.json()).outcome, 'opted_out')
+      assert.deepEqual(optOutCalls, ['254712345678'], `gate=${String(gate)}`)
+      assert.equal(capturedInbound, null)
+    })
+  }
+})
+
+test('gate OFF: an unsigned or mis-signed request is still rejected', async () => {
+  await withEnv({ WHATSAPP_APP_SECRET: APP_SECRET, WHATSAPP_PARENT_REPLY_EFFECTS: undefined }, async () => {
+    const body = JSON.stringify({ object: 'whatsapp_business_account', entry: [] })
+    assert.equal((await POST(postReq(body))).status, 401)
+    assert.equal((await POST(postReq(body, sign(body, 'wrong-secret')))).status, 401)
+  })
+})
+
+test('gate OFF: a skipped reply is acknowledged to Meta with 200 but sends nothing to the parent', async () => {
+  pipelineResult = { processed: false, skipped: 'effects_disabled' }
+  sendWhatsAppCalls = []
+  await withEnv({ WHATSAPP_APP_SECRET: APP_SECRET, WHATSAPP_PARENT_REPLY_EFFECTS: undefined }, async () => {
+    const body = JSON.stringify({
+      object: 'whatsapp_business_account',
+      entry: [{ changes: [{ value: { messages: [{ id: 'wamid.SKIP1', from: '254712345678', text: { body: '2' } }] } }] }],
+    })
+    const res = await POST(postReq(body, sign(body, APP_SECRET)))
+    assert.equal(res.status, 200)
+    assert.deepEqual(await res.json(), { ok: true, outcome: null })
+    assert.equal(sendWhatsAppCalls.length, 0, 'no educational acknowledgement while effects are disabled')
   })
 })

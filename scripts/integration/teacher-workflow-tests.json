@@ -1,0 +1,10 @@
+{
+  "description": "TEACHER_WORKFLOW integration — the four suites that pin the teacher document/SOW workflow against a real (local, disposable) Supabase and an isolated Next server whose DeepSeek calls are answered by scripts/integration/deepseek-stub.mjs. Run by scripts/run-teacher-workflow-integration.mjs. The per-file counts are asserted: a missing, extra, skipped or cancelled case fails the job rather than shrinking coverage silently.",
+  "expectedTests": 57,
+  "files": [
+    { "file": "lib/row/recordOfWorkIntegrity.integration.test.ts", "expectedTests": 34 },
+    { "file": "lib/lessonPlan/teachingWorkflowReliability.integration.test.ts", "expectedTests": 11 },
+    { "file": "lib/testing/sowGenerateContract.http.integration.test.ts", "expectedTests": 6 },
+    { "file": "lib/testing/sowJobState.http.integration.test.ts", "expectedTests": 6 }
+  ]
+}

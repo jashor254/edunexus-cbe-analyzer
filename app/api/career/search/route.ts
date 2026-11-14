@@ -48,6 +48,16 @@ export async function GET(req: NextRequest) {
       if (result.status === 'known') {
         return apiSuccess({ careers: [result.career], provisional: false })
       }
+      if (result.status === 'ai_paused') {
+        // Search itself still works; only new AI-generated knowledge is paused.
+        // Nothing the learner typed was sent, logged, charged or queued.
+        return apiSuccess({
+          careers: [],
+          provisional: false,
+          paused: true,
+          message: "We don't have this career in our verified library yet, and adding new careers with AI is paused while we review our AI providers. Try a different name or explore related careers.",
+        })
+      }
       if (result.status === 'rate_limited') {
         // Never a fabricated career and never a hard failure of the search
         // itself (Phase 9.1 §17) — canonical search above this branch was

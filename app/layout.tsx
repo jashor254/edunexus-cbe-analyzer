@@ -1,7 +1,7 @@
 // app/layout.tsx
 import type { Metadata, Viewport } from 'next'
 import { ToastProvider } from '@/components/toast-system'
-import { Analytics } from '@vercel/analytics/react'
+import { RedactedAnalytics } from '@/components/layout/RedactedAnalytics'
 import WhatsAppButton from '@/components/WhatsAppButton'
 import Script from 'next/script'
 import { montserrat, inter } from '@/app/fonts/fonts'
@@ -191,7 +191,7 @@ export default function RootLayout({
           <ToastProvider />
         </div>
         <div data-blueprint-hide-in-pdf="true">
-          <Analytics />
+          <RedactedAnalytics />
         </div>
       </body>
     </html>

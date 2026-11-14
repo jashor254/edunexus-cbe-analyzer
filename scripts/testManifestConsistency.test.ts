@@ -54,3 +54,45 @@ test('every file referenced by excluded-tests.json exists on disk', () => {
   const missing = readManifest('excluded-tests.json').filter(f => !existsSync(join(ROOT, f)))
   assert.deepEqual(missing, [], `excluded-tests.json references files that don't exist: ${missing.join(', ')}`)
 })
+
+// ── TEACHER_WORKFLOW integration manifest ────────────────────────────────────
+// scripts/integration/teacher-workflow-tests.json is enforced by the
+// teacher-workflow-integration CI job, which needs a database. These checks
+// need none, so they run in the STANDARD gate and catch a deleted, renamed or
+// shrunk suite before the slower job does.
+
+type IntegrationManifest = { expectedTests: number; files: Array<{ file: string; expectedTests: number }> }
+const integration: IntegrationManifest = JSON.parse(
+  readFileSync(join(__dirname, 'integration', 'teacher-workflow-tests.json'), 'utf8'),
+)
+
+test('every TEACHER_WORKFLOW integration file exists on disk', () => {
+  const missing = integration.files.map(f => f.file).filter(f => !existsSync(join(ROOT, f)))
+  assert.deepEqual(missing, [], `teacher-workflow-tests.json references files that don't exist: ${missing.join(', ')}`)
+})
+
+test('TEACHER_WORKFLOW per-file counts add up to the manifest total', () => {
+  const sum = integration.files.reduce((n, f) => n + f.expectedTests, 0)
+  assert.equal(sum, integration.expectedTests)
+})
+
+test('each TEACHER_WORKFLOW file declares exactly the number of cases the manifest expects', () => {
+  for (const { file, expectedTests } of integration.files) {
+    const declared = (readFileSync(join(ROOT, file), 'utf8').match(/^\s*test\(/gm) ?? []).length
+    assert.equal(declared, expectedTests,
+      `${file} declares ${declared} test() cases but the manifest expects ${expectedTests} — update both deliberately, never one alone`)
+  }
+})
+
+test('no TEACHER_WORKFLOW integration file sits in the database-free STANDARD gate', () => {
+  const standard = new Set(readManifest('standard-tests.json'))
+  const overlap = integration.files.map(f => f.file).filter(f => standard.has(f))
+  assert.deepEqual(overlap, [], `database-backed suites cannot run in the secret-free STANDARD gate: ${overlap.join(', ')}`)
+})
+
+test('no TEACHER_WORKFLOW integration case may skip itself silently', () => {
+  for (const { file } of integration.files) {
+    const source = readFileSync(join(ROOT, file), 'utf8')
+    assert.ok(!/\[skip\]/i.test(source), `${file} contains a self-skip marker — an unmet prerequisite must fail, not pass`)
+  }
+})

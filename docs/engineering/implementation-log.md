@@ -3870,3 +3870,38 @@ Supabase disabled the legacy anon/service_role keys on **2026-05-25** (productio
 - **Verified**: server with ONLY the two valid names — protected routes 307→login (was 500); sentinel, SAFE-009, HTTP_PR 14/14, HTTP_MAIN 55/55 pass; standard suite 1,825/1,825; guard negative-controlled. Original failing tests reproduced under CI's env first.
 - **Production-side steps NOT done** (need approval; order matters — see `docs/engineering/supabase-api-keys.md`): deploy this, smoke test, only then remove the legacy-named hosting variables.
 - **ADR**: none (no canonical identity/boundary change; narrows config). **Rollback**: revert the PR; the app then needs the legacy-named variable again.
+
+### 2026-11-05 — WhatsApp recovery Phase 2A: parent-reply effects gate (local only, NOT deployed)
+
+Inbound parent WhatsApp replies could update the legacy learner profile, write pending parent evidence, raise teacher alerts, publish a domain event and send an educational acknowledgement, while reply attribution and interpretation are not yet verified. Added a fail-closed, default-OFF switch so none of that happens until it is explicitly authorized.
+
+- **Code**: `lib/config/whatsappReplyEffects.ts` (`isParentReplyEffectsEnabled`, exact value `enabled` only); gate at the top of `processInboundReply` (`lib/parentPulse/observationPipeline.ts`) returning `{ processed:false, skipped:'effects_disabled' }` after a best-effort metadata-only inbound log (phone, Meta id, time, fixed reason; message text withheld). Route unchanged: HMAC and STOP precede the pipeline; no outcome ⇒ no acknowledgement.
+- **Not changed (by instruction)**: reply attribution, parser semantics, idempotency ordering.
+- **Tests added**: `lib/parentPulse/observationPipeline.gate.test.ts` (9, registered in `scripts/standard-tests.json`) + 3 gate cases in `app/api/webhooks/whatsapp/route.test.ts`. Standard suite 1,889/1,889; `tsc` and ESLint clean on touched files.
+- **ADR**: none (config gate on an existing pipeline; no identity/schema/auth change). Referenced: Constitution, CLAUDE.md Security Rules.
+- **Rollout order**: deploy this code (flag unset) BEFORE applying the two pending WhatsApp migrations; enabling effects needs separate authorization.
+- **Known limitation (documented)**: while the gate is OFF and `whatsapp_inbound_log.meta_message_id` does not exist (migration `20261031120000` unapplied), the metadata insert fails and is swallowed with a `warn` log — no inbound record is kept and held replies cannot be reconciled. Nothing educational happens either way (fail-closed); applying the migration restores the metadata trail.
+- **Rollback**: unset the variable (default OFF) or revert the commit; no schema change.
+
+### 2026-11-05 — Build no longer needs privileged runtime credentials (lazy repository + email clients) (PR open, NOT merged)
+
+`next build` imports every route module while collecting page data. `lib/repositories/index.ts` builds a singleton of 46 repositories at import and each `BaseRepository` constructor created the service-role client, and `lib/resend-client.ts` threw at import without `RESEND_API_KEY` — so a build in any environment without those secrets (e.g. an isolated Preview) failed although a build makes no database or email call.
+
+- **Changed**: `lib/repositories/base.ts` (`db` is a lazy, memoised getter — the client is created on first use), `lib/resend-client.ts` (`getResend()` replaces the eager constant), call sites in `lib/email/sender.ts` and `lib/email/reportEmail.ts`.
+- **Not weakened**: `createServiceClient()` and `getResend()` throw the same errors at the first database/email operation; there is no fallback credential; `/api/health` still exercises the client. No client component imports these server modules (one type-only import).
+- **Tests added**: `lib/repositories/lazyClient.test.ts` (6): import without credentials; first DB operation fails closed with the original error; email client lazy / fail-closed / memoised; an email send without credentials fails before any network request; concurrent first uses share one client per repository. Registered in `scripts/standard-tests.json`.
+- **Evidence**: `next build` with an empty environment exits 0 (was exit 1); the built app run with no credentials fails explicitly and early; run against the local Docker stack only it reports `database: ok`.
+- **ADR**: none (initialisation timing only; no ownership, identity or boundary change). **Rollback**: revert the PR.
+
+### 2026-11-04 — DSA-01: shared reports behind a service-only token boundary (PR open, NOT applied/deployed)
+
+Deep audit finding DSA-01 (2026-11-04): `shared_reports` had a PUBLIC `SELECT USING (true)` policy — the whole table (tokens, names, grades, payloads) was enumerable by anon. Fix = one migration + server-side reader/controls. **Nothing is merged, applied to production or deployed.**
+
+- **Migration** `20261104120000_shared_reports_token_boundary.sql`: drops the open policy; owner-only SELECT; revokes all `anon` and `authenticated` INSERT/UPDATE privileges; `revoked_at` + `provenance`; strict-32 lookup function `get_shared_report_by_token` (SECURITY DEFINER, `search_path=''`, service_role only, fixed DTO); CHECKs for token format (192-bit base64url, **not hex**), ≤90-day expiry, ≤16 KiB report, provenance; revokes any legacy row; self-checking.
+- **App**: `lib/repositories/sharedReport.repository.ts`, `lib/sharedReports/{token,read,reportSchema}.ts`; `/shared/[token]` reads only through the RPC (awaits `params` per Next 16, `force-dynamic`); `/api/share/generate` has a strict Zod schema, 32 KiB body cap, fixed 30-day TTL, provenance stamp; new owner-only `POST /api/share/revoke`; legacy 12-char tokens retired; `next.config.ts` no-store/noindex/no-referrer headers for `/shared/*` and `/api/share/*`; `robots.txt` disallow; `RedactedAnalytics` keeps tokens out of Vercel Analytics.
+- **Evidence**: role-based SQL regression (dev + freshly bootstrapped DB, negative control); HTTP suite 23/23 twice on a CI-identical production build; manual failure injection; token entropy measured (5.99999 bits/char, 200k samples); 1,877/1,877 standard; all gates pass. Fingerprints: `main` = `e3cfda63…` (CI pin stale because of the two WhatsApp migrations — fixed in a separate PR), `main`+DSA-01 = `f2c4cc56…`.
+- **ADR**: ADR-0035 (accepted: narrow service-role exception). **Docs**: `docs/security/dsa-01-remediation.md` (design, entropy, controls, headers, fingerprints, release sequence, risks R1–R16, checklist).
+- **Tests added**: `lib/sharedReports/sharedReports.test.ts` (25) and `components/layout/RedactedAnalytics.test.ts` (1) — standard; `lib/testing/sharedReports.http.integration.test.ts` (23) — `http-main-tests.json` (expectedTests 55→78), `deep-tests.json`, classification D2; `scripts/security/shared-reports-boundary.test.sql` (real-role regression) and `shared-reports-failure-injection.ts` (manual, destructive).
+- **Rollback**: migration header; re-opens DSA-01 — prefer fix-forward. **Unrelated finding**: production lacks the two 2026-10-31 WhatsApp migrations although `main` code uses their columns.
+- **Log hygiene**: entries for 2026-10-30 (security remediation, AI efficiency) and 2026-10-31 (WhatsApp) are still missing here.
+- **Addendum (same day)**: `/api/share/generate` disabled (410, code-pinned gate); public page now origin-aware via the RPC's `provenance`; HTTP suite 22 tests (`http-main-tests.json` expectedTests 77); fingerprint pin recomputed for the revised migration.

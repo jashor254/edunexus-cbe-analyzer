@@ -11,6 +11,8 @@ import { repos } from '@/lib/repositories'
 import { updateFromParentObservation } from '@/lib/learnerModel/updater'
 import { recordParentObservationEvidence } from '@/lib/parentPulse/observationEvidence'
 import { publishEvent } from '@/lib/events'
+import { isParentReplyEffectsEnabled } from '@/lib/config/whatsappReplyEffects'
+import { logger } from '@/lib/observability/logger'
 import type { ParentObservationOutcome } from '@/lib/learnerModel/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -45,6 +47,8 @@ type ProcessResult = {
   processed:       boolean
   outcome?:        ReplyOutcome
   error?:          string
+  /** Set when the reply-effects gate is OFF: the reply was received but deliberately not acted on. */
+  skipped?:        'effects_disabled'
   /** Only meaningful when outcome === 'struggled' — whether a real student_alerts row reached the teacher's AttentionFeed. */
   teacherNotified?: boolean
 }
@@ -182,6 +186,15 @@ async function notifyTeacherOfStruggle(studentId: string, substrand: string): Pr
 export async function processInboundReply(
   inbound: InboundReply
 ): Promise<ProcessResult> {
+  // Fail-closed gate (lib/config/whatsappReplyEffects.ts). Reply attribution
+  // and parsing are not yet trustworthy (WA-01/WA-02), so unless effects are
+  // explicitly enabled nothing educational may happen: no parse, no phone→
+  // learner resolution, no learner-profile write, no evidence, no teacher
+  // alert, no event, and (because no outcome is returned) no acknowledgement.
+  if (!isParentReplyEffectsEnabled()) {
+    return recordEffectsDisabled(inbound)
+  }
+
   try {
     if (inbound.metaMessageId) {
       const alreadySeen = await repos.notifications.isInboundDuplicate(inbound.metaMessageId)
@@ -348,6 +361,36 @@ export function buildAcknowledgement(
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// Operational metadata only: sender phone, Meta message id and receipt time are
+// kept so a held reply can be reconciled later; the parent's message text is
+// NOT retained (raw_body is NOT NULL in the schema, hence the fixed marker).
+// The log write is best-effort — a failure (e.g. the idempotency column not yet
+// migrated) must never turn into an educational side effect or a webhook error.
+// KNOWN LIMITATION: while the gate is OFF and the schema is absent (the
+// whatsapp_inbound_log.meta_message_id column from migration
+// 20261031120000_whatsapp_inbound_idempotency.sql), this insert fails and is
+// swallowed with a warning, so NO inbound record exists. That is intentional
+// fail-closed behaviour (nothing educational happens either way), but it means
+// held replies cannot be reconciled until the migration is applied.
+const WITHHELD_BODY = '[withheld: parent reply effects disabled]'
+
+async function recordEffectsDisabled(inbound: InboundReply): Promise<ProcessResult> {
+  try {
+    await logInbound({
+      phone:         inbound.fromPhone,
+      rawBody:       WITHHELD_BODY,
+      receivedAt:    inbound.receivedAt,
+      metaMessageId: inbound.metaMessageId,
+      parsedReply:   'free_form',
+      processed:     false,
+      errorMessage:  'parent_reply_effects_disabled',
+    })
+  } catch (err) {
+    logger.warn('[observationPipeline] disabled-reply metadata not recorded', undefined, err)
+  }
+  return { processed: false, skipped: 'effects_disabled' }
+}
 
 type InboundLogParams = {
   phone:          string

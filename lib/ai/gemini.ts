@@ -8,6 +8,7 @@
 
 import { GoogleGenerativeAI, type GenerateContentResult, type GenerativeModel } from '@google/generative-ai'
 import { GEMINI_PRIMARY } from '@/lib/ai/models'
+import { assertAIFeatureAllowed } from '@/lib/ai/childDataPolicy'
 import {
   geminiUsage,
   recordProviderRequest,
@@ -83,6 +84,7 @@ export async function generateGeminiWithTimeout(
   request: Parameters<GenerativeModel['generateContent']>[0],
   opts: { timeoutMs: number; modelName: string; call: LogicalCall },
 ): Promise<GenerateContentResult> {
+  assertAIFeatureAllowed(opts.call.feature)
   opts.call.attempts++
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), opts.timeoutMs)

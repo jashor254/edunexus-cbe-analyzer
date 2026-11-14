@@ -103,7 +103,9 @@ export function BulkScanUpload({ base, learners, maxPagesPerScript, onClose }: {
           ? { status: 'done' }
           : res.status === 409
             ? { status: 'failed', message: 'Already being marked from another request — check the class list in a moment.' }
-            : { status: 'failed', message: 'Uploaded, but marking failed — mark it again from the class list.' }))
+            : res.status === 503
+              ? { status: 'failed', message: 'Uploaded and saved. AI marking is paused while we review our AI service providers\u2019 terms for use with learners.' }
+              : { status: 'failed', message: 'Uploaded, but marking failed — mark it again from the class list.' }))
         .catch(() => set(id, { status: 'failed', message: 'Uploaded, but marking failed — mark it again from the class list.' }))
         .finally(() => { inFlight-- })
       marking.push(job)

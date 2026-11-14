@@ -210,7 +210,7 @@ export async function POST(req: Request) {
           selectedSubstrands.map(s => s.strandId),
         )
         const result = await generateSchemePipeline(
-          { timeline, selectedSubstrands, context, kicdEntriesByStrandId },
+          { timeline, selectedSubstrands, context, kicdEntriesByStrandId, correlationId: job.id },
           async progress => {
             await repos.jobs.updateProgress(job.id, {
               result: { total: progress.total, completed: progress.completed, failed: progress.failed },

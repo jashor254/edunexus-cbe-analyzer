@@ -37,12 +37,16 @@
 import { repos } from '@/lib/repositories'
 import { reserveDailyCall, type HeldReservation } from '@/lib/ai/rateLimit'
 import { logAICall } from '@/lib/ai/logger'
+import { isChildDataAIPaused } from '@/lib/ai/childDataPolicy'
 import { generateCareerProfile, getCareerBySlug, slugify } from './careerEngine'
 import { buildProvisionalPreview } from './provisionalPreview'
 import type { ProvisionalCareerPreview } from './provisionalPreview'
 import type { Career } from './types'
 
 const AI_GENERATION_FEATURE = 'career_knowledge_request' as const
+
+/** Longest career query accepted anywhere; matches the search route's own cap. */
+export const MAX_CAREER_QUERY_CHARS = 100
 
 export type CareerKnowledgeRequest =
   | { status: 'known'; career: Career }
@@ -51,6 +55,9 @@ export type CareerKnowledgeRequest =
   // exact-pending-queue reuse never touch the rate limit, so ordinary search
   // is never rate-limited by this.
   | { status: 'rate_limited'; resetAt: string }
+  // Child-data containment: generating new career knowledge from learner-typed
+  // text is paused. Nothing was sent, charged, logged or queued.
+  | { status: 'ai_paused' }
 
 /**
  * Answer a learner's career query.
@@ -68,6 +75,9 @@ export async function requestCareerKnowledge(
 ): Promise<CareerKnowledgeRequest> {
   const trimmed = query.trim()
   if (!trimmed) throw new Error('Career search query cannot be empty')
+  if (trimmed.length > MAX_CAREER_QUERY_CHARS) {
+    throw new Error(`Career search query exceeds ${MAX_CAREER_QUERY_CHARS} characters`)
+  }
 
   const slug = slugify(trimmed)
 
@@ -86,10 +96,11 @@ export async function requestCareerKnowledge(
   // still each pay for their own generation, deliberately (Phase 9 §8).
   const existingPending = await repos.careers.findPendingCareerReviewBySlug(slug)
   if (existingPending && existingPending.payload) {
-    const requestCount = await repos.careers.incrementCareerReviewDemand(
-      existingPending.id,
-      existingPending.request_count,
-    )
+    // While contained, reading an already-generated draft is allowed but it is
+    // read-only: no demand write is attributed to the learner's query.
+    const requestCount = isChildDataAIPaused()
+      ? existingPending.request_count
+      : await repos.careers.incrementCareerReviewDemand(existingPending.id, existingPending.request_count)
     return {
       status: 'provisional',
       newlyQueued: false,
@@ -99,6 +110,12 @@ export async function requestCareerKnowledge(
       ),
     }
   }
+
+  // CHILD-DATA CONTAINMENT GUARD. Must stay ABOVE quota reservation, provider
+  // selection/call, AI request logging and queue insertion: the learner-typed
+  // text must not leave this function, be charged against, logged or stored
+  // while generation is paused.
+  if (isChildDataAIPaused()) return { status: 'ai_paused' }
 
   // Not in the corpus and no reusable draft queued. This is the expensive,
   // ungrounded path (Phase 9 §21/§22) — cap it per learner per day so a burst

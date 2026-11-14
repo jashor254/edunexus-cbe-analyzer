@@ -197,13 +197,11 @@ CORRECT pattern — learners act, teacher supports:
   "step2": "Dakika 10. Wanafunzi wanafanya shughuli ya SOW: '${experiences[1] || ''}'. Andika TU kile WANAFUNZI wanachofanya. Dumisha aina ile ile ya shughuli na muktadha wa Kikenya. Nafasi ya mwalimu: kuzunguka na kuongoza tu.",
   "step3": "Dakika 10. Wanafunzi wanafanya shughuli ya SOW: '${experiences[2] || ''}'. Andika TU kile WANAFUNZI wanachofanya. Dumisha aina ile ile ya shughuli na muktadha wa Kikenya. Nafasi ya mwalimu: kuwezesha mgawanyo wa mawazo tu.",
   "conclusion": "Dakika 5. Wanafunzi wanafupisha mambo muhimu ya somo. Wanafunzi wanajibu maswali 1-2 ya haraka ya mdomo kupima uelewa. Mwalimu anatoa muhtasari wa somo lijalo.",
-  "extendedActivities": "Vipengele VITATU HASA. Kila kipengele ni shughuli moja huru ambayo mwanafunzi anaweza kufanya nyumbani peke yake. Anza kila kimoja na kitenzi: Chora, Andika, Hoji, Tafiti, Angalia, Buni, Uliza, Tafuta. Kamwe usitumie orodha za nambari. Kamwe usiandike kama aya. Umbo: '- [kitenzi] [shughuli]\\n- [kitenzi] [shughuli]\\n- [kitenzi] [shughuli]'",
-  "reflection": "Je, wanafunzi waliweza ${outcomes[0] || '[matokeo a]'}? Je, wanafunzi waliweza ${outcomes[1] || '[matokeo b]'}? Je, wanafunzi waliweza ${outcomes[2] || '[matokeo c]'}? Kama sivyo, utawasaidiaje katika somo lijalo?"
+  "extendedActivities": "Vipengele VITATU HASA. Kila kipengele ni shughuli moja huru ambayo mwanafunzi anaweza kufanya nyumbani peke yake. Anza kila kimoja na kitenzi: Chora, Andika, Hoji, Tafiti, Angalia, Buni, Uliza, Tafuta. Kamwe usitumie orodha za nambari. Kamwe usiandike kama aya. Umbo: '- [kitenzi] [shughuli]\\n- [kitenzi] [shughuli]\\n- [kitenzi] [shughuli]'"
 }
 
 KANUNI ZA ZIADA:
 - Hatua 1, 2, 3 LAZIMA zitumie aina ile ile ya shughuli kutoka kwenye uzoefu wa SOW hapo juu — usibadilishe wala kubuni mpya
-- Sehemu ya tafakuri lazima itolewe kama ilivyo maswali elekezi yaliyoonyeshwa hapo juu — usiiandike upya
 - Rudisha JSON sahihi pekee, hakuna markdown`
     : `Generate ONLY these sections as JSON:
 {
@@ -213,13 +211,11 @@ KANUNI ZA ZIADA:
   "step2": "10 minutes. Learners carry out the SOW activity: '${experiences[1] || ''}'. Write ONLY what LEARNERS do. Keep the same activity type and Kenyan context. Teacher role: circulate and guide only.",
   "step3": "10 minutes. Learners carry out the SOW activity: '${experiences[2] || ''}'. Write ONLY what LEARNERS do. Keep the same activity type and Kenyan context. Teacher role: facilitate sharing only.",
   "conclusion": "5 minutes. Learners summarize the key lesson points. Learners answer 1-2 quick oral questions to check understanding. Teacher previews the next lesson.",
-  "extendedActivities": "EXACTLY 3 bullet points. Each bullet is one standalone activity a learner can do at home independently. Start each with a verb: Draw, Write, Interview, Research, Observe, Create, Ask, Find. Never use numbered lists. Never write as a paragraph. Format as: '- [verb] [activity]\\n- [verb] [activity]\\n- [verb] [activity]'",
-  "reflection": "Were learners able to ${outcomes[0] || '[outcome a]'}? Were learners able to ${outcomes[1] || '[outcome b]'}? Were learners able to ${outcomes[2] || '[outcome c]'}? If not, how will you assist them in the next lesson?"
+  "extendedActivities": "EXACTLY 3 bullet points. Each bullet is one standalone activity a learner can do at home independently. Start each with a verb: Draw, Write, Interview, Research, Observe, Create, Ask, Find. Never use numbered lists. Never write as a paragraph. Format as: '- [verb] [activity]\\n- [verb] [activity]\\n- [verb] [activity]'"
 }
 
 ADDITIONAL RULES:
 - Steps 1, 2, 3 MUST use the same activity type from the SOW experiences above — do not substitute or invent new ones
-- The reflection field must be output exactly as the guiding questions shown above — do not rewrite it
 - Return ONLY valid JSON, no markdown`
 
   const contextSection = placeBased
@@ -288,6 +284,21 @@ ${contextSection}
 `
 }
 
+/**
+ * The reflection guiding questions printed on a lesson plan. Fully determined
+ * by the lesson's outcomes, so the model is not asked to write (echo) it —
+ * it used to be told to "output exactly" this text, which cost output tokens
+ * for nothing and let a paraphrase drift from the outcomes. It is the same
+ * string the prompt previously demanded and the old fallback produced.
+ * (Not the teacher's own reflection — that is teacher_self_evaluation.)
+ */
+export function buildReflectionPrompt(ctx: Pick<LessonPlanContext, 'learningArea' | 'learningOutcomes'>): string {
+  const o = ctx.learningOutcomes
+  return isKiswahiliSubject(ctx.learningArea)
+    ? `Je, wanafunzi waliweza ${o[0] || '[matokeo a]'}? Je, wanafunzi waliweza ${o[1] || '[matokeo b]'}? Je, wanafunzi waliweza ${o[2] || '[matokeo c]'}? Kama sivyo, utawasaidiaje katika somo lijalo?`
+    : `Were learners able to ${o[0] || '[outcome a]'}? Were learners able to ${o[1] || '[outcome b]'}? Were learners able to ${o[2] || '[outcome c]'}? If not, how will you assist them in the next lesson?`
+}
+
 export async function generateLessonPlan(
   ctx: LessonPlanContext
 ): Promise<GeneratedLessonPlan> {
@@ -297,7 +308,11 @@ export async function generateLessonPlan(
   for (let attempt = 0; attempt < 3; attempt++) {
     let raw: string
     try {
-      raw = await callAI(prompt, LESSON_PLAN_SYSTEM, { temperature: 0.3, maxTokens: 2000, costContext: ctx.costContext, feature: 'lesson_plan_generate' })
+      raw = await callAI(prompt, LESSON_PLAN_SYSTEM, {
+        temperature: 0.3, maxTokens: 2000, costContext: ctx.costContext, feature: 'lesson_plan_generate',
+        // Telemetry only: groups a week's plans and numbers malformed-output retries.
+        callSite: 'lesson_plan.lesson', correlationId: ctx.correlationId, workflowAttempt: attempt + 1,
+      })
     } catch (err: unknown) {
       // Provider failure: callDeepSeek already retried and fell back — a
       // further attempt would repeat that whole chain. Malformed or
@@ -323,12 +338,7 @@ export async function generateLessonPlan(
       parsed.conclusion &&
       parsed.extendedActivities
     ) {
-      const reflectionFallback = isKiswahiliSubject(ctx.learningArea)
-        ? `Je, wanafunzi waliweza ${ctx.learningOutcomes[0] || '[matokeo a]'}? Je, wanafunzi waliweza ${ctx.learningOutcomes[1] || '[matokeo b]'}? Je, wanafunzi waliweza ${ctx.learningOutcomes[2] || '[matokeo c]'}? Kama sivyo, utawasaidiaje katika somo lijalo?`
-        : `Were learners able to ${ctx.learningOutcomes[0] || '[outcome a]'}? Were learners able to ${ctx.learningOutcomes[1] || '[outcome b]'}? Were learners able to ${ctx.learningOutcomes[2] || '[outcome c]'}? If not, how will you assist them in the next lesson?`
-      const reflection = typeof parsed.reflection === 'string' && parsed.reflection.trim()
-        ? parsed.reflection
-        : reflectionFallback
+      const reflection = buildReflectionPrompt(ctx)
 
       return {
         context: ctx,

@@ -19,6 +19,10 @@ import assert from 'node:assert/strict'
 type LogCall = { level: string; message: string; context: Record<string, unknown> }
 const logCalls: LogCall[] = []
 
+// These tests exercise the provider transport / payload contracts as they behave when learner-data AI is
+// ALLOWED. Containment itself (the switch OFF) is proven separately in lib/ai/childDataContainment.test.ts.
+mock.module('@/lib/ai/childDataPolicy', { namedExports: { assertAIFeatureAllowed: () => {} } })
+
 mock.module('@/lib/observability/logger', {
   namedExports: {
     logger: {
