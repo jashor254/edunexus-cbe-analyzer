@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "defaultPolicy": "deny",
+  "denyList": [],
+  "targets": [
+    {
+      "id": "edunexus-repo",
+      "adapter": "edunexus",
+      "kind": "repository",
+      "path": "../..",
+      "environment": "development",
+      "allowedModes": ["passive"],
+      "authorisation": {
+        "approvedBy": "founder (Jashor Breaker Mission 002, gate G2)",
+        "approvedAt": "2026-11-13",
+        "expiresAt": "2027-02-13",
+        "scope": "Read-only static checks of this repository's tracked files. No network, no database, no production, no mutations."
+      }
+    }
+  ]
+}
