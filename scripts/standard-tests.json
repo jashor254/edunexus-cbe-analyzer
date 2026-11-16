@@ -1,6 +1,7 @@
 {
   "description": "STANDARD_SAFE test manifest \u2014 Phase H1A/H1S-FIX. Every file listed here was verified to require zero privileged infrastructure (no Supabase, no network, no auth, no external services) and confirmed by an actual secret-free run (all NEXT_PUBLIC_SUPABASE_*/SUPABASE_SERVICE_ROLE_KEY/TEST_SUPABASE_*/DEEPSEEK_AI_API_KEY/PAYSTACK_* variables explicitly unset). Run by npm test / npm run test:standard. Do not add files by editing this list without re-verifying \u2014 use scripts/check-standard-manifest.mjs, then an actual secret-free run.",
   "files": [
+    "app/api/cron/auto-publish-holiday-plans/route.test.ts",
     "app/api/student/blueprint/[learnerId]/pdf/route.test.ts",
     "app/api/teacher/monday-panel/buildAction.test.ts",
     "app/api/webhooks/whatsapp/route.test.ts",
