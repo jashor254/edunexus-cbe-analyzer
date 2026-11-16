@@ -15,12 +15,15 @@
 
 import { test, before, beforeEach, afterEach, mock } from 'node:test'
 import assert from 'node:assert/strict'
+import { randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { NextRequest } from 'next/server'
 
 const FLAG = 'HOLIDAY_AUTO_PUBLISH_ENABLED'
-const SECRET = 'hlg05-test-cron-secret'
+// Generated per run with the cryptographic RNG: no secret-like literal lives in the repo.
+// Every assertion below is relative to this value, so results stay deterministic.
+const SECRET = randomBytes(24).toString('hex')
 
 type StalePlan = { id: string; teacher_id: string | null; student_id: string; term: number; year: number }
 
@@ -283,7 +286,7 @@ test('GET and POST are consistent across the whole secret × flag × credential 
 })
 
 test('responses never contain the secret value (401, disabled 200, enabled 200)', async () => {
-  const secret = 'hlg05b-secret-that-must-not-appear-in-any-response'
+  const secret = randomBytes(24).toString('base64url')
   setSecret(secret)
   const bodies: string[] = []
   bodies.push(await (await getWith('Bearer wrong')).text())
