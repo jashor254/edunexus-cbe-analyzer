@@ -23,8 +23,10 @@
 // invisible to the learner's canonical record.
 //
 // Three deliberately small changes, no new producer:
-//   1. the evidence source is chosen from `assessments.source`, which
-//      already records which intake path was used;
+//   1. (SUPERSEDED by SEC-02A) the evidence source was chosen from
+//      `assessments.source`. That column is client-writable and is no longer
+//      trusted: every report-card row now enters as `parent_observation`
+//      — see resolveReportCardProvenance in ./reportCardProvenance.ts;
 //   2. `teacherId` accepts null, because the parent path has no teacher
 //      (createIngestionRun already allowed this — lib/compass/evidence.ts
 //      has always passed null);
@@ -45,29 +47,27 @@ import { persistEvidenceBatch } from '@/lib/intelligence/evidenceLifecycle'
 import { reportCardResultKey } from '@/lib/intelligence/correctionKey'
 import { mapSubject } from '@/lib/intelligence/subjectMapping'
 import { createServiceClient } from '@/utils/supabase/service'
+import { resolveReportCardProvenance } from './reportCardProvenance'
 
 const EXTRACTION_METHOD = 'report_card_pipeline_v1'
 
 /**
- * Who entered this assessment — the one thing that decides its evidence
- * source, and therefore its trust tier and whether it can auto-confirm.
+ * SEC-02A — the evidence source of a report-card row is decided HERE, by
+ * policy, never by the stored `assessments.source` column.
  *
- * Read from `assessments.source`, a column that already distinguishes the
- * two intake paths. Neither value is new: `teacher_upload` (tier 3) is
- * exactly what this producer has always emitted for the teacher path, and
- * `parent_observation` (tier 1) already exists in EVIDENCE_SOURCE_TRUST_TIER
- * for precisely this shape of claim — a score reported by a parent, not
- * administered or attested by a teacher.
+ * That column is written by the data owner (the parent/learner page inserts
+ * it from the browser; the deprecated create route used to copy a client-
+ * supplied value), so it is descriptive metadata, not proof of who authored
+ * the numbers. Previously any value other than `'parent'` — `'teacher'`,
+ * NULL, a typo — was treated as a teacher assessment (tier 3, auto-confirmed,
+ * eligible verified performance). Every report-card row now enters as
+ * `parent_observation` (tier 1, structurally `pending_review`, never
+ * performance evidence); see `reportCardProvenance.ts` for the full rule and
+ * for where teacher-authored assessment evidence legitimately comes from.
  *
- * Tier 1 caps confidence at 60, below the 85 auto-confirm threshold, so a
- * parent-entered score is STRUCTURALLY incapable of becoming confirmed
- * evidence without a teacher's review. That is a property of the existing
- * Evidence Domain, not a rule this file enforces — which is exactly why no
- * new source, tier, or review semantics were invented here.
+ * The claimed label is kept on the evidence row (`issues`, closed vocabulary)
+ * so it remains auditable.
  */
-function resolveEvidenceSource(assessmentSource: string | null): 'teacher_upload' | 'parent_observation' {
-  return assessmentSource === 'parent' ? 'parent_observation' : 'teacher_upload'
-}
 
 /** The provenance prefix every row this producer emits shares, per assessment. */
 function rawInputRefPrefix(assessmentId: string): string {
@@ -138,7 +138,8 @@ export async function recordReportCardAssessmentEvidence(
   const term = (assessment.term as number) ?? null
   const importedAt = startedAt.toISOString()
 
-  const SOURCE = resolveEvidenceSource(assessment.source as string | null)
+  const provenance = resolveReportCardProvenance(assessment.source)
+  const SOURCE = provenance.evidenceSource
 
   const confidence = computeConfidence({
     identityConfidence: 100, // studentId is a real FK, not name/fuzzy-matched
@@ -147,6 +148,16 @@ export async function recordReportCardAssessmentEvidence(
     source: SOURCE,
   })
   const reviewStatus = resolveReviewStatus(confidence)
+
+  // Non-negotiable invariant (SEC-02A): a report-card row is never confirmed
+  // evidence at creation. Structurally guaranteed by tier 1's confidence ceiling
+  // (60 < AUTO_CONFIRM_THRESHOLD 85); this makes the guarantee explicit and
+  // fails loudly if that ceiling is ever raised without re-reviewing this producer.
+  if (reviewStatus !== 'pending_review') {
+    throw new Error(
+      `recordReportCardAssessmentEvidence: computed reviewStatus '${reviewStatus}' for a ${SOURCE} row — report-card evidence must ALWAYS be pending_review.`,
+    )
+  }
 
   const evidenceBatch: LearnerEvidence[] = []
   for (const [rawSubject, rawLevel] of Object.entries(scores)) {
@@ -180,7 +191,8 @@ export async function recordReportCardAssessmentEvidence(
         assessmentId, studentId, canonicalSubject, source: SOURCE,
       }),
       importedAt,
-      issues: [],
+      // The claimed label, normalised — audit trail only, never authority.
+      issues: provenance.issues,
     })
   }
   if (!evidenceBatch.length) return

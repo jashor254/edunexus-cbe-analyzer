@@ -84,11 +84,12 @@ export async function POST(req: Request) {
     // no Evidence at all, so a parent-entered assessment shaped what Compass
     // taught while staying invisible to the learner's canonical record.
     //
-    // `teacherId` is null because this path genuinely has no teacher; the
-    // producer reads `assessments.source` to emit `parent_observation`
-    // (tier 1), which the existing confidence ceiling keeps at
-    // `pending_review` — a parent-reported score can only reach canonical
-    // state through a real teacher review.
+    // `teacherId` is null because this path genuinely has no teacher. The
+    // producer emits `parent_observation` (tier 1) for every report-card row
+    // regardless of the stored `assessments.source` label (SEC-02A: that
+    // column is client-writable and is not proof of authority); the tier-1
+    // confidence ceiling keeps it `pending_review`, and it is never performance
+    // evidence.
     //
     // Fire-and-forget with the same failure isolation as the teacher route:
     // the pipeline has already succeeded by this point, and an Evidence

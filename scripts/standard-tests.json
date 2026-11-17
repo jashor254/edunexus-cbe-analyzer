@@ -28,6 +28,7 @@
     "lib/assessments/assessmentTypeCatalog.test.ts",
     "lib/assessments/buildPositionMap.regression.test.ts",
     "lib/assessments/markLinking.test.ts",
+    "lib/assessments/reportCardProvenance.test.ts",
     "lib/assessments/subjectMarkMerge.test.ts",
     "lib/assessments/phaseBMigration.safety.test.ts",
     "lib/academicClinic/aiImpactRegression.test.ts",

@@ -234,12 +234,18 @@ test('E. the same report-card result reprocessed → BOTH_SUPERSEDE', async () =
   assert.equal(first.length, 1)
   assert.equal(correctionKeyNamespace(first[0].correction_key), 'report_card_result')
 
+  // SEC-02A: a report-card row is always an unverified, reported claim
+  // (`parent_observation`, tier 1, pending_review) — the stored
+  // `assessments.source` label ('teacher' in this fixture) is not authority.
+  assert.equal(first[0].evidence_source, 'parent_observation',
+    'the stored label is not trusted: the producer emits parent_observation whatever the row claims')
+
   // A corrected value for the SAME assessment. The producer's idempotency
   // guard skips an identical replay, so the row is re-emitted directly with
-  // the producer's own key to model reprocessing after a correction.
+  // the producer's own source and key to model reprocessing after a correction.
   await new Promise(r => setTimeout(r, 1100))
   const { id: runId } = await repos.evidence.createIngestionRun({
-    source: 'teacher_upload', initiatedBy: authUserId, teacherId, institution: null,
+    source: 'parent_observation', initiatedBy: authUserId, teacherId, institution: null,
   })
   const { persistEvidenceBatch } = await import('./evidenceLifecycle')
   const { reportCardResultKey } = await import('./correctionKey')
@@ -247,13 +253,13 @@ test('E. the same report-card result reprocessed → BOTH_SUPERSEDE', async () =
     learnerId: learnerE, extractedName: '', extractedExternalId: null,
     subject: 'mathematics', rawSubject: 'mathematics', score: null, cbcLevel: 4,
     assessmentType: 'term_exam', academicYear: 2026, term: 2,
-    evidenceSource: 'teacher_upload', trustTier: 3, evidenceConfidence: 100,
-    extractionMethod: 'report_card_pipeline_v1', reviewStatus: 'auto_confirmed',
+    evidenceSource: 'parent_observation', trustTier: 1, evidenceConfidence: 60,
+    extractionMethod: 'report_card_pipeline_v1', reviewStatus: 'pending_review',
     rawInputRef: `assessments:${reportAssessmentId}:mathematics:${learnerE}:corrected`,
     importedAt: new Date().toISOString(), issues: [], subStrandId: null,
     correctionKey: reportCardResultKey({
       assessmentId: reportAssessmentId, studentId: learnerE,
-      canonicalSubject: 'mathematics', source: 'teacher_upload',
+      canonicalSubject: 'mathematics', source: 'parent_observation',
     }),
   }], runId)
 
@@ -311,6 +317,15 @@ test('GATE D. pending keyed corrections are recorded, and execution timing is un
   console.log(`[gate-d] pending keyed corrections observed: ${pendingKeyed.length}`)
 
   // Whatever the count, E3.5 changes nothing about WHEN supersession runs.
+  //
+  // SEC-02A: report-card rows are now always unverified `parent_observation`
+  // (tier 1, pending_review), so the report-card correction in test E is a
+  // PENDING correction — recorded, with its supersession deferred until review —
+  // instead of an auto-confirmed one that supersedes immediately. Executed
+  // supersession therefore now comes from the auto-confirmed producers (test A,
+  // the regraded assignment), and the report-card pair is the pending case this
+  // gate exists to observe.
   const superseded = rows.filter(r => r.lifecycle_state === 'superseded')
-  assert.ok(superseded.length >= 2, 'the LEGACY rule still executed supersession, exactly as before')
+  assert.ok(superseded.length >= 1, 'the LEGACY rule still executed supersession for auto-confirmed corrections, exactly as before')
+  assert.ok(pendingKeyed.length >= 2, 'the report-card correction pair is recorded as pending keyed rows, its supersession deferred')
 })
