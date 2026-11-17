@@ -26,31 +26,18 @@
 // "Not Yet Decided" status for this exact route). If a future audit
 // reconfirms zero callers and no external usage, this is the safe-removal
 // candidate to act on.
-import { z } from 'zod'
+//
+// SEC-02A: this route no longer accepts client-supplied provenance. It stamps
+// `source: 'parent'` server-side (the caller is the owning learner/parent —
+// `requireStudent`) and rejects `source: 'teacher'` with 400. See
+// lib/assessments/createAssessmentRequest.ts. It emits no evidence itself.
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
 import { recomputeAndSaveCapabilityProfile } from '@/lib/career/careerEngine'
 import { requireStudent } from '@/lib/core/permissions'
 import { UnauthorizedError, isEduNexusError } from '@/lib/core/errors'
-
-const CreateAssessmentSchema = z.object({
-  student_id:              z.string().uuid(),
-  grade:                   z.number().int().optional(),
-  term:                    z.number().int().min(1).max(3),
-  year:                    z.number().int(),
-  grade_level:             z.enum(['junior', 'senior']).optional(),
-  subject_scores:          z.record(z.string(), z.unknown()).refine(s => Object.keys(s).length >= 5, {
-    message: 'At least 5 subject scores are required',
-  }),
-  curriculum_type:         z.string().optional(),
-  assessment_style:        z.string().optional(),
-  mathematics_type:        z.string().optional(),
-  pathway_electives:       z.unknown().optional(),
-  pathway_recommendations: z.unknown().optional(),
-  source:                  z.enum(['teacher', 'parent']).optional(),
-  raw_marks:               z.record(z.string(), z.unknown()).optional(),
-})
+import { CreateAssessmentSchema, CREATED_ASSESSMENT_SOURCE } from '@/lib/assessments/createAssessmentRequest'
 
 export async function POST(request: Request) {
   try {
@@ -71,7 +58,6 @@ export async function POST(request: Request) {
       mathematics_type,
       pathway_electives,
       pathway_recommendations,
-      source,
       raw_marks,
     } = parsed.data
 
@@ -113,7 +99,10 @@ export async function POST(request: Request) {
         mathematics_type:        mathematics_type ?? null,
         pathway_electives:       pathway_electives ?? null,
         pathway_recommendations: pathway_recommendations ?? null,
-        source:                  source === 'teacher' ? 'teacher' : 'parent',
+        // SEC-02A: provenance is assigned by the server, never taken from the
+        // request. This route is owner-only (requireStudent), so what it stores is
+        // reported by the family — never teacher-authored.
+        source:                  CREATED_ASSESSMENT_SOURCE,
         raw_marks:               raw_marks ?? {},
       })
       .select()

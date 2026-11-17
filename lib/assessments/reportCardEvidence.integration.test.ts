@@ -25,6 +25,7 @@
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
+import { createClient } from '@supabase/supabase-js'
 import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { repos } from '@/lib/repositories'
 import { persistEvidenceBatch } from '@/lib/intelligence/evidenceLifecycle'
@@ -32,6 +33,8 @@ import { EVIDENCE_SOURCE_TRUST_TIER, type LearnerEvidence } from '@/lib/intellig
 import { computeConfidence, resolveReviewStatus, AUTO_CONFIRM_THRESHOLD } from '@/lib/intelligence/confidence'
 import { recomputeLearnerProjection } from '@/lib/projection/recompute'
 import { recordReportCardAssessmentEvidence } from './reportCardEvidence'
+import { recordAssignmentMarkEvidence } from '@/lib/assignments/evidence'
+import { marksToLevel } from '@/lib/intelligence/cbcScale'
 import { asStudentId } from '@/lib/core/identityTypes'
 import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
@@ -44,9 +47,11 @@ let studentId: string
 let collisionStudentId: string
 let teacherOnlyStudentId: string
 let parentAssessmentId: string
-let teacherAssessmentId: string
 let teacherOnlyAssessmentId: string
 const ingestionRunIds: string[] = []
+// SEC-02A fixtures: learners created on demand by the provenance tests (cleaned up in after()).
+const extraStudentIds: string[] = []
+const extraAuthUserIds: string[] = []
 
 async function retryAsync<T>(fn: () => Promise<T>, attempts = 6): Promise<T> {
   let lastError: unknown
@@ -106,13 +111,12 @@ before(async () => {
   teacherOnlyStudentId = await insertStudent('Teacher Path Regression Test')
 
   parentAssessmentId = await insertAssessment(studentId, 'parent', { mathematics: 2, english: 3, kiswahili: 1 })
-  teacherAssessmentId = await insertAssessment(collisionStudentId, 'teacher', { mathematics: 4 })
   teacherOnlyAssessmentId = await insertAssessment(teacherOnlyStudentId, 'teacher', { mathematics: 3, english: 4 })
 })
 
 after(async () => {
   const safely = async (fn: () => PromiseLike<unknown>) => { try { await fn() } catch { /* best-effort */ } }
-  const students = [studentId, collisionStudentId, teacherOnlyStudentId].filter(Boolean)
+  const students = [studentId, collisionStudentId, teacherOnlyStudentId, ...extraStudentIds].filter(Boolean)
 
   for (const id of students) {
     const { data: rows } = await db.from('learner_evidence').select('id').eq('learner_id', id)
@@ -128,6 +132,7 @@ after(async () => {
   }
   if (ingestionRunIds.length) await safely(() => db.from('ingestion_runs').delete().in('id', ingestionRunIds))
   if (teacherId) await safely(() => db.from('teachers').delete().eq('id', teacherId))
+  for (const id of extraAuthUserIds) await safely(() => deleteAuthUserOrThrow(db, id))
   if (authUserId) {
     await db.from('notification_log').delete().eq('user_id', authUserId)
     await db.from('platform_events').delete().eq('actor_id', authUserId)
@@ -149,8 +154,33 @@ async function evidenceFor(learnerId: string) {
 // ════════════════════════════════════════════════════════════════════════════
 
 test('GATE. a parent tier-1 pending claim must not degrade a teacher tier-3 confirmed claim', async () => {
-  // 1. Teacher's confirmed claim, via the real producer.
-  await recordReportCardAssessmentEvidence(teacherAssessmentId, collisionStudentId, teacherId, authUserId)
+  // 1. A teacher's confirmed claim. SEC-02A: the report-card producer no longer
+  //    emits teacher evidence (a stored `assessments.source = 'teacher'` label is
+  //    not authority), so the teacher claim is built directly, exactly as an
+  //    authorised teacher pathway (gradebook / assignment marking) produces it:
+  //    `teacher_upload`, tier 3, auto_confirmed.
+  const { id: teacherRunId } = await repos.evidence.createIngestionRun({
+    source: 'teacher_upload', initiatedBy: authUserId, teacherId, institution: null,
+  })
+  ingestionRunIds.push(teacherRunId)
+  const teacherConfidence = computeConfidence({
+    identityConfidence: 100, identityMatchType: 'external_id', fieldIssueCount: 0, source: 'teacher_upload',
+  })
+  await persistEvidenceBatch([{
+    learnerId: collisionStudentId,
+    extractedName: '', extractedExternalId: null,
+    subject: 'mathematics', rawSubject: 'mathematics',
+    score: null, cbcLevel: 4,
+    assessmentType: 'term_exam', academicYear: 2026, term: 2,
+    evidenceSource: 'teacher_upload',
+    trustTier: EVIDENCE_SOURCE_TRUST_TIER.teacher_upload,
+    evidenceConfidence: teacherConfidence,
+    extractionMethod: `${SYNTHETIC_MARKER}_teacher_claim`,
+    reviewStatus: resolveReviewStatus(teacherConfidence),
+    rawInputRef: `${SYNTHETIC_MARKER}:teacher-claim:mathematics`,
+    importedAt: new Date().toISOString(),
+    issues: [],
+  }], teacherRunId)
 
   const afterTeacher = await evidenceFor(collisionStudentId)
   const teacherRow = afterTeacher.find(r => r.evidence_source === 'teacher_upload')
@@ -274,7 +304,7 @@ test('1+2+3+4. parent intake produces one tier-1, pending_review row per scored 
   assert.equal(rows.length, 3, 'one row per scored subject (mathematics, english, kiswahili)')
 
   for (const row of rows) {
-    assert.equal(row.evidence_source, 'parent_observation', 'source is chosen from assessments.source')
+    assert.equal(row.evidence_source, 'parent_observation', 'every report-card row is parent_observation, whatever the stored label (SEC-02A)')
     assert.equal(row.trust_tier, 1, 'the existing tier for parent_observation — not a new tier')
     assert.equal(row.lifecycle_state, 'pending_review', 'never auto-confirmed')
     assert.ok(row.evidence_confidence <= 60, 'tier-1 ceiling applies')
@@ -361,22 +391,222 @@ test('12. a producer failure cannot fail assessment processing (fire-and-forget 
   )
 })
 
-test('T. the teacher path is unchanged — same source, tier and auto-confirmation as before', async () => {
-  // Its own learner: the collision probe above deliberately supersedes its
-  // teacher row, so asserting the teacher path's normal behaviour there
-  // would be asserting against a state another test intentionally changed.
+// ════════════════════════════════════════════════════════════════════════════
+// SEC-02A — assessment provenance is established by an authenticated, authorised
+// workflow, never by a client-supplied `assessments.source` label.
+//
+// Threat (SEC-01 / NF-1): the label is written by the data owner (the parent
+// page inserts it from the browser), yet the producer used to treat every value
+// other than 'parent' — 'teacher', NULL, a typo — as a teacher assessment
+// (tier 3, auto_confirmed, eligible verified performance).
+// ════════════════════════════════════════════════════════════════════════════
+
+async function insertStudentRow(name: string, ownerUserId: string | null = null): Promise<string> {
+  const { data } = await retryAsync(async () => {
+    const r = await db.from('students')
+      .insert({ name, grade: 8, level: 'Junior School', school: SYNTHETIC_MARKER, added_by: 'teacher', teacher_id: teacherId, user_id: ownerUserId })
+      .select('id').single()
+    if (r.error) throw r.error
+    return r
+  })
+  extraStudentIds.push(data!.id)
+  return data!.id
+}
+
+/** Stores an `assessments` row with an arbitrary stored source value, as any writer of that column could. */
+async function insertAssessmentWithStoredSource(forStudent: string, storedSource: string | null, scores: Record<string, number>): Promise<string> {
+  const { data } = await retryAsync(async () => {
+    const r = await db.from('assessments')
+      .insert({
+        student_id: forStudent, user_id: authUserId, grade: 8, term: 2, year: 2026,
+        grade_level: 'junior', subject_scores: scores, curriculum_type: 'cbc',
+        assessment_style: 'formative', source: storedSource,
+      })
+      .select('id').single()
+    if (r.error) throw r.error
+    return r
+  })
+  return data!.id
+}
+
+async function evidenceDetailFor(learnerId: string) {
+  const { data } = await db.from('learner_evidence')
+    .select('id, subject, cbc_level, evidence_source, extraction_method, trust_tier, lifecycle_state, evidence_confidence, issues, raw_input_ref')
+    .eq('learner_id', learnerId)
+    .order('created_at', { ascending: true })
+  return data ?? []
+}
+
+/** Asserts a learner's report-card evidence is unverified, reported-only context that cannot reach verified proficiency. */
+async function assertUnverifiedReportedEvidence(learnerId: string, expectedRows: number, expectedClaim: string, why: string) {
+  const rows = await evidenceDetailFor(learnerId)
+  assert.equal(rows.length, expectedRows, `${why}: one row per scored subject`)
+  for (const row of rows) {
+    assert.equal(row.evidence_source, 'parent_observation', `${why}: never teacher_upload`)
+    assert.equal(row.trust_tier, 1, `${why}: tier 1, not tier 3`)
+    assert.equal(row.lifecycle_state, 'pending_review', `${why}: never auto-confirmed`)
+    assert.ok(row.evidence_confidence < AUTO_CONFIRM_THRESHOLD, `${why}: confidence stays below the auto-confirm threshold`)
+    assert.equal(row.extraction_method, 'report_card_pipeline_v1')
+    assert.ok((row.issues as string[]).includes(`assessment_source_claim_unverified:${expectedClaim}`),
+      `${why}: the claimed label is recorded for audit (as "${expectedClaim}"), not trusted`)
+  }
+
+  // H — downstream: no verified proficiency, risk, capability or knowledge from this row.
+  const confirmed = await repos.evidence.findConfirmedEvidenceForLearner(asStudentId(learnerId))
+  assert.equal(confirmed.length, 0, `${why}: nothing reaches the confirmed set`)
+  const projection = await recomputeLearnerProjection(learnerId)
+  assert.equal(projection.academic, null, `${why}: no verified academic proficiency`)
+  assert.equal(projection.capability, null)
+  assert.equal(projection.knowledge, null)
+  assert.equal(projection.risk, null)
+}
+
+test('SEC-02A A+B. a stored "teacher" label — written by a parent or a learner — does not grant teacher authority or verified proficiency', async () => {
+  const learner = await insertStudentRow('SEC02A Teacher-Label Learner')
+  const assessmentId = await insertAssessmentWithStoredSource(learner, 'teacher', { mathematics: 4, english: 4 })
+  await recordReportCardAssessmentEvidence(assessmentId, learner, null, authUserId)
+  await assertUnverifiedReportedEvidence(learner, 2, 'teacher', 'stored "teacher"')
+})
+
+test('SEC-02A C. a missing source never becomes teacher evidence', async () => {
+  const learner = await insertStudentRow('SEC02A Missing-Source Learner')
+  const assessmentId = await insertAssessmentWithStoredSource(learner, null, { mathematics: 4, english: 3 })
+  await recordReportCardAssessmentEvidence(assessmentId, learner, null, authUserId)
+  await assertUnverifiedReportedEvidence(learner, 2, 'unlabelled', 'NULL source')
+})
+
+for (const [label, stored, claim] of [
+  ['unknown string', 'bogus', 'unrecognised'],
+  ['near-miss casing/whitespace', 'Teacher ', 'unrecognised'],
+  ['a trusted EVIDENCE source name', 'teacher_upload', 'unrecognised'],
+  ['empty string', '', 'unlabelled'],
+] as const) {
+  test(`SEC-02A D. ${label} never becomes teacher evidence`, async () => {
+    const learner = await insertStudentRow(`SEC02A Unknown-Source Learner (${label})`)
+    const assessmentId = await insertAssessmentWithStoredSource(learner, stored, { mathematics: 4, english: 4 })
+    await recordReportCardAssessmentEvidence(assessmentId, learner, null, authUserId)
+    await assertUnverifiedReportedEvidence(learner, 2, claim, label)
+  })
+}
+
+test('SEC-02A D2. the teacher-triggered processing route cannot upgrade a row either: the producer is the same whoever calls it', async () => {
+  const learner = await insertStudentRow('SEC02A Teacher-Processed Learner')
+  const assessmentId = await insertAssessmentWithStoredSource(learner, 'teacher', { mathematics: 4 })
+  // The teacher route passes its authenticated teacher id; that identifies who PROCESSED the row, not who authored the numbers.
+  await recordReportCardAssessmentEvidence(assessmentId, learner, teacherId, authUserId)
+  await assertUnverifiedReportedEvidence(learner, 1, 'teacher', 'teacher-triggered processing of a client-labelled row')
+})
+
+test('SEC-02A E. the ordinary parent-reported flow stays available, provenance preserved, and is not promoted', async () => {
+  // `studentId` / `parentAssessmentId` were processed by test 1+2+3+4 with a genuine 'parent' label.
+  const rows = await evidenceDetailFor(studentId)
+  assert.equal(rows.length, 3, 'the parent-reported scores remain stored as evidence')
+  for (const row of rows) {
+    assert.equal(row.evidence_source, 'parent_observation')
+    assert.equal(row.trust_tier, 1)
+    assert.ok(row.raw_input_ref.startsWith(`assessments:${parentAssessmentId}:`), 'provenance (the assessment it came from) is preserved')
+    assert.ok((row.issues as string[]).includes('assessment_source_claim_unverified:parent'), 'the claimed label is preserved for audit')
+  }
+  assert.deepEqual(
+    rows.map(r => r.cbc_level).sort(),
+    [1, 2, 3],
+    'the reported levels are carried through unchanged',
+  )
+})
+
+test('T. a report-card row labelled "teacher" is only a reported claim — the teacher tier is reached through the authorised teacher pathways, not through this producer', async () => {
+  // Replaces the former "teacher path unchanged" test, which asserted that
+  // `assessments.source = 'teacher'` mapped to teacher_upload / tier 3 /
+  // auto_confirmed. That behaviour was the vulnerability (SEC-01, NF-1).
   await recordReportCardAssessmentEvidence(teacherOnlyAssessmentId, teacherOnlyStudentId, teacherId, authUserId)
 
   const rows = await evidenceFor(teacherOnlyStudentId)
-  assert.equal(rows.length, 2, 'one row per scored subject, exactly as before P0-B')
+  assert.equal(rows.length, 2, 'one row per scored subject')
   for (const row of rows) {
-    assert.equal(row.evidence_source, 'teacher_upload', 'assessments.source = teacher still maps to teacher_upload')
-    assert.equal(row.trust_tier, 3)
-    assert.equal(row.lifecycle_state, 'auto_confirmed', 'teacher-entered scores still auto-confirm')
+    assert.equal(row.evidence_source, 'parent_observation', 'a stored "teacher" label no longer maps to teacher_upload')
+    assert.equal(row.trust_tier, 1)
+    assert.equal(row.lifecycle_state, 'pending_review')
     assert.ok(row.raw_input_ref.startsWith(`assessments:${teacherOnlyAssessmentId}:`), 'provenance format is unchanged')
   }
-
   const projection = await recomputeLearnerProjection(teacherOnlyStudentId)
-  assert.equal(projection.academic?.value.bySubject.mathematics?.latestLevel, 3,
-    'and still reaches canonical state without a review, exactly as before')
+  assert.equal(projection.academic, null, 'and nothing reaches canonical state')
+})
+
+test('SEC-02A F. a legitimately authorised teacher assessment pathway still produces eligible, confirmed teacher evidence', async () => {
+  // Teacher marking of an assignment is an established pathway whose
+  // provenance comes from the authenticated, authorised teacher workflow
+  // (lib/assignments/evidence.ts), not from any label on a client-written row.
+  const learner = await insertStudentRow('SEC02A Legitimate-Teacher Learner')
+  const score = 16, maxScore = 20
+  await recordAssignmentMarkEvidence({
+    studentId: learner,
+    assignmentId: `${SYNTHETIC_MARKER}-assignment`,
+    subject: 'mathematics', topic: 'SEC-02A legitimate teacher marking', substrandId: null,
+    score, maxScore, teacherId, teacherUserId: authUserId,
+    academicYear: 2026, term: 2, markedAt: new Date().toISOString(),
+  })
+
+  const rows = await evidenceDetailFor(learner)
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].evidence_source, 'teacher_upload')
+  assert.equal(rows[0].trust_tier, 3)
+  assert.equal(rows[0].lifecycle_state, 'auto_confirmed')
+
+  const projection = await recomputeLearnerProjection(learner)
+  assert.equal(projection.academic?.value.bySubject.mathematics?.latestLevel, marksToLevel(Math.round((score / maxScore) * 100)),
+    'the authorised teacher pathway still reaches verified performance under the established rules')
+})
+
+test('SEC-02A G. KNOWN GAP (database-level, reserved for the DB-enforcement package): an owner can still write source:"teacher" straight through the browser client — the application classifier ignores it', async () => {
+  // This is the limitation the application-layer fix cannot close. The owner of a
+  // `students` row holds INSERT/UPDATE on `assessments` under RLS with no rule on
+  // the `source` column, so a direct browser→database write of a privileged label
+  // is still PERMITTED. SEC-02A makes that label harmless to the Evidence Domain
+  // (asserted below); it does not prevent the write, and other label readers
+  // (e.g. the Clinic PDF "teacher-wins" merge) still see it.
+  //
+  // The two `assert.equal(error, null)` assertions are TRIPWIRES: they are
+  // expected to FAIL on the day database enforcement (trigger / CHECK / column
+  // privilege) lands, so the limitation is reviewed and removed deliberately.
+  const email = `${SYNTHETIC_MARKER.toLowerCase()}-owner-${Date.now()}@example.com`
+  const password = `Test!${Math.random().toString(36).slice(2, 12)}`
+  const { data: created, error: createErr } = await db.auth.admin.createUser({ email, password, email_confirm: true })
+  assert.equal(createErr, null)
+  extraAuthUserIds.push(created!.user.id)
+  const ownerId = created!.user.id
+
+  const learner = await insertStudentRow('SEC02A Owner-Write Learner', ownerId)
+
+  const owner = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!)
+  const { error: signInErr } = await owner.auth.signInWithPassword({ email, password })
+  assert.equal(signInErr, null)
+
+  // Direct insert with a privileged label.
+  const inserted = await owner.from('assessments')
+    .insert({
+      student_id: learner, grade: 8, term: 2, year: 2026, grade_level: 'junior',
+      subject_scores: { mathematics: 4, english: 4 }, curriculum_type: 'cbc', assessment_style: 'formative',
+      source: 'teacher',
+    })
+    .select('id, source').single()
+  assert.equal(inserted.error, null, 'TRIPWIRE: database-level enforcement of assessments.source is not in place')
+  assert.equal(inserted.data!.source, 'teacher', 'the privileged label is stored verbatim')
+
+  // Direct relabel of an honestly-labelled row.
+  const honestId = await insertAssessmentWithStoredSource(learner, 'parent', { mathematics: 3 })
+  const relabelled = await owner.from('assessments').update({ source: 'teacher' }).eq('id', honestId).select('id, source').single()
+  assert.equal(relabelled.error, null, 'TRIPWIRE: the owner can still change an existing assessments.source')
+
+  // …and yet the application layer no longer treats it as authority.
+  await recordReportCardAssessmentEvidence(inserted.data!.id, learner, null, ownerId)
+  await recordReportCardAssessmentEvidence(honestId, learner, null, ownerId)
+  const rows = await evidenceDetailFor(learner)
+  assert.equal(rows.length, 3, 'two subjects from the forged insert + one from the relabelled row')
+  for (const row of rows) {
+    assert.equal(row.evidence_source, 'parent_observation')
+    assert.equal(row.trust_tier, 1)
+    assert.equal(row.lifecycle_state, 'pending_review')
+  }
+  const projection = await recomputeLearnerProjection(learner)
+  assert.equal(projection.academic, null, 'a forged label cannot establish verified proficiency through this ingestion path')
 })
