@@ -181,6 +181,7 @@
     "scripts/growth/enrich/websiteEnrichment.test.ts",
     "scripts/growth/lib/csv.test.ts",
     "scripts/growth/lib/quality.test.ts",
+    "scripts/growth/lib/coldSendGuard.test.ts",
     "scripts/testManifestConsistency.test.ts",
     "lib/paperIntelligence/validation.test.ts",
     "lib/paperIntelligence/validation.adversarial.test.ts",
