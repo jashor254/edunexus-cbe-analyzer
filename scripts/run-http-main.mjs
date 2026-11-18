@@ -22,9 +22,12 @@ if (!process.env.TEST_BASE_URL) {
 const manifest = JSON.parse(readFileSync(join(__dirname, 'http-main-tests.json'), 'utf8'))
 console.log(`HTTP_MAIN: running ${manifest.files.length} files`)
 
+// Serial on purpose: files that need a platform administrator (see
+// lib/testing/platformAdminFixture.ts) all authenticate as the ONE account whose email the
+// server is configured with (GROWTH_FOUNDER_EMAIL), so they cannot run in parallel.
 const result = spawnSync(
   tsx,
-  ['--experimental-test-module-mocks', '--test', ...manifest.files],
+  ['--experimental-test-module-mocks', '--test', '--test-concurrency=1', ...manifest.files],
   { stdio: 'inherit', cwd: repoRoot, env: process.env }
 )
 

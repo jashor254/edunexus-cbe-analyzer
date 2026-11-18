@@ -12,7 +12,7 @@
 //
 // Requires an isolated stack and a server started against it:
 //   GROWTH_FOUNDER_EMAIL=<synthetic> next dev ...   and   TEST_PLATFORM_ADMIN_EMAIL=<same>
-// Run: TEST_BASE_URL=http://localhost:3300 TEST_PLATFORM_ADMIN_EMAIL=... npx tsx --test \
+// Run: TEST_BASE_URL=http://localhost:3100 TEST_PLATFORM_ADMIN_EMAIL=... npx tsx --test \
 //        --test-concurrency=1 lib/testing/platformAdminRoutes.http.integration.test.ts
 
 import { test, before, after } from 'node:test'
@@ -23,7 +23,7 @@ import { signInForHttpTest } from '@/lib/testing/httpAuthTestHelper'
 import { platformAdminTestEmail } from '@/lib/testing/platformAdminFixture'
 import { deleteAuthUserOrThrow } from '@/lib/testing/deleteAuthUserOrThrow'
 
-const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:3300'
+const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:3100'
 const MARKER = 'synthetic-fi03-routes'
 const db = createTestServiceClient()
 const password = 'Synthetic-Test-Password-1!'

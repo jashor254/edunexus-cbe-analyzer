@@ -650,6 +650,7 @@ jobs:
             NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$LOCAL_ANON_KEY" \
             SUPABASE_SECRET_KEY="$LOCAL_SERVICE_ROLE_KEY" \
             RESEND_API_KEY="ci-unset" \
+            GROWTH_FOUNDER_EMAIL="ci-platform-admin@example.com" \
             npx next start -p 3100 &
           for i in $(seq 1 20); do
             curl -sf http://localhost:3100/api/health && break
@@ -688,6 +689,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ env.LOCAL_ANON_KEY }}
           SUPABASE_SECRET_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
           TEST_BASE_URL: 'http://localhost:3100'
+          TEST_PLATFORM_ADMIN_EMAIL: 'ci-platform-admin@example.com'
         run: node scripts/run-http-main.mjs
 
       - name: Cleanup gate — dry-run reaper, expect 0 residual
