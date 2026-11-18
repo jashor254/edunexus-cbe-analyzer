@@ -5,7 +5,7 @@
 // live". Before this existed, reaching that page required knowing a UUID.
 //
 // SECURITY BOUNDARY
-// requireGrowthUser(), same as every other platform-admin surface. A school
+// requirePlatformAdmin(), same as every other platform-admin surface. A school
 // admin is authoritative INSIDE their own school and has no business reading a
 // platform-wide list of institutions — that distinction is the whole point of
 // keeping the two authorities separate.
@@ -20,7 +20,7 @@
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
-import { requireGrowthUser } from '@/lib/growth/auth'
+import { requirePlatformAdmin } from '@/lib/growth/auth'
 import { listSchoolsForPlatformAdmin, type SchoolDirectoryEntry } from '@/lib/core/schoolDirectory'
 import { UnauthorizedError, ForbiddenError } from '@/lib/core/errors'
 
@@ -34,7 +34,7 @@ type SchoolsResponse = { schools: SchoolDirectoryEntry[] }
 export async function GET(request: Request) {
   try {
     const supabase = await createClient()
-    await requireGrowthUser(supabase)
+    await requirePlatformAdmin(supabase)
 
     const url = new URL(request.url)
     const parsed = QuerySchema.safeParse({

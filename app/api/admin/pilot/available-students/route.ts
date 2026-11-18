@@ -8,7 +8,7 @@
 // roster — a different question, so a different path.
 //
 // SECURITY BOUNDARY
-// requireGrowthUser() is the authorization boundary, not the page. The client
+// requirePlatformAdmin() is the authorization boundary, not the page. The client
 // still checks NEXT_PUBLIC_ADMIN_EMAILS to decide what to render, but that is a
 // public env var compiled into the bundle and is UX only — anyone can edit it
 // in their own browser. This route re-derives identity server-side from the
@@ -22,7 +22,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response'
-import { requireGrowthUser } from '@/lib/growth/auth'
+import { requirePlatformAdmin } from '@/lib/growth/auth'
 import { listSelectableStudents, type SelectableStudent } from '@/lib/pilot/students'
 import { UnauthorizedError, ForbiddenError } from '@/lib/core/errors'
 
@@ -31,7 +31,7 @@ type AvailableStudentsResponse = { students: SelectableStudent[] }
 export async function GET() {
   try {
     const supabase = await createClient()
-    await requireGrowthUser(supabase)
+    await requirePlatformAdmin(supabase)
 
     const students = await listSelectableStudents()
 

@@ -10,9 +10,9 @@
 // be covered." School payment will later become the business reason to call
 // this — this phase builds the destination first.
 //
-// Authorization is requireGrowthUser (founder-only, fail-closed, hardened in
+// Authorization is requirePlatformAdmin (founder-only, fail-closed, hardened in
 // Sprint PR-2) — not ADMIN_CONFIG's hardcoded email, because that constant
-// bakes an address into the bundle while requireGrowthUser reads a server-only
+// bakes an address into the bundle while requirePlatformAdmin reads a server-only
 // env var and already guards every other founder surface. The database
 // enforces the same boundary independently via trg_guard_school_entitlement,
 // so a bug in this route cannot become a self-grant path.
@@ -20,7 +20,7 @@
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
-import { requireGrowthUser } from '@/lib/growth/auth'
+import { requirePlatformAdmin } from '@/lib/growth/auth'
 import { setSchoolEntitlement } from '@/lib/core/schoolEntitlement'
 import { UnauthorizedError, ForbiddenError } from '@/lib/core/errors'
 
@@ -45,7 +45,7 @@ export async function POST(
 ) {
   try {
     const supabase = await createClient()
-    const growthUser = await requireGrowthUser(supabase)
+    const growthUser = await requirePlatformAdmin(supabase)
 
     const { schoolId } = await params
     if (!z.string().uuid().safeParse(schoolId).success) {

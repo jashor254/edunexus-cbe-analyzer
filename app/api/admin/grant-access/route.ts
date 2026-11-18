@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiForbidden, apiUnauthorized, apiBadRequest } from '@/lib/api/response'
-import { requireGrowthUser } from '@/lib/growth/auth'
+import { requirePlatformAdmin } from '@/lib/growth/auth'
 import { UnauthorizedError, ForbiddenError } from '@/lib/core/errors'
 
 const GrantAccessSchema = z.object({
@@ -15,7 +15,7 @@ const GrantAccessSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    await requireGrowthUser(supabase)
+    await requirePlatformAdmin(supabase)
 
     const parsed = GrantAccessSchema.safeParse(await request.json())
     if (!parsed.success) return apiBadRequest(parsed.error.issues[0]?.message ?? 'Invalid input')

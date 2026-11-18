@@ -132,7 +132,7 @@ export async function resolveSchoolCoverage(
  * here. Payment infrastructure will later become a *reason to call this*; it
  * will not replace it.
  *
- * Authorization is the caller's job (the route gates on requireGrowthUser) and
+ * Authorization is the caller's job (the route gates on requirePlatformAdmin) and
  * the database's (trg_guard_school_entitlement rejects this write outright for
  * the `authenticated` and `anon` roles). Both layers, because UI gating alone
  * would leave the "schools: own update" RLS policy — created_by = auth.uid(),

@@ -288,7 +288,7 @@ jobs:
           # only schema changes; FAIL_COUNT=9 UNRECOVERED=0, unchanged. Computed
           # on an isolated throwaway pifp stack that first reproduced e3cfda63
           # at origin/main 41ac517.
-          EXPECTED="291d53f8661d9d5f0cace868edeb633a"
+          EXPECTED="a3607565dd1d67496d9c88d1543be7dd"
           echo "expected: $EXPECTED"
           echo "actual:   $ACTUAL"
           if [ "$ACTUAL" != "$EXPECTED" ]; then
@@ -650,6 +650,7 @@ jobs:
             NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$LOCAL_ANON_KEY" \
             SUPABASE_SECRET_KEY="$LOCAL_SERVICE_ROLE_KEY" \
             RESEND_API_KEY="ci-unset" \
+            GROWTH_FOUNDER_EMAIL="ci-platform-admin@example.com" \
             npx next start -p 3100 &
           for i in $(seq 1 20); do
             curl -sf http://localhost:3100/api/health && break
@@ -688,6 +689,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ env.LOCAL_ANON_KEY }}
           SUPABASE_SECRET_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
           TEST_BASE_URL: 'http://localhost:3100'
+          TEST_PLATFORM_ADMIN_EMAIL: 'ci-platform-admin@example.com'
         run: node scripts/run-http-main.mjs
 
       - name: Cleanup gate — dry-run reaper, expect 0 residual

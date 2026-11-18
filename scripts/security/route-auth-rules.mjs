@@ -19,6 +19,7 @@ export const DIRECT_GUARD_CALLS = [
   'requireAuth',
   'requireClassTeacher',
   'requireGrowthUser',
+  'requirePlatformAdmin', // lib/growth/auth.ts — requireAuthentication (→ auth.getUser) first, then founder identity + Growth membership
   'requireSchoolAdmin',
   'requireSchoolMembership',
   'requireSchoolStaff',

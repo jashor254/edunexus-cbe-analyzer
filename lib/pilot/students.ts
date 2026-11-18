@@ -9,7 +9,7 @@
 // `teachers.role = 'admin'`, a value any authenticated user could write to
 // their own row. Migration 20260812190000 removed that policy, and with it the
 // browser's cross-tenant reach. This module is the legitimate replacement: the
-// same list, resolved server-side behind requireGrowthUser(), so platform-wide
+// same list, resolved server-side behind requirePlatformAdmin(), so platform-wide
 // read authority lives on the server and never in a browser session.
 //
 // This is a READ. It performs no mutation, and deliberately exposes no field

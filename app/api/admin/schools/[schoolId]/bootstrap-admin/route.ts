@@ -4,7 +4,7 @@
 // canonical school that has none, so the school can then run its own staffing.
 //
 // SECURITY BOUNDARY
-// requireGrowthUser() — the same platform-admin gate as the entitlement and
+// requirePlatformAdmin() — the same platform-admin gate as the entitlement and
 // payment routes beside it. It deliberately does NOT use requireSchoolAdmin():
 // the absence of a school administrator is the exact condition this route
 // exists to resolve, so demanding one would be circular. That makes the
@@ -28,7 +28,7 @@
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
-import { requireGrowthUser } from '@/lib/growth/auth'
+import { requirePlatformAdmin } from '@/lib/growth/auth'
 import {
   bootstrapSchoolAdministrator,
   listActiveAdministrators,
@@ -60,7 +60,7 @@ export async function GET(
 ) {
   try {
     const supabase = await createClient()
-    await requireGrowthUser(supabase)
+    await requirePlatformAdmin(supabase)
 
     const { schoolId } = await params
     if (!z.string().uuid().safeParse(schoolId).success) return apiBadRequest('Invalid school id')
@@ -82,7 +82,7 @@ export async function POST(
 ) {
   try {
     const supabase = await createClient()
-    const growthUser = await requireGrowthUser(supabase)
+    const growthUser = await requirePlatformAdmin(supabase)
 
     const { schoolId } = await params
     if (!z.string().uuid().safeParse(schoolId).success) return apiBadRequest('Invalid school id')

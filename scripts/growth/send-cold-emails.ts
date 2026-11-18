@@ -18,6 +18,7 @@ import { Resend } from 'resend'
 import { parseCsvRecords, writeCsvTable } from './lib/csv'
 import { readFile, writeFile } from 'node:fs/promises'
 import { resolveOutreachReplyTo } from '../../lib/growth/messaging/replyTo'
+import { coldSendBlockedReason } from './lib/coldSendGuard'
 
 const API_KEY = process.env.RESEND_API_KEY
 const FROM = process.env.RESEND_FROM_EMAIL ? `EduNexus <${process.env.RESEND_FROM_EMAIL}>` : 'EduNexus <hello@edunexus.co.ke>'
@@ -82,6 +83,12 @@ async function appendSentLog(entries: string[][]) {
 
 async function main() {
   const { list, send, limit } = parseArgs()
+  // Refuse real sends by default (see lib/coldSendGuard.ts) — before any key, file or network access.
+  const blocked = coldSendBlockedReason({ send })
+  if (blocked) {
+    console.error(blocked)
+    process.exit(1)
+  }
   if (!list) {
     console.error('Usage: --list=<path-to-email-list-csv> [--send] [--limit=N]')
     process.exit(1)

@@ -9,7 +9,7 @@
 // this records that fact and activates entitlement as a consequence.
 //
 // All data comes from /api/admin/schools/[schoolId]/payments, which is gated by
-// requireGrowthUser(). The browser never queries the database directly — same
+// requirePlatformAdmin(). The browser never queries the database directly — same
 // model as the pilot admin repair. There is deliberately no client-side admin
 // check here: an unauthorised caller simply gets 403 from the API and sees the
 // error state, so the server remains the only authority rather than one of two.
