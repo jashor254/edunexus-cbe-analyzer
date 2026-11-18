@@ -134,9 +134,9 @@ test('Guard P (provenance) — the human stamp is called only from markCareerHum
 
 test('Guard P (provenance) — the verify route authenticates through the admin gate before verifying', () => {
   const route = read('app/api/admin/career/verify/route.ts')
-  const gateAt = route.indexOf('await requireGrowthUser(supabase)')
+  const gateAt = route.indexOf('await requirePlatformAdmin(supabase)')
   const verifyAt = route.indexOf('await markCareerHumanVerified(')
-  assert.ok(gateAt >= 0, 'verify route must use requireGrowthUser')
+  assert.ok(gateAt >= 0, 'verify route must use requirePlatformAdmin')
   assert.ok(verifyAt > gateAt, 'the gate must run before any verification')
 })
 

@@ -9,7 +9,7 @@
 // list of canonical schools anywhere, so the payment page could only be reached
 // by hand-copying an id.
 //
-// All data comes from /api/admin/schools, gated by requireGrowthUser(). The
+// All data comes from /api/admin/schools, gated by requirePlatformAdmin(). The
 // browser never queries schools directly — cross-tenant reads belong on the
 // server. There is no client-side admin check: an unauthorised caller gets 403
 // and sees the error state, keeping the server the only authority.

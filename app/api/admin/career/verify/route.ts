@@ -14,7 +14,7 @@ import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiForbidden } from '@/lib/api/response'
-import { requireGrowthUser } from '@/lib/growth/auth'
+import { requirePlatformAdmin } from '@/lib/growth/auth'
 import { markCareerHumanVerified } from '@/lib/career/knowledgeRequests'
 
 export const dynamic = 'force-dynamic'
@@ -29,7 +29,7 @@ type VerifyResponse = { slug: string; verificationSource: 'human' }
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient()
-    const reviewer = await requireGrowthUser(supabase).catch(() => null)
+    const reviewer = await requirePlatformAdmin(supabase).catch(() => null)
     if (!reviewer) return apiForbidden()
 
     const body = await req.json().catch(() => null)

@@ -2,13 +2,13 @@
 import { createClient } from '@/utils/supabase/server'
 import { createServiceClient } from '@/utils/supabase/service'
 import { apiSuccess, apiError, apiForbidden, apiUnauthorized } from '@/lib/api/response'
-import { requireGrowthUser } from '@/lib/growth/auth'
+import { requirePlatformAdmin } from '@/lib/growth/auth'
 import { UnauthorizedError, ForbiddenError } from '@/lib/core/errors'
 
 export async function GET() {
   try {
     const supabase = await createClient()
-    await requireGrowthUser(supabase)
+    await requirePlatformAdmin(supabase)
 
     const service = createServiceClient()
 

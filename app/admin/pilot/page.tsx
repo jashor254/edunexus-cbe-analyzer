@@ -98,7 +98,7 @@ export default function PilotPage() {
   // client. This used to be a direct `.from('students')` query that only
   // worked because of an RLS policy trusting a self-writable admin flag
   // (removed by migration 20260812190000). The endpoint below re-derives
-  // authorization server-side via requireGrowthUser().
+  // authorization server-side via requirePlatformAdmin().
   const fetchAllStudents = async () => {
     setAllStudentsLoading(true)
     setAddError(null)

@@ -4,7 +4,7 @@
 // find the school they just sold to, and reach its payment/entitlement page
 // without knowing a UUID.
 //
-// Cross-school reads happen HERE, server-side, behind requireGrowthUser(). They
+// Cross-school reads happen HERE, server-side, behind requirePlatformAdmin(). They
 // deliberately do not happen through RLS: the previous phases removed exactly
 // that architecture (an `Admin full access on students` policy trusting a
 // self-writable admin flag), and rebuilding a browser-reachable cross-tenant

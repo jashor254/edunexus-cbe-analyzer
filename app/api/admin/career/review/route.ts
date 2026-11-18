@@ -18,7 +18,7 @@ import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiForbidden } from '@/lib/api/response'
-import { requireGrowthUser } from '@/lib/growth/auth'
+import { requirePlatformAdmin } from '@/lib/growth/auth'
 import { repos } from '@/lib/repositories'
 import { publishReviewedCareer, rejectReviewedCareer } from '@/lib/career/knowledgeRequests'
 
@@ -33,7 +33,7 @@ const DecisionSchema = z.object({
 export async function GET() {
   try {
     const supabase = await createClient()
-    const reviewer = await requireGrowthUser(supabase).catch(() => null)
+    const reviewer = await requirePlatformAdmin(supabase).catch(() => null)
     if (!reviewer) return apiForbidden()
 
     const pending = await repos.careers.listPendingCareerReviews()
@@ -47,7 +47,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient()
-    const reviewer = await requireGrowthUser(supabase).catch(() => null)
+    const reviewer = await requirePlatformAdmin(supabase).catch(() => null)
     if (!reviewer) return apiForbidden()
 
     const body = await req.json().catch(() => null)

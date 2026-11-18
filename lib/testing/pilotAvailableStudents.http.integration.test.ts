@@ -19,6 +19,7 @@ import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { signInForHttpTest } from '@/lib/testing/httpAuthTestHelper'
+import { platformAdminTestEmail } from '@/lib/testing/platformAdminFixture'
 
 const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:3100'
 const MARKER = 'SYNTHETIC_PILOT_PICKER'
@@ -36,7 +37,7 @@ let founderCookie: string
 let founderId: string
 
 async function mkUser(label: string): Promise<{ id: string; cookie: string }> {
-  const email = `pilot-picker-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@example.com`
+  const email = label === 'founder' ? platformAdminTestEmail() : `pilot-picker-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@example.com`
   const password = `Test!${Math.random().toString(36).slice(2, 12)}`
   const { data, error } = await db.auth.admin.createUser({ email, password, email_confirm: true })
   if (error || !data?.user) throw new Error(`mkUser: ${error?.message}`)
@@ -68,8 +69,8 @@ before(async () => {
   })
 
   // An authorized platform admin: a real growth_users row is what
-  // requireGrowthUser() accepts (the other accepted path is an email matching
-  // GROWTH_FOUNDER_EMAIL, which we must not depend on in tests).
+  // requireGrowthUser() accepts AND the caller's email matching the server's
+  // GROWTH_FOUNDER_EMAIL (see platformAdminFixture.ts).
   const founder = await mkUser('founder')
   founderCookie = founder.cookie
   founderId = founder.id

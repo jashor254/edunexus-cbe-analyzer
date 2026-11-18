@@ -15,6 +15,7 @@ import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { signInForHttpTest } from '@/lib/testing/httpAuthTestHelper'
+import { platformAdminTestEmail } from '@/lib/testing/platformAdminFixture'
 
 const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:3100'
 const MARKER = 'SYNTHETIC_ROSTER'
@@ -34,7 +35,7 @@ let founderId: string
 let founderCookie: string
 
 async function mkUser(label: string) {
-  const email = `roster-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@example.com`
+  const email = label === 'founder' ? platformAdminTestEmail() : `roster-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@example.com`
   const password = `Test!${Math.random().toString(36).slice(2, 12)}`
   const { data, error } = await db.auth.admin.createUser({ email, password, email_confirm: true })
   if (error || !data?.user) throw new Error(`mkUser: ${error?.message}`)

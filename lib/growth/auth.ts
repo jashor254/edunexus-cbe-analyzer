@@ -2,6 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireAuthentication } from '@/lib/core/permissions'
 import { PermissionDeniedError } from '@/lib/core/errors'
 import { growthRepos } from '@/lib/growth/repositories'
+import { logger } from '@/lib/observability/logger'
+import { isFounderIdentity } from '@/lib/growth/founderIdentity'
 
 // Sprint PR-2 (Founder Boundary Security, Release Gate 2's one High
 // finding) — this used to self-register ANY authenticated caller
@@ -53,4 +55,42 @@ export async function requireGrowthUser(client: SupabaseClient): Promise<{ id: s
 
   const founder = await growthRepos.users.ensure(user.id, user.email ?? 'Founder')
   return { id: founder.id }
+}
+
+// Growth CRM membership is not administrative authority.
+//
+// `requireGrowthUser()` answers "is this caller a Growth CRM member" and, by
+// design, trusts an existing growth_users row (it must keep working for the
+// founder even if GROWTH_FOUNDER_EMAIL is later unset). Privileged operations
+// (the app/api/admin/* routes that grant access, confirm payments, set school
+// entitlement, create school administrators, publish career content or list
+// users) need more than membership.
+//
+// `requirePlatformAdmin()` is that stricter gate: CRM membership AND a
+// server-side founder identity check (the authenticated email must equal
+// GROWTH_FOUNDER_EMAIL, a server-only env var no client can influence). The
+// identity check cannot be satisfied by anything stored in the database, so it
+// holds independently of database grants and policies. Fails closed: with the
+// env var unset, no one is a platform admin.
+
+export async function requirePlatformAdmin(client: SupabaseClient): Promise<{ id: string }> {
+  const user = await requireAuthentication(client)
+
+  if (!isFounderIdentity(user.email, process.env.GROWTH_FOUNDER_EMAIL)) {
+    // A Growth member who is not the configured founder is an unexpected state
+    // (membership is provisioned for the founder only) — surface it for review.
+    const member = await growthRepos.users.findById(user.id)
+    if (member) {
+      logger.error(
+        'requirePlatformAdmin: denied — Growth member is not the configured founder identity',
+        { operation: 'growth.auth.requirePlatformAdmin', user_id: user.id },
+      )
+    }
+    throw new PermissionDeniedError()
+  }
+
+  // Identity is the founder; membership resolution (including first-use
+  // bootstrap for the founder only) is unchanged.
+  const member = await requireGrowthUser(client)
+  return { id: member.id }
 }

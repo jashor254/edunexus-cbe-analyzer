@@ -8,7 +8,7 @@
 // existing entitlement as a consequence. No Paystack, no Daraja, no checkout.
 //
 // SECURITY BOUNDARY
-// requireGrowthUser() — the same boundary as the entitlement route this
+// requirePlatformAdmin() — the same boundary as the entitlement route this
 // ultimately calls. A school admin cannot confirm their own school's payment; a
 // teacher cannot; a parent cannot. The database enforces the entitlement half
 // independently (trg_guard_school_entitlement), so a bug here cannot become a
@@ -23,7 +23,7 @@
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden, apiBadRequest } from '@/lib/api/response'
-import { requireGrowthUser } from '@/lib/growth/auth'
+import { requirePlatformAdmin } from '@/lib/growth/auth'
 import { recordSchoolPayment, getSchoolPaymentContext, ConflictingPaymentError } from '@/lib/core/schoolPayments'
 import { UnauthorizedError, ForbiddenError } from '@/lib/core/errors'
 import type { SchoolPayment } from '@/types/core'
@@ -62,7 +62,7 @@ export async function GET(
 ) {
   try {
     const supabase = await createClient()
-    await requireGrowthUser(supabase)
+    await requirePlatformAdmin(supabase)
 
     const schoolId = await resolveSchoolId(params)
     if (!schoolId) return apiBadRequest('Invalid school id')
@@ -86,7 +86,7 @@ export async function POST(
 ) {
   try {
     const supabase = await createClient()
-    const growthUser = await requireGrowthUser(supabase)
+    const growthUser = await requirePlatformAdmin(supabase)
 
     const schoolId = await resolveSchoolId(params)
     if (!schoolId) return apiBadRequest('Invalid school id')

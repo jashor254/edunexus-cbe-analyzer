@@ -18,6 +18,7 @@ import assert from 'node:assert/strict'
 import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
 import { createTestServiceClient as createServiceClient } from '@/utils/supabase/test-service'
 import { signInForHttpTest } from '@/lib/testing/httpAuthTestHelper'
+import { platformAdminTestEmail } from '@/lib/testing/platformAdminFixture'
 import { resolveSchoolCoverage } from '@/lib/core/schoolEntitlement'
 
 const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:3100'
@@ -43,7 +44,7 @@ let departedTeacher: string
 const url = (s: string) => `${BASE}/api/admin/schools/${s}/payments`
 
 async function mkUser(label: string) {
-  const email = `schoolpay-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@example.com`
+  const email = label === 'founder' ? platformAdminTestEmail() : `schoolpay-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@example.com`
   const password = `Test!${Math.random().toString(36).slice(2, 12)}`
   const { data, error } = await db.auth.admin.createUser({ email, password, email_confirm: true })
   if (error || !data?.user) throw new Error(`mkUser: ${error?.message}`)

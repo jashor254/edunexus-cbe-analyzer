@@ -119,7 +119,7 @@ export async function listActiveAdministrators(schoolId: string): Promise<Existi
 /**
  * Installs the first administrator of a school that has none.
  *
- * Authorization is the caller's job — the route gates on requireGrowthUser().
+ * Authorization is the caller's job — the route gates on requirePlatformAdmin().
  * Deliberately NOT requireSchoolAdmin: the absence of a school admin is the
  * condition this function exists to resolve, so requiring one would be
  * circular.
